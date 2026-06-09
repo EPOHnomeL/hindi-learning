@@ -34,6 +34,14 @@ export function createApp(deps: AppDeps) {
     return c.html(html);
   });
 
+  app.get("/api/references/:id/html", async (c) => {
+    const reference = await deps.hub.getReference(c.req.param("id"));
+    if (reference === undefined) return c.notFound();
+    const html = await deps.artifacts.get(reference.r2Key);
+    if (html === undefined) return c.notFound();
+    return c.html(html);
+  });
+
   // --- Captures (the lesson posts these) ---
   app.post("/api/responses", (c) => capture(c, async (body) => deps.capture.submitResponse(body)));
   app.post("/api/questions", (c) => capture(c, async (body) => deps.capture.askQuestion(body)));

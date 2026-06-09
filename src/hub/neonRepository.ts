@@ -86,6 +86,15 @@ export class NeonHubRepository implements HubRepository {
              content_hash = excluded.content_hash`;
   }
 
+  async getReference(id: string): Promise<ReferenceRecord | undefined> {
+    const rows = await this
+      .sql`select id, topic_id, title, r2_key, content_hash from topic_references where id = ${id}`;
+    const r = rows[0];
+    return r
+      ? { id: r.id, topicId: r.topic_id, title: r.title, r2Key: r.r2_key, contentHash: r.content_hash }
+      : undefined;
+  }
+
   async listReferences(topicId: string): Promise<ReferenceRecord[]> {
     const rows = await this
       .sql`select id, topic_id, title, r2_key, content_hash from topic_references where topic_id = ${topicId} order by id`;

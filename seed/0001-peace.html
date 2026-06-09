@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  body { font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif; color: #2a2f37; line-height: 1.7; max-width: 640px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+  .verse { font-size: 1.3rem; border-left: 3px solid #7a5cff; padding-left: 1rem; }
+  .cite { display: block; font-family: system-ui, sans-serif; font-size: 0.8rem; color: #6b7280; margin-top: 0.3rem; }
+  .dev { font-size: 1.15em; }
+  h1 { font-size: 2rem; }
+  h3 { font-family: system-ui, sans-serif; font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase; color: #6b7280; }
+  .aside { background: #fff7e6; border: 1px solid #f0e2c0; border-radius: 10px; padding: 0.8rem 1rem; font-family: system-ui, sans-serif; font-size: 0.95rem; }
+  .quiz { font-family: system-ui, sans-serif; border: 1px solid #e7e3da; border-radius: 12px; padding: 1.1rem; margin-top: 2rem; background: #fff; }
+  .quiz button { display: block; width: 100%; text-align: left; margin: 0.4rem 0; padding: 0.6rem 0.8rem; border: 1px solid #e7e3da; border-radius: 8px; background: #fff; font: inherit; cursor: pointer; }
+  .quiz button.right { border-color: #3a9d6b; background: #eaf7f0; }
+  .quiz button.wrong { border-color: #d9534f; background: #fbecec; }
+  #fb { margin-top: 0.6rem; font-size: 0.95rem; }
+</style>
+</head>
+<body>
+  <h1>शान्ति — “Peace be with you”</h1>
+  <p class="verse">“…यीशु आकर बीच में खड़ा हुआ और उनसे कहा, <strong>तुम्हें शान्ति मिले।</strong>”
+    <span class="cite">— यूहन्ना 20:19 (John 20:19)</span></p>
+  <p>The word <span class="dev">शान्ति</span> <em>(śānti)</em> means <strong>peace</strong> — wholeness and calm.
+    Say it slowly: <em>SHAAN-tee</em>.</p>
+  <h3>Break it down</h3>
+  <ul>
+    <li><span class="dev">शा</span> — <em>śā</em> (like “shah”)</li>
+    <li><span class="dev">न्ति</span> — <em>nti</em> (soft “n” into “tee”)</li>
+  </ul>
+  <p class="aside">📖 You already know this verse in English — new language, familiar ground.</p>
+
+  <div class="quiz">
+    <strong>Quick check — what does शान्ति mean?</strong>
+    <div id="opts">
+      <button data-k="a">Light</button>
+      <button data-k="b">Peace</button>
+      <button data-k="c">Bread</button>
+      <button data-k="d">Father</button>
+    </div>
+    <div id="fb"></div>
+  </div>
+
+  <script>
+    // Capture protocol (demo): post the Response to the worker. Relative URL →
+    // same origin as the reader, so it reaches /api/responses.
+    const LESSON_ID = "0001-peace";
+    const CORRECT = "b";
+    let answered = false;
+    document.querySelectorAll("#opts button").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        if (answered) return;
+        answered = true;
+        const key = btn.dataset.k;
+        const correct = key === CORRECT;
+        btn.classList.add(correct ? "right" : "wrong");
+        document.getElementById("fb").textContent = correct
+          ? "✓ Correct — शान्ति means peace."
+          : "✗ Not quite — शान्ति means peace.";
+        try {
+          await fetch("/api/responses", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ lessonId: LESSON_ID, promptId: "q1", kind: "quiz", value: key, correctness: correct }),
+          });
+        } catch (e) { /* offline demo is fine */ }
+      });
+    });
+  </script>
+</body>
+</html>
