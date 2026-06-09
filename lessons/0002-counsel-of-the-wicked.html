@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 2 · In the counsel of the wicked — postpositions & the oblique case</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#2b2622; --soft:#6b6258; --line:#e6ddd968; --paper:#fbf7f0;
+    --card:#fffdf9; --accent:#9c5b34; --accent2:#3f6f5e; --gold:#b88a2e;
+    --hi:#fbeecb; --good:#e7f3ec; --good-b:#3f8f63; --bad:#fbe9e7; --bad-b:#c0573f;
+    --book:#34506b; --book-bg:#eef3f7;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Spectral',Georgia,'Times New Roman',serif; line-height:1.62; font-size:18px;}
+  .wrap{max-width:760px; margin:0 auto; padding:54px 26px 110px}
+  .deva{font-family:'Noto Serif Devanagari','Noto Sans Devanagari',serif;}
+  header.lesson{border-bottom:1px solid #e7ddd4; padding-bottom:26px; margin-bottom:34px}
+  .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:600}
+  h1{font-size:33px; line-height:1.18; margin:.32em 0 .15em; font-weight:600; letter-spacing:-.01em}
+  .sub{color:var(--soft); font-style:italic; font-size:18px}
+  h2{font-size:13px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent2); margin:52px 0 6px; font-weight:600}
+  h2 .num{color:var(--gold); margin-right:.5em; font-style:normal}
+  .lead{font-size:20px}
+  p{margin:.7em 0}
+  .verse{background:var(--card); border:1px solid #ece2d6; border-left:4px solid var(--gold);
+    border-radius:10px; padding:22px 26px; margin:20px 0; box-shadow:0 2px 14px #b88a2e10;}
+  .verse .ref{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--soft); margin-bottom:10px}
+  .verse .hi{font-size:25px; line-height:1.95; color:#1f1b18}
+  .verse .en{color:var(--soft); font-style:italic; margin-top:12px; font-size:16.5px}
+  mark{background:var(--hi); padding:.04em .14em; border-radius:3px; box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  mark.b{background:#d9ead8}
+
+  /* handbook quote block */
+  .book{background:var(--book-bg); border:1px solid #d4e0ea; border-left:4px solid var(--book);
+    border-radius:10px; padding:18px 22px 16px; margin:20px 0}
+  .book .src{font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--book);
+    font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:8px}
+  .book .src::before{content:"📖"}
+  .book p{margin:.45em 0}
+  .book .deva{font-size:19px}
+
+  table.paradigm{border-collapse:collapse; width:100%; margin:18px 0; font-size:16.5px; background:var(--card)}
+  table.paradigm th,table.paradigm td{border:1px solid #ece2d6; padding:8px 12px; text-align:left}
+  table.paradigm th{background:#f3ebe0; font-weight:600; font-size:12.5px; letter-spacing:.04em; text-transform:uppercase; color:var(--soft)}
+  table.paradigm .d{font-family:'Noto Serif Devanagari',serif; font-size:19px}
+  table.paradigm td em{color:var(--soft)}
+  table.paradigm tr.key td{background:var(--hi)}
+
+  .build{display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin:16px 0; font-size:20px}
+  .build .chip{background:#f3ebe0; border:1px solid #e2d6c5; border-radius:8px; padding:6px 12px}
+  .build .chip.deva{font-size:23px}
+  .build .op{color:var(--gold); font-weight:600}
+  .build .res{background:var(--hi); border-color:#e9d49a}
+
+  .word{display:grid; grid-template-columns:auto 1fr; gap:4px 16px; margin:10px 0;
+        border-bottom:1px dotted #e2d6c5; padding-bottom:10px}
+  .word .w{font-family:'Noto Serif Devanagari',serif; font-size:23px; color:var(--accent)}
+  .word .g{align-self:center}
+  .word .g b{color:var(--accent2); font-weight:600}
+
+  .note{background:#f4efe6; border-radius:9px; padding:15px 19px; margin:20px 0; font-size:16.5px}
+  .note .t{font-weight:600; color:var(--accent2); font-style:normal; display:block; margin-bottom:3px}
+
+  .quiz{background:var(--card); border:1px solid #e7dccd; border-radius:12px; padding:22px 24px; margin:22px 0; box-shadow:0 2px 14px #00000008}
+  .quiz .q{font-weight:600; margin-bottom:4px}
+  .quiz .q .deva{font-weight:400}
+  .opts{display:flex; flex-direction:column; gap:9px; margin-top:14px}
+  .opt{display:block; width:100%; text-align:left; cursor:pointer; font:inherit; font-size:17px;
+       background:#fff; border:1.5px solid #e2d6c5; border-radius:9px; padding:11px 15px; transition:.13s}
+  .opt:hover{border-color:var(--gold); background:#fffdf6}
+  .opt.correct{background:var(--good); border-color:var(--good-b); color:#235138}
+  .opt.wrong{background:var(--bad); border-color:var(--bad-b); color:#7a2d1c}
+  .opt:disabled{cursor:default}
+  .fb{margin-top:13px; font-size:16px; min-height:1.2em; opacity:0; transition:.2s}
+  .fb.show{opacity:1}
+  .fb.ok{color:var(--good-b)} .fb.no{color:var(--bad-b)}
+  .fb .deva{font-size:18px}
+  .fill input{font:inherit; font-size:20px; font-family:'Noto Serif Devanagari',serif;
+    border:none; border-bottom:2px solid var(--gold); background:#fffdf6; width:150px; text-align:center; padding:2px 6px}
+  .fill input:focus{outline:none; background:var(--hi)}
+  .fill button{font:inherit; font-size:15px; margin-left:12px; background:var(--accent2); color:#fff;
+    border:none; border-radius:7px; padding:7px 16px; cursor:pointer}
+  .fill button:hover{background:#345b4d}
+
+  .cite{font-size:13.5px; color:var(--soft)}
+  .cite a{color:var(--accent)}
+  a{color:var(--accent)}
+  .park{border:1px dashed #d8c9b4; border-radius:10px; padding:16px 20px; margin:22px 0; background:#fcfaf5}
+  .park h3{margin:0 0 6px; font-size:15px; letter-spacing:.05em; color:var(--accent); text-transform:uppercase}
+  .park .hi{font-family:'Noto Serif Devanagari',serif}
+  .ask{background:linear-gradient(180deg,#3f6f5e,#365e50); color:#f4efe6; border-radius:12px; padding:22px 26px; margin:46px 0 0; font-size:16.5px}
+  .ask b{color:#fff}
+  .ask .deva{color:#ffeec6}
+  footer{margin-top:40px; border-top:1px solid #e7ddd4; padding-top:18px; font-size:13.5px; color:var(--soft)}
+  .pill{display:inline-block; background:#f3ebe0; border-radius:20px; padding:3px 12px; font-size:13px; color:var(--soft); margin-right:6px}
+  .recap{font-size:15px; color:var(--soft); background:#f4efe6; border-radius:8px; padding:10px 16px; margin:0 0 8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="lesson">
+  <div class="kicker">Lesson 2 · Postpositions &amp; the Oblique Case</div>
+  <h1>In the counsel of the wicked</h1>
+  <div class="sub">The connective tissue of Psalm 1:1 — why दुष्ट becomes दुष्टों, and how की / के / में / पर work.</div>
+  <div style="margin-top:14px">
+    <span class="pill">Vehicle: भजन संहिता 1:1</span>
+    <span class="pill">One skill: oblique case + postpositions</span>
+    <span class="pill">~12 min</span>
+  </div>
+</header>
+
+<p class="recap">Recap of Lesson 1: चलता / होता / बैठता are <b>habitual verbs</b> (stem + –ता),
+and biblical Hindi drops the है until the end of a list. Today: the phrases <i>between</i> those verbs.</p>
+
+<p class="lead">Last time you read the verbs of Psalm 1:1. But the man walks, stands and sits
+somewhere — “in the <b>counsel of the wicked</b>”, “in the <b>path of sinners</b>”. Those
+phrases are built from <b>postpositions</b>, and they force the nouns to change shape.
+That shape-change is the single most useful pattern in Hindi. Learn it today.</p>
+
+<div class="verse">
+  <div class="ref">भजन संहिता · Psalm 1:1 · BSI OV</div>
+  <div class="hi deva">क्या ही धन्य है वह पुरुष<br>
+    जो <mark>दुष्टों की युक्ति पर</mark> नहीं चलता,<br>
+    और न <mark>पापियों के मार्ग में</mark> खड़ा होता;<br>
+    और न <mark>ठट्ठा करनेवालों की मण्डली में</mark> बैठता है!</div>
+  <div class="en">How blessed is the man who does not walk <b>in the counsel of the wicked</b>,
+    nor stand <b>in the path of sinners</b>, nor sit <b>in the assembly of mockers</b>!</div>
+</div>
+
+<h2><span class="num">1</span> Postpositions: English “in” comes <em>after</em> in Hindi</h2>
+
+<div class="book">
+  <div class="src">Teach Yourself Hindi · §3.1 · printed p.40</div>
+  <p>“In English, words like ‘in’ and ‘from’ are called <i>pre</i>positions because they
+  <b>precede</b> a noun or pronoun (‘in the house’); in Hindi they <b>follow</b> a noun
+  or pronoun, so they’re called <i>post</i>positions (<span class="deva">मकान में</span>
+  <i>makān mẽ</i> ‘in the house’). There are five ‘simple’ or single-word postpositions:”</p>
+</div>
+
+<table class="paradigm">
+  <tr><th>Postposition</th><th>Meaning</th><th>Example (handbook)</th></tr>
+  <tr class="key"><td class="d">में</td><td>in</td><td class="d">घर में <em>— in the house</em></td></tr>
+  <tr class="key"><td class="d">पर</td><td>on, upon</td><td class="d">मेज़ पर <em>— on the table</em></td></tr>
+  <tr><td class="d">को</td><td>to</td><td class="d">राम को <em>— to Ram</em></td></tr>
+  <tr><td class="d">से</td><td>by, with, from</td><td class="d">बस से <em>— by bus</em></td></tr>
+  <tr><td class="d">तक</td><td>up to, as far as</td><td class="d">भारत तक <em>— as far as India</em></td></tr>
+</table>
+<p>Two of these are in our verse: <mark>पर</mark> (“upon”, rendered “in”) and <mark>में</mark> (“in”).</p>
+
+<h2><span class="num">2</span> The oblique case: nouns change before a postposition</h2>
+
+<div class="book">
+  <div class="src">Teach Yourself Hindi · §3.2 · printed pp.41–42</div>
+  <p>“Hindi has two main cases. … all nouns were in the <i>direct</i> case, which is
+  obligatory for verb subjects. But when a noun is followed by a postposition, it must
+  <b>transform into a different case, known as the <i>oblique</i> case.</b>”</p>
+  <p>“Masculine ‘type 1’ nouns like <span class="deva">कमरा</span> <i>kamrā</i> ‘room’
+  change their final <i>-ā</i> to <i>-e</i> in the oblique singular
+  (<span class="deva">कमरे</span> <i>kamre</i>):”</p>
+  <p style="margin-left:14px"><span class="deva">कमरे में सामान है।</span> — “There is furniture in the room.”</p>
+  <p>“Nouns of <b>all</b> classes change in the oblique <b>plural</b>, which ends in
+  <b><span class="deva">-ओं</span></b> (<span class="deva">कमरों में</span>
+  <i>kamrõ mẽ</i> ‘in the rooms’).”</p>
+</div>
+
+<p>That last line is the key to our verse. Watch what happens to “wicked” when a
+postposition lands behind it:</p>
+
+<div class="build">
+  <span class="chip deva">दुष्ट</span>
+  <span style="font-size:15px;color:var(--soft)">(wicked — direct)</span>
+  <span class="op">+ की (postposition) →</span>
+  <span class="chip deva res">दुष्टों की</span>
+  <span style="font-size:15px;color:var(--soft);font-style:italic">“of the wicked (ones)”</span>
+</div>
+<p>The <span class="deva">-ओं</span> ending is a flashing signal: <b>“I am a plural noun,
+and a postposition is right behind me.”</b> Once you see it, you know to look for the
+postposition that triggered it.</p>
+
+<div class="note">
+  <span class="t">The three –ओं words in Psalm 1:1</span>
+  <span class="deva">दुष्टों</span> (the wicked), <span class="deva">पापियों</span> (sinners),
+  <span class="deva">करनेवालों</span> (doers / “those who do”) — all oblique plurals,
+  each pulled into that shape by the <span class="deva">की / के</span> sitting behind it.
+</div>
+
+<h2><span class="num">3</span> की / के — the postposition meaning “of”</h2>
+<p>The little word linking the two nouns is <span class="deva">का</span> (“of / ’s”). Like
+every postposition it forces the noun <em>before</em> it into the oblique — and it also
+changes its own ending to agree with the noun <em>after</em> it:</p>
+
+<table class="paradigm">
+  <tr><th>Form</th><th>Agrees with</th><th>In the verse</th></tr>
+  <tr><td class="d">का</td><td>masculine singular (direct)</td><td>—</td></tr>
+  <tr><td class="d">के</td><td>masculine, oblique / plural</td><td class="d">पापियों <mark class="b">के</mark> मार्ग में <em>— in the path…</em></td></tr>
+  <tr><td class="d">की</td><td>feminine</td><td class="d">दुष्टों <mark class="b">की</mark> युक्ति <em>— …counsel of…</em></td></tr>
+</table>
+<p>So <span class="deva">की</span> appears because <span class="deva">युक्ति</span>
+(counsel) and <span class="deva">मण्डली</span> (assembly) are <b>feminine</b>; <span class="deva">के</span>
+appears because <span class="deva">मार्ग</span> (path) is <b>masculine</b> and itself sits oblique before में.</p>
+<p class="cite">Genitive का/के/की behaves as a postposition (Teach Yourself Hindi, §3.1–3.2);
+its agreement with the following noun is developed further in the adjective sections, §5.3 (pp.44–45).</p>
+
+<h2><span class="num">4</span> Full parse — your win</h2>
+<p>Put it together and a phrase that was a wall is now transparent:</p>
+
+<div class="verse" style="border-left-color:var(--accent2)">
+  <div class="hi deva" style="font-size:23px">पापियों<span style="color:var(--accent)">¹</span> के<span style="color:var(--accent)">²</span> मार्ग<span style="color:var(--accent)">³</span> में<span style="color:var(--accent)">⁴</span></div>
+  <div class="en" style="margin-top:8px">“in the path of sinners”</div>
+</div>
+<div class="word"><span class="w deva">पापियों ¹</span><span class="g"><b class="deva">पापी</b> “sinner” → oblique <b>plural</b> (–ओं), because a postposition follows.</span></div>
+<div class="word"><span class="w deva">के ²</span><span class="g">“of” — the masculine-oblique form of <b class="deva">का</b>, agreeing with मार्ग.</span></div>
+<div class="word"><span class="w deva">मार्ग ³</span><span class="g">“path / way” — masculine noun, sitting oblique before में.</span></div>
+<div class="word"><span class="w deva">में ⁴</span><span class="g">“in” — the simple postposition that triggered the whole oblique chain.</span></div>
+
+<h2><span class="num">5</span> Check yourself</h2>
+<p style="color:var(--soft);font-style:italic;margin-top:0">Immediate feedback — click an answer.</p>
+
+<div class="quiz" data-correct="b">
+  <div class="q">1. In Hindi, “in the house” is <span class="deva">घर में</span>. Why is में written <em>after</em> घर?</div>
+  <div class="opts">
+    <button class="opt" data-k="a">It’s a spelling rule for the letter घ</button>
+    <button class="opt" data-k="b">Hindi uses <i>post</i>positions — they follow the noun, unlike English prepositions</button>
+    <button class="opt" data-k="c">में is a verb and verbs go last</button>
+  </div>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="q">2. You see the word <span class="deva">पापियों</span>. The <span class="deva">-ओं</span> ending tells you it is…</div>
+  <div class="opts">
+    <button class="opt" data-k="a">a verb in the past tense</button>
+    <button class="opt" data-k="b">a singular noun in the direct case</button>
+    <button class="opt" data-k="c">a plural noun in the oblique — so a postposition is coming right after it</button>
+  </div>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="q">3. <span class="deva">दुष्टों की युक्ति</span> uses <span class="deva">की</span> (not <span class="deva">का</span> / <span class="deva">के</span>). What does that tell you about <span class="deva">युक्ति</span> (“counsel”)?</div>
+  <div class="opts">
+    <button class="opt" data-k="a">It is plural</button>
+    <button class="opt" data-k="b">It is feminine (की is the feminine form of “of”)</button>
+    <button class="opt" data-k="c">It is in the past tense</button>
+  </div>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz fill" data-answer="कमरों" data-alt="कमरों में">
+  <div class="q">4. The handbook gives <span class="deva">कमरा</span> “room”. Write the <b>oblique plural</b> (“in the rooms” = ___ में):</div>
+  <div style="margin-top:14px">
+    <input type="text" class="deva" autocomplete="off" spellcheck="false" placeholder="…">
+    <button>Check</button>
+  </div>
+  <div class="fb"></div>
+</div>
+
+<div class="park">
+  <h3>Parked for Lesson 3</h3>
+  <p style="margin:.3em 0">Two phrases remain before you own all of v1: <span class="hi">क्या ही धन्य है</span>
+  (“how blessed is…”, the exclamation frame) and the relative pronoun <span class="hi">जो</span>
+  (“who”) that hangs the whole description on <span class="hi">वह पुरुष</span> (“that man”).
+  After that, you read Psalm 1:1 end to end with nothing parked.</p>
+</div>
+
+<div class="ask">
+  <b>I’m your teacher — ask me anything.</b> Want the other three simple postpositions
+  drilled? Curious why <span class="deva">करनेवालों</span> (“doers / those who do”) also
+  takes –ओं? Want me to parse <span class="deva">ठट्ठा करनेवालों की मण्डली में</span> the same
+  way? Just ask. Next: <span class="deva">क्या ही धन्य है … जो …</span> — and you’ll have the whole verse.
+</div>
+
+<footer>
+  Sources — Verse: BSI OV / Hindi Holy Bible,
+  <a href="https://www.bible.com/bible/819/PSA.1.HHBD">Psalm 1 (bible.com 819)</a>.
+  Grammar quoted from Snell &amp; Weightman, <i>Teach Yourself Hindi</i>, §3.1–3.2, pp.&nbsp;40–43.
+  · See <span class="deva">GLOSSARY.md</span> for terms.
+</footer>
+
+</div>
+
+<script>
+document.querySelectorAll('.quiz[data-correct]').forEach(function(q){
+  var correct=q.getAttribute('data-correct'); var fb=q.querySelector('.fb');
+  q.querySelectorAll('.opt').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      if(q.dataset.done) return; q.dataset.done='1';
+      var k=btn.getAttribute('data-k');
+      q.querySelectorAll('.opt').forEach(function(b){
+        b.disabled=true;
+        if(b.getAttribute('data-k')===correct) b.classList.add('correct');
+      });
+      if(k===correct){ fb.textContent='✓ Right.'; fb.className='fb show ok'; }
+      else{ btn.classList.add('wrong');
+        fb.textContent='Not quite — the highlighted answer is correct. Re-read the section above, then move on.';
+        fb.className='fb show no'; }
+    });
+  });
+});
+document.querySelectorAll('.quiz.fill').forEach(function(q){
+  var ans=q.getAttribute('data-answer'), alt=q.getAttribute('data-alt');
+  var input=q.querySelector('input'), btn=q.querySelector('button'), fb=q.querySelector('.fb');
+  function norm(s){return (s||'').replace(/\s+/g,' ').trim();}
+  function check(){
+    var v=norm(input.value);
+    if(v===ans||v===alt){ fb.innerHTML='✓ Exactly — <span class="deva">कमरों में</span> “in the rooms”. The plural always ends in –ओं before a postposition.';
+      fb.className='fb show ok'; input.style.borderColor='var(--good-b)'; }
+    else if(v===''){ fb.textContent='Type the form in Devanagari, then press Check.'; fb.className='fb show no'; }
+    else{ fb.innerHTML='Not yet. All plurals go to –ओं in the oblique: कमरा → <span class="deva">कमरों</span>. Try again.';
+      fb.className='fb show no'; }
+  }
+  btn.addEventListener('click',check);
+  input.addEventListener('keydown',function(e){if(e.key==='Enter')check();});
+});
+</script>
+</body>
+</html>
