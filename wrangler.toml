@@ -1,0 +1,17 @@
+name = "hindi-learning"
+main = "src/worker/index.ts"
+compatibility_date = "2025-06-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Frontend assets (the Vite-built reader) get wired here later via the
+# Cloudflare Vite plugin. For now this is an API-only Worker.
+
+# R2 — the Artifact store (Lesson/Reference HTML blobs). Uncomment once the
+# private bucket exists in your Cloudflare account:
+# [[r2_buckets]]
+# binding = "ARTIFACTS"
+# bucket_name = "served-teach-artifacts"
+
+# Secrets (DATABASE_URL, STACK_SECRET_SERVER_KEY, …) are NOT set here.
+# Local dev: put them in .dev.vars (gitignored).
+# Production: `wrangler secret put DATABASE_URL`.

@@ -8,7 +8,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "prototype": "vite prototype",
-    "migrate": "node --experimental-strip-types scripts/migrate.ts"
+    "migrate": "node --experimental-strip-types scripts/migrate.ts",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
     "@types/node": "^25.9.2",
@@ -20,9 +22,11 @@
     "react-dom": "^18.3.1",
     "typescript": "^5.6.3",
     "vite": "^5.4.21",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "wrangler": "^4.99.0"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.1.0"
+    "@neondatabase/serverless": "^1.1.0",
+    "hono": "^4.12.25"
   }
 }
