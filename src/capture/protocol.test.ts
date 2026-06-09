@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceProgress, parseQuestion, parseResponse } from "./protocol.js";
+import { advanceProgress, parseProgress, parseQuestion, parseResponse } from "./protocol.js";
 
 describe("parseResponse", () => {
   it("parses a valid quiz Response tied to a prompt within a Lesson", () => {
@@ -76,6 +76,23 @@ describe("parseQuestion", () => {
 
   it("rejects a Question with no Lesson", () => {
     expect(() => parseQuestion({ text: "A real question" })).toThrow(/lesson/i);
+  });
+});
+
+describe("parseProgress", () => {
+  it("parses a valid Progress payload", () => {
+    expect(parseProgress({ lessonId: "0001-greetings", state: "opened" })).toEqual({
+      lessonId: "0001-greetings",
+      state: "opened",
+    });
+  });
+
+  it("rejects an unknown Progress state", () => {
+    expect(() => parseProgress({ lessonId: "0001-greetings", state: "skimmed" })).toThrow(/state/i);
+  });
+
+  it("rejects Progress with no Lesson", () => {
+    expect(() => parseProgress({ state: "opened" })).toThrow(/lesson/i);
   });
 });
 

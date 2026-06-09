@@ -11,6 +11,21 @@ export function advanceProgress(current: ProgressState, incoming: ProgressState)
   return PROGRESS_RANK[incoming] > PROGRESS_RANK[current] ? incoming : current;
 }
 
+export interface ProgressPayload {
+  lessonId: string;
+  state: ProgressState;
+}
+
+export function parseProgress(raw: unknown): ProgressPayload {
+  const r = asObject(raw, "A Progress update");
+  const lessonId = requireString(r, "lessonId", "A Progress update");
+  if (!(typeof r.state === "string" && r.state in PROGRESS_RANK)) {
+    const known = Object.keys(PROGRESS_RANK).join(", ");
+    throw new Error(`A Progress update requires a known state (one of: ${known})`);
+  }
+  return { lessonId, state: r.state as ProgressState };
+}
+
 export type ResponseKind = "quiz" | "free_text";
 
 export interface ResponsePayload {
