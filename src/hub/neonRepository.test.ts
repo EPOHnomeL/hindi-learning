@@ -23,8 +23,9 @@ if (!url) {
       "utf8",
     );
     const statements = ddl
+      .replace(/--.*$/gm, "") // strip line comments first (they may contain ';')
       .split(";")
-      .map((s) => s.replace(/--.*$/gm, "").trim())
+      .map((s) => s.trim())
       .filter((s) => s.length > 0);
     for (const statement of statements) {
       await sql.query(statement);

@@ -26,8 +26,9 @@ const sql = neon(url);
 for (const file of files) {
   const ddl = readFileSync(dir + file, "utf8");
   const statements = ddl
+    .replace(/--.*$/gm, "") // strip line comments first (they may contain ';')
     .split(";")
-    .map((s) => s.replace(/--.*$/gm, "").trim())
+    .map((s) => s.trim())
     .filter((s) => s.length > 0);
   for (const statement of statements) {
     await sql.query(statement);
