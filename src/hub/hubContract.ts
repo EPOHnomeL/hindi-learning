@@ -35,6 +35,13 @@ export function runHubContract(label: string, makeHub: () => Promise<HubReposito
         expect(lessons.map((l) => l.id)).toEqual(["l1", "l2"]);
       });
 
+      it("fetches a single Lesson by id (and returns undefined when unknown)", async () => {
+        await hub.insertLesson({ id: "l1", topicId: "t1", order: 1, title: "Greetings", r2Key: "k1" });
+
+        expect((await hub.getLesson("l1"))?.title).toBe("Greetings");
+        expect(await hub.getLesson("missing")).toBeUndefined();
+      });
+
       it("excludes a superseded Lesson from the active list but keeps it retrievable", async () => {
         await hub.insertLesson({ id: "l1", topicId: "t1", order: 1, title: "Greetings", r2Key: "k1" });
         await hub.insertLesson({ id: "l2", topicId: "t1", order: 2, title: "Greetings v2", r2Key: "k2" });

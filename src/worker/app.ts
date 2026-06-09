@@ -1,9 +1,11 @@
 import { Hono, type Context } from "hono";
+import type { ArtifactStore } from "../hub/artifactStore.js";
 import type { CaptureService } from "../capture/service.js";
 import type { HubRepository } from "../hub/repository.js";
 
 export interface AppDeps {
   hub: HubRepository;
+  artifacts: ArtifactStore;
   capture: CaptureService;
   /** Resolves the authenticated user (Neon Auth later; a dev stub for now). */
   currentUserId: (c: Context) => string;
@@ -22,6 +24,15 @@ export function createApp(deps: AppDeps) {
   app.get("/api/topics/:id/lessons", async (c) => c.json(await deps.hub.listActiveLessons(c.req.param("id"))));
   app.get("/api/topics/:id/references", async (c) => c.json(await deps.hub.listReferences(c.req.param("id"))));
   app.get("/api/topics/:id/questions", async (c) => c.json(await deps.hub.listOpenQuestions(c.req.param("id"))));
+
+  // The rendered Lesson HTML blob, streamed from the Artifact store (R2).
+  app.get("/api/lessons/:id/html", async (c) => {
+    const lesson = await deps.hub.getLesson(c.req.param("id"));
+    if (lesson === undefined) return c.notFound();
+    const html = await deps.artifacts.get(lesson.r2Key);
+    if (html === undefined) return c.notFound();
+    return c.html(html);
+  });
 
   // --- Captures (the lesson posts these) ---
   app.post("/api/responses", (c) => capture(c, async (body) => deps.capture.submitResponse(body)));

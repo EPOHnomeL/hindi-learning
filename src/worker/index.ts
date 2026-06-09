@@ -1,10 +1,12 @@
 import { neon } from "@neondatabase/serverless";
 import { CaptureService } from "../capture/service.js";
+import { R2ArtifactStore, type R2BucketLike } from "../hub/artifactStore.js";
 import { NeonHubRepository } from "../hub/neonRepository.js";
 import { createApp } from "./app.js";
 
 export interface Env {
   DATABASE_URL: string;
+  ARTIFACTS: R2BucketLike;
 }
 
 // Worker entry. Builds the real dependencies from env (Neon Hub) and serves the
@@ -13,9 +15,11 @@ export interface Env {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const hub = new NeonHubRepository(neon(env.DATABASE_URL));
+    const artifacts = new R2ArtifactStore(env.ARTIFACTS);
     const capture = new CaptureService(hub, () => crypto.randomUUID());
     const app = createApp({
       hub,
+      artifacts,
       capture,
       currentUserId: () => "dev-user", // TODO(neon-auth): resolve from session
     });

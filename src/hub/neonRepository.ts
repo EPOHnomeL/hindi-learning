@@ -48,6 +48,12 @@ export class NeonHubRepository implements HubRepository {
            values (${lesson.id}, ${lesson.topicId}, ${lesson.order}, ${lesson.title}, ${lesson.r2Key}, ${lesson.supersededBy ?? null})`;
   }
 
+  async getLesson(id: string): Promise<LessonRecord | undefined> {
+    const rows = await this
+      .sql`select id, topic_id, seq, title, r2_key, superseded_by from lessons where id = ${id}`;
+    return rows[0] ? toLesson(rows[0]) : undefined;
+  }
+
   async listLessons(topicId: string): Promise<LessonRecord[]> {
     const rows = await this
       .sql`select id, topic_id, seq, title, r2_key, superseded_by from lessons where topic_id = ${topicId} order by seq`;

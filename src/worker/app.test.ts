@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { CaptureService } from "../capture/service.js";
+import { InMemoryArtifactStore } from "../hub/artifactStore.js";
 import { InMemoryHubRepository } from "../hub/repository.js";
 import { createApp } from "./app.js";
 
 function setup() {
   const hub = new InMemoryHubRepository();
+  const artifacts = new InMemoryArtifactStore();
   let n = 0;
   const capture = new CaptureService(hub, () => `id-${++n}`);
-  const app = createApp({ hub, capture, currentUserId: () => "me" });
-  return { hub, app };
+  const app = createApp({ hub, artifacts, capture, currentUserId: () => "me" });
+  return { hub, artifacts, app };
 }
 
 const json = (body: unknown) => ({
@@ -55,6 +57,23 @@ describe("worker API", () => {
 
     expect(res.status).toBe(201);
     expect(await hub.listOpenQuestions("t1")).toHaveLength(1);
+  });
+
+  it("GET /api/lessons/:id/html serves the Lesson's blob from the Artifact store", async () => {
+    const { hub, artifacts, app } = setup();
+    await hub.insertLesson({ id: "l1", topicId: "t1", order: 1, title: "L", r2Key: "lessons/l1.html" });
+    await artifacts.put("lessons/l1.html", "<h1>शान्ति</h1>");
+
+    const res = await app.request("/api/lessons/l1/html");
+
+    expect(res.status).toBe(200);
+    expect(await res.text()).toContain("शान्ति");
+  });
+
+  it("GET /api/lessons/:id/html is 404 for an unknown Lesson", async () => {
+    const { app } = setup();
+    const res = await app.request("/api/lessons/nope/html");
+    expect(res.status).toBe(404);
   });
 
   it("POST /api/progress records advance-only Progress for the user", async () => {
