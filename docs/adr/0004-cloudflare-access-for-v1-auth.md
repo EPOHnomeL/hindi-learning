@@ -1,5 +1,7 @@
 # Cloudflare Access for v1 authentication
 
+> Status: superseded by ADR-0006 (Neon Auth). Kept for the reasoning trail.
+
 v1 is a single-learner app deployed on Cloudflare, so we gate the whole app with **Cloudflare Access** (identity-based, "only this person gets in") rather than writing in-app auth. This means zero auth code, no sessions table, no password or magic-link handling for v1. The schema still scopes every row by `user_id` so that moving to in-app accounts later is additive, not a migration.
 
 ## Considered Options
