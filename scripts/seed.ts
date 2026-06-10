@@ -21,14 +21,16 @@ await sql`insert into topics (id, user_id, title, mission)
           'Read the Gospels in Hindi well enough to follow a sermon, grounding every lesson in verses I already know in English.')`;
 
 await sql`insert into lessons (id, topic_id, seq, title, r2_key)
-  values ('0001-peace', 'hindi', 1, ${"शान्ति — “Peace be with you”"}, 'lessons/0001-peace.html')`;
+  values ('0001-blessed-is-the-man', 'hindi', 1, ${"Blessed is the man — Psalm 1:1 & the habitual verb"}, 'lessons/0001-blessed-is-the-man.html')`;
 await sql`insert into lessons (id, topic_id, seq, title, r2_key)
-  values ('0002-light', 'hindi', 2, ${"ज्योति — “the Light”"}, 'lessons/0002-light.html')`;
+  values ('0002-counsel-of-the-wicked', 'hindi', 2, ${"In the counsel of the wicked — postpositions & the oblique case"}, 'lessons/0002-counsel-of-the-wicked.html')`;
+await sql`insert into lessons (id, topic_id, seq, title, r2_key)
+  values ('0003-the-man-who', 'hindi', 3, ${"The man who — जो, the relative pronoun"}, 'lessons/0003-the-man-who.html')`;
 
 await sql`insert into topic_references (id, topic_id, title, r2_key, content_hash)
   values ('ref-core-words', 'hindi', 'Core words so far', 'references/ref-core-words.html', 'seed')`;
 
 await sql`insert into questions (id, lesson_id, text, state)
-  values ('seed-q1', '0001-peace', ${"Is शान्ति ever used as a person's name?"}, 'open')`;
+  values ('seed-q1', '0001-blessed-is-the-man', ${"Is the habitual verb ever dropped in casual speech?"}, 'open')`;
 
-console.log("seeded: topic 'hindi' (dev-user), 2 lessons, 1 reference, 1 open question.");
+console.log("seeded: topic 'hindi' (dev-user), 3 lessons, 1 reference, 1 open question.");
