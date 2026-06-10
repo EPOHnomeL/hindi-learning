@@ -27,8 +27,10 @@ Reuse worth noting: the repository and service reuse `answerQuestion`/`openQuest
 - **Single origin** — the built reader is served by the Worker via `[assets]` in `wrangler.toml`; `run_worker_first = ["/api/*"]` keeps API requests on the Worker, everything else falls back to the SPA. `pnpm build` then `wrangler dev`/`deploy`. Verified locally: `/`, SPA fallback, `/api/*`, and hashed assets all serve.
 - **Real teaching data** — the dev seed (`scripts/seed.ts` + `pnpm seed:r2`) points at the real artifacts (`lessons/*.html`, `references/ref-core-words.html` rendered from `GLOSSARY.md`). All sample blobs and the fabricated seed Question were removed; the conversation starts empty.
 
+- **Publish shell** — `scripts/publish.ts` wraps the pure planner (`src/publish/plan.ts`): scans `lessons/` + `references/`, diffs against the Hub, and pushes new/changed artifacts (`wrangler r2 object put` for blobs + Neon writes for metadata). Idempotent. Authoring is now `pnpm run publish` — a new lesson file appears on the site with no hand-seeding. `seed.ts` only resets the dev identity (user + topic). Convention (see the publish header): filename stem = id, `<title>` after " · " = display title, optional `<meta name="supersedes">` for replacements.
+
 ### Local dev today
-Two servers (HMR): `pnpm dev` (Worker/API, 8787) + `pnpm client` (reader, 5173, LAN-bound). Or single origin: `pnpm build` + `pnpm dev`.
+Setup: `pnpm seed` (reset identity) then `pnpm run publish` (publish the workspace). Run: two servers (HMR) `pnpm dev` (Worker/API, 8787) + `pnpm client` (reader, 5173, LAN-bound); or single origin `pnpm build` + `pnpm dev`.
 
 ## Remaining
 
@@ -36,7 +38,8 @@ Two servers (HMR): `pnpm dev` (Worker/API, 8787) + `pnpm client` (reader, 5173, 
   1. Cloudflare account + Workers project + a private R2 bucket (`served-teach-artifacts`) with real ids in `wrangler.toml`.
   2. A Neon database + test branch; `DATABASE_URL` via `wrangler secret put`.
   3. Cloudflare Access policy — which identity/identities gate the app (ADR-0004), and Neon Auth wiring (ADR-0006) to replace the `dev-user` stub in `src/worker/index.ts`.
-- **Publish execution shell** — wraps the pure Publish planner (`src/publish/plan.ts`): `wrangler r2 object put` for blobs + Neon writes for metadata, so authoring no longer hand-runs the seed scripts.
+  4. `pnpm run publish -- --remote` to push artifacts to the real R2 bucket.
+- **Teach-skill integration** — have the teach skill run `pnpm run publish` after authoring a lesson (and follow the filename/`<title>`/`supersedes` conventions), so publishing is automatic rather than a manual step.
 
 ## Open threads
 - `/to-issues` produced a 9-slice breakdown but it was **not approved/published** — we jumped to `/tdd`. The slices map onto the Remaining items above when you want them filed.
