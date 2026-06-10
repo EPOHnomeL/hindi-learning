@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [react()],
   build: { outDir: "dist/client" },
   server: {
+    host: true, // bind 0.0.0.0 so the reader is reachable on the LAN (phone)
     port: 5173,
     proxy: { "/api": "http://localhost:8787" },
   },

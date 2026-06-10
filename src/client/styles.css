@@ -45,10 +45,11 @@ button { font-family: inherit; cursor: pointer; }
 
 /* Reader */
 .reader { flex-direction: column; }
-.reader-head { display: flex; align-items: center; gap: 0.7rem; padding: 0.8rem 1rem; border-bottom: 1px solid var(--line); background: #fff; }
+.reader-head { display: flex; align-items: center; gap: 0.7rem; padding: 0.8rem 1rem; border-bottom: 1px solid var(--line); background: #fff; position: sticky; top: 0; z-index: 1; }
 .kicker { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--accent); }
 .reader-title { font-weight: 700; flex: 1; }
-.reader-frame { flex: 1; width: 100%; border: none; background: #fff; }
+/* Height is set per-content by LessonFrame; the .reader pane scrolls, not the iframe. */
+.reader-frame { display: block; width: 100%; min-height: 200px; border: none; background: #fff; }
 
 /* Thread / ask */
 .rail { flex-direction: column; padding: 1rem; background: #fbfaf7; gap: 0.6rem; }

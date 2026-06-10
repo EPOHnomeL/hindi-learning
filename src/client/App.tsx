@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   api,
   type Lesson,
@@ -152,7 +152,7 @@ export function App() {
                   </button>
                 )}
               </div>
-              <iframe className="reader-frame" title={selection.title} srcDoc={html} />
+              <LessonFrame title={selection.title} html={html} />
             </>
           ) : (
             <div className="center muted">Pick a lesson on the left to start reading.</div>
@@ -182,6 +182,42 @@ export function App() {
       </div>
     </div>
   );
+}
+
+/**
+ * Embeds a Lesson/Reference HTML artifact and sizes the iframe to its content
+ * height so the whole reader pane scrolls as one. Internal iframe scrolling is
+ * avoided — mobile WebKit only paints the first slice of a scrolling srcDoc
+ * iframe, leaving the rest blank. srcDoc is same-origin, so we can measure the
+ * content directly and re-measure as web fonts load or quizzes expand.
+ */
+function LessonFrame({ html, title }: { html: string; title: string }) {
+  const ref = useRef<HTMLIFrameElement>(null);
+  useEffect(() => {
+    const frame = ref.current;
+    if (!frame) return;
+    let observer: ResizeObserver | undefined;
+    const fit = () => {
+      const doc = frame.contentDocument;
+      if (doc?.documentElement) frame.style.height = `${doc.documentElement.scrollHeight}px`;
+    };
+    const onLoad = () => {
+      fit();
+      const doc = frame.contentDocument;
+      if (doc?.documentElement) {
+        observer = new ResizeObserver(fit);
+        observer.observe(doc.documentElement);
+      }
+    };
+    frame.addEventListener("load", onLoad);
+    const t = setTimeout(fit, 400); // catch already-loaded / late font metrics
+    return () => {
+      frame.removeEventListener("load", onLoad);
+      observer?.disconnect();
+      clearTimeout(t);
+    };
+  }, [html]);
+  return <iframe ref={ref} className="reader-frame" title={title} srcDoc={html} scrolling="no" />;
 }
 
 function AskBox({ disabled, onAsk }: { disabled: boolean; onAsk: (text: string) => Promise<void> }) {
