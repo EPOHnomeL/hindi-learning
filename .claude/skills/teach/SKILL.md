@@ -12,7 +12,7 @@ The user has asked you to teach them something. This is a stateful request - the
 Treat the current directory as a teaching workspace. The state of their learning is captured in this directory in several files:
 
 - `MISSION.md`: A document capturing the _reason_ the user is interested in the topic. This should be used to ground all teaching. Use the format in [MISSION-FORMAT.md](./MISSION-FORMAT.md).
-- `./reference/*.html`: A directory of reference materials. These are the compressed learnings from the lessons - cheat sheets, reference algorithms, syntax, yoga poses, glossaries. They are the raw units of learning. They should be beautiful documents which print out well, and are designed for quick reference.
+- `./references/*.html`: A directory of reference materials. These are the compressed learnings from the lessons - cheat sheets, reference algorithms, syntax, yoga poses, glossaries. They are the raw units of learning. They should be beautiful documents which print out well, and are designed for quick reference.
 - `RESOURCES.md`: A list of resources which can be explored to ground your teaching in contextual knowledge, or to acquire knowledge and wisdom. Use the format in [RESOURCES-FORMAT.md](./RESOURCES-FORMAT.md).
 - `./learning-records/*.md`: A directory of learning records, which capture what the user has learned. These are loosely equivalent to architectural decision records in software development - they capture non-obvious lessons and key insights that may need to be revised later, or drive future sessions. These should be used to calculate the zone of proximal development. They are titled `0001-<dash-case-name>.md`, where the number increments each time. Use the format in [LEARNING-RECORD-FORMAT.md](./LEARNING-RECORD-FORMAT.md).
 - `./lessons/*.html`: A directory of lessons. A **lesson** is a single, self-contained HTML output that teaches one tightly-scoped thing tied to the mission. This is the primary unit of teaching in this workspace.
@@ -38,7 +38,26 @@ A lesson should be **beautiful** — clean, readable typography and layout — s
 
 The lesson should teach ONE THING only. It should be completable very quickly - but give the user a tangible win that they can build on. It should be directly tied to the mission, and should be in the user's zone of proximal development.
 
-Make opening a lesson as easy as possible — ideally a single CLI command the user can run to open the HTML file in their browser.
+Make opening a lesson as easy as possible. This workspace serves its lessons and references on the web (the reader app), so the user can open them on any device — see **Publishing** below.
+
+## Publishing
+
+This workspace is wired to a web app (a Cloudflare Worker over a Neon Hub + R2 artifact store) that serves the lessons and references to the user on any device, and feeds their answers and questions back to you. The local files are the source of truth; publishing is a deliberate push, not a live sync.
+
+**After you create or change a lesson or reference, publish it** so it appears in the reader:
+
+```
+pnpm run publish
+```
+
+This scans `./lessons/` and `./references/`, diffs against what the Hub already has, and pushes only what is new or changed (the HTML blob to R2, the metadata row to the Hub). It is idempotent — safe to run any time. Use `pnpm run publish -- --remote` to publish to the deployed site rather than local dev.
+
+For publishing to work, follow these conventions when authoring:
+
+- **One file per artifact**, named `<id>.html`. The filename stem is the artifact id. Lessons are `0001-<dash-case-name>.html` (the leading number is the order); references are `<dash-case-name>.html` (prefix with `1-`, `2-`, … if you need to control their order in the list).
+- **`<title>` is `"Lesson N · <display title>"`** for a lesson, or `"Reference · <display title>"` for a reference. The text after the ` · ` becomes the title shown in the reader, so make it descriptive (e.g. the skill being taught).
+- **Lessons are immutable** once published — never edit a published lesson. If a lesson needs to be replaced, write a new lesson file and add `<meta name="supersedes" content="<old-lesson-id>">` to its `<head>`; publishing will retire the old one. **References are mutable** — edit the reference file in place and re-publish; the current version always wins. (Glossaries especially: keep them current.)
+- **Quizzes are captured automatically.** The reader records the learner's first answer to each quiz back to you, by reading the authored quiz markup — so keep using `.quiz[data-correct]` with `.opt[data-k]` buttons for multiple-choice and `.quiz.fill[data-answer]` for fill-in. You don't need to add any API calls to the lesson; keep lessons self-contained.
 
 ## The Mission
 
