@@ -6,7 +6,7 @@ DATABASE_URL="postgresql://USER:PASSWORD@HOST.neon.tech/DBNAME?sslmode=require"
 
 # Neon Auth (ADR-0006). Leave UNSET locally to run without auth (the worker falls
 # back to DEV_USER_ID). Set it in production to turn auth on — see docs/deploy.md.
-# STACK_PROJECT_ID="your-neon-auth-project-id"
+# NEON_AUTH_URL="https://ep-xxx.neonauth.<region>.aws.neon.tech/<db>/auth"
 
 # Identity used when auth is disabled (local dev). Defaults to "dev-user".
 # DEV_USER_ID="dev-user"

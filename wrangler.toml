@@ -19,6 +19,6 @@ run_worker_first = ["/api/*"]
 binding = "ARTIFACTS"
 bucket_name = "served-teach-artifacts"
 
-# Secrets (DATABASE_URL, STACK_SECRET_SERVER_KEY, …) are NOT set here.
+# Secrets (DATABASE_URL, NEON_AUTH_URL, …) are NOT set here.
 # Local dev: put them in .dev.vars (gitignored).
 # Production: `wrangler secret put DATABASE_URL`.
