@@ -11,6 +11,8 @@
     "migrate": "node --experimental-strip-types scripts/migrate.ts",
     "seed": "node --experimental-strip-types scripts/seed.ts",
     "publish": "node --experimental-strip-types scripts/publish.ts",
+    "review": "node --experimental-strip-types scripts/review.ts",
+    "reply": "node --experimental-strip-types scripts/reply.ts",
     "dev": "wrangler dev",
     "client": "vite",
     "build": "vite build",
