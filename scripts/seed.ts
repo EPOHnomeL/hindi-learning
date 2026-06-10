@@ -9,7 +9,7 @@ import "dotenv/config";
 import { neon } from "@neondatabase/serverless";
 import { resolveDbUrl } from "./db.ts";
 
-const sql = neon(resolveDbUrl());
+const sql = neon(resolveDbUrl("dev"));
 
 const TABLES = ["users", "topics", "lessons", "topic_references", "responses", "questions", "replies", "progress"];
 await sql.query(`truncate table ${TABLES.join(", ")}`);

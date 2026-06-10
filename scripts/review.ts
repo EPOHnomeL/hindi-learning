@@ -13,7 +13,7 @@ import { resolveDbUrl } from "./db.ts";
 const TOPIC_ID = "hindi"; // v1 has one Topic; CONTEXT.md.
 const USER_ID = "dev-user"; // dev stub until Neon Auth (ADR-0006).
 
-const sql = neon(resolveDbUrl({ prod: process.argv.includes("--prod") }));
+const sql = neon(resolveDbUrl(process.argv.includes("--prod") ? "prod" : "dev"));
 
 const lessons = await sql`select id, seq, title from lessons
   where topic_id = ${TOPIC_ID} and superseded_by is null order by seq`;

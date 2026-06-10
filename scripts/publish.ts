@@ -28,7 +28,7 @@ const MODE = REMOTE ? "--remote" : "--local";
 
 // --remote publishes blobs to the real R2 bucket AND metadata to the production
 // branch; local mode pairs the simulated R2 with the dev branch.
-const sql = neon(resolveDbUrl({ prod: REMOTE }));
+const sql = neon(resolveDbUrl(REMOTE ? "prod" : "dev"));
 
 interface Meta {
   kind: "lesson" | "reference";

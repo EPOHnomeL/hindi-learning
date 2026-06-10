@@ -18,7 +18,7 @@ if (!id || text === "") {
   process.exit(1);
 }
 
-const sql = neon(resolveDbUrl({ prod }));
+const sql = neon(resolveDbUrl(prod ? "prod" : "dev"));
 
 const rows = await sql`select state from questions where id = ${id}`;
 const question = rows[0];

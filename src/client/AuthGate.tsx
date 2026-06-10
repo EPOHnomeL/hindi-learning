@@ -36,12 +36,17 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, [refreshToken]);
 
   // Keep the short-lived JWT fresh while reading — periodically and whenever
-  // the tab comes back to the foreground (mobile resume).
+  // the tab comes back to the foreground (mobile resume). A failed refresh
+  // means the session is gone: drop back to the sign-in form rather than
+  // letting the app fire unauthenticated requests.
   useEffect(() => {
     if (phase !== "ready" || !authClient) return;
-    const interval = setInterval(() => void refreshToken(), TOKEN_REFRESH_MS);
+    const refresh = async () => {
+      if (!(await refreshToken())) setPhase("signed-out");
+    };
+    const interval = setInterval(() => void refresh(), TOKEN_REFRESH_MS);
     const onVisible = () => {
-      if (document.visibilityState === "visible") void refreshToken();
+      if (document.visibilityState === "visible") void refresh();
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {

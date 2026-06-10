@@ -9,20 +9,14 @@ import "dotenv/config";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { neon } from "@neondatabase/serverless";
-import { resolveDbUrl } from "./db.ts";
+import { resolveDbUrl, type DbTarget } from "./db.ts";
 
-const target = process.argv.includes("--prod")
-  ? "production"
+const target: DbTarget = process.argv.includes("--prod")
+  ? "prod"
   : process.argv.includes("--dev")
     ? "dev"
     : "test";
-const url =
-  target === "test" ? process.env.DATABASE_URL_TEST : resolveDbUrl({ prod: target === "production" });
-
-if (!url) {
-  console.error("No connection string. Set DATABASE_URL_TEST in .env.");
-  process.exit(1);
-}
+const url = resolveDbUrl(target);
 
 const dir = fileURLToPath(new URL("../migrations/", import.meta.url));
 const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
@@ -40,4 +34,4 @@ for (const file of files) {
   }
   console.log(`applied ${file} (${statements.length} statements)`);
 }
-console.log(`migration complete (${target}).`);
+console.log(`migration complete (${target} branch).`);
