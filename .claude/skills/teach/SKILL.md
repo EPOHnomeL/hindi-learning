@@ -59,6 +59,31 @@ For publishing to work, follow these conventions when authoring:
 - **Lessons are immutable** once published — never edit a published lesson. If a lesson needs to be replaced, write a new lesson file and add `<meta name="supersedes" content="<old-lesson-id>">` to its `<head>`; publishing will retire the old one. **References are mutable** — edit the reference file in place and re-publish; the current version always wins. (Glossaries especially: keep them current.)
 - **Quizzes are captured automatically.** The reader records the learner's first answer to each quiz back to you, by reading the authored quiz markup — so keep using `.quiz[data-correct]` with `.opt[data-k]` buttons for multiple-choice and `.quiz.fill[data-answer]` for fill-in. You don't need to add any API calls to the lesson; keep lessons self-contained.
 
+## The conversation loop
+
+The web app is a two-way channel, not just a publishing target. While the learner reads, they leave **Responses** (quiz answers), **Progress** (opened/completed), and **Questions** (things they got stuck on). This is an asynchronous conversation with you — they cannot ask you a follow-up live, so the questions queue up for your next session.
+
+**At the start of every teach session, read the learner's state first:**
+
+```
+pnpm run review
+```
+
+This prints, from the Hub:
+
+- **Open questions** — the explicit to-do queue. Each is something the learner asked while reading a lesson and is waiting for you to answer.
+- **Responses & progress per lesson** — what they got right/wrong and how far they've got. This is your evidence for the zone of proximal development: a lesson `opened` but never `completed`, or with wrong answers, is where they may be stuck.
+
+**Answer every open question** before moving on, with:
+
+```
+pnpm run reply <question-id> "<your answer>"
+```
+
+The reply appears inline with the question in the reader, and the question flips to `answered`. Treat a confusion that several questions circle around as a signal to write a short reference, or a corrective next lesson.
+
+Then use the Responses and Progress to choose what to teach next, exactly as you would use the `learning-records` — they are the real-time evidence of what has actually landed.
+
 ## The Mission
 
 Every lesson should be tied into the mission - the reason that the user is interested in learning about the topic.
