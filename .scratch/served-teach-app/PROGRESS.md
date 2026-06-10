@@ -32,14 +32,16 @@ Reuse worth noting: the repository and service reuse `answerQuestion`/`openQuest
 ### Local dev today
 Setup: `pnpm seed` (reset identity) then `pnpm run publish` (publish the workspace). Run: two servers (HMR) `pnpm dev` (Worker/API, 8787) + `pnpm client` (reader, 5173, LAN-bound); or single origin `pnpm build` + `pnpm dev`.
 
-## Remaining
+- **Conversation loop (teach side)** — `pnpm run review` reads open Questions + Responses/Progress from the Hub; `pnpm run reply <id> "…"` answers a Question. The teach skill (`.claude/skills/teach/SKILL.md`) documents both, plus publishing and the authoring conventions, so it knows the app is a two-way channel.
 
-- **Cloud deploy (HITL — needs your accounts + decisions):**
-  1. Cloudflare account + Workers project + a private R2 bucket (`served-teach-artifacts`) with real ids in `wrangler.toml`.
-  2. A Neon database + test branch; `DATABASE_URL` via `wrangler secret put`.
-  3. Cloudflare Access policy — which identity/identities gate the app (ADR-0004), and Neon Auth wiring (ADR-0006) to replace the `dev-user` stub in `src/worker/index.ts`.
-  4. `pnpm run publish -- --remote` to push artifacts to the real R2 bucket.
-- **Teach-skill integration** — have the teach skill run `pnpm run publish` after authoring a lesson (and follow the filename/`<title>`/`supersedes` conventions), so publishing is automatic rather than a manual step.
+- **Reader go-live fixes** — Progress now persists across reloads (GET `/api/topics/:id/progress` + hydrate on load); the device Back button moves between panes instead of leaving the app (panes pushed to history).
+
+## Remaining (go-live)
+
+- **Auth (HITL)** — the app is ungated and `currentUserId` is a `dev-user` stub. Decide v1 auth: Cloudflare Access (gate to your email — ADR-0004) and/or Neon Auth (in-app login — ADR-0006), then wire it into `src/worker/index.ts`.
+- **Cloud deploy (HITL)** — Cloudflare account + Workers project + a private R2 bucket (`served-teach-artifacts`) with real ids in `wrangler.toml`; `DATABASE_URL` via `wrangler secret put`; then `pnpm build && pnpm run deploy` and `pnpm run publish -- --remote`.
+- **MCPs (HITL)** — no `.mcp.json` yet. Connect at least the Neon MCP (manage the Hub from Claude Code, per ADR-0002) and any others wanted (e.g. Cloudflare).
+- **⚠️ Separate the test DB branch** — `DATABASE_URL_TEST` (.env) points at the SAME Neon branch as the dev worker (`.dev.vars` `DATABASE_URL` → `ep-orange-frost`). The Neon contract tests truncate tables, so running `pnpm test` **wipes dev data** (lessons/progress/questions). Point `DATABASE_URL_TEST` at a dedicated test branch before running tests against anything you care about.
 
 ## Open threads
 - `/to-issues` produced a 9-slice breakdown but it was **not approved/published** — we jumped to `/tdd`. The slices map onto the Remaining items above when you want them filed.
