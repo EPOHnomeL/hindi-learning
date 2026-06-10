@@ -5,119 +5,116 @@ on Cloudflare with Neon Auth. Steps marked **(you)** create accounts or paste
 secrets — they need credentials I don't have. The code seams are already in place
 (see `src/worker/auth.ts`, `.mcp.json`, `.env.example`).
 
-## 0. Connect the MCP servers (`.mcp.json` is committed)
+> **Status (2026-06-10):** steps 0–2 and 4 are DONE; production schema migration,
+> R2 (step 3), and everything after are pending. The two blockers are both yours:
+> enable R2 in the Cloudflare dashboard, and approve `pnpm migrate --prod`.
 
-`.mcp.json` declares the Neon and Cloudflare remote MCP servers. In Claude Code,
-run `/mcp` and authenticate each via OAuth (a browser window opens):
+## 0. Connect the MCP servers ✅ DONE
 
-- **neon** → `https://mcp.neon.tech/mcp` — manage the Hub (branches, SQL).
-- **cloudflare-bindings** / **cloudflare-observability** — manage Workers/R2 and read logs.
+`.mcp.json` declares the Neon and Cloudflare remote MCP servers; both are
+authenticated. Neon project: **teacher** (`billowing-voice-30173788`), Cloudflare
+account `60350b90af583712edccbf20905459bb`.
 
-Once connected I can do most of steps 1–6 for you through the MCPs instead of you
-running CLI commands by hand.
+## 1. Fix the test branch ✅ DONE
 
-## 1. Fix the test branch ⚠️ (you, ~2 min — do this first)
+`DATABASE_URL_TEST` now points at the dedicated `test` Neon branch
+(`br-polished-mud`, endpoint `ep-orange-frost`); migrations are applied and the
+full `pnpm test` suite runs green without touching dev data. Branch map:
 
-Today `DATABASE_URL_TEST` (in `.env`) points at the **same** Neon branch the dev
-worker uses (`.dev.vars` `DATABASE_URL`). The Neon contract tests truncate tables,
-so `pnpm test` **wipes dev data**. Create a dedicated test branch and point the
-tests at it:
+| Neon branch  | endpoint        | used by                          |
+| ------------ | --------------- | -------------------------------- |
+| `production` | ep-young-bread  | `.env` `DATABASE_URL`, deploy    |
+| `dev`        | ep-wild-sky     | `.dev.vars` (wrangler dev)       |
+| `test`       | ep-orange-frost | `.env` `DATABASE_URL_TEST`       |
 
-1. Neon console → your project → Branches → **Create branch** (e.g. `test`).
-2. Copy its pooled connection string into `.env` as `DATABASE_URL_TEST=...`.
-3. `pnpm migrate` against it once (set `DATABASE_URL` to the test branch for that run, or add a `migrate:test`).
+## 2. Neon Auth ✅ DONE (code side)
 
-After this, `pnpm test` is safe.
+Neon Auth is provisioned on the production branch — and it is the **new Better
+Auth-based** service, not the Stack Auth flavor this runbook originally assumed.
+There are no `STACK_*` keys; one public URL drives everything:
 
-## 2. Neon Auth (in-app login — ADR-0006)
-
-### a. Enable it (you)
-Neon console → your project → **Auth** → enable Neon Auth. Copy:
-- Project ID → `VITE_STACK_PROJECT_ID` and worker `STACK_PROJECT_ID`
-- Publishable client key → `VITE_STACK_PUBLISHABLE_CLIENT_KEY`
-- Secret server key → `STACK_SECRET_SERVER_KEY`
-
-Put the `VITE_*` values in `.env` (build-time, browser-exposed) and the worker
-values as Wrangler secrets (step 5).
-
-### b. Worker (already wired)
-`src/worker/auth.ts` verifies the `Authorization: Bearer <jwt>` against the Stack
-JWKS and returns the user id; the middleware in `index.ts` sets it on the request,
-falling back to a dev user only when `STACK_PROJECT_ID` is unset. Setting
-`STACK_PROJECT_ID` in production turns auth on — no code change.
-
-### c. Client (one wiring step)
-The reader already sends the token (`setAuthToken` in `src/client/api.ts`); it just
-needs the Stack provider to supply it:
-
-```bash
-pnpm add @stackframe/react
+```
+NEON_AUTH_URL = https://ep-young-bread-as4yo5g5.neonauth.c-4.eu-central-1.aws.neon.tech/neondb/auth
+JWKS          = <NEON_AUTH_URL>/.well-known/jwks.json
 ```
 
-Wrap the app and feed the access token to the API client (confirm the exact hook
-names against current Neon Auth docs — the shape is stable, names may differ):
+Enabled methods: email/password (sign-up open) + shared Google OAuth.
 
-```tsx
-// src/client/main.tsx
-import { StackProvider, StackClientApp } from "@stackframe/react";
+### Worker
+`src/worker/auth.ts` verifies the `Authorization: Bearer <jwt>` (EdDSA, issuer =
+the auth URL's origin) against the JWKS and returns the user id (`sub`). Setting
+the `NEON_AUTH_URL` secret in production turns auth on; unset (local dev) falls
+back to the dev user.
 
-const stack = new StackClientApp({
-  projectId: import.meta.env.VITE_STACK_PROJECT_ID,
-  publishableClientKey: import.meta.env.VITE_STACK_PUBLISHABLE_CLIENT_KEY,
-  tokenStore: "cookie",
-});
-
-// In a small component mounted inside <StackProvider app={stack}>:
-//   const user = useUser({ or: "redirect" });        // gates the app to signed-in users
-//   useEffect(() => { user?.getAuthJson().then(j => setAuthToken(j?.accessToken)); }, [user]);
-```
-
-Once `setAuthToken` carries a real token, the worker resolves the real Neon Auth
-user instead of `dev-user`, and Progress/Responses/Questions are scoped to them.
+### Client
+`@neondatabase/neon-js` is installed. `src/client/AuthGate.tsx` gates the reader:
+session via SDK cookie, JWT fetched with `authClient.token()` and fed to
+`setAuthToken`, refreshed every 10 min and on tab-resume (tokens last 15 min).
+The gate only mounts when the build carries `VITE_NEON_AUTH_URL` — committed in
+`.env.production`, loaded by `pnpm build` only, so dev stays gate-free.
 
 > The `dev-user` rows seeded locally are a stand-in. In production the first real
 > sign-in creates the user; re-`publish` the topic/lessons under that user, or
 > migrate the `dev-user` rows to the new id.
 
-## 3. R2 bucket (you / or via Cloudflare MCP)
+## 3. Enable R2 + create the bucket ⚠️ BLOCKED (you, ~1 min)
 
-Create the private bucket the worker binds:
+The account does not have R2 enabled (API returns 403 "Please enable R2 through
+the Cloudflare Dashboard"). Dashboard → **R2** → enable (needs a payment method
+on file; the free tier covers this app). Then the bucket can be created via MCP
+or:
 
 ```bash
 pnpm exec wrangler r2 bucket create served-teach-artifacts
 ```
 
-It is bound in `wrangler.toml` and served only through the worker (never public, ADR-0005).
+It is bound in `wrangler.toml` and served only through the worker (never public,
+ADR-0005). **Deploy is blocked until this exists** — wrangler refuses to deploy
+a worker bound to a missing bucket.
 
-## 4. Cloudflare login (you)
+## 4. Cloudflare login ✅ DONE
+
+`wrangler whoami` → jonathan@y-knot.io, OAuth token with workers write.
+
+## 5. Migrate production (you — approve it)
+
+The production branch has only the `neon_auth.*` tables; the app schema is not
+applied yet. The migration is additive/idempotent (`create table if not exists`):
 
 ```bash
-pnpm exec wrangler login
+pnpm migrate --prod     # applies migrations/0001_init.sql to DATABASE_URL
 ```
 
-## 5. Secrets (you)
+## 6. Secrets (after first deploy or via dashboard)
 
 ```bash
-pnpm exec wrangler secret put DATABASE_URL          # production Neon pooled URL
-pnpm exec wrangler secret put STACK_PROJECT_ID      # turns auth on
-# STACK_SECRET_SERVER_KEY too, if/when server-side Stack calls are added
+pnpm exec wrangler secret put DATABASE_URL    # production Neon pooled URL (ep-young-bread)
+pnpm exec wrangler secret put NEON_AUTH_URL   # the auth URL above — turns auth on
 ```
 
-## 6. Build, deploy, publish
+## 7. Build, deploy, publish
 
 ```bash
-pnpm build                  # reader SPA → dist/client (served by the Worker)
+pnpm build                  # reader SPA → dist/client (already built once, green)
 pnpm run deploy             # wrangler deploy
 pnpm run publish -- --remote   # push lesson/reference blobs to the real R2 bucket
 ```
 
-## 7. Verify
+## 8. Trusted origins (after deploy)
 
-- Visit the deployed URL → you should be sent to Neon Auth sign-in, then into the reader.
-- Open a lesson, answer a quiz, ask a question, reload → progress dot persists; the answer/question are recorded under your real user.
+Neon Auth's `trusted_origins` list is empty (localhost is allowed separately).
+Add the deployed URL (`https://hindi-learning.<subdomain>.workers.dev` and any
+custom domain) via the Neon console → Auth → Configuration, or the
+`configure_neon_auth` MCP tool — sign-in from the deployed origin fails until
+this is set.
+
+## 9. Verify
+
+- Visit the deployed URL → sign-in gate appears; create an account, land in the reader.
+- Open a lesson, answer a quiz, ask a question, reload → progress dot persists; the answer/question are recorded under your real user (check `neon_auth.user` for the id).
 - `pnpm run review` (with `DATABASE_URL` pointed at production) shows your activity.
 
 ## Notes
 
-- **Custom domain**: add it in the Cloudflare dashboard (Workers → your worker → Domains) or `wrangler.toml` `routes`.
+- **Custom domain**: add it in the Cloudflare dashboard (Workers → your worker → Domains) or `wrangler.toml` `routes`. Remember to add it to trusted origins (step 8).
 - **Cloudflare Access** was considered (ADR-0004) but we chose Neon Auth for in-app login. If you later want an extra edge gate, add an Access policy in Cloudflare Zero Trust over the worker route — it composes with Neon Auth.
