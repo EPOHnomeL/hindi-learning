@@ -10,7 +10,7 @@
     "prototype": "vite prototype",
     "migrate": "node --experimental-strip-types scripts/migrate.ts",
     "seed": "node --experimental-strip-types scripts/seed.ts",
-    "seed:r2": "wrangler r2 object put served-teach-artifacts/lessons/0001-blessed-is-the-man.html --file=lessons/0001-blessed-is-the-man.html --local && wrangler r2 object put served-teach-artifacts/lessons/0002-counsel-of-the-wicked.html --file=lessons/0002-counsel-of-the-wicked.html --local && wrangler r2 object put served-teach-artifacts/lessons/0003-the-man-who.html --file=lessons/0003-the-man-who.html --local && wrangler r2 object put served-teach-artifacts/references/ref-core-words.html --file=references/ref-core-words.html --local",
+    "seed:r2": "wrangler r2 object put served-teach-artifacts/lessons/0001-blessed-is-the-man.html --file=lessons/0001-blessed-is-the-man.html --local && wrangler r2 object put served-teach-artifacts/lessons/0002-counsel-of-the-wicked.html --file=lessons/0002-counsel-of-the-wicked.html --local && wrangler r2 object put served-teach-artifacts/lessons/0003-the-man-who.html --file=lessons/0003-the-man-who.html --local && wrangler r2 object put served-teach-artifacts/references/ref-grammar.html --file=references/ref-grammar.html --local && wrangler r2 object put served-teach-artifacts/references/ref-glossary.html --file=references/ref-glossary.html --local",
     "dev": "wrangler dev",
     "client": "vite",
     "build": "vite build",

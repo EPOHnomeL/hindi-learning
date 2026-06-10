@@ -29,8 +29,13 @@ await sql`insert into lessons (id, topic_id, seq, title, r2_key)
 await sql`insert into lessons (id, topic_id, seq, title, r2_key)
   values ('0003-the-man-who', 'hindi', 3, ${"The man who — जो, the relative pronoun"}, 'lessons/0003-the-man-who.html')`;
 
+// Ordered ids: References list by id, so the ref-1/ref-2 prefixes keep grammar
+// above glossary in the reader.
 await sql`insert into topic_references (id, topic_id, title, r2_key, content_hash)
-  values ('ref-core-words', 'hindi', ${"Grammar & core words (Psalm 1)"}, 'references/ref-core-words.html',
-          'b86f1b708327318422a844801a4266af7130d52a7bca343ef366324bc9f7a13e')`;
+  values ('ref-1-grammar', 'hindi', 'Current grammar', 'references/ref-grammar.html',
+          'ce3a364a7f72d668838ae4b8a8b5ffada6c4bdca4720077e411f5fa65ee7e66c')`;
+await sql`insert into topic_references (id, topic_id, title, r2_key, content_hash)
+  values ('ref-2-glossary', 'hindi', 'Current glossary', 'references/ref-glossary.html',
+          '9605a8397b5d82115ad7028bfa1141a280162634079d1a966251925d23f4aaca')`;
 
-console.log("seeded: topic 'hindi' (dev-user), 3 lessons, 1 reference.");
+console.log("seeded: topic 'hindi' (dev-user), 3 lessons, 2 references (grammar + glossary).");
