@@ -17,6 +17,12 @@ button { font-family: inherit; cursor: pointer; }
 .error { color: #c0392b; }
 .small { font-size: 0.85rem; }
 
+/* Sign-in gate (Neon Auth) */
+.authgate { display: flex; flex-direction: column; gap: 0.7rem; width: min(320px, 90vw); background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 1.5rem; text-align: left; }
+.authgate h1 { margin: 0 0 0.3rem; font-size: 1.2rem; }
+.authgate input { border: 1px solid var(--line); border-radius: 8px; padding: 0.55rem 0.7rem; font-family: inherit; font-size: 0.95rem; }
+.authgate a { color: var(--accent); }
+
 /* Top bar */
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.7rem 1rem; background: #fff; border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 5; }
 .topbar-title { font-weight: 800; }

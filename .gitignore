@@ -18,6 +18,8 @@ wrangler.toml.bak
 .env
 .env.*
 !.env.example
+# Holds only the public Neon Auth URL (build-time, browser-exposed) — committed.
+!.env.production
 
 # Test / coverage
 coverage/
