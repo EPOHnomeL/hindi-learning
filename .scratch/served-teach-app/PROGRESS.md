@@ -36,12 +36,17 @@ Setup: `pnpm seed` (reset identity) then `pnpm run publish` (publish the workspa
 
 - **Reader go-live fixes** — Progress now persists across reloads (GET `/api/topics/:id/progress` + hydrate on load); the device Back button moves between panes instead of leaving the app (panes pushed to history).
 
-## Remaining (go-live)
+## Go-live: scaffolded, awaiting your accounts
 
-- **Auth (HITL)** — the app is ungated and `currentUserId` is a `dev-user` stub. Decide v1 auth: Cloudflare Access (gate to your email — ADR-0004) and/or Neon Auth (in-app login — ADR-0006), then wire it into `src/worker/index.ts`.
-- **Cloud deploy (HITL)** — Cloudflare account + Workers project + a private R2 bucket (`served-teach-artifacts`) with real ids in `wrangler.toml`; `DATABASE_URL` via `wrangler secret put`; then `pnpm build && pnpm run deploy` and `pnpm run publish -- --remote`.
-- **MCPs (HITL)** — no `.mcp.json` yet. Connect at least the Neon MCP (manage the Hub from Claude Code, per ADR-0002) and any others wanted (e.g. Cloudflare).
-- **⚠️ Separate the test DB branch** — `DATABASE_URL_TEST` (.env) points at the SAME Neon branch as the dev worker (`.dev.vars` `DATABASE_URL` → `ep-orange-frost`). The Neon contract tests truncate tables, so running `pnpm test` **wipes dev data** (lessons/progress/questions). Point `DATABASE_URL_TEST` at a dedicated test branch before running tests against anything you care about.
+Decision (recorded): **Neon Auth** for in-app login (ADR-0006, not Cloudflare Access), **Neon + Cloudflare MCPs**, deployment as **prep-only** for now. Full runbook: [`docs/deploy.md`](../../docs/deploy.md).
+
+- **Auth seam (done, inactive)** — `src/worker/auth.ts` verifies a Neon Auth (Stack) JWT and resolves the user; the `index.ts` middleware sets it on the request, falling back to a dev user until `STACK_PROJECT_ID` is set. Client sends the bearer token (`setAuthToken` in `api.ts`). Activation = enable Neon Auth, set the keys, add the Stack provider (one client step) — see the runbook §2.
+- **MCPs (done)** — `.mcp.json` declares Neon + Cloudflare (bindings, observability). Authenticate via `/mcp` (OAuth).
+
+### Remaining (HITL — needs your accounts/credentials)
+- **Enable Neon Auth** and add the Stack provider to the client (runbook §2).
+- **Cloudflare**: create the private R2 bucket, `wrangler login`, set secrets (`DATABASE_URL`, `STACK_PROJECT_ID`), then `pnpm build && pnpm run deploy && pnpm run publish -- --remote` (runbook §3–7).
+- **⚠️ Separate the test DB branch** — `DATABASE_URL_TEST` (.env) points at the SAME Neon branch as the dev worker (`.dev.vars` → `ep-orange-frost`). The Neon contract tests truncate tables, so `pnpm test` **wipes dev data**. Point `DATABASE_URL_TEST` at a dedicated test branch (runbook §1) before running the full suite. (Workaround until then: run only the pure/worker tests, e.g. `pnpm exec vitest run src/worker src/capture src/domain src/publish`.)
 
 ## Open threads
 - `/to-issues` produced a 9-slice breakdown but it was **not approved/published** — we jumped to `/tdd`. The slices map onto the Remaining items above when you want them filed.
