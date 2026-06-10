@@ -5,9 +5,12 @@ on Cloudflare with Neon Auth. Steps marked **(you)** create accounts or paste
 secrets — they need credentials I don't have. The code seams are already in place
 (see `src/worker/auth.ts`, `.mcp.json`, `.env.example`).
 
-> **Status (2026-06-10):** steps 0–2 and 4 are DONE; production schema migration,
-> R2 (step 3), and everything after are pending. The two blockers are both yours:
-> enable R2 in the Cloudflare dashboard, and approve `pnpm migrate --prod`.
+> **Status (2026-06-10): LIVE.** Every step below is done. The worker runs at
+> **https://hindi-learning.jonathan-603.workers.dev** with auth on (API returns
+> 401 without a token), production schema + artifacts published, and the
+> deployed origin trusted by Neon Auth. Remaining first-use step: sign in once,
+> then create the production Topic row under your real user id (the `dev-user`
+> Topic exists only on the dev branch) — see step 9.
 
 ## 0. Connect the MCP servers ✅ DONE
 
@@ -57,62 +60,57 @@ The gate only mounts when the build carries `VITE_NEON_AUTH_URL` — committed i
 > sign-in creates the user; re-`publish` the topic/lessons under that user, or
 > migrate the `dev-user` rows to the new id.
 
-## 3. Enable R2 + create the bucket ⚠️ BLOCKED (you, ~1 min)
+## 3. R2 bucket ✅ DONE
 
-The account does not have R2 enabled (API returns 403 "Please enable R2 through
-the Cloudflare Dashboard"). Dashboard → **R2** → enable (needs a payment method
-on file; the free tier covers this app). Then the bucket can be created via MCP
-or:
-
-```bash
-pnpm exec wrangler r2 bucket create served-teach-artifacts
-```
-
-It is bound in `wrangler.toml` and served only through the worker (never public,
-ADR-0005). **Deploy is blocked until this exists** — wrangler refuses to deploy
-a worker bound to a missing bucket.
+R2 enabled on the account; the private bucket `served-teach-artifacts` exists
+(WEUR). It is bound in `wrangler.toml` and served only through the worker
+(never public, ADR-0005).
 
 ## 4. Cloudflare login ✅ DONE
 
 `wrangler whoami` → jonathan@y-knot.io, OAuth token with workers write.
 
-## 5. Migrate production (you — approve it)
+## 5. Migrate production ✅ DONE
 
-The production branch has only the `neon_auth.*` tables; the app schema is not
-applied yet. The migration is additive/idempotent (`create table if not exists`):
+`pnpm migrate --prod` applied `0001_init.sql` (idempotent, safe to re-run).
+The dev branch was also migrated + seeded + published (`pnpm migrate --dev`,
+`pnpm seed`, `pnpm run publish`) since it was created before production had
+the schema.
+
+## 6. Secrets ✅ DONE
+
+`DATABASE_URL` (production pooled URL, ep-young-bread) and `NEON_AUTH_URL` are
+set as worker secrets. Setting `NEON_AUTH_URL` is what turns auth on — the API
+now answers 401 to unauthenticated requests.
+
+## 7. Build, deploy, publish ✅ DONE
+
+Deployed to **https://hindi-learning.jonathan-603.workers.dev** and
+`pnpm run publish -- --remote` pushed all 4 lessons + 2 references (blobs →
+real R2, metadata → production branch). Re-run any of these after changes:
 
 ```bash
-pnpm migrate --prod     # applies migrations/0001_init.sql to DATABASE_URL
+pnpm build                     # reader SPA → dist/client
+pnpm run deploy                # wrangler deploy
+pnpm run publish -- --remote   # workspace artifacts → production
 ```
 
-## 6. Secrets (after first deploy or via dashboard)
+## 8. Trusted origins ✅ DONE
 
-```bash
-pnpm exec wrangler secret put DATABASE_URL    # production Neon pooled URL (ep-young-bread)
-pnpm exec wrangler secret put NEON_AUTH_URL   # the auth URL above — turns auth on
-```
+`https://hindi-learning.jonathan-603.workers.dev` is in Neon Auth's
+`trusted_origins` (localhost allowed separately). Add any future custom domain
+the same way (Neon console → Auth → Configuration, or the `configure_neon_auth`
+MCP tool) — sign-in from an untrusted origin fails.
 
-## 7. Build, deploy, publish
-
-```bash
-pnpm build                  # reader SPA → dist/client (already built once, green)
-pnpm run deploy             # wrangler deploy
-pnpm run publish -- --remote   # push lesson/reference blobs to the real R2 bucket
-```
-
-## 8. Trusted origins (after deploy)
-
-Neon Auth's `trusted_origins` list is empty (localhost is allowed separately).
-Add the deployed URL (`https://hindi-learning.<subdomain>.workers.dev` and any
-custom domain) via the Neon console → Auth → Configuration, or the
-`configure_neon_auth` MCP tool — sign-in from the deployed origin fails until
-this is set.
-
-## 9. Verify
+## 9. First sign-in + verify (you)
 
 - Visit the deployed URL → sign-in gate appears; create an account, land in the reader.
-- Open a lesson, answer a quiz, ask a question, reload → progress dot persists; the answer/question are recorded under your real user (check `neon_auth.user` for the id).
-- `pnpm run review` (with `DATABASE_URL` pointed at production) shows your activity.
+- The production `topics` table is empty: after your first sign-in the reader
+  says "No topics yet" until the Topic row is created under your real user id
+  (find it in `neon_auth.user`, then insert the `hindi` Topic with that
+  `user_id` — ask Claude Code to do it via the Neon MCP).
+- Open a lesson, answer a quiz, ask a question, reload → progress dot persists; the answer/question are recorded under your real user.
+- `pnpm run review -- --prod` shows the live learner's activity; answer with `pnpm run reply -- --prod <id> "<text>"`.
 
 ## Notes
 
