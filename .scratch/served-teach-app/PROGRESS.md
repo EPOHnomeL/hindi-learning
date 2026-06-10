@@ -23,7 +23,7 @@ Reuse worth noting: the repository and service reuse `answerQuestion`/`openQuest
 - **Neon adapter** — `src/hub/neonRepository.ts`, satisfying the repository contract tests against a Neon test branch.
 - **Artifact store adapter (R2)** — `src/hub/artifactStore.ts`; `get`/`put` over the R2 binding, served only through the worker (ADR-0005).
 - **Hono worker routes** — `src/worker/app.ts`: serve Lesson/Reference HTML from R2; `GET` topics/lessons/references/questions → repository; `POST` responses/questions/progress → `CaptureService`.
-- **Vite reader UI** — `src/client/`: three-pane workstation (Lessons nav + progress · reader · question/reply thread). `LessonFrame` sizes the artifact iframe to its content so it renders fully on mobile.
+- **Vite reader UI** — `src/client/`: three-pane workstation (Lessons nav + progress · reader · question/reply thread). `LessonFrame` sizes the artifact iframe to its content so it renders fully on mobile, and captures the first answer to each lesson quiz back to the Hub (`POST /api/responses`) by hooking the authored quiz markup in the same-origin iframe — lessons stay pure artifacts.
 - **Single origin** — the built reader is served by the Worker via `[assets]` in `wrangler.toml`; `run_worker_first = ["/api/*"]` keeps API requests on the Worker, everything else falls back to the SPA. `pnpm build` then `wrangler dev`/`deploy`. Verified locally: `/`, SPA fallback, `/api/*`, and hashed assets all serve.
 - **Real teaching data** — the dev seed (`scripts/seed.ts` + `pnpm seed:r2`) points at the real artifacts (`lessons/*.html`, `references/ref-core-words.html` rendered from `GLOSSARY.md`). All sample blobs and the fabricated seed Question were removed; the conversation starts empty.
 
@@ -36,7 +36,6 @@ Two servers (HMR): `pnpm dev` (Worker/API, 8787) + `pnpm client` (reader, 5173, 
   1. Cloudflare account + Workers project + a private R2 bucket (`served-teach-artifacts`) with real ids in `wrangler.toml`.
   2. A Neon database + test branch; `DATABASE_URL` via `wrangler secret put`.
   3. Cloudflare Access policy — which identity/identities gate the app (ADR-0004), and Neon Auth wiring (ADR-0006) to replace the `dev-user` stub in `src/worker/index.ts`.
-- **Capture widgets in lessons** — the authored lesson HTML has quizzes, but they don't yet POST to `/api/responses`; the reader currently captures Questions and Progress only.
 - **Publish execution shell** — wraps the pure Publish planner (`src/publish/plan.ts`): `wrangler r2 object put` for blobs + Neon writes for metadata, so authoring no longer hand-runs the seed scripts.
 
 ## Open threads

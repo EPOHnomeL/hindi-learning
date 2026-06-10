@@ -2,6 +2,7 @@
 // dev (Vite proxy → wrangler) and in prod (same-origin Worker).
 
 export type ProgressState = "unseen" | "opened" | "completed";
+export type ResponseKind = "quiz" | "free_text";
 
 export interface Topic {
   id: string;
@@ -63,4 +64,6 @@ export const api = {
   },
   ask: (lessonId: string, text: string) => fetch("/api/questions", post({ lessonId, text })),
   progress: (lessonId: string, state: ProgressState) => fetch("/api/progress", post({ lessonId, state })),
+  respond: (lessonId: string, r: { promptId: string; kind: ResponseKind; value: string; correctness?: boolean }) =>
+    fetch("/api/responses", post({ lessonId, ...r })),
 };

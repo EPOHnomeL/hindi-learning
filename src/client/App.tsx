@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   api,
   type Lesson,
@@ -81,6 +81,15 @@ export function App() {
     }
   };
 
+  // Capture quiz answers from the open lesson back to the Hub (fire-and-forget,
+  // like progress). Keyed on the selection so each lesson gets its own reporter.
+  const handleResponse = useCallback(
+    (r: QuizResponse) => {
+      if (selection?.kind === "lesson") void api.respond(selection.id, r);
+    },
+    [selection],
+  );
+
   if (loading) return <div className="center muted">Loading…</div>;
   if (error) return <div className="center error">Couldn’t reach the API: {error}</div>;
   if (!topic) {
@@ -152,7 +161,11 @@ export function App() {
                   </button>
                 )}
               </div>
-              <LessonFrame title={selection.title} html={html} />
+              <LessonFrame
+                title={selection.title}
+                html={html}
+                onResponse={selection.kind === "lesson" ? handleResponse : undefined}
+              />
             </>
           ) : (
             <div className="center muted">Pick a lesson on the left to start reading.</div>
@@ -191,7 +204,15 @@ export function App() {
  * iframe, leaving the rest blank. srcDoc is same-origin, so we can measure the
  * content directly and re-measure as web fonts load or quizzes expand.
  */
-function LessonFrame({ html, title }: { html: string; title: string }) {
+function LessonFrame({
+  html,
+  title,
+  onResponse,
+}: {
+  html: string;
+  title: string;
+  onResponse?: (r: QuizResponse) => void;
+}) {
   const ref = useRef<HTMLIFrameElement>(null);
   useEffect(() => {
     const frame = ref.current;
@@ -207,6 +228,7 @@ function LessonFrame({ html, title }: { html: string; title: string }) {
       if (doc?.documentElement) {
         observer = new ResizeObserver(fit);
         observer.observe(doc.documentElement);
+        if (onResponse) wireQuizCapture(doc, onResponse);
       }
     };
     frame.addEventListener("load", onLoad);
@@ -216,8 +238,57 @@ function LessonFrame({ html, title }: { html: string; title: string }) {
       observer?.disconnect();
       clearTimeout(t);
     };
-  }, [html]);
+  }, [html, onResponse]);
   return <iframe ref={ref} className="reader-frame" title={title} srcDoc={html} scrolling="no" />;
+}
+
+type QuizResponse = { promptId: string; kind: "quiz" | "free_text"; value: string; correctness: boolean };
+
+/**
+ * Reads a learner's first answer to each quiz in the (same-origin) lesson and
+ * reports it as a Response. Hooks the authored quiz markup — `.quiz[data-correct]`
+ * multiple-choice and `.quiz.fill[data-answer]` fill-in — so lessons stay pure,
+ * self-contained artifacts. promptId is the quiz's ordinal in the lesson (q1, q2,
+ * …); stable because lessons are immutable (ADR-0003). One Response per prompt:
+ * the first attempt is the signal of what was mastered.
+ */
+function wireQuizCapture(doc: Document, onResponse: (r: QuizResponse) => void) {
+  const captured = new Set<string>();
+  const report = (r: QuizResponse) => {
+    if (captured.has(r.promptId)) return;
+    captured.add(r.promptId);
+    onResponse(r);
+  };
+  doc.querySelectorAll<HTMLElement>(".quiz").forEach((quiz, i) => {
+    const promptId = `q${i + 1}`;
+    if (quiz.classList.contains("fill")) {
+      const answer = quiz.getAttribute("data-answer");
+      const alt = quiz.getAttribute("data-alt");
+      const input = quiz.querySelector("input");
+      const submit = () => {
+        const value = (input?.value ?? "").replace(/\s+/g, " ").trim();
+        if (value === "") return;
+        report({ promptId, kind: "quiz", value, correctness: value === answer || value === alt });
+      };
+      quiz.querySelector("button")?.addEventListener("click", submit);
+      input?.addEventListener("keydown", (e) => {
+        if ((e as KeyboardEvent).key === "Enter") submit();
+      });
+    } else {
+      const correct = quiz.getAttribute("data-correct");
+      quiz.querySelectorAll<HTMLElement>(".opt").forEach((opt) => {
+        opt.addEventListener("click", () => {
+          const key = opt.getAttribute("data-k");
+          report({
+            promptId,
+            kind: "quiz",
+            value: (opt.textContent ?? "").replace(/\s+/g, " ").trim(),
+            correctness: key === correct,
+          });
+        });
+      });
+    }
+  });
 }
 
 function AskBox({ disabled, onAsk }: { disabled: boolean; onAsk: (text: string) => Promise<void> }) {
