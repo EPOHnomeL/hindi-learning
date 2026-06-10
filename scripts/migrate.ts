@@ -1,21 +1,26 @@
 // Applies migrations/*.sql to a Neon database. Reads the connection string
-// from .env at runtime (never printed, never committed). Targets the test
-// branch if DATABASE_URL_TEST is set, else DATABASE_URL.
+// from .env at runtime (never printed, never committed). Statements are
+// idempotent (`create table if not exists`), so re-running is safe.
 //
-//   pnpm migrate            # migrate whichever URL is present (test preferred)
-//   pnpm migrate --prod     # force DATABASE_URL (production branch)
+//   pnpm migrate            # the TEST branch (DATABASE_URL_TEST) — for the contract tests
+//   pnpm migrate --dev      # the dev branch (DATABASE_URL_DEV) — the local worker's Hub
+//   pnpm migrate --prod     # the production branch (DATABASE_URL)
 import "dotenv/config";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { neon } from "@neondatabase/serverless";
+import { resolveDbUrl } from "./db.ts";
 
-const forceProd = process.argv.includes("--prod");
-const url = forceProd
-  ? process.env.DATABASE_URL
-  : (process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL);
+const target = process.argv.includes("--prod")
+  ? "production"
+  : process.argv.includes("--dev")
+    ? "dev"
+    : "test";
+const url =
+  target === "test" ? process.env.DATABASE_URL_TEST : resolveDbUrl({ prod: target === "production" });
 
 if (!url) {
-  console.error("No connection string. Set DATABASE_URL_TEST or DATABASE_URL in .env.");
+  console.error("No connection string. Set DATABASE_URL_TEST in .env.");
   process.exit(1);
 }
 
@@ -35,4 +40,4 @@ for (const file of files) {
   }
   console.log(`applied ${file} (${statements.length} statements)`);
 }
-console.log(`migration complete${forceProd ? " (production)" : ""}.`);
+console.log(`migration complete (${target}).`);

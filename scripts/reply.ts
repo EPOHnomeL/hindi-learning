@@ -4,23 +4,21 @@
 // Mirrors NeonHubRepository.replyToQuestion. Reads the connection string from
 // .env at runtime.
 //
-// Usage: pnpm run reply <question-id> "<reply text>"
+// Usage: pnpm run reply [--prod] <question-id> "<reply text>"
 import "dotenv/config";
 import { neon } from "@neondatabase/serverless";
+import { resolveDbUrl } from "./db.ts";
 
-const id = process.argv[2];
-const text = process.argv.slice(3).join(" ").trim();
+const prod = process.argv.includes("--prod");
+const args = process.argv.slice(2).filter((a) => a !== "--prod");
+const id = args[0];
+const text = args.slice(1).join(" ").trim();
 if (!id || text === "") {
-  console.error('Usage: pnpm run reply <question-id> "<reply text>"');
+  console.error('Usage: pnpm run reply [--prod] <question-id> "<reply text>"');
   process.exit(1);
 }
 
-const url = process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL;
-if (!url) {
-  console.error("Set DATABASE_URL_TEST (or DATABASE_URL) in .env.");
-  process.exit(1);
-}
-const sql = neon(url);
+const sql = neon(resolveDbUrl({ prod }));
 
 const rows = await sql`select state from questions where id = ${id}`;
 const question = rows[0];

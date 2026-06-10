@@ -3,18 +3,17 @@
 // Responses and Progress per lesson that reveal what has been mastered and where
 // the learner is stuck. Read-only. Answer questions with `pnpm run reply`.
 // Reads the connection string from .env at runtime.
+//
+// Usage: pnpm run review            # dev branch (local loop)
+//        pnpm run review -- --prod  # production (the live learner)
 import "dotenv/config";
 import { neon } from "@neondatabase/serverless";
+import { resolveDbUrl } from "./db.ts";
 
 const TOPIC_ID = "hindi"; // v1 has one Topic; CONTEXT.md.
 const USER_ID = "dev-user"; // dev stub until Neon Auth (ADR-0006).
 
-const url = process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL;
-if (!url) {
-  console.error("Set DATABASE_URL_TEST (or DATABASE_URL) in .env.");
-  process.exit(1);
-}
-const sql = neon(url);
+const sql = neon(resolveDbUrl({ prod: process.argv.includes("--prod") }));
 
 const lessons = await sql`select id, seq, title from lessons
   where topic_id = ${TOPIC_ID} and superseded_by is null order by seq`;

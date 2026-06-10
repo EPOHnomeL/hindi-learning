@@ -20,17 +20,15 @@ import { createHash } from "node:crypto";
 import { execSync } from "node:child_process";
 import { neon } from "@neondatabase/serverless";
 import { planPublish, type PublishedArtifact, type WorkspaceArtifact } from "../src/publish/plan.ts";
+import { resolveDbUrl } from "./db.ts";
 
 const TOPIC_ID = "hindi"; // v1 has one Topic; CONTEXT.md.
 const REMOTE = process.argv.includes("--remote");
 const MODE = REMOTE ? "--remote" : "--local";
 
-const url = process.env.DATABASE_URL_TEST ?? process.env.DATABASE_URL;
-if (!url) {
-  console.error("Set DATABASE_URL_TEST (or DATABASE_URL) in .env.");
-  process.exit(1);
-}
-const sql = neon(url);
+// --remote publishes blobs to the real R2 bucket AND metadata to the production
+// branch; local mode pairs the simulated R2 with the dev branch.
+const sql = neon(resolveDbUrl({ prod: REMOTE }));
 
 interface Meta {
   kind: "lesson" | "reference";
