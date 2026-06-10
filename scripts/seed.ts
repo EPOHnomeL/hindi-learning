@@ -1,7 +1,9 @@
-// Seeds the Neon TEST branch with a sample Hindi topic for local dev so the
-// reader has something to show. Pairs with the HTML blobs in seed/, which get
-// uploaded to local R2 via wrangler (see README/commands). Reads the connection
-// string from .env at runtime. Idempotent: it truncates first.
+// Seeds the Neon TEST branch with the real Hindi topic for local dev so the
+// reader has something to show. The metadata here points at the real artifacts
+// (lessons/*.html, references/*.html), which `pnpm seed:r2` uploads to local
+// R2. Reads the connection string from .env at runtime. Idempotent: it
+// truncates first. No fabricated Responses/Questions — the conversation starts
+// empty, as a real learner's would.
 import "dotenv/config";
 import { neon } from "@neondatabase/serverless";
 
@@ -28,9 +30,7 @@ await sql`insert into lessons (id, topic_id, seq, title, r2_key)
   values ('0003-the-man-who', 'hindi', 3, ${"The man who — जो, the relative pronoun"}, 'lessons/0003-the-man-who.html')`;
 
 await sql`insert into topic_references (id, topic_id, title, r2_key, content_hash)
-  values ('ref-core-words', 'hindi', 'Core words so far', 'references/ref-core-words.html', 'seed')`;
+  values ('ref-core-words', 'hindi', ${"Grammar & core words (Psalm 1)"}, 'references/ref-core-words.html',
+          'b86f1b708327318422a844801a4266af7130d52a7bca343ef366324bc9f7a13e')`;
 
-await sql`insert into questions (id, lesson_id, text, state)
-  values ('seed-q1', '0001-blessed-is-the-man', ${"Is the habitual verb ever dropped in casual speech?"}, 'open')`;
-
-console.log("seeded: topic 'hindi' (dev-user), 3 lessons, 1 reference, 1 open question.");
+console.log("seeded: topic 'hindi' (dev-user), 3 lessons, 1 reference.");

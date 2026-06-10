@@ -3,8 +3,14 @@ main = "src/worker/index.ts"
 compatibility_date = "2025-06-01"
 compatibility_flags = ["nodejs_compat"]
 
-# Frontend assets (the Vite-built reader) get wired here later via the
-# Cloudflare Vite plugin. For now this is an API-only Worker.
+# Frontend assets — the Vite-built reader (dist/client). The asset handler
+# serves static files and falls back to index.html for client-side routes
+# (SPA). `run_worker_first` forces /api/* to the Worker so the asset SPA
+# fallback never swallows API requests. Build with `pnpm build` before deploy.
+[assets]
+directory = "./dist/client"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
 
 # R2 — the Artifact store (Lesson/Reference HTML blobs, ADR-0005). Local
 # `wrangler dev` simulates this with no cloud bucket; deploying needs the real

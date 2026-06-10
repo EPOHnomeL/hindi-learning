@@ -1,6 +1,6 @@
 # Progress — Served Teach App
 
-Status: in-progress (pure core complete; transport + infra blocked on slice 0)
+Status: in-progress (pure core + transport complete; runs locally as a single origin; cloud deploy is the remaining HITL slice)
 
 Snapshot of an AFK build session. Vocabulary per [`CONTEXT.md`](../../CONTEXT.md); decisions per [`docs/adr/`](../../docs/adr/).
 
@@ -18,20 +18,26 @@ All four PRD deep modules plus the inbound seam — all pure / infra-free, each 
 
 Reuse worth noting: the repository and service reuse `answerQuestion`/`openQuestion` (domain) and `advanceProgress` (protocol) rather than re-implementing the rules.
 
-## Blocked on slice 0 (HITL — needs your accounts + decisions)
+## Transport built since (runs locally end-to-end)
 
-Nothing below can be built/verified without real infrastructure:
+- **Neon adapter** — `src/hub/neonRepository.ts`, satisfying the repository contract tests against a Neon test branch.
+- **Artifact store adapter (R2)** — `src/hub/artifactStore.ts`; `get`/`put` over the R2 binding, served only through the worker (ADR-0005).
+- **Hono worker routes** — `src/worker/app.ts`: serve Lesson/Reference HTML from R2; `GET` topics/lessons/references/questions → repository; `POST` responses/questions/progress → `CaptureService`.
+- **Vite reader UI** — `src/client/`: three-pane workstation (Lessons nav + progress · reader · question/reply thread). `LessonFrame` sizes the artifact iframe to its content so it renders fully on mobile.
+- **Single origin** — the built reader is served by the Worker via `[assets]` in `wrangler.toml`; `run_worker_first = ["/api/*"]` keeps API requests on the Worker, everything else falls back to the SPA. `pnpm build` then `wrangler dev`/`deploy`. Verified locally: `/`, SPA fallback, `/api/*`, and hashed assets all serve.
+- **Real teaching data** — the dev seed (`scripts/seed.ts` + `pnpm seed:r2`) points at the real artifacts (`lessons/*.html`, `references/ref-core-words.html` rendered from `GLOSSARY.md`). All sample blobs and the fabricated seed Question were removed; the conversation starts empty.
 
-- **Neon adapter** — a real `HubRepository` implementation. *Must satisfy the existing contract tests in `src/hub/repository.test.ts`* (run them against a Neon test branch).
-- **Artifact store adapter (R2)** — `get`/`put` over the R2 binding; private bucket served only through the worker (ADR-0005).
-- **Hono worker routes** — thin glue: serve Lesson/Reference HTML via the R2 binding behind Cloudflare Access; `POST` capture → `CaptureService`; `GET` topics/lessons/threads → repository.
-- **Vite reader UI** — topic list, lesson view (renders served HTML + mounts capture widgets), reference view, question/reply thread, progress.
-- **Publish execution shell** — wraps the pure Publish planner: `wrangler r2 object put` for blobs + Neon writes for metadata.
+### Local dev today
+Two servers (HMR): `pnpm dev` (Worker/API, 8787) + `pnpm client` (reader, 5173, LAN-bound). Or single origin: `pnpm build` + `pnpm dev`.
 
-### What I need from you to unblock
-1. Cloudflare account + a Workers/Pages project, an R2 bucket (private), and a `wrangler.toml` with real ids.
-2. A Neon database + a test branch, connection string available to the worker and to tests.
-3. The Cloudflare Access policy decision (gate the app to which identity/identities — ADR-0004).
+## Remaining
+
+- **Cloud deploy (HITL — needs your accounts + decisions):**
+  1. Cloudflare account + Workers project + a private R2 bucket (`served-teach-artifacts`) with real ids in `wrangler.toml`.
+  2. A Neon database + test branch; `DATABASE_URL` via `wrangler secret put`.
+  3. Cloudflare Access policy — which identity/identities gate the app (ADR-0004), and Neon Auth wiring (ADR-0006) to replace the `dev-user` stub in `src/worker/index.ts`.
+- **Capture widgets in lessons** — the authored lesson HTML has quizzes, but they don't yet POST to `/api/responses`; the reader currently captures Questions and Progress only.
+- **Publish execution shell** — wraps the pure Publish planner (`src/publish/plan.ts`): `wrangler r2 object put` for blobs + Neon writes for metadata, so authoring no longer hand-runs the seed scripts.
 
 ## Open threads
-- `/to-issues` produced a 9-slice breakdown (slice 0 HITL, the rest AFK) but it was **not approved/published** — we jumped to `/tdd`. The slices map cleanly onto the work above when you want them filed.
+- `/to-issues` produced a 9-slice breakdown but it was **not approved/published** — we jumped to `/tdd`. The slices map onto the Remaining items above when you want them filed.
