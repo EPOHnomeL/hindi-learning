@@ -85,4 +85,16 @@ describe("worker API", () => {
 
     expect(await hub.getProgress("me", "l1")).toBe("completed");
   });
+
+  it("GET /api/topics/:id/progress returns the user's Progress as a lessonId->state map", async () => {
+    const { hub, app } = setup();
+    await hub.insertLesson({ id: "l1", topicId: "t1", order: 1, title: "L1", r2Key: "k1" });
+    await hub.insertLesson({ id: "l2", topicId: "t1", order: 2, title: "L2", r2Key: "k2" });
+    await hub.recordProgress({ userId: "me", lessonId: "l1", state: "completed" });
+
+    const res = await app.request("/api/topics/t1/progress");
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ l1: "completed", l2: "unseen" });
+  });
 });

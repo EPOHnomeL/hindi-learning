@@ -52,6 +52,8 @@ export const api = {
   lessons: (topicId: string): Promise<Lesson[]> => fetch(`/api/topics/${topicId}/lessons`).then(json),
   references: (topicId: string): Promise<Reference[]> => fetch(`/api/topics/${topicId}/references`).then(json),
   openQuestions: (topicId: string): Promise<Question[]> => fetch(`/api/topics/${topicId}/questions`).then(json),
+  progressMap: (topicId: string): Promise<Record<string, ProgressState>> =>
+    fetch(`/api/topics/${topicId}/progress`).then(json),
   lessonHtml: async (lessonId: string): Promise<string> => {
     const r = await fetch(`/api/lessons/${lessonId}/html`);
     if (!r.ok) throw new Error(`${r.status}`);

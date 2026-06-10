@@ -36,14 +36,16 @@ export function App() {
         const t = topics[0] ?? null;
         setTopic(t);
         if (t) {
-          const [ls, rs, qs] = await Promise.all([
+          const [ls, rs, qs, pr] = await Promise.all([
             api.lessons(t.id),
             api.references(t.id),
             api.openQuestions(t.id),
+            api.progressMap(t.id),
           ]);
           setLessons(ls);
           setReferences(rs);
           setQuestions(qs);
+          setProgress(pr); // restore progress dots from the Hub
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load");
@@ -58,9 +60,24 @@ export function App() {
     void api.progress(lessonId, state);
   };
 
+  // Keep the active pane in browser history so the device Back button moves
+  // between panes (e.g. lesson → list) instead of leaving the app.
+  useEffect(() => {
+    window.history.replaceState({ pane: "nav" }, "");
+    const onPop = (e: PopStateEvent) => setPane(((e.state as { pane?: Pane } | null)?.pane) ?? "nav");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const navigate = (p: Pane) => {
+    setPane(p);
+    if (p === "nav") window.history.replaceState({ pane: "nav" }, "");
+    else window.history.pushState({ pane: p }, "");
+  };
+
   const openLesson = async (l: Lesson) => {
     setSelection({ kind: "lesson", id: l.id, title: l.title });
-    setPane("read");
+    navigate("read");
     setHtml("");
     bump(l.id, "opened");
     try {
@@ -72,7 +89,7 @@ export function App() {
 
   const openReference = async (r: Reference) => {
     setSelection({ kind: "reference", id: r.id, title: r.title });
-    setPane("read");
+    navigate("read");
     setHtml("");
     try {
       setHtml(await api.referenceHtml(r.id));
@@ -105,9 +122,9 @@ export function App() {
       <header className="topbar">
         <div className="topbar-title">{topic.title}</div>
         <div className="topbar-tabs">
-          <button className={pane === "nav" ? "on" : ""} onClick={() => setPane("nav")}>Lessons</button>
-          <button className={pane === "read" ? "on" : ""} onClick={() => setPane("read")} disabled={!selection}>Read</button>
-          <button className={pane === "thread" ? "on" : ""} onClick={() => setPane("thread")}>
+          <button className={pane === "nav" ? "on" : ""} onClick={() => navigate("nav")}>Lessons</button>
+          <button className={pane === "read" ? "on" : ""} onClick={() => navigate("read")} disabled={!selection}>Read</button>
+          <button className={pane === "thread" ? "on" : ""} onClick={() => navigate("thread")}>
             Questions{questions.length ? ` ·${questions.length}` : ""}
           </button>
         </div>

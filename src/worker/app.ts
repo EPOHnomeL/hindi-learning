@@ -25,6 +25,17 @@ export function createApp(deps: AppDeps) {
   app.get("/api/topics/:id/references", async (c) => c.json(await deps.hub.listReferences(c.req.param("id"))));
   app.get("/api/topics/:id/questions", async (c) => c.json(await deps.hub.listOpenQuestions(c.req.param("id"))));
 
+  // The authenticated user's Progress across the Topic's Lessons, as a
+  // { lessonId: state } map — lets the reader restore its progress dots on load.
+  app.get("/api/topics/:id/progress", async (c) => {
+    const userId = deps.currentUserId(c);
+    const lessons = await deps.hub.listLessons(c.req.param("id"));
+    const entries = await Promise.all(
+      lessons.map(async (l) => [l.id, await deps.hub.getProgress(userId, l.id)] as const),
+    );
+    return c.json(Object.fromEntries(entries));
+  });
+
   // The rendered Lesson HTML blob, streamed from the Artifact store (R2).
   app.get("/api/lessons/:id/html", async (c) => {
     const lesson = await deps.hub.getLesson(c.req.param("id"));
