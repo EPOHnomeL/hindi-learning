@@ -42,7 +42,7 @@ Make opening a lesson as easy as possible. This workspace serves its lessons and
 
 ## Publishing
 
-This workspace is wired to a web app (a Cloudflare Worker over a Neon Hub + R2 artifact store) that serves the lessons and references to the user on any device, and feeds their answers and questions back to you. The local files are the source of truth; publishing is a deliberate push, not a live sync.
+This workspace is wired to a web app (a Next.js reader backed by Convex) that serves the lessons and references to the user on any device, and feeds their answers and questions back to you. The local files are the source of truth; publishing is a deliberate push, not a live sync.
 
 **After you create or change a lesson or reference, publish it** so it appears in the reader:
 
@@ -50,7 +50,7 @@ This workspace is wired to a web app (a Cloudflare Worker over a Neon Hub + R2 a
 pnpm run publish
 ```
 
-This scans `./lessons/` and `./references/`, diffs against what the Hub already has, and pushes only what is new or changed (the HTML blob to R2, the metadata row to the Hub). It is idempotent — safe to run any time. Use `pnpm run publish -- --remote` to publish to the deployed site rather than local dev.
+This scans `./lessons/` and `./references/`, diffs against what Convex already has, and pushes only what is new or changed (immutable lessons are inserted once; references upsert on content change). It is idempotent — safe to run any time. There is a single Convex deployment, so there is no separate local/remote step.
 
 For publishing to work, follow these conventions when authoring:
 
