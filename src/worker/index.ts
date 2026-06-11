@@ -39,6 +39,30 @@ export default {
     });
 
     const root = new Hono<{ Variables: Vars }>();
+
+    // Same-origin proxy for Neon Auth (ADR-0006). The auth service lives on the
+    // neonauth domain; its session cookie is third-party from the reader's
+    // origin, and browsers drop such cookies on fetch — sign-in succeeded but
+    // the session never persisted. So the SDK talks to /api/auth/* here and the
+    // worker forwards to the real service. Set-Cookie Domain is stripped so the
+    // session binds to this origin (first-party). Registered before the auth
+    // middleware: these endpoints are how you GET a token, they can't demand one.
+    if (env.NEON_AUTH_URL) {
+      const upstreamBase = env.NEON_AUTH_URL.replace(/\/+$/, "");
+      root.all("/api/auth/*", async (c) => {
+        const url = new URL(c.req.url);
+        const upstream = upstreamBase + url.pathname.slice("/api/auth".length) + url.search;
+        const response = await fetch(new Request(upstream, c.req.raw));
+        const headers = new Headers(response.headers);
+        const cookies = response.headers.getSetCookie();
+        if (cookies.length > 0) {
+          headers.delete("set-cookie");
+          for (const cookie of cookies) headers.append("set-cookie", cookie.replace(/;\s*domain=[^;]*/gi, ""));
+        }
+        return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+      });
+    }
+
     root.use("*", async (c, next) => {
       const userId = await resolveUser(c.req.raw);
       if (!userId && authConfigured) return c.json({ error: "unauthenticated" }, 401);

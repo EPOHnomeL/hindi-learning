@@ -15,24 +15,34 @@ type Phase = "loading" | "signed-out" | "ready";
 export function AuthGate({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<Phase>(authClient ? "loading" : "ready");
 
+  // The SDK's fetch wrapper THROWS on non-OK responses (e.g. /token with no
+  // session) rather than returning { error } — treat any failure as "no token".
   const refreshToken = useCallback(async () => {
     if (!authClient) return false;
-    const { data, error } = await authClient.token();
-    if (error || !data?.token) {
+    try {
+      const { data, error } = await authClient.token();
+      if (error || !data?.token) {
+        setAuthToken(undefined);
+        return false;
+      }
+      setAuthToken(data.token);
+      return true;
+    } catch {
       setAuthToken(undefined);
       return false;
     }
-    setAuthToken(data.token);
-    return true;
   }, []);
 
   // Initial session check: an existing cookie session goes straight through.
   useEffect(() => {
     if (!authClient) return;
-    void authClient.getSession().then(async (result) => {
-      if (result.data?.session && (await refreshToken())) setPhase("ready");
-      else setPhase("signed-out");
-    });
+    void authClient
+      .getSession()
+      .then(async (result) => {
+        if (result.data?.session && (await refreshToken())) setPhase("ready");
+        else setPhase("signed-out");
+      })
+      .catch(() => setPhase("signed-out"));
   }, [refreshToken]);
 
   // Keep the short-lived JWT fresh while reading — periodically and whenever
@@ -69,21 +79,28 @@ function SignInForm({ onSignedIn }: { onSignedIn: () => Promise<void> }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // The SDK throws on non-OK responses; without the catch (and the finally
+  // resetting busy) a failed call left the button stuck on "…" forever.
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!authClient) return;
     setBusy(true);
     setError(null);
-    const result =
-      mode === "sign-up"
-        ? await authClient.signUp.email({ name: email.split("@")[0] || "Learner", email, password })
-        : await authClient.signIn.email({ email, password });
-    if (result.error) {
-      setError(result.error.message ?? "Sign-in failed");
+    try {
+      const result =
+        mode === "sign-up"
+          ? await authClient.signUp.email({ name: email.split("@")[0] || "Learner", email, password })
+          : await authClient.signIn.email({ email, password });
+      if (result.error) {
+        setError(result.error.message ?? "Sign-in failed");
+        return;
+      }
+      await onSignedIn();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign-in failed");
+    } finally {
       setBusy(false);
-      return;
     }
-    await onSignedIn();
   };
 
   return (
