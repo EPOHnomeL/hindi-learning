@@ -40,6 +40,20 @@ noun in the oblique; it also agrees with the **following** noun — का (masc
 the wicked".
 _Avoid_: treating का/के/की as three different words — they are one word agreeing.
 
+**Relative pronoun (जो)**:
+The word "(the one) who / which", used to attach a describing clause to a noun.
+It is both singular and plural. All Hindi relatives begin with **ज-** (जो who,
+जब when, जहाँ where), whereas the matching question words begin with **क-** (कौन,
+कब, कहाँ). (Handbook §13.1 p.162, §13.4 p.168.)
+_Avoid_: confusing जो (relative "who") with कौन (interrogative "who?").
+
+**Correlative (वह … जो)**:
+The "answering" word that pairs with a relative. Hindi keeps a **balanced pair**
+of clauses where English fuses them: वह पुरुष **जो** … = "the man **who** …" (lit.
+"that man, who …"). The relative clause (ज-) is matched by a correlative (वह/वे,
+तब, वहाँ). (Handbook §13.1, p.162.)
+_Avoid_: expecting one fused word like English "who"; look for the ज-/वह pair.
+
 **Auxiliary** (here, the है-auxiliary):
 The "to be" verb (हूँ / है / हैं / हो) tagged onto a participle to anchor it in
 present time. In elevated/literary and biblical Hindi it is often **dropped**,
@@ -47,7 +61,36 @@ especially in lists and timeless statements — which is why Psalm 1:1 reads
 चलता … होता … बैठता है (auxiliary only on the last verb).
 _Avoid_: helper verb (ambiguous — Hindi also has true compound-verb helpers).
 
+**Continuative (करता रहना)**:
+A habitual participle (–ता form) + **रहना** "to remain", meaning **"to keep on /
+go on doing"** — the action continues. The participle agrees with the subject:
+वह काम करती रही "she went on working"; ध्यान करता रहता है "he keeps on meditating".
+(Handbook §15.1, p.191.)
+_Avoid_: reading रहता literally as "remains" when a –ता participle sits in front of it.
+
+**Conjunct verb (ध्यान करना)**:
+A noun (or adjective) + a light verb — usually **करना** "to do" or **होना** "to be"
+— fused into one verb. ध्यान करना "to meditate" (lit. "to do attention"); प्रेम करना
+"to love"; विश्वास करना "to believe". The noun stays put; only करना/होना conjugates.
+_Avoid_: translating the noun and करना separately ("do attention").
+
 ## Vocabulary (BSI OV, Psalm 1)
+
+**यहोवा** (yahovā):
+The LORD — the divine covenant name (Yahweh, יהוה). Indeclinable (never changes
+form). The BSI OV uses it where English Bibles print "the LORD" in small caps.
+
+**व्यवस्था** (vyavasthā):
+Law, instruction, ordinance — the Torah / God's law. Feminine (so: यहोवा **की**
+व्यवस्था "the law of the LORD").
+
+**परन्तु** (parantu):
+But — the contrast conjunction. Marks the turn from Psalm 1:1's "does not…" to
+1:2's "but he does…". A more literary/formal twin of लेकिन.
+
+**प्रसन्न** (prasanna):
+Pleased, glad, delighted. प्रसन्न रहना "to remain glad / to delight (in)".
+
 
 **धन्य** (dhanya):
 Blessed, fortunate, happy. The opening word of Psalm 1's blessing —
