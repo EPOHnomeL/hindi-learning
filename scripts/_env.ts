@@ -19,6 +19,10 @@ function load(file: string) {
 load(".env.local");
 load(".env");
 
+// ConvexHttpClient rejects a base URL with a trailing slash, so strip any here —
+// the env var is set by hand and easily ends up as "https://….convex.cloud/".
+const clean = (url: string) => url.replace(/\/+$/, "");
+
 export function convexUrl(prod = false): string {
   if (prod) {
     const url = process.env.CONVEX_PROD_URL;
@@ -29,14 +33,14 @@ export function convexUrl(prod = false): string {
       );
       process.exit(1);
     }
-    return url;
+    return clean(url);
   }
   const url = process.env.CONVEX_URL ?? process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!url) {
     console.error("Missing NEXT_PUBLIC_CONVEX_URL — run `npx convex dev` once to create the deployment.");
     process.exit(1);
   }
-  return url;
+  return clean(url);
 }
 
 export function publishSecret(): string {
