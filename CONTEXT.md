@@ -43,3 +43,11 @@ _Avoid_: Deploy, push, sync, upload
 **Reply**:
 Claude Code's answer to a specific Question, written back to the hub and readable on the web inline with the Question it answers. Transitions the Question to `answered`. The return leg that makes the loop a conversation rather than a feedback form.
 _Avoid_: Response (that is the learner's, not Claude Code's), comment
+
+**Routine**:
+The unattended invocation of the teach loop (review → reply → author → publish) by Claude Code in the cloud, as opposed to a human-driven session. It is started two ways — a daily schedule and an on-demand fire from the reader — but only authors when the Frontier permits (see Frontier). v1 runs one Routine whose instructions fix it to the single Topic; advancing several Topics is a later concern.
+_Avoid_: Job, cron, automation, agent (when naming the concept)
+
+**Frontier**:
+The highest-ordered, non-superseded Lesson in a Topic — the learner's leading edge. The Routine authors the next Lesson only once the learner has marked the Frontier `completed`, so a Topic holds at most one unread Lesson beyond what's done (a buffer of one). When the learner completes the Frontier, the reader offers to fire the Routine for the next one.
+_Avoid_: Latest, head, tip, edge
