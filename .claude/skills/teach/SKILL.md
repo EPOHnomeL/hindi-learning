@@ -44,13 +44,13 @@ Make opening a lesson as easy as possible. This workspace serves its lessons and
 
 This workspace is wired to a web app (a Next.js reader backed by Convex) that serves the lessons and references to the user on any device, and feeds their answers and questions back to you. The local files are the source of truth; publishing is a deliberate push, not a live sync.
 
-**After you create or change a lesson or reference, publish it** so it appears in the reader:
+**After you create or change a lesson or reference, publish it to the live site** so it appears in the learner's reader:
 
 ```
-pnpm run publish
+pnpm run publish:prod
 ```
 
-This scans `./lessons/` and `./references/`, diffs against what Convex already has, and pushes only what is new or changed (immutable lessons are inserted once; references upsert on content change). It is idempotent — safe to run any time. There is a single Convex deployment, so there is no separate local/remote step.
+This scans `./lessons/` and `./references/`, diffs against what the live (production) Convex deployment already has, and pushes only what is new or changed (immutable lessons are inserted once; references upsert on content change). It is idempotent — safe to run any time. (Use `pnpm run publish` without `:prod` to push to your local dev deployment for previewing with `pnpm dev`.)
 
 For publishing to work, follow these conventions when authoring:
 
@@ -63,10 +63,10 @@ For publishing to work, follow these conventions when authoring:
 
 The web app is a two-way channel, not just a publishing target. While the learner reads, they leave **Responses** (quiz answers), **Progress** (opened/completed), and **Questions** (things they got stuck on). This is an asynchronous conversation with you — they cannot ask you a follow-up live, so the questions queue up for your next session.
 
-**At the start of every teach session, read the learner's state first:**
+**At the start of every teach session, read the live learner's state first:**
 
 ```
-pnpm run review
+pnpm run review:prod
 ```
 
 This prints, from the Hub:
@@ -77,7 +77,7 @@ This prints, from the Hub:
 **Answer every open question** before moving on, with:
 
 ```
-pnpm run reply <question-id> "<your answer>"
+pnpm run reply:prod <question-id> "<your answer>"
 ```
 
 The reply appears inline with the question in the reader, and the question flips to `answered`. Treat a confusion that several questions circle around as a signal to write a short reference, or a corrective next lesson.

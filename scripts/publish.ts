@@ -10,8 +10,10 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
 import { convexUrl, publishSecret } from "./_env";
 
+const PROD = process.argv.includes("--prod");
 const secret = publishSecret();
-const client = new ConvexHttpClient(convexUrl());
+const client = new ConvexHttpClient(convexUrl(PROD));
+console.log(`Publishing to ${PROD ? "PROD (live site)" : "dev"}…`);
 
 const titleFrom = (html: string): string => {
   const raw = html.match(/<title>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? "";

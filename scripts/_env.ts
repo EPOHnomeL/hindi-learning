@@ -19,7 +19,18 @@ function load(file: string) {
 load(".env.local");
 load(".env");
 
-export function convexUrl(): string {
+export function convexUrl(prod = false): string {
+  if (prod) {
+    const url = process.env.CONVEX_PROD_URL;
+    if (!url) {
+      console.error(
+        "Missing CONVEX_PROD_URL — set it in .env.local to your prod deployment URL\n" +
+          "(e.g. https://<your-prod>.convex.cloud) so *:prod commands target the live site.",
+      );
+      process.exit(1);
+    }
+    return url;
+  }
   const url = process.env.CONVEX_URL ?? process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!url) {
     console.error("Missing NEXT_PUBLIC_CONVEX_URL — run `npx convex dev` once to create the deployment.");

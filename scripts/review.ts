@@ -5,7 +5,8 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
 import { convexUrl, publishSecret } from "./_env";
 
-const client = new ConvexHttpClient(convexUrl());
+const PROD = process.argv.includes("--prod");
+const client = new ConvexHttpClient(convexUrl(PROD));
 const state = await client.query(api.capture.reviewState, { secret: publishSecret() });
 
 console.log("\n=== OPEN QUESTIONS ===");
