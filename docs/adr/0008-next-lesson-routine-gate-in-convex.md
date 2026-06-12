@@ -62,3 +62,7 @@ routine; Convex stores that token and POSTs the Fire URL.
   Lesson file (source of truth, ADR 0002) *and* publish to prod Convex.
 - "Delivery" (FR14) is just Convex realtime: the published Lesson appears in the
   reader live; the button shows generating → done/failed/caught-up off the lock.
+
+The operational wiring this decision implies — the claude.ai routine config, its
+connectors/permissions, the fire request shape, Vercel/Convex deploy keys, and
+known failure modes — is documented as a runbook in [docs/routine.md](../routine.md).
