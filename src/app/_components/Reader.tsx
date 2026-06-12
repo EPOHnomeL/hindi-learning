@@ -91,7 +91,7 @@ export function Reader() {
         </nav>
       </aside>
 
-      <section className="min-w-0 flex-1 overflow-hidden p-4">
+      <section className="min-w-0 flex-1 overflow-hidden md:p-4">
         {current ? (
           <ArtifactView
             kind={current.kind}
@@ -100,7 +100,7 @@ export function Reader() {
             isFrontier={current.kind === "lesson" && current.key === frontierKey}
           />
         ) : (
-          <p className="text-soft">Select a lesson.</p>
+          <p className="p-4 text-soft">Select a lesson.</p>
         )}
       </section>
     </div>

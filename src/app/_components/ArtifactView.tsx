@@ -75,7 +75,8 @@ function Frame({ html, withBridge }: { html: string; withBridge: boolean }) {
     if (!withBridge) return html;
     return html.includes("</body>") ? html.replace("</body>", CAPTURE_BRIDGE + "</body>") : html + CAPTURE_BRIDGE;
   }, [html, withBridge]);
-  return <iframe sandbox="allow-scripts" srcDoc={srcDoc} className="min-h-[60vh] w-full flex-1 rounded-xl border border-line bg-card" />;
+  // Full-bleed on mobile (edge-to-edge, no side border/rounding); a bordered card on desktop.
+  return <iframe sandbox="allow-scripts" srcDoc={srcDoc} className="min-h-[60vh] w-full flex-1 border-y border-line bg-card md:rounded-xl md:border" />;
 }
 
 function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; topicSlug: string; isFrontier: boolean }) {
@@ -119,7 +120,7 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
     <div className="flex h-full flex-col gap-4 md:flex-row">
       {/* Lesson column — fills the available height. */}
       <div className="flex min-h-0 flex-1 flex-col gap-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-3 px-3 pt-3 md:px-0 md:pt-0">
           <h2 className="text-lg font-semibold">{lesson.title}</h2>
           <div className="flex shrink-0 items-center gap-2">
             {isFrontier && completed && <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />}
@@ -223,7 +224,7 @@ function ReferenceView({ refKey }: { refKey: string }) {
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   return (
     <div className="flex h-full flex-col gap-3">
-      <h2 className="text-lg font-semibold">{ref.title}</h2>
+      <h2 className="px-3 pt-3 text-lg font-semibold md:px-0 md:pt-0">{ref.title}</h2>
       <Frame html={ref.html} withBridge={false} />
     </div>
   );
