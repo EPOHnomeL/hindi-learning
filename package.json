@@ -15,7 +15,9 @@
     "review": "tsx scripts/review.ts",
     "review:prod": "tsx scripts/review.ts --prod",
     "reply": "tsx scripts/reply.ts",
-    "reply:prod": "tsx scripts/reply.ts --prod"
+    "reply:prod": "tsx scripts/reply.ts --prod",
+    "report": "tsx scripts/report.ts",
+    "report:prod": "tsx scripts/report.ts --prod"
   },
   "dependencies": {
     "@auth/core": "0.37.0",

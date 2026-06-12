@@ -50,12 +50,33 @@ export default defineSchema({
     correct: v.boolean(),
   }).index("by_user_lesson_quiz", ["userId", "lessonKey", "quizId"]),
 
-  // Per-lesson reading state.
+  // Per-lesson reading state. `by_lesson` lets the Routine's gate ask "is this
+  // lesson completed?" without a user (the daily cron has none); v1 is single-
+  // learner, so any completed row is the learner's.
   progress: defineTable({
     userId: v.id("users"),
     lessonKey: v.string(),
     status: v.union(v.literal("opened"), v.literal("completed")),
-  }).index("by_user_lesson", ["userId", "lessonKey"]),
+  })
+    .index("by_user_lesson", ["userId", "lessonKey"])
+    .index("by_lesson", ["lessonKey"]),
+
+  // The next-lesson Routine's single-flight lock, one row per Topic (see ADR
+  // 0008). `frontierKey` is the lesson the in-flight (or last) run fired for;
+  // with `status: "caughtUp"` it debounces re-fires until the Frontier advances.
+  // `startedAt` backstops a crashed run that never reports (stale → re-fireable).
+  generation: defineTable({
+    topicId: v.id("topics"),
+    status: v.union(
+      v.literal("idle"),
+      v.literal("generating"),
+      v.literal("failed"),
+      v.literal("caughtUp"),
+    ),
+    frontierKey: v.optional(v.string()),
+    startedAt: v.optional(v.number()),
+    error: v.optional(v.string()),
+  }).index("by_topic", ["topicId"]),
 
   // A question the learner asked from inside a lesson; the teacher replies.
   questions: defineTable({

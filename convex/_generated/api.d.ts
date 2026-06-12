@@ -11,7 +11,9 @@
 import type * as auth from "../auth.js";
 import type * as capture from "../capture.js";
 import type * as content from "../content.js";
+import type * as crons from "../crons.js";
 import type * as http from "../http.js";
+import type * as routine from "../routine.js";
 
 import type {
   ApiFromModules,
@@ -23,7 +25,9 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   capture: typeof capture;
   content: typeof content;
+  crons: typeof crons;
   http: typeof http;
+  routine: typeof routine;
 }>;
 
 /**
