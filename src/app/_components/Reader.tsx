@@ -2,7 +2,7 @@
 
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery } from "convex/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { ArtifactView } from "./ArtifactView";
 
@@ -11,22 +11,61 @@ type Selection = { kind: "lesson" | "reference"; key: string };
 // v1 serves a single Topic; a switcher arrives with multi-topic.
 const TOPIC_SLUG = "hindi";
 
+// localStorage key for answered-question ids the learner has already seen.
+const SEEN_KEY = "hindi:answers-seen";
+
 export function Reader() {
   const lessons = useQuery(api.content.listLessons);
   const references = useQuery(api.content.listReferences);
   const progress = useQuery(api.capture.myProgress);
+  const questions = useQuery(api.capture.myQuestions);
   const { signOut } = useAuthActions();
   const [selected, setSelected] = useState<Selection | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Answered-question ids the learner has already seen (client-only, per device).
+  // A lesson with a reply not in this set gets a notification dot in the nav;
+  // opening that lesson marks its answers seen and clears the dot.
+  const [seen, setSeen] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SEEN_KEY);
+      if (raw) setSeen(new Set(JSON.parse(raw) as string[]));
+    } catch {
+      /* unavailable or corrupt storage — start empty */
+    }
+  }, []);
+
   // lessonKey -> status, so the nav can show what's already completed.
   const completed = new Set((progress ?? []).filter((p) => p.status === "completed").map((p) => p.lessonKey));
+
+  // Lessons with a teacher reply the learner hasn't seen yet → show a dot.
+  const unseenAnswers = new Set<string>();
+  for (const q of questions ?? []) if (q.reply && !seen.has(q.id)) unseenAnswers.add(q.lessonKey);
 
   // The Frontier: the last (highest-seq) lesson. listLessons is seq-ascending.
   const frontierKey = lessons && lessons.length > 0 ? lessons[lessons.length - 1]!.key : null;
 
   // Default to the first lesson once they load.
   const current = selected ?? (lessons && lessons.length > 0 ? { kind: "lesson" as const, key: lessons[0]!.key } : null);
+
+  // Viewing a lesson counts as seeing its answers — mark them so the dot clears.
+  useEffect(() => {
+    if (current?.kind !== "lesson" || !questions) return;
+    const ids = questions.filter((q) => q.lessonKey === current.key && q.reply).map((q) => q.id);
+    if (ids.length === 0) return;
+    setSeen((prev) => {
+      if (ids.every((id) => prev.has(id))) return prev;
+      const next = new Set(prev);
+      for (const id of ids) next.add(id);
+      try {
+        localStorage.setItem(SEEN_KEY, JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, [current?.key, questions]);
 
   // Selecting from the drawer closes it (mobile); a no-op on desktop.
   const select = (s: Selection) => {
@@ -77,6 +116,7 @@ export function Reader() {
               key={l.key}
               active={current?.kind === "lesson" && current.key === l.key}
               done={completed.has(l.key)}
+              notify={unseenAnswers.has(l.key)}
               onClick={() => select({ kind: "lesson", key: l.key })}
             >
               {l.seq}. {l.title.split("—")[0]!.trim()}
@@ -111,11 +151,13 @@ export function Reader() {
 function NavItem({
   active,
   done = false,
+  notify = false,
   onClick,
   children,
 }: {
   active: boolean;
   done?: boolean;
+  notify?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -127,15 +169,20 @@ function NavItem({
       }`}
     >
       <span className="min-w-0">{children}</span>
-      {done && (
-        <span
-          aria-label="completed"
-          title="Completed"
-          className={`shrink-0 text-xs ${active ? "text-white" : "text-accent2"}`}
-        >
-          ✓
-        </span>
-      )}
+      <span className="flex shrink-0 items-center gap-1.5">
+        {notify && (
+          <span
+            aria-label="New reply from your teacher"
+            title="Your teacher answered a question here"
+            className={`h-2 w-2 rounded-full ${active ? "bg-white" : "bg-gold"}`}
+          />
+        )}
+        {done && (
+          <span aria-label="completed" title="Completed" className={`text-xs ${active ? "text-white" : "text-accent2"}`}>
+            ✓
+          </span>
+        )}
+      </span>
     </button>
   );
 }
