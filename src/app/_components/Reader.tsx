@@ -18,8 +18,8 @@ export function Reader() {
   const current = selected ?? (lessons && lessons.length > 0 ? { kind: "lesson" as const, key: lessons[0]!.key } : null);
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-6 md:flex-row">
-      <aside className="md:w-64 md:shrink-0">
+    <div className="flex min-h-screen flex-col md:h-screen md:flex-row md:overflow-hidden">
+      <aside className="shrink-0 border-b border-stone-200 p-4 md:w-64 md:overflow-y-auto md:border-b-0 md:border-r">
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-lg font-semibold">Hindi</h1>
           <button onClick={() => void signOut()} className="text-xs text-stone-500 hover:text-stone-800">
@@ -45,7 +45,7 @@ export function Reader() {
         </nav>
       </aside>
 
-      <section className="min-w-0 flex-1">
+      <section className="min-w-0 flex-1 p-4 md:overflow-hidden">
         {current ? (
           <ArtifactView kind={current.kind} artifactKey={current.key} />
         ) : (

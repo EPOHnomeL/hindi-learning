@@ -38,12 +38,14 @@ export function ArtifactView({ kind, artifactKey }: { kind: "lesson" | "referenc
   return <LessonView lessonKey={artifactKey} />;
 }
 
+// Fills its flex parent; min height keeps it usable when the column is short
+// (e.g. stacked on mobile).
 function Frame({ html, withBridge }: { html: string; withBridge: boolean }) {
   const srcDoc = useMemo(() => {
     if (!withBridge) return html;
     return html.includes("</body>") ? html.replace("</body>", CAPTURE_BRIDGE + "</body>") : html + CAPTURE_BRIDGE;
   }, [html, withBridge]);
-  return <iframe sandbox="allow-scripts" srcDoc={srcDoc} className="h-[78vh] w-full rounded-xl border border-stone-200 bg-white" />;
+  return <iframe sandbox="allow-scripts" srcDoc={srcDoc} className="min-h-[60vh] w-full flex-1 rounded-xl border border-stone-200 bg-white" />;
 }
 
 function LessonView({ lessonKey }: { lessonKey: string }) {
@@ -70,15 +72,21 @@ function LessonView({ lessonKey }: { lessonKey: string }) {
   if (lesson === null) return <p className="text-stone-400">Lesson not found.</p>;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">{lesson.title}</h2>
-        <button onClick={() => void setProgress({ lessonKey, status: "completed" })} className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-100">
-          Mark complete
-        </button>
+    <div className="flex h-full flex-col gap-4 md:flex-row">
+      {/* Lesson column — fills the available height. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">{lesson.title}</h2>
+          <button onClick={() => void setProgress({ lessonKey, status: "completed" })} className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-100">
+            Mark complete
+          </button>
+        </div>
+        <Frame html={lesson.html} withBridge />
       </div>
-      <Frame html={lesson.html} withBridge />
-      <QuestionBox lessonKey={lessonKey} />
+      {/* Ask column — right-hand side on desktop, stacks below on mobile. */}
+      <aside className="shrink-0 md:w-80 md:overflow-y-auto">
+        <QuestionBox lessonKey={lessonKey} />
+      </aside>
     </div>
   );
 }
@@ -88,7 +96,7 @@ function ReferenceView({ refKey }: { refKey: string }) {
   if (ref === undefined) return <p className="text-stone-400">Loading…</p>;
   if (ref === null) return <p className="text-stone-400">Reference not found.</p>;
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex h-full flex-col gap-3">
       <h2 className="text-lg font-semibold">{ref.title}</h2>
       <Frame html={ref.html} withBridge={false} />
     </div>
@@ -103,7 +111,7 @@ function QuestionBox({ lessonKey }: { lessonKey: string }) {
   const mine = questions?.filter((q) => q.lessonKey === lessonKey) ?? [];
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-4">
+    <div className="flex h-full flex-col rounded-xl border border-stone-200 bg-white p-4">
       <h3 className="mb-2 text-sm font-medium">Ask about this lesson</h3>
       <form
         className="flex gap-2"
@@ -115,10 +123,10 @@ function QuestionBox({ lessonKey }: { lessonKey: string }) {
           await askQuestion({ lessonKey, text: t });
         }}
       >
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Your question…" className="flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Your question…" className="min-w-0 flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm" />
         <button type="submit" className="rounded-lg bg-stone-900 px-3 py-2 text-sm text-white">Ask</button>
       </form>
-      <ul className="mt-3 flex flex-col gap-3">
+      <ul className="mt-3 flex flex-col gap-3 overflow-y-auto">
         {mine.map((q) => (
           <li key={q.id} className="text-sm">
             <p className="text-stone-800">{q.text}</p>
