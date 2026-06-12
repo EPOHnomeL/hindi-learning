@@ -42,3 +42,26 @@ document.querySelectorAll('.quiz.fill').forEach(function(q){
   input.addEventListener('keydown',function(e){if(e.key==='Enter')check();});
 });
 </script>
+<!-- Light/dark mode toggle. Injects a floating button and flips data-theme on
+     <html>. The lesson renders in a sandboxed iframe (no same-origin), so
+     localStorage may throw — it is wrapped, and we fall back to the OS
+     prefers-color-scheme for the initial theme. Styles live in head.html. -->
+<script>
+(function(){
+  var root=document.documentElement, KEY='lesson-theme';
+  function read(){try{return localStorage.getItem(KEY);}catch(e){return null;}}
+  function save(v){try{localStorage.setItem(KEY,v);}catch(e){}}
+  var saved=read();
+  if(saved==='dark'||saved==='light'){ root.dataset.theme=saved; }
+  else if(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches){ root.dataset.theme='dark'; }
+  var btn=document.createElement('button');
+  btn.className='theme-toggle'; btn.type='button';
+  function label(){ var d=root.dataset.theme==='dark'; btn.textContent=d?'☀ Light':'☾ Dark';
+    btn.setAttribute('aria-label', d?'Switch to light mode':'Switch to dark mode'); }
+  label();
+  btn.addEventListener('click',function(){
+    root.dataset.theme=(root.dataset.theme==='dark')?'light':'dark'; save(root.dataset.theme); label();
+  });
+  document.body.appendChild(btn);
+})();
+</script>

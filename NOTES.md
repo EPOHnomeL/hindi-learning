@@ -33,16 +33,23 @@
 - End each lesson with a nudge to ask me (their teacher) follow-up questions.
 
 ## Open threads / next ZPD steps
-- Lessons 1–7 done: **Psalm 1:1–1:4 read end-to-end with nothing parked.** Covered:
+- Lessons 1–8 done: **Psalm 1:1–1:5 read end-to-end with nothing parked.** Covered:
   habitual (sg+pl agreement), oblique+postpositions, का/के/की, जो/correlative,
-  करता रहता है, के समान, and **the passive** (participle + जाना, both agreeing;
-  agent से = "by"). (See LR-0001…0005.)
-- **Psalm 1:5–6** is now the top candidate — the only psalm-text left, and the
-  mission's first waypoint (the whole psalm): future/subjunctive (रह सकेंगे,
-  ठहरेंगे) and the closing contrast (जानता है … नाश हो जाएगा).
-- **Passive tense drill** (बनाया जाता है / गया / जाएगा) — useful consolidation,
-  secondary to finishing the psalm.
+  करता रहता है, के समान, **the passive** (participle + जाना, both agreeing; agent
+  से = "by"), and now **the future tense** (single word, stem + -एँगे; रह सकेंगे,
+  ठहरेंगे) + a light intro to **सकना** "be able to". (See LR-0001…0006.)
+- **Psalm 1:6** is now the top candidate — the LAST verse, completing the mission's
+  first waypoint (the whole psalm). Present + future side by side: यहोवा … जानता है
+  (present habitual) vs दुष्टों का मार्ग नाश हो जाएगा (future; हो जाएगा = होना's
+  irregular future + compound — natural follow-on from L8).
+- **Future paradigm drill** incl. irregulars होगा/लेगा/देगा (§9.1, p.113) — secondary.
 - **Feminine habitual** (-ती है/हैं) in an *active* verb is still unmet — the learner
   has seen feminine agreement only inside the passive (उड़ाई जाती, L7). Teach when a
   feminine active subject appears in a verse.
 - Find a BSI OV audio source for read-aloud anchoring (RESOURCES gap).
+
+## Reader / design system
+- **Light/dark toggle** added to the shared lesson chrome (head.html dark palette +
+  foot.html toggle script), per Jonathan's L7 request. Applies **L8 onward only**
+  (L1–7 are immutable). Persists via localStorage (try/catch — sandboxed iframe) and
+  defaults to OS prefers-color-scheme.

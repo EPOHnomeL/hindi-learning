@@ -106,6 +106,13 @@
     border:none; border-radius:7px; padding:7px 16px; cursor:pointer}
   .fill button:hover{background:#345b4d}
 
+  /* Floating light/dark switch, injected by _partials/foot.html. Hidden in print. */
+  .theme-toggle{position:fixed; top:14px; right:14px; z-index:50; font:inherit; font-size:13px;
+    background:var(--card); color:var(--soft); border:1px solid #e2d6c5; border-radius:20px;
+    padding:6px 13px; cursor:pointer; box-shadow:0 2px 10px #00000014; line-height:1}
+  .theme-toggle:hover{border-color:var(--gold); color:var(--accent)}
+  @media print{.theme-toggle{display:none}}
+
   .cite{font-size:13.5px; color:var(--soft)} .cite a{color:var(--accent)}
   a{color:var(--accent)}
   .win{background:linear-gradient(180deg,#fffdf7,#fbf3e2); border:1px solid #ecdcb8; border-radius:12px; padding:24px 26px; margin:22px 0}
@@ -119,4 +126,41 @@
   footer{margin-top:40px; border-top:1px solid #e7ddd4; padding-top:18px; font-size:13.5px; color:var(--soft)}
   .pill{display:inline-block; background:#f3ebe0; border-radius:20px; padding:3px 12px; font-size:13px; color:var(--soft); margin-right:6px}
   .recap{font-size:15px; color:var(--soft); background:#f4efe6; border-radius:8px; padding:10px 16px; margin:0 0 8px}
+
+  /* ── Dark theme ───────────────────────────────────────────────────────────
+     Toggled by the .theme-toggle (foot.html) setting data-theme="dark" on the
+     root. The palette is redefined via the variables; the handful of components
+     that hard-code a light surface/border are re-skinned below so verses,
+     quizzes and cards stay legible. Light mode (the paper aesthetic) is default. */
+  :root[data-theme="dark"]{
+    --ink:#e9e1d4; --soft:#a99d8a; --paper:#1b1815;
+    --card:#241f1a; --accent:#dd9863; --accent2:#79b39b; --gold:#d8ab57;
+    --hi:#4a3c1f; --good:#1e3328; --good-b:#74cf9b; --bad:#3c241e; --bad-b:#e0937c;
+    --book:#9cc0dc; --book-bg:#1f2a34;
+  }
+  :root[data-theme="dark"] header.lesson, :root[data-theme="dark"] footer{border-color:#3a322a}
+  :root[data-theme="dark"] .theme-toggle{border-color:#3a322a}
+  :root[data-theme="dark"] .verse{border-color:#3a322a; box-shadow:none}
+  :root[data-theme="dark"] .verse .hi{color:#f3ecdf}
+  :root[data-theme="dark"] mark.r, :root[data-theme="dark"] mark.v, :root[data-theme="dark"] mark.b{background:#2c3a2c}
+  :root[data-theme="dark"] mark.c, :root[data-theme="dark"] mark.j{background:#29333f}
+  :root[data-theme="dark"] .book{border-color:#33485a}
+  :root[data-theme="dark"] .grid2 .col, :root[data-theme="dark"] .word{border-color:#3a322a; border-bottom-color:#3a322a}
+  :root[data-theme="dark"] .grid2 .row{border-top-color:#3a322a}
+  :root[data-theme="dark"] .grid2 .col.sg .ch{background:#322a20}
+  :root[data-theme="dark"] .grid2 .col.pl .ch{background:#22332c}
+  :root[data-theme="dark"] .build .chip{background:#2f2820; border-color:#3a322a}
+  :root[data-theme="dark"] .build .res{border-color:#5a4a26}
+  :root[data-theme="dark"] table.paradigm th, :root[data-theme="dark"] table.paradigm td{border-color:#3a322a}
+  :root[data-theme="dark"] table.paradigm th{background:#2f2820}
+  :root[data-theme="dark"] .park{background:#221d16; border-color:#4a3d2a}
+  :root[data-theme="dark"] .note{background:#241f1a}
+  :root[data-theme="dark"] .note.devo{background:#251f2b}
+  :root[data-theme="dark"] .quiz{border-color:#3a322a}
+  :root[data-theme="dark"] .opt{background:#221d16; border-color:#3a322a}
+  :root[data-theme="dark"] .opt:hover{background:#2a2418}
+  :root[data-theme="dark"] .fill input{background:#2a2418}
+  :root[data-theme="dark"] .win{background:linear-gradient(180deg,#241f1a,#2c2417); border-color:#4a3d2a}
+  :root[data-theme="dark"] .recap{background:#241f1a}
+  :root[data-theme="dark"] .pill{background:#2f2820}
 </style>
