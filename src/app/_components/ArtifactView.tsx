@@ -74,7 +74,13 @@ export function ArtifactView({
 function Frame({ html, withBridge }: { html: string; withBridge: boolean }) {
   const srcDoc = useMemo(() => {
     const scripts = HEIGHT_BRIDGE + (withBridge ? QUIZ_BRIDGE : "");
-    return html.includes("</body>") ? html.replace("</body>", scripts + "</body>") : html + scripts;
+    // Inject before the LAST </body>. A first-match replace is unsafe: an
+    // assembled lesson can carry an authoring comment (or a code sample) that
+    // contains a literal "</body>" earlier in the document, and injecting there
+    // would bury the bridge scripts inside it — inert, so the iframe never
+    // reports its height (ask box overlaps) and quiz answers aren't captured.
+    const i = html.lastIndexOf("</body>");
+    return i === -1 ? html + scripts : html.slice(0, i) + scripts + html.slice(i);
   }, [html, withBridge]);
 
   // On mobile the iframe is sized to its content so the whole page scrolls as one

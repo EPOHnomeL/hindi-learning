@@ -1,6 +1,6 @@
 <!-- Shared in-lesson quiz feedback (visual correct/wrong highlighting + the
-     inline .fb message). publish.ts injects this before </body> of every lean
-     lesson fragment. NOTE: this is the *visual* layer only — the reader
+     inline .fb message). publish.ts injects this at the end of the body of every
+     lean lesson fragment. NOTE: this is the *visual* layer only — the reader
      (ArtifactView.tsx QUIZ_BRIDGE) separately captures the learner's first
      answer back to you; keep the same .quiz[data-correct]/.opt[data-k] and
      .quiz.fill[data-answer] markup so both layers work.
