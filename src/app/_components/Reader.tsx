@@ -8,6 +8,9 @@ import { ArtifactView } from "./ArtifactView";
 
 type Selection = { kind: "lesson" | "reference"; key: string };
 
+// v1 serves a single Topic; a switcher arrives with multi-topic.
+const TOPIC_SLUG = "hindi";
+
 export function Reader() {
   const lessons = useQuery(api.content.listLessons);
   const references = useQuery(api.content.listReferences);
@@ -17,6 +20,9 @@ export function Reader() {
 
   // lessonKey -> status, so the nav can show what's already completed.
   const completed = new Set((progress ?? []).filter((p) => p.status === "completed").map((p) => p.lessonKey));
+
+  // The Frontier: the last (highest-seq) lesson. listLessons is seq-ascending.
+  const frontierKey = lessons && lessons.length > 0 ? lessons[lessons.length - 1]!.key : null;
 
   // Default to the first lesson once they load.
   const current = selected ?? (lessons && lessons.length > 0 ? { kind: "lesson" as const, key: lessons[0]!.key } : null);
@@ -56,7 +62,12 @@ export function Reader() {
 
       <section className="min-w-0 flex-1 p-4 md:overflow-hidden">
         {current ? (
-          <ArtifactView kind={current.kind} artifactKey={current.key} />
+          <ArtifactView
+            kind={current.kind}
+            artifactKey={current.key}
+            topicSlug={TOPIC_SLUG}
+            isFrontier={current.kind === "lesson" && current.key === frontierKey}
+          />
         ) : (
           <p className="text-soft">Select a lesson.</p>
         )}

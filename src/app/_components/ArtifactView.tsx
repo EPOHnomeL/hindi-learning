@@ -1,8 +1,12 @@
 "use client";
 
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+
+// Mirror of the server's stale threshold (convex/routine.ts STALE_MS): a run
+// stuck "generating" past this is treated as crashed and offered for retry.
+const STALE_MS = 10 * 60 * 1000;
 
 // Injected into a lesson's iframe. It reads the AUTHORED quiz markup
 // (.quiz[data-correct] + .opt[data-k], and .quiz.fill[data-answer]) and posts
@@ -33,9 +37,19 @@ const CAPTURE_BRIDGE = `<script>(function(){
   });
 }());<\/script>`;
 
-export function ArtifactView({ kind, artifactKey }: { kind: "lesson" | "reference"; artifactKey: string }) {
+export function ArtifactView({
+  kind,
+  artifactKey,
+  topicSlug,
+  isFrontier,
+}: {
+  kind: "lesson" | "reference";
+  artifactKey: string;
+  topicSlug: string;
+  isFrontier: boolean;
+}) {
   if (kind === "reference") return <ReferenceView refKey={artifactKey} />;
-  return <LessonView lessonKey={artifactKey} />;
+  return <LessonView lessonKey={artifactKey} topicSlug={topicSlug} isFrontier={isFrontier} />;
 }
 
 // Fills its flex parent; min height keeps it usable when the column is short
@@ -48,7 +62,7 @@ function Frame({ html, withBridge }: { html: string; withBridge: boolean }) {
   return <iframe sandbox="allow-scripts" srcDoc={srcDoc} className="min-h-[60vh] w-full flex-1 rounded-xl border border-line bg-card" />;
 }
 
-function LessonView({ lessonKey }: { lessonKey: string }) {
+function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; topicSlug: string; isFrontier: boolean }) {
   const lesson = useQuery(api.content.getLesson, { key: lessonKey });
   const progress = useQuery(api.capture.myProgress);
   const recordResponse = useMutation(api.capture.recordResponse);
@@ -80,17 +94,20 @@ function LessonView({ lessonKey }: { lessonKey: string }) {
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">{lesson.title}</h2>
-          <button
-            onClick={() => void setProgress({ lessonKey, status: "completed" })}
-            disabled={completed}
-            className={`shrink-0 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-              completed
-                ? "cursor-default border-accent2 bg-accent2 text-white"
-                : "border-accent text-accent hover:bg-hi"
-            }`}
-          >
-            {completed ? "✓ Completed" : "Mark complete"}
-          </button>
+          <div className="flex shrink-0 items-center gap-2">
+            {isFrontier && completed && <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />}
+            <button
+              onClick={() => void setProgress({ lessonKey, status: "completed" })}
+              disabled={completed}
+              className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                completed
+                  ? "cursor-default border-accent2 bg-accent2 text-white"
+                  : "border-accent text-accent hover:bg-hi"
+              }`}
+            >
+              {completed ? "✓ Completed" : "Mark complete"}
+            </button>
+          </div>
         </div>
         <Frame html={lesson.html} withBridge />
       </div>
@@ -98,6 +115,69 @@ function LessonView({ lessonKey }: { lessonKey: string }) {
       <aside className="shrink-0 md:w-80 md:overflow-y-auto">
         <QuestionBox lessonKey={lessonKey} />
       </aside>
+    </div>
+  );
+}
+
+// Fires the next-lesson Routine on demand (ADR 0008). Only rendered on the
+// completed Frontier. It reflects the lock so a press can't double-fire and a
+// crashed run eventually offers a retry; the new lesson arrives live (Convex
+// subscription), at which point this lesson is no longer the Frontier and the
+// button unmounts.
+function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; frontierKey: string }) {
+  const gen = useQuery(api.routine.generationStatus, { topicSlug });
+  const requestNext = useAction(api.routine.requestNextLesson);
+  const [pending, setPending] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  const status = gen?.status ?? "idle";
+  const generating = status === "generating";
+
+  // Tick while generating so a crashed run crosses the stale threshold in the UI.
+  useEffect(() => {
+    if (!generating) return;
+    const id = setInterval(() => setNow(Date.now()), 20_000);
+    return () => clearInterval(id);
+  }, [generating]);
+
+  const stale = generating && gen?.startedAt != null && now - gen.startedAt > STALE_MS;
+  const caughtUp = status === "caughtUp" && gen?.frontierKey === frontierKey;
+
+  async function fire() {
+    setPending(true);
+    try {
+      await requestNext({ topicSlug });
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (generating && !stale) {
+    return <span className="animate-pulse text-sm text-soft">Generating next lesson…</span>;
+  }
+  if (caughtUp) {
+    return (
+      <span className="text-sm text-accent2" title="Your teacher has nothing new queued yet.">
+        ✨ All caught up
+      </span>
+    );
+  }
+
+  const label = status === "failed" ? "Retry" : stale ? "Still working — retry" : "Generate next lesson →";
+  return (
+    <div className="flex items-center gap-2">
+      {status === "failed" && gen?.error && (
+        <span title={gen.error} className="text-xs text-soft">
+          generation failed
+        </span>
+      )}
+      <button
+        onClick={() => void fire()}
+        disabled={pending}
+        className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+      >
+        {pending ? "Starting…" : label}
+      </button>
     </div>
   );
 }
