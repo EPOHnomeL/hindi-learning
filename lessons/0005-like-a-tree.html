@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lesson 5 · Like a tree — के समान "like, similar to" (Psalm 1:3)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#2b2622; --soft:#6b6258; --paper:#fbf7f0;
+    --card:#fffdf9; --accent:#9c5b34; --accent2:#3f6f5e; --gold:#b88a2e;
+    --hi:#fbeecb; --good:#e7f3ec; --good-b:#3f8f63; --bad:#fbe9e7; --bad-b:#c0573f;
+    --book:#34506b; --book-bg:#eef3f7;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Spectral',Georgia,'Times New Roman',serif; line-height:1.62; font-size:18px;}
+  .wrap{max-width:760px; margin:0 auto; padding:54px 26px 110px}
+  .deva{font-family:'Noto Serif Devanagari','Noto Sans Devanagari',serif;}
+  header.lesson{border-bottom:1px solid #e7ddd4; padding-bottom:26px; margin-bottom:34px}
+  .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:600}
+  h1{font-size:33px; line-height:1.18; margin:.32em 0 .15em; font-weight:600; letter-spacing:-.01em}
+  .sub{color:var(--soft); font-style:italic; font-size:18px}
+  h2{font-size:13px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent2); margin:52px 0 6px; font-weight:600}
+  h2 .num{color:var(--gold); margin-right:.5em; font-style:normal}
+  .lead{font-size:20px}
+  p{margin:.7em 0}
+  .verse{background:var(--card); border:1px solid #ece2d6; border-left:4px solid var(--gold);
+    border-radius:10px; padding:22px 26px; margin:20px 0; box-shadow:0 2px 14px #b88a2e10;}
+  .verse .ref{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--soft); margin-bottom:10px}
+  .verse .hi{font-size:25px; line-height:1.95; color:#1f1b18}
+  .verse .en{color:var(--soft); font-style:italic; margin-top:12px; font-size:16.5px}
+  mark{background:var(--hi); padding:.04em .14em; border-radius:3px; box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  mark.r{background:#e6f0e3} mark.c{background:#e0e8f3}
+
+  .book{background:var(--book-bg); border:1px solid #d4e0ea; border-left:4px solid var(--book);
+    border-radius:10px; padding:18px 22px 16px; margin:20px 0}
+  .book .src{font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--book);
+    font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:8px}
+  .book .src::before{content:"📖"}
+  .book p{margin:.45em 0}
+  .book .deva{font-size:19px}
+  .book .ex{display:grid; grid-template-columns:1fr 1fr; gap:4px 18px; margin:8px 0 2px; align-items:center}
+  .book .ex .d{font-family:'Noto Serif Devanagari',serif; font-size:19px}
+  .book .ex .t{color:var(--book)}
+
+  .build{display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin:16px 0; font-size:20px}
+  .build .chip{background:#f3ebe0; border:1px solid #e2d6c5; border-radius:8px; padding:6px 12px}
+  .build .chip.deva{font-size:23px}
+  .build .op{color:var(--gold); font-weight:600}
+  .build .res{background:var(--hi); border-color:#e9d49a}
+
+  .word{display:grid; grid-template-columns:auto 1fr; gap:4px 16px; margin:10px 0; border-bottom:1px dotted #e2d6c5; padding-bottom:10px}
+  .word .w{font-family:'Noto Serif Devanagari',serif; font-size:23px; color:var(--accent)}
+  .word .g{align-self:center}
+  .word .g b{color:var(--accent2); font-weight:600}
+
+  .note{background:#f4efe6; border-radius:9px; padding:15px 19px; margin:20px 0; font-size:16.5px}
+  .note .t{font-weight:600; color:var(--accent2); font-style:normal; display:block; margin-bottom:3px}
+  .note.devo{background:#f3eef6; }
+  .note.devo .t{color:#6b4e86}
+
+  .quiz{background:var(--card); border:1px solid #e7dccd; border-radius:12px; padding:22px 24px; margin:22px 0; box-shadow:0 2px 14px #00000008}
+  .quiz .q{font-weight:600; margin-bottom:4px}
+  .quiz .q .deva{font-weight:400}
+  .opts{display:flex; flex-direction:column; gap:9px; margin-top:14px}
+  .opt{display:block; width:100%; text-align:left; cursor:pointer; font:inherit; font-size:17px;
+       background:#fff; border:1.5px solid #e2d6c5; border-radius:9px; padding:11px 15px; transition:.13s}
+  .opt:hover{border-color:var(--gold); background:#fffdf6}
+  .opt.correct{background:var(--good); border-color:var(--good-b); color:#235138}
+  .opt.wrong{background:var(--bad); border-color:var(--bad-b); color:#7a2d1c}
+  .opt:disabled{cursor:default}
+  .fb{margin-top:13px; font-size:16px; min-height:1.2em; opacity:0; transition:.2s}
+  .fb.show{opacity:1}
+  .fb.ok{color:var(--good-b)} .fb.no{color:var(--bad-b)}
+  .fb .deva{font-size:18px}
+  .fill input{font:inherit; font-size:20px; font-family:'Noto Serif Devanagari',serif;
+    border:none; border-bottom:2px solid var(--gold); background:#fffdf6; width:260px; text-align:center; padding:2px 6px}
+  .fill input:focus{outline:none; background:var(--hi)}
+  .fill button{font:inherit; font-size:15px; margin-left:12px; background:var(--accent2); color:#fff;
+    border:none; border-radius:7px; padding:7px 16px; cursor:pointer}
+  .fill button:hover{background:#345b4d}
+
+  .cite{font-size:13.5px; color:var(--soft)} .cite a{color:var(--accent)}
+  a{color:var(--accent)}
+  .win{background:linear-gradient(180deg,#fffdf7,#fbf3e2); border:1px solid #ecdcb8; border-radius:12px; padding:24px 26px; margin:22px 0}
+  .win .ref{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); font-weight:600; margin-bottom:12px}
+  .win .row{display:grid; grid-template-columns:1fr; gap:3px; margin:13px 0; padding-bottom:11px; border-bottom:1px dotted #e7d6b3}
+  .win .row:last-child{border:none}
+  .win .h{font-family:'Noto Serif Devanagari',serif; font-size:23px}
+  .win .e{color:var(--soft); font-style:italic; font-size:16px}
+  .ask{background:linear-gradient(180deg,#3f6f5e,#365e50); color:#f4efe6; border-radius:12px; padding:22px 26px; margin:46px 0 0; font-size:16.5px}
+  .ask b{color:#fff} .ask .deva{color:#ffeec6}
+  footer{margin-top:40px; border-top:1px solid #e7ddd4; padding-top:18px; font-size:13.5px; color:var(--soft)}
+  .pill{display:inline-block; background:#f3ebe0; border-radius:20px; padding:3px 12px; font-size:13px; color:var(--soft); margin-right:6px}
+  .recap{font-size:15px; color:var(--soft); background:#f4efe6; border-radius:8px; padding:10px 16px; margin:0 0 8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="lesson">
+  <div class="kicker">Lesson 5 · के समान & the oblique</div>
+  <h1>Like a tree</h1>
+  <div class="sub">के समान “like / similar to” — a compound postposition, and how it turns वह into उस. Into Psalm 1:3.</div>
+  <div style="margin-top:14px">
+    <span class="pill">Vehicle: भजन संहिता 1:3</span>
+    <span class="pill">One skill: के समान “like”</span>
+    <span class="pill">~12 min</span>
+  </div>
+</header>
+
+<p class="recap">Recap — you own all of v1–v2: habitual verbs (L1), oblique + postpositions / की (L2),
+the relative जो (L3), and करता रहता है “keeps on doing” (L4). Verse 2 told us the blessed man
+<b>delights</b> in the law and meditates day and night. Verse 3 now paints him a <b>picture</b>.</p>
+
+<p class="lead">What is such a man <i>like</i>? Verse 3 answers with one of the most beloved similes in
+the Psalms — he is <b>like a tree</b> planted by streams of water. The hinge word is
+<span class="deva">के समान</span>, “like / similar to”. That little phrase — and the way it bends
+<span class="deva">वह</span> into <span class="deva">उस</span> — is today’s one thing.</p>
+
+<div class="verse">
+  <div class="ref">भजन संहिता · Psalm 1:3 · BSI OV</div>
+  <div class="hi deva">वह <mark class="r">उस</mark> वृक्ष <mark class="c">के समान</mark> है, जो बहती नालियों के किनारे लगाया गया है।<br>
+    और अपनी ऋतु में फलता है, और जिसके पत्ते कभी मुरझाते नहीं।<br>
+    इसलिये जो कुछ वह पुरूष करे वह सफल होता है॥</div>
+  <div class="en">He is like a tree planted by streams of water, which yields its fruit in its season;
+    and whose leaf never withers. Therefore whatever that man does prospers.</div>
+</div>
+
+<h2><span class="num">1</span> समान — “like, equal, similar”</h2>
+<p>On its own, <span class="deva">समान</span> (<i>samān</i>) is an adjective meaning <b>“like, equal,
+similar, alike”</b>. It is <b>indeclinable</b> — it never changes form for gender or number.
+<span class="cite">(<a href="https://en.wiktionary.org/wiki/%E0%A4%B8%E0%A4%AE%E0%A4%BE%E0%A4%A8">Wiktionary: समान</a>.)</span></p>
+<p>Glue the possessive <span class="deva">के</span> in front of it and you get the phrase
+<span class="deva">के समान</span> — <b>“like / similar to”</b>, “in the manner of”. It sits <i>after</i>
+the thing being compared to, the way all Hindi relationship-words do:</p>
+<div class="build">
+  <span class="chip deva">वृक्ष</span><span style="font-size:15px;color:var(--soft)">tree</span>
+  <span class="op">+</span>
+  <span class="chip deva">के समान</span><span style="font-size:15px;color:var(--soft)">like</span>
+  <span class="op">→</span>
+  <span class="chip deva res">वृक्ष के समान</span>
+  <span style="font-size:15px;color:var(--soft);font-style:italic">“like a tree”</span>
+</div>
+
+<h2><span class="num">2</span> A compound postposition — and it takes the oblique</h2>
+<p>Why two words, <span class="deva">के + समान</span>? Because <span class="deva">के समान</span> is a
+<b>compound postposition</b>. The handbook defines the whole family precisely:</p>
+
+<div class="book">
+  <div class="src">Teach Yourself Hindi · §6.4 · printed p.80</div>
+  <p>“§6.4&nbsp; <b>Compound postpositions</b>.”</p>
+  <p>“These postpositions consist of two or more words, the first of which is the possessive
+  <span class="deva">के</span> (or <span class="deva">की</span> if used with a feminine noun…).
+  Like the one-word ‘simple postpositions’ (3.1), <b>they take the oblique case</b>.”</p>
+  <div class="ex"><span class="d">मेज़ के नीचे</span><span class="t">under the table</span></div>
+  <div class="ex"><span class="d">घर के पास</span><span class="t">near the house</span></div>
+</div>
+
+<p>This is the same law you learned in <b>Lesson 2</b>: a postposition forces the word before it into the
+<b>oblique case</b>. So the demonstrative <span class="deva">वह</span> “that / he” cannot stand as-is
+before <span class="deva">के समान</span> — it must become its oblique form, <span class="deva">उस</span>
+(you met this exact shift in Lesson 4: <span class="deva">उसकी व्यवस्था</span>):</p>
+<div class="build">
+  <span class="chip deva">वह</span><span style="font-size:14px;color:var(--soft)">that (direct)</span>
+  <span class="op">→</span>
+  <span class="chip deva res">उस</span><span style="font-size:14px;color:var(--soft)">that (oblique)</span>
+  <span class="op">+</span>
+  <span class="chip deva">वृक्ष के समान</span>
+  <span class="op">→</span>
+  <span class="chip deva res">उस वृक्ष के समान</span>
+  <span style="font-size:14px;color:var(--soft);font-style:italic">“like that tree”</span>
+</div>
+<p>Notice the noun <span class="deva">वृक्ष</span> “tree” does <b>not</b> change shape — masculine nouns
+that don’t end in <span class="deva">-ा</span> look the same in the oblique singular. The oblique
+shows itself on the little pointing word <span class="deva">वह → उस</span>. Put it together with the
+copula <span class="deva">है</span> “is”, and you can read the whole opening clause:</p>
+<div class="build">
+  <span class="chip deva res" style="font-size:22px">वह उस वृक्ष के समान है</span>
+  <span style="font-size:15px;color:var(--soft);font-style:italic">“He is like that tree.”</span>
+</div>
+
+<h2><span class="num">3</span> The rest of verse 3</h2>
+<p>The simile unfolds in a relative clause (your friend <span class="deva">जो</span> from Lesson 3).
+You don’t need to master every word today — just see how the picture is built:</p>
+<div class="word"><span class="w deva">जो … लगाया गया है</span><span class="g"><b>which is planted</b> — जो “which” (L3) + a new
+  verb shape, <span class="deva">लगाया गया है</span> “has been planted”. That is the <b>passive</b>, a whole skill of its own — parked for a future lesson. For now, just read it as “(which) is planted”.</span></div>
+<div class="word"><span class="w deva">बहती नालियों के किनारे</span><span class="g"><b>by streams of running water</b>. बहती “flowing”, नालियों “channels/streams” (note the <b class="deva">-ओं</b> oblique-plural signal from L2!), किनारे “at the bank/edge of”.</span></div>
+<div class="word"><span class="w deva">अपनी ऋतु में फलता है</span><span class="g"><b>bears fruit in its season</b>. ऋतु “season”; फलता है “bears fruit” — a habitual verb (L1) once more.</span></div>
+<div class="word"><span class="w deva">जिसके पत्ते कभी मुरझाते नहीं</span><span class="g"><b>whose leaves never wither</b>. पत्ते “leaves”; मुरझाते नहीं “do not wither” (habitual + नहीं, L1).</span></div>
+<div class="word"><span class="w deva">वह सफल होता है</span><span class="g"><b>he/it prospers</b> — literally “becomes successful”. <span class="deva">सफल</span> “successful, fruitful”. <span class="cite">(Handbook glossary, unit 14.)</span></span></div>
+
+<div class="note devo">
+  <span class="t">के समान — why it matters</span>
+  Scripture reasons constantly in similes — “<i>like</i> a tree”, “<i>like</i> the chaff”, “as a deer
+  pants…”. <span class="deva">के समान</span> is one of the workhorses that carries them in the Hindi OV.
+  Look at the very next verse, Psalm 1:4 — the wicked are <span class="deva">उस भूसी <b>के समान</b></span>,
+  “<b>like that chaff</b>”. Same construction, opposite picture. Learn it once, read it everywhere.
+</div>
+
+<h2><span class="num">4</span> Check yourself</h2>
+<p style="color:var(--soft);font-style:italic;margin-top:0">Immediate feedback — click an answer.</p>
+
+<div class="quiz" data-correct="b">
+  <div class="q">1. What does <span class="deva">के समान</span> mean?</div>
+  <div class="opts">
+    <button class="opt" data-k="a">“in front of”</button>
+    <button class="opt" data-k="b">“like / similar to”</button>
+    <button class="opt" data-k="c">“because of”</button>
+  </div>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz" data-correct="c">
+  <div class="q">2. In <span class="deva">वह उस वृक्ष के समान है</span>, why has <span class="deva">वह</span> become <span class="deva">उस</span>?</div>
+  <div class="opts">
+    <button class="opt" data-k="a">Because उस is the plural of वह</button>
+    <button class="opt" data-k="b">Because the sentence is a question</button>
+    <button class="opt" data-k="c">Because के समान is a postposition, and a postposition puts the word before it in the oblique case</button>
+  </div>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz" data-correct="a">
+  <div class="q">3. By §6.4, a compound postposition (like <span class="deva">के समान</span>, <span class="deva">के पास</span>) is built from the possessive <span class="deva">के</span> + a word, and the noun before it takes which case?</div>
+  <div class="opts">
+    <button class="opt" data-k="a">The oblique case</button>
+    <button class="opt" data-k="b">The direct case</button>
+    <button class="opt" data-k="c">It never changes</button>
+  </div>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz" data-correct="b">
+  <div class="q">4. Psalm 1:4 says the wicked are <span class="deva">उस भूसी के समान</span>. That means…</div>
+  <div class="opts">
+    <button class="opt" data-k="a">“near the chaff”</button>
+    <button class="opt" data-k="b">“like that chaff”</button>
+    <button class="opt" data-k="c">“the chaff’s house”</button>
+  </div>
+  <div class="fb"></div>
+</div>
+
+<div class="quiz fill" data-answer="उस वृक्ष के समान" data-alt="वृक्ष के समान">
+  <div class="q">5. Build “like that tree” from <span class="deva">वृक्ष</span> “tree” and <span class="deva">वह</span> “that” (remember: a postposition needs the oblique <span class="deva">उस</span>).</div>
+  <div style="margin-top:14px">
+    <input type="text" class="deva" autocomplete="off" spellcheck="false" placeholder="…">
+    <button>Check</button>
+  </div>
+  <div class="fb"></div>
+</div>
+
+<h2><span class="num">5</span> 🎉 Your win — Psalm 1:3’s opening, and the simile</h2>
+<div class="win">
+  <div class="ref">भजन संहिता 1:3 — the picture</div>
+  <div class="row"><span class="h">वह उस वृक्ष के समान है,</span><span class="e">He is like that tree —</span></div>
+  <div class="row"><span class="h">जो बहती नालियों के किनारे लगाया गया है।</span><span class="e">which is planted by streams of running water;</span></div>
+  <div class="row"><span class="h">…जो कुछ वह पुरूष करे वह सफल होता है॥</span><span class="e">…whatever that man does, prospers.</span></div>
+</div>
+<p>You can now read the heart of verse 3: the blessed man of v1–v2 is <span class="deva">उस वृक्ष के समान</span>
+— <b>like that tree</b> by the water. And you can already spot the same shape waiting in v4
+(<span class="deva">उस भूसी के समान</span>, “like that chaff”). One little compound postposition,
+two whole verses unlocked.</p>
+
+<div class="ask">
+  <b>I’m your teacher — ask me anything.</b> Want the cousin phrase <span class="deva">की तरह</span>
+  (“like”, with feminine की)? Curious how <span class="deva">लगाया गया है</span> works — the
+  <b>passive</b>, “is planted / has been planted” (a natural next lesson straight out of this verse)?
+  Or the subjunctive <span class="deva">करे</span> in <span class="deva">जो कुछ वह पुरूष करे</span>
+  “whatever he <i>may</i> do”? Or push on to <b>Psalm 1:4</b> — the chaff the wind drives away. Just say the word.
+</div>
+
+<footer>
+  Sources — Verse: BSI OV / Hindi Holy Bible,
+  <a href="https://www.bible.com/bible/819/PSA.1.3">Psalm 1:3 (bible.com 819)</a>.
+  Grammar quoted from Snell &amp; Weightman, <i>Teach Yourself Hindi</i>, §6.4 “Compound postpositions”,
+  p.&nbsp;80 (oblique case §3.2, pp.&nbsp;41–42, from Lesson 2). Word <span class="deva">समान</span>:
+  <a href="https://en.wiktionary.org/wiki/%E0%A4%B8%E0%A4%AE%E0%A4%BE%E0%A4%A8">Wiktionary</a>;
+  <span class="deva">सफल</span>: handbook Hindi–English glossary.
+  · See <span class="deva">GLOSSARY.md</span> for terms.
+</footer>
+
+</div>
+
+<script>
+document.querySelectorAll('.quiz[data-correct]').forEach(function(q){
+  var correct=q.getAttribute('data-correct'); var fb=q.querySelector('.fb');
+  q.querySelectorAll('.opt').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      if(q.dataset.done) return; q.dataset.done='1';
+      var k=btn.getAttribute('data-k');
+      q.querySelectorAll('.opt').forEach(function(b){
+        b.disabled=true;
+        if(b.getAttribute('data-k')===correct) b.classList.add('correct');
+      });
+      if(k===correct){ fb.textContent='✓ Right.'; fb.className='fb show ok'; }
+      else{ btn.classList.add('wrong');
+        fb.textContent='Not quite — the highlighted answer is correct. Re-read the section above, then move on.';
+        fb.className='fb show no'; }
+    });
+  });
+});
+document.querySelectorAll('.quiz.fill').forEach(function(q){
+  var ans=q.getAttribute('data-answer'), alt=q.getAttribute('data-alt');
+  var input=q.querySelector('input'), btn=q.querySelector('button'), fb=q.querySelector('.fb');
+  function norm(s){return (s||'').replace(/\s+/g,' ').trim();}
+  function check(){
+    var v=norm(input.value);
+    if(v===ans||v===alt){ fb.innerHTML='✓ Exactly — <span class="deva">उस वृक्ष के समान</span> “like that tree”. वह bends to उस before the postposition, just as in Lesson 2.';
+      fb.className='fb show ok'; input.style.borderColor='var(--good-b)'; }
+    else if(v===''){ fb.textContent='Type it in Devanagari, then press Check.'; fb.className='fb show no'; }
+    else{ fb.innerHTML='Not yet. Oblique उस + वृक्ष + के समान → <span class="deva">उस वृक्ष के समान</span>. Try again.';
+      fb.className='fb show no'; }
+  }
+  btn.addEventListener('click',check);
+  input.addEventListener('keydown',function(e){if(e.key==='Enter')check();});
+});
+</script>
+</body>
+</html>
