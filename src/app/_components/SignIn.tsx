@@ -12,7 +12,7 @@ export function SignIn() {
   return (
     <div className="grid min-h-screen place-items-center px-4">
       <form
-        className="flex w-full max-w-sm flex-col gap-3 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm"
+        className="flex w-full max-w-sm flex-col gap-3 rounded-2xl border border-line bg-card p-6 shadow-sm"
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
@@ -27,16 +27,16 @@ export function SignIn() {
           }
         }}
       >
-        <h1 className="text-xl font-semibold">{flow === "signIn" ? "Sign in" : "Create account"}</h1>
-        <input name="email" type="email" placeholder="Email" autoComplete="email" required className="rounded-lg border border-stone-300 px-3 py-2" />
-        <input name="password" type="password" placeholder="Password" autoComplete={flow === "signIn" ? "current-password" : "new-password"} required className="rounded-lg border border-stone-300 px-3 py-2" />
-        <button type="submit" disabled={busy} className="rounded-lg bg-stone-900 px-3 py-2 font-medium text-white disabled:opacity-50">
+        <h1 className="text-xl font-semibold text-accent">{flow === "signIn" ? "Sign in" : "Create account"}</h1>
+        <input name="email" type="email" placeholder="Email" autoComplete="email" required className="rounded-lg border border-line bg-white px-3 py-2 focus:border-gold focus:outline-none" />
+        <input name="password" type="password" placeholder="Password" autoComplete={flow === "signIn" ? "current-password" : "new-password"} required className="rounded-lg border border-line bg-white px-3 py-2 focus:border-gold focus:outline-none" />
+        <button type="submit" disabled={busy} className="rounded-lg bg-accent px-3 py-2 font-medium text-white disabled:opacity-50">
           {busy ? "…" : flow === "signIn" ? "Sign in" : "Sign up"}
         </button>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button
           type="button"
-          className="text-sm text-stone-500 hover:text-stone-800"
+          className="text-sm text-soft hover:text-accent"
           onClick={() => {
             setError(null);
             setFlow(flow === "signIn" ? "signUp" : "signIn");

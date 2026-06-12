@@ -1,6 +1,29 @@
 @import "tailwindcss";
 
+/* Palette + type lifted from the lesson artifacts (lessons/*.html) so the app
+   chrome reads as the same "paper" surface the lessons live on. */
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: var(--font-spectral), Georgia, "Times New Roman", ui-serif, serif;
+  --font-serif: var(--font-spectral), Georgia, "Times New Roman", serif;
+  --font-deva: var(--font-noto-deva), "Noto Serif Devanagari", serif;
+
+  --color-paper: #fbf7f0;
+  --color-card: #fffdf9;
+  --color-ink: #2b2622;
+  --color-soft: #6b6258;
+  --color-line: #e7ddd4;
+  --color-accent: #9c5b34;
+  --color-accent2: #3f6f5e;
+  --color-gold: #b88a2e;
+  --color-hi: #fbeecb;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-serif);
+}
+
+.font-deva {
+  font-family: var(--font-deva);
 }

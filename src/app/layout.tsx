@@ -1,7 +1,7 @@
 import "~/styles/globals.css";
 
 import { type Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Spectral, Noto_Serif_Devanagari } from "next/font/google";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 
@@ -11,12 +11,22 @@ export const metadata: Metadata = {
   icons: [{ rel: "icon", url: "/favicon.ico" }],
 };
 
-const geist = Geist({ subsets: ["latin"], variable: "--font-geist-sans" });
+const spectral = Spectral({
+  subsets: ["latin"],
+  weight: ["400", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-spectral",
+});
+const notoDeva = Noto_Serif_Devanagari({
+  subsets: ["devanagari"],
+  weight: ["400", "600"],
+  variable: "--font-noto-deva",
+});
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <ConvexAuthNextjsServerProvider>
-      <html lang="en" className={`${geist.variable}`}>
+      <html lang="en" className={`${spectral.variable} ${notoDeva.variable}`}>
         <body>
           <ConvexClientProvider>{children}</ConvexClientProvider>
         </body>
