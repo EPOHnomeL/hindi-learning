@@ -119,28 +119,6 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
 
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
 
-  // On mobile the ask box stays hidden until the learner scrolls to the bottom of
-  // the page (the lesson now scrolls the whole page, not a nested iframe). A body
-  // ResizeObserver re-checks once the iframe finishes sizing to its content.
-  const [atBottom, setAtBottom] = useState(false);
-  useEffect(() => {
-    setAtBottom(false);
-    function check() {
-      const el = document.scrollingElement ?? document.documentElement;
-      setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 64);
-    }
-    window.addEventListener("scroll", check, { passive: true });
-    window.addEventListener("resize", check, { passive: true });
-    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(check) : null;
-    ro?.observe(document.body);
-    check();
-    return () => {
-      window.removeEventListener("scroll", check);
-      window.removeEventListener("resize", check);
-      ro?.disconnect();
-    };
-  }, [lessonKey]);
-
   useEffect(() => {
     if (lesson) void setProgress({ lessonKey, status: "opened" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -183,19 +161,16 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
           </div>
         </div>
         <Frame html={lesson.html} withBridge />
+        {/* Mobile: ask + answers inline right under the lesson — reliably reached by
+            scrolling, no slide-up trigger. Desktop uses the side column instead. */}
+        <div className="p-3 md:hidden">
+          <QuestionBox lessonKey={lessonKey} variant="inline" />
+        </div>
       </div>
       {/* Desktop: persistent ask column on the right. */}
       <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
         <QuestionBox lessonKey={lessonKey} />
       </aside>
-      {/* Mobile: ask slides up from the bottom once the lesson is read through. */}
-      <div
-        className={`fixed inset-x-0 bottom-0 z-30 px-3 pb-3 transition-transform duration-300 md:hidden ${
-          atBottom ? "translate-y-0" : "pointer-events-none translate-y-full"
-        }`}
-      >
-        <QuestionBox lessonKey={lessonKey} variant="sheet" />
-      </div>
     </div>
   );
 }
@@ -275,9 +250,9 @@ function ReferenceView({ refKey }: { refKey: string }) {
   );
 }
 
-// Ask the teacher a question and see the reply inline once answered (live).
-// `panel` is the desktop side column; `sheet` is the mobile slide-up surface.
-function QuestionBox({ lessonKey, variant = "panel" }: { lessonKey: string; variant?: "panel" | "sheet" }) {
+// Ask the teacher a question and see the reply once answered (live).
+// `panel` is the desktop side column; `inline` sits at the end of the lesson on mobile.
+function QuestionBox({ lessonKey, variant = "panel" }: { lessonKey: string; variant?: "panel" | "inline" }) {
   const questions = useQuery(api.capture.myQuestions);
   const askQuestion = useMutation(api.capture.askQuestion);
   const [text, setText] = useState("");
@@ -286,12 +261,11 @@ function QuestionBox({ lessonKey, variant = "panel" }: { lessonKey: string; vari
   return (
     <div
       className={
-        variant === "sheet"
-          ? "flex max-h-[60dvh] flex-col rounded-t-2xl border border-line bg-card p-4 shadow-2xl"
+        variant === "inline"
+          ? "rounded-xl border border-line bg-card p-4"
           : "flex h-full flex-col rounded-xl border border-line bg-card p-4"
       }
     >
-      {variant === "sheet" && <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-line" />}
       <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-accent2">Ask about this lesson</h3>
       <form
         className="flex gap-2"
@@ -306,12 +280,15 @@ function QuestionBox({ lessonKey, variant = "panel" }: { lessonKey: string; vari
         <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Your question…" className="min-w-0 flex-1 rounded-lg border border-line bg-white px-3 py-2 text-sm focus:border-gold focus:outline-none" />
         <button type="submit" className="rounded-lg bg-accent2 px-3 py-2 text-sm text-white hover:bg-accent2/90">Ask</button>
       </form>
-      <ul className="mt-3 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
+      <ul className={`mt-3 flex flex-col gap-3 ${variant === "inline" ? "" : "min-h-0 flex-1 overflow-y-auto"}`}>
         {mine.map((q) => (
           <li key={q.id} className="text-sm">
-            <p className="text-ink">{q.text}</p>
+            <p className="font-medium text-ink">{q.text}</p>
             {q.reply ? (
-              <p className="mt-1 rounded-lg bg-hi px-3 py-2 text-ink">{q.reply}</p>
+              <div className="mt-1.5 rounded-lg border-l-2 border-accent2 bg-hi px-3 py-2">
+                <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-accent2">Teacher</p>
+                <p className="text-ink">{q.reply}</p>
+              </div>
             ) : (
               <p className="mt-1 text-xs text-soft">Waiting for your teacher…</p>
             )}
