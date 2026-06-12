@@ -3,7 +3,7 @@
 // Usage: pnpm run review
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
-import { convexUrl, publishSecret } from "./_env.ts";
+import { convexUrl, publishSecret } from "./_env";
 
 const client = new ConvexHttpClient(convexUrl());
 const state = await client.query(api.capture.reviewState, { secret: publishSecret() });

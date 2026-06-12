@@ -4,7 +4,7 @@
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
-import { convexUrl, publishSecret } from "./_env.ts";
+import { convexUrl, publishSecret } from "./_env";
 
 const [questionId, reply] = process.argv.slice(2);
 if (!questionId || !reply) {

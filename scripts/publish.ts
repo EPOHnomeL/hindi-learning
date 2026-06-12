@@ -8,7 +8,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
-import { convexUrl, publishSecret } from "./_env.ts";
+import { convexUrl, publishSecret } from "./_env";
 
 const secret = publishSecret();
 const client = new ConvexHttpClient(convexUrl());
