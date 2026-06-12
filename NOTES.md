@@ -33,7 +33,13 @@
 - End each lesson with a nudge to ask me (their teacher) follow-up questions.
 
 ## Open threads / next ZPD steps
-- After the habitual verb (Lesson 1), the next blocker in Psalm 1:1 is the
-  **oblique case + postpositions** (दुष्टों की युक्ति पर, पापियों के मार्ग में,
-  ...वालों की मण्डली में). That is Lesson 2's natural target.
+- Lessons 1–6 done: Psalm 1:1–1:4 read end-to-end. Covered: habitual (sg+pl
+  agreement), oblique+postpositions, का/के/की, जो/correlative, करता रहता है,
+  के समान. (See LR-0001…0004.)
+- **The passive** (लगाया गया है v3, उड़ाई जाती है v4) is the one parked skill,
+  teased twice. Hook: से = "by" (just met in पवन से). Bigger jump (handbook Ch.14).
+- **Feminine habitual** (-ती है/हैं) is the missing half of agreement — wait for a
+  feminine subject in a verse before teaching it.
+- **Psalm 1:5–6** finish the psalm (the mission's first waypoint): future/subjunctive
+  (रह सकेंगे, ठहरेंगे) and the closing contrast (जानता है … नाश हो जाएगा).
 - Find a BSI OV audio source for read-aloud anchoring (RESOURCES gap).
