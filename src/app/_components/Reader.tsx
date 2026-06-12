@@ -17,6 +17,7 @@ export function Reader() {
   const progress = useQuery(api.capture.myProgress);
   const { signOut } = useAuthActions();
   const [selected, setSelected] = useState<Selection | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // lessonKey -> status, so the nav can show what's already completed.
   const completed = new Set((progress ?? []).filter((p) => p.status === "completed").map((p) => p.lessonKey));
@@ -27,9 +28,39 @@ export function Reader() {
   // Default to the first lesson once they load.
   const current = selected ?? (lessons && lessons.length > 0 ? { kind: "lesson" as const, key: lessons[0]!.key } : null);
 
+  // Selecting from the drawer closes it (mobile); a no-op on desktop.
+  const select = (s: Selection) => {
+    setSelected(s);
+    setMenuOpen(false);
+  };
+
   return (
-    <div className="flex min-h-screen flex-col md:h-screen md:flex-row md:overflow-hidden">
-      <aside className="shrink-0 border-b border-line p-4 md:w-64 md:overflow-y-auto md:border-b-0 md:border-r">
+    <div className="flex h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
+      {/* Mobile top bar: hamburger opens the lesson selector. */}
+      <header className="flex shrink-0 items-center gap-3 border-b border-line p-3 md:hidden">
+        <button
+          onClick={() => setMenuOpen(true)}
+          aria-label="Open lessons"
+          className="rounded-lg p-1.5 text-ink hover:bg-hi"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+        <h1 className="text-base font-semibold tracking-tight text-accent">Hindi</h1>
+      </header>
+
+      {/* Backdrop behind the drawer (mobile only). */}
+      {menuOpen && <div onClick={() => setMenuOpen(false)} aria-hidden className="fixed inset-0 z-40 bg-black/40 md:hidden" />}
+
+      {/* Lesson selector: slide-in drawer on mobile, static column on desktop. */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-72 transform overflow-y-auto border-r border-line bg-paper p-4 transition-transform duration-300 md:static md:z-auto md:w-64 md:translate-x-0 md:transition-none ${
+          menuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="mb-4 flex items-center justify-between">
           <h1 className="text-lg font-semibold tracking-tight text-accent">Hindi</h1>
           <button onClick={() => void signOut()} className="text-xs text-soft hover:text-accent">
@@ -45,7 +76,7 @@ export function Reader() {
               key={l.key}
               active={current?.kind === "lesson" && current.key === l.key}
               done={completed.has(l.key)}
-              onClick={() => setSelected({ kind: "lesson", key: l.key })}
+              onClick={() => select({ kind: "lesson", key: l.key })}
             >
               {l.seq}. {l.title.split("—")[0]!.trim()}
             </NavItem>
@@ -53,14 +84,14 @@ export function Reader() {
 
           <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">References</p>
           {references?.map((r) => (
-            <NavItem key={r.key} active={current?.kind === "reference" && current.key === r.key} onClick={() => setSelected({ kind: "reference", key: r.key })}>
+            <NavItem key={r.key} active={current?.kind === "reference" && current.key === r.key} onClick={() => select({ kind: "reference", key: r.key })}>
               {r.title}
             </NavItem>
           ))}
         </nav>
       </aside>
 
-      <section className="min-w-0 flex-1 p-4 md:overflow-hidden">
+      <section className="min-w-0 flex-1 overflow-hidden p-4">
         {current ? (
           <ArtifactView
             kind={current.kind}

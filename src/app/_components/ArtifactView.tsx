@@ -35,6 +35,22 @@ const CAPTURE_BRIDGE = `<script>(function(){
       post({type:'response', quizId:id, answer:input.value, correct: v===answer});
     });
   });
+  // Tell the parent when the learner reaches the bottom of the lesson, so the
+  // reader can reveal the ask box on mobile. A lesson short enough not to scroll
+  // counts as "at bottom" immediately.
+  var ticking=false;
+  function reportBottom(){
+    ticking=false;
+    var doc=document.documentElement;
+    var st=window.scrollY||doc.scrollTop||0;
+    var ch=window.innerHeight||doc.clientHeight;
+    var sh=Math.max(document.body?document.body.scrollHeight:0, doc.scrollHeight);
+    post({type:'scroll', atBottom: st+ch>=sh-24});
+  }
+  window.addEventListener('scroll', function(){ if(!ticking){ ticking=true; requestAnimationFrame(reportBottom); } }, {passive:true});
+  window.addEventListener('resize', reportBottom, {passive:true});
+  window.addEventListener('load', reportBottom);
+  setTimeout(reportBottom, 250);
 }());<\/script>`;
 
 export function ArtifactView({
@@ -70,6 +86,11 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
 
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
 
+  // On mobile the ask box stays hidden until the learner scrolls to the bottom
+  // of the lesson (reported by the iframe bridge). Reset when the lesson changes.
+  const [atBottom, setAtBottom] = useState(false);
+  useEffect(() => setAtBottom(false), [lessonKey]);
+
   useEffect(() => {
     if (lesson) void setProgress({ lessonKey, status: "opened" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -77,9 +98,15 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
 
   useEffect(() => {
     function onMessage(e: MessageEvent) {
-      const d = e.data as { __lesson?: boolean; type?: string; quizId?: string; answer?: unknown; correct?: unknown };
-      if (!d?.__lesson || d.type !== "response" || !d.quizId) return;
-      void recordResponse({ lessonKey, quizId: d.quizId, answer: String(d.answer ?? ""), correct: Boolean(d.correct) });
+      const d = e.data as { __lesson?: boolean; type?: string; quizId?: string; answer?: unknown; correct?: unknown; atBottom?: unknown };
+      if (!d?.__lesson) return;
+      if (d.type === "scroll") {
+        setAtBottom(Boolean(d.atBottom));
+        return;
+      }
+      if (d.type === "response" && d.quizId) {
+        void recordResponse({ lessonKey, quizId: d.quizId, answer: String(d.answer ?? ""), correct: Boolean(d.correct) });
+      }
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
@@ -111,10 +138,18 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
         </div>
         <Frame html={lesson.html} withBridge />
       </div>
-      {/* Ask column — right-hand side on desktop, stacks below on mobile. */}
-      <aside className="shrink-0 md:w-80 md:overflow-y-auto">
+      {/* Desktop: persistent ask column on the right. */}
+      <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
         <QuestionBox lessonKey={lessonKey} />
       </aside>
+      {/* Mobile: ask slides up from the bottom once the lesson is read through. */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-30 px-3 pb-3 transition-transform duration-300 md:hidden ${
+          atBottom ? "translate-y-0" : "pointer-events-none translate-y-full"
+        }`}
+      >
+        <QuestionBox lessonKey={lessonKey} variant="sheet" />
+      </div>
     </div>
   );
 }
@@ -195,14 +230,22 @@ function ReferenceView({ refKey }: { refKey: string }) {
 }
 
 // Ask the teacher a question and see the reply inline once answered (live).
-function QuestionBox({ lessonKey }: { lessonKey: string }) {
+// `panel` is the desktop side column; `sheet` is the mobile slide-up surface.
+function QuestionBox({ lessonKey, variant = "panel" }: { lessonKey: string; variant?: "panel" | "sheet" }) {
   const questions = useQuery(api.capture.myQuestions);
   const askQuestion = useMutation(api.capture.askQuestion);
   const [text, setText] = useState("");
   const mine = questions?.filter((q) => q.lessonKey === lessonKey) ?? [];
 
   return (
-    <div className="flex h-full flex-col rounded-xl border border-line bg-card p-4">
+    <div
+      className={
+        variant === "sheet"
+          ? "flex max-h-[60dvh] flex-col rounded-t-2xl border border-line bg-card p-4 shadow-2xl"
+          : "flex h-full flex-col rounded-xl border border-line bg-card p-4"
+      }
+    >
+      {variant === "sheet" && <div className="mx-auto mb-3 h-1 w-10 shrink-0 rounded-full bg-line" />}
       <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-accent2">Ask about this lesson</h3>
       <form
         className="flex gap-2"
@@ -217,7 +260,7 @@ function QuestionBox({ lessonKey }: { lessonKey: string }) {
         <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Your question…" className="min-w-0 flex-1 rounded-lg border border-line bg-white px-3 py-2 text-sm focus:border-gold focus:outline-none" />
         <button type="submit" className="rounded-lg bg-accent2 px-3 py-2 text-sm text-white hover:bg-accent2/90">Ask</button>
       </form>
-      <ul className="mt-3 flex flex-col gap-3 overflow-y-auto">
+      <ul className="mt-3 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         {mine.map((q) => (
           <li key={q.id} className="text-sm">
             <p className="text-ink">{q.text}</p>
