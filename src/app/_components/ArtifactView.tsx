@@ -45,13 +45,16 @@ function Frame({ html, withBridge }: { html: string; withBridge: boolean }) {
     if (!withBridge) return html;
     return html.includes("</body>") ? html.replace("</body>", CAPTURE_BRIDGE + "</body>") : html + CAPTURE_BRIDGE;
   }, [html, withBridge]);
-  return <iframe sandbox="allow-scripts" srcDoc={srcDoc} className="min-h-[60vh] w-full flex-1 rounded-xl border border-stone-200 bg-white" />;
+  return <iframe sandbox="allow-scripts" srcDoc={srcDoc} className="min-h-[60vh] w-full flex-1 rounded-xl border border-line bg-card" />;
 }
 
 function LessonView({ lessonKey }: { lessonKey: string }) {
   const lesson = useQuery(api.content.getLesson, { key: lessonKey });
+  const progress = useQuery(api.capture.myProgress);
   const recordResponse = useMutation(api.capture.recordResponse);
   const setProgress = useMutation(api.capture.setProgress);
+
+  const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
 
   useEffect(() => {
     if (lesson) void setProgress({ lessonKey, status: "opened" });
@@ -68,17 +71,25 @@ function LessonView({ lessonKey }: { lessonKey: string }) {
     return () => window.removeEventListener("message", onMessage);
   }, [lessonKey, recordResponse]);
 
-  if (lesson === undefined) return <p className="text-stone-400">Loading…</p>;
-  if (lesson === null) return <p className="text-stone-400">Lesson not found.</p>;
+  if (lesson === undefined) return <p className="text-soft">Loading…</p>;
+  if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
 
   return (
     <div className="flex h-full flex-col gap-4 md:flex-row">
       {/* Lesson column — fills the available height. */}
       <div className="flex min-h-0 flex-1 flex-col gap-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold">{lesson.title}</h2>
-          <button onClick={() => void setProgress({ lessonKey, status: "completed" })} className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-100">
-            Mark complete
+          <button
+            onClick={() => void setProgress({ lessonKey, status: "completed" })}
+            disabled={completed}
+            className={`shrink-0 rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+              completed
+                ? "cursor-default border-accent2 bg-accent2 text-white"
+                : "border-accent text-accent hover:bg-hi"
+            }`}
+          >
+            {completed ? "✓ Completed" : "Mark complete"}
           </button>
         </div>
         <Frame html={lesson.html} withBridge />
@@ -93,8 +104,8 @@ function LessonView({ lessonKey }: { lessonKey: string }) {
 
 function ReferenceView({ refKey }: { refKey: string }) {
   const ref = useQuery(api.content.getReference, { key: refKey });
-  if (ref === undefined) return <p className="text-stone-400">Loading…</p>;
-  if (ref === null) return <p className="text-stone-400">Reference not found.</p>;
+  if (ref === undefined) return <p className="text-soft">Loading…</p>;
+  if (ref === null) return <p className="text-soft">Reference not found.</p>;
   return (
     <div className="flex h-full flex-col gap-3">
       <h2 className="text-lg font-semibold">{ref.title}</h2>
@@ -111,8 +122,8 @@ function QuestionBox({ lessonKey }: { lessonKey: string }) {
   const mine = questions?.filter((q) => q.lessonKey === lessonKey) ?? [];
 
   return (
-    <div className="flex h-full flex-col rounded-xl border border-stone-200 bg-white p-4">
-      <h3 className="mb-2 text-sm font-medium">Ask about this lesson</h3>
+    <div className="flex h-full flex-col rounded-xl border border-line bg-card p-4">
+      <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-accent2">Ask about this lesson</h3>
       <form
         className="flex gap-2"
         onSubmit={async (e) => {
@@ -123,17 +134,17 @@ function QuestionBox({ lessonKey }: { lessonKey: string }) {
           await askQuestion({ lessonKey, text: t });
         }}
       >
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Your question…" className="min-w-0 flex-1 rounded-lg border border-stone-300 px-3 py-2 text-sm" />
-        <button type="submit" className="rounded-lg bg-stone-900 px-3 py-2 text-sm text-white">Ask</button>
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Your question…" className="min-w-0 flex-1 rounded-lg border border-line bg-white px-3 py-2 text-sm focus:border-gold focus:outline-none" />
+        <button type="submit" className="rounded-lg bg-accent2 px-3 py-2 text-sm text-white hover:bg-accent2/90">Ask</button>
       </form>
       <ul className="mt-3 flex flex-col gap-3 overflow-y-auto">
         {mine.map((q) => (
           <li key={q.id} className="text-sm">
-            <p className="text-stone-800">{q.text}</p>
+            <p className="text-ink">{q.text}</p>
             {q.reply ? (
-              <p className="mt-1 rounded-lg bg-stone-100 px-3 py-2 text-stone-700">{q.reply}</p>
+              <p className="mt-1 rounded-lg bg-hi px-3 py-2 text-ink">{q.reply}</p>
             ) : (
-              <p className="mt-1 text-xs text-stone-400">Waiting for your teacher…</p>
+              <p className="mt-1 text-xs text-soft">Waiting for your teacher…</p>
             )}
           </li>
         ))}

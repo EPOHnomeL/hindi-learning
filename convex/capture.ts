@@ -53,6 +53,20 @@ export const setProgress = mutation({
   },
 });
 
+// The learner's per-lesson progress, so the reader can show what's done (live).
+export const myProgress = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const rows = await ctx.db
+      .query("progress")
+      .withIndex("by_user_lesson", (q) => q.eq("userId", userId))
+      .collect();
+    return rows.map((p) => ({ lessonKey: p.lessonKey, status: p.status }));
+  },
+});
+
 export const askQuestion = mutation({
   args: { lessonKey: v.string(), text: v.string() },
   handler: async (ctx, { lessonKey, text }) => {
