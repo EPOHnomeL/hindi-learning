@@ -23,12 +23,49 @@ const titleFrom = (html: string): string => {
 const supersedesFrom = (html: string): string | undefined =>
   html.match(/<meta\s+name=["']supersedes["']\s+content=["']([^"']+)["']/i)?.[1];
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
-const htmlFiles = (dir: string) => readdirSync(dir).filter((f) => f.endsWith(".html")).sort();
+// Skip partials/templates (anything underscore-prefixed); only real artifacts.
+const htmlFiles = (dir: string) =>
+  readdirSync(dir).filter((f) => f.endsWith(".html") && !f.startsWith("_")).sort();
+
+// Lessons are authored as lean fragments (content only); the shared <head>
+// design system and the quiz-feedback <script> live once in lessons/_partials/
+// and are wrapped on here at publish time, so the stored HTML stays fully
+// self-contained. A file that is already a complete document (the immutable
+// lessons published before this change) is passed through untouched.
+const HEAD = readFileSync("lessons/_partials/head.html", "utf8").trim();
+const FOOT = readFileSync("lessons/_partials/foot.html", "utf8").trim();
+const assembleLesson = (raw: string): string => {
+  const fragment = raw.trim();
+  if (/<!DOCTYPE|<html[\s>]/i.test(fragment)) return raw; // already complete
+  const title = fragment.match(/<title>[\s\S]*?<\/title>/i)?.[0] ?? "";
+  const supersedes = fragment.match(/<meta\s+name=["']supersedes["'][^>]*>/i)?.[0] ?? "";
+  const content = fragment
+    .replace(/<title>[\s\S]*?<\/title>/i, "")
+    .replace(/<meta\s+name=["']supersedes["'][^>]*>/i, "")
+    .trim();
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+${title}
+${supersedes}
+${HEAD}
+</head>
+<body>
+<div class="wrap">
+${content}
+</div>
+${FOOT}
+</body>
+</html>
+`;
+};
 
 await client.mutation(api.content.ensureTopic, { secret, title: "Hindi" });
 
 for (const f of htmlFiles("lessons")) {
-  const html = readFileSync(`lessons/${f}`, "utf8");
+  const html = assembleLesson(readFileSync(`lessons/${f}`, "utf8"));
   const key = f.replace(/\.html$/, "");
   const seq = Number(key.match(/^(\d+)/)?.[1] ?? 0);
   const result = await client.mutation(api.content.publishLesson, {

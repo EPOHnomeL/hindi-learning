@@ -1,0 +1,122 @@
+<!-- Shared lesson <head> chrome: fonts + the full design system.
+     publish.ts injects this into every lean lesson fragment, so authored
+     lessons carry ONLY their content. Edit styles here once; every future
+     lesson picks them up on the next publish. (Already-published lessons are
+     immutable and keep their own inlined copy — see scripts/publish.ts.)
+     This is a SUPERSET of every component used in lessons 1–6. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#2b2622; --soft:#6b6258; --paper:#fbf7f0;
+    --card:#fffdf9; --accent:#9c5b34; --accent2:#3f6f5e; --gold:#b88a2e;
+    --hi:#fbeecb; --good:#e7f3ec; --good-b:#3f8f63; --bad:#fbe9e7; --bad-b:#c0573f;
+    --book:#34506b; --book-bg:#eef3f7;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Spectral',Georgia,'Times New Roman',serif; line-height:1.62; font-size:18px;}
+  .wrap{max-width:760px; margin:0 auto; padding:54px 26px 110px}
+  .deva{font-family:'Noto Serif Devanagari','Noto Sans Devanagari',serif;}
+  header.lesson{border-bottom:1px solid #e7ddd4; padding-bottom:26px; margin-bottom:34px}
+  .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:600}
+  h1{font-size:33px; line-height:1.18; margin:.32em 0 .15em; font-weight:600; letter-spacing:-.01em}
+  .sub{color:var(--soft); font-style:italic; font-size:18px}
+  h2{font-size:13px; letter-spacing:.16em; text-transform:uppercase; color:var(--accent2); margin:52px 0 6px; font-weight:600}
+  h2 .num{color:var(--gold); margin-right:.5em; font-style:normal}
+  .lead{font-size:20px}
+  p{margin:.7em 0}
+  .verse{background:var(--card); border:1px solid #ece2d6; border-left:4px solid var(--gold);
+    border-radius:10px; padding:22px 26px; margin:20px 0; box-shadow:0 2px 14px #b88a2e10;}
+  .verse .ref{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--soft); margin-bottom:10px}
+  .verse .hi{font-size:25px; line-height:1.95; color:#1f1b18}
+  .verse .en{color:var(--soft); font-style:italic; margin-top:12px; font-size:16.5px}
+  mark{background:var(--hi); padding:.04em .14em; border-radius:3px; box-decoration-break:clone;-webkit-box-decoration-break:clone}
+  mark.r{background:#e6f0e3} mark.c{background:#e0e8f3}
+  mark.b{background:#d9ead8} mark.j{background:#e0e8f3} mark.v{background:#e6f0e3}
+
+  .book{background:var(--book-bg); border:1px solid #d4e0ea; border-left:4px solid var(--book);
+    border-radius:10px; padding:18px 22px 16px; margin:20px 0}
+  .book .src{font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--book);
+    font-weight:600; margin-bottom:8px; display:flex; align-items:center; gap:8px}
+  .book .src::before{content:"📖"}
+  .book p{margin:.45em 0}
+  .book .deva{font-size:19px}
+  .book .ex{display:grid; grid-template-columns:1fr 1fr; gap:4px 18px; margin:8px 0 2px; align-items:center}
+  .book .ex .d{font-family:'Noto Serif Devanagari',serif; font-size:19px}
+  .book .ex .t{color:var(--book)}
+
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:0 24px; margin:18px 0}
+  .grid2 .col{border:1px solid #e7dccd; border-radius:10px; overflow:hidden}
+  .grid2 .ch{padding:8px 14px; font-size:12px; letter-spacing:.12em; text-transform:uppercase; font-weight:600}
+  .grid2 .col.sg .ch{background:#f3ebe0; color:var(--accent)}
+  .grid2 .col.pl .ch{background:#e7f0ec; color:var(--accent2)}
+  .grid2 .row{display:flex; justify-content:space-between; align-items:baseline; padding:8px 14px; border-top:1px dotted #e7dccd}
+  .grid2 .row .d{font-family:'Noto Serif Devanagari',serif; font-size:21px}
+  .grid2 .row .e{color:var(--soft); font-size:14px; font-style:italic}
+  .grid2 b{color:var(--accent2)}
+
+  .build{display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin:16px 0; font-size:20px}
+  .build .chip{background:#f3ebe0; border:1px solid #e2d6c5; border-radius:8px; padding:6px 12px}
+  .build .chip.deva{font-size:23px}
+  .build .op{color:var(--gold); font-weight:600}
+  .build .res{background:var(--hi); border-color:#e9d49a}
+
+  .word{display:grid; grid-template-columns:auto 1fr; gap:4px 16px; margin:10px 0; border-bottom:1px dotted #e2d6c5; padding-bottom:10px}
+  .word .w{font-family:'Noto Serif Devanagari',serif; font-size:23px; color:var(--accent)}
+  .word .g{align-self:center}
+  .word .g b{color:var(--accent2); font-weight:600}
+
+  table.paradigm{border-collapse:collapse; width:100%; margin:18px 0; font-size:17px; background:var(--card)}
+  table.paradigm th,table.paradigm td{border:1px solid #ece2d6; padding:9px 13px; text-align:left}
+  table.paradigm th{background:#f3ebe0; font-weight:600; font-size:13px; letter-spacing:.04em; text-transform:uppercase; color:var(--soft)}
+  table.paradigm .d{font-family:'Noto Serif Devanagari',serif; font-size:20px}
+  table.paradigm td:last-child{color:var(--soft); font-style:italic}
+  table.paradigm tr.key td{background:var(--hi)}
+
+  .park{border:1px dashed #d8c9b4; border-radius:10px; padding:16px 20px; margin:22px 0; background:#fcfaf5}
+  .park h3{margin:0 0 6px; font-size:15px; letter-spacing:.05em; color:var(--accent); text-transform:uppercase}
+  .park .hi{font-family:'Noto Serif Devanagari',serif}
+
+  .note{background:#f4efe6; border-radius:9px; padding:15px 19px; margin:20px 0; font-size:16.5px}
+  .note .t{font-weight:600; color:var(--accent2); font-style:normal; display:block; margin-bottom:3px}
+  .note.devo{background:#f3eef6; }
+  .note.devo .t{color:#6b4e86}
+
+  .quiz{background:var(--card); border:1px solid #e7dccd; border-radius:12px; padding:22px 24px; margin:22px 0; box-shadow:0 2px 14px #00000008}
+  .quiz .q{font-weight:600; margin-bottom:4px}
+  .quiz .q .deva{font-weight:400}
+  .opts{display:flex; flex-direction:column; gap:9px; margin-top:14px}
+  .opt{display:block; width:100%; text-align:left; cursor:pointer; font:inherit; font-size:17px;
+       background:#fff; border:1.5px solid #e2d6c5; border-radius:9px; padding:11px 15px; transition:.13s}
+  .opt:hover{border-color:var(--gold); background:#fffdf6}
+  .opt.correct{background:var(--good); border-color:var(--good-b); color:#235138}
+  .opt.wrong{background:var(--bad); border-color:var(--bad-b); color:#7a2d1c}
+  .opt:disabled{cursor:default}
+  .fb{margin-top:13px; font-size:16px; min-height:1.2em; opacity:0; transition:.2s}
+  .fb.show{opacity:1}
+  .fb.ok{color:var(--good-b)} .fb.no{color:var(--bad-b)}
+  .fb .deva{font-size:18px}
+  .fill input{font:inherit; font-size:20px; font-family:'Noto Serif Devanagari',serif;
+    border:none; border-bottom:2px solid var(--gold); background:#fffdf6; width:240px; text-align:center; padding:2px 6px}
+  .fill input:focus{outline:none; background:var(--hi)}
+  .fill button{font:inherit; font-size:15px; margin-left:12px; background:var(--accent2); color:#fff;
+    border:none; border-radius:7px; padding:7px 16px; cursor:pointer}
+  .fill button:hover{background:#345b4d}
+
+  .cite{font-size:13.5px; color:var(--soft)} .cite a{color:var(--accent)}
+  a{color:var(--accent)}
+  .win{background:linear-gradient(180deg,#fffdf7,#fbf3e2); border:1px solid #ecdcb8; border-radius:12px; padding:24px 26px; margin:22px 0}
+  .win .ref{font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); font-weight:600; margin-bottom:12px}
+  .win .row{display:grid; grid-template-columns:1fr; gap:3px; margin:13px 0; padding-bottom:11px; border-bottom:1px dotted #e7d6b3}
+  .win .row:last-child{border:none}
+  .win .h{font-family:'Noto Serif Devanagari',serif; font-size:23px}
+  .win .e{color:var(--soft); font-style:italic; font-size:16px}
+  .ask{background:linear-gradient(180deg,#3f6f5e,#365e50); color:#f4efe6; border-radius:12px; padding:22px 26px; margin:46px 0 0; font-size:16.5px}
+  .ask b{color:#fff} .ask .deva{color:#ffeec6}
+  footer{margin-top:40px; border-top:1px solid #e7ddd4; padding-top:18px; font-size:13.5px; color:var(--soft)}
+  .pill{display:inline-block; background:#f3ebe0; border-radius:20px; padding:3px 12px; font-size:13px; color:var(--soft); margin-right:6px}
+  .recap{font-size:15px; color:var(--soft); background:#f4efe6; border-radius:8px; padding:10px 16px; margin:0 0 8px}
+</style>

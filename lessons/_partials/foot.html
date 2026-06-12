@@ -1,0 +1,44 @@
+<!-- Shared in-lesson quiz feedback (visual correct/wrong highlighting + the
+     inline .fb message). publish.ts injects this before </body> of every lean
+     lesson fragment. NOTE: this is the *visual* layer only — the reader
+     (ArtifactView.tsx QUIZ_BRIDGE) separately captures the learner's first
+     answer back to you; keep the same .quiz[data-correct]/.opt[data-k] and
+     .quiz.fill[data-answer] markup so both layers work.
+
+     Per-quiz custom feedback is OPTIONAL: add data-ok / data-no attributes to
+     a .quiz to override the default messages (HTML allowed). Omit them and the
+     sensible defaults below are used. -->
+<script>
+document.querySelectorAll('.quiz[data-correct]').forEach(function(q){
+  var correct=q.getAttribute('data-correct'); var fb=q.querySelector('.fb');
+  q.querySelectorAll('.opt').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      if(q.dataset.done) return; q.dataset.done='1';
+      var k=btn.getAttribute('data-k');
+      q.querySelectorAll('.opt').forEach(function(b){
+        b.disabled=true;
+        if(b.getAttribute('data-k')===correct) b.classList.add('correct');
+      });
+      if(k===correct){ fb.innerHTML=q.getAttribute('data-ok')||'✓ Right.'; fb.className='fb show ok'; }
+      else{ btn.classList.add('wrong');
+        fb.innerHTML=q.getAttribute('data-no')||'Not quite — the highlighted answer is correct. Re-read the section above, then move on.';
+        fb.className='fb show no'; }
+    });
+  });
+});
+document.querySelectorAll('.quiz.fill').forEach(function(q){
+  var ans=(q.getAttribute('data-answer')||'').trim(), alt=(q.getAttribute('data-alt')||'').trim();
+  var input=q.querySelector('input'), btn=q.querySelector('button'), fb=q.querySelector('.fb');
+  function norm(s){return (s||'').replace(/\s+/g,' ').trim();}
+  function check(){
+    var v=norm(input.value);
+    if(v===ans||(alt&&v===alt)){ fb.innerHTML=q.getAttribute('data-ok')||'✓ Correct.';
+      fb.className='fb show ok'; input.style.borderColor='var(--good-b)'; }
+    else if(v===''){ fb.textContent='Type your answer, then press Check.'; fb.className='fb show no'; }
+    else{ fb.innerHTML=q.getAttribute('data-no')||'Not yet — try again.';
+      fb.className='fb show no'; }
+  }
+  btn.addEventListener('click',check);
+  input.addEventListener('keydown',function(e){if(e.key==='Enter')check();});
+});
+</script>

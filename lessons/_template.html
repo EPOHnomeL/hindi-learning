@@ -1,0 +1,42 @@
+<!-- LEAN LESSON TEMPLATE — copy me to 000N-<dash-case-name>.html and fill in.
+     Write ONLY content: the shared <head> design system and the quiz feedback
+     <script> are injected automatically at publish time (see scripts/publish.ts
+     and lessons/_partials/). Do NOT add <!DOCTYPE>, <html>, <head>, <style>,
+     <body>, <div class="wrap"> or the feedback <script> — they are wrapped on.
+
+     Keep the <title> as the first line: "Lesson N · <descriptive title>".
+     The text after " · " becomes the title shown in the reader.
+     To replace a published lesson, add right under <title>:
+       <meta name="supersedes" content="000X-old-key">
+
+     Component classes available (defined in _partials/head.html): .verse,
+     .book/.book .ex, .grid2/.col.sg/.col.pl/.row, .build/.chip/.op/.res,
+     .word, table.paradigm(+tr.key), .park, .note(.devo), .quiz/.opts/.opt,
+     .quiz.fill, .win, .ask, .recap, .pill, mark(.r/.c/.b/.j/.v), .deva, .cite.
+
+     Quiz markup the reader captures (keep these attributes):
+       <div class="quiz" data-correct="b" data-ok="…" data-no="…"> … </div>
+         with <button class="opt" data-k="a|b|c">…</button> options
+       <div class="quiz fill" data-answer="…" data-alt="…" data-ok="…" data-no="…">
+         with an <input> and a <button>Check</button>
+     data-ok / data-no are OPTIONAL custom feedback (HTML ok); omit for defaults. -->
+<title>Lesson N · &lt;descriptive title&gt;</title>
+
+<header class="lesson">
+  <div class="kicker">Lesson N · &lt;one-line skill&gt;</div>
+  <h1>&lt;display title&gt;</h1>
+  <div class="sub">&lt;the one thing this lesson teaches, in a sentence&gt;</div>
+  <div style="margin-top:14px">
+    <span class="pill">Vehicle: &lt;verse&gt;</span>
+    <span class="pill">One skill: &lt;skill&gt;</span>
+    <span class="pill">~10 min</span>
+  </div>
+</header>
+
+<p class="recap">Recap — &lt;what they already own from prior lessons&gt;</p>
+
+<!-- … lesson body: lead, verse, numbered <h2> sections, quizzes, .win, .ask … -->
+
+<footer>
+  Sources — &lt;citations&gt;
+</footer>
