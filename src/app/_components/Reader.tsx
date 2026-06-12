@@ -41,7 +41,7 @@ export function Reader() {
               done={completed.has(l.key)}
               onClick={() => setSelected({ kind: "lesson", key: l.key })}
             >
-              {l.seq}. {l.title}
+              {l.seq}. {l.title.split("—")[0]!.trim()}
             </NavItem>
           ))}
 
