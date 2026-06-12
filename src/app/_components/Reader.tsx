@@ -35,9 +35,10 @@ export function Reader() {
   };
 
   return (
-    <div className="flex h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
-      {/* Mobile top bar: hamburger opens the lesson selector. */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-line p-3 md:hidden">
+    <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
+      {/* Mobile top bar: hamburger opens the lesson selector. Sticky + fixed h-12 so
+          the lesson/reference title bar can pin directly beneath it (top-12). */}
+      <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 md:hidden">
         <button
           onClick={() => setMenuOpen(true)}
           aria-label="Open lessons"
@@ -91,7 +92,7 @@ export function Reader() {
         </nav>
       </aside>
 
-      <section className="min-w-0 flex-1 overflow-hidden md:p-4">
+      <section className="min-w-0 flex-1 md:overflow-hidden md:p-4">
         {current ? (
           <ArtifactView
             kind={current.kind}

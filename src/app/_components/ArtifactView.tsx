@@ -8,12 +8,29 @@ import { api } from "../../../convex/_generated/api";
 // stuck "generating" past this is treated as crashed and offered for retry.
 const STALE_MS = 10 * 60 * 1000;
 
-// Injected into a lesson's iframe. It reads the AUTHORED quiz markup
-// (.quiz[data-correct] + .opt[data-k], and .quiz.fill[data-answer]) and posts
-// the learner's answer to the parent — so lessons stay self-contained with no
-// API calls of their own (the teach convention). First-answer-only is enforced
-// server-side, so re-clicks are harmless.
-const CAPTURE_BRIDGE = `<script>(function(){
+// Injected into the iframe. Two concerns, kept separate:
+//  - HEIGHT_BRIDGE (always): posts the document's content height so the parent
+//    can size the iframe to fit. On mobile that makes the whole PAGE the single
+//    scroll surface (no nested iframe scroll), so the browser chrome is free to
+//    collapse and the lesson gets the full screen.
+//  - QUIZ_BRIDGE (lessons only): reads the AUTHORED quiz markup (.quiz[data-correct]
+//    + .opt[data-k], and .quiz.fill[data-answer]) and posts the learner's answer,
+//    so lessons stay self-contained with no API calls of their own. First-answer-
+//    only is enforced server-side, so re-clicks are harmless.
+const HEIGHT_BRIDGE = `<script>(function(){
+  function post(m){ try{ parent.postMessage(Object.assign({__lesson:true}, m), '*'); }catch(e){} }
+  function reportHeight(){
+    var doc=document.documentElement;
+    post({type:'height', height: Math.max(document.body?document.body.scrollHeight:0, doc.scrollHeight)});
+  }
+  window.addEventListener('load', reportHeight);
+  window.addEventListener('resize', reportHeight);
+  if(window.ResizeObserver){ try{ new ResizeObserver(reportHeight).observe(document.documentElement); }catch(e){} }
+  setTimeout(reportHeight, 100);
+  setTimeout(reportHeight, 600);
+}());<\/script>`;
+
+const QUIZ_BRIDGE = `<script>(function(){
   function post(m){ try{ parent.postMessage(Object.assign({__lesson:true}, m), '*'); }catch(e){} }
   document.querySelectorAll('.quiz[data-correct]').forEach(function(quiz,i){
     var id = quiz.id || ('quiz-'+i);
@@ -35,22 +52,6 @@ const CAPTURE_BRIDGE = `<script>(function(){
       post({type:'response', quizId:id, answer:input.value, correct: v===answer});
     });
   });
-  // Tell the parent when the learner reaches the bottom of the lesson, so the
-  // reader can reveal the ask box on mobile. A lesson short enough not to scroll
-  // counts as "at bottom" immediately.
-  var ticking=false;
-  function reportBottom(){
-    ticking=false;
-    var doc=document.documentElement;
-    var st=window.scrollY||doc.scrollTop||0;
-    var ch=window.innerHeight||doc.clientHeight;
-    var sh=Math.max(document.body?document.body.scrollHeight:0, doc.scrollHeight);
-    post({type:'scroll', atBottom: st+ch>=sh-24});
-  }
-  window.addEventListener('scroll', function(){ if(!ticking){ ticking=true; requestAnimationFrame(reportBottom); } }, {passive:true});
-  window.addEventListener('resize', reportBottom, {passive:true});
-  window.addEventListener('load', reportBottom);
-  setTimeout(reportBottom, 250);
 }());<\/script>`;
 
 export function ArtifactView({
@@ -72,11 +73,42 @@ export function ArtifactView({
 // (e.g. stacked on mobile).
 function Frame({ html, withBridge }: { html: string; withBridge: boolean }) {
   const srcDoc = useMemo(() => {
-    if (!withBridge) return html;
-    return html.includes("</body>") ? html.replace("</body>", CAPTURE_BRIDGE + "</body>") : html + CAPTURE_BRIDGE;
+    const scripts = HEIGHT_BRIDGE + (withBridge ? QUIZ_BRIDGE : "");
+    return html.includes("</body>") ? html.replace("</body>", scripts + "</body>") : html + scripts;
   }, [html, withBridge]);
-  // Full-bleed on mobile (edge-to-edge, no side border/rounding); a bordered card on desktop.
-  return <iframe sandbox="allow-scripts" srcDoc={srcDoc} className="min-h-[60vh] w-full flex-1 border-y border-line bg-card md:rounded-xl md:border" />;
+
+  // On mobile the iframe is sized to its content so the whole page scrolls as one
+  // surface; on desktop it fills its column and scrolls internally. The measured
+  // height is ignored above md (the style is only applied while `mobile`).
+  const [mobile, setMobile] = useState(false);
+  const [contentH, setContentH] = useState<number | null>(null);
+  useEffect(() => setContentH(null), [srcDoc]);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  useEffect(() => {
+    function onMsg(e: MessageEvent) {
+      const d = e.data as { __lesson?: boolean; type?: string; height?: unknown };
+      if (d?.__lesson && d.type === "height" && typeof d.height === "number") setContentH(d.height);
+    }
+    window.addEventListener("message", onMsg);
+    return () => window.removeEventListener("message", onMsg);
+  }, []);
+
+  // Full-bleed on mobile (edge-to-edge, no side border/rounding); a bordered card
+  // that fills and scrolls internally on desktop.
+  return (
+    <iframe
+      sandbox="allow-scripts"
+      srcDoc={srcDoc}
+      style={mobile && contentH ? { height: contentH } : undefined}
+      className={`w-full border-y border-line bg-card md:min-h-[60vh] md:flex-1 md:rounded-xl md:border ${contentH ? "" : "min-h-[60vh]"}`}
+    />
+  );
 }
 
 function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; topicSlug: string; isFrontier: boolean }) {
@@ -87,10 +119,27 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
 
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
 
-  // On mobile the ask box stays hidden until the learner scrolls to the bottom
-  // of the lesson (reported by the iframe bridge). Reset when the lesson changes.
+  // On mobile the ask box stays hidden until the learner scrolls to the bottom of
+  // the page (the lesson now scrolls the whole page, not a nested iframe). A body
+  // ResizeObserver re-checks once the iframe finishes sizing to its content.
   const [atBottom, setAtBottom] = useState(false);
-  useEffect(() => setAtBottom(false), [lessonKey]);
+  useEffect(() => {
+    setAtBottom(false);
+    function check() {
+      const el = document.scrollingElement ?? document.documentElement;
+      setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 64);
+    }
+    window.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check, { passive: true });
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(check) : null;
+    ro?.observe(document.body);
+    check();
+    return () => {
+      window.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+      ro?.disconnect();
+    };
+  }, [lessonKey]);
 
   useEffect(() => {
     if (lesson) void setProgress({ lessonKey, status: "opened" });
@@ -99,13 +148,8 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
 
   useEffect(() => {
     function onMessage(e: MessageEvent) {
-      const d = e.data as { __lesson?: boolean; type?: string; quizId?: string; answer?: unknown; correct?: unknown; atBottom?: unknown };
-      if (!d?.__lesson) return;
-      if (d.type === "scroll") {
-        setAtBottom(Boolean(d.atBottom));
-        return;
-      }
-      if (d.type === "response" && d.quizId) {
+      const d = e.data as { __lesson?: boolean; type?: string; quizId?: string; answer?: unknown; correct?: unknown };
+      if (d?.__lesson && d.type === "response" && d.quizId) {
         void recordResponse({ lessonKey, quizId: d.quizId, answer: String(d.answer ?? ""), correct: Boolean(d.correct) });
       }
     }
@@ -117,11 +161,12 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
   if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
 
   return (
-    <div className="flex h-full flex-col gap-4 md:flex-row">
-      {/* Lesson column — fills the available height. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-3">
-        <div className="flex items-center justify-between gap-3 px-3 pt-3 md:px-0 md:pt-0">
-          <h2 className="text-lg font-semibold">{lesson.title}</h2>
+    <div className="flex flex-col gap-4 md:h-full md:flex-row">
+      {/* Lesson column — fills the available height on desktop; grows with content on mobile. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3">
+        {/* Title + actions: a sticky bar under the mobile header; inline on desktop. */}
+        <div className="sticky top-12 z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">
+          <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
           <div className="flex shrink-0 items-center gap-2">
             {isFrontier && completed && <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />}
             <button
@@ -223,8 +268,8 @@ function ReferenceView({ refKey }: { refKey: string }) {
   if (ref === undefined) return <p className="text-soft">Loading…</p>;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   return (
-    <div className="flex h-full flex-col gap-3">
-      <h2 className="px-3 pt-3 text-lg font-semibold md:px-0 md:pt-0">{ref.title}</h2>
+    <div className="flex flex-col gap-0 md:h-full md:gap-3">
+      <h2 className="sticky top-12 z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">{ref.title}</h2>
       <Frame html={ref.html} withBridge={false} />
     </div>
   );
