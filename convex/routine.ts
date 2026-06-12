@@ -191,7 +191,11 @@ async function fireForTopic(ctx: ActionCtx, topicSlug: string): Promise<FireResu
     // locally for the lock and the agent's report.
     const res = await fetch(url, {
       method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      headers: {
+        "content-type": "application/json",
+        "anthropic-version": "2023-06-01",
+        authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({}),
     });
     if (!res.ok) throw new Error(`fire ${res.status}: ${await res.text()}`);
