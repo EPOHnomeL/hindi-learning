@@ -13,6 +13,7 @@ import type * as capture from "../capture.js";
 import type * as content from "../content.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
+import type * as lib from "../lib.js";
 import type * as routine from "../routine.js";
 
 import type {
@@ -27,6 +28,7 @@ declare const fullApi: ApiFromModules<{
   content: typeof content;
   crons: typeof crons;
   http: typeof http;
+  lib: typeof lib;
   routine: typeof routine;
 }>;
 

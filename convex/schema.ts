@@ -49,25 +49,32 @@ export default defineSchema({
     .index("by_topic", ["topicId"])
     .index("by_topic_key", ["topicId", "key"]),
 
-  // The learner's first answer to a quiz, recorded automatically.
+  // The learner's first answer to a quiz, recorded automatically. `topicId` is
+  // optional only for the widen→backfill window (issue 03); narrow once prod is
+  // backfilled. Indexes lead with `topicId` so identical lessonKeys across
+  // Topics never collide.
   responses: defineTable({
     userId: v.id("users"),
+    topicId: v.optional(v.id("topics")),
     lessonKey: v.string(),
     quizId: v.string(),
     answer: v.string(),
     correct: v.boolean(),
-  }).index("by_user_lesson_quiz", ["userId", "lessonKey", "quizId"]),
+  })
+    .index("by_topic_user_lesson_quiz", ["topicId", "userId", "lessonKey", "quizId"])
+    .index("by_topic", ["topicId"]),
 
-  // Per-lesson reading state. `by_lesson` lets the Routine's gate ask "is this
-  // lesson completed?" without a user (the daily cron has none); v1 is single-
-  // learner, so any completed row is the learner's.
+  // Per-lesson reading state. `by_topic_lesson` lets the Routine's gate ask "is
+  // this Topic's lesson completed?" without a user (the daily cron has none); a
+  // Topic has one owner, so any completed row for it is the owner's.
   progress: defineTable({
     userId: v.id("users"),
+    topicId: v.optional(v.id("topics")),
     lessonKey: v.string(),
     status: v.union(v.literal("opened"), v.literal("completed")),
   })
-    .index("by_user_lesson", ["userId", "lessonKey"])
-    .index("by_lesson", ["lessonKey"]),
+    .index("by_topic_user_lesson", ["topicId", "userId", "lessonKey"])
+    .index("by_topic_lesson", ["topicId", "lessonKey"]),
 
   // The next-lesson Routine's single-flight lock, one row per Topic (see ADR
   // 0008). `frontierKey` is the lesson the in-flight (or last) run fired for;
@@ -89,11 +96,12 @@ export default defineSchema({
   // A question the learner asked from inside a lesson; the teacher replies.
   questions: defineTable({
     userId: v.id("users"),
+    topicId: v.optional(v.id("topics")),
     lessonKey: v.string(),
     text: v.string(),
     status: v.union(v.literal("open"), v.literal("answered")),
     reply: v.optional(v.string()),
   })
-    .index("by_user", ["userId"])
-    .index("by_status", ["status"]),
+    .index("by_topic_user", ["topicId", "userId"])
+    .index("by_topic_status", ["topicId", "status"]),
 });

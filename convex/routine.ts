@@ -37,11 +37,12 @@ async function frontierLesson(ctx: QueryCtx, topicId: Id<"topics">): Promise<Doc
   return null;
 }
 
-async function isCompleted(ctx: QueryCtx, lessonKey: string): Promise<boolean> {
-  // v1 is single-learner, so any completed row is the learner's.
+async function isCompleted(ctx: QueryCtx, topicId: Id<"topics">, lessonKey: string): Promise<boolean> {
+  // Scoped to this Topic: an identical lessonKey in another Topic must not count.
+  // A Topic has one owner, so any completed row for it is the owner's.
   const rows = await ctx.db
     .query("progress")
-    .withIndex("by_lesson", (q) => q.eq("lessonKey", lessonKey))
+    .withIndex("by_topic_lesson", (q) => q.eq("topicId", topicId).eq("lessonKey", lessonKey))
     .collect();
   return rows.some((p) => p.status === "completed");
 }
@@ -89,7 +90,7 @@ export const tryAcquireGeneration = internalMutation({
 
     const frontier = await frontierLesson(ctx, topic._id);
     if (!frontier) return { acquired: false, reason: "no-frontier" };
-    if (!(await isCompleted(ctx, frontier.key))) {
+    if (!(await isCompleted(ctx, topic._id, frontier.key))) {
       return { acquired: false, reason: "frontier-not-completed" };
     }
 

@@ -1,8 +1,8 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query, type QueryCtx } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { assertAdmin } from "./lib";
+import { assertAdmin, getOwnedTopic } from "./lib";
 
 // Lessons & references. Reader queries are auth-gated and owner-scoped: a Topic
 // is resolved by (owner = signed-in user, slug), so one learner never sees
@@ -10,14 +10,6 @@ import { assertAdmin } from "./lib";
 // (`pnpm run publish`) and guarded by PUBLISH_SECRET; they resolve the owner
 // from `ownerEmail` (the operator has no auth identity) and thread the resulting
 // topicId through.
-
-// A Topic owned by `userId` with this slug, or null. The reader's resolver.
-async function getOwnedTopic(ctx: QueryCtx, userId: Id<"users">, slug: string) {
-  return await ctx.db
-    .query("topics")
-    .withIndex("by_owner_slug", (q) => q.eq("ownerId", userId).eq("slug", slug))
-    .unique();
-}
 
 // ---- Reader (learner) ------------------------------------------------------
 
