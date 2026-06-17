@@ -1,9 +1,10 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useQuery } from "convex/react";
-import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "convex/react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { ArtifactView } from "./ArtifactView";
 
 type Selection = { kind: "lesson" | "reference"; key: string };
@@ -156,6 +157,8 @@ export function Reader() {
               {r.title}
             </NavItem>
           ))}
+
+          {topicSlug && <ResourcesSection topicSlug={topicSlug} />}
         </nav>
       </aside>
 
@@ -211,5 +214,59 @@ function NavItem({
         )}
       </span>
     </button>
+  );
+}
+
+// The active Topic's uploaded Resources + a file uploader. Standard Convex
+// 3-step upload (generateUploadUrl → POST → addResource). Raw storage only;
+// the Routine processes them later (issue 06), so these aren't openable yet.
+function ResourcesSection({ topicSlug }: { topicSlug: string }) {
+  const resources = useQuery(api.resources.listResources, { topicSlug });
+  const generateUploadUrl = useMutation(api.resources.generateUploadUrl);
+  const addResource = useMutation(api.resources.addResource);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function upload(file: File) {
+    setBusy(true);
+    try {
+      const url = await generateUploadUrl();
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+      if (!res.ok) throw new Error(`upload failed (${res.status})`);
+      const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+      await addResource({ topicSlug, filename: file.name, storageId });
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <>
+      <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">Resources</p>
+      {resources?.length === 0 && <p className="px-2 text-sm text-soft">No resources yet.</p>}
+      {resources?.map((r) => (
+        <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-ink">
+          <span className="min-w-0 truncate">{r.filename}</span>
+          {r.status !== "ready" && <span className="shrink-0 text-xs text-soft">{r.status}</span>}
+        </div>
+      ))}
+      <input
+        ref={inputRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void upload(file);
+        }}
+      />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={busy}
+        className="mt-1 rounded-lg border border-dashed border-line px-2 py-1.5 text-left text-sm text-soft hover:bg-hi disabled:opacity-60"
+      >
+        {busy ? "Uploading…" : "+ Upload a resource"}
+      </button>
+    </>
   );
 }
