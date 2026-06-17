@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
 
@@ -66,4 +66,16 @@ test("materialiseTopic returns one owner's topic context and is owner-scoped", a
 
   // Wrong owner → null.
   expect(await t.query(api.routine.materialiseTopic, { secret, ownerEmail: "nobody@example.com", topicSlug: "hindi" })).toBeNull();
+});
+
+test("the bootstrap gate fires a seeded topic with no lessons; a plain empty topic does not", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "greek", title: "Greek", status: "seeded" }));
+  await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "empty", title: "Empty" })); // no status, no lessons
+
+  const seeded = await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "greek" });
+  expect(seeded).toMatchObject({ acquired: true, frontierKey: "(seed)" });
+  const plain = await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "empty" });
+  expect(plain).toMatchObject({ acquired: false, reason: "no-frontier" });
 });

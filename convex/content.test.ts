@@ -125,3 +125,36 @@ test("ensureTopic rejects a bad secret and an unknown owner", async () => {
   await expect(t.mutation(api.content.ensureTopic, { secret: "wrong", ownerEmail: "alice@example.com", slug: "hindi", title: "Hindi" })).rejects.toThrow();
   await expect(t.mutation(api.content.ensureTopic, { secret: "test-secret", ownerEmail: "ghost@example.com", slug: "hindi", title: "Hindi" })).rejects.toThrow();
 });
+
+test("seedTopic creates a seeded topic; identical titles get distinct slugs", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const as = asUser(t, alice);
+
+  const r1 = await as.mutation(api.content.seedTopic, { title: "Koine Greek!", why: "read the NT" });
+  const r2 = await as.mutation(api.content.seedTopic, { title: "Koine Greek!", why: "again" });
+  expect(r1.slug).toBe("koine-greek");
+  expect(r2.slug).toBe("koine-greek-2");
+
+  const topics = await as.query(api.content.listTopics, {});
+  expect(topics.find((x) => x.slug === "koine-greek")).toMatchObject({ title: "Koine Greek!", status: "seeded", mission: null });
+});
+
+test("editMission sets the learner's mission (owner-scoped); publishMission flips status to active", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const bob = await seedUser(t, "bob@example.com");
+  const as = asUser(t, alice);
+  const secret = "test-secret";
+  const { slug } = await as.mutation(api.content.seedTopic, { title: "Greek", why: "NT" });
+
+  await as.mutation(api.content.editMission, { topicSlug: slug, mission: "Read John in Greek." });
+  expect((await as.query(api.content.listTopics, {})).find((x) => x.slug === slug)?.mission).toBe("Read John in Greek.");
+  // bob can't edit alice's topic
+  await expect(asUser(t, bob).mutation(api.content.editMission, { topicSlug: slug, mission: "hijack" })).rejects.toThrow();
+
+  // The Routine publishes a drafted mission and activates the topic.
+  await t.mutation(api.content.publishMission, { secret, ownerEmail: "alice@example.com", topicSlug: slug, mission: "Drafted mission." });
+  const topic = (await as.query(api.content.listTopics, {})).find((x) => x.slug === slug);
+  expect(topic).toMatchObject({ status: "active", mission: "Drafted mission." });
+});
