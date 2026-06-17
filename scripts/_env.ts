@@ -54,3 +54,17 @@ export function publishSecret(): string {
   }
   return secret;
 }
+
+// The email of the user who owns the published Topic. The publish path has no
+// auth identity, so the owner is named here; the user must already be registered.
+export function ownerEmail(): string {
+  const email = process.env.OWNER_EMAIL;
+  if (!email) {
+    console.error(
+      "Missing OWNER_EMAIL — set it in .env.local to the registered email that owns the\n" +
+        "published Topic (e.g. OWNER_EMAIL=you@example.com).",
+    );
+    process.exit(1);
+  }
+  return email;
+}

@@ -8,10 +8,11 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
-import { convexUrl, publishSecret } from "./_env";
+import { convexUrl, ownerEmail, publishSecret } from "./_env";
 
 const PROD = process.argv.includes("--prod");
 const secret = publishSecret();
+const owner = ownerEmail();
 const client = new ConvexHttpClient(convexUrl(PROD));
 console.log(`Publishing to ${PROD ? "PROD (live site)" : "dev"}…`);
 
@@ -62,7 +63,7 @@ ${FOOT}
 `;
 };
 
-await client.mutation(api.content.ensureTopic, { secret, title: "Hindi" });
+const topicId = await client.mutation(api.content.ensureTopic, { secret, ownerEmail: owner, slug: "hindi", title: "Hindi" });
 
 for (const f of htmlFiles("lessons")) {
   const html = assembleLesson(readFileSync(`lessons/${f}`, "utf8"));
@@ -70,6 +71,7 @@ for (const f of htmlFiles("lessons")) {
   const seq = Number(key.match(/^(\d+)/)?.[1] ?? 0);
   const result = await client.mutation(api.content.publishLesson, {
     secret,
+    topicId,
     key,
     seq,
     title: titleFrom(html),
@@ -84,6 +86,7 @@ for (const f of htmlFiles("references")) {
   const key = f.replace(/\.html$/, "");
   const result = await client.mutation(api.content.upsertReference, {
     secret,
+    topicId,
     key,
     title: titleFrom(html),
     html,
