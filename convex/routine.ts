@@ -26,6 +26,10 @@ import { assertAdmin, getOwnedTopic, topicBySlug } from "./lib";
 // A run stuck "generating" past this is treated as crashed and re-fireable.
 const STALE_MS = 10 * 60 * 1000;
 
+// The on-demand button can fire a Topic at most once per this window; the daily
+// cron is the primary authoring path (issue 08 — bounds Claude usage).
+const MANUAL_COOLDOWN_MS = 20 * 60 * 60 * 1000;
+
 // The Frontier: highest-seq non-superseded Lesson, or null if the Topic has none.
 async function frontierLesson(ctx: QueryCtx, topicId: Id<"topics">): Promise<Doc<"lessons"> | null> {
   for await (const lesson of ctx.db
@@ -70,6 +74,9 @@ export const generationStatus = query({
       frontierKey: gen?.frontierKey ?? null,
       startedAt: gen?.startedAt ?? null,
       error: gen?.error ?? null,
+      // Raw timestamp; the client compares against the cooldown (queries can't
+      // call Date.now()). Lets the button disable when fired within the window.
+      lastManualFireAt: gen?.lastManualFireAt ?? null,
     };
   },
 });
@@ -83,8 +90,8 @@ type AcquireResult =
 // Check the gate and grab the lock in one transaction. Returns whether the
 // caller should now fire the routine. The ONLY place that decides to author.
 export const tryAcquireGeneration = internalMutation({
-  args: { topicSlug: v.string() },
-  handler: async (ctx, { topicSlug }): Promise<AcquireResult> => {
+  args: { topicSlug: v.string(), manual: v.optional(v.boolean()) },
+  handler: async (ctx, { topicSlug, manual }): Promise<AcquireResult> => {
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return { acquired: false, reason: "no-topic" };
 
@@ -110,9 +117,13 @@ export const tryAcquireGeneration = internalMutation({
       if (gen.status === "caughtUp" && gen.frontierKey === frontierKey) {
         return { acquired: false, reason: "caught-up" };
       }
+      // The button is capped to once per cooldown; the cron (manual=false) isn't.
+      if (manual && gen.lastManualFireAt !== undefined && now - gen.lastManualFireAt < MANUAL_COOLDOWN_MS) {
+        return { acquired: false, reason: "rate-limited" };
+      }
     }
 
-    const patch = {
+    const base = {
       status: "generating" as const,
       frontierKey,
       startedAt: now,
@@ -120,6 +131,7 @@ export const tryAcquireGeneration = internalMutation({
       claimedAt: undefined, // fresh lock — unclaimed until a fired run grabs it
       runId: undefined,
     };
+    const patch = manual ? { ...base, lastManualFireAt: now } : base;
     if (gen) await ctx.db.patch(gen._id, patch);
     else await ctx.db.insert("generation", { topicId: topic._id, ...patch });
 
@@ -195,8 +207,8 @@ type FireResult = { fired: boolean; reason?: string; error?: string };
 
 // Shared by the button and the cron: acquire the lock, then POST the routine's
 // Fire URL with the Topic slug in the body. On a failed fire, release the lock.
-async function fireForTopic(ctx: ActionCtx, topicSlug: string): Promise<FireResult> {
-  const acquired: AcquireResult = await ctx.runMutation(internal.routine.tryAcquireGeneration, { topicSlug });
+async function fireForTopic(ctx: ActionCtx, topicSlug: string, manual: boolean): Promise<FireResult> {
+  const acquired: AcquireResult = await ctx.runMutation(internal.routine.tryAcquireGeneration, { topicSlug, manual });
   if (!acquired.acquired) return { fired: false, reason: acquired.reason };
 
   try {
@@ -231,7 +243,7 @@ export const requestNextLesson = action({
   args: { topicSlug: v.string() },
   handler: async (ctx, { topicSlug }): Promise<FireResult> => {
     if (!(await getAuthUserId(ctx))) throw new Error("unauthenticated");
-    return await fireForTopic(ctx, topicSlug);
+    return await fireForTopic(ctx, topicSlug, true);
   },
 });
 
@@ -252,7 +264,7 @@ export const dailyFire = internalAction({
   handler: async (ctx) => {
     const slugs: string[] = await ctx.runQuery(internal.routine.listTopicSlugs, {});
     for (const slug of slugs) {
-      await fireForTopic(ctx, slug);
+      await fireForTopic(ctx, slug, false);
     }
   },
 });

@@ -119,6 +119,9 @@ export default defineSchema({
     // unclaimed row. Lets fire-all hand each concurrent run a distinct Topic.
     claimedAt: v.optional(v.number()),
     runId: v.optional(v.string()),
+    // Last on-demand (button) fire, for the per-Topic manual cooldown (issue 08)
+    // — the daily cron stays the primary authoring path. Survives reports.
+    lastManualFireAt: v.optional(v.number()),
   }).index("by_topic", ["topicId"]),
 
   // A question the learner asked from inside a lesson; the teacher replies.
