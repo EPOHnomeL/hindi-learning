@@ -1,5 +1,14 @@
 # Next-lesson Routine: gate in Convex, API-only routine, one routine for all Topics
 
+> **Partially superseded by [ADR 0009](0009-content-source-of-truth-in-convex-routine-pulls-context.md)
+> and [ADR 0010](0010-teaching-compute-swappable-adapter.md).** The Convex gate +
+> single-flight lock still stand and generalise to many Topics. What changed: the
+> Routine no longer reads the repo for content or commits Lessons to `main`
+> (0009) — it claims a Topic and materialises its context from Convex — and the
+> compute that runs it is now an explicit swappable adapter (0010). The
+> "one Routine, Topic fixed in its instructions" stance is replaced by
+> "one topic-agnostic Routine that claims its Topic at run time."
+
 The Routine that authors the next Lesson (PRD FR14) is a single cloud Claude Code
 routine with **only an API ("Call via API") trigger — no cron on the routine
 itself**. The gate ("author the next Lesson iff the Frontier is `completed`") and

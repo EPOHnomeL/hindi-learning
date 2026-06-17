@@ -1,10 +1,15 @@
-# 01 — Multi-topic: "teach me anything" (single user)
+# 01 — Multi-topic: "teach me anything" (seed / now scoped)
 
-Status: needs-info
+Status: wontfix (superseded by the PRD)
 
-> TODO / placeholder. To be scoped properly later with `grill-with-docs`. This
-> just captures the intent and what was already found, so the scoping session
-> has a seed. Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md).
+> **Scoped.** This placeholder has been resolved by a `grill-with-docs` session.
+> The decisions are now in [`../PRD.md`](../PRD.md),
+> [ADR 0009](../../../docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md),
+> and [ADR 0010](../../../docs/adr/0010-teaching-compute-swappable-adapter.md);
+> the implementation slices are issues `02`–`09` in this folder. Two scope
+> changes vs. this note: it is **multi-user** (≈4 whitelisted accounts, not
+> single-user), and the **source of truth moved to Convex** (data leaves the
+> repo). Kept for history.
 
 ## Want
 

@@ -1,5 +1,11 @@
 # Local teach workspace is the source of truth; Neon is a published mirror + inbox, integrated via the Neon MCP
 
+> **Superseded by [ADR 0009](0009-content-source-of-truth-in-convex-routine-pulls-context.md).**
+> The storage move to Convex (ADR 0007) already retired Neon/R2/the MCP; the
+> multi-tenant dashboard then flipped the source of truth itself from the local
+> workspace to Convex. The teach skill stays file-based, but it now runs against
+> a workspace *materialised from Convex per run*, not a durable local source.
+
 Content is authored by Claude Code's file-based teach skill (a workspace of `lessons/*.html`, `reference/*.html`, `MISSION.md`, `learning-records/`, `GLOSSARY.md`). That local workspace is the **source of truth**. An explicit **Publish** action pushes artifacts to the hub: HTML blobs go to R2 (see ADR-0005) and the metadata rows go to Neon via the Neon MCP (insert new Lessons, upsert References). Neon additionally accumulates learner-generated data (Responses, Questions) created only on the web, which Claude Code reads back through the same MCP to drive the next authoring round.
 
 ## Considered Options
