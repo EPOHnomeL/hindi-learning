@@ -119,14 +119,14 @@ function Frame({ html, withBridge }: { html: string; withBridge: boolean }) {
 
 function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; topicSlug: string; isFrontier: boolean }) {
   const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey });
-  const progress = useQuery(api.capture.myProgress);
+  const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
   const setProgress = useMutation(api.capture.setProgress);
 
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
 
   useEffect(() => {
-    if (lesson) void setProgress({ lessonKey, status: "opened" });
+    if (lesson) void setProgress({ topicSlug, lessonKey, status: "opened" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson?.key]);
 
@@ -134,12 +134,12 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
     function onMessage(e: MessageEvent) {
       const d = e.data as { __lesson?: boolean; type?: string; quizId?: string; answer?: unknown; correct?: unknown };
       if (d?.__lesson && d.type === "response" && d.quizId) {
-        void recordResponse({ lessonKey, quizId: d.quizId, answer: String(d.answer ?? ""), correct: Boolean(d.correct) });
+        void recordResponse({ topicSlug, lessonKey, quizId: d.quizId, answer: String(d.answer ?? ""), correct: Boolean(d.correct) });
       }
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [lessonKey, recordResponse]);
+  }, [topicSlug, lessonKey, recordResponse]);
 
   if (lesson === undefined) return <p className="text-soft">Loading…</p>;
   if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
@@ -154,7 +154,7 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
           <div className="flex shrink-0 items-center gap-2">
             {isFrontier && completed && <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />}
             <button
-              onClick={() => void setProgress({ lessonKey, status: "completed" })}
+              onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
               disabled={completed}
               className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
                 completed
@@ -170,12 +170,12 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
             scrolling, no slide-up trigger. Desktop uses the side column instead. */}
         <div className="p-3 md:hidden">
-          <QuestionBox lessonKey={lessonKey} variant="inline" />
+          <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} variant="inline" />
         </div>
       </div>
       {/* Desktop: persistent ask column on the right. */}
       <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
-        <QuestionBox lessonKey={lessonKey} />
+        <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} />
       </aside>
     </div>
   );
@@ -258,8 +258,8 @@ function ReferenceView({ refKey, topicSlug }: { refKey: string; topicSlug: strin
 
 // Ask the teacher a question and see the reply once answered (live).
 // `panel` is the desktop side column; `inline` sits at the end of the lesson on mobile.
-function QuestionBox({ lessonKey, variant = "panel" }: { lessonKey: string; variant?: "panel" | "inline" }) {
-  const questions = useQuery(api.capture.myQuestions);
+function QuestionBox({ topicSlug, lessonKey, variant = "panel" }: { topicSlug: string; lessonKey: string; variant?: "panel" | "inline" }) {
+  const questions = useQuery(api.capture.myQuestions, { topicSlug });
   const askQuestion = useMutation(api.capture.askQuestion);
   const [text, setText] = useState("");
   const mine = questions?.filter((q) => q.lessonKey === lessonKey) ?? [];
@@ -280,7 +280,7 @@ function QuestionBox({ lessonKey, variant = "panel" }: { lessonKey: string; vari
           const t = text.trim();
           if (!t) return;
           setText("");
-          await askQuestion({ lessonKey, text: t });
+          await askQuestion({ topicSlug, lessonKey, text: t });
         }}
       >
         <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Your question…" className="min-w-0 flex-1 rounded-lg border border-line bg-white px-3 py-2 text-sm focus:border-gold focus:outline-none" />

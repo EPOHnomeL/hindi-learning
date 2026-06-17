@@ -26,8 +26,8 @@ export function Reader() {
 
   const lessons = useQuery(api.content.listLessons, topicSlug ? { topicSlug } : "skip");
   const references = useQuery(api.content.listReferences, topicSlug ? { topicSlug } : "skip");
-  const progress = useQuery(api.capture.myProgress);
-  const questions = useQuery(api.capture.myQuestions);
+  const progress = useQuery(api.capture.myProgress, topicSlug ? { topicSlug } : "skip");
+  const questions = useQuery(api.capture.myQuestions, topicSlug ? { topicSlug } : "skip");
 
   const switchTopic = (slug: string) => {
     setActiveSlug(slug);
