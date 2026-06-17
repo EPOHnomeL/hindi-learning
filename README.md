@@ -7,7 +7,7 @@ them to the learner on any device and feeds answers/questions back. See
 
 ## Stack
 
-- **Next.js (App Router)** + Tailwind + `@t3-oss/env-nextjs` — the reader.
+- **Next.js (App Router)** + Tailwind — the reader.
 - **Convex** — database, server functions, and realtime (the "Hub").
 - **Convex Auth** — email/password sign-in (no JWT/cookie plumbing).
 - **tsx** — runs the teach CLI (`publish` / `review` / `reply`).
