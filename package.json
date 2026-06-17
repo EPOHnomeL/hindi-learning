@@ -15,6 +15,8 @@
     "publish:prod": "tsx scripts/publish.ts --prod",
     "materialise": "tsx scripts/materialise.ts",
     "materialise:prod": "tsx scripts/materialise.ts --prod",
+    "migrate-hindi": "tsx scripts/migrate-hindi.ts",
+    "migrate-hindi:prod": "tsx scripts/migrate-hindi.ts --prod",
     "review": "tsx scripts/review.ts",
     "review:prod": "tsx scripts/review.ts --prod",
     "reply": "tsx scripts/reply.ts",
