@@ -79,3 +79,25 @@ test("the bootstrap gate fires a seeded topic with no lessons; a plain empty top
   const plain = await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "empty" });
   expect(plain).toMatchObject({ acquired: false, reason: "no-frontier" });
 });
+
+test("the on-demand button is rate-limited per topic; the daily cron is not", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi");
+  await t.run(async (ctx) => {
+    await ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1", html: "<p>x</p>" });
+    await ctx.db.insert("progress", { userId: alice, topicId, lessonKey: "0001", status: "completed" });
+  });
+
+  // First manual fire acquires (and stamps lastManualFireAt).
+  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: true });
+  // Simulate the run finishing — back to idle, lastManualFireAt retained.
+  await t.run(async (ctx) => {
+    const gen = await ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique();
+    await ctx.db.patch(gen!._id, { status: "idle", startedAt: undefined, claimedAt: undefined, runId: undefined });
+  });
+  // A second manual fire within the cooldown is rate-limited...
+  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: false, reason: "rate-limited" });
+  // ...but the daily cron (manual=false) still fires.
+  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: false })).toMatchObject({ acquired: true });
+});
