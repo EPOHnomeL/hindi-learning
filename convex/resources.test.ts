@@ -107,6 +107,24 @@ test("cacheProcessedResource fills processed + flips to ready, idempotently", as
   expect((await t.run((ctx) => ctx.db.get(rid)))!.status).toBe("ready");
 });
 
+test("addResourceAdmin records an operator upload owner-scoped by email, and dedupes", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  const secret = "test-secret";
+
+  const sid = await storeBlob(t, "handbook bytes");
+  const id1 = await t.mutation(api.resources.addResourceAdmin, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", filename: "Handbook.pdf", storageId: sid });
+  const sid2 = await storeBlob(t, "handbook bytes"); // identical → dedupe
+  const id2 = await t.mutation(api.resources.addResourceAdmin, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", filename: "Handbook.pdf", storageId: sid2 });
+  expect(id2).toBe(id1);
+  expect(await asUser(t, alice).query(api.resources.listResources, { topicSlug: "hindi" })).toMatchObject([{ filename: "Handbook.pdf", status: "raw" }]);
+
+  await expect(
+    t.mutation(api.resources.addResourceAdmin, { secret: "wrong", ownerEmail: "alice@example.com", topicSlug: "hindi", filename: "x", storageId: sid }),
+  ).rejects.toThrow();
+});
+
 test("cacheProcessedResource rejects a bad secret and an unknown contentHash", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
