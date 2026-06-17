@@ -1,15 +1,11 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
+import { assertAdmin } from "./lib";
 
 // The conversation loop (PRD §4–§5). Reader writes responses/progress/questions
 // for the signed-in learner; the teach CLI reads them (`pnpm run review`) and
 // answers questions (`pnpm run reply`), both PUBLISH_SECRET-guarded.
-
-function assertAdmin(secret: string) {
-  const expected = process.env.PUBLISH_SECRET;
-  if (!expected || secret !== expected) throw new Error("unauthorized");
-}
 
 async function requireUser(ctx: any) {
   const userId = await getAuthUserId(ctx);

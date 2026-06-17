@@ -13,6 +13,7 @@ import {
   type ActionCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { assertAdmin, topicBySlug } from "./lib";
 
 // The next-lesson Routine (ADR 0008). One cloud Claude Code routine, fired two
 // ways through one gate: a daily Convex cron (`dailyFire`) and the reader button
@@ -24,18 +25,6 @@ import type { Doc, Id } from "./_generated/dataModel";
 
 // A run stuck "generating" past this is treated as crashed and re-fireable.
 const STALE_MS = 10 * 60 * 1000;
-
-function assertAdmin(secret: string) {
-  const expected = process.env.PUBLISH_SECRET;
-  if (!expected || secret !== expected) throw new Error("unauthorized");
-}
-
-async function topicBySlug(ctx: QueryCtx, slug: string): Promise<Doc<"topics"> | null> {
-  return await ctx.db
-    .query("topics")
-    .withIndex("by_slug", (q) => q.eq("slug", slug))
-    .unique();
-}
 
 // The Frontier: highest-seq non-superseded Lesson, or null if the Topic has none.
 async function frontierLesson(ctx: QueryCtx, topicId: Id<"topics">): Promise<Doc<"lessons"> | null> {
