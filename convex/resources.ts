@@ -1,11 +1,44 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type MutationCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 import { assertAdmin, getOwnedTopic } from "./lib";
 
 // Learner-uploaded Resources (PRD §Resources). Standard Convex 3-step upload:
 // `generateUploadUrl` → client POSTs the file → `addResource` records the row.
 // Only raw storage here; lazy processing into `processed` is issue 06.
+
+// Shared record step: dedupe by the blob's sha256 (Convex computes it into
+// _storage metadata) — a re-upload of the same bytes returns the existing row
+// and drops the redundant blob. Used by the learner and operator upload paths.
+async function recordUploadedResource(
+  ctx: MutationCtx,
+  topicId: Id<"topics">,
+  ownerId: Id<"users">,
+  filename: string,
+  storageId: Id<"_storage">,
+) {
+  const meta = await ctx.db.system.get(storageId);
+  if (!meta) throw new Error("upload not found");
+  const contentHash = meta.sha256;
+  const existing = await ctx.db
+    .query("resources")
+    .withIndex("by_topic_hash", (q) => q.eq("topicId", topicId).eq("contentHash", contentHash))
+    .unique();
+  if (existing) {
+    await ctx.storage.delete(storageId); // identical bytes already stored
+    return existing._id;
+  }
+  return await ctx.db.insert("resources", {
+    topicId,
+    ownerId,
+    filename,
+    rawStorageId: storageId,
+    contentHash,
+    status: "raw",
+    kind: "file",
+  });
+}
 
 // Step 1: a short-lived URL the client POSTs the file to. Auth-gated so only a
 // signed-in learner can upload.
@@ -27,29 +60,25 @@ export const addResource = mutation({
     if (!userId) throw new Error("unauthenticated");
     const topic = await getOwnedTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
+    return await recordUploadedResource(ctx, topic._id, userId, filename, storageId);
+  },
+});
 
-    const meta = await ctx.db.system.get(storageId);
-    if (!meta) throw new Error("upload not found");
-    const contentHash = meta.sha256;
-
-    const existing = await ctx.db
-      .query("resources")
-      .withIndex("by_topic_hash", (q) => q.eq("topicId", topic._id).eq("contentHash", contentHash))
+// Operator upload (PUBLISH_SECRET-guarded): the migration path has no auth, so
+// the owner is named by email. Used to move Handbook.pdf into the hindi Topic
+// (issue 09). Same dedupe as the learner path.
+export const addResourceAdmin = mutation({
+  args: { secret: v.string(), ownerEmail: v.string(), topicSlug: v.string(), filename: v.string(), storageId: v.id("_storage") },
+  handler: async (ctx, { secret, ownerEmail, topicSlug, filename, storageId }) => {
+    assertAdmin(secret);
+    const owner = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", ownerEmail))
       .unique();
-    if (existing) {
-      await ctx.storage.delete(storageId); // identical bytes already stored
-      return existing._id;
-    }
-
-    return await ctx.db.insert("resources", {
-      topicId: topic._id,
-      ownerId: userId,
-      filename,
-      rawStorageId: storageId,
-      contentHash,
-      status: "raw",
-      kind: "file",
-    });
+    if (!owner) throw new Error("owner not found");
+    const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    return await recordUploadedResource(ctx, topic._id, owner._id, filename, storageId);
   },
 });
 
