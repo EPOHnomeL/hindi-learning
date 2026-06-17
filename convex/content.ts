@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic } from "./lib";
+import { assertAdmin, getOwnedTopic, topicBySlug } from "./lib";
 
 // Lessons & references. Reader queries are auth-gated and owner-scoped: a Topic
 // is resolved by (owner = signed-in user, slug), so one learner never sees
@@ -25,7 +25,38 @@ export const listTopics = query({
       .collect();
     return topics
       .sort((a, b) => (a.seq ?? Infinity) - (b.seq ?? Infinity) || a._creationTime - b._creationTime)
-      .map((t) => ({ slug: t.slug, title: t.title, seq: t.seq }));
+      .map((t) => ({ slug: t.slug, title: t.title, seq: t.seq, status: t.status ?? "active", mission: t.mission ?? null }));
+  },
+});
+
+// Start a Topic from the dashboard: title + free-text "why" (the Seed). The
+// Routine turns the Seed into a Mission + first Lesson on its next run; no LLM
+// runs here (ADR 0001). Slugs are globally unique (the routine path resolves by
+// slug), so identical titles get -2/-3 suffixes.
+export const seedTopic = mutation({
+  args: { title: v.string(), why: v.string() },
+  handler: async (ctx, { title, why }): Promise<{ slug: string }> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const base = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "topic";
+    let slug = base;
+    for (let n = 2; await topicBySlug(ctx, slug); n++) slug = `${base}-${n}`;
+    await ctx.db.insert("topics", { slug, title, ownerId: userId, seed: why, status: "seeded" });
+    return { slug };
+  },
+});
+
+// The learner curating their own "why" — editing the Mission text (not authoring
+// a Lesson, so it doesn't break "no authoring in the web", ADR 0001). The edit
+// round-trips into MISSION.md at the next materialise.
+export const editMission = mutation({
+  args: { topicSlug: v.string(), mission: v.string() },
+  handler: async (ctx, { topicSlug, mission }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    await ctx.db.patch(topic._id, { mission });
   },
 });
 
@@ -120,6 +151,24 @@ export const ensureTopic = mutation({
       return existing._id;
     }
     return await ctx.db.insert("topics", { slug, title, ownerId: owner._id });
+  },
+});
+
+// The Routine's Mission publish (issue 07): on a Seeded Topic's first run it
+// drafts the Mission from the Seed + Resources, publishes it here, and flips
+// `seeded` → `active`. Operator path (no auth), so owner is named by email.
+export const publishMission = mutation({
+  args: { secret: v.string(), ownerEmail: v.string(), topicSlug: v.string(), mission: v.string() },
+  handler: async (ctx, { secret, ownerEmail, topicSlug, mission }) => {
+    assertAdmin(secret);
+    const owner = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", ownerEmail))
+      .unique();
+    if (!owner) throw new Error(`no registered user with email ${ownerEmail}`);
+    const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    await ctx.db.patch(topic._id, { mission, status: "active" });
   },
 });
 

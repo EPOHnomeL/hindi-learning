@@ -89,10 +89,15 @@ export const tryAcquireGeneration = internalMutation({
     if (!topic) return { acquired: false, reason: "no-topic" };
 
     const frontier = await frontierLesson(ctx, topic._id);
-    if (!frontier) return { acquired: false, reason: "no-frontier" };
-    if (!(await isCompleted(ctx, topic._id, frontier.key))) {
+    if (!frontier) {
+      // Bootstrap (issue 07): a Seeded Topic with no Lessons fires once to draft
+      // the Mission + Lesson 1. Any other Topic with no Frontier just no-ops.
+      if (topic.status !== "seeded") return { acquired: false, reason: "no-frontier" };
+    } else if (!(await isCompleted(ctx, topic._id, frontier.key))) {
       return { acquired: false, reason: "frontier-not-completed" };
     }
+    // The lock key: the completed Frontier, or a sentinel for the bootstrap fire.
+    const frontierKey = frontier?.key ?? "(seed)";
 
     const gen = await generationRow(ctx, topic._id);
     const now = Date.now();
@@ -102,14 +107,14 @@ export const tryAcquireGeneration = internalMutation({
         return { acquired: false, reason: "already-generating" };
       }
       // Debounce: a previous run reported nothing for this exact Frontier.
-      if (gen.status === "caughtUp" && gen.frontierKey === frontier.key) {
+      if (gen.status === "caughtUp" && gen.frontierKey === frontierKey) {
         return { acquired: false, reason: "caught-up" };
       }
     }
 
     const patch = {
       status: "generating" as const,
-      frontierKey: frontier.key,
+      frontierKey,
       startedAt: now,
       error: undefined,
       claimedAt: undefined, // fresh lock — unclaimed until a fired run grabs it
@@ -118,7 +123,7 @@ export const tryAcquireGeneration = internalMutation({
     if (gen) await ctx.db.patch(gen._id, patch);
     else await ctx.db.insert("generation", { topicId: topic._id, ...patch });
 
-    return { acquired: true, topicSlug, frontierKey: frontier.key };
+    return { acquired: true, topicSlug, frontierKey };
   },
 });
 

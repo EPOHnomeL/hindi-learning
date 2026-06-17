@@ -18,6 +18,12 @@ export default defineSchema({
     title: v.string(),
     ownerId: v.optional(v.id("users")),
     seq: v.optional(v.number()),
+    // Seed flow (issue 07): a learner Seeds a Topic (title + "why"); the Routine
+    // drafts the Mission and flips `seeded` → `active`. `status` is optional so
+    // the legacy hindi row (pre-seed) is accepted; issue 09 sets it `active`.
+    seed: v.optional(v.string()),
+    mission: v.optional(v.string()),
+    status: v.optional(v.union(v.literal("seeded"), v.literal("active"))),
   })
     .index("by_slug", ["slug"])
     .index("by_owner", ["ownerId"])
