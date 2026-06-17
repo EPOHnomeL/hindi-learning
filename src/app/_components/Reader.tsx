@@ -8,20 +8,32 @@ import { ArtifactView } from "./ArtifactView";
 
 type Selection = { kind: "lesson" | "reference"; key: string };
 
-// v1 serves a single Topic; a switcher arrives with multi-topic.
-const TOPIC_SLUG = "hindi";
-
 // localStorage key for answered-question ids the learner has already seen.
 const SEEN_KEY = "hindi:answers-seen";
 
 export function Reader() {
-  const lessons = useQuery(api.content.listLessons);
-  const references = useQuery(api.content.listReferences);
-  const progress = useQuery(api.capture.myProgress);
-  const questions = useQuery(api.capture.myQuestions);
+  const topics = useQuery(api.content.listTopics);
   const { signOut } = useAuthActions();
+  const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // Active Topic: the chosen one, else the first. Content queries skip until it
+  // resolves (and on switch, the selected lesson/reference resets — its key is
+  // topic-local).
+  const activeTopic = topics?.find((t) => t.slug === activeSlug) ?? topics?.[0] ?? null;
+  const topicSlug = activeTopic?.slug ?? null;
+
+  const lessons = useQuery(api.content.listLessons, topicSlug ? { topicSlug } : "skip");
+  const references = useQuery(api.content.listReferences, topicSlug ? { topicSlug } : "skip");
+  const progress = useQuery(api.capture.myProgress);
+  const questions = useQuery(api.capture.myQuestions);
+
+  const switchTopic = (slug: string) => {
+    setActiveSlug(slug);
+    setSelected(null);
+    setMenuOpen(false);
+  };
 
   // Answered-question ids the learner has already seen (client-only, per device).
   // A lesson with a reply not in this set gets a notification dot in the nav;
@@ -89,7 +101,7 @@ export function Reader() {
             <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
-        <h1 className="text-base font-semibold tracking-tight text-accent">Hindi</h1>
+        <h1 className="text-base font-semibold tracking-tight text-accent">{activeTopic?.title ?? "…"}</h1>
       </header>
 
       {/* Backdrop behind the drawer (mobile only). */}
@@ -101,9 +113,24 @@ export function Reader() {
           menuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-lg font-semibold tracking-tight text-accent">Hindi</h1>
-          <button onClick={() => void signOut()} className="text-xs text-soft hover:text-accent">
+        <div className="mb-4 flex items-center justify-between gap-2">
+          {topics && topics.length > 1 ? (
+            <select
+              value={activeTopic?.slug ?? ""}
+              onChange={(e) => switchTopic(e.target.value)}
+              aria-label="Switch topic"
+              className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2 py-1 text-lg font-semibold tracking-tight text-accent focus:border-gold focus:outline-none"
+            >
+              {topics.map((t) => (
+                <option key={t.slug} value={t.slug}>
+                  {t.title}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <h1 className="min-w-0 truncate text-lg font-semibold tracking-tight text-accent">{activeTopic?.title ?? "…"}</h1>
+          )}
+          <button onClick={() => void signOut()} className="shrink-0 text-xs text-soft hover:text-accent">
             Sign out
           </button>
         </div>
@@ -133,11 +160,11 @@ export function Reader() {
       </aside>
 
       <section className="min-w-0 flex-1 md:overflow-hidden md:p-4">
-        {current ? (
+        {current && topicSlug ? (
           <ArtifactView
             kind={current.kind}
             artifactKey={current.key}
-            topicSlug={TOPIC_SLUG}
+            topicSlug={topicSlug}
             isFrontier={current.kind === "lesson" && current.key === frontierKey}
           />
         ) : (

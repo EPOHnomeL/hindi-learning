@@ -65,7 +65,7 @@ export function ArtifactView({
   topicSlug: string;
   isFrontier: boolean;
 }) {
-  if (kind === "reference") return <ReferenceView refKey={artifactKey} />;
+  if (kind === "reference") return <ReferenceView refKey={artifactKey} topicSlug={topicSlug} />;
   return <LessonView lessonKey={artifactKey} topicSlug={topicSlug} isFrontier={isFrontier} />;
 }
 
@@ -118,7 +118,7 @@ function Frame({ html, withBridge }: { html: string; withBridge: boolean }) {
 }
 
 function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; topicSlug: string; isFrontier: boolean }) {
-  const lesson = useQuery(api.content.getLesson, { key: lessonKey });
+  const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey });
   const progress = useQuery(api.capture.myProgress);
   const recordResponse = useMutation(api.capture.recordResponse);
   const setProgress = useMutation(api.capture.setProgress);
@@ -244,8 +244,8 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
   );
 }
 
-function ReferenceView({ refKey }: { refKey: string }) {
-  const ref = useQuery(api.content.getReference, { key: refKey });
+function ReferenceView({ refKey, topicSlug }: { refKey: string; topicSlug: string }) {
+  const ref = useQuery(api.content.getReference, { topicSlug, key: refKey });
   if (ref === undefined) return <p className="text-soft">Loading…</p>;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   return (
