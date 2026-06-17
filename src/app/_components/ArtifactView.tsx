@@ -8,6 +8,10 @@ import { api } from "../../../convex/_generated/api";
 // stuck "generating" past this is treated as crashed and offered for retry.
 const STALE_MS = 10 * 60 * 1000;
 
+// Mirror of routine.ts MANUAL_COOLDOWN_MS: after an on-demand fire the button
+// is disabled for this window so the daily schedule is the primary path.
+const MANUAL_COOLDOWN_MS = 20 * 60 * 60 * 1000;
+
 // Injected into the iframe. Two concerns, kept separate:
 //  - HEIGHT_BRIDGE (always): posts the document's content height so the parent
 //    can size the iframe to fit. On mobile that makes the whole PAGE the single
@@ -204,6 +208,7 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
 
   const stale = generating && gen?.startedAt != null && now - gen.startedAt > STALE_MS;
   const caughtUp = status === "caughtUp" && gen?.frontierKey === frontierKey;
+  const rateLimited = gen?.lastManualFireAt != null && now - gen.lastManualFireAt < MANUAL_COOLDOWN_MS;
 
   async function fire() {
     setPending(true);
@@ -221,6 +226,13 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
     return (
       <span className="text-sm text-accent2" title="Your teacher has nothing new queued yet.">
         ✨ All caught up
+      </span>
+    );
+  }
+  if (rateLimited && status !== "failed") {
+    return (
+      <span className="text-sm text-soft" title="The daily schedule will continue authoring — this caps on-demand runs.">
+        ✓ Generated today
       </span>
     );
   }
