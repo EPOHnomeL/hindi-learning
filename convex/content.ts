@@ -1,37 +1,52 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, type QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { assertAdmin } from "./lib";
 
-// Lessons & references. Reader queries are auth-gated; publish mutations are
-// called by the teach CLI (`pnpm run publish`) and guarded by PUBLISH_SECRET
-// (set with `npx convex env set PUBLISH_SECRET ...`).
+// Lessons & references. Reader queries are auth-gated and owner-scoped: a Topic
+// is resolved by (owner = signed-in user, slug), so one learner never sees
+// another's content. Publish mutations are called by the teach CLI
+// (`pnpm run publish`) and guarded by PUBLISH_SECRET; they resolve the owner
+// from `ownerEmail` (the operator has no auth identity) and thread the resulting
+// topicId through.
 
-const TOPIC_SLUG = "hindi";
-
-function assertAdmin(secret: string) {
-  const expected = process.env.PUBLISH_SECRET;
-  if (!expected || secret !== expected) throw new Error("unauthorized");
-}
-
-async function getTopicId(ctx: { db: any }) {
-  const topic = await ctx.db
+// A Topic owned by `userId` with this slug, or null. The reader's resolver.
+async function getOwnedTopic(ctx: QueryCtx, userId: Id<"users">, slug: string) {
+  return await ctx.db
     .query("topics")
-    .withIndex("by_slug", (q: any) => q.eq("slug", TOPIC_SLUG))
+    .withIndex("by_owner_slug", (q) => q.eq("ownerId", userId).eq("slug", slug))
     .unique();
-  return topic?._id ?? null;
 }
 
 // ---- Reader (learner) ------------------------------------------------------
 
-export const listLessons = query({
+// The signed-in user's Topics, ordered by `seq` (unsequenced last), then age.
+export const listTopics = query({
   args: {},
   handler: async (ctx) => {
-    if (!(await getAuthUserId(ctx))) return [];
-    const topicId = await getTopicId(ctx);
-    if (!topicId) return [];
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const topics = await ctx.db
+      .query("topics")
+      .withIndex("by_owner", (q) => q.eq("ownerId", userId))
+      .collect();
+    return topics
+      .sort((a, b) => (a.seq ?? Infinity) - (b.seq ?? Infinity) || a._creationTime - b._creationTime)
+      .map((t) => ({ slug: t.slug, title: t.title, seq: t.seq }));
+  },
+});
+
+export const listLessons = query({
+  args: { topicSlug: v.string() },
+  handler: async (ctx, { topicSlug }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) return [];
     const lessons = await ctx.db
       .query("lessons")
-      .withIndex("by_topic_seq", (q) => q.eq("topicId", topicId))
+      .withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id))
       .collect();
     return lessons
       .filter((l) => !l.supersededBy)
@@ -40,14 +55,15 @@ export const listLessons = query({
 });
 
 export const getLesson = query({
-  args: { key: v.string() },
-  handler: async (ctx, { key }) => {
-    if (!(await getAuthUserId(ctx))) return null;
-    const topicId = await getTopicId(ctx);
-    if (!topicId) return null;
+  args: { topicSlug: v.string(), key: v.string() },
+  handler: async (ctx, { topicSlug, key }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) return null;
     const lesson = await ctx.db
       .query("lessons")
-      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     if (!lesson || lesson.supersededBy) return null;
     return { key: lesson.key, seq: lesson.seq, title: lesson.title, html: lesson.html };
@@ -55,14 +71,15 @@ export const getLesson = query({
 });
 
 export const listReferences = query({
-  args: {},
-  handler: async (ctx) => {
-    if (!(await getAuthUserId(ctx))) return [];
-    const topicId = await getTopicId(ctx);
-    if (!topicId) return [];
+  args: { topicSlug: v.string() },
+  handler: async (ctx, { topicSlug }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) return [];
     const refs = await ctx.db
       .query("references")
-      .withIndex("by_topic", (q) => q.eq("topicId", topicId))
+      .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
       .collect();
     return refs
       .sort((a, b) => a.key.localeCompare(b.key))
@@ -71,14 +88,15 @@ export const listReferences = query({
 });
 
 export const getReference = query({
-  args: { key: v.string() },
-  handler: async (ctx, { key }) => {
-    if (!(await getAuthUserId(ctx))) return null;
-    const topicId = await getTopicId(ctx);
-    if (!topicId) return null;
+  args: { topicSlug: v.string(), key: v.string() },
+  handler: async (ctx, { topicSlug, key }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) return null;
     const ref = await ctx.db
       .query("references")
-      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     return ref ? { key: ref.key, title: ref.title, html: ref.html } : null;
   },
@@ -86,13 +104,30 @@ export const getReference = query({
 
 // ---- Publish (teach CLI, PUBLISH_SECRET-guarded) ---------------------------
 
+// Resolve the Topic's owner from email, then create the owned Topic or backfill
+// `ownerId` on the pre-existing unowned row (the legacy Hindi topic). Returns
+// the topicId the rest of the publish run threads through.
+// ponytail: by_slug.unique() assumes one Topic per slug globally — true until
+// issue 05 owner-scopes the routine/publish path; multi-owner same-slug needs that.
 export const ensureTopic = mutation({
-  args: { secret: v.string(), title: v.string() },
-  handler: async (ctx, { secret, title }) => {
+  args: { secret: v.string(), ownerEmail: v.string(), slug: v.string(), title: v.string() },
+  handler: async (ctx, { secret, ownerEmail, slug, title }): Promise<Id<"topics">> => {
     assertAdmin(secret);
-    const existing = await getTopicId(ctx);
-    if (existing) return existing;
-    return await ctx.db.insert("topics", { slug: TOPIC_SLUG, title });
+    const owner = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", ownerEmail))
+      .unique();
+    if (!owner) throw new Error(`no registered user with email ${ownerEmail} — register first`);
+
+    const existing = await ctx.db
+      .query("topics")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .unique();
+    if (existing) {
+      if (!existing.ownerId) await ctx.db.patch(existing._id, { ownerId: owner._id });
+      return existing._id;
+    }
+    return await ctx.db.insert("topics", { slug, title, ownerId: owner._id });
   },
 });
 
@@ -101,16 +136,15 @@ export const ensureTopic = mutation({
 export const publishLesson = mutation({
   args: {
     secret: v.string(),
+    topicId: v.id("topics"),
     key: v.string(),
     seq: v.number(),
     title: v.string(),
     html: v.string(),
     supersedes: v.optional(v.string()),
   },
-  handler: async (ctx, { secret, key, seq, title, html, supersedes }) => {
+  handler: async (ctx, { secret, topicId, key, seq, title, html, supersedes }) => {
     assertAdmin(secret);
-    const topicId = await getTopicId(ctx);
-    if (!topicId) throw new Error("topic not found — run ensureTopic first");
 
     const existing = await ctx.db
       .query("lessons")
@@ -134,15 +168,14 @@ export const publishLesson = mutation({
 export const upsertReference = mutation({
   args: {
     secret: v.string(),
+    topicId: v.id("topics"),
     key: v.string(),
     title: v.string(),
     html: v.string(),
     contentHash: v.string(),
   },
-  handler: async (ctx, { secret, key, title, html, contentHash }) => {
+  handler: async (ctx, { secret, topicId, key, title, html, contentHash }) => {
     assertAdmin(secret);
-    const topicId = await getTopicId(ctx);
-    if (!topicId) throw new Error("topic not found — run ensureTopic first");
 
     const existing = await ctx.db
       .query("references")

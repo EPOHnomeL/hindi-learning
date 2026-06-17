@@ -9,11 +9,19 @@ import { v } from "convex/values";
 export default defineSchema({
   ...authTables,
 
-  // A subject space. v1 ships a single topic ("hindi").
+  // A subject space, owned by its creator. `ownerId` is optional only so the
+  // schema push accepts the pre-existing unowned Hindi row; `ensureTopic`
+  // backfills it. `seq` orders a user's Topics in the switcher. `by_slug` stays
+  // for the operator publish path and the still-global routine (issue 05).
   topics: defineTable({
     slug: v.string(),
     title: v.string(),
-  }).index("by_slug", ["slug"]),
+    ownerId: v.optional(v.id("users")),
+    seq: v.optional(v.number()),
+  })
+    .index("by_slug", ["slug"])
+    .index("by_owner", ["ownerId"])
+    .index("by_owner_slug", ["ownerId", "slug"]),
 
   // Immutable once published. A replacement carries `supersededBy` (the key of
   // the lesson that retired it). `key` is the filename stem, e.g.
