@@ -108,6 +108,11 @@ export default defineSchema({
     frontierKey: v.optional(v.string()),
     startedAt: v.optional(v.number()),
     error: v.optional(v.string()),
+    // The fire body is closed (ADR 0008), so a fired run learns its Topic by
+    // calling `claimWork`, which stamps `claimedAt`/`runId` on one locked-but-
+    // unclaimed row. Lets fire-all hand each concurrent run a distinct Topic.
+    claimedAt: v.optional(v.number()),
+    runId: v.optional(v.string()),
   }).index("by_topic", ["topicId"]),
 
   // A question the learner asked from inside a lesson; the teacher replies.

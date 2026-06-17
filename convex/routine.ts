@@ -13,7 +13,7 @@ import {
   type ActionCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, topicBySlug } from "./lib";
+import { assertAdmin, getOwnedTopic, topicBySlug } from "./lib";
 
 // The next-lesson Routine (ADR 0008). One cloud Claude Code routine, fired two
 // ways through one gate: a daily Convex cron (`dailyFire`) and the reader button
@@ -112,6 +112,8 @@ export const tryAcquireGeneration = internalMutation({
       frontierKey: frontier.key,
       startedAt: now,
       error: undefined,
+      claimedAt: undefined, // fresh lock — unclaimed until a fired run grabs it
+      runId: undefined,
     };
     if (gen) await ctx.db.patch(gen._id, patch);
     else await ctx.db.insert("generation", { topicId: topic._id, ...patch });
@@ -150,13 +152,35 @@ export const reportGeneration = mutation({
     if (!topic) throw new Error("topic not found");
     const gen = await generationRow(ctx, topic._id);
     if (!gen) return;
+    const clear = { startedAt: undefined, claimedAt: undefined, runId: undefined };
     if (outcome === "published") {
-      await ctx.db.patch(gen._id, { status: "idle", startedAt: undefined, error: undefined });
+      await ctx.db.patch(gen._id, { status: "idle", error: undefined, ...clear });
     } else if (outcome === "nothing") {
-      await ctx.db.patch(gen._id, { status: "caughtUp", startedAt: undefined, error: undefined });
+      await ctx.db.patch(gen._id, { status: "caughtUp", error: undefined, ...clear });
     } else {
-      await ctx.db.patch(gen._id, { status: "failed", startedAt: undefined, error: error ?? "run failed" });
+      await ctx.db.patch(gen._id, { status: "failed", error: error ?? "run failed", ...clear });
     }
+  },
+});
+
+// ---- The agent's claim (PUBLISH_SECRET-guarded) ----------------------------
+
+// A fired run can't be told its Topic (the Fire body is closed, ADR 0008), so it
+// calls this to atomically grab one locked-but-unclaimed Topic and stamp its
+// runId. Concurrent fires (fire-all) each claim a distinct Topic; surplus fires
+// get null and no-op. Returns the claimed Topic's slug, or null if none waiting.
+export const claimWork = mutation({
+  args: { secret: v.string(), runId: v.string() },
+  handler: async (ctx, { secret, runId }): Promise<{ topicSlug: string } | null> => {
+    assertAdmin(secret);
+    const rows = await ctx.db.query("generation").collect();
+    const candidate = rows
+      .filter((g) => g.status === "generating" && g.claimedAt === undefined)
+      .sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0))[0];
+    if (!candidate) return null;
+    await ctx.db.patch(candidate._id, { claimedAt: Date.now(), runId });
+    const topic = await ctx.db.get(candidate.topicId);
+    return topic ? { topicSlug: topic.slug } : null;
   },
 });
 
@@ -225,5 +249,72 @@ export const dailyFire = internalAction({
     for (const slug of slugs) {
       await fireForTopic(ctx, slug);
     }
+  },
+});
+
+// ---- Materialise (PUBLISH_SECRET-guarded) ----------------------------------
+
+// The whole context a claimed run needs, pulled in one round-trip: prior
+// Lessons + References (with HTML), Resources (raw download URL + any cached
+// `processed`), and Topic-scoped capture. The `materialise` CLI writes these to
+// `topics/<slug>/` and the teach skill runs there (ADR 0009: the Routine pulls
+// from Convex, never the repo). ponytail: returns all Lesson HTML in one query —
+// fine for a curriculum's worth; paginate if a Topic ever grows huge.
+export const materialiseTopic = query({
+  args: { secret: v.string(), ownerEmail: v.string(), topicSlug: v.string() },
+  handler: async (ctx, { secret, ownerEmail, topicSlug }) => {
+    assertAdmin(secret);
+    const owner = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", ownerEmail))
+      .unique();
+    if (!owner) return null;
+    const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
+    if (!topic) return null;
+
+    const lessons = (
+      await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
+    )
+      .filter((l) => !l.supersededBy)
+      .map((l) => ({ key: l.key, seq: l.seq, title: l.title, html: l.html }));
+    const references = (
+      await ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()
+    ).map((r) => ({ key: r.key, title: r.title, html: r.html }));
+    const resources = await Promise.all(
+      (await ctx.db.query("resources").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()).map(
+        async (r) => ({
+          filename: r.filename,
+          kind: r.kind,
+          status: r.status,
+          contentHash: r.contentHash,
+          rawUrl: await ctx.storage.getUrl(r.rawStorageId),
+          processed: r.processed ?? null,
+        }),
+      ),
+    );
+    const open = await ctx.db
+      .query("questions")
+      .withIndex("by_topic_status", (q) => q.eq("topicId", topic._id).eq("status", "open"))
+      .collect();
+    const responses = await ctx.db
+      .query("responses")
+      .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
+      .collect();
+    const progress = await ctx.db
+      .query("progress")
+      .withIndex("by_topic_lesson", (q) => q.eq("topicId", topic._id))
+      .collect();
+
+    return {
+      topic: { slug: topic.slug, title: topic.title },
+      lessons,
+      references,
+      resources,
+      capture: {
+        openQuestions: open.map((q) => ({ id: q._id, lessonKey: q.lessonKey, text: q.text })),
+        responses: responses.map((r) => ({ lessonKey: r.lessonKey, quizId: r.quizId, answer: r.answer, correct: r.correct })),
+        progress: progress.map((p) => ({ lessonKey: p.lessonKey, status: p.status })),
+      },
+    };
   },
 });
