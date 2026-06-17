@@ -8,13 +8,14 @@ import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
-import { convexUrl, ownerEmail, publishSecret } from "./_env";
+import { convexUrl, ownerEmail, publishSecret, topicArg } from "./_env";
 
 const PROD = process.argv.includes("--prod");
 const secret = publishSecret();
 const owner = ownerEmail();
+const slug = topicArg();
 const client = new ConvexHttpClient(convexUrl(PROD));
-console.log(`Publishing to ${PROD ? "PROD (live site)" : "dev"}…`);
+console.log(`Publishing "${slug}" to ${PROD ? "PROD (live site)" : "dev"}…`);
 
 const titleFrom = (html: string): string => {
   const raw = html.match(/<title>([\s\S]*?)<\/title>/i)?.[1]?.trim() ?? "";
@@ -63,7 +64,10 @@ ${FOOT}
 `;
 };
 
-const topicId = await client.mutation(api.content.ensureTopic, { secret, ownerEmail: owner, slug: "hindi", title: "Hindi" });
+// Title only matters when creating a brand-new Topic; a Seeded/existing one
+// keeps its own title (ensureTopic just backfills the owner).
+const title = slug === "hindi" ? "Hindi" : slug;
+const topicId = await client.mutation(api.content.ensureTopic, { secret, ownerEmail: owner, slug, title });
 
 for (const f of htmlFiles("lessons")) {
   const html = assembleLesson(readFileSync(`lessons/${f}`, "utf8"));

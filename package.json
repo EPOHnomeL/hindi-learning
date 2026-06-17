@@ -13,6 +13,8 @@
     "test": "vitest",
     "publish": "tsx scripts/publish.ts",
     "publish:prod": "tsx scripts/publish.ts --prod",
+    "materialise": "tsx scripts/materialise.ts",
+    "materialise:prod": "tsx scripts/materialise.ts --prod",
     "review": "tsx scripts/review.ts",
     "review:prod": "tsx scripts/review.ts --prod",
     "reply": "tsx scripts/reply.ts",

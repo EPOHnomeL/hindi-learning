@@ -3,14 +3,14 @@
 // Usage: pnpm run review
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
-import { convexUrl, ownerEmail, publishSecret } from "./_env";
+import { convexUrl, ownerEmail, publishSecret, topicArg } from "./_env";
 
 const PROD = process.argv.includes("--prod");
 const client = new ConvexHttpClient(convexUrl(PROD));
 const state = await client.query(api.capture.reviewState, {
   secret: publishSecret(),
   ownerEmail: ownerEmail(),
-  topicSlug: "hindi",
+  topicSlug: topicArg(),
 });
 
 console.log("\n=== OPEN QUESTIONS ===");

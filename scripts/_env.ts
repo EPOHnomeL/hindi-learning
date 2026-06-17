@@ -55,6 +55,14 @@ export function publishSecret(): string {
   return secret;
 }
 
+// The Topic slug a teach-CLI step operates on. `--topic <slug>`, default "hindi"
+// (the only Topic until the multi-topic cut-over).
+export function topicArg(): string {
+  const i = process.argv.indexOf("--topic");
+  const slug = i >= 0 ? process.argv[i + 1] : undefined;
+  return slug && !slug.startsWith("--") ? slug : "hindi";
+}
+
 // The email of the user who owns the published Topic. The publish path has no
 // auth identity, so the owner is named here; the user must already be registered.
 export function ownerEmail(): string {
