@@ -1,11 +1,15 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { expect, test } from "vitest";
+import { beforeAll, expect, test } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
+
+beforeAll(() => {
+  process.env.PUBLISH_SECRET = "test-secret";
+});
 
 function asUser(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
   return t.withIdentity({ subject: `${userId}|session` });
@@ -73,4 +77,44 @@ test("generateUploadUrl and addResource require auth", async () => {
   await expect(t.mutation(api.resources.generateUploadUrl, {})).rejects.toThrow();
   const sid = await storeBlob(t, "x");
   await expect(t.mutation(api.resources.addResource, { topicSlug: "hindi", filename: "x.pdf", storageId: sid })).rejects.toThrow();
+});
+
+test("cacheProcessedResource fills processed + flips to ready, idempotently", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  const as = asUser(t, alice);
+  const secret = "test-secret";
+
+  const sid = await storeBlob(t, "%PDF handbook");
+  const rid = await as.mutation(api.resources.addResource, { topicSlug: "hindi", filename: "h.pdf", storageId: sid });
+  const hash = (await t.run((ctx) => ctx.db.get(rid)))!.contentHash;
+
+  await t.mutation(api.resources.cacheProcessedResource, {
+    secret,
+    ownerEmail: "alice@example.com",
+    topicSlug: "hindi",
+    contentHash: hash,
+    processed: { pages: ["page-1", "page-2"] },
+  });
+  expect(await as.query(api.resources.listResources, { topicSlug: "hindi" })).toMatchObject([{ status: "ready" }]);
+  expect((await t.run((ctx) => ctx.db.get(rid)))!.processed).toEqual({ pages: ["page-1", "page-2"] });
+
+  // Idempotent re-cache (e.g. a second concurrent run) overwrites, stays ready.
+  await t.mutation(api.resources.cacheProcessedResource, {
+    secret, ownerEmail: "alice@example.com", topicSlug: "hindi", contentHash: hash, processed: { pages: ["page-1", "page-2"] },
+  });
+  expect((await t.run((ctx) => ctx.db.get(rid)))!.status).toBe("ready");
+});
+
+test("cacheProcessedResource rejects a bad secret and an unknown contentHash", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  await expect(
+    t.mutation(api.resources.cacheProcessedResource, { secret: "wrong", ownerEmail: "alice@example.com", topicSlug: "hindi", contentHash: "x", processed: {} }),
+  ).rejects.toThrow();
+  await expect(
+    t.mutation(api.resources.cacheProcessedResource, { secret: "test-secret", ownerEmail: "alice@example.com", topicSlug: "hindi", contentHash: "nope", processed: {} }),
+  ).rejects.toThrow();
 });
