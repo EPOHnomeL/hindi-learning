@@ -136,6 +136,9 @@ export function Reader() {
           </button>
         </div>
 
+        {activeTopic && <MissionPanel topicSlug={activeTopic.slug} mission={activeTopic.mission} status={activeTopic.status} />}
+        <NewCourse onCreated={switchTopic} />
+
         <nav className="flex flex-col gap-1">
           <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">Lessons</p>
           {lessons?.length === 0 && <p className="px-2 text-sm text-soft">No lessons published yet.</p>}
@@ -214,6 +217,94 @@ function NavItem({
         )}
       </span>
     </button>
+  );
+}
+
+// The active Topic's Mission: the learner's "why", drafted by the Routine from
+// the Seed and editable here (plain form, no authoring — ADR 0001).
+function MissionPanel({ topicSlug, mission, status }: { topicSlug: string; mission: string | null; status: "seeded" | "active" }) {
+  const editMission = useMutation(api.content.editMission);
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(mission ?? "");
+  useEffect(() => {
+    setText(mission ?? "");
+    setEditing(false);
+  }, [mission, topicSlug]);
+
+  if (editing) {
+    return (
+      <form
+        className="mb-4 rounded-lg border border-line bg-card p-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          await editMission({ topicSlug, mission: text.trim() });
+          setEditing(false);
+        }}
+      >
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} className="w-full rounded border border-line bg-white p-2 text-sm focus:border-gold focus:outline-none" placeholder="Why are you learning this?" />
+        <div className="mt-1 flex gap-2">
+          <button type="submit" className="rounded bg-accent2 px-2 py-1 text-xs text-white">Save</button>
+          <button type="button" onClick={() => setEditing(false)} className="text-xs text-soft hover:text-accent">Cancel</button>
+        </div>
+      </form>
+    );
+  }
+  return (
+    <div className="mb-4 rounded-lg border border-line bg-card p-2 text-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold uppercase tracking-wider text-accent2">Mission</span>
+        <button onClick={() => setEditing(true)} className="text-xs text-soft hover:text-accent">Edit</button>
+      </div>
+      {mission ? (
+        <p className="mt-1 whitespace-pre-wrap text-ink">{mission}</p>
+      ) : (
+        <p className="mt-1 text-soft">{status === "seeded" ? "Your teacher will draft this from your seed." : "No mission yet — add your why."}</p>
+      )}
+    </div>
+  );
+}
+
+// Start a new Topic (Seed): title + free-text "why". The Routine drafts the
+// Mission + first Lesson on its next run. Upload Resources after switching in.
+function NewCourse({ onCreated }: { onCreated: (slug: string) => void }) {
+  const seedTopic = useMutation(api.content.seedTopic);
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [why, setWhy] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="mb-2 w-full rounded-lg border border-dashed border-line px-2 py-1.5 text-left text-sm text-soft hover:bg-hi">
+        + New course
+      </button>
+    );
+  }
+  return (
+    <form
+      className="mb-3 rounded-lg border border-line bg-card p-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!title.trim()) return;
+        setBusy(true);
+        try {
+          const { slug } = await seedTopic({ title: title.trim(), why: why.trim() });
+          setTitle("");
+          setWhy("");
+          setOpen(false);
+          onCreated(slug);
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Course title" className="w-full rounded border border-line bg-white px-2 py-1 text-sm focus:border-gold focus:outline-none" />
+      <textarea value={why} onChange={(e) => setWhy(e.target.value)} rows={3} placeholder="Why are you learning this?" className="mt-1 w-full rounded border border-line bg-white px-2 py-1 text-sm focus:border-gold focus:outline-none" />
+      <div className="mt-1 flex gap-2">
+        <button type="submit" disabled={busy} className="rounded bg-accent px-2 py-1 text-xs text-white disabled:opacity-60">{busy ? "Creating…" : "Create"}</button>
+        <button type="button" onClick={() => setOpen(false)} className="text-xs text-soft hover:text-accent">Cancel</button>
+      </div>
+    </form>
   );
 }
 
