@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
-import { getOwnedTopic } from "./lib";
+import { assertAdmin, getOwnedTopic } from "./lib";
 
 // Learner-uploaded Resources (PRD §Resources). Standard Convex 3-step upload:
 // `generateUploadUrl` → client POSTs the file → `addResource` records the row.
@@ -50,6 +50,44 @@ export const addResource = mutation({
       status: "raw",
       kind: "file",
     });
+  },
+});
+
+// ---- Lazy ingestion (PUBLISH_SECRET-guarded) -------------------------------
+
+// The agent uploads rendered/extracted artifacts (e.g. PDF page PNGs) through
+// this; it has PUBLISH_SECRET, not an auth identity, so it can't use the
+// learner-facing generateUploadUrl.
+export const generateProcessedUploadUrl = mutation({
+  args: { secret: v.string() },
+  handler: async (ctx, { secret }) => {
+    assertAdmin(secret);
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+// Cache an ingested Resource back: fill `processed` and flip to `ready`, keyed
+// by (Topic, contentHash). Idempotent — two runs rendering the same Resource
+// converge. A re-uploaded (changed) file is a new row with a new hash and no
+// processed, so it naturally re-renders; this never matches the stale one.
+export const cacheProcessedResource = mutation({
+  args: { secret: v.string(), ownerEmail: v.string(), topicSlug: v.string(), contentHash: v.string(), processed: v.any() },
+  handler: async (ctx, { secret, ownerEmail, topicSlug, contentHash, processed }) => {
+    assertAdmin(secret);
+    const owner = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", ownerEmail))
+      .unique();
+    if (!owner) throw new Error("owner not found");
+    const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const res = await ctx.db
+      .query("resources")
+      .withIndex("by_topic_hash", (q) => q.eq("topicId", topic._id).eq("contentHash", contentHash))
+      .unique();
+    if (!res) throw new Error("no resource for that contentHash");
+    await ctx.db.patch(res._id, { processed, status: "ready" });
+    return res._id;
   },
 });
 
