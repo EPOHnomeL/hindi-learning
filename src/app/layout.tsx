@@ -27,6 +27,16 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <ConvexAuthNextjsServerProvider>
       <html lang="en" className={`${spectral.variable} ${notoDeva.variable}`}>
+        <head>
+          {/* Apply the saved theme before paint so a dark-mode user never flashes
+              the light "paper" palette on load. Mirrors hindi:theme / data-theme
+              written by ThemeContext (ADR 0011). */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `try{var t=localStorage.getItem('hindi:theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);}catch(e){}`,
+            }}
+          />
+        </head>
         <body>
           <ConvexClientProvider>{children}</ConvexClientProvider>
         </body>
