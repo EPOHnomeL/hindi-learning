@@ -1,6 +1,14 @@
 # 05 — Routine: claim, materialise from Convex, fire-all (drop git-commit)
 
-Status: ready-for-agent
+Status: done
+
+> Done: `claimWork` + `materialiseTopic` (with Mission/Seed + learning records),
+> a `learningRecords` table, `claim`/`materialise`/`publish`/`review`/`report`
+> all `--topic`-scoped and reading/writing `topics/<slug>/`, fire-all in
+> `dailyFire`, and the rewritten topic-agnostic Routine prompt
+> ([docs/routine-prompt.md](../../../docs/routine-prompt.md)). The Routine no
+> longer commits content to git. NOTES.md per-Topic preferences are folded into
+> the Mission for now (no separate store) — revisit if needed.
 
 Spec: [`../PRD.md`](../PRD.md). Decisions:
 [ADR 0009](../../../docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md),
