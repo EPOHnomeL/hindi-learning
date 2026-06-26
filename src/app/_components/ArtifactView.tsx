@@ -1,8 +1,10 @@
 "use client";
 
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { buildSrcDoc, themeMessage, type Theme } from "./lessonSrcDoc";
+import { useTheme } from "./ThemeContext";
 
 // Mirror of the server's stale threshold (convex/routine.ts STALE_MS): a run
 // stuck "generating" past this is treated as crashed and offered for retry.
@@ -11,52 +13,6 @@ const STALE_MS = 10 * 60 * 1000;
 // Mirror of routine.ts MANUAL_COOLDOWN_MS: after an on-demand fire the button
 // is disabled for this window so the daily schedule is the primary path.
 const MANUAL_COOLDOWN_MS = 20 * 60 * 60 * 1000;
-
-// Injected into the iframe. Two concerns, kept separate:
-//  - HEIGHT_BRIDGE (always): posts the document's content height so the parent
-//    can size the iframe to fit. On mobile that makes the whole PAGE the single
-//    scroll surface (no nested iframe scroll), so the browser chrome is free to
-//    collapse and the lesson gets the full screen.
-//  - QUIZ_BRIDGE (lessons only): reads the AUTHORED quiz markup (.quiz[data-correct]
-//    + .opt[data-k], and .quiz.fill[data-answer]) and posts the learner's answer,
-//    so lessons stay self-contained with no API calls of their own. First-answer-
-//    only is enforced server-side, so re-clicks are harmless.
-const HEIGHT_BRIDGE = `<script>(function(){
-  function post(m){ try{ parent.postMessage(Object.assign({__lesson:true}, m), '*'); }catch(e){} }
-  function reportHeight(){
-    var doc=document.documentElement;
-    post({type:'height', height: Math.max(document.body?document.body.scrollHeight:0, doc.scrollHeight)});
-  }
-  window.addEventListener('load', reportHeight);
-  window.addEventListener('resize', reportHeight);
-  if(window.ResizeObserver){ try{ new ResizeObserver(reportHeight).observe(document.documentElement); }catch(e){} }
-  setTimeout(reportHeight, 100);
-  setTimeout(reportHeight, 600);
-}());<\/script>`;
-
-const QUIZ_BRIDGE = `<script>(function(){
-  function post(m){ try{ parent.postMessage(Object.assign({__lesson:true}, m), '*'); }catch(e){} }
-  document.querySelectorAll('.quiz[data-correct]').forEach(function(quiz,i){
-    var id = quiz.id || ('quiz-'+i);
-    var correct = quiz.getAttribute('data-correct');
-    quiz.querySelectorAll('.opt[data-k]').forEach(function(opt){
-      opt.addEventListener('click', function(){
-        var k = opt.getAttribute('data-k');
-        post({type:'response', quizId:id, answer:k, correct: k===correct});
-      });
-    });
-  });
-  document.querySelectorAll('.quiz.fill[data-answer]').forEach(function(quiz,i){
-    var id = quiz.id || ('fill-'+i);
-    var answer = (quiz.getAttribute('data-answer')||'').trim().toLowerCase();
-    var input = quiz.querySelector('input');
-    var btn = quiz.querySelector('[data-check]') || quiz.querySelector('button');
-    if(btn && input) btn.addEventListener('click', function(){
-      var v=(input.value||'').trim().toLowerCase();
-      post({type:'response', quizId:id, answer:input.value, correct: v===answer});
-    });
-  });
-}());<\/script>`;
 
 export function ArtifactView({
   kind,
@@ -74,18 +30,27 @@ export function ArtifactView({
 }
 
 // Fills its flex parent; min height keeps it usable when the column is short
-// (e.g. stacked on mobile).
-function Frame({ html, withBridge }: { html: string; withBridge: boolean }) {
-  const srcDoc = useMemo(() => {
-    const scripts = HEIGHT_BRIDGE + (withBridge ? QUIZ_BRIDGE : "");
-    // Inject before the LAST </body>. A first-match replace is unsafe: an
-    // assembled lesson can carry an authoring comment (or a code sample) that
-    // contains a literal "</body>" earlier in the document, and injecting there
-    // would bury the bridge scripts inside it — inert, so the iframe never
-    // reports its height (ask box overlaps) and quiz answers aren't captured.
-    const i = html.lastIndexOf("</body>");
-    return i === -1 ? html + scripts : html.slice(0, i) + scripts + html.slice(i);
-  }, [html, withBridge]);
+// (e.g. stacked on mobile). `theme`, when given (lessons), app-themes the
+// artifact: the initial theme is baked into srcDoc and later changes are pushed
+// live via postMessage so a toggle re-skins without reloading (ADR 0011).
+function Frame({ html, withBridge, theme }: { html: string; withBridge: boolean; theme?: Theme }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  // Read theme via a ref so changing it does NOT rebuild srcDoc (which would
+  // reload the iframe, losing scroll + answered-quiz state). The bake only needs
+  // the value at build time; the effect below handles live changes.
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+  const srcDoc = useMemo(
+    () => buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current }),
+    [html, withBridge],
+  );
+
+  // Push theme changes into the already-loaded iframe (no reload). Also fires
+  // when srcDoc changes (lesson switch) so a freshly loaded frame is in sync.
+  useEffect(() => {
+    if (!theme) return;
+    iframeRef.current?.contentWindow?.postMessage(themeMessage(theme), "*");
+  }, [theme, srcDoc]);
 
   // On mobile the iframe is sized to its content so the whole page scrolls as one
   // surface; on desktop it fills its column and scrolls internally. The measured
@@ -113,6 +78,7 @@ function Frame({ html, withBridge }: { html: string; withBridge: boolean }) {
   // that fills and scrolls internally on desktop.
   return (
     <iframe
+      ref={iframeRef}
       sandbox="allow-scripts"
       srcDoc={srcDoc}
       style={mobile && contentH ? { height: contentH } : undefined}
@@ -122,6 +88,7 @@ function Frame({ html, withBridge }: { html: string; withBridge: boolean }) {
 }
 
 function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; topicSlug: string; isFrontier: boolean }) {
+  const { theme } = useTheme();
   const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey });
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
@@ -170,7 +137,7 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
             </button>
           </div>
         </div>
-        <Frame html={lesson.html} withBridge />
+        <Frame html={lesson.html} withBridge theme={theme} />
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
             scrolling, no slide-up trigger. Desktop uses the side column instead. */}
         <div className="p-3 md:hidden">
@@ -295,7 +262,7 @@ function QuestionBox({ topicSlug, lessonKey, variant = "panel" }: { topicSlug: s
           await askQuestion({ topicSlug, lessonKey, text: t });
         }}
       >
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Your question…" className="min-w-0 flex-1 rounded-lg border border-line bg-white px-3 py-2 text-sm focus:border-gold focus:outline-none" />
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Your question…" className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none" />
         <button type="submit" className="rounded-lg bg-accent2 px-3 py-2 text-sm text-white hover:bg-accent2/90">Ask</button>
       </form>
       <ul className={`mt-3 flex flex-col gap-3 ${variant === "inline" ? "" : "min-h-0 flex-1 overflow-y-auto"}`}>
