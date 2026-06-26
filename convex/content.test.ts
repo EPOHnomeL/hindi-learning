@@ -158,3 +158,32 @@ test("editMission sets the learner's mission (owner-scoped); publishMission flip
   const topic = (await as.query(api.content.listTopics, {})).find((x) => x.slug === slug);
   expect(topic).toMatchObject({ status: "active", mission: "Drafted mission." });
 });
+
+test("dashboard returns the user's topics with live lesson + completed counts", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const bob = await seedUser(t, "bob@example.com");
+  const hindi = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  await seedTopic(t, bob, "spanish", "Spanish", 1);
+  await t.run(async (ctx) => {
+    await ctx.db.insert("lessons", { topicId: hindi, key: "0001", seq: 1, title: "A", html: "<p>a</p>" });
+    await ctx.db.insert("lessons", { topicId: hindi, key: "0002", seq: 2, title: "B", html: "<p>b</p>" });
+    await ctx.db.insert("lessons", { topicId: hindi, key: "0000", seq: 0, title: "Old", html: "<p>o</p>", supersededBy: "0001" });
+    await ctx.db.insert("progress", { userId: alice, topicId: hindi, lessonKey: "0001", status: "completed" });
+  });
+
+  const cards = await asUser(t, alice).query(api.content.dashboard, {});
+  expect(cards.map((c) => c.slug)).toEqual(["hindi"]); // only alice's
+  expect(cards[0]).toMatchObject({ lessonCount: 2, completedCount: 1 }); // superseded excluded
+});
+
+test("renameTopic changes the title, keeps the slug, and is owner-scoped", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const bob = await seedUser(t, "bob@example.com");
+  await seedTopic(t, alice, "hindi", "Hindi", 1);
+
+  await asUser(t, alice).mutation(api.content.renameTopic, { topicSlug: "hindi", title: "Biblical Hindi" });
+  expect((await asUser(t, alice).query(api.content.dashboard, {}))[0]).toMatchObject({ slug: "hindi", title: "Biblical Hindi" });
+  await expect(asUser(t, bob).mutation(api.content.renameTopic, { topicSlug: "hindi", title: "x" })).rejects.toThrow();
+});
