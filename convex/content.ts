@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, topicBySlug } from "./lib";
+import { assertAdmin, getOwnedTopic, getViewableTopic, topicBySlug, topicLessonCounts } from "./lib";
 
 // Lessons & references. Reader queries are auth-gated and owner-scoped: a Topic
 // is resolved by (owner = signed-in user, slug), so one learner never sees
@@ -42,14 +42,7 @@ export const dashboard = query({
       .collect();
     const cards = await Promise.all(
       topics.map(async (t) => {
-        const lessons = (
-          await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", t._id)).collect()
-        ).filter((l) => !l.supersededBy);
-        const progress = await ctx.db
-          .query("progress")
-          .withIndex("by_topic_lesson", (q) => q.eq("topicId", t._id))
-          .collect();
-        const done = new Set(progress.filter((p) => p.status === "completed").map((p) => p.lessonKey));
+        const counts = await topicLessonCounts(ctx, t._id);
         return {
           slug: t.slug,
           title: t.title,
@@ -57,8 +50,7 @@ export const dashboard = query({
           mission: t.mission ?? null,
           seq: t.seq,
           creationTime: t._creationTime,
-          lessonCount: lessons.length,
-          completedCount: lessons.filter((l) => done.has(l.key)).length,
+          ...counts,
         };
       }),
     );
@@ -117,7 +109,7 @@ export const listLessons = query({
   handler: async (ctx, { topicSlug }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic) return [];
     const lessons = await ctx.db
       .query("lessons")
@@ -134,7 +126,7 @@ export const getLesson = query({
   handler: async (ctx, { topicSlug, key }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic) return null;
     const lesson = await ctx.db
       .query("lessons")
@@ -150,7 +142,7 @@ export const listReferences = query({
   handler: async (ctx, { topicSlug }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic) return [];
     const refs = await ctx.db
       .query("references")
@@ -167,7 +159,7 @@ export const getReference = query({
   handler: async (ctx, { topicSlug, key }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic) return null;
     const ref = await ctx.db
       .query("references")
