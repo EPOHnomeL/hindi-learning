@@ -62,6 +62,20 @@ export default defineSchema({
     .index("by_topic", ["topicId"])
     .index("by_topic_hash", ["topicId", "contentHash"]),
 
+  // The teacher's own learning records (markdown), one per Lesson authored —
+  // loosely ADRs for the learner's progress, used to compute the next ZPD step.
+  // Append-only history, so insert-once like Lessons (never edited in place).
+  // In the repo-as-SoT model these lived in git; ADR 0009 moves content into
+  // Convex, so the Routine publishes them here and pulls them back at materialise.
+  learningRecords: defineTable({
+    topicId: v.id("topics"),
+    key: v.string(),
+    seq: v.number(),
+    markdown: v.string(),
+  })
+    .index("by_topic_seq", ["topicId", "seq"])
+    .index("by_topic_key", ["topicId", "key"]),
+
   // Mutable: edited in place and re-published; current version always wins.
   // `contentHash` lets publish skip unchanged references.
   references: defineTable({

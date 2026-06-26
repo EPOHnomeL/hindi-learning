@@ -294,6 +294,9 @@ export const materialiseTopic = query({
     )
       .filter((l) => !l.supersededBy)
       .map((l) => ({ key: l.key, seq: l.seq, title: l.title, html: l.html }));
+    const learningRecords = (
+      await ctx.db.query("learningRecords").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
+    ).map((r) => ({ key: r.key, seq: r.seq, markdown: r.markdown }));
     const references = (
       await ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()
     ).map((r) => ({ key: r.key, title: r.title, html: r.html }));
@@ -324,8 +327,18 @@ export const materialiseTopic = query({
       .collect();
 
     return {
-      topic: { slug: topic.slug, title: topic.title },
+      topic: {
+        slug: topic.slug,
+        title: topic.title,
+        status: topic.status ?? "active",
+        // The drafted Mission (null until the Routine drafts it) and the learner's
+        // raw Seed ("why"). A seeded Topic has a seed but no mission yet — the run
+        // drafts the mission from the seed + resources, then publishes it.
+        mission: topic.mission ?? null,
+        seed: topic.seed ?? null,
+      },
       lessons,
+      learningRecords,
       references,
       resources,
       capture: {

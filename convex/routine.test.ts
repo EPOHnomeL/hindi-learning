@@ -68,6 +68,44 @@ test("materialiseTopic returns one owner's topic context and is owner-scoped", a
   expect(await t.query(api.routine.materialiseTopic, { secret, ownerEmail: "nobody@example.com", topicSlug: "hindi" })).toBeNull();
 });
 
+test("materialiseTopic carries the mission/seed and learning records", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  // A seeded topic: a seed/"why" but no drafted mission yet.
+  const seededId = await t.run((ctx) =>
+    ctx.db.insert("topics", { ownerId: alice, slug: "greek", title: "Greek", status: "seeded", seed: "read the NT" }),
+  );
+  await t.run((ctx) => ctx.db.insert("learningRecords", { topicId: seededId, key: "0001-alpha", seq: 1, markdown: "# learned alpha" }));
+  const secret = "test-secret";
+
+  const seeded = await t.query(api.routine.materialiseTopic, { secret, ownerEmail: "alice@example.com", topicSlug: "greek" });
+  expect(seeded?.topic).toMatchObject({ status: "seeded", mission: null, seed: "read the NT" });
+  expect(seeded?.learningRecords).toEqual([{ key: "0001-alpha", seq: 1, markdown: "# learned alpha" }]);
+
+  // An active topic with a drafted mission.
+  await t.run((ctx) => ctx.db.patch(seededId, { status: "active", mission: "Read Koine fluently." }));
+  const active = await t.query(api.routine.materialiseTopic, { secret, ownerEmail: "alice@example.com", topicSlug: "greek" });
+  expect(active?.topic).toMatchObject({ status: "active", mission: "Read Koine fluently." });
+});
+
+test("publishLearningRecord is insert-once (append-only history)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi");
+  const secret = "test-secret";
+
+  const first = await t.mutation(api.content.publishLearningRecord, { secret, topicId, key: "0001-x", seq: 1, markdown: "v1" });
+  expect(first).toEqual({ status: "inserted" });
+  // A second publish of the same key is a no-op — records are immutable history.
+  const again = await t.mutation(api.content.publishLearningRecord, { secret, topicId, key: "0001-x", seq: 1, markdown: "v2" });
+  expect(again).toEqual({ status: "exists" });
+
+  const stored = await t.run((ctx) =>
+    ctx.db.query("learningRecords").withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", "0001-x")).unique(),
+  );
+  expect(stored?.markdown).toBe("v1"); // unchanged
+});
+
 test("the bootstrap gate fires a seeded topic with no lessons; a plain empty topic does not", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");

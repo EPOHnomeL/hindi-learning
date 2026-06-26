@@ -257,6 +257,29 @@ export const publishLesson = mutation({
   },
 });
 
+// Learning records are append-only history: insert if absent, otherwise no-op
+// (like Lessons). The Routine writes one per authored Lesson; they ground the
+// next run's ZPD decision and are pulled back at materialise.
+export const publishLearningRecord = mutation({
+  args: {
+    secret: v.string(),
+    topicId: v.id("topics"),
+    key: v.string(),
+    seq: v.number(),
+    markdown: v.string(),
+  },
+  handler: async (ctx, { secret, topicId, key, seq, markdown }) => {
+    assertAdmin(secret);
+    const existing = await ctx.db
+      .query("learningRecords")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
+      .unique();
+    if (existing) return { status: "exists" as const };
+    await ctx.db.insert("learningRecords", { topicId, key, seq, markdown });
+    return { status: "inserted" as const };
+  },
+});
+
 // References are mutable: upsert, skipping unchanged content (by hash).
 export const upsertReference = mutation({
   args: {
