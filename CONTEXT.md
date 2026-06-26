@@ -62,3 +62,11 @@ _Avoid_: Draft, stub, request
 **Frontier**:
 The highest-ordered, non-superseded Lesson in a Topic — the learner's leading edge. The Routine authors the next Lesson only once the learner has marked the Frontier `completed`, so a Topic holds at most one unread Lesson beyond what's done (a buffer of one). When the learner completes the Frontier, the reader offers to fire the Routine for the next one.
 _Avoid_: Latest, head, tip, edge
+
+**Share**:
+A grant giving one existing User read-only access to a single Topic owned by another User. Created by the Topic's owner, who supplies the recipient's account email — the Share only forms if an account with that email already exists. Revocable by the owner at any time; removed when its Topic is deleted. A Topic may have many Shares (shared with several Users); a Share never confers write access.
+_Avoid_: Invite, link, permission, grant (as separate terms), public link
+
+**Viewer**:
+The User on the receiving end of a Share — has read-only access to a Topic they do not own. A Viewer sees everything in the Topic (Lessons, References, Resources, the owner's Questions and Replies, the owner's Progress) but writes nothing: they cannot add Resources, edit the Mission, ask Questions, mark Progress, or fire the Routine. A Viewer must have an account (distinct from a "guest"). Shared Topics appear in the Viewer's "Shared with me" section.
+_Avoid_: Guest, collaborator, member, recipient
