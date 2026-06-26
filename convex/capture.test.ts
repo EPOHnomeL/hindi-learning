@@ -95,27 +95,3 @@ test("the gate counts completion per topic — completing one topic doesn't open
   const spanishAcq = await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "spanish" });
   expect(spanishAcq).toMatchObject({ acquired: false, reason: "frontier-not-completed" });
 });
-
-test("backfill assigns the topic to legacy capture rows and is idempotent", async () => {
-  const t = convexTest(schema, modules);
-  const alice = await seedUser(t, "alice@example.com");
-  await seedTopic(t, alice, "hindi");
-  const secret = "test-secret";
-  // Pre-migration rows: no topicId.
-  await t.run(async (ctx) => {
-    await ctx.db.insert("progress", { userId: alice, lessonKey: "0001", status: "completed" });
-    await ctx.db.insert("responses", { userId: alice, lessonKey: "0001", quizId: "q1", answer: "A", correct: true });
-    await ctx.db.insert("questions", { userId: alice, lessonKey: "0001", text: "hi?", status: "open" });
-  });
-
-  const first = await t.mutation(api.capture.backfillCaptureTopic, { secret, slug: "hindi" });
-  expect(first).toEqual({ progress: 1, responses: 1, questions: 1 });
-
-  // Now reachable through the topic-scoped reads.
-  const prog = await asUser(t, alice).query(api.capture.myProgress, { topicSlug: "hindi" });
-  expect(prog).toMatchObject([{ lessonKey: "0001", status: "completed" }]);
-
-  // Idempotent: a second run finds nothing left.
-  const second = await t.mutation(api.capture.backfillCaptureTopic, { secret, slug: "hindi" });
-  expect(second).toEqual({ progress: 0, responses: 0, questions: 0 });
-});

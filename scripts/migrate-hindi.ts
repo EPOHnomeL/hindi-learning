@@ -1,7 +1,7 @@
 // One-shot cut-over of the existing Hindi Topic onto the multi-tenant model
 // (issue 09). Idempotent: ensures the Topic is owned + active with the current
-// Mission, moves Handbook.pdf into Convex file storage as a raw Resource, and
-// backfills capture rows onto the hindi Topic.
+// Mission and moves Handbook.pdf into Convex file storage as a raw Resource.
+// (Capture rows were backfilled by the issue-03 migration, now narrowed away.)
 //   Usage: pnpm run migrate-hindi          (dev)
 //          pnpm run migrate-hindi --prod   (live — take a Convex snapshot first!)
 // NOTE: removing the 35 MB Handbook.pdf from git is a SEPARATE, deliberate step
@@ -35,9 +35,5 @@ if (!res.ok) throw new Error(`Handbook upload failed (${res.status})`);
 const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
 await client.mutation(api.resources.addResourceAdmin, { secret, ownerEmail: owner, topicSlug: SLUG, filename: "Handbook.pdf", storageId });
 console.log("✓ Handbook.pdf stored as a hindi Resource");
-
-// 4. Backfill capture rows onto the hindi Topic (idempotent).
-const counts = await client.mutation(api.capture.backfillCaptureTopic, { secret, slug: SLUG });
-console.log("✓ capture backfill:", counts);
 
 console.log('hindi migrated. Verify the Resource reads back, then remove Handbook.pdf from git.');

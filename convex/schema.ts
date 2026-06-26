@@ -72,13 +72,12 @@ export default defineSchema({
     .index("by_topic", ["topicId"])
     .index("by_topic_key", ["topicId", "key"]),
 
-  // The learner's first answer to a quiz, recorded automatically. `topicId` is
-  // optional only for the widen→backfill window (issue 03); narrow once prod is
-  // backfilled. Indexes lead with `topicId` so identical lessonKeys across
-  // Topics never collide.
+  // The learner's first answer to a quiz, recorded automatically. Indexes lead
+  // with `topicId` so identical lessonKeys across Topics never collide (`topicId`
+  // is required as of the issue-03 migration narrow — all rows are backfilled).
   responses: defineTable({
     userId: v.id("users"),
-    topicId: v.optional(v.id("topics")),
+    topicId: v.id("topics"),
     lessonKey: v.string(),
     quizId: v.string(),
     answer: v.string(),
@@ -92,7 +91,7 @@ export default defineSchema({
   // Topic has one owner, so any completed row for it is the owner's.
   progress: defineTable({
     userId: v.id("users"),
-    topicId: v.optional(v.id("topics")),
+    topicId: v.id("topics"),
     lessonKey: v.string(),
     status: v.union(v.literal("opened"), v.literal("completed")),
   })
@@ -127,7 +126,7 @@ export default defineSchema({
   // A question the learner asked from inside a lesson; the teacher replies.
   questions: defineTable({
     userId: v.id("users"),
-    topicId: v.optional(v.id("topics")),
+    topicId: v.id("topics"),
     lessonKey: v.string(),
     text: v.string(),
     status: v.union(v.literal("open"), v.literal("answered")),

@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, topicBySlug } from "./lib";
+import { assertAdmin, getOwnedTopic } from "./lib";
 
 // The conversation loop (PRD §4–§5). Reader writes responses/progress/questions
 // for the signed-in learner, scoped to the active Topic so identical lesson keys
@@ -157,44 +157,5 @@ export const replyToQuestion = mutation({
   handler: async (ctx, { secret, questionId, reply }) => {
     assertAdmin(secret);
     await ctx.db.patch(questionId, { reply, status: "answered" });
-  },
-});
-
-// One-shot migration (PUBLISH_SECRET-guarded): stamp the Topic onto capture
-// rows written before Topic-scoping existed. v1 is single-learner, so every
-// orphaned row is that learner's <slug> data. Idempotent; returns per-table
-// patched counts. Run once per deployment:
-//   npx convex run capture:backfillCaptureTopic '{"secret":"…","slug":"hindi"}'
-// ponytail: full scan + per-row patch — fine for one learner; if capture ever
-// grows large, batch with ctx.scheduler.runAfter to stay within txn limits.
-export const backfillCaptureTopic = mutation({
-  args: { secret: v.string(), slug: v.string() },
-  handler: async (ctx, { secret, slug }) => {
-    assertAdmin(secret);
-    const topic = await topicBySlug(ctx, slug);
-    if (!topic) throw new Error(`topic "${slug}" not found — run ensureTopic first`);
-
-    let progress = 0;
-    let responses = 0;
-    let questions = 0;
-    for (const row of await ctx.db.query("progress").collect()) {
-      if (row.topicId === undefined) {
-        await ctx.db.patch(row._id, { topicId: topic._id });
-        progress++;
-      }
-    }
-    for (const row of await ctx.db.query("responses").collect()) {
-      if (row.topicId === undefined) {
-        await ctx.db.patch(row._id, { topicId: topic._id });
-        responses++;
-      }
-    }
-    for (const row of await ctx.db.query("questions").collect()) {
-      if (row.topicId === undefined) {
-        await ctx.db.patch(row._id, { topicId: topic._id });
-        questions++;
-      }
-    }
-    return { progress, responses, questions };
   },
 });
