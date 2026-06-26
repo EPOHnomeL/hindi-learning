@@ -29,6 +29,43 @@ export const listTopics = query({
   },
 });
 
+// The home dashboard: the signed-in user's Topics as cards, each with its live
+// lesson count + how many they've completed (for a progress indicator).
+export const dashboard = query({
+  args: {},
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const topics = await ctx.db
+      .query("topics")
+      .withIndex("by_owner", (q) => q.eq("ownerId", userId))
+      .collect();
+    const cards = await Promise.all(
+      topics.map(async (t) => {
+        const lessons = (
+          await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", t._id)).collect()
+        ).filter((l) => !l.supersededBy);
+        const progress = await ctx.db
+          .query("progress")
+          .withIndex("by_topic_lesson", (q) => q.eq("topicId", t._id))
+          .collect();
+        const done = new Set(progress.filter((p) => p.status === "completed").map((p) => p.lessonKey));
+        return {
+          slug: t.slug,
+          title: t.title,
+          status: t.status ?? "active",
+          mission: t.mission ?? null,
+          seq: t.seq,
+          creationTime: t._creationTime,
+          lessonCount: lessons.length,
+          completedCount: lessons.filter((l) => done.has(l.key)).length,
+        };
+      }),
+    );
+    return cards.sort((a, b) => (a.seq ?? Infinity) - (b.seq ?? Infinity) || a.creationTime - b.creationTime);
+  },
+});
+
 // Start a Topic from the dashboard: title + free-text "why" (the Seed). The
 // Routine turns the Seed into a Mission + first Lesson on its next run; no LLM
 // runs here (ADR 0001). Slugs are globally unique (the routine path resolves by
@@ -57,6 +94,21 @@ export const editMission = mutation({
     const topic = await getOwnedTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
     await ctx.db.patch(topic._id, { mission });
+  },
+});
+
+// Rename a Topic's display title. The slug is immutable (the routine + publish
+// paths resolve by it), so only `title` changes.
+export const renameTopic = mutation({
+  args: { topicSlug: v.string(), title: v.string() },
+  handler: async (ctx, { topicSlug, title }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const trimmed = title.trim();
+    if (!trimmed) throw new Error("title required");
+    await ctx.db.patch(topic._id, { title: trimmed });
   },
 });
 
