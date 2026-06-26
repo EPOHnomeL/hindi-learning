@@ -1,11 +1,11 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import type { Id } from "../../../convex/_generated/dataModel";
 import { ArtifactView } from "./ArtifactView";
+import { useResourceUpload } from "./useResourceUpload";
 
 type Selection = { kind: "lesson" | "reference"; key: string };
 
@@ -201,24 +201,20 @@ function NavItem({
   );
 }
 
-// The active Topic's uploaded Resources + a file uploader. Standard Convex
-// 3-step upload (generateUploadUrl → POST → addResource). Raw storage only;
-// the Routine processes them later (issue 06), so these aren't openable yet.
+// The active Topic's Resources — PDFs (uploaded) and links — each opening in a
+// new tab. Add more by uploading a file or pasting a link.
 function ResourcesSection({ topicSlug }: { topicSlug: string }) {
   const resources = useQuery(api.resources.listResources, { topicSlug });
-  const generateUploadUrl = useMutation(api.resources.generateUploadUrl);
-  const addResource = useMutation(api.resources.addResource);
+  const { uploadFile, addLink } = useResourceUpload();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [linkDraft, setLinkDraft] = useState("");
+  const [adding, setAdding] = useState(false);
 
-  async function upload(file: File) {
+  async function run(fn: () => Promise<void>) {
     setBusy(true);
     try {
-      const url = await generateUploadUrl();
-      const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
-      if (!res.ok) throw new Error(`upload failed (${res.status})`);
-      const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
-      await addResource({ topicSlug, filename: file.name, storageId });
+      await fn();
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -229,28 +225,77 @@ function ResourcesSection({ topicSlug }: { topicSlug: string }) {
     <>
       <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">Resources</p>
       {resources?.length === 0 && <p className="px-2 text-sm text-soft">No resources yet.</p>}
-      {resources?.map((r) => (
-        <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-ink">
-          <span className="min-w-0 truncate">{r.filename}</span>
-          {r.status !== "ready" && <span className="shrink-0 text-xs text-soft">{r.status}</span>}
-        </div>
-      ))}
+      {resources?.map((r) =>
+        r.url ? (
+          <a
+            key={r.id}
+            href={r.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-ink transition-colors hover:bg-hi"
+          >
+            <span className="min-w-0 truncate">
+              <span aria-hidden className="mr-1 text-soft">{r.kind === "url" ? "🔗" : "📄"}</span>
+              {r.filename}
+            </span>
+            {r.status !== "ready" && r.status !== "raw" && <span className="shrink-0 text-xs text-soft">{r.status}</span>}
+          </a>
+        ) : (
+          <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-soft">
+            <span className="min-w-0 truncate">{r.filename}</span>
+            <span className="shrink-0 text-xs">{r.status}</span>
+          </div>
+        ),
+      )}
+
       <input
         ref={inputRef}
         type="file"
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) void upload(file);
+          if (file) void run(() => uploadFile(topicSlug, file));
         }}
       />
-      <button
-        onClick={() => inputRef.current?.click()}
-        disabled={busy}
-        className="mt-1 rounded-lg border border-dashed border-line px-2 py-1.5 text-left text-sm text-soft hover:bg-hi disabled:opacity-60"
-      >
-        {busy ? "Uploading…" : "+ Upload a resource"}
-      </button>
+      {adding ? (
+        <form
+          className="mt-1 flex gap-1"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const link = linkDraft.trim();
+            if (!link) return;
+            setLinkDraft("");
+            setAdding(false);
+            void run(() => addLink(topicSlug, link));
+          }}
+        >
+          <input
+            autoFocus
+            value={linkDraft}
+            onChange={(e) => setLinkDraft(e.target.value)}
+            placeholder="https://…"
+            className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2 py-1 text-sm focus:border-gold focus:outline-none"
+          />
+          <button type="submit" className="rounded-lg bg-accent2 px-2 py-1 text-xs text-white">Add</button>
+        </form>
+      ) : (
+        <div className="mt-1 flex gap-2">
+          <button
+            onClick={() => inputRef.current?.click()}
+            disabled={busy}
+            className="flex-1 rounded-lg border border-dashed border-line px-2 py-1.5 text-left text-sm text-soft hover:bg-hi disabled:opacity-60"
+          >
+            {busy ? "Working…" : "+ Upload PDF"}
+          </button>
+          <button
+            onClick={() => setAdding(true)}
+            disabled={busy}
+            className="rounded-lg border border-dashed border-line px-2 py-1.5 text-sm text-soft hover:bg-hi disabled:opacity-60"
+          >
+            + Link
+          </button>
+        </div>
+      )}
     </>
   );
 }

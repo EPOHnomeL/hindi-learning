@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { Reader } from "./Reader";
+import { useResourceUpload } from "./useResourceUpload";
 
 type Course = {
   slug: string;
@@ -173,10 +174,20 @@ function CardEditor({ course, onDone }: { course: Course; onDone: () => void }) 
 // first Lesson on its next run. On create, open it so they can upload Resources.
 function NewCourseCard({ onCreated }: { onCreated: (slug: string) => void }) {
   const seedTopic = useMutation(api.content.seedTopic);
+  const { uploadFile, addLink } = useResourceUpload();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [why, setWhy] = useState("");
+  const [links, setLinks] = useState<string[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
+  const [linkDraft, setLinkDraft] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const addDraftLink = () => {
+    const l = linkDraft.trim();
+    if (l) setLinks((xs) => [...xs, l]);
+    setLinkDraft("");
+  };
 
   if (!open) {
     return (
@@ -201,8 +212,12 @@ function NewCourseCard({ onCreated }: { onCreated: (slug: string) => void }) {
         setBusy(true);
         try {
           const { slug } = await seedTopic({ title: t, why: why.trim() });
+          for (const l of links) await addLink(slug, l);
+          for (const f of files) await uploadFile(slug, f);
           setTitle("");
           setWhy("");
+          setLinks([]);
+          setFiles([]);
           setOpen(false);
           onCreated(slug);
         } finally {
@@ -225,6 +240,55 @@ function NewCourseCard({ onCreated }: { onCreated: (slug: string) => void }) {
         placeholder="Why are you learning this?"
         className="resize-none rounded-lg border border-line bg-white px-3 py-2 text-sm focus:border-gold focus:outline-none"
       />
+
+      <label className="mt-1 text-xs font-semibold uppercase tracking-wide text-accent2">Resources (optional)</label>
+      {(links.length > 0 || files.length > 0) && (
+        <ul className="flex flex-col gap-1">
+          {links.map((l, i) => (
+            <li key={`l-${i}`} className="flex items-center justify-between gap-2 rounded bg-hi/50 px-2 py-1 text-xs text-ink">
+              <span className="min-w-0 truncate">🔗 {l}</span>
+              <button type="button" onClick={() => setLinks((xs) => xs.filter((_, j) => j !== i))} className="shrink-0 text-soft hover:text-accent" aria-label="Remove link">✕</button>
+            </li>
+          ))}
+          {files.map((f, i) => (
+            <li key={`f-${i}`} className="flex items-center justify-between gap-2 rounded bg-hi/50 px-2 py-1 text-xs text-ink">
+              <span className="min-w-0 truncate">📄 {f.name}</span>
+              <button type="button" onClick={() => setFiles((xs) => xs.filter((_, j) => j !== i))} className="shrink-0 text-soft hover:text-accent" aria-label="Remove file">✕</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex gap-1">
+        <input
+          value={linkDraft}
+          onChange={(e) => setLinkDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addDraftLink();
+            }
+          }}
+          placeholder="Paste a link…"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2 py-1.5 text-sm focus:border-gold focus:outline-none"
+        />
+        <button type="button" onClick={addDraftLink} className="rounded-lg border border-line px-2 py-1.5 text-sm text-soft hover:bg-hi">
+          Add link
+        </button>
+      </div>
+      <label className="cursor-pointer rounded-lg border border-dashed border-line px-2 py-1.5 text-center text-sm text-soft hover:bg-hi">
+        + Attach PDF{files.length > 0 ? "s" : ""}
+        <input
+          type="file"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const picked = Array.from(e.target.files ?? []);
+            if (picked.length) setFiles((xs) => [...xs, ...picked]);
+            e.target.value = "";
+          }}
+        />
+      </label>
+
       <div className="mt-1 flex gap-2">
         <button type="submit" disabled={busy} className="flex-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60">
           {busy ? "Creating…" : "Create"}
