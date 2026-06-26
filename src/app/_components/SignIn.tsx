@@ -28,8 +28,8 @@ export function SignIn() {
         }}
       >
         <h1 className="text-xl font-semibold text-accent">{flow === "signIn" ? "Sign in" : "Create account"}</h1>
-        <input name="email" type="email" placeholder="Email" autoComplete="email" required className="rounded-lg border border-line bg-white px-3 py-2 focus:border-gold focus:outline-none" />
-        <input name="password" type="password" placeholder="Password" autoComplete={flow === "signIn" ? "current-password" : "new-password"} required className="rounded-lg border border-line bg-white px-3 py-2 focus:border-gold focus:outline-none" />
+        <input name="email" type="email" placeholder="Email" autoComplete="email" required className="rounded-lg border border-line bg-card px-3 py-2 focus:border-gold focus:outline-none" />
+        <input name="password" type="password" placeholder="Password" autoComplete={flow === "signIn" ? "current-password" : "new-password"} required className="rounded-lg border border-line bg-card px-3 py-2 focus:border-gold focus:outline-none" />
         <button type="submit" disabled={busy} className="rounded-lg bg-accent px-3 py-2 font-medium text-white disabled:opacity-50">
           {busy ? "…" : flow === "signIn" ? "Sign in" : "Sign up"}
         </button>

@@ -18,6 +18,22 @@
   --color-hi: #fbeecb;
 }
 
+/* App-wide dark mode (ADR 0011). Overriding the color tokens under the dark
+   selector re-skins every utility that reads them, so the reader chrome,
+   dashboard and sign-in all flip together. Values mirror the lesson dark palette
+   in lessons/_partials/head.html so the app and the served lesson agree. */
+html[data-theme="dark"] {
+  --color-paper: #1b1815;
+  --color-card: #241f1a;
+  --color-ink: #e9e1d4;
+  --color-soft: #a99d8a;
+  --color-line: #3a322a;
+  --color-accent: #dd9863;
+  --color-accent2: #79b39b;
+  --color-gold: #d8ab57;
+  --color-hi: #4a3c1f;
+}
+
 body {
   background: var(--color-paper);
   color: var(--color-ink);
