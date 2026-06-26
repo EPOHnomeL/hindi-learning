@@ -139,6 +139,18 @@ export default defineSchema({
     lastManualFireAt: v.optional(v.number()),
   }).index("by_topic", ["topicId"]),
 
+  // A Share: grants one Viewer read-only access to one Topic they don't own.
+  // Created by the owner. `by_viewer` powers "Shared with me"; `by_topic` lists
+  // a Topic's Viewers (and cascades on delete); `by_topic_viewer` is the read-gate
+  // check and the dedup key (at most one Share per (Topic, Viewer)).
+  shares: defineTable({
+    topicId: v.id("topics"),
+    viewerId: v.id("users"),
+  })
+    .index("by_viewer", ["viewerId"])
+    .index("by_topic", ["topicId"])
+    .index("by_topic_viewer", ["topicId", "viewerId"]),
+
   // A question the learner asked from inside a lesson; the teacher replies.
   questions: defineTable({
     userId: v.id("users"),

@@ -16,6 +16,7 @@ import type * as http from "../http.js";
 import type * as lib from "../lib.js";
 import type * as resources from "../resources.js";
 import type * as routine from "../routine.js";
+import type * as shares from "../shares.js";
 
 import type {
   ApiFromModules,
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   lib: typeof lib;
   resources: typeof resources;
   routine: typeof routine;
+  shares: typeof shares;
 }>;
 
 /**
