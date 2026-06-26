@@ -25,10 +25,29 @@ const base = `topics/${slug}`;
 mkdirSync(`${base}/lessons`, { recursive: true });
 mkdirSync(`${base}/references`, { recursive: true });
 mkdirSync(`${base}/resources`, { recursive: true });
+mkdirSync(`${base}/learning-records`, { recursive: true });
 
 for (const l of ctx.lessons) writeFileSync(`${base}/lessons/${l.key}.html`, l.html);
 for (const r of ctx.references) writeFileSync(`${base}/references/${r.key}.html`, r.html);
+for (const lr of ctx.learningRecords) writeFileSync(`${base}/learning-records/${lr.key}.md`, lr.markdown);
 writeFileSync(`${base}/CAPTURE.json`, JSON.stringify(ctx.capture, null, 2));
+
+// The Mission round-trips through a file (PRD §4). A drafted mission → MISSION.md
+// (publish reads it back). A still-seeded Topic has only the learner's "why" → a
+// SEED.md the Routine drafts the mission from; no MISSION.md exists yet, which is
+// the signal to draft one. Writing both files would blur that signal, so it's
+// strictly one or the other.
+if (ctx.topic.mission) {
+  writeFileSync(`${base}/MISSION.md`, ctx.topic.mission.endsWith("\n") ? ctx.topic.mission : `${ctx.topic.mission}\n`);
+} else {
+  writeFileSync(
+    `${base}/SEED.md`,
+    `# Seed — draft the Mission from this\n\n` +
+      `This Topic is **seeded** but has no Mission yet. Draft one from the learner's "why" ` +
+      `below plus the resources, write it to MISSION.md, then publish.\n\n` +
+      `## The learner's "why"\n\n${ctx.topic.seed ?? "(none given)"}\n`,
+  );
+}
 
 // Resources: download the raw blob; record processed manifest + hash so issue
 // 06's ingestion can skip re-rendering when the cache is current.
@@ -47,5 +66,6 @@ writeFileSync(
 );
 
 console.log(
-  `materialised "${slug}" → ${base}/ (${ctx.lessons.length} lessons, ${ctx.references.length} refs, ${ctx.resources.length} resources)`,
+  `materialised "${slug}" → ${base}/ (${ctx.lessons.length} lessons, ${ctx.learningRecords.length} records, ` +
+    `${ctx.references.length} refs, ${ctx.resources.length} resources; ${ctx.topic.mission ? "MISSION.md" : "SEED.md"})`,
 );

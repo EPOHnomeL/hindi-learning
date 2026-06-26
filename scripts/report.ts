@@ -7,10 +7,12 @@ import { api } from "../convex/_generated/api";
 import { convexUrl, publishSecret } from "./_env";
 
 const PROD = process.argv.includes("--prod");
-const [outcome, topicSlug = "hindi", error] = process.argv.slice(2).filter((a) => a !== "--prod");
+const [outcome, topicSlug, error] = process.argv.slice(2).filter((a) => a !== "--prod");
 
-if (outcome !== "published" && outcome !== "nothing" && outcome !== "failed") {
-  console.error('Usage: pnpm run report:prod <published|nothing|failed> [topicSlug] ["error message"]');
+// topicSlug is required: the Routine is multi-topic now, so a default would
+// silently release the wrong Topic's lock.
+if ((outcome !== "published" && outcome !== "nothing" && outcome !== "failed") || !topicSlug) {
+  console.error('Usage: pnpm run report:prod <published|nothing|failed> <topicSlug> ["error message"]');
   process.exit(1);
 }
 
