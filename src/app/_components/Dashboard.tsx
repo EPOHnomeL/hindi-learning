@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation, useQuery } from "convex/react";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { Reader } from "./Reader";
@@ -60,6 +60,8 @@ function CourseGrid({ onOpen }: { onOpen: (slug: string) => void }) {
 
 function CourseCard({ course, onOpen }: { course: Course; onOpen: () => void }) {
   const [editing, setEditing] = useState(false);
+  const requestSetup = useAction(api.routine.requestSetup);
+  const [setup, setSetup] = useState<"idle" | "starting" | "started" | "error">("idle");
 
   if (editing) {
     return <CardEditor course={course} onDone={() => setEditing(false)} />;
@@ -67,6 +69,16 @@ function CourseCard({ course, onOpen }: { course: Course; onOpen: () => void }) 
 
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
   const allDone = course.lessonCount > 0 && course.completedCount === course.lessonCount;
+
+  const startSetup = async () => {
+    setSetup("starting");
+    try {
+      await requestSetup({ topicSlug: course.slug });
+      setSetup("started");
+    } catch {
+      setSetup("error");
+    }
+  };
 
   return (
     <article className="flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
@@ -99,6 +111,22 @@ function CourseCard({ course, onOpen }: { course: Course; onOpen: () => void }) 
           <div className="h-full rounded-full bg-accent2 transition-[width] duration-300" style={{ width: `${pct}%` }} />
         </div>
       </div>
+
+      {course.status === "seeded" && (
+        <button
+          onClick={() => void startSetup()}
+          disabled={setup === "starting" || setup === "started"}
+          className="mb-2 w-full rounded-lg bg-gold/20 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-gold/30 disabled:opacity-70"
+        >
+          {setup === "starting"
+            ? "Starting setup…"
+            : setup === "started"
+              ? "Setup started — first lesson in ~1 min"
+              : setup === "error"
+                ? "Couldn't start — retry"
+                : "Set up now"}
+        </button>
+      )}
 
       <div className="flex items-center gap-2">
         <button
@@ -174,6 +202,7 @@ function CardEditor({ course, onDone }: { course: Course; onDone: () => void }) 
 // first Lesson on its next run. On create, open it so they can upload Resources.
 function NewCourseCard({ onCreated }: { onCreated: (slug: string) => void }) {
   const seedTopic = useMutation(api.content.seedTopic);
+  const requestSetup = useAction(api.routine.requestSetup);
   const { uploadFile, addLink } = useResourceUpload();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -214,6 +243,15 @@ function NewCourseCard({ onCreated }: { onCreated: (slug: string) => void }) {
           const { slug } = await seedTopic({ title: t, why: why.trim() });
           for (const l of links) await addLink(slug, l);
           for (const f of files) await uploadFile(slug, f);
+          // Kick off setup immediately, once Resources are attached — no waiting
+          // for the daily cron. Best-effort: if the fire can't land, the card
+          // still shows "Setting up" (with a "Set up now" retry) and the cron
+          // picks it up anyway, so a failure here must not block creation.
+          try {
+            await requestSetup({ topicSlug: slug });
+          } catch (err) {
+            console.warn("couldn't start setup immediately; the routine will pick it up", err);
+          }
           setTitle("");
           setWhy("");
           setLinks([]);
