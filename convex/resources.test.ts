@@ -107,6 +107,25 @@ test("cacheProcessedResource fills processed + flips to ready, idempotently", as
   expect((await t.run((ctx) => ctx.db.get(rid)))!.status).toBe("ready");
 });
 
+test("addUrlResource adds a link (deduped by url); listResources exposes an openable url for both kinds", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  const as = asUser(t, alice);
+
+  await as.mutation(api.resources.addUrlResource, { topicSlug: "hindi", url: "https://example.com/doc", label: "Spec" });
+  await as.mutation(api.resources.addUrlResource, { topicSlug: "hindi", url: "https://example.com/doc" }); // dedupe
+  expect(await as.query(api.resources.listResources, { topicSlug: "hindi" })).toMatchObject([
+    { kind: "url", filename: "Spec", url: "https://example.com/doc", status: "raw" },
+  ]);
+
+  // a file resource exposes a signed blob url to open
+  const sid = await storeBlob(t, "pdf bytes");
+  await as.mutation(api.resources.addResource, { topicSlug: "hindi", filename: "h.pdf", storageId: sid });
+  const file = (await as.query(api.resources.listResources, { topicSlug: "hindi" })).find((r) => r.kind === "file");
+  expect(file?.url).toBeTruthy();
+});
+
 test("addResourceAdmin records an operator upload owner-scoped by email, and dedupes", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
