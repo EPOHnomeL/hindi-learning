@@ -247,6 +247,20 @@ export const requestNextLesson = action({
   },
 });
 
+// Kick off setup for a (usually freshly seeded) Topic straight from the app — the
+// dashboard calls this on create and from the "Set up now" button, so a learner
+// never waits for the daily cron. Fired as non-manual on purpose: setup isn't the
+// rate-limited on-demand button, so a failed fire (e.g. transient) can be retried
+// immediately rather than being locked out by the 20h manual cooldown. The gate
+// still no-ops anything that isn't ready (e.g. an in-flight or caught-up Topic).
+export const requestSetup = action({
+  args: { topicSlug: v.string() },
+  handler: async (ctx, { topicSlug }): Promise<FireResult> => {
+    if (!(await getAuthUserId(ctx))) throw new Error("unauthenticated");
+    return await fireForTopic(ctx, topicSlug, false);
+  },
+});
+
 // ---- Daily cron ------------------------------------------------------------
 
 export const listTopicSlugs = internalQuery({
