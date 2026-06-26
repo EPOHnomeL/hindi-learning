@@ -5,6 +5,7 @@ import { useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { ArtifactView } from "./ArtifactView";
+import { useTheme } from "./ThemeContext";
 import { useResourceUpload } from "./useResourceUpload";
 
 type Selection = { kind: "lesson" | "reference"; key: string };
@@ -102,7 +103,7 @@ export function Reader({ topicSlug, onExit }: { topicSlug: string; onExit: () =>
 
       {/* Lesson selector: slide-in drawer on mobile, static column on desktop. */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 transform overflow-y-auto border-r border-line bg-paper p-4 transition-transform duration-300 md:static md:z-auto md:w-64 md:translate-x-0 md:transition-none ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 transform flex-col overflow-y-auto border-r border-line bg-paper p-4 transition-transform duration-300 md:static md:z-auto md:w-64 md:translate-x-0 md:transition-none ${
           menuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -144,6 +145,10 @@ export function Reader({ topicSlug, onExit }: { topicSlug: string; onExit: () =>
 
           {topicSlug && <ResourcesSection topicSlug={topicSlug} />}
         </nav>
+
+        {/* Theme setting, pinned at the bottom of the drawer. Flips the whole app
+            and the served lesson together (ADR 0011). */}
+        <ThemeToggle />
       </aside>
 
       <section className="min-w-0 flex-1 md:overflow-hidden md:p-4">
@@ -159,6 +164,23 @@ export function Reader({ topicSlug, onExit }: { topicSlug: string; onExit: () =>
         )}
       </section>
     </div>
+  );
+}
+
+// Light/Dark toggle pinned to the bottom of the sidebar. `mt-auto` pushes it
+// below the nav lists; it themes the app chrome and the lesson iframe at once.
+function ThemeToggle() {
+  const { theme, toggle } = useTheme();
+  const dark = theme === "dark";
+  return (
+    <button
+      onClick={toggle}
+      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      className="mt-auto flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
+    >
+      <span>{dark ? "Dark" : "Light"} mode</span>
+      <span aria-hidden className="text-base">{dark ? "☾" : "☀"}</span>
+    </button>
   );
 }
 
@@ -274,7 +296,7 @@ function ResourcesSection({ topicSlug }: { topicSlug: string }) {
             value={linkDraft}
             onChange={(e) => setLinkDraft(e.target.value)}
             placeholder="https://…"
-            className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2 py-1 text-sm focus:border-gold focus:outline-none"
+            className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-sm focus:border-gold focus:outline-none"
           />
           <button type="submit" className="rounded-lg bg-accent2 px-2 py-1 text-xs text-white">Add</button>
         </form>
