@@ -304,7 +304,8 @@ export const materialiseTopic = query({
           kind: r.kind,
           status: r.status,
           contentHash: r.contentHash,
-          rawUrl: await ctx.storage.getUrl(r.rawStorageId),
+          url: r.url ?? null, // external link, for kind: "url"
+          rawUrl: r.rawStorageId ? await ctx.storage.getUrl(r.rawStorageId) : null, // signed blob URL, for kind: "file"
           processed: r.processed ?? null,
         }),
       ),

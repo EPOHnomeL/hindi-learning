@@ -43,15 +43,17 @@ export default defineSchema({
     .index("by_topic_seq", ["topicId", "seq"])
     .index("by_topic_key", ["topicId", "key"]),
 
-  // A learner-uploaded Resource (PDF, etc.). Only the raw blob is stored here
-  // (issue 04); `processed` (a manifest of rendered/extracted artifacts) is
-  // filled lazily by the Routine on first need (issue 06). Dedupe by
-  // `(topicId, contentHash)` where contentHash is the blob's _storage sha256.
+  // A learner's Resource: either an uploaded blob (`kind: "file"`, bytes in
+  // `rawStorageId`) or an external link (`kind: "url"`, in `url`). `processed`
+  // (a manifest of rendered/extracted artifacts) is filled lazily by the Routine
+  // on first need (issue 06). Dedupe by `(topicId, contentHash)` — the blob's
+  // _storage sha256 for files, the URL string for links.
   resources: defineTable({
     topicId: v.id("topics"),
     ownerId: v.id("users"),
     filename: v.string(),
-    rawStorageId: v.id("_storage"),
+    rawStorageId: v.optional(v.id("_storage")),
+    url: v.optional(v.string()),
     contentHash: v.string(),
     status: v.union(v.literal("raw"), v.literal("processing"), v.literal("ready")),
     kind: v.union(v.literal("file"), v.literal("url")),

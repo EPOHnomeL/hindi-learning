@@ -64,6 +64,35 @@ export const addResource = mutation({
   },
 });
 
+// Add an external link Resource (no blob). Deduped by the URL within the Topic.
+export const addUrlResource = mutation({
+  args: { topicSlug: v.string(), url: v.string(), label: v.optional(v.string()) },
+  handler: async (ctx, { topicSlug, url, label }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const link = url.trim();
+    if (!link) throw new Error("url required");
+
+    const existing = await ctx.db
+      .query("resources")
+      .withIndex("by_topic_hash", (q) => q.eq("topicId", topic._id).eq("contentHash", link))
+      .unique();
+    if (existing) return existing._id;
+
+    return await ctx.db.insert("resources", {
+      topicId: topic._id,
+      ownerId: userId,
+      filename: label?.trim() || link,
+      url: link,
+      contentHash: link,
+      status: "raw",
+      kind: "url",
+    });
+  },
+});
+
 // Operator upload (PUBLISH_SECRET-guarded): the migration path has no auth, so
 // the owner is named by email. Used to move Handbook.pdf into the hindi Topic
 // (issue 09). Same dedupe as the learner path.
@@ -132,6 +161,16 @@ export const listResources = query({
       .query("resources")
       .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
       .collect();
-    return rows.map((r) => ({ id: r._id, filename: r.filename, status: r.status, kind: r.kind }));
+    // `url` is what the sidebar opens: the external link, or a signed URL for
+    // the stored blob.
+    return await Promise.all(
+      rows.map(async (r) => ({
+        id: r._id,
+        filename: r.filename,
+        status: r.status,
+        kind: r.kind,
+        url: r.kind === "url" ? (r.url ?? null) : r.rawStorageId ? await ctx.storage.getUrl(r.rawStorageId) : null,
+      })),
+    );
   },
 });
