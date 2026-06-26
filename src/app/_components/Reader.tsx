@@ -12,29 +12,21 @@ type Selection = { kind: "lesson" | "reference"; key: string };
 // localStorage key for answered-question ids the learner has already seen.
 const SEEN_KEY = "hindi:answers-seen";
 
-export function Reader() {
+// Reads one course (fixed by `topicSlug`, chosen on the dashboard) and lets the
+// learner work through its Lessons/References. `onExit` returns to the dashboard.
+export function Reader({ topicSlug, onExit }: { topicSlug: string; onExit: () => void }) {
   const topics = useQuery(api.content.listTopics);
   const { signOut } = useAuthActions();
-  const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // Active Topic: the chosen one, else the first. Content queries skip until it
-  // resolves (and on switch, the selected lesson/reference resets — its key is
-  // topic-local).
-  const activeTopic = topics?.find((t) => t.slug === activeSlug) ?? topics?.[0] ?? null;
-  const topicSlug = activeTopic?.slug ?? null;
+  // This course's row (for its title + mission), from the user's Topic list.
+  const activeTopic = topics?.find((t) => t.slug === topicSlug) ?? null;
 
-  const lessons = useQuery(api.content.listLessons, topicSlug ? { topicSlug } : "skip");
-  const references = useQuery(api.content.listReferences, topicSlug ? { topicSlug } : "skip");
-  const progress = useQuery(api.capture.myProgress, topicSlug ? { topicSlug } : "skip");
-  const questions = useQuery(api.capture.myQuestions, topicSlug ? { topicSlug } : "skip");
-
-  const switchTopic = (slug: string) => {
-    setActiveSlug(slug);
-    setSelected(null);
-    setMenuOpen(false);
-  };
+  const lessons = useQuery(api.content.listLessons, { topicSlug });
+  const references = useQuery(api.content.listReferences, { topicSlug });
+  const progress = useQuery(api.capture.myProgress, { topicSlug });
+  const questions = useQuery(api.capture.myQuestions, { topicSlug });
 
   // Answered-question ids the learner has already seen (client-only, per device).
   // A lesson with a reply not in this set gets a notification dot in the nav;
@@ -114,30 +106,21 @@ export function Reader() {
           menuOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="mb-4 flex items-center justify-between gap-2">
-          {topics && topics.length > 1 ? (
-            <select
-              value={activeTopic?.slug ?? ""}
-              onChange={(e) => switchTopic(e.target.value)}
-              aria-label="Switch topic"
-              className="min-w-0 flex-1 rounded-lg border border-line bg-white px-2 py-1 text-lg font-semibold tracking-tight text-accent focus:border-gold focus:outline-none"
-            >
-              {topics.map((t) => (
-                <option key={t.slug} value={t.slug}>
-                  {t.title}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <h1 className="min-w-0 truncate text-lg font-semibold tracking-tight text-accent">{activeTopic?.title ?? "…"}</h1>
-          )}
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <button
+            onClick={onExit}
+            className="-ml-1 flex items-center gap-1 rounded-lg px-1.5 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
+            aria-label="Back to courses"
+          >
+            <span aria-hidden>←</span> Courses
+          </button>
           <button onClick={() => void signOut()} className="shrink-0 text-xs text-soft hover:text-accent">
             Sign out
           </button>
         </div>
+        <h1 className="mb-4 truncate text-lg font-semibold tracking-tight text-accent">{activeTopic?.title ?? "…"}</h1>
 
         {activeTopic && <MissionPanel topicSlug={activeTopic.slug} mission={activeTopic.mission} status={activeTopic.status} />}
-        <NewCourse onCreated={switchTopic} />
 
         <nav className="flex flex-col gap-1">
           <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">Lessons</p>
@@ -261,50 +244,6 @@ function MissionPanel({ topicSlug, mission, status }: { topicSlug: string; missi
         <p className="mt-1 text-soft">{status === "seeded" ? "Your teacher will draft this from your seed." : "No mission yet — add your why."}</p>
       )}
     </div>
-  );
-}
-
-// Start a new Topic (Seed): title + free-text "why". The Routine drafts the
-// Mission + first Lesson on its next run. Upload Resources after switching in.
-function NewCourse({ onCreated }: { onCreated: (slug: string) => void }) {
-  const seedTopic = useMutation(api.content.seedTopic);
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [why, setWhy] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} className="mb-2 w-full rounded-lg border border-dashed border-line px-2 py-1.5 text-left text-sm text-soft hover:bg-hi">
-        + New course
-      </button>
-    );
-  }
-  return (
-    <form
-      className="mb-3 rounded-lg border border-line bg-card p-2"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        if (!title.trim()) return;
-        setBusy(true);
-        try {
-          const { slug } = await seedTopic({ title: title.trim(), why: why.trim() });
-          setTitle("");
-          setWhy("");
-          setOpen(false);
-          onCreated(slug);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Course title" className="w-full rounded border border-line bg-white px-2 py-1 text-sm focus:border-gold focus:outline-none" />
-      <textarea value={why} onChange={(e) => setWhy(e.target.value)} rows={3} placeholder="Why are you learning this?" className="mt-1 w-full rounded border border-line bg-white px-2 py-1 text-sm focus:border-gold focus:outline-none" />
-      <div className="mt-1 flex gap-2">
-        <button type="submit" disabled={busy} className="rounded bg-accent px-2 py-1 text-xs text-white disabled:opacity-60">{busy ? "Creating…" : "Create"}</button>
-        <button type="button" onClick={() => setOpen(false)} className="text-xs text-soft hover:text-accent">Cancel</button>
-      </div>
-    </form>
   );
 }
 
