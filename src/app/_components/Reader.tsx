@@ -120,8 +120,6 @@ export function Reader({ topicSlug, onExit }: { topicSlug: string; onExit: () =>
         </div>
         <h1 className="mb-4 truncate text-lg font-semibold tracking-tight text-accent">{activeTopic?.title ?? "…"}</h1>
 
-        {activeTopic && <MissionPanel topicSlug={activeTopic.slug} mission={activeTopic.mission} status={activeTopic.status} />}
-
         <nav className="flex flex-col gap-1">
           <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">Lessons</p>
           {lessons?.length === 0 && <p className="px-2 text-sm text-soft">No lessons published yet.</p>}
@@ -200,50 +198,6 @@ function NavItem({
         )}
       </span>
     </button>
-  );
-}
-
-// The active Topic's Mission: the learner's "why", drafted by the Routine from
-// the Seed and editable here (plain form, no authoring — ADR 0001).
-function MissionPanel({ topicSlug, mission, status }: { topicSlug: string; mission: string | null; status: "seeded" | "active" }) {
-  const editMission = useMutation(api.content.editMission);
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(mission ?? "");
-  useEffect(() => {
-    setText(mission ?? "");
-    setEditing(false);
-  }, [mission, topicSlug]);
-
-  if (editing) {
-    return (
-      <form
-        className="mb-4 rounded-lg border border-line bg-card p-2"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          await editMission({ topicSlug, mission: text.trim() });
-          setEditing(false);
-        }}
-      >
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} className="w-full rounded border border-line bg-white p-2 text-sm focus:border-gold focus:outline-none" placeholder="Why are you learning this?" />
-        <div className="mt-1 flex gap-2">
-          <button type="submit" className="rounded bg-accent2 px-2 py-1 text-xs text-white">Save</button>
-          <button type="button" onClick={() => setEditing(false)} className="text-xs text-soft hover:text-accent">Cancel</button>
-        </div>
-      </form>
-    );
-  }
-  return (
-    <div className="mb-4 rounded-lg border border-line bg-card p-2 text-sm">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-accent2">Mission</span>
-        <button onClick={() => setEditing(true)} className="text-xs text-soft hover:text-accent">Edit</button>
-      </div>
-      {mission ? (
-        <p className="mt-1 whitespace-pre-wrap text-ink">{mission}</p>
-      ) : (
-        <p className="mt-1 text-soft">{status === "seeded" ? "Your teacher will draft this from your seed." : "No mission yet — add your why."}</p>
-      )}
-    </div>
   );
 }
 
