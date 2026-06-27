@@ -1,0 +1,3741 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <!-- Vendored from upstream@9aa1d25e0c9180cefff7e4f1e2c7302a9f874bf0. Do NOT hand-edit; run scripts/refresh-spa.mjs. Repo-specific seams are marked `SKILL: replace`. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <base href="/docs/architecture/" />
+    <title>Served Teach App — Knowledge Bank</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=JetBrains+Mono&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/themes/prism-tomorrow.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-highlight/prism-line-highlight.min.css"
+      rel="stylesheet"
+    />
+    <script>
+      // Apply persisted theme + width before first paint to avoid a flash.
+      // localStorage keys: docs-theme, docs-width.
+      (function () {
+        try {
+          // A saved / offline copy opened over file:// always starts in light
+          // mode: the persisted-theme + prefers-color-scheme logic below is
+          // for the live served site, and a snapshot's file:// origin has no
+          // docs-theme key anyway. Mirrors the OFFLINE guard in the boot
+          // script that keeps the saved DOM from being re-fetched.
+          if (location.protocol === "file:") return;
+          var t = localStorage.getItem("docs-theme");
+          if (!t) t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+          if (localStorage.getItem("docs-width") === "wide") document.documentElement.setAttribute("data-width", "wide");
+        } catch (e) {}
+      })();
+    </script>
+    <style>
+      /* Palette + fonts lifted from the app's "paper" theme (src/styles/globals.css). */
+      :root {
+        --bg: #fbf7f0;
+        --fg: #2b2622;
+        --heading-fg: #1a1714;
+        --muted-fg: #6b6258;
+        --border: #e7ddd4;
+        --primary: #9c5b34;
+        --primary-strong: #7d4527;
+        --primary-soft: rgba(156, 91, 52, 0.14);
+        --accent: #3f6f5e;
+        --card: #fffdf9;
+        --code-bg: #f1ece3;
+        --tooltip-bg: #2b2622;
+        --tooltip-fg: #fbf7f0;
+        --pre-bg: #2b2622;
+        --pre-fg: #f1ece3;
+        --shadow: 0 6px 22px rgba(43, 38, 34, 0.18);
+        --color-scheme: light;
+      }
+
+      :root[data-theme="dark"] {
+        --bg: #1b1815;
+        --fg: #e9e1d4;
+        --heading-fg: #f3ecdf;
+        --muted-fg: #a99d8a;
+        --border: #3a322a;
+        --primary: #dd9863;
+        --primary-strong: #e9b487;
+        --primary-soft: rgba(221, 152, 99, 0.18);
+        --accent: #79b39b;
+        --card: #241f1a;
+        --code-bg: #2a241f;
+        --tooltip-bg: #3a322a;
+        --tooltip-fg: #f3ecdf;
+        --pre-bg: #14110e;
+        --pre-fg: #e9e1d4;
+        --shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
+        --color-scheme: dark;
+      }
+
+      :root { color-scheme: var(--color-scheme); }
+
+      * { box-sizing: border-box; }
+
+      html, body {
+        margin: 0;
+        padding: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: "Spectral", Georgia, ui-serif, serif;
+        font-size: 14.5px;
+        line-height: 1.6;
+      }
+
+      h1, h2, h3, h4 {
+        font-family: "Spectral", serif;
+        font-weight: 600;
+        color: var(--heading-fg);
+        margin: 1.4em 0 0.4em;
+      }
+      h1 { font-size: 28px; margin-top: 0; letter-spacing: -0.01em; }
+      h2 { font-size: 19px; margin-top: 1.8em; }
+      h3 { font-size: 15px; }
+
+      a { color: var(--primary-strong); text-decoration: none; }
+      a:hover { text-decoration: underline; color: var(--primary); }
+      :root[data-theme="dark"] a { color: var(--primary); }
+      :root[data-theme="dark"] a:hover { color: var(--primary-strong); }
+
+      code, pre { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 13px; }
+      code { background: var(--code-bg); padding: 1px 6px; border-radius: 4px; }
+      pre { background: var(--pre-bg); color: var(--pre-fg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; }
+      pre code { background: transparent; padding: 0; color: inherit; }
+
+      blockquote {
+        border-left: 3px solid var(--primary);
+        margin: 1em 0;
+        padding: 6px 0 6px 14px;
+        color: var(--fg);
+      }
+
+      table { border-collapse: collapse; width: 100%; margin: 1em 0; font-size: 13.5px; }
+      th, td { border-bottom: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+      th { font-family: "Spectral", serif; font-weight: 600; color: var(--heading-fg); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+
+      /* ──────────── layout ──────────── */
+      .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+      .sidebar {
+        background: transparent;
+        border-right: 1px solid var(--border);
+        padding: 22px 14px;
+        position: sticky;
+        top: 0;
+        max-height: 100vh;
+        overflow-y: auto;
+      }
+      .brand {
+        font-family: "Spectral", serif;
+        font-weight: 700;
+        color: var(--heading-fg);
+        font-size: 15px;
+        padding: 0 8px 18px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); }
+      .brand small {
+        display: block;
+        color: var(--muted-fg);
+        font-weight: 500;
+        font-size: 10.5px;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        margin-top: 2px;
+      }
+
+      .nav-group {
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--muted-fg);
+        font-family: "Spectral", serif;
+        margin: 14px 8px 4px;
+      }
+      .nav-group-collapsible { margin-top: 24px; }
+      .nav-group-toggle {
+        background: transparent;
+        border: 0;
+        padding: 6px 8px;
+        margin: 0 -8px;
+        color: var(--muted-fg);
+        font-family: "Spectral", serif;
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: calc(100% + 16px);
+        border-radius: 6px;
+      }
+      .nav-group-toggle:hover { color: var(--fg); background: var(--primary-soft); }
+      .nav-group-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+      .nav-group-toggle .nav-group-chevron {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 14px;
+        color: var(--muted-fg);
+        transition: transform 160ms ease;
+      }
+      .nav-group-toggle[aria-expanded="true"] .nav-group-chevron { transform: rotate(90deg); }
+      #nav-references .nav-link,
+      #nav-agent-context .nav-link { font-size: 12.5px; }
+
+      /* Clickable controls toggle/navigate on click; double-clicking one
+         should never leave its label text selected. */
+      .nav-link,
+      .nav-chevron,
+      .nav-group-toggle,
+      .topbar-toggle,
+      .drawer-close,
+      .btn {
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 9px;
+        border-radius: 6px;
+        color: var(--fg);
+        cursor: pointer;
+        font-size: 13.5px;
+        line-height: 1.3;
+      }
+      .nav-link:hover { background: var(--primary-soft); text-decoration: none; }
+      .nav-link.active { background: var(--primary); color: #1a1a1a; font-weight: 600; }
+      .nav-link .mark {
+        margin-left: auto;
+        font-size: 9.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .nav-link.active .mark { color: #1a1a1a; }
+
+      /* Collapsible sub-modules per context */
+      .nav-item { display: block; }
+      .nav-row {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+      }
+      .nav-row .nav-link { flex: 1; min-width: 0; }
+      .nav-chevron {
+        background: transparent;
+        border: 0;
+        color: var(--muted-fg);
+        cursor: pointer;
+        padding: 6px 7px;
+        border-radius: 6px;
+        line-height: 0;
+        font-family: inherit;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+      .nav-chevron svg { transition: transform 160ms ease; }
+      .nav-chevron[aria-expanded="true"] svg { transform: rotate(90deg); }
+      .nav-chevron:hover { background: var(--primary-soft); color: var(--fg); }
+      .nav-chevron:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+      .nav-children {
+        margin: 2px 0 6px 14px;
+        padding-left: 6px;
+        border-left: 1px solid var(--border);
+      }
+      .nav-sub { font-size: 12.5px; padding: 4px 9px; color: var(--muted-fg); }
+      .nav-sub.active { background: var(--primary-soft); color: var(--fg); }
+
+      /* ──────────── content ──────────── */
+      .topbar {
+        position: sticky;
+        top: 0;
+        background: var(--bg);
+        z-index: 10;
+        padding: 16px 36px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid transparent;
+      }
+      .topbar.scrolled { border-bottom-color: var(--border); }
+      .crumb {
+        font-size: 11.5px;
+        color: var(--muted-fg);
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        font-family: "Spectral", serif;
+      }
+      .topbar-actions { display: flex; gap: 8px; }
+      .btn {
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--fg);
+        padding: 6px 12px;
+        border-radius: 6px;
+        font: inherit;
+        font-size: 12.5px;
+        cursor: pointer;
+        font-family: "Spectral", serif;
+      }
+      .btn:hover { border-color: var(--primary); color: var(--heading-fg); }
+      .btn.active { background: var(--primary-soft); border-color: var(--primary); color: var(--heading-fg); }
+      .btn kbd {
+        background: var(--code-bg);
+        border-radius: 3px;
+        padding: 0 5px;
+        font-size: 11px;
+        margin-left: 6px;
+        color: var(--muted-fg);
+        font-family: "JetBrains Mono", monospace;
+      }
+
+      .content { padding: 8px 36px 80px; max-width: 880px; margin: 0 auto; width: 100%; transition: max-width 180ms ease; }
+      :root[data-width="wide"] .content { max-width: none; }
+
+      /* topbar toggle controls */
+      .topbar-toggle {
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--fg);
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        border-radius: 6px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+        line-height: 1;
+      }
+      .topbar-toggle:hover { border-color: var(--primary); color: var(--heading-fg); }
+      .topbar-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+      .topbar-toggle svg { width: 16px; height: 16px; }
+
+      .meta {
+        margin: 4px 0 24px;
+        color: var(--muted-fg);
+        font-size: 12.5px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+      }
+      .meta b { color: var(--fg); font-weight: 600; }
+      .meta .tag-todo { color: #ab570a; font-weight: 600; }
+      .meta .tag-exemplar { color: var(--accent); font-weight: 600; }
+      .meta .tag-done { color: #11843c; font-weight: 600; }
+      .meta .tag-draft { color: #0b6dd2; font-weight: 600; }
+      .meta .tag-stub { color: #929292; font-weight: 600; }
+
+      /* glossary terms */
+      dfn[data-term] {
+        font-style: normal;
+        border-bottom: 1px dashed var(--accent);
+        cursor: help;
+        position: relative;
+      }
+      dfn[data-term]:hover { color: var(--accent); }
+      dfn[data-missing] { border-bottom-style: dotted; opacity: 0.65; }
+      a.ctx-link {
+        color: var(--fg);
+        border-bottom: 1px solid var(--primary);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      a.ctx-link:hover { color: var(--primary); text-decoration: none; }
+      .tip {
+        position: absolute;
+        bottom: calc(100% + 6px);
+        left: 0;
+        width: max-content;
+        min-width: 240px;
+        max-width: min(420px, 60vw);
+        background: var(--tooltip-bg);
+        color: var(--tooltip-fg);
+        padding: 10px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        line-height: 1.55;
+        z-index: 100;
+        box-shadow: var(--shadow);
+        pointer-events: auto;
+        white-space: normal;
+        font-style: normal;
+      }
+      .tip a { color: var(--primary); text-decoration: underline; }
+      .tip a:hover { color: var(--primary-strong); }
+      .tip code { background: rgba(255,255,255,0.08); color: inherit; }
+      .tip p { margin: 0; }
+      .tip p + p { margin-top: 6px; }
+      /* If the term is near the right edge of the column, flip the tooltip
+         to anchor on the right rather than overflowing. JS sets data-flip
+         on hover when there's no room on the right. */
+      .tip[data-flip="right"] { left: auto; right: 0; }
+
+      /* mermaid */
+      .mermaid {
+        background: var(--card);
+        border-radius: 10px;
+        padding: 16px;
+        margin: 1em 0;
+        text-align: center;
+        border: 1px solid var(--border);
+      }
+      .mermaid svg { max-width: 100%; height: auto; }
+
+      /* Zoomable Mermaid wrapper. Inline height is set in JS to match the
+         SVG's natural aspect ratio so the box hugs short diagrams; tall
+         diagrams are capped at max-height and rendered at near-natural
+         zoom with the top anchored — the reader pans downward instead of
+         squinting at squashed labels. */
+      .mermaid-zoomable {
+        position: relative;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        margin: 1em 0;
+        min-height: 320px;
+        max-height: 40vh;
+        height: 480px;
+        overflow: hidden;
+      }
+      /* The System map gets double the vertical room of a context diagram. */
+      .mermaid-zoomable--tall {
+        min-height: 640px;
+        max-height: 80vh;
+        height: 960px;
+      }
+      .mermaid-zoomable .mermaid {
+        background: transparent;
+        border: 0;
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+      }
+      .mermaid-zoomable .mermaid svg {
+        max-width: none;
+        width: 100% !important;
+        height: 100% !important;
+        cursor: grab;
+        display: block;
+      }
+      .mermaid-zoomable .mermaid svg:active { cursor: grabbing; }
+      .mermaid-zoomable .clickable rect,
+      .mermaid-zoomable .clickable polygon,
+      .mermaid-zoomable .clickable circle { transition: filter 120ms ease; }
+      .mermaid-zoomable .clickable:hover rect,
+      .mermaid-zoomable .clickable:hover polygon,
+      .mermaid-zoomable .clickable:hover circle { filter: brightness(1.08); cursor: pointer; }
+      .mermaid-zoom-controls {
+        position: absolute;
+        right: 12px;
+        bottom: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        z-index: 5;
+      }
+      .mermaid-zoom-controls button {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--fg);
+        cursor: pointer;
+        font: inherit;
+        font-size: 16px;
+        line-height: 1;
+        font-family: "JetBrains Mono", monospace;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      }
+      .mermaid-zoom-controls button:hover { border-color: var(--primary); color: var(--heading-fg); }
+      /* Mermaid's themeVariables.fontSize doesn't reliably apply to every chart
+         type / version, so force it via CSS too. The team picked "double" the
+         old default; tweak here rather than in mermaid.initialize so all chart
+         types respect it. */
+      .mermaid svg,
+      .mermaid svg .nodeLabel,
+      .mermaid svg .edgeLabel,
+      .mermaid svg .label,
+      .mermaid svg .actor-line + text,
+      .mermaid svg .messageText,
+      .mermaid svg .noteText,
+      .mermaid svg .stateLabel { font-size: 22px !important; }
+      .mermaid .clickable { cursor: pointer; }
+
+      .loading { color: var(--muted-fg); font-style: italic; padding: 40px 0; }
+      .error { background: #fdecea; border: 1px solid #f5c2c0; color: #b71c1c; padding: 12px 14px; border-radius: 6px; }
+      :root[data-theme="dark"] .error { background: #3a1a1a; border-color: #6b2727; color: #f0b3b3; }
+
+      /* ──────────── glossary drawer ──────────── */
+      .drawer-scrim {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.25);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 180ms ease;
+        z-index: 50;
+      }
+      .drawer-scrim.open { opacity: 1; pointer-events: auto; }
+      .drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100vh;
+        width: 380px;
+        max-width: 90vw;
+        background: var(--card);
+        box-shadow: -8px 0 32px rgba(0, 0, 0, 0.08);
+        transform: translateX(100%);
+        transition: transform 220ms ease;
+        z-index: 60;
+        display: flex;
+        flex-direction: column;
+      }
+      .drawer.open { transform: translateX(0); }
+      .drawer-head {
+        padding: 16px 18px 12px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .drawer-head h3 { margin: 0; font-size: 16px; }
+      .drawer-search {
+        width: 100%;
+        padding: 8px 10px;
+        margin-top: 10px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        font: inherit;
+        font-size: 13px;
+        background: var(--code-bg);
+      }
+      .drawer-search:focus { outline: none; border-color: var(--primary); background: #fff; }
+      .drawer-close {
+        background: transparent;
+        border: none;
+        font-size: 20px;
+        color: var(--muted-fg);
+        cursor: pointer;
+        line-height: 1;
+        padding: 4px 8px;
+      }
+      .drawer-close:hover { color: var(--fg); }
+      .drawer-body { flex: 1; overflow-y: auto; padding: 8px 12px 24px; }
+      .term {
+        padding: 9px 10px;
+        border-radius: 6px;
+        margin-bottom: 2px;
+      }
+      .term:hover { background: var(--primary-soft); }
+      .term-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+      .term-name {
+        font-family: "Spectral", serif;
+        font-weight: 600;
+        color: var(--heading-fg);
+        font-size: 13.5px;
+      }
+      .term-source {
+        color: var(--muted-fg);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        font-family: "Spectral", serif;
+      }
+      .term-def { font-size: 12.5px; color: var(--fg); margin-top: 2px; }
+
+      /* ──────────── ADRs page ──────────── */
+      .adr-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-left: 4px solid var(--primary);
+        border-radius: 10px;
+        padding: 14px 18px 12px;
+        margin: 0 0 14px;
+      }
+      .adr-card-error { border-left-color: #c0392b; }
+      .adr-head {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .adr-num {
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 11.5px;
+        color: var(--accent);
+        font-weight: 600;
+        letter-spacing: 0.04em;
+      }
+      .adr-title {
+        font-family: "Spectral", serif;
+        font-size: 15.5px;
+        font-weight: 600;
+        margin: 0;
+        flex: 1;
+        min-width: 0;
+        line-height: 1.3;
+      }
+      .adr-status {
+        font-family: "Spectral", serif;
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        padding: 3px 8px;
+        border-radius: 999px;
+      }
+      .adr-status-ok { background: var(--primary-soft); color: var(--primary-strong); }
+      .adr-status-old { background: var(--code-bg); color: var(--muted-fg); }
+      .adr-source {
+        font-size: 10.5px;
+        font-family: "JetBrains Mono", monospace;
+        color: var(--muted-fg);
+        text-decoration: none;
+      }
+      .adr-source:hover { color: var(--accent); }
+      .adr-intro {
+        font-size: 13px;
+        color: var(--fg);
+        margin: 8px 0 6px;
+        line-height: 1.5;
+      }
+      .adr-details summary {
+        font-size: 12px;
+        color: var(--accent);
+        cursor: pointer;
+        padding: 4px 0;
+        user-select: none;
+      }
+      .adr-details summary:hover { text-decoration: underline; }
+      .adr-body {
+        padding: 8px 0 4px;
+        border-top: 1px dashed var(--border);
+        margin-top: 6px;
+      }
+      .adr-body h1 { display: none; }       /* the H1 inside the markdown body is redundant with the card header */
+      .adr-body h2 { font-size: 14px; margin-top: 18px; }
+      .adr-body h3 { font-size: 13px; }
+      .adr-body p { font-size: 13px; }
+      .adr-body code { font-size: 12px; }
+      .adr-body pre { font-size: 12px; }
+
+      /* ──────────── code drawer ──────────── */
+      .code-drawer {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100vh;
+        width: 60vw;
+        max-width: 1100px;
+        min-width: 420px;
+        background: var(--card);
+        box-shadow: -8px 0 32px rgba(0, 0, 0, 0.12);
+        transform: translateX(100%);
+        transition: transform 220ms ease;
+        z-index: 70;
+        display: flex;
+        flex-direction: column;
+      }
+      .code-drawer.open { transform: translateX(0); }
+      .code-drawer .drawer-head {
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .code-drawer-path {
+        font-family: "JetBrains Mono", ui-monospace, monospace;
+        font-size: 12px;
+        color: var(--muted-fg);
+        margin: 2px 0 0;
+        word-break: break-all;
+      }
+      .code-drawer .drawer-head h3 { margin: 0; font-size: 13px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
+      .code-drawer-body {
+        flex: 1;
+        overflow: auto;
+        background: #2d2d2d;
+        padding: 0;
+      }
+      .code-drawer-body pre {
+        margin: 0;
+        border-radius: 0;
+        background: #2d2d2d !important;
+        font-size: 13px;
+        line-height: 1.55;
+        padding: 14px 16px 14px 56px !important;
+        position: relative;
+      }
+      .code-drawer-body pre.line-numbers .line-numbers-rows {
+        border-right: 1px solid #444;
+        padding-top: 14px !important;
+      }
+      .code-drawer-body .line-highlight {
+        position: absolute;
+        left: 0;
+        right: 0;
+        background: var(--primary-soft);
+        border-left: 3px solid var(--primary);
+        pointer-events: none;
+      }
+      .code-drawer-error {
+        padding: 24px 18px;
+        color: #f0b3b3;
+        font-family: "Inter", sans-serif;
+        font-size: 13px;
+      }
+      .code-drawer-loading {
+        padding: 24px 18px;
+        color: var(--muted-fg);
+        font-style: italic;
+        font-size: 13px;
+      }
+      /* `<a>` tags that point at code files open the drawer instead of
+         navigating away. Style as a regular underlined link — the
+         tooltip is enough to telegraph the drawer behaviour. */
+      .content a[data-code] {
+        text-decoration: underline;
+      }
+
+      /* ──────────── ADR chips (top of context pages) ──────────── */
+      .adr-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; }
+      .adr-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 8px 3px 6px;
+        background: var(--primary-soft);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11px;
+        color: var(--fg);
+        text-decoration: none;
+      }
+      .adr-chip:hover { border-color: var(--primary); color: var(--primary-strong); text-decoration: none; }
+      .adr-chip-num { color: var(--muted-fg); }
+
+      /* ──────────── last-updated ──────────── */
+      .last-updated {
+        font-size: 11.5px;
+        color: var(--muted-fg);
+        font-family: "Spectral", serif;
+      }
+
+      /* ──────────── diagnostics nav badge ──────────── */
+      .nav-badge {
+        margin-left: auto;
+        min-width: 18px;
+        padding: 1px 6px;
+        border-radius: 999px;
+        background: var(--primary-soft);
+        color: var(--primary-strong);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 10.5px;
+        font-weight: 600;
+        text-align: center;
+      }
+      .nav-badge.warn { background: rgba(212, 137, 22, 0.18); color: #9d6411; }
+      :root[data-theme="dark"] .nav-badge.warn { color: #f0c47b; }
+
+      /* ──────────── right-hand TOC ──────────── */
+      .page-toc {
+        position: fixed;
+        right: 24px;
+        top: 96px;
+        width: 220px;
+        max-height: calc(100vh - 120px);
+        overflow-y: auto;
+        padding: 12px 4px 12px 14px;
+        border-left: 1px solid var(--border);
+        font-size: 12.5px;
+        line-height: 1.4;
+        display: none;
+        z-index: 5;
+      }
+      .page-toc .toc-label {
+        font-family: "Spectral", serif;
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        color: var(--muted-fg);
+        margin: 0 0 8px;
+      }
+      .page-toc a {
+        display: block;
+        padding: 3px 8px 3px 10px;
+        color: var(--muted-fg);
+        border-left: 2px solid transparent;
+        text-decoration: none;
+        border-radius: 0 4px 4px 0;
+      }
+      .page-toc a:hover { color: var(--fg); background: var(--primary-soft); text-decoration: none; }
+      .page-toc a.active { color: var(--heading-fg); border-left-color: var(--primary); background: var(--primary-soft); }
+      .page-toc a.lvl-3 { padding-left: 22px; font-size: 12px; }
+      @media (min-width: 1280px) { .page-toc { display: block; } }
+      :root[data-width="wide"] .page-toc { display: none; }
+
+      /* Heading anchor (¶) — appears on hover. */
+      .content :is(h1, h2, h3, h4) { position: relative; }
+      .heading-anchor {
+        opacity: 0;
+        margin-left: 6px;
+        font-size: 0.7em;
+        color: var(--primary);
+        text-decoration: none;
+        cursor: pointer;
+        transition: opacity 120ms ease;
+        background: transparent;
+        border: 0;
+        padding: 0 2px;
+        font-family: inherit;
+      }
+      .content :is(h1, h2, h3, h4):hover .heading-anchor,
+      .heading-anchor:focus-visible { opacity: 1; }
+      .heading-anchor.copied::after { content: "✓ copied"; font-size: 10px; margin-left: 6px; color: var(--muted-fg); font-style: italic; }
+
+      .reading-time {
+        font-size: 12px;
+        color: var(--muted-fg);
+        margin: -10px 0 18px;
+        font-family: "Spectral", serif;
+      }
+
+      /* ──────────── breadcrumbs ──────────── */
+      .crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 11.5px; font-family: "Spectral", serif; color: var(--muted-fg); text-transform: uppercase; letter-spacing: 0.07em; }
+      .crumbs a { color: var(--muted-fg); text-decoration: none; }
+      .crumbs a:hover { color: var(--primary); text-decoration: underline; }
+      .crumbs .sep { opacity: 0.55; }
+      .crumbs .current { color: var(--fg); }
+
+      /* ──────────── page nav (prev/next) ──────────── */
+      .page-nav {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin: 56px 0 0;
+        padding-top: 24px;
+        border-top: 1px solid var(--border);
+      }
+      .page-nav a {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--card);
+        color: var(--fg);
+        text-decoration: none;
+        min-width: 0;
+        transition: border-color 120ms ease, transform 120ms ease;
+      }
+      .page-nav a:hover { border-color: var(--primary); text-decoration: none; }
+      .page-nav .page-nav-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted-fg); font-family: "Spectral", serif; }
+      .page-nav .page-nav-title { font-size: 14px; color: var(--heading-fg); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .page-nav-next { grid-column: 2; text-align: right; }
+      .page-nav-prev:only-child { grid-column: 1; }
+      .page-nav .empty { visibility: hidden; }
+
+      /* ──────────── command palette / fuzzy finder ──────────── */
+      .palette-scrim {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.32);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 160ms ease;
+        z-index: 90;
+      }
+      .palette-scrim.open { opacity: 1; pointer-events: auto; }
+      .palette {
+        position: fixed;
+        top: 12vh;
+        left: 50%;
+        transform: translate(-50%, -8px);
+        width: min(640px, 92vw);
+        max-height: 70vh;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+        z-index: 95;
+        display: none;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .palette.open { display: flex; transform: translate(-50%, 0); }
+      .palette-input {
+        width: 100%;
+        padding: 14px 18px;
+        border: 0;
+        border-bottom: 1px solid var(--border);
+        background: transparent;
+        font: inherit;
+        font-size: 15px;
+        color: var(--fg);
+        outline: none;
+      }
+      .palette-results { overflow-y: auto; padding: 6px 0; }
+      .palette-result {
+        padding: 9px 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        cursor: pointer;
+        border-left: 3px solid transparent;
+      }
+      .palette-result:hover,
+      .palette-result.active { background: var(--primary-soft); border-left-color: var(--primary); }
+      .palette-result-title { font-size: 13.5px; color: var(--heading-fg); font-weight: 500; }
+      .palette-result-title mark { background: rgba(184,138,46,0.35); color: inherit; padding: 0 1px; border-radius: 2px; }
+      .palette-result-meta { font-size: 11px; color: var(--muted-fg); font-family: "Spectral", serif; text-transform: uppercase; letter-spacing: 0.06em; display: flex; gap: 8px; align-items: center; }
+      .palette-result-kind { background: var(--code-bg); padding: 1px 6px; border-radius: 3px; }
+      .palette-result-snippet { font-size: 12.5px; color: var(--muted-fg); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+      .palette-empty { padding: 24px 18px; color: var(--muted-fg); font-style: italic; }
+      .palette-hint { padding: 10px 18px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted-fg); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+      .palette-hint kbd { background: var(--code-bg); border-radius: 3px; padding: 1px 5px; font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--fg); }
+
+      /* search-hit highlight (after navigation from palette) */
+      .docs-search-hit {
+        background: rgba(150,199,72,0.45);
+        outline: 2px solid var(--primary);
+        outline-offset: 2px;
+        border-radius: 3px;
+        transition: background 600ms ease, outline-color 600ms ease;
+      }
+      .docs-search-hit.fade { background: transparent; outline-color: transparent; }
+
+      /* ──────────── shortcuts cheatsheet ──────────── */
+      .cheatsheet {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: min(440px, 92vw);
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: var(--shadow);
+        z-index: 95;
+        display: none;
+        padding: 18px 22px;
+      }
+      .cheatsheet.open { display: block; }
+      .cheatsheet h3 { margin: 0 0 12px; font-size: 15px; }
+      .cheatsheet table { width: 100%; }
+      .cheatsheet td { padding: 4px 0; font-size: 12.5px; border: 0; }
+      .cheatsheet td.k { width: 110px; }
+      .cheatsheet kbd {
+        background: var(--code-bg);
+        border-radius: 4px;
+        padding: 1px 6px;
+        font-family: "JetBrains Mono", monospace;
+        font-size: 11.5px;
+        color: var(--fg);
+        margin-right: 4px;
+      }
+
+      @media (max-width: 720px) {
+        .app { grid-template-columns: 1fr; }
+        .sidebar { position: static; max-height: none; }
+        .content, .topbar { padding-left: 16px; padding-right: 16px; }
+        .page-nav { grid-template-columns: 1fr; }
+        .page-nav-next { grid-column: 1; text-align: left; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="dot"></span>
+          <div>Served Teach<small>Knowledge Bank</small></div>
+        </div>
+
+        <div class="nav-group">Overview</div>
+        <a class="nav-link" data-route="overview"><span>System map</span></a>
+
+        <div class="nav-group">Domain contexts</div>
+        <div id="nav-contexts"></div>
+
+        <div class="nav-group">AI Agent Context</div>
+        <div id="nav-agent-context"></div>
+
+        <div class="nav-group">Reference</div>
+        <div id="nav-references"></div>
+      </aside>
+
+      <main>
+        <div class="topbar">
+          <nav class="crumbs" id="breadcrumb" aria-label="Breadcrumb"></nav>
+          <div class="topbar-actions">
+            <button class="topbar-toggle" id="toggle-width" title="Toggle reading width" aria-pressed="false">
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                <rect x="2.5" y="3.5" width="11" height="9" rx="1"></rect>
+                <path d="M6 3.5v9M10 3.5v9"></path>
+              </svg>
+            </button>
+            <button class="topbar-toggle" id="toggle-theme" title="Toggle light / dark theme" aria-pressed="false">
+              <svg id="toggle-theme-sun" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                <circle cx="8" cy="8" r="3"></circle>
+                <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.4 1.4M11.55 11.55l1.4 1.4M3.05 12.95l1.4-1.4M11.55 4.45l1.4-1.4"></path>
+              </svg>
+              <svg id="toggle-theme-moon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" style="display:none">
+                <path d="M13 9.5A5.5 5.5 0 1 1 6.5 3a4 4 0 0 0 6.5 6.5z"></path>
+              </svg>
+            </button>
+            <button class="btn" id="open-glossary">Glossary<kbd>g</kbd></button>
+          </div>
+        </div>
+        <div class="content">
+          <article id="article"><p class="loading">Loading…</p></article>
+        </div>
+        <aside class="page-toc" id="page-toc" aria-label="On this page"></aside>
+      </main>
+    </div>
+
+    <div class="drawer-scrim" id="scrim"></div>
+    <aside class="drawer" id="drawer" aria-hidden="true">
+      <div class="drawer-head">
+        <div style="flex: 1">
+          <h3>Glossary</h3>
+          <input id="drawer-search" class="drawer-search" placeholder="Search terms… (esc to close)" />
+        </div>
+        <button class="drawer-close" id="drawer-close" aria-label="Close">×</button>
+      </div>
+      <div class="drawer-body" id="drawer-body"></div>
+    </aside>
+
+    <div class="palette-scrim" id="palette-scrim"></div>
+    <div class="palette" id="palette" role="dialog" aria-modal="true" aria-label="Find anything in the docs">
+      <input id="palette-input" class="palette-input" placeholder="Find a page, heading, or glossary term…" autocomplete="off" spellcheck="false" />
+      <div id="palette-results" class="palette-results"></div>
+      <div class="palette-hint">
+        <span><kbd>↑</kbd><kbd>↓</kbd> navigate · <kbd>↵</kbd> open · <kbd>esc</kbd> close</span>
+        <span><kbd>?</kbd> all shortcuts</span>
+      </div>
+    </div>
+
+    <div class="cheatsheet" id="cheatsheet" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+      <h3>Keyboard shortcuts</h3>
+      <table>
+        <tr><td class="k"><kbd>/</kbd> or <kbd>Ctrl</kbd>+<kbd>K</kbd></td><td>Open finder</td></tr>
+        <tr><td class="k"><kbd>g</kbd></td><td>Toggle glossary</td></tr>
+        <tr><td class="k"><kbd>[</kbd> · <kbd>]</kbd></td><td>Previous · Next page</td></tr>
+        <tr><td class="k"><kbd>n</kbd> · <kbd>p</kbd></td><td>Next · Previous page</td></tr>
+        <tr><td class="k"><kbd>g</kbd> <kbd>g</kbd></td><td>Back to overview</td></tr>
+        <tr><td class="k"><kbd>?</kbd></td><td>This cheatsheet</td></tr>
+        <tr><td class="k"><kbd>esc</kbd></td><td>Close any overlay</td></tr>
+      </table>
+    </div>
+
+    <aside class="code-drawer" id="code-drawer" aria-hidden="true">
+      <div class="drawer-head">
+        <div style="flex: 1; min-width: 0;">
+          <h3 id="code-drawer-title">Source</h3>
+          <p id="code-drawer-path" class="code-drawer-path"></p>
+        </div>
+        <a id="code-drawer-vscode" class="btn" title="Open in VS Code">VS Code ↗</a>
+        <button class="drawer-close" id="code-drawer-close" aria-label="Close">×</button>
+      </div>
+      <div class="code-drawer-body" id="code-drawer-body">
+        <div class="code-drawer-loading">Pick a code link to view a file here.</div>
+      </div>
+    </aside>
+
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/components/prism-core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-numbers/prism-line-numbers.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/prismjs@1.29.0/plugins/line-highlight/prism-line-highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+
+    <script type="module">
+      import { marked } from "https://esm.sh/marked@12";
+      import mermaid from "https://esm.sh/mermaid@11";
+      // ELK layout is a separate package in Mermaid 11+; without registering
+      // it, `layout: "elk"` silently falls back to dagre.
+      import elkLayouts from "https://esm.sh/@mermaid-js/layout-elk@0";
+      mermaid.registerLayoutLoaders(elkLayouts);
+
+      // Mermaid theme variables — fully specified so the default "pink"
+      // colours never leak through on state / sequence / class diagrams.
+      // Keep light + dark in lock-step; only the values change.
+      function mermaidThemeVariables(theme) {
+        const isDark = theme === "dark";
+        return {
+          primaryColor:        isDark ? "#a8d05a" : "#96c748",
+          primaryTextColor:    isDark ? "#0f1410" : "#1a1a1a",
+          primaryBorderColor:  isDark ? "#c7e482" : "#6e9530",
+          secondaryColor:      isDark ? "#1f2422" : "#f3f9f8",
+          secondaryTextColor:  isDark ? "#e5e5e5" : "#1a1a1a",
+          secondaryBorderColor:isDark ? "#3a4240" : "#cccccc",
+          tertiaryColor:       isDark ? "#262c2a" : "#ffffff",
+          tertiaryTextColor:   isDark ? "#e5e5e5" : "#1a1a1a",
+          tertiaryBorderColor: isDark ? "#3a4240" : "#dddddd",
+          lineColor:           isDark ? "#a8a8a8" : "#484848",
+          textColor:           isDark ? "#e5e5e5" : "#1a1a1a",
+          mainBkg:             isDark ? "#a8d05a" : "#96c748",
+          nodeBkg:             isDark ? "#a8d05a" : "#96c748",
+          nodeBorder:          isDark ? "#c7e482" : "#6e9530",
+          nodeTextColor:       isDark ? "#0f1410" : "#1a1a1a",
+          clusterBkg:          isDark ? "#1f2422" : "#f1f6ec",
+          clusterBorder:       isDark ? "#3a4240" : "#cdd7be",
+          edgeLabelBackground: isDark ? "#1c2222" : "#f3f9f8",
+          labelColor:          isDark ? "#e5e5e5" : "#1a1a1a",
+          labelTextColor:      isDark ? "#e5e5e5" : "#1a1a1a",
+          // sequence diagram
+          actorBkg:            isDark ? "#1f2422" : "#ffffff",
+          actorBorder:         isDark ? "#a8d05a" : "#96c748",
+          actorTextColor:      isDark ? "#e5e5e5" : "#1a1a1a",
+          actorLineColor:      isDark ? "#a8a8a8" : "#484848",
+          signalColor:         isDark ? "#a8a8a8" : "#484848",
+          signalTextColor:     isDark ? "#e5e5e5" : "#1a1a1a",
+          loopTextColor:       isDark ? "#e5e5e5" : "#1a1a1a",
+          noteBkgColor:        isDark ? "#3a3320" : "#fff8d0",
+          noteTextColor:       isDark ? "#f0e8c0" : "#1a1a1a",
+          noteBorderColor:     isDark ? "#6b5e3a" : "#e0d089",
+          activationBkgColor:  isDark ? "#a8d05a" : "#96c748",
+          activationBorderColor: isDark ? "#c7e482" : "#6e9530",
+          // state diagram
+          stateBkg:            isDark ? "#a8d05a" : "#96c748",
+          stateLabelColor:     isDark ? "#0f1410" : "#1a1a1a",
+          transitionColor:     isDark ? "#a8a8a8" : "#484848",
+          transitionLabelColor:isDark ? "#e5e5e5" : "#1a1a1a",
+          altBackground:       isDark ? "#262c2a" : "#f3f9f8",
+          // common
+          errorBkgColor:       isDark ? "#3a1a1a" : "#fdecea",
+          errorTextColor:      isDark ? "#f0b3b3" : "#b71c1c",
+          fontFamily: "Inter, sans-serif",
+          fontSize: "28px",
+        };
+      }
+
+      function initMermaid(theme) {
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: "loose", // required for click callbacks
+          theme: "base",
+          themeVariables: mermaidThemeVariables(theme),
+          // `layout: "elk"` is the top-level switch in Mermaid 11+ that
+          // activates the registered ELK loader above. The flowchart curve
+          // is kept linear so ELK's orthogonal bend points draw as straight
+          // segments rather than bezier-smoothed.
+          layout: "elk",
+          flowchart: { curve: "linear", htmlLabels: true, nodeSpacing: 60, rankSpacing: 70 },
+          elk: { "elk.algorithm": "layered", "elk.edgeRouting": "ORTHOGONAL", "elk.layered.spacing.nodeNodeBetweenLayers": "80" },
+          sequence: { actorFontSize: 18, noteFontSize: 16, messageFontSize: 16 },
+          state: { fontSize: 28 },
+        });
+      }
+
+      initMermaid(document.documentElement.getAttribute("data-theme") || "light");
+
+      // When this file is opened as a saved snapshot (browser "Save Page As"),
+      // it loads over file://. Every markdown / glossary / meta fetch is then
+      // CORS-blocked, and the failing loadPage fetch would wipe the article
+      // the browser already saved. OFFLINE short-circuits all of that: the
+      // boot script skips the loaders and the initial navigation, and
+      // loadPage no-ops, so the saved DOM stays exactly as captured.
+      const OFFLINE = location.protocol === "file:";
+
+      // ──────────────────────────────────────────────────────────
+      // Data
+      // ──────────────────────────────────────────────────────────
+      const CONTEXTS = [
+        { slug: "hub-content",          name: "Hub & Content Model",  file: "contexts/01-hub-content.md",          status: "stub" },
+        { slug: "reader",               name: "Reader",               file: "contexts/02-reader.md",               status: "stub" },
+        { slug: "teaching-routine",     name: "Teaching Routine",     file: "contexts/03-teaching-routine.md",     status: "stub" },
+        { slug: "publishing-workspace", name: "Publishing & Workspace", file: "contexts/04-publishing-workspace.md", status: "stub" },
+        { slug: "access-sharing",       name: "Access & Sharing",     file: "contexts/05-access-sharing.md",       status: "stub" },
+      ];
+
+      const SUBMODULES = [];
+
+      const GLOSSARY_SOURCES = [
+        { source: "root", url: "/CONTEXT.md" },
+      ];
+
+      // Sidebar entries shown below the domain contexts. Two groups:
+      //   - "agent-context"  → workspace-wide root docs + per-package
+      //                        CONTEXT.md files, named by their
+      //                        repo-relative path so an AI agent can match
+      //                        them by path quickly. Renders above
+      //                        Reference; this is the surface agents
+      //                        consume most.
+      //   - "reference"      → always-expanded; orientation / triage docs
+      //                        (the ADRs index, Diagnostics).
+      // All entries render inline in the SPA article pane.
+      const REFERENCES = [
+        { slug: "ref-claude",   group: "agent-context", name: "CLAUDE.md",  file: "/CLAUDE.md" },
+        { slug: "ref-agents",   group: "agent-context", name: "AGENTS.md",  file: "/AGENTS.md" },
+        { slug: "ref-context",  group: "agent-context", name: "CONTEXT.md", file: "/CONTEXT.md" },
+        { slug: "ref-glossary", group: "agent-context", name: "GLOSSARY.md (Hindi)", file: "/GLOSSARY.md" },
+
+        { slug: "ref-adrs",     group: "reference",     name: "ADRs",       route: "_adrs" },
+      ];
+
+      // Authored ADR list. We don't have a server-side directory listing,
+      // so this is the manual index. When you add an ADR, add it here too.
+      // (NB: two ADRs share number 0011 — a known numbering collision in docs/adr/.)
+      const ADRS = [
+        { num: "0001", slug: "asynchronous-hub-mediated-teaching-loop",            title: "Asynchronous, hub-mediated teaching loop" },
+        { num: "0002", slug: "local-workspace-source-of-truth-neon-mirror-via-mcp", title: "Local workspace source of truth; Neon mirror via MCP" },
+        { num: "0003", slug: "immutable-lessons-mutable-references",               title: "Immutable Lessons, mutable References" },
+        { num: "0007", slug: "nextjs-convex-rebuild",                              title: "Next.js + Convex rebuild" },
+        { num: "0008", slug: "next-lesson-routine-gate-in-convex",                 title: "Next-lesson Routine: gate in Convex" },
+        { num: "0009", slug: "content-source-of-truth-in-convex-routine-pulls-context", title: "Content source of truth in Convex; Routine pulls context" },
+        { num: "0010", slug: "teaching-compute-swappable-adapter",                 title: "Teaching compute is a swappable adapter" },
+        { num: "0011", slug: "allowlist-in-convex-admin-portal",                   title: "Allowlist in Convex, managed by an Admin" },
+        { num: "0011", slug: "app-driven-theme-into-sandboxed-lesson-iframe",      title: "App-driven theme into the sandboxed lesson iframe" },
+        { num: "0012", slug: "app-router-url-addressable-navigation",              title: "URL-addressable navigation via the App Router" },
+      ];
+
+      // Map Mermaid node id (in overview.md) → context slug
+      const NODE_TO_SLUG = {
+        HUB: "hub-content",
+        READER: "reader",
+        ROUTINE: "teaching-routine",
+        PUB: "publishing-workspace",
+        ACCESS: "access-sharing",
+      };
+
+      // ──────────────────────────────────────────────────────────
+      // Frontmatter
+      // ──────────────────────────────────────────────────────────
+      function parseFrontmatter(md) {
+        const m = md.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+        if (!m) return { fm: {}, body: md };
+        const fm = {};
+        for (const line of m[1].split("\n")) {
+          const kv = line.match(/^([a-zA-Z0-9_-]+):\s*(.*)$/);
+          if (!kv) continue;
+          let [, k, v] = kv;
+          v = v.trim();
+          if (v.startsWith("[") && v.endsWith("]"))
+            v = v.slice(1, -1).split(",").map((s) => s.trim()).filter(Boolean);
+          fm[k] = v;
+        }
+        return { fm, body: m[2] };
+      }
+
+      function renderMeta(fm) {
+        if (!fm || !fm.status) return "";
+        const parts = [];
+        const tagCls = `tag-${fm.status}`;
+        parts.push(`<span><b>Status:</b> <span class="${tagCls}">${escapeHtml(fm.status)}</span></span>`);
+        if (Array.isArray(fm.ownerPackages) && fm.ownerPackages.length)
+          parts.push(`<span><b>Owns:</b> ${fm.ownerPackages.map(escapeHtml).join(", ")}</span>`);
+        if (Array.isArray(fm.adrs) && fm.adrs.length)
+          parts.push(`<span><b>ADRs:</b> ${fm.adrs.map(escapeHtml).join(", ")}</span>`);
+        return `<div class="meta">${parts.join("")}</div>`;
+      }
+
+      // ──────────────────────────────────────────────────────────
+      // Glossary
+      // ──────────────────────────────────────────────────────────
+      function extractTerms(md, source) {
+        const terms = [];
+        const lines = md.split("\n");
+        const push = (rawName, def) => {
+          const name = rawName.trim();
+          if (!name) return;
+          terms.push({ name, def, source });
+          const splitSlashes = (s) => {
+            if (!s.includes(" / ")) return [s];
+            return s.split(" / ").map((p) => p.trim()).filter(Boolean);
+          };
+          // Also register the bare term without a trailing parenthetical
+          // alias (e.g. "GCC (Green Certificate Company)" → also "GCC"),
+          // and the alias on its own (e.g. "Green Certificate Company").
+          // The inner alias is itself slash-split so "Project (reps / REP)"
+          // registers "Project", "reps", and "REP" (not "reps / REP").
+          const paren = name.match(/^([^(]+?)\s*\(([^)]+)\)\s*$/);
+          if (paren) {
+            for (const p of splitSlashes(paren[1].trim()))
+              terms.push({ name: p, def, source });
+            for (const p of splitSlashes(paren[2].trim()))
+              terms.push({ name: p, def, source });
+          } else if (name.includes(" / ")) {
+            // Top-level slash-split (e.g. "Cancel Redemption / declineRedemption").
+            for (const part of splitSlashes(name))
+              if (part !== name) terms.push({ name: part, def, source });
+          }
+        };
+        for (let i = 0; i < lines.length; i++) {
+          let m = lines[i].match(/^\s*-\s+\*\*([^*]+)\*\*\s*[—:-]\s*(.+)$/);
+          if (m) { push(m[1], m[2].trim()); continue; }
+          m = lines[i].match(/^\*\*([^*]+)\*\*[^:*]*:\s*$/);
+          if (m && i + 1 < lines.length) {
+            const def = lines[i + 1].trim();
+            if (def && !def.startsWith("*")) push(m[1], def);
+          }
+        }
+        return terms;
+      }
+
+      const GLOSSARY = new Map();
+      async function loadGlossary() {
+        const out = [];
+        for (const src of GLOSSARY_SOURCES) {
+          try {
+            const r = await fetch(src.url);
+            if (!r.ok) continue;
+            out.push(...extractTerms(await r.text(), src.source));
+          } catch {}
+        }
+        // Earlier in this array = higher priority on duplicate-term collisions.
+        // Domain-richest packages win over generic ones; root is the fallback.
+        const order = ["ordering", "billing", "fulfillment", "root"];
+        for (const t of out) {
+          const key = t.name.toLowerCase();
+          const existing = GLOSSARY.get(key);
+          if (!existing || order.indexOf(t.source) < order.indexOf(existing.source))
+            GLOSSARY.set(key, t);
+        }
+        renderDrawer();
+      }
+
+      function renderDrawer(filter = "") {
+        const host = document.getElementById("drawer-body");
+        const q = filter.trim().toLowerCase();
+        const terms = [...GLOSSARY.values()]
+          .filter((t) => !q || t.name.toLowerCase().includes(q) || t.def.toLowerCase().includes(q))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        host.innerHTML = terms.length
+          ? terms.map((t) => `
+              <div class="term">
+                <div class="term-row">
+                  <span class="term-name">${escapeHtml(t.name)}</span>
+                  <span class="term-source">${escapeHtml(t.source)}</span>
+                </div>
+                <div class="term-def">${escapeHtml(t.def)}</div>
+              </div>`).join("")
+          : `<p style="color: var(--muted-fg); padding: 16px 8px">No matches.</p>`;
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      }
+
+      // ──────────────────────────────────────────────────────────
+      // [[term]] rewriter
+      // ──────────────────────────────────────────────────────────
+      function rewriteTerms(html) {
+        return html.replace(/\[\[([^\]|]+?)(?:\|([^\]]+?))?\]\]/g, (m, term, label) => {
+          const key = term.trim().toLowerCase();
+          const hit = GLOSSARY.get(key);
+          const display = (label || term).trim();
+          // If no glossary hit, fall back to matching a context page by
+          // name — so [[Identity & Access]] etc. resolves to nav rather
+          // than rendering as "Term not yet in CONTEXT.md".
+          if (!hit) {
+            const ctxByName = CONTEXTS.find((c) => c.name.toLowerCase() === key);
+            if (ctxByName) {
+              return `<a class="ctx-link" data-ctx-slug="${ctxByName.slug}" href="#${ctxByName.slug}">${escapeHtml(display)}</a>`;
+            }
+            return `<dfn data-term="${escapeHtml(term)}" data-missing="1">${escapeHtml(display)}</dfn>`;
+          }
+          return `<dfn data-term="${escapeHtml(term)}">${escapeHtml(display)}</dfn>`;
+        });
+      }
+
+      // Inline-render a glossary definition so embedded markdown links
+      // become real <a> tags inside the tooltip. Glossary text comes from
+      // trusted CONTEXT.md files in this repo — same source as the article
+      // body, which already runs through marked. We reuse marked.parseInline
+      // so the tooltip and the page agree on what a definition looks like.
+      function renderTipBody(hit) {
+        const raw = `**${hit.name}** — ${hit.def}`;
+        try {
+          return marked.parseInline(raw);
+        } catch {
+          return escapeHtml(`${hit.name} — ${hit.def}`);
+        }
+      }
+
+      function attachTermTooltips(root) {
+        for (const el of root.querySelectorAll("dfn[data-term]")) {
+          const hit = GLOSSARY.get((el.dataset.term || "").toLowerCase());
+          if (!hit) { el.title = "Term not yet in CONTEXT.md"; continue; }
+          let hideTimer = null;
+          const removeTip = () => {
+            for (const tip of el.querySelectorAll(".tip")) tip.remove();
+          };
+          el.addEventListener("mouseenter", () => {
+            if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+            if (el.querySelector(".tip")) return;
+            const tip = document.createElement("span");
+            tip.className = "tip";
+            tip.innerHTML = renderTipBody(hit);
+            // Keep the tooltip alive while the cursor is over it so links
+            // can be clicked. Tooltip has pointer-events: auto in CSS.
+            tip.addEventListener("mouseenter", () => {
+              if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+            });
+            tip.addEventListener("mouseleave", () => {
+              hideTimer = setTimeout(removeTip, 80);
+            });
+            el.appendChild(tip);
+            // If the tooltip would overflow the article column on the right,
+            // flip it to anchor on the right edge of the term instead.
+            requestAnimationFrame(() => {
+              const article = document.getElementById("article");
+              if (!article || !el.isConnected) return;
+              const tipRect = tip.getBoundingClientRect();
+              const articleRect = article.getBoundingClientRect();
+              if (tipRect.right > articleRect.right - 12) {
+                tip.setAttribute("data-flip", "right");
+              }
+            });
+          });
+          el.addEventListener("mouseleave", () => {
+            // Delay so the cursor has a chance to enter the tooltip.
+            hideTimer = setTimeout(removeTip, 120);
+          });
+        }
+      }
+
+      // ──────────────────────────────────────────────────────────
+      // Page loader
+      // ──────────────────────────────────────────────────────────
+      window.fsNavigate = navigateTo; // exposed for Mermaid click handlers
+      // Open the code drawer from a Mermaid click. Accepts a repo-root path
+      // optionally followed by a `#L42` or `#L42-L51` hash.
+      //   click NODE call fsOpenCode("/packages/api/src/lib/transfers.ts#L493")
+      window.fsOpenCode = (href) => {
+        try {
+          const info = parseCodeHref(new URL(href, location.origin).href);
+          if (info) showCode(info);
+        } catch {}
+      };
+
+      let CURRENT_PAGE = null;
+      async function loadPage(file, crumbs) {
+        // Offline snapshot: the rendered article is already in the saved DOM
+        // and the markdown is unreachable over file://. Keep what we have.
+        if (OFFLINE) return;
+        CURRENT_PAGE = { file, crumbs };
+        const article = document.getElementById("article");
+        article.innerHTML = '<p class="loading">Loading…</p>';
+
+        if (file === "_adrs") {
+          await renderAdrsPage(article);
+          return;
+        }
+
+        if (file === "_codegraph") {
+          await renderCodeGraphPage(article);
+          return;
+        }
+
+        try {
+          const r = await fetch(file);
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          let { fm, body } = parseFrontmatter(await r.text());
+
+          // For the overview page, inject Mermaid click directives mapping
+          // node ids → window.fsNavigate(contextSlug)
+          if (file === "overview.md") body = injectMermaidClicks(body);
+
+          // For context pages with sub-modules, prepend an auto-generated
+          // navigation diagram immediately after the page's first H1.
+          const submoduleBlock = submoduleDiagramFor(file);
+          if (submoduleBlock) {
+            if (/^#\s+/m.test(body)) {
+              body = body.replace(/^(#\s+[^\n]+\n)/m, "$1\n" + submoduleBlock + "\n");
+            } else {
+              body = submoduleBlock + "\n" + body;
+            }
+          }
+
+          let html = marked.parse(body);
+          html = rewriteTerms(html);
+          article.innerHTML = renderMeta(fm) + html;
+          injectHeadingIds(article);
+          rewriteRepoMentions(article);
+          attachTermTooltips(article);
+
+          // render mermaid blocks — every diagram gets the same zoomable
+          // shell so it never spills past the reading column, and the
+          // pan/zoom controls work uniformly.
+          const blocks = article.querySelectorAll("code.language-mermaid");
+          let idx = 0;
+          for (const block of blocks) {
+            const code = block.textContent;
+            const id = `mmd-${Date.now()}-${idx++}`;
+            const container = document.createElement("div");
+            container.className = "mermaid";
+            container.id = id;
+            const wrap = document.createElement("div");
+            wrap.className = "mermaid-zoomable";
+            // The System map (overview.md) is the one diagram worth twice the
+            // vertical room — it's the whole-system graph readers explore.
+            if (file === "overview.md") wrap.classList.add("mermaid-zoomable--tall");
+            wrap.appendChild(container);
+            const controls = document.createElement("div");
+            controls.className = "mermaid-zoom-controls";
+            controls.innerHTML = `
+              <button type="button" data-zoom-act="in" title="Zoom in" aria-label="Zoom in">+</button>
+              <button type="button" data-zoom-act="out" title="Zoom out" aria-label="Zoom out">−</button>
+              <button type="button" data-zoom-act="reset" title="Reset view" aria-label="Reset view">⤾</button>
+              <button type="button" data-zoom-act="download" title="Download SVG" aria-label="Download SVG">↓</button>
+            `;
+            wrap.appendChild(controls);
+            block.parentElement.replaceWith(wrap);
+            try {
+              const { svg, bindFunctions } = await mermaid.render(`${id}-svg`, code);
+              container.innerHTML = svg;
+              bindFunctions?.(container);
+              // Mermaid's ELK integration ignores `elk.edgeRouting:
+              // ORTHOGONAL` (the bundled subset of elk options excludes it)
+              // and smooths each edge polyline with curveBasis. Rewrite each
+              // edge path as a manhattan-routed L-shape so the rendered
+              // arrows are truly orthogonal.
+              orthogonaliseEdges(container);
+              // make all clickable nodes visually obvious
+              container.querySelectorAll("[id^=flowchart-]").forEach((n) => {
+                if (n.querySelector("a") || n.onclick) n.classList.add("clickable");
+              });
+              // Bind navigation on each clickable node (stored callback)
+              // and delegate the actual click event on the outer wrapper
+              // so svg-pan-zoom's listeners inside the SVG can't swallow it.
+              reattachMermaidClicks(container, code);
+              attachMermaidClickDelegate(wrap);
+              attachZoom(wrap, container);
+            } catch (e) {
+              container.innerHTML = `<div class="error">Mermaid render error: ${escapeHtml(e.message)}</div><pre>${escapeHtml(code)}</pre>`;
+            }
+          }
+
+          // Wire [[Context Name]] fallback links → navigateTo(context).
+          for (const a of article.querySelectorAll("a.ctx-link[data-ctx-slug]")) {
+            const slug = a.dataset.ctxSlug;
+            const ctx = CONTEXTS.find((c) => c.slug === slug);
+            if (!ctx) continue;
+            a.addEventListener("click", (ev) => {
+              ev.preventDefault();
+              navigateTo(ctx.file);
+            });
+          }
+
+          // SPA-link wiring
+          for (const a of article.querySelectorAll("a[href]")) {
+            const href = a.getAttribute("href");
+            if (!href) continue;
+            // ADR markdown links → ADRs page + scroll to that ADR's card.
+            const adrMatch = href.match(/(?:^|\/)docs\/adr\/(\d+)-([a-z0-9-]+)\.md/i);
+            if (adrMatch) {
+              const [, num, slug] = adrMatch;
+              a.addEventListener("click", (ev) => {
+                ev.preventDefault();
+                navigateTo("_adrs");
+                // Wait one frame for the ADR cards to render, then scroll +
+                // expand the targeted one.
+                const tryScroll = (retries) => {
+                  const card = document.getElementById(`adr-${num}-${slug}`);
+                  if (card) {
+                    const d = card.querySelector("details.adr-details");
+                    if (d) d.open = true;
+                    card.scrollIntoView({ behavior: "smooth", block: "start" });
+                  } else if (retries > 0) {
+                    setTimeout(() => tryScroll(retries - 1), 60);
+                  }
+                };
+                requestAnimationFrame(() => tryScroll(40));
+              });
+              continue;
+            }
+            // Any absolute *.md link → render inline in the SPA so we don't
+            // dump the reader on a raw-markdown text/plain page. Skip
+            // links rewriteRepoMentions has already wired (otherwise the
+            // click would fire navigateTo twice).
+            if (/^\/[^?#]+\.md(?:[?#]|$)/.test(href) && !a.hasAttribute("data-context-link")) {
+              a.addEventListener("click", (ev) => {
+                ev.preventDefault();
+                navigateTo(href.split(/[?#]/)[0]);
+              });
+              continue;
+            }
+            // Repo source links (/packages, /apps, /ops) that aren't .md and
+            // weren't already wired as @repo/x context links. A package root
+            // (/packages/<name>) opens that package's CONTEXT.md inline — the
+            // same destination rewriteRepoMentions gives @repo/<name> text. A
+            // deeper path (a specific source file) opens via the editor bridge
+            // when present (VS Code extension), else in a new tab — so the
+            // click never dumps the reader onto a raw text/plain file in place.
+            const repoMatch = href.match(
+              /^\/(packages|apps|ops)\/([^/?#]+)((?:\/[^?#]*)?)/,
+            );
+            if (
+              repoMatch &&
+              !/\.md(?:[?#]|$)/.test(href) &&
+              !a.hasAttribute("data-context-link")
+            ) {
+              const [, root, name, rest] = repoMatch;
+              const isPackageRoot = root === "packages" && (!rest || rest === "/");
+              a.addEventListener("click", (ev) => {
+                ev.preventDefault();
+                if (isPackageRoot) {
+                  navigateTo(`/packages/${name}/CONTEXT.md`);
+                } else if (typeof window.fsOpenCode === "function") {
+                  window.fsOpenCode(href);
+                } else {
+                  window.open(href, "_blank", "noopener");
+                }
+              });
+              continue;
+            }
+            if (
+              href.startsWith("contexts/") ||
+              href.startsWith("sub-modules/") ||
+              href === "overview.md" ||
+              href.startsWith("../sub-modules/") ||
+              href.startsWith("../contexts/")
+            ) {
+              a.addEventListener("click", (ev) => {
+                ev.preventDefault();
+                const resolved = new URL(href, location.origin + "/docs/architecture/" + file).pathname
+                  .replace(/^\/+/, "")
+                  .replace(/^docs\/architecture\//, "");
+                navigateTo(resolved);
+              });
+            }
+          }
+          // Append prev/next nav at the bottom for any page that lives in
+          // the linear PAGE_ORDER. Pages outside the order (one-offs) get
+          // none, which is fine.
+          const navHtml = renderPageNav(file);
+          if (navHtml) {
+            article.insertAdjacentHTML("beforeend", navHtml);
+            attachPageNavHandlers(article);
+          }
+          // Reading time, heading anchors, right-hand TOC.
+          injectReadingTime(article);
+          injectLastUpdated(article, file);
+          injectAdrChips(article, file);
+          injectHeadingAnchors(article);
+          buildPageToc(article);
+          window.scrollTo({ top: 0, behavior: "instant" });
+        } catch (e) {
+          article.innerHTML = `<div class="error">Failed to load <code>${escapeHtml(file)}</code>: ${escapeHtml(e.message)}</div>`;
+        }
+      }
+
+      // marked@12 doesn't emit `id` attributes on headings. Inject them after
+      // render so in-page links like `[Pitfalls](#pitfalls)` actually scroll.
+      function injectHeadingIds(article) {
+        const used = new Set();
+        const slug = (s) =>
+          s.toLowerCase()
+            .replace(/<[^>]+>/g, "")
+            .replace(/[^\w\s-]/g, "")
+            .replace(/\s+/g, "-")
+            .replace(/^-+|-+$/g, "");
+        for (const h of article.querySelectorAll("h1, h2, h3, h4, h5, h6")) {
+          if (h.id) continue;
+          const base = slug(h.textContent);
+          if (!base) continue;
+          let candidate = base, i = 1;
+          while (used.has(candidate)) candidate = `${base}-${i++}`;
+          used.add(candidate);
+          h.id = candidate;
+        }
+        // Pure-anchor links (`<a href="#foo">`) — scroll inline rather than
+        // letting the browser overwrite the route hash. Keep the page route
+        // intact in the address bar.
+        for (const a of article.querySelectorAll('a[href^="#"]')) {
+          const href = a.getAttribute("href");
+          if (!href || href === "#") continue;
+          const id = href.slice(1);
+          if (!/^[A-Za-z][\w-]*$/.test(id)) continue;
+          a.addEventListener("click", (ev) => {
+            const target = document.getElementById(id);
+            if (!target) return;
+            ev.preventDefault();
+            target.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
+      }
+
+      // Re-attach click navigation to Mermaid diagram nodes. svg-pan-zoom
+      // installs pointer/mouse listeners on the SVG root in the capture
+      // phase, which both starts a pan from any press inside the SVG and
+      // can swallow the synthetic click before our per-node listener
+      // fires. We work around that by:
+      //
+      // 1) Stopping mouse / pointer / touch presses at the node so they
+      //    never reach svg-pan-zoom and no pan is started.
+      // 2) Storing a navigation callback on each clickable node and
+      //    delegating the actual click on the OUTER wrapper, which sits
+      //    outside the SVG entirely — click events bubble there
+      //    unhindered no matter what svg-pan-zoom does inside the SVG.
+      // Direction of the first (step +1, from the start anchor) or last
+      // (step -1, from the end anchor) non-degenerate segment of an ELK
+      // polyline — used to decide whether an edge leaves / enters a node
+      // horizontally. `ax,ay` is the anchor being scanned away from; we skip
+      // points within ~2px of it so a coincident bend point doesn't read as a
+      // zero-length segment. Falls back to `dflt` if every segment is
+      // degenerate.
+      function segmentHoriz(pts, start, step, ax, ay, dflt) {
+        for (let i = start + step; i >= 0 && i < pts.length; i += step) {
+          const sdx = pts[i][0] - ax, sdy = pts[i][1] - ay;
+          if (Math.abs(sdx) >= 2 || Math.abs(sdy) >= 2) {
+            return Math.abs(sdx) >= Math.abs(sdy);
+          }
+        }
+        return dflt;
+      }
+
+      // Force every flowchart edge to a manhattan-routed L-shape between
+      // its anchor points. Mermaid's ELK integration produces a bezier-
+      // smoothed polyline regardless of curve / elk.edgeRouting config,
+      // so we rewrite the path post-render. We keep ELK's source / target
+      // anchors and the orientation it left / entered each node with, then
+      // bridge them with right-angle segments so arrows always meet a node
+      // edge perpendicularly.
+      function orthogonaliseEdges(container) {
+        // Flowcharts only. State-diagram transitions (path.transition)
+        // use dagre routing that already weaves around obstacle nodes;
+        // collapsing those curves to a naive first→last L-shape would
+        // slice through other states / labels. State diagrams keep
+        // their original routing.
+        const paths = container.querySelectorAll("path.flowchart-link");
+        for (const path of paths) {
+          const d = path.getAttribute("d") || "";
+          // Capture every absolute coordinate pair in the path. We don't
+          // need the command — the sequence of points along the route is
+          // enough: the first / last are the node anchors, and the segments
+          // adjacent to them tell us each end's exit / entry orientation.
+          const pts = [];
+          const re = /([MLC])\s*([-\d.,\s]+)/g;
+          let m;
+          while ((m = re.exec(d))) {
+            const nums = m[2].trim().split(/[\s,]+/).map(Number);
+            for (let i = 0; i + 1 < nums.length; i += 2) {
+              if (Number.isFinite(nums[i]) && Number.isFinite(nums[i + 1]))
+                pts.push([nums[i], nums[i + 1]]);
+            }
+          }
+          if (pts.length < 2) continue;
+          const [x1, y1] = pts[0];
+          const [x2, y2] = pts[pts.length - 1];
+          // Treat as already-axis-aligned if the deltas are tiny — leave
+          // such edges alone.
+          const dx = x2 - x1, dy = y2 - y1;
+          if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue;
+          let newD;
+          if (Math.abs(dy) < 1 || Math.abs(dx) < 1) {
+            // Endpoints already share a row / column.
+            newD = `M${x1},${y1} L${x2},${y2}`;
+          } else {
+            // Honour the directions ELK actually routed the edge out of the
+            // source and into the target, so the arrow meets each node edge
+            // at a right angle. Deciding the L-shape from the gross dx/dy (the
+            // old behaviour) ignored which side the anchor sat on, so an edge
+            // ELK attached to a node's top/bottom would slide in horizontally
+            // — meeting the edge parallel to it (a 180° join) instead of
+            // perpendicular. pts are ELK's real bend points (curve: "linear"),
+            // so the first / last non-degenerate segment gives the true
+            // exit / entry orientation.
+            const dfltHoriz = Math.abs(dx) >= Math.abs(dy);
+            const exitHoriz = segmentHoriz(pts, 0, +1, x1, y1, dfltHoriz);
+            const entryHoriz = segmentHoriz(pts, pts.length - 1, -1, x2, y2, dfltHoriz);
+            if (exitHoriz && entryHoriz) {
+              // Leave and arrive horizontally: H-V-H around the x midpoint.
+              const mid = (x1 + x2) / 2;
+              newD = `M${x1},${y1} L${mid},${y1} L${mid},${y2} L${x2},${y2}`;
+            } else if (!exitHoriz && !entryHoriz) {
+              // Leave and arrive vertically: V-H-V around the y midpoint.
+              const mid = (y1 + y2) / 2;
+              newD = `M${x1},${y1} L${x1},${mid} L${x2},${mid} L${x2},${y2}`;
+            } else if (exitHoriz && !entryHoriz) {
+              // Leave horizontally, arrive vertically: single bend over x2,y1.
+              newD = `M${x1},${y1} L${x2},${y1} L${x2},${y2}`;
+            } else {
+              // Leave vertically, arrive horizontally: single bend over x1,y2.
+              newD = `M${x1},${y1} L${x1},${y2} L${x2},${y2}`;
+            }
+          }
+          path.setAttribute("d", newD);
+        }
+      }
+
+      function reattachMermaidClicks(container, source) {
+        const findNode = (rawId) => {
+          // Mermaid v11 + ELK flowcharts emit ids prefixed with the SVG
+          // container's own id, e.g. "mmd-1779…-0-svg-flowchart-IA-3".
+          // Older flowcharts emit "flowchart-IA-3"; state / sequence
+          // diagrams use the raw id directly.
+          //
+          // Substring match on "flowchart-<rawId>-" anchored with the
+          // trailing hyphen catches both the prefixed and bare forms
+          // without over-matching ("flowchart-IA-" is not a substring
+          // of "flowchart-IAB-3", so disjoint-rawId collisions can't
+          // happen).
+          const esc = CSS.escape(rawId);
+          return (
+            container.querySelector(`g[id="${esc}"]`) ||
+            container.querySelector(`g[id*="flowchart-${esc}-"]`) ||
+            container.querySelector(`[id*="flowchart-${esc}-"]`) ||
+            container.querySelector(`g[id^="flowchart-${esc}-"]`) ||
+            container.querySelector(`[id^="${esc}-"]`) ||
+            container.querySelector(`g.node.${esc}, g.${esc}`)
+          );
+        };
+        const swallow = (ev) => { ev.stopPropagation(); };
+        const wire = (re, callback) => {
+          for (const m of source.matchAll(re)) {
+            const node = findNode(m[1]);
+            if (!node) continue;
+            node.classList.add("clickable");
+            node.style.cursor = "pointer";
+            node.__fsClickAction = () => callback(m[2]);
+            node.addEventListener("mousedown", swallow);
+            node.addEventListener("pointerdown", swallow);
+            node.addEventListener("touchstart", swallow, { passive: true });
+          }
+        };
+        wire(/click\s+(\S+)\s+call\s+fsNavigate\(\s*["']([^"']+)["']\s*\)/g, (file) => window.fsNavigate?.(file));
+        wire(/click\s+(\S+)\s+call\s+fsOpenCode\(\s*["']([^"']+)["']\s*\)/g, (href) => window.fsOpenCode?.(href));
+      }
+
+      // Export the rendered Mermaid diagram as a PNG file. PNG > SVG for
+      // pasting into Confluence / Slack / a PR description — those tools
+      // don't always render inline SVG correctly. We rasterise via an
+      // off-screen canvas at 2× scale so the output stays crisp.
+      function downloadDiagramSvg(svg, host) {
+        try {
+          const clone = svg.cloneNode(true);
+          // Strip the svg-pan-zoom viewport wrapper so the saved file
+          // shows the natural layout, not the user's current pan/zoom.
+          const viewport = clone.querySelector(".svg-pan-zoom_viewport");
+          if (viewport) {
+            const parent = viewport.parentNode;
+            while (viewport.firstChild) parent.insertBefore(viewport.firstChild, viewport);
+            parent.removeChild(viewport);
+          }
+          // Restore intrinsic sizing so the rasterised output has a
+          // sensible aspect ratio. Use the SVG's own `viewBox` (set by
+          // Mermaid at render time) for the natural diagram bounds —
+          // svg-pan-zoom v3 manipulates the inner <g> transform and
+          // leaves viewBox alone, so it survives any current pan/zoom.
+          // `svg.getBBox()` would compose the pan-zoom transform into
+          // the result and crop the export to the on-screen viewport.
+          let width, height;
+          const vb = svg.viewBox && svg.viewBox.baseVal;
+          if (vb && vb.width > 0 && vb.height > 0) {
+            clone.setAttribute("viewBox", `${vb.x} ${vb.y} ${vb.width} ${vb.height}`);
+            width = Math.round(vb.width);
+            height = Math.round(vb.height);
+            clone.setAttribute("width", String(width));
+            clone.setAttribute("height", String(height));
+          } else {
+            // Fallback only if Mermaid did not emit a viewBox — measure
+            // the cleaned clone off-screen so the transform isn't seen.
+            clone.style.position = "absolute";
+            clone.style.left = "-99999px";
+            clone.style.top = "0";
+            document.body.appendChild(clone);
+            let bbox = null;
+            try { bbox = clone.getBBox(); } catch {}
+            document.body.removeChild(clone);
+            clone.removeAttribute("style");
+            if (bbox && bbox.width && bbox.height) {
+              clone.setAttribute("viewBox", `${bbox.x} ${bbox.y} ${bbox.width} ${bbox.height}`);
+              width = Math.round(bbox.width);
+              height = Math.round(bbox.height);
+              clone.setAttribute("width", String(width));
+              clone.setAttribute("height", String(height));
+            } else {
+              width = Math.max(800, host.clientWidth || 800);
+              height = Math.max(500, host.clientHeight || 500);
+            }
+          }
+          clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+          clone.setAttribute("xmlns:xlink", "http://www.w3.org/1999/xlink");
+          const xml = new XMLSerializer().serializeToString(clone);
+          const svgBlob = new Blob([xml], { type: "image/svg+xml;charset=utf-8" });
+          const svgUrl = URL.createObjectURL(svgBlob);
+          const scale = 2;
+          const titleSlug = (document.querySelector("#article h1")?.textContent || "diagram").trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = width * scale;
+            canvas.height = height * scale;
+            const ctx = canvas.getContext("2d");
+            // Theme-matched background so dark-mode exports don't look
+            // bizarre when dropped on a white page.
+            const bg = getComputedStyle(document.documentElement).getPropertyValue("--card").trim() || "#ffffff";
+            ctx.fillStyle = bg;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.scale(scale, scale);
+            ctx.drawImage(img, 0, 0, width, height);
+            URL.revokeObjectURL(svgUrl);
+            canvas.toBlob((blob) => {
+              if (!blob) return;
+              const pngUrl = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = pngUrl;
+              a.download = `${titleSlug || "diagram"}.png`;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              setTimeout(() => URL.revokeObjectURL(pngUrl), 1000);
+            }, "image/png");
+          };
+          img.onerror = (e) => {
+            URL.revokeObjectURL(svgUrl);
+            console.error("Failed to rasterise diagram for PNG export", e);
+          };
+          img.src = svgUrl;
+        } catch (e) {
+          console.error("Failed to download diagram", e);
+        }
+      }
+
+      // Delegated click handler on the .mermaid-zoomable wrapper. The
+      // wrapper is outside the SVG, so this listener runs in a world
+      // svg-pan-zoom can't reach. We walk up from the click target
+      // looking for a node with a stored __fsClickAction and trigger it.
+      function attachMermaidClickDelegate(wrap) {
+        wrap.addEventListener("click", (ev) => {
+          let el = ev.target;
+          while (el && el !== wrap) {
+            if (typeof el.__fsClickAction === "function") {
+              ev.preventDefault();
+              ev.stopPropagation();
+              el.__fsClickAction();
+              return;
+            }
+            el = el.parentNode;
+          }
+        });
+      }
+
+      // Attach svg-pan-zoom to a rendered Mermaid diagram and wire its
+      // surrounding +/-/reset controls. Clicks on inner shapes are
+      // re-bound separately via reattachMermaidClicks — svg-pan-zoom
+      // swallows click events that originate inside the SVG root.
+      function attachZoom(host, mermaidContainer) {
+        const svg = mermaidContainer.querySelector("svg");
+        if (!svg || !window.svgPanZoom) return;
+        // Strip the inline width/height Mermaid sets so the SVG fills the host.
+        svg.removeAttribute("width");
+        svg.removeAttribute("height");
+        svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+
+        // Read the SVG's natural aspect ratio from its viewBox. Fall back
+        // to a moderate 4:3 when absent so we still produce something
+        // legible rather than a flat strip.
+        const readAspect = () => {
+          const vb = svg.viewBox && svg.viewBox.baseVal;
+          if (vb && vb.width > 0 && vb.height > 0) return vb.height / vb.width;
+          const raw = svg.getAttribute("viewBox");
+          if (raw) {
+            const p = raw.trim().split(/[\s,]+/).map(Number);
+            if (p.length === 4 && p[2] > 0 && p[3] > 0) return p[3] / p[2];
+          }
+          return 0.75;
+        };
+        const aspect = readAspect();
+
+        // Resolve the CSS min-height / max-height bounds so we can clamp
+        // the JS-set inline height into the same range the stylesheet
+        // would have enforced.
+        const cs = window.getComputedStyle(host);
+        const parsePx = (v, fb) => {
+          const n = parseFloat(v);
+          return Number.isFinite(n) ? n : fb;
+        };
+        const minH = parsePx(cs.minHeight, 320);
+        const maxH = (() => {
+          if (cs.maxHeight && cs.maxHeight !== "none") {
+            const n = parseFloat(cs.maxHeight);
+            if (Number.isFinite(n)) {
+              // getComputedStyle resolves vh to px for us.
+              return n;
+            }
+          }
+          return Math.round(window.innerHeight * 0.8);
+        })();
+
+        // Size the host to the SVG's natural aspect ratio, clamped to the
+        // CSS bounds. fit:true then renders the whole diagram at ~zoom 1.0
+        // — no squashing, no oceans of whitespace.
+        const sizeHostToSvg = () => {
+          const w = host.clientWidth;
+          if (!w) return;
+          const desired = Math.round(w * aspect);
+          const h = Math.max(minH, Math.min(maxH, desired));
+          host.style.height = `${h}px`;
+        };
+        sizeHostToSvg();
+
+        let panZoomInstance = null;
+        try {
+          panZoomInstance = window.svgPanZoom(svg, {
+            zoomEnabled: true,
+            controlIconsEnabled: false,
+            dblClickZoomEnabled: false,
+            // Mouse wheel scroll is for the PAGE, not the diagram —
+            // otherwise readers scrolling past a diagram involuntarily
+            // zoom out of it. Zoom is driven by the +/-/reset buttons.
+            mouseWheelZoomEnabled: false,
+            fit: true,
+            center: true,
+            minZoom: 0.4,
+            maxZoom: 8,
+            zoomScaleSensitivity: 0.35,
+            beforePan: () => true,
+            beforeZoom: () => true,
+          });
+        } catch (e) {
+          return;
+        }
+        // Initial view strategy:
+        //  - When the SVG's natural aspect fits inside the host (we sized
+        //    the host to match), use fit + center — the whole diagram is
+        //    visible at ~zoom 1.0.
+        //  - When the diagram is taller than the host can show, render the
+        //    top portion at 2× width-fit so labels are large and readable;
+        //    the reader pans down to see the rest. Capped at 3× to avoid
+        //    silly oversize on narrow diagrams.
+        const resetView = () => {
+          try {
+            panZoomInstance.resize();
+            const vb = svg.viewBox && svg.viewBox.baseVal;
+            const hostW = host.clientWidth;
+            const hostH = host.clientHeight;
+            if (!vb || !vb.width || !vb.height || !hostW || !hostH) {
+              panZoomInstance.fit();
+              panZoomInstance.center();
+              return;
+            }
+            const naturalScaled = vb.height * (hostW / vb.width);
+            if (naturalScaled <= hostH + 1) {
+              panZoomInstance.fit();
+              panZoomInstance.center();
+              return;
+            }
+            const widthFit = hostW / vb.width;
+            const target = Math.min(3.0, Math.max(1.0, widthFit * 2));
+            panZoomInstance.zoom(target);
+            panZoomInstance.center();
+            const cp = panZoomInstance.getPan();
+            panZoomInstance.pan({ x: cp.x, y: 0 });
+          } catch {}
+        };
+        resetView();
+
+        const controls = host.querySelector(".mermaid-zoom-controls");
+        if (!controls) return;
+        controls.addEventListener("click", (ev) => {
+          const btn = ev.target.closest("button[data-zoom-act]");
+          if (!btn) return;
+          const act = btn.dataset.zoomAct;
+          if (act === "in") panZoomInstance.zoomIn();
+          else if (act === "out") panZoomInstance.zoomOut();
+          else if (act === "reset") {
+            sizeHostToSvg();
+            resetView();
+          }
+          else if (act === "download") downloadDiagramSvg(svg, host);
+        });
+        // Refit when the host's WIDTH changes (viewport / sidebar toggle).
+        // We skip the observer firing on our own height writes by gating
+        // on width-delta — otherwise sizeHostToSvg would trip itself in a
+        // loop.
+        let lastWidth = host.clientWidth;
+        const resizeObs = new ResizeObserver(() => {
+          const w = host.clientWidth;
+          if (w === lastWidth) return;
+          lastWidth = w;
+          sizeHostToSvg();
+          resetView();
+        });
+        resizeObs.observe(host);
+      }
+
+      // Auto-build a small fan-out Mermaid diagram for any context page
+      // that has registered sub-modules. Returned string is markdown — a
+      // fenced ```mermaid block that the page render loop picks up just
+      // like an authored one. Empty string when there are no sub-modules.
+      // ──────────────────────────────────────────────────────────
+      // Docs meta: backlinks, last-updated, context→ADR map
+      // (loaded from /docs/architecture/_meta.json, generated by
+      //  `node tooling/docs-meta.mjs` before serving).
+      // ──────────────────────────────────────────────────────────
+      let DOCS_META = null;
+      async function loadDocsMeta() {
+        try {
+          const r = await fetch("/docs/architecture/_meta.json", { cache: "no-store" });
+          if (!r.ok) return;
+          DOCS_META = await r.json();
+        } catch {}
+      }
+
+      // Resolve a route file (e.g. "contexts/04-issuance.md" or
+      // "/CONTEXT.md") to the repo-relative key used by docs-meta.
+      function metaKeyFor(file) {
+        if (!file || typeof file !== "string") return null;
+        if (file === "_adrs") return null;
+        if (file.startsWith("/")) return file;
+        if (file.startsWith("contexts/") || file.startsWith("sub-modules/") || file === "overview.md") {
+          return "/docs/architecture/" + file;
+        }
+        return null;
+      }
+
+      function formatRelative(iso) {
+        if (!iso) return "";
+        const then = new Date(iso).getTime();
+        const now = Date.now();
+        const sec = Math.max(1, Math.round((now - then) / 1000));
+        if (sec < 60) return "just now";
+        const min = Math.round(sec / 60);
+        if (min < 60) return `${min} min ago`;
+        const hr = Math.round(min / 60);
+        if (hr < 24) return `${hr}h ago`;
+        const d = Math.round(hr / 24);
+        if (d < 30) return `${d}d ago`;
+        const mo = Math.round(d / 30);
+        if (mo < 12) return `${mo} month${mo === 1 ? "" : "s"} ago`;
+        const yr = Math.round(mo / 12);
+        return `${yr} year${yr === 1 ? "" : "s"} ago`;
+      }
+
+      function injectLastUpdated(article, file) {
+        if (!DOCS_META) return;
+        const key = metaKeyFor(file);
+        if (!key) return;
+        const m = DOCS_META.files?.[key];
+        if (!m?.updated) return;
+        // Append next to the reading-time line if present, else under the H1.
+        const h1 = article.querySelector("h1");
+        if (!h1) return;
+        const span = document.createElement("span");
+        span.className = "last-updated";
+        const iso = m.updated;
+        span.textContent = ` · updated ${formatRelative(iso)}`;
+        span.title = new Date(iso).toLocaleString();
+        const existingReadingTime = article.querySelector(".reading-time");
+        if (existingReadingTime) existingReadingTime.appendChild(span);
+        else {
+          const el = document.createElement("p");
+          el.className = "reading-time";
+          el.appendChild(span);
+          h1.insertAdjacentElement("afterend", el);
+        }
+      }
+
+      function injectAdrChips(article, file) {
+        if (!DOCS_META) return;
+        const ctx = CONTEXTS.find((c) => c.file === file);
+        if (!ctx) return;
+        const adrs = DOCS_META.contextToAdrs?.[ctx.slug] || [];
+        if (!adrs.length) return;
+        const chips = adrs.map((num) => {
+          const adr = ADRS.find((a) => a.num === num.padStart(4, "0"));
+          if (!adr) return "";
+          return `<a class="adr-chip" href="#ref-adrs" data-adr-num="${escapeHtml(adr.num)}" data-adr-slug="${escapeHtml(adr.slug)}" title="${escapeHtml(adr.title)}">
+            <span class="adr-chip-num">ADR ${escapeHtml(adr.num)}</span>
+            <span>${escapeHtml(adr.title)}</span>
+          </a>`;
+        }).filter(Boolean).join("");
+        if (!chips) return;
+        const h1 = article.querySelector("h1");
+        if (!h1) return;
+        const wrap = document.createElement("div");
+        wrap.className = "adr-chips";
+        wrap.innerHTML = chips;
+        // Insert AFTER the reading-time/last-updated line if present, so
+        // chips appear between meta and the first sub-section.
+        const rt = article.querySelector(".reading-time");
+        (rt || h1).insertAdjacentElement("afterend", wrap);
+        for (const a of wrap.querySelectorAll("a[data-adr-num]")) {
+          a.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            const num = a.dataset.adrNum;
+            const slug = a.dataset.adrSlug;
+            navigateTo("_adrs");
+            const tryScroll = (retries) => {
+              const card = document.getElementById(`adr-${num}-${slug}`);
+              if (card) {
+                const d = card.querySelector("details.adr-details");
+                if (d) d.open = true;
+                card.scrollIntoView({ behavior: "smooth", block: "start" });
+              } else if (retries > 0) {
+                setTimeout(() => tryScroll(retries - 1), 60);
+              }
+            };
+            requestAnimationFrame(() => tryScroll(40));
+          });
+        }
+      }
+
+      // Count unchecked "[ ]" boxes in the diagnostics page so the sidebar
+      // can surface open-issue count.
+      async function paintDiagnosticsBadge() {
+        try {
+          const r = await fetch("/docs/diagnostics.md", { cache: "no-store" });
+          if (!r.ok) return;
+          const text = await r.text();
+          const open = (text.match(/^\s*-\s*\[\s\]/gm) || []).length;
+          const link = document.querySelector('.nav-link[data-ref="/docs/diagnostics.md"]');
+          if (!link) return;
+          // Avoid stacking badges on re-runs.
+          for (const old of link.querySelectorAll(".nav-badge")) old.remove();
+          if (!open) return;
+          const badge = document.createElement("span");
+          badge.className = "nav-badge" + (open > 2 ? " warn" : "");
+          badge.textContent = String(open);
+          badge.title = `${open} open issue${open === 1 ? "" : "s"} in diagnostics`;
+          link.appendChild(badge);
+        } catch {}
+      }
+
+      function submoduleDiagramFor(file) {
+        const ctx = CONTEXTS.find((c) => c.file === file);
+        if (!ctx) return "";
+        const subs = SUBMODULES.filter((s) => s.parent === ctx.slug);
+        // Only inject the auto-generated nav diagram when there are enough
+        // sub-modules to be worth showing as a diagram. For 1-2 children
+        // the inline "Sub-modules" list in the page body conveys the same
+        // information without burning a viewport.
+        if (subs.length < 3) return "";
+        const safeId = (s) => "S_" + s.slug.replace(/[^a-z0-9]/gi, "_");
+        const ctxId = "CTX_" + ctx.slug.replace(/[^a-z0-9]/gi, "_");
+        const lines = [];
+        lines.push("```mermaid");
+        // TB (top-to-bottom): parent on top rank, sub-modules on a single
+        // horizontal rank below. LR was producing a tall stacked column
+        // with awkwardly long connectors when a context had 4+ children.
+        lines.push("flowchart TB");
+        lines.push(`  ${ctxId}(["${ctx.name}"]):::ctxNode`);
+        for (const s of subs) lines.push(`  ${safeId(s)}["${s.name}"]:::subNode`);
+        for (const s of subs) lines.push(`  ${ctxId} --> ${safeId(s)}`);
+        for (const s of subs) lines.push(`  click ${safeId(s)} call fsNavigate("${s.file}") "Open ${s.name}"`);
+        lines.push("  classDef ctxNode fill:#96c748,stroke:#5e7e2d,color:#1a1a1a,stroke-width:2px;");
+        lines.push("  classDef subNode fill:#ffffff,stroke:#7a7a7a,color:#1a1a1a;");
+        lines.push("```");
+        return lines.join("\n") + "\n";
+      }
+
+      // Rewrite "@repo/<name>" mentions in inline code or link text to
+      // "packages/<name>" and route them to the package's CONTEXT.md.
+      // Skips contents inside <pre> blocks (real code snippets).
+      // Skips paths like "packages/api/src/..." which the code-drawer
+      // already handles via its CODE_PREFIXES match.
+      const REPO_PKG_RE = /^@repo\/([a-z0-9-]+)(\/.*)?$/;
+      function rewriteRepoMentions(article) {
+        // 1) bare <code>@repo/x</code> not already inside an anchor.
+        for (const c of [...article.querySelectorAll("code")]) {
+          if (c.closest("pre") || c.closest("a")) continue;
+          const m = c.textContent.trim().match(REPO_PKG_RE);
+          if (!m) continue;
+          const pkg = m[1];
+          const a = document.createElement("a");
+          const target = `/packages/${pkg}/CONTEXT.md`;
+          a.href = target;
+          a.dataset.contextLink = target;
+          a.title = `Open packages/${pkg}/CONTEXT.md`;
+          const code = document.createElement("code");
+          code.textContent = `packages/${pkg}${m[2] || ""}`;
+          a.appendChild(code);
+          c.replaceWith(a);
+        }
+        // 2) <a> tags whose visible text matches @repo/<name>. Repoint
+        // them at the package CONTEXT.md regardless of their original
+        // href (often the bare /packages/<name> directory that 404s).
+        for (const a of [...article.querySelectorAll("a")]) {
+          const m = (a.textContent || "").trim().match(REPO_PKG_RE);
+          if (!m) continue;
+          const pkg = m[1];
+          const newText = `packages/${pkg}${m[2] || ""}`;
+          const inner = a.querySelector("code");
+          if (inner) inner.textContent = newText;
+          else a.textContent = newText;
+          const target = `/packages/${pkg}/CONTEXT.md`;
+          a.setAttribute("href", target);
+          a.dataset.contextLink = target;
+          a.title = `Open packages/${pkg}/CONTEXT.md`;
+        }
+        for (const a of article.querySelectorAll("a[data-context-link]")) {
+          const file = a.dataset.contextLink;
+          a.addEventListener("click", (ev) => { ev.preventDefault(); navigateTo(file); });
+        }
+      }
+
+      // Build the right-hand TOC from h2/h3 in the article and wire
+      // a scroll-spy that highlights the heading currently in view.
+      let _tocScrollSpy = null;
+      function buildPageToc(article) {
+        const host = document.getElementById("page-toc");
+        if (!host) return;
+        if (_tocScrollSpy) { _tocScrollSpy.disconnect(); _tocScrollSpy = null; }
+        const heads = [...article.querySelectorAll("h2, h3")].filter((h) => h.id);
+        if (heads.length < 2) { host.innerHTML = ""; return; }
+        const items = heads.map((h) =>
+          `<a href="#${h.id}" class="lvl-${h.tagName === "H2" ? 2 : 3}" data-toc-id="${h.id}">${escapeHtml(h.textContent.replace(/¶$/, "").trim())}</a>`
+        ).join("");
+        host.innerHTML = `<p class="toc-label">On this page</p>${items}`;
+        for (const a of host.querySelectorAll("a[data-toc-id]")) {
+          a.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            const target = document.getElementById(a.dataset.tocId);
+            if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+            history.replaceState(history.state, "", "#" + a.dataset.tocId);
+          });
+        }
+        // Scroll-spy: mark the heading whose section is currently nearest
+        // the top of the viewport. We track intersection with a band
+        // ~120px below the topbar.
+        const linkFor = new Map();
+        for (const a of host.querySelectorAll("a[data-toc-id]")) linkFor.set(a.dataset.tocId, a);
+        const visible = new Set();
+        _tocScrollSpy = new IntersectionObserver((entries) => {
+          for (const e of entries) {
+            if (e.isIntersecting) visible.add(e.target.id);
+            else visible.delete(e.target.id);
+          }
+          // Active = first heading whose section is visible. Fallback: first.
+          let activeId = null;
+          for (const h of heads) {
+            if (visible.has(h.id)) { activeId = h.id; break; }
+          }
+          if (!activeId && heads.length) activeId = heads[0].id;
+          for (const a of host.querySelectorAll("a[data-toc-id]"))
+            a.classList.toggle("active", a.dataset.tocId === activeId);
+        }, { rootMargin: "-100px 0px -55% 0px" });
+        heads.forEach((h) => _tocScrollSpy.observe(h));
+      }
+
+      // Reading time estimate under the H1. ~240wpm. Skip for very short
+      // pages where the estimate would round to zero.
+      function injectReadingTime(article) {
+        const h1 = article.querySelector("h1");
+        if (!h1) return;
+        const words = article.textContent.trim().split(/\s+/).length;
+        if (words < 200) return;
+        const minutes = Math.max(1, Math.round(words / 240));
+        const el = document.createElement("p");
+        el.className = "reading-time";
+        el.textContent = `≈ ${minutes} min read`;
+        h1.insertAdjacentElement("afterend", el);
+      }
+
+      // Add a hoverable ¶ button next to every heading that copies the
+      // heading's full URL to the clipboard.
+      function injectHeadingAnchors(article) {
+        for (const h of article.querySelectorAll("h1, h2, h3, h4")) {
+          if (!h.id) continue;
+          const btn = document.createElement("button");
+          btn.className = "heading-anchor";
+          btn.type = "button";
+          btn.textContent = "¶";
+          btn.title = "Copy link to this section";
+          btn.addEventListener("click", async (ev) => {
+            ev.preventDefault();
+            const url = `${location.origin}${location.pathname}#${h.id}`;
+            try {
+              await navigator.clipboard.writeText(url);
+            } catch {
+              // Fallback for non-secure contexts: select-and-execCommand.
+              const ta = document.createElement("textarea");
+              ta.value = url;
+              document.body.appendChild(ta);
+              ta.select();
+              try { document.execCommand("copy"); } catch {}
+              ta.remove();
+            }
+            btn.classList.add("copied");
+            setTimeout(() => btn.classList.remove("copied"), 1400);
+          });
+          h.appendChild(btn);
+        }
+      }
+
+      function injectMermaidClicks(md) {
+        return md.replace(/```mermaid\n([\s\S]*?)```/g, (full, body) => {
+          if (body.includes("click ")) return full;
+          const lines = [body.trimEnd()];
+          for (const [id, slug] of Object.entries(NODE_TO_SLUG)) {
+            const ctx = CONTEXTS.find((c) => c.slug === slug);
+            if (!ctx) continue;
+            lines.push(`  click ${id} call fsNavigate("${ctx.file}") "Open ${ctx.name}"`);
+          }
+          return "```mermaid\n" + lines.join("\n") + "\n```";
+        });
+      }
+
+      function setActive(route) {
+        for (const a of document.querySelectorAll(".nav-link"))
+          a.classList.toggle("active", a.dataset.route === route);
+      }
+
+      // ──────────────────────────────────────────────────────────
+      // ADRs page — one fetch per ADR, parallel; renders as a single
+      // accordion with the ADR number/title visible and the body
+      // collapsed behind a <details> per entry.
+      // ──────────────────────────────────────────────────────────
+      async function renderAdrsPage(article) {
+        const intro = `
+          <h1>Architecture Decision Records</h1>
+          <p class="meta" style="margin-bottom: 18px;">
+            Cross-cutting architectural decisions for this project. Click any ADR title
+            to expand its full body. Each ADR is a load-bearing rule —
+            <code>/grill-with-docs</code> and the change checklist in
+            <code>CLAUDE.md</code> both ground in this list.
+          </p>
+        `;
+        article.innerHTML =
+          intro + `<div id="adrs-list"><p class="loading">Loading ${ADRS.length} ADRs…</p></div>`;
+        const host = document.getElementById("adrs-list");
+
+        const results = await Promise.allSettled(
+          ADRS.map(async (a) => {
+            const url = `/docs/adr/${a.num}-${a.slug}.md`;
+            const r = await fetch(url);
+            if (!r.ok) throw new Error(`${r.status}`);
+            const text = await r.text();
+            return { ...a, url, text };
+          })
+        );
+
+        const cards = results.map((res, i) => {
+          const a = ADRS[i];
+          if (res.status === "rejected") {
+            return `
+              <article class="adr-card adr-card-error">
+                <header><span class="adr-num">ADR ${a.num}</span> ${escapeHtml(a.title)}</header>
+                <p class="error">Failed to load <code>${a.num}-${a.slug}.md</code>.</p>
+              </article>
+            `;
+          }
+          const adr = res.value;
+          const lines = adr.text.split("\n");
+          const titleLine = lines.find((l) => l.startsWith("# ")) || `# ADR ${a.num}`;
+          const title = titleLine.replace(/^#\s+/, "").trim();
+          // First non-heading, non-empty line is the intro paragraph.
+          let intro = "";
+          for (let j = 0; j < lines.length; j++) {
+            const l = lines[j].trim();
+            if (!l || l.startsWith("#")) continue;
+            intro = l;
+            break;
+          }
+          const tag = inferAdrStatus(a);
+          const bodyHtml = marked.parse(adr.text);
+          return `
+            <article class="adr-card" id="adr-${a.num}-${a.slug}">
+              <header class="adr-head">
+                <span class="adr-num">ADR ${a.num}</span>
+                <h2 class="adr-title">${escapeHtml(title)}</h2>
+                ${tag ? `<span class="adr-status ${tag.cls}">${tag.label}</span>` : ""}
+                <a class="adr-source" href="/docs/adr/${a.num}-${a.slug}.md" target="_blank" rel="noopener" title="View raw markdown">source</a>
+              </header>
+              <p class="adr-intro">${escapeHtml(intro)}</p>
+              <details class="adr-details">
+                <summary>Read the full ADR</summary>
+                <div class="adr-body">${bodyHtml}</div>
+              </details>
+            </article>
+          `;
+        });
+
+        host.innerHTML = cards.join("");
+
+        // Render any Mermaid blocks inside expanded ADRs lazily on details open.
+        host.querySelectorAll("details.adr-details").forEach((d) => {
+          d.addEventListener("toggle", async () => {
+            if (!d.open) return;
+            const blocks = d.querySelectorAll("code.language-mermaid:not(.rendered)");
+            for (const block of blocks) {
+              const code = block.textContent;
+              const id = `adr-mmd-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+              const container = document.createElement("div");
+              container.className = "mermaid";
+              container.id = id;
+              const wrap = document.createElement("div");
+              wrap.className = "mermaid-zoomable";
+              wrap.appendChild(container);
+              const ctrls = document.createElement("div");
+              ctrls.className = "mermaid-zoom-controls";
+              ctrls.innerHTML = `
+                <button type="button" data-zoom-act="in" title="Zoom in" aria-label="Zoom in">+</button>
+                <button type="button" data-zoom-act="out" title="Zoom out" aria-label="Zoom out">−</button>
+                <button type="button" data-zoom-act="reset" title="Reset view" aria-label="Reset view">⤾</button>
+                <button type="button" data-zoom-act="download" title="Download SVG" aria-label="Download SVG">↓</button>
+              `;
+              wrap.appendChild(ctrls);
+              block.classList.add("rendered");
+              block.parentElement.replaceWith(wrap);
+              try {
+                const { svg, bindFunctions } = await mermaid.render(`${id}-svg`, code);
+                container.innerHTML = svg;
+                bindFunctions?.(container);
+                orthogonaliseEdges(container);
+                container.querySelectorAll("[id^=flowchart-]").forEach((n) => {
+                  if (n.querySelector("a") || n.onclick) n.classList.add("clickable");
+                });
+                reattachMermaidClicks(container, code);
+                attachMermaidClickDelegate(wrap);
+                attachZoom(wrap, container);
+              } catch (e) {
+                container.innerHTML = `<div class="error">Mermaid render error: ${escapeHtml(e.message)}</div>`;
+              }
+            }
+          });
+        });
+
+        window.scrollTo({ top: 0, behavior: "instant" });
+      }
+
+      // ──────────────────────────────────────────────────────────
+      // Code Graph — interactive view of the GitNexus-derived code
+      // graph (docs/architecture/graph/code-graph.json, produced by
+      // `pnpm documentation:setup-graph`). Two-level drill-down: a cluster
+      // overview, then the symbols inside one cluster. Clicking a
+      // symbol opens its source in the inline code drawer. Plain
+      // Cytoscape only — no layout/expand-collapse extensions — so a
+      // CDN hiccup degrades to a clear message, not a broken page.
+      // ──────────────────────────────────────────────────────────
+      const CODEGRAPH_URL = "/docs/architecture/graph/code-graph.json";
+      const CODEGRAPH_PALETTE = [
+        "#96c748", "#4e36f5", "#e0883a", "#3aa6e0", "#d6536d",
+        "#7d57c1", "#3ab98a", "#c1a23a", "#5a7de0", "#c14f9e",
+      ];
+      let _codeGraphData = null; // cached parsed artifact
+      let _cyLibPromise = null;
+      let _pkgContextMap = null;
+
+      function loadCytoscape() {
+        if (_cyLibPromise) return _cyLibPromise;
+        _cyLibPromise = new Promise((res, rej) => {
+          if (window.cytoscape) return res(window.cytoscape);
+          const s = document.createElement("script");
+          s.src = "https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js";
+          s.async = true;
+          s.onload = () => res(window.cytoscape);
+          s.onerror = () => rej(new Error("Failed to load Cytoscape from CDN"));
+          document.head.appendChild(s);
+        });
+        return _cyLibPromise;
+      }
+
+      // package → [{slug,name}] from each context's ownerPackages frontmatter,
+      // so a symbol's package can cross-link to the context(s) that own it.
+      async function buildPackageContextMap() {
+        if (_pkgContextMap) return _pkgContextMap;
+        const map = new Map();
+        await Promise.allSettled(
+          CONTEXTS.map(async (c) => {
+            try {
+              const r = await fetch(c.file);
+              if (!r.ok) return;
+              const { fm } = parseFrontmatter(await r.text());
+              const owners = Array.isArray(fm.ownerPackages)
+                ? fm.ownerPackages
+                : fm.ownerPackages ? [fm.ownerPackages] : [];
+              for (const p of owners) {
+                const key = String(p).trim();
+                if (!key) continue;
+                if (!map.has(key)) map.set(key, []);
+                map.get(key).push({ slug: c.slug, name: c.name, file: c.file });
+              }
+            } catch {}
+          }),
+        );
+        _pkgContextMap = map;
+        return map;
+      }
+
+      // Stable colour per key (package / cluster) so the palette is deterministic.
+      function codeGraphColor(key) {
+        let h = 0;
+        for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+        return CODEGRAPH_PALETTE[h % CODEGRAPH_PALETTE.length];
+      }
+
+      function ensureCodeGraphStyles() {
+        if (document.getElementById("codegraph-styles")) return;
+        const style = document.createElement("style");
+        style.id = "codegraph-styles";
+        style.textContent = `
+          .cg-toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:12px; }
+          .cg-toolbar .cg-spacer { flex:1; }
+          .cg-btn { font:inherit; font-size:13px; padding:5px 10px; border:1px solid var(--border); background:var(--card); color:var(--fg); border-radius:7px; cursor:pointer; }
+          .cg-btn:hover { border-color:var(--primary-strong); }
+          .cg-btn[aria-pressed="true"] { background:var(--primary-soft); border-color:var(--primary-strong); color:var(--primary-strong); }
+          .cg-search { position:relative; }
+          .cg-search input { font:inherit; font-size:13px; padding:5px 10px; border:1px solid var(--border); background:var(--card); color:var(--fg); border-radius:7px; min-width:220px; }
+          .cg-results { position:absolute; z-index:20; top:calc(100% + 4px); left:0; right:0; max-height:280px; overflow:auto; background:var(--card); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); }
+          .cg-results button { display:block; width:100%; text-align:left; font:inherit; font-size:12.5px; padding:7px 10px; border:0; border-bottom:1px solid var(--border); background:none; color:var(--fg); cursor:pointer; }
+          .cg-results button:last-child { border-bottom:0; }
+          .cg-results button:hover { background:var(--primary-soft); }
+          .cg-results .cg-res-path { color:var(--muted-fg); font-size:11px; }
+          .cg-stage { display:flex; gap:14px; align-items:stretch; }
+          .cg-cy { flex:1; height:70vh; min-height:420px; border:1px solid var(--border); border-radius:12px; background:var(--bg); }
+          .cg-info { width:288px; flex:0 0 288px; border:1px solid var(--border); border-radius:12px; background:var(--card); padding:14px; overflow:auto; }
+          .cg-info h3 { margin:0 0 4px; font-size:15px; }
+          .cg-info .cg-kind { display:inline-block; font-size:11px; padding:1px 7px; border-radius:999px; background:var(--primary-soft); color:var(--primary-strong); margin-bottom:10px; }
+          .cg-info dl { margin:0; font-size:12.5px; }
+          .cg-info dt { color:var(--muted-fg); margin-top:8px; }
+          .cg-info dd { margin:2px 0 0; word-break:break-all; }
+          .cg-info .cg-empty { color:var(--muted-fg); font-size:13px; }
+          .cg-info a { color:var(--accent); cursor:pointer; }
+          .cg-open { margin-top:14px; width:100%; }
+          .cg-hint { color:var(--muted-fg); font-size:12px; margin:10px 0 0; }
+          @media (max-width:880px) { .cg-stage { flex-direction:column; } .cg-info { width:auto; flex:auto; } .cg-cy { height:55vh; } }
+        `;
+        document.head.appendChild(style);
+      }
+
+      // Overview groups by package — a clean ≤15-node top level. GitNexus's
+      // Leiden communities are sparse (most symbols are unclustered), so they
+      // serve as per-symbol colour + annotation inside a package, not the top
+      // grouping. A package drill is capped (CODEGRAPH_CAP) so a huge package
+      // can't try to render thousands of nodes at once.
+      const CODEGRAPH_CAP = 600;
+      function codeGraphGroups(data) {
+        const groups = new Map(); // key → { key, label, package, nodeIds:Set }
+        for (const n of data.nodes) {
+          const key = "p:" + n.package;
+          if (!groups.has(key)) groups.set(key, { key, label: n.package, package: n.package, nodeIds: new Set() });
+          groups.get(key).nodeIds.add(n.id);
+        }
+        return groups;
+      }
+
+      async function renderCodeGraphPage(article) {
+        ensureCodeGraphStyles();
+        article.innerHTML = `<h1>Code Graph</h1><p class="loading">Loading code graph…</p>`;
+
+        // 1. Load the artifact.
+        if (!_codeGraphData) {
+          try {
+            const r = await fetch(CODEGRAPH_URL, { cache: "no-cache" });
+            if (!r.ok) throw new Error(`${r.status}`);
+            _codeGraphData = await r.json();
+          } catch (e) {
+            article.innerHTML = `
+              <h1>Code Graph</h1>
+              <p class="meta" style="margin-bottom:14px;">A structural map of the codebase — functions, classes, files and their import/call edges — derived from <a href="https://github.com/abhigyanpatwari/GitNexus" target="_blank" rel="noopener">GitNexus</a>.</p>
+              <div class="error" style="padding:16px;border:1px solid var(--border);border-radius:10px;">
+                <p><b>The graph hasn't been generated yet.</b></p>
+                <p>It's built locally (and kept out of the repo to save space). Run <code>pnpm documentation:setup-graph</code> from the repo root to index the codebase and write <code>docs/architecture/graph/code-graph.json</code>, then reload this page.</p>
+                <p class="cg-hint">(${escapeHtml(String(e.message || e))})</p>
+              </div>`;
+            return;
+          }
+        }
+        const data = _codeGraphData;
+
+        // 2. Load Cytoscape.
+        let cytoscape;
+        try {
+          cytoscape = await loadCytoscape();
+          if (!cytoscape) throw new Error("Cytoscape global missing after load");
+        } catch (e) {
+          article.innerHTML = `<h1>Code Graph</h1><div class="error" style="padding:16px;">Couldn't load the graph library from the CDN: ${escapeHtml(String(e.message || e))}.<br/>The rest of the docs still work offline; this page needs network access to <code>jsdelivr.net</code>.</div>`;
+          return;
+        }
+        buildPackageContextMap(); // warm the cache; not awaited (best-effort cross-links)
+
+        // 3. Shell.
+        const generated = data.generatedAt ? new Date(data.generatedAt).toLocaleString() : "unknown";
+        article.innerHTML = `
+          <h1>Code Graph</h1>
+          <p class="meta" style="margin-bottom:14px;">${data.nodes.length} symbols · ${data.edges.length} edges · ${(data.clusters || []).length} clusters · generated ${escapeHtml(generated)}. Click a cluster to drill in; click a symbol to open its source.</p>
+          <div class="cg-toolbar">
+            <button class="cg-btn" id="cg-back" hidden>← All clusters</button>
+            <strong id="cg-mode" style="font-size:14px;"></strong>
+            <span class="cg-spacer"></span>
+            <button class="cg-btn" id="cg-edge-import" aria-pressed="true">Imports</button>
+            <button class="cg-btn" id="cg-edge-call" aria-pressed="true">Calls</button>
+            <div class="cg-search">
+              <input id="cg-search" type="search" placeholder="Find a symbol…" autocomplete="off" />
+              <div class="cg-results" id="cg-results" hidden></div>
+            </div>
+          </div>
+          <div class="cg-stage">
+            <div class="cg-cy" id="cg-cy"></div>
+            <aside class="cg-info" id="cg-info"><p class="cg-empty">Select a node to see its details.</p></aside>
+          </div>`;
+
+        const nodeById = new Map(data.nodes.map((n) => [n.id, n]));
+        const clusterLabel = new Map((data.clusters || []).map((c) => [String(c.id), c.label]));
+        const groups = codeGraphGroups(data);
+        const groupOf = (id) => {
+          const n = nodeById.get(id);
+          return n ? "p:" + n.package : null;
+        };
+        // Colour a symbol by its community when it has one (so a package drill
+        // reveals GitNexus's modules), else by package.
+        const symbolColor = (n) => codeGraphColor(n.clusterId ? "c:" + n.clusterId : "p:" + n.package);
+
+        // Active edge-kind filter.
+        const activeKinds = { import: true, call: true };
+        const edgeVisible = (kind) => {
+          if (kind === "import") return activeKinds.import;
+          if (kind === "call") return activeKinds.call;
+          return true; // structural edges (contains, etc.) always shown
+        };
+
+        const baseStyle = (() => {
+          const cs = getComputedStyle(document.documentElement);
+          const v = (name, fb) => (cs.getPropertyValue(name).trim() || fb);
+          const fg = v("--fg", "#2a2a2a");
+          const bg = v("--bg", "#f3f9f8");
+          const border = v("--border", "#e6e8e7");
+          const muted = v("--muted-fg", "#7a7a7a");
+          const accent = v("--accent", "#4e36f5");
+          const primaryStrong = v("--primary-strong", "#6e9530");
+          return [
+            { selector: "node", style: {
+              "background-color": "data(color)", "background-opacity": 0.92,
+              "label": "data(label)", "color": fg, "font-family": "Inter, sans-serif",
+              "font-size": 9, "text-wrap": "wrap", "text-max-width": "110px",
+              "text-valign": "bottom", "text-margin-y": 3,
+              "text-outline-width": 2, "text-outline-color": bg, "text-outline-opacity": 0.9,
+              "width": "data(size)", "height": "data(size)",
+              "border-width": 1, "border-color": border, "border-opacity": 0.5,
+              "transition-property": "opacity, border-width, border-color", "transition-duration": "120ms",
+            }},
+            // Low-signal symbols keep their dot but drop the label, so dense
+            // packages stay readable; hover/select brings the label back.
+            { selector: "node.cg-quiet", style: { "text-opacity": 0 } },
+            { selector: "node.cg-group", style: {
+              "shape": "round-rectangle", "font-size": 13, "font-weight": "bold",
+              "text-valign": "center", "text-margin-y": 0, "color": "#fff",
+              "text-outline-width": 2.5, "text-outline-color": "data(color)", "text-outline-opacity": 1,
+              "border-width": 0, "background-opacity": 1,
+            }},
+            { selector: "edge", style: {
+              "width": "data(w)", "line-color": muted, "target-arrow-color": muted,
+              "target-arrow-shape": "triangle", "curve-style": "bezier", "arrow-scale": 0.6, "opacity": 0.3,
+            }},
+            { selector: "edge.cg-import", style: { "line-color": accent, "target-arrow-color": accent } },
+            { selector: "edge.cg-call", style: { "line-color": primaryStrong, "target-arrow-color": primaryStrong, "line-style": "dashed" } },
+            { selector: "node:selected", style: { "border-width": 3, "border-color": accent, "border-opacity": 1, "text-opacity": 1, "z-index": 9999 } },
+            // Hover focus: spotlight a node and its neighbours, fade the rest.
+            { selector: ".cg-hl", style: { "opacity": 1, "text-opacity": 1, "z-index": 900 } },
+            { selector: ".cg-dim", style: { "opacity": 0.07, "text-opacity": 0 } },
+          ];
+        })();
+
+        const cy = cytoscape({
+          container: document.getElementById("cg-cy"),
+          elements: [],
+          style: baseStyle,
+          wheelSensitivity: 0.2,
+          minZoom: 0.05,
+          maxZoom: 3,
+        });
+
+        // Size a node from its connection count (degree): a sqrt curve so the
+        // busiest hubs stand out without dwarfing everything else.
+        const sizeForDegree = (deg, min, k, max) => Math.min(max, min + Math.sqrt(deg) * k);
+
+        const layout = (extra = {}) => ({ name: "cose", animate: false, randomize: true, padding: 30, nodeRepulsion: 8000, idealEdgeLength: 70, ...extra });
+
+        // Hover spotlight on the rendered graph.
+        cy.on("mouseover", "node", (ev) => {
+          cy.elements().addClass("cg-dim");
+          ev.target.closedNeighborhood().removeClass("cg-dim").addClass("cg-hl");
+        });
+        cy.on("mouseout", "node", () => cy.elements().removeClass("cg-dim cg-hl"));
+
+        // ---- Overview: one node per package, aggregated cross-package edges. ----
+        function showOverview() {
+          currentGroupKey = null;
+          document.getElementById("cg-back").hidden = true;
+          document.getElementById("cg-mode").textContent = "All packages";
+          const agg = new Map(); // "a|b" → count
+          const connWeight = new Map(); // package key → total cross-package edges
+          for (const e of data.edges) {
+            if (!edgeVisible(e.kind)) continue;
+            const ga = groupOf(e.source), gb = groupOf(e.target);
+            if (!ga || !gb || ga === gb) continue;
+            const k = ga < gb ? `${ga}|${gb}` : `${gb}|${ga}`;
+            agg.set(k, (agg.get(k) || 0) + 1);
+            connWeight.set(ga, (connWeight.get(ga) || 0) + 1);
+            connWeight.set(gb, (connWeight.get(gb) || 0) + 1);
+          }
+          // Size each package by how connected it is to the rest of the system.
+          const nodes = [...groups.values()].map((g) => ({ data: {
+            id: g.key, label: `${g.label} (${g.nodeIds.size})`, color: codeGraphColor(g.key),
+            size: sizeForDegree(connWeight.get(g.key) || 0, 34, 6, 96), group: true,
+          }, classes: "cg-group" }));
+          const edges = [...agg.entries()].map(([k, c], i) => {
+            const [a, b] = k.split("|");
+            return { data: { id: "agg" + i, source: a, target: b, w: Math.min(9, 1 + Math.log2(c)) } };
+          });
+          cy.elements().remove();
+          cy.add([...nodes, ...edges]);
+          cy.layout(layout()).run();
+          cy.fit(undefined, 30);
+        }
+
+        // ---- Detail: symbols inside one package + their intra-package edges.
+        // Capped at CODEGRAPH_CAP, keeping the best-connected symbols (plus any
+        // we're asked to keep, e.g. a searched-for node) so a huge package
+        // stays renderable. `extraKeep` is a node id to force-include. ----
+        function showGroup(key, extraKeep) {
+          const g = groups.get(key);
+          if (!g) return showOverview();
+          currentGroupKey = key;
+          document.getElementById("cg-back").hidden = false;
+
+          const all = [...g.nodeIds];
+          // Degree within the package, honouring the active edge-kind filter.
+          const degree = new Map(all.map((id) => [id, 0]));
+          for (const e of data.edges) {
+            if (!g.nodeIds.has(e.source) || !g.nodeIds.has(e.target)) continue;
+            if (!edgeVisible(e.kind)) continue;
+            degree.set(e.source, (degree.get(e.source) || 0) + 1);
+            degree.set(e.target, (degree.get(e.target) || 0) + 1);
+          }
+          let keptIds = all;
+          const capped = all.length > CODEGRAPH_CAP;
+          if (capped) {
+            keptIds = all.slice().sort((a, b) => (degree.get(b) - degree.get(a))).slice(0, CODEGRAPH_CAP);
+            if (extraKeep && !keptIds.includes(extraKeep)) keptIds.push(extraKeep);
+          }
+          const idSet = new Set(keptIds);
+          document.getElementById("cg-mode").textContent =
+            `${g.label} · ${all.length} symbols${capped ? ` (showing ${idSet.size} best-connected)` : ""}`;
+
+          const nodes = keptIds.map((id) => {
+            const n = nodeById.get(id);
+            const deg = degree.get(id) || 0;
+            return {
+              data: { id, label: n.label, color: symbolColor(n), size: sizeForDegree(deg, 14, 6, 58) },
+              classes: deg < 2 ? "cg-quiet" : "",
+            };
+          });
+          const edgeClass = { import: "cg-import", call: "cg-call" };
+          const edges = [];
+          data.edges.forEach((e, i) => {
+            if (!idSet.has(e.source) || !idSet.has(e.target)) return;
+            if (!edgeVisible(e.kind)) return;
+            edges.push({ data: { id: "e" + i, source: e.source, target: e.target, w: 1.4, kind: e.kind }, classes: edgeClass[e.kind] || "" });
+          });
+          cy.elements().remove();
+          cy.add([...nodes, ...edges]);
+          cy.layout(layout({ nodeRepulsion: 12000 })).run();
+          cy.fit(undefined, 30);
+        }
+
+        let currentGroupKey = null;
+
+        // ---- Info panel ----
+        async function showInfo(node) {
+          const info = document.getElementById("cg-info");
+          if (node.data("group")) {
+            const g = groups.get(node.id());
+            info.innerHTML = `<h3>${escapeHtml(g.label)}</h3><span class="cg-kind">package</span><dl><dt>Symbols</dt><dd>${g.nodeIds.size}</dd></dl><p class="cg-hint">Click the package to drill into its symbols.</p>`;
+            return;
+          }
+          const n = nodeById.get(node.id());
+          if (!n) return;
+          const map = await buildPackageContextMap();
+          const ctxs = map.get(n.package) || [];
+          const ctxLinks = ctxs.length
+            ? ctxs.map((c) => `<a data-ctx-file="${escapeHtml(c.file)}">${escapeHtml(c.name)}</a>`).join(", ")
+            : '<span class="cg-empty">—</span>';
+          const community = n.clusterId ? (clusterLabel.get(String(n.clusterId)) || n.clusterId) : null;
+          info.innerHTML = `
+            <h3>${escapeHtml(n.label)}</h3>
+            <span class="cg-kind">${escapeHtml(n.kind)}</span>
+            <dl>
+              <dt>Package</dt><dd>${escapeHtml(n.package)}</dd>
+              ${community ? `<dt>Community</dt><dd>${escapeHtml(String(community))}</dd>` : ""}
+              <dt>File</dt><dd><a data-open-code="${escapeHtml(n.filePath)}#L${n.line}">${escapeHtml(n.filePath)}:${n.line}</a></dd>
+              <dt>Related contexts</dt><dd>${ctxLinks}</dd>
+            </dl>
+            <button class="cg-btn cg-open" data-open-code="${escapeHtml(n.filePath)}#L${n.line}">Open in code drawer ↗</button>`;
+          info.querySelectorAll("[data-open-code]").forEach((el) =>
+            el.addEventListener("click", () => window.fsOpenCode(el.dataset.openCode)));
+          info.querySelectorAll("[data-ctx-file]").forEach((el) =>
+            el.addEventListener("click", () => navigateTo(el.dataset.ctxFile)));
+        }
+
+        // ---- Wiring ----
+        cy.on("tap", "node", (ev) => {
+          const node = ev.target;
+          // Cluster → drill into its symbols; symbol → show details + actions.
+          if (node.data("group")) return showGroup(node.id());
+          showInfo(node);
+        });
+        cy.on("tap", (ev) => { if (ev.target === cy) document.getElementById("cg-results").hidden = true; });
+
+        document.getElementById("cg-back").addEventListener("click", showOverview);
+
+        const toggleKind = (kind, btn) => {
+          activeKinds[kind] = !activeKinds[kind];
+          btn.setAttribute("aria-pressed", String(activeKinds[kind]));
+          currentGroupKey ? showGroup(currentGroupKey) : showOverview();
+        };
+        document.getElementById("cg-edge-import").addEventListener("click", (e) => toggleKind("import", e.currentTarget));
+        document.getElementById("cg-edge-call").addEventListener("click", (e) => toggleKind("call", e.currentTarget));
+
+        // ---- Global symbol search → drill into the symbol's package. ----
+        const searchInput = document.getElementById("cg-search");
+        const resultsBox = document.getElementById("cg-results");
+        searchInput.addEventListener("input", () => {
+          const q = searchInput.value.trim().toLowerCase();
+          if (q.length < 2) { resultsBox.hidden = true; return; }
+          const hits = data.nodes.filter((n) => n.label.toLowerCase().includes(q)).slice(0, 30);
+          if (!hits.length) { resultsBox.innerHTML = `<button disabled style="cursor:default;color:var(--muted-fg)">No matches</button>`; resultsBox.hidden = false; return; }
+          resultsBox.innerHTML = hits.map((n) =>
+            `<button data-id="${escapeHtml(n.id)}">${escapeHtml(n.label)} <span class="cg-res-path">${escapeHtml(n.package)}</span></button>`).join("");
+          resultsBox.hidden = false;
+          resultsBox.querySelectorAll("button[data-id]").forEach((b) =>
+            b.addEventListener("click", () => {
+              resultsBox.hidden = true;
+              searchInput.value = "";
+              const id = b.dataset.id;
+              const gk = groupOf(id);
+              if (gk) showGroup(gk, id); // force-keep the searched node past the cap
+              const el = cy.getElementById(id);
+              if (el && el.length) {
+                cy.$(":selected").unselect();
+                el.select();
+                cy.animate({ fit: { eles: el.closedNeighborhood(), padding: 80 } }, { duration: 300 });
+                showInfo(el);
+              }
+            }));
+        });
+
+        showOverview();
+        window.scrollTo({ top: 0, behavior: "instant" });
+      }
+
+      // ADR status inference. We don't have a frontmatter status field,
+      // so derive a coarse tag from filename + title cues.
+      function inferAdrStatus(a) {
+        if (a.num === "0012" && a.slug === "utc-everywhere") return { label: "Superseded by 0009", cls: "adr-status-old" };
+        if (/superseded/i.test(a.title)) return { label: "Superseded", cls: "adr-status-old" };
+        return { label: "Accepted", cls: "adr-status-ok" };
+      }
+
+      // Resolve a route file into a structured breadcrumb trail so the
+      // topbar can render real links per level instead of a flat string.
+      function breadcrumbFor(routeFile) {
+        const overview = { label: "Overview", route: "overview" };
+        const ctx = CONTEXTS.find((c) => c.file === routeFile);
+        const sub = SUBMODULES.find((s) => s.file === routeFile);
+        const ref = REFERENCES.find((r) => r.file === routeFile || r.route === routeFile);
+        if (routeFile === "overview.md") return { routeKey: "overview", crumbs: [{ label: "Overview", current: true }] };
+        if (routeFile === "_adrs") return { routeKey: "ref-adrs", crumbs: [overview, { label: "Architecture Decision Records", current: true }] };
+        if (routeFile === "_codegraph") return { routeKey: "ref-codegraph", crumbs: [overview, { label: "Code Graph", current: true }] };
+        if (ctx) return { routeKey: ctx.slug, crumbs: [overview, { label: "Domain contexts" }, { label: ctx.name, current: true }] };
+        if (sub) {
+          const parentCtx = CONTEXTS.find((c) => c.slug === sub.parent);
+          return {
+            routeKey: sub.slug,
+            crumbs: [
+              overview,
+              { label: "Domain contexts" },
+              parentCtx ? { label: parentCtx.name, route: parentCtx.slug, file: parentCtx.file } : { label: sub.parent },
+              { label: sub.name, current: true },
+            ],
+          };
+        }
+        if (ref) {
+          const groupLabel = ref.group === "agent-context" ? "AI Agent Context" : "Reference";
+          return { routeKey: ref.slug, crumbs: [overview, { label: groupLabel }, { label: ref.name, current: true }] };
+        }
+        if (routeFile.startsWith("/") && routeFile.endsWith(".md")) {
+          const fileName = routeFile.split("/").pop();
+          return {
+            routeKey: "ref-" + routeFile.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, ""),
+            crumbs: [overview, { label: "Reference" }, { label: fileName, current: true }],
+          };
+        }
+        return { routeKey: routeFile, crumbs: [overview, { label: routeFile, current: true }] };
+      }
+
+      function renderBreadcrumb(crumbs) {
+        const el = document.getElementById("breadcrumb");
+        const parts = [];
+        crumbs.forEach((c, i) => {
+          if (i > 0) parts.push(`<span class="sep">›</span>`);
+          if (c.current) {
+            parts.push(`<span class="current">${escapeHtml(c.label)}</span>`);
+          } else if (c.route === "overview") {
+            parts.push(`<a href="#overview" data-crumb-overview>${escapeHtml(c.label)}</a>`);
+          } else if (c.file) {
+            parts.push(`<a href="#${escapeHtml(c.route)}" data-crumb-file="${escapeHtml(c.file)}">${escapeHtml(c.label)}</a>`);
+          } else {
+            parts.push(`<span>${escapeHtml(c.label)}</span>`);
+          }
+        });
+        el.innerHTML = parts.join(" ");
+        for (const a of el.querySelectorAll("a[data-crumb-overview]")) {
+          a.addEventListener("click", (ev) => { ev.preventDefault(); navigateTo("overview.md"); });
+        }
+        for (const a of el.querySelectorAll("a[data-crumb-file]")) {
+          a.addEventListener("click", (ev) => { ev.preventDefault(); navigateTo(a.dataset.crumbFile); });
+        }
+      }
+
+      // Linear page order used by prev/next buttons + the [ / ] / n / p
+      // shortcuts. Built so a sub-module immediately follows its parent
+      // context, matching how the sidebar reads top-to-bottom.
+      const PAGE_ORDER = (function () {
+        const list = [{ file: "overview.md", slug: "overview", title: "System map" }];
+        for (const c of CONTEXTS) {
+          list.push({ file: c.file, slug: c.slug, title: c.name });
+          for (const s of SUBMODULES.filter((s) => s.parent === c.slug)) {
+            list.push({ file: s.file, slug: s.slug, title: `${c.name} · ${s.name}` });
+          }
+        }
+        for (const r of REFERENCES) {
+          list.push({ file: r.file || r.route, slug: r.slug, title: r.name });
+        }
+        return list;
+      })();
+
+      function pageIndex(routeFile) {
+        return PAGE_ORDER.findIndex((p) => p.file === routeFile);
+      }
+
+      function renderPageNav(routeFile) {
+        const idx = pageIndex(routeFile);
+        if (idx < 0) return "";
+        const prev = idx > 0 ? PAGE_ORDER[idx - 1] : null;
+        const next = idx < PAGE_ORDER.length - 1 ? PAGE_ORDER[idx + 1] : null;
+        if (!prev && !next) return "";
+        const link = (p, kind) =>
+          `<a class="page-nav-${kind}" href="#${escapeHtml(p.slug)}" data-page-nav="${escapeHtml(p.file)}">
+            <span class="page-nav-label">${kind === "prev" ? "← Previous" : "Next →"}</span>
+            <span class="page-nav-title">${escapeHtml(p.title)}</span>
+          </a>`;
+        return `<nav class="page-nav" aria-label="Page navigation">${
+          prev ? link(prev, "prev") : '<span class="empty"></span>'
+        }${
+          next ? link(next, "next") : '<span class="empty"></span>'
+        }</nav>`;
+      }
+
+      function attachPageNavHandlers(article) {
+        for (const a of article.querySelectorAll("a[data-page-nav]")) {
+          a.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            navigateTo(a.dataset.pageNav);
+          });
+        }
+      }
+
+      let _initialNav = true;
+      let _suppressHistory = false;
+      function navigateTo(routeFile) {
+        const { routeKey, crumbs } = breadcrumbFor(routeFile);
+        const targetHash = `#${routeKey}`;
+        if (!_suppressHistory && location.hash !== targetHash) {
+          if (_initialNav) {
+            history.replaceState({ route: routeKey, file: routeFile }, "", targetHash);
+            _initialNav = false;
+          } else {
+            history.pushState({ route: routeKey, file: routeFile }, "", targetHash);
+          }
+        } else if (_initialNav) {
+          history.replaceState({ route: routeKey, file: routeFile }, "", targetHash);
+          _initialNav = false;
+        }
+        setActive(routeKey);
+        expandActiveParent(routeKey);
+        renderBreadcrumb(crumbs);
+        loadPage(routeFile, crumbs);
+      }
+
+      window.addEventListener("popstate", () => {
+        const hash = (location.hash || "#overview").slice(1);
+        const ctx = CONTEXTS.find((x) => x.slug === hash);
+        const sub = SUBMODULES.find((x) => x.slug === hash);
+        const ref = REFERENCES.find((x) => x.slug === hash);
+        const file = ctx ? ctx.file : sub ? sub.file : ref ? (ref.file || ref.route) : hash === "adrs" || hash === "ref-adrs" ? "_adrs" : hash === "codegraph" ? "_codegraph" : "overview.md";
+        _suppressHistory = true;
+        navigateTo(file);
+        _suppressHistory = false;
+      });
+
+      // ──────────────────────────────────────────────────────────
+      // Nav — nested collapsible sub-modules per context
+      // ──────────────────────────────────────────────────────────
+      function renderNav() {
+        const subsByParent = new Map();
+        for (const s of SUBMODULES) {
+          if (!subsByParent.has(s.parent)) subsByParent.set(s.parent, []);
+          subsByParent.get(s.parent).push(s);
+        }
+
+        const chevronSvg = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>`;
+
+        document.getElementById("nav-contexts").innerHTML = CONTEXTS.map((x) => {
+          const subs = subsByParent.get(x.slug) || [];
+          const exemplar = x.status === "exemplar" ? '<span class="mark">★</span>' : "";
+          const chevron = subs.length
+            ? `<button class="nav-chevron" data-parent="${x.slug}" aria-expanded="false" aria-label="Toggle sub-modules of ${x.name}">${chevronSvg}</button>`
+            : "";
+          const children = subs.length
+            ? `<div class="nav-children" data-parent-children="${x.slug}" hidden>${subs.map((s) =>
+                `<a class="nav-link nav-sub" data-route="${s.slug}" data-file="${s.file}"><span>${s.name}</span></a>`
+              ).join("")}</div>`
+            : "";
+          return `
+            <div class="nav-item${subs.length ? " has-children" : ""}">
+              <div class="nav-row">
+                <a class="nav-link" data-route="${x.slug}" data-file="${x.file}"><span>${x.name}</span>${exemplar}</a>
+                ${chevron}
+              </div>
+              ${children}
+            </div>
+          `;
+        }).join("");
+
+        const refsByGroup = (group) => REFERENCES.filter((r) => r.group === group);
+        const renderRefRow = (r) =>
+          `<a class="nav-link" data-route="${r.slug}" data-ref="${r.file || r.route}"><span>${r.name}</span></a>`;
+
+        document.getElementById("nav-agent-context").innerHTML =
+          refsByGroup("agent-context").map(renderRefRow).join("");
+        document.getElementById("nav-references").innerHTML =
+          refsByGroup("reference").map(renderRefRow).join("");
+
+        for (const a of document.querySelectorAll(".nav-link[data-file]")) {
+          a.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            const parentItem = a.closest(".nav-item.has-children");
+            const parentSlug = a.dataset.route;
+            // Already on this page: don't reload it. If it's a parent with
+            // sub-modules, just toggle its dropdown open/closed instead.
+            if (a.classList.contains("active")) {
+              if (parentItem && parentSlug) toggleChildren(parentSlug);
+              return;
+            }
+            // First navigation here: navigateTo → expandActiveParent opens
+            // the dropdown so the reader sees the children of the page.
+            navigateTo(a.dataset.file);
+          });
+        }
+        for (const a of document.querySelectorAll(".nav-link[data-ref]")) {
+          a.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            if (a.classList.contains("active")) return;
+            navigateTo(a.dataset.ref);
+          });
+        }
+        for (const btn of document.querySelectorAll(".nav-chevron")) {
+          btn.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            toggleChildren(btn.dataset.parent);
+          });
+        }
+        document.querySelector('.nav-link[data-route="overview"]')
+          .addEventListener("click", (ev) => {
+            ev.preventDefault();
+            if (ev.currentTarget.classList.contains("active")) return;
+            navigateTo("overview.md");
+          });
+
+      }
+
+      function toggleChildren(parentSlug, force) {
+        const children = document.querySelector(`[data-parent-children="${parentSlug}"]`);
+        const chevron = document.querySelector(`.nav-chevron[data-parent="${parentSlug}"]`);
+        if (!children || !chevron) return;
+        const open = typeof force === "boolean" ? force : children.hasAttribute("hidden");
+        if (open) {
+          children.removeAttribute("hidden");
+          chevron.setAttribute("aria-expanded", "true");
+        } else {
+          children.setAttribute("hidden", "");
+          chevron.setAttribute("aria-expanded", "false");
+        }
+      }
+
+      // Auto-expand the parent of any active sub-module.
+      function expandActiveParent(routeKey) {
+        const sub = SUBMODULES.find((s) => s.slug === routeKey);
+        if (sub) toggleChildren(sub.parent, true);
+        const ctx = CONTEXTS.find((c) => c.slug === routeKey);
+        if (ctx) toggleChildren(ctx.slug, true);
+        // Reference and AI Agent Context groups are always expanded —
+        // no auto-toggle needed.
+      }
+
+      // ──────────────────────────────────────────────────────────
+      // Drawer
+      // ──────────────────────────────────────────────────────────
+      const drawer = document.getElementById("drawer");
+      const scrim = document.getElementById("scrim");
+      const search = document.getElementById("drawer-search");
+
+      function openDrawer() {
+        drawer.classList.add("open");
+        scrim.classList.add("open");
+        drawer.setAttribute("aria-hidden", "false");
+        setTimeout(() => search.focus(), 80);
+      }
+      function closeDrawer() {
+        drawer.classList.remove("open");
+        scrim.classList.remove("open");
+        drawer.setAttribute("aria-hidden", "true");
+      }
+      document.getElementById("open-glossary").addEventListener("click", openDrawer);
+      document.getElementById("drawer-close").addEventListener("click", closeDrawer);
+      scrim.addEventListener("click", closeDrawer);
+      search.addEventListener("input", () => renderDrawer(search.value));
+
+      // ──────────────────────────────────────────────────────────
+      // Code drawer — click any /packages/, /apps/, /ops/, /tooling/
+      // link in the rendered article and the source file opens in a
+      // slide-out drawer on the right, syntax-highlighted by Prism,
+      // jumping to a #Lxx line if the href has one.
+      // ──────────────────────────────────────────────────────────
+      const codeDrawer = document.getElementById("code-drawer");
+      const codeDrawerBody = document.getElementById("code-drawer-body");
+      const codeDrawerTitle = document.getElementById("code-drawer-title");
+      const codeDrawerPath = document.getElementById("code-drawer-path");
+      const codeDrawerVscode = document.getElementById("code-drawer-vscode");
+
+      const CODE_PREFIXES = ["/src/", "/convex/", "/scripts/", "/tooling/", "/lessons/"];
+      const CODE_EXTS = new Set([
+        "ts","tsx","mts","cts","js","jsx","mjs","cjs",
+        "py","go","rs","java","kt","kts","rb","php","swift","scala","dart","lua","r","jl",
+        "c","h","cc","cpp","cxx","hpp","hh","cs","ex","exs","erl","hs","clj","groovy","gradle",
+        "sql","proto","graphql","gql","vue","svelte","tf","hcl",
+        "prisma","json","yaml","yml","toml","sh","bash","ps1","dockerfile",
+        "html","css","scss",
+      ]);
+
+      const LANG_MAP = {
+        ts: "typescript", tsx: "tsx", mts: "typescript", cts: "typescript",
+        js: "javascript", jsx: "jsx", mjs: "javascript", cjs: "javascript",
+        py: "python", go: "go", rs: "rust", java: "java", kt: "kotlin", kts: "kotlin",
+        rb: "ruby", php: "php", swift: "swift", scala: "scala", dart: "dart", lua: "lua", r: "r", jl: "julia",
+        c: "c", h: "c", cc: "cpp", cpp: "cpp", cxx: "cpp", hpp: "cpp", hh: "cpp", cs: "csharp",
+        ex: "elixir", exs: "elixir", erl: "erlang", hs: "haskell", clj: "clojure", groovy: "groovy", gradle: "groovy",
+        sql: "sql", proto: "protobuf", graphql: "graphql", gql: "graphql", vue: "markup", svelte: "markup",
+        tf: "hcl", hcl: "hcl", dockerfile: "docker",
+        prisma: "prisma", json: "json", yaml: "yaml", yml: "yaml",
+        toml: "toml", sh: "bash", bash: "bash", ps1: "powershell",
+        html: "markup", css: "css", scss: "scss",
+      };
+
+      function parseCodeHref(href) {
+        const u = new URL(href, location.href);
+        if (u.origin !== location.origin) return null;
+        const path = u.pathname;
+        if (!CODE_PREFIXES.some((p) => path.startsWith(p))) return null;
+        const ext = path.split(".").pop()?.toLowerCase();
+        if (!ext || !CODE_EXTS.has(ext)) return null;
+        // hash forms: #L42 or #L42-L51 or empty
+        let lineStart = null, lineEnd = null;
+        if (u.hash) {
+          const m1 = u.hash.match(/^#L(\d+)(?:-L?(\d+))?$/);
+          if (m1) { lineStart = +m1[1]; lineEnd = m1[2] ? +m1[2] : lineStart; }
+        }
+        return { path, ext, lineStart, lineEnd };
+      }
+
+      function openCodeDrawer() {
+        codeDrawer.classList.add("open");
+        codeDrawer.setAttribute("aria-hidden", "false");
+      }
+      function closeCodeDrawer() {
+        codeDrawer.classList.remove("open");
+        codeDrawer.setAttribute("aria-hidden", "true");
+      }
+      document.getElementById("code-drawer-close").addEventListener("click", closeCodeDrawer);
+      // Click anywhere outside the drawer closes it. Ignore clicks on the
+      // links/buttons that open it, so opening one doesn't immediately close.
+      document.addEventListener("pointerdown", (ev) => {
+        if (!codeDrawer.classList.contains("open")) return;
+        if (codeDrawer.contains(ev.target)) return;
+        if (ev.target.closest("a[data-code], [data-open-code]")) return;
+        closeCodeDrawer();
+      });
+
+      async function showCode({ path, ext, lineStart, lineEnd }) {
+        codeDrawerTitle.textContent = path.split("/").pop();
+        codeDrawerPath.textContent = path + (lineStart ? `:L${lineStart}${lineEnd && lineEnd !== lineStart ? `-L${lineEnd}` : ""}` : "");
+        codeDrawerVscode.href = `vscode://file${path}${lineStart ? `:${lineStart}` : ""}`;
+        codeDrawerBody.innerHTML = `<div class="code-drawer-loading">Loading ${escapeHtml(path)}…</div>`;
+        openCodeDrawer();
+        try {
+          const r = await fetch(path);
+          if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+          const text = await r.text();
+          const lang = LANG_MAP[ext] || "none";
+          codeDrawerBody.innerHTML = `<pre class="line-numbers"><code class="language-${lang}"></code></pre>`;
+          const code = codeDrawerBody.querySelector("code");
+          code.textContent = text;
+          if (window.Prism) Prism.highlightElement(code);
+          if (lineStart) {
+            // Position the highlight band off the line-numbers rows — the
+            // same elements that draw the visible numbers — so it can never
+            // drift off-by-one from what the reader sees. (Prism's own
+            // line-highlight plugin overlay positions independently and
+            // accumulates a per-line offset, landing on blank lines.)
+            requestAnimationFrame(() => {
+              const pre = codeDrawerBody.querySelector("pre");
+              const rows = pre?.querySelectorAll(".line-numbers-rows > span");
+              if (!rows || !rows.length) return;
+              const startRow = rows[lineStart - 1];
+              const endRow = rows[(lineEnd || lineStart) - 1] || startRow;
+              if (!startRow) return;
+              const preTop = pre.getBoundingClientRect().top;
+              const top = startRow.getBoundingClientRect().top - preTop;
+              const height = endRow.getBoundingClientRect().bottom
+                - startRow.getBoundingClientRect().top;
+              const band = document.createElement("div");
+              band.className = "line-highlight";
+              band.style.top = `${top}px`;
+              band.style.height = `${height}px`;
+              pre.appendChild(band);
+              band.scrollIntoView({ block: "center", behavior: "smooth" });
+            });
+          }
+        } catch (e) {
+          codeDrawerBody.innerHTML = `<div class="code-drawer-error">Failed to load <code>${escapeHtml(path)}</code>: ${escapeHtml(e.message)}.<br/><br/>If you're running <code>pnpm documentation</code>, make sure the script is the repo-root one (it should be <code>pnpm dlx serve@latest --listen tcp://127.0.0.1:3000 .</code>). Older versions served only <code>docs/</code>, which makes every <code>/packages/</code> link 404.</div>`;
+        }
+      }
+
+      // Delegated click handler on the article pane — also catches links
+      // inside Mermaid `<svg>`s that get inlined via marked.
+      document.getElementById("article").addEventListener("click", (ev) => {
+        const a = ev.target.closest("a[href]");
+        if (!a) return;
+        const parsed = parseCodeHref(a.getAttribute("href"));
+        if (!parsed) return;
+        ev.preventDefault();
+        showCode(parsed);
+      });
+
+      // Mark code-shaped links visually after every page render so the
+      // reader knows what will happen.
+      const _origLoadPage = loadPage;
+      loadPage = async function (file, breadcrumb) {
+        await _origLoadPage(file, breadcrumb);
+        for (const a of document.querySelectorAll("#article a[href]")) {
+          if (parseCodeHref(a.getAttribute("href"))) {
+            a.setAttribute("data-code", "");
+            a.setAttribute("title", `Open ${a.getAttribute("href")} in code drawer`);
+          }
+        }
+      };
+
+      // ──────────────────────────────────────────────────────────
+      // Global fuzzy finder (palette)
+      // ──────────────────────────────────────────────────────────
+      const palette = document.getElementById("palette");
+      const paletteScrim = document.getElementById("palette-scrim");
+      const paletteInput = document.getElementById("palette-input");
+      const paletteResults = document.getElementById("palette-results");
+      const cheatsheet = document.getElementById("cheatsheet");
+
+      // Index built lazily on first palette open. Records:
+      //   { kind: "page" | "heading" | "glossary", title, snippet, page, anchor? }
+      let PALETTE_INDEX = null;
+      let PALETTE_INDEX_LOADING = null;
+      let PALETTE_ACTIVE = 0;
+      let PALETTE_RESULTS = [];
+
+      async function buildPaletteIndex() {
+        if (PALETTE_INDEX) return PALETTE_INDEX;
+        if (PALETTE_INDEX_LOADING) return PALETTE_INDEX_LOADING;
+        PALETTE_INDEX_LOADING = (async () => {
+          const idx = [];
+          // pages
+          for (const p of PAGE_ORDER) {
+            idx.push({ kind: "page", title: p.title, page: p });
+          }
+          // headings — fetch every markdown page we know about, extract
+          // h2/h3 lines. ~50 files, parallel.
+          const headingFetches = PAGE_ORDER
+            .filter((p) => typeof p.file === "string" && (p.file.endsWith(".md") || p.file.startsWith("/")))
+            .map(async (p) => {
+              try {
+                const url = p.file.startsWith("/") ? p.file : p.file;
+                const r = await fetch(url);
+                if (!r.ok) return;
+                const text = await r.text();
+                const lines = text.split("\n");
+                for (let i = 0; i < lines.length; i++) {
+                  const m = lines[i].match(/^(#{2,3})\s+(.+?)\s*$/);
+                  if (!m) continue;
+                  const title = m[2].replace(/[*`_]/g, "").trim();
+                  const anchor = title
+                    .toLowerCase()
+                    .replace(/<[^>]+>/g, "")
+                    .replace(/[^\w\s-]/g, "")
+                    .replace(/\s+/g, "-");
+                  // grab the next non-empty line as a snippet
+                  let snippet = "";
+                  for (let j = i + 1; j < Math.min(lines.length, i + 8); j++) {
+                    const l = lines[j].trim();
+                    if (l && !l.startsWith("#")) { snippet = l.replace(/[*`_]/g, "").slice(0, 140); break; }
+                  }
+                  idx.push({ kind: "heading", title, snippet, page: p, anchor });
+                }
+              } catch {}
+            });
+          await Promise.all(headingFetches);
+          // glossary
+          for (const t of GLOSSARY.values()) {
+            idx.push({ kind: "glossary", title: t.name, snippet: t.def, source: t.source });
+          }
+          PALETTE_INDEX = idx;
+          return idx;
+        })();
+        return PALETTE_INDEX_LOADING;
+      }
+
+      // Cheap fuzzy: token subsequence match with priority by:
+      //   1) glossary exact (case-insensitive)
+      //   2) heading exact match
+      //   3) page-title exact match
+      //   4) prefix matches
+      //   5) substring matches
+      //   6) subsequence matches
+      function scoreHit(item, q) {
+        const t = item.title.toLowerCase();
+        if (item.kind === "glossary" && t === q) return 1000;
+        if (item.kind === "heading" && t === q) return 900;
+        if (item.kind === "page" && t === q) return 850;
+        if (t.startsWith(q)) return 600 + (item.kind === "page" ? 50 : 0);
+        if (t.includes(q)) return 400 + (item.kind === "page" ? 50 : 0);
+        // subsequence
+        let i = 0;
+        for (const ch of q) {
+          const at = t.indexOf(ch, i);
+          if (at < 0) return -1;
+          i = at + 1;
+        }
+        return 100 - Math.min(99, t.length - q.length);
+      }
+
+      function highlightMatch(text, q) {
+        if (!q) return escapeHtml(text);
+        const ql = q.toLowerCase();
+        const tl = text.toLowerCase();
+        const idx = tl.indexOf(ql);
+        if (idx < 0) return escapeHtml(text);
+        return escapeHtml(text.slice(0, idx)) +
+          `<mark>${escapeHtml(text.slice(idx, idx + ql.length))}</mark>` +
+          escapeHtml(text.slice(idx + ql.length));
+      }
+
+      function renderPaletteResults() {
+        if (!PALETTE_RESULTS.length) {
+          paletteResults.innerHTML = `<div class="palette-empty">${PALETTE_INDEX ? "No matches." : "Building index…"}</div>`;
+          return;
+        }
+        const q = paletteInput.value.trim();
+        paletteResults.innerHTML = PALETTE_RESULTS.map((r, i) => {
+          const kindLabel = r.kind === "page" ? "Page" : r.kind === "heading" ? "Heading" : `Glossary · ${r.source || ""}`;
+          const context = r.kind === "heading" ? ` in ${escapeHtml(r.page.title)}` : "";
+          return `
+            <div class="palette-result${i === PALETTE_ACTIVE ? " active" : ""}" data-idx="${i}">
+              <div class="palette-result-title">${highlightMatch(r.title, q)}</div>
+              <div class="palette-result-meta">
+                <span class="palette-result-kind">${escapeHtml(kindLabel)}</span>
+                ${context ? `<span>${context}</span>` : ""}
+              </div>
+              ${r.snippet ? `<div class="palette-result-snippet">${escapeHtml(r.snippet)}</div>` : ""}
+            </div>
+          `;
+        }).join("");
+        for (const el of paletteResults.querySelectorAll(".palette-result")) {
+          el.addEventListener("click", () => {
+            PALETTE_ACTIVE = Number(el.dataset.idx);
+            openPaletteResult();
+          });
+          el.addEventListener("mouseenter", () => {
+            PALETTE_ACTIVE = Number(el.dataset.idx);
+            for (const node of paletteResults.querySelectorAll(".palette-result"))
+              node.classList.toggle("active", Number(node.dataset.idx) === PALETTE_ACTIVE);
+          });
+        }
+      }
+
+      function updatePaletteSearch() {
+        const q = paletteInput.value.trim().toLowerCase();
+        if (!PALETTE_INDEX) {
+          PALETTE_RESULTS = [];
+          renderPaletteResults();
+          return;
+        }
+        if (!q) {
+          // Show the page order so an empty palette is still useful.
+          PALETTE_RESULTS = PALETTE_INDEX.filter((r) => r.kind === "page").slice(0, 24);
+        } else {
+          PALETTE_RESULTS = PALETTE_INDEX
+            .map((item) => ({ item, score: scoreHit(item, q) }))
+            .filter((s) => s.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 30)
+            .map((s) => s.item);
+        }
+        PALETTE_ACTIVE = 0;
+        renderPaletteResults();
+      }
+
+      async function openPalette() {
+        paletteScrim.classList.add("open");
+        palette.classList.add("open");
+        paletteInput.value = "";
+        paletteResults.innerHTML = `<div class="palette-empty">Loading index…</div>`;
+        setTimeout(() => paletteInput.focus(), 30);
+        await buildPaletteIndex();
+        updatePaletteSearch();
+      }
+      function closePalette() {
+        paletteScrim.classList.remove("open");
+        palette.classList.remove("open");
+      }
+      function openPaletteResult() {
+        const r = PALETTE_RESULTS[PALETTE_ACTIVE];
+        if (!r) return;
+        closePalette();
+        if (r.kind === "page") {
+          navigateTo(r.page.file);
+        } else if (r.kind === "heading") {
+          navigateTo(r.page.file);
+          // Wait for render then scroll + highlight.
+          const tryScroll = (retries) => {
+            const target = document.getElementById(r.anchor);
+            if (target) {
+              target.scrollIntoView({ behavior: "smooth", block: "start" });
+              target.classList.add("docs-search-hit");
+              setTimeout(() => target.classList.add("fade"), 1200);
+              setTimeout(() => target.classList.remove("docs-search-hit", "fade"), 2400);
+            } else if (retries > 0) {
+              setTimeout(() => tryScroll(retries - 1), 60);
+            }
+          };
+          requestAnimationFrame(() => tryScroll(40));
+        } else if (r.kind === "glossary") {
+          openDrawer();
+          search.value = r.title;
+          renderDrawer(r.title);
+        }
+      }
+
+      paletteInput.addEventListener("input", updatePaletteSearch);
+      paletteScrim.addEventListener("click", closePalette);
+      paletteInput.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          PALETTE_ACTIVE = Math.min(PALETTE_RESULTS.length - 1, PALETTE_ACTIVE + 1);
+          renderPaletteResults();
+          paletteResults.querySelector(".palette-result.active")?.scrollIntoView({ block: "nearest" });
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          PALETTE_ACTIVE = Math.max(0, PALETTE_ACTIVE - 1);
+          renderPaletteResults();
+          paletteResults.querySelector(".palette-result.active")?.scrollIntoView({ block: "nearest" });
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          openPaletteResult();
+        }
+      });
+
+      // ──────────────────────────────────────────────────────────
+      // Cheatsheet
+      // ──────────────────────────────────────────────────────────
+      function openCheatsheet() { cheatsheet.classList.add("open"); }
+      function closeCheatsheet() { cheatsheet.classList.remove("open"); }
+      cheatsheet.addEventListener("click", (ev) => {
+        if (ev.target === cheatsheet) closeCheatsheet();
+      });
+
+      // ──────────────────────────────────────────────────────────
+      // Keyboard shortcuts: /  Ctrl+K  open finder;  g glossary;
+      // n / p / [ / ] cycle pages;  ? cheatsheet;  g g overview;  esc close.
+      // ──────────────────────────────────────────────────────────
+      let _gPressedAt = 0;
+
+      function cyclePage(delta) {
+        const here = (location.hash || "#overview").slice(1);
+        const cur = PAGE_ORDER.find((p) => p.slug === here);
+        const idx = cur ? PAGE_ORDER.indexOf(cur) : 0;
+        const next = idx + delta;
+        if (next >= 0 && next < PAGE_ORDER.length) navigateTo(PAGE_ORDER[next].file);
+      }
+
+      document.addEventListener("keydown", (e) => {
+        const editing = ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName);
+
+        // Escape closes any open overlay, in priority order.
+        if (e.key === "Escape") {
+          if (palette.classList.contains("open")) return closePalette();
+          if (cheatsheet.classList.contains("open")) return closeCheatsheet();
+          if (codeDrawer.classList.contains("open")) return closeCodeDrawer();
+          if (drawer.classList.contains("open")) return closeDrawer();
+          return;
+        }
+
+        // Ctrl/Cmd-K opens the palette from anywhere, even input fields.
+        if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+          e.preventDefault();
+          if (palette.classList.contains("open")) closePalette(); else openPalette();
+          return;
+        }
+
+        if (editing) return;
+
+        if (e.key === "/") {
+          e.preventDefault();
+          openPalette();
+          return;
+        }
+        if (e.key === "?") {
+          e.preventDefault();
+          if (cheatsheet.classList.contains("open")) closeCheatsheet(); else openCheatsheet();
+          return;
+        }
+        if (e.key === "g") {
+          // double-g within 500ms → home
+          const now = Date.now();
+          if (now - _gPressedAt < 500) { _gPressedAt = 0; navigateTo("overview.md"); return; }
+          _gPressedAt = now;
+          // single g toggles glossary after the double-press window.
+          setTimeout(() => {
+            if (_gPressedAt && Date.now() - _gPressedAt >= 480) {
+              _gPressedAt = 0;
+              drawer.classList.contains("open") ? closeDrawer() : openDrawer();
+            }
+          }, 500);
+          e.preventDefault();
+          return;
+        }
+        if (e.key === "n" || e.key === "]") { e.preventDefault(); cyclePage(+1); return; }
+        if (e.key === "p" || e.key === "[") { e.preventDefault(); cyclePage(-1); return; }
+      });
+
+      // ──────────────────────────────────────────────────────────
+      // Topbar scroll shadow
+      // ──────────────────────────────────────────────────────────
+      const topbar = document.querySelector(".topbar");
+      window.addEventListener("scroll", () => {
+        topbar.classList.toggle("scrolled", window.scrollY > 8);
+      });
+
+      // ──────────────────────────────────────────────────────────
+      // Theme + width toggles (light/dark, default/full-width).
+      // The early head-script applies persisted state before paint;
+      // this wires the button UI and keeps mermaid in sync.
+      // ──────────────────────────────────────────────────────────
+      const themeBtn = document.getElementById("toggle-theme");
+      const themeSun = document.getElementById("toggle-theme-sun");
+      const themeMoon = document.getElementById("toggle-theme-moon");
+      const widthBtn = document.getElementById("toggle-width");
+
+      function syncThemeIcon() {
+        const dark = document.documentElement.getAttribute("data-theme") === "dark";
+        themeSun.style.display = dark ? "none" : "";
+        themeMoon.style.display = dark ? "" : "none";
+        themeBtn.setAttribute("aria-pressed", String(dark));
+        themeBtn.title = dark ? "Switch to light theme" : "Switch to dark theme";
+      }
+      function syncWidthIcon() {
+        const wide = document.documentElement.getAttribute("data-width") === "wide";
+        widthBtn.setAttribute("aria-pressed", String(wide));
+        widthBtn.classList.toggle("active", wide);
+        widthBtn.title = wide ? "Switch to default reading width" : "Switch to full width";
+      }
+      syncThemeIcon();
+      syncWidthIcon();
+
+      themeBtn.addEventListener("click", () => {
+        const dark = document.documentElement.getAttribute("data-theme") === "dark";
+        const next = dark ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        try { localStorage.setItem("docs-theme", next); } catch (e) {}
+        syncThemeIcon();
+        // Re-init mermaid with the new palette and re-render the current
+        // page so any inlined SVG picks up the new colours.
+        initMermaid(next);
+        if (CURRENT_PAGE) loadPage(CURRENT_PAGE.file, CURRENT_PAGE.crumbs);
+      });
+
+      widthBtn.addEventListener("click", () => {
+        const wide = document.documentElement.getAttribute("data-width") === "wide";
+        if (wide) {
+          document.documentElement.removeAttribute("data-width");
+          try { localStorage.setItem("docs-width", "default"); } catch (e) {}
+        } else {
+          document.documentElement.setAttribute("data-width", "wide");
+          try { localStorage.setItem("docs-width", "wide"); } catch (e) {}
+        }
+        syncWidthIcon();
+      });
+
+      // ──────────────────────────────────────────────────────────
+      // Boot
+      // ──────────────────────────────────────────────────────────
+      // A saved snapshot (file://) keeps the DOM the browser captured: the
+      // sidebar (whose original click listeners weren't serialised, so its
+      // links are inert) and the rendered article both stay put. Rebuilding
+      // the nav or running the initial navigation would only re-trigger the
+      // CORS-blocked fetches and blank the page, so skip boot entirely.
+      if (!OFFLINE) {
+        renderNav();
+        // Glossary, docs meta, and diagnostics badge can all load in parallel.
+        await Promise.all([loadGlossary(), loadDocsMeta(), paintDiagnosticsBadge()]);
+        const initial = (location.hash || "#overview").slice(1);
+        const ctx = CONTEXTS.find((x) => x.slug === initial);
+        const sub = SUBMODULES.find((x) => x.slug === initial);
+        const ref = REFERENCES.find((x) => x.slug === initial);
+        navigateTo(
+          ctx ? ctx.file :
+          sub ? sub.file :
+          ref ? (ref.file || ref.route) :
+          initial === "adrs" ? "_adrs" :
+          initial === "codegraph" ? "_codegraph" :
+          "overview.md"
+        );
+      }
+    </script>
+  </body>
+</html>

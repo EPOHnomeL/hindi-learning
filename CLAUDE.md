@@ -12,6 +12,11 @@ Five canonical triage roles, using the default strings (`needs-triage`, `needs-i
 
 Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+Interactive knowledge bank (glossary, ADRs, system map, code drawer): run `pnpm documentation` and
+open <http://localhost:3000/docs/architecture/>. Sources live under `docs/architecture/` (registries
+in `index.html`, meta generator in `tooling/docs-meta.mjs`); authoring contract in
+`docs/architecture/README.md`.
+
 <!-- convex-ai-start -->
 
 This project uses [Convex](https://convex.dev) as its backend.

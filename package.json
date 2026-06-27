@@ -11,6 +11,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
+    "documentation": "node tooling/docs-meta.mjs && pnpm dlx serve@latest --listen tcp://127.0.0.1:3000 .",
+    "documentation:meta": "node tooling/docs-meta.mjs",
     "claim": "tsx scripts/claim.ts",
     "claim:prod": "tsx scripts/claim.ts --prod",
     "publish": "tsx scripts/publish.ts",

@@ -1,0 +1,242 @@
+{
+  "generatedAt": "2026-06-27T08:34:53.749Z",
+  "files": {
+    "/docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md": {
+      "title": "Asynchronous, hub-mediated teaching loop (no live tutor on the web)",
+      "updated": "2026-06-09T19:50:08+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/overview.md",
+          "title": "Served Teach App — Technical Overview"
+        }
+      ]
+    },
+    "/docs/adr/0002-local-workspace-source-of-truth-neon-mirror-via-mcp.md": {
+      "title": "Local teach workspace is the source of truth; Neon is a published mirror + inbox, integrated via the Neon MCP",
+      "updated": "2026-06-17T12:58:39+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md",
+          "title": "Content source of truth moves to Convex; the Routine pulls per-Topic context (supersedes 0002; partially supersedes 0008)"
+        }
+      ]
+    },
+    "/docs/adr/0003-immutable-lessons-mutable-references.md": {
+      "title": "Immutable Lessons, mutable References",
+      "updated": "2026-06-09T19:50:08+02:00",
+      "backlinks": []
+    },
+    "/docs/adr/0007-nextjs-convex-rebuild.md": {
+      "title": "Next.js + Convex rebuild (supersedes 0004, 0005, 0006)",
+      "updated": "2026-06-11T21:48:39+02:00",
+      "backlinks": [
+        {
+          "path": "/CONTEXT.md",
+          "title": "Served Teach App Glossary"
+        }
+      ]
+    },
+    "/docs/adr/0008-next-lesson-routine-gate-in-convex.md": {
+      "title": "Next-lesson Routine: gate in Convex, API-only routine, one routine for all Topics",
+      "updated": "2026-06-17T12:58:39+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md",
+          "title": "Content source of truth moves to Convex; the Routine pulls per-Topic context (supersedes 0002; partially supersedes 0008)"
+        },
+        {
+          "path": "/docs/routine.md",
+          "title": "The next-lesson Routine — operational runbook"
+        }
+      ]
+    },
+    "/docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md": {
+      "title": "Content source of truth moves to Convex; the Routine pulls per-Topic context (supersedes 0002; partially supersedes 0008)",
+      "updated": "2026-06-17T12:58:39+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/adr/0002-local-workspace-source-of-truth-neon-mirror-via-mcp.md",
+          "title": "Local teach workspace is the source of truth; Neon is a published mirror + inbox, integrated via the Neon MCP"
+        },
+        {
+          "path": "/docs/adr/0008-next-lesson-routine-gate-in-convex.md",
+          "title": "Next-lesson Routine: gate in Convex, API-only routine, one routine for all Topics"
+        },
+        {
+          "path": "/docs/adr/0010-teaching-compute-swappable-adapter.md",
+          "title": "The teaching compute is a swappable adapter: shared claude.ai Routine now, per-owner Agent-SDK worker later"
+        },
+        {
+          "path": "/docs/architecture/overview.md",
+          "title": "Served Teach App — Technical Overview"
+        },
+        {
+          "path": "/docs/routine-prompt.md",
+          "title": "The next-lesson Routine — canonical Instructions"
+        },
+        {
+          "path": "/CONTEXT.md",
+          "title": "Served Teach App Glossary"
+        }
+      ]
+    },
+    "/docs/adr/0010-teaching-compute-swappable-adapter.md": {
+      "title": "The teaching compute is a swappable adapter: shared claude.ai Routine now, per-owner Agent-SDK worker later",
+      "updated": "2026-06-17T12:58:39+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/adr/0008-next-lesson-routine-gate-in-convex.md",
+          "title": "Next-lesson Routine: gate in Convex, API-only routine, one routine for all Topics"
+        }
+      ]
+    },
+    "/docs/adr/0011-allowlist-in-convex-admin-portal.md": {
+      "title": "The Allowlist lives in Convex and is managed by an in-app Admin, gating sign-up only",
+      "updated": "2026-06-27T10:22:05+02:00",
+      "backlinks": []
+    },
+    "/docs/adr/0011-app-driven-theme-into-sandboxed-lesson-iframe.md": {
+      "title": "App-driven theme, pushed into the sandboxed lesson iframe",
+      "updated": "2026-06-27T10:15:46+02:00",
+      "backlinks": []
+    },
+    "/docs/adr/0012-app-router-url-addressable-navigation.md": {
+      "title": "URL-addressable navigation via the App Router",
+      "updated": "2026-06-27T08:32:35.611Z",
+      "backlinks": []
+    },
+    "/docs/agents/domain.md": {
+      "title": "Domain Docs",
+      "updated": "2026-06-09T19:18:22+02:00",
+      "backlinks": []
+    },
+    "/docs/agents/issue-tracker.md": {
+      "title": "Issue tracker: Local Markdown",
+      "updated": "2026-06-09T19:18:22+02:00",
+      "backlinks": []
+    },
+    "/docs/agents/triage-labels.md": {
+      "title": "Triage Labels",
+      "updated": "2026-06-09T19:18:22+02:00",
+      "backlinks": []
+    },
+    "/docs/architecture/contexts/01-hub-content.md": {
+      "title": "Hub & Content Model",
+      "updated": "2026-06-27T08:31:16.094Z",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/overview.md",
+          "title": "Served Teach App — Technical Overview"
+        }
+      ]
+    },
+    "/docs/architecture/contexts/02-reader.md": {
+      "title": "Reader",
+      "updated": "2026-06-27T08:34:27.837Z",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/overview.md",
+          "title": "Served Teach App — Technical Overview"
+        }
+      ]
+    },
+    "/docs/architecture/contexts/03-teaching-routine.md": {
+      "title": "Teaching Routine",
+      "updated": "2026-06-27T08:31:31.357Z",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/overview.md",
+          "title": "Served Teach App — Technical Overview"
+        }
+      ]
+    },
+    "/docs/architecture/contexts/04-publishing-workspace.md": {
+      "title": "Publishing & Workspace",
+      "updated": "2026-06-27T08:31:37.657Z",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/overview.md",
+          "title": "Served Teach App — Technical Overview"
+        }
+      ]
+    },
+    "/docs/architecture/contexts/05-access-sharing.md": {
+      "title": "Access & Sharing",
+      "updated": "2026-06-27T08:31:43.494Z",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/overview.md",
+          "title": "Served Teach App — Technical Overview"
+        }
+      ]
+    },
+    "/docs/architecture/overview.md": {
+      "title": "Served Teach App — Technical Overview",
+      "updated": "2026-06-27T08:30:54.149Z",
+      "backlinks": []
+    },
+    "/docs/architecture/README.md": {
+      "title": "Architecture / Technical Overview",
+      "updated": "2026-06-27T08:28:32.783Z",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/contexts/01-hub-content.md",
+          "title": "Hub & Content Model"
+        }
+      ]
+    },
+    "/docs/routine-prompt.md": {
+      "title": "The next-lesson Routine — canonical Instructions",
+      "updated": "2026-06-26T18:46:45+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/routine.md",
+          "title": "The next-lesson Routine — operational runbook"
+        }
+      ]
+    },
+    "/docs/routine.md": {
+      "title": "The next-lesson Routine — operational runbook",
+      "updated": "2026-06-26T18:46:45+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/adr/0008-next-lesson-routine-gate-in-convex.md",
+          "title": "Next-lesson Routine: gate in Convex, API-only routine, one routine for all Topics"
+        },
+        {
+          "path": "/docs/routine-prompt.md",
+          "title": "The next-lesson Routine — canonical Instructions"
+        }
+      ]
+    },
+    "/CONTEXT.md": {
+      "title": "Served Teach App Glossary",
+      "updated": "2026-06-27T10:22:05+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md",
+          "title": "Content source of truth moves to Convex; the Routine pulls per-Topic context (supersedes 0002; partially supersedes 0008)"
+        },
+        {
+          "path": "/docs/architecture/overview.md",
+          "title": "Served Teach App — Technical Overview"
+        },
+        {
+          "path": "/docs/routine.md",
+          "title": "The next-lesson Routine — operational runbook"
+        }
+      ]
+    },
+    "/CLAUDE.md": {
+      "title": "/CLAUDE.md",
+      "updated": "2026-06-12T08:05:21+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/README.md",
+          "title": "Architecture / Technical Overview"
+        }
+      ]
+    }
+  },
+  "contextToAdrs": {}
+}
