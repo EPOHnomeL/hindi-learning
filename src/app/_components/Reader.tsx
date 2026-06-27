@@ -200,7 +200,7 @@ function NavItem({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors ${
+      className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors md:py-1.5 ${
         active ? "bg-accent text-white" : "text-ink hover:bg-hi"
       }`}
     >
@@ -254,7 +254,7 @@ function ResourcesSection({ topicSlug }: { topicSlug: string }) {
             href={r.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-ink transition-colors hover:bg-hi"
+            className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-sm text-ink transition-colors hover:bg-hi md:py-1.5"
           >
             <span className="min-w-0 truncate">
               <span aria-hidden className="mr-1 text-soft">{r.kind === "url" ? "🔗" : "📄"}</span>
@@ -305,14 +305,14 @@ function ResourcesSection({ topicSlug }: { topicSlug: string }) {
           <button
             onClick={() => inputRef.current?.click()}
             disabled={busy}
-            className="flex-1 rounded-lg border border-dashed border-line px-2 py-1.5 text-left text-sm text-soft hover:bg-hi disabled:opacity-60"
+            className="flex-1 rounded-lg border border-dashed border-line px-2.5 py-2.5 text-left text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
           >
             {busy ? "Working…" : "+ Upload PDF"}
           </button>
           <button
             onClick={() => setAdding(true)}
             disabled={busy}
-            className="rounded-lg border border-dashed border-line px-2 py-1.5 text-sm text-soft hover:bg-hi disabled:opacity-60"
+            className="rounded-lg border border-dashed border-line px-3 py-2.5 text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
           >
             + Link
           </button>

@@ -11,6 +11,16 @@ import { assertAdmin, getOwnedTopic, getViewableTopic, topicBySlug, topicLessonC
 // from `ownerEmail` (the operator has no auth identity) and thread the resulting
 // topicId through.
 
+// Titles are authored upstream from generated HTML and can arrive entity-encoded
+// (e.g. "Maps &amp; List"). Decode the handful of named/numeric entities that
+// show up in plain-text titles so the UI never renders a raw "&amp;".
+// ponytail: covers the common entities; extend the map if a new one appears.
+export function decodeEntities(s: string): string {
+  return s.replace(/&(amp|lt|gt|quot|#39|apos);/g, (_, e) =>
+    ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'" })[e as string] ?? _,
+  );
+}
+
 // ---- Reader (learner) ------------------------------------------------------
 
 // The signed-in user's Topics, ordered by `seq` (unsequenced last), then age.
@@ -117,7 +127,7 @@ export const listLessons = query({
       .collect();
     return lessons
       .filter((l) => !l.supersededBy)
-      .map((l) => ({ key: l.key, seq: l.seq, title: l.title }));
+      .map((l) => ({ key: l.key, seq: l.seq, title: decodeEntities(l.title) }));
   },
 });
 
@@ -133,7 +143,7 @@ export const getLesson = query({
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     if (!lesson || lesson.supersededBy) return null;
-    return { key: lesson.key, seq: lesson.seq, title: lesson.title, html: lesson.html };
+    return { key: lesson.key, seq: lesson.seq, title: decodeEntities(lesson.title), html: lesson.html };
   },
 });
 
@@ -150,7 +160,7 @@ export const listReferences = query({
       .collect();
     return refs
       .sort((a, b) => a.key.localeCompare(b.key))
-      .map((r) => ({ key: r.key, title: r.title }));
+      .map((r) => ({ key: r.key, title: decodeEntities(r.title) }));
   },
 });
 
@@ -165,7 +175,7 @@ export const getReference = query({
       .query("references")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
-    return ref ? { key: ref.key, title: ref.title, html: ref.html } : null;
+    return ref ? { key: ref.key, title: decodeEntities(ref.title), html: ref.html } : null;
   },
 });
 

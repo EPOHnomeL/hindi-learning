@@ -2,6 +2,7 @@
 import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
 import { api } from "./_generated/api";
+import { decodeEntities } from "./content";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
 
@@ -35,6 +36,12 @@ test("listTopics returns only the signed-in user's topics", async () => {
 
   const aliceTopics = await asUser(t, alice).query(api.content.listTopics, {});
   expect(aliceTopics.map((x) => x.slug)).toEqual(["hindi"]);
+});
+
+test("decodeEntities turns entity-encoded titles back into plain text", () => {
+  expect(decodeEntities("Course Map &amp; Reading List")).toBe("Course Map & Reading List");
+  expect(decodeEntities("&lt;a&gt; &quot;x&quot; &#39;y&#39;")).toBe('<a> "x" \'y\'');
+  expect(decodeEntities("nothing to decode")).toBe("nothing to decode");
 });
 
 test("listTopics orders by seq then creation, unsequenced last", async () => {
