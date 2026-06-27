@@ -12,4 +12,4 @@ Because the iframe is `sandbox="allow-scripts"` (no same-origin), the parent can
 ## Consequences
 
 - Published Lessons stay immutable, yet behave consistently: the parent **strips the old pill `<script>` at render time** (a regex over the stored HTML before assembling `srcDoc`), and injects the theme bridge + initial `data-theme`. The same render path fixes existing and future lessons. The `:root[data-theme="dark"]` palette in `head.html` is deliberately **kept** — the app now drives it; only the toggle script in `foot.html` is removed.
-- References are raw authored HTML without the shared dark palette, so they remain on their light styling in dark mode — an accepted limitation.
+- References are raw authored HTML without a bundled dark palette, so the parent injects one (`themeCss`) into their srcDoc at render time — flipping the shared CSS variables plus the few hardcoded light colors the reference design system uses (`header.ref`, `.term`, `.word`, the near-black term titles). They theme with the rest of the app.

@@ -30,10 +30,11 @@ export function ArtifactView({
 }
 
 // Fills its flex parent; min height keeps it usable when the column is short
-// (e.g. stacked on mobile). `theme`, when given (lessons), app-themes the
-// artifact: the initial theme is baked into srcDoc and later changes are pushed
-// live via postMessage so a toggle re-skins without reloading (ADR 0011).
-function Frame({ html, withBridge, theme }: { html: string; withBridge: boolean; theme?: Theme }) {
+// (e.g. stacked on mobile). `theme`, when given, app-themes the artifact: the
+// initial theme is baked into srcDoc and later changes are pushed live via
+// postMessage so a toggle re-skins without reloading (ADR 0011). `themeCss`
+// injects the dark palette too — set for references, which don't ship their own.
+function Frame({ html, withBridge, theme, themeCss }: { html: string; withBridge: boolean; theme?: Theme; themeCss?: boolean }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   // Read theme via a ref so changing it does NOT rebuild srcDoc (which would
   // reload the iframe, losing scroll + answered-quiz state). The bake only needs
@@ -41,8 +42,8 @@ function Frame({ html, withBridge, theme }: { html: string; withBridge: boolean;
   const themeRef = useRef(theme);
   themeRef.current = theme;
   const srcDoc = useMemo(
-    () => buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current }),
-    [html, withBridge],
+    () => buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss }),
+    [html, withBridge, themeCss],
   );
 
   // Push theme changes into the already-loaded iframe (no reload). Also fires
@@ -224,13 +225,16 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
 }
 
 function ReferenceView({ refKey, topicSlug }: { refKey: string; topicSlug: string }) {
+  const { theme } = useTheme();
   const ref = useQuery(api.content.getReference, { topicSlug, key: refKey });
   if (ref === undefined) return <p className="text-soft">Loading…</p>;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3">
       <h2 className="sticky top-12 z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">{ref.title}</h2>
-      <Frame html={ref.html} withBridge={false} />
+      {/* References carry no dark CSS of their own, so themeCss injects the dark
+          palette (ADR 0011) — the theme then flips them with the rest of the app. */}
+      <Frame html={ref.html} withBridge={false} theme={theme} themeCss />
     </div>
   );
 }

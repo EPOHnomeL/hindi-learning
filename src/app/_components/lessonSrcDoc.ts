@@ -65,6 +65,27 @@ export function themeMessage(theme: Theme): { __lessonTheme: true; theme: Theme 
   return { __lessonTheme: true, theme };
 }
 
+// Dark palette for References. Unlike lessons (whose dark CSS ships in head.html),
+// references are raw authored HTML carrying only a light :root{} palette plus a
+// few hardcoded light colors. This override flips the shared CSS variables AND
+// the hardcoded surfaces/borders/near-black text used by the reference design
+// system (header.ref, .term, .word) so they stay legible in dark — ADR 0011.
+const REFERENCE_DARK_CSS = `<style>
+:root[data-theme="dark"]{--ink:#e9e1d4; --soft:#a99d8a; --paper:#1b1815; --card:#241f1a; --accent:#dd9863; --accent2:#79b39b; --gold:#d8ab57; --hi:#4a3c1f;}
+:root[data-theme="dark"] header.ref{border-color:#3a322a}
+:root[data-theme="dark"] .term{border-color:#3a322a}
+:root[data-theme="dark"] .term .name{color:#f3ecdf}
+:root[data-theme="dark"] .term .avoid{border-top-color:#3a322a}
+:root[data-theme="dark"] .term .avoid b{color:#e0937c}
+:root[data-theme="dark"] .word{border-bottom-color:#3a322a}
+</style>`;
+
+// Inject the reference dark palette before </head> so it applies before paint.
+function injectReferenceDarkCss(html: string): string {
+  const i = html.indexOf("</head>");
+  return i === -1 ? REFERENCE_DARK_CSS + html : html.slice(0, i) + REFERENCE_DARK_CSS + html.slice(i);
+}
+
 // Bake the selected theme onto the root <html> so the lesson renders in the
 // right palette with no flash.
 function setRootTheme(html: string, theme: Theme): string {
@@ -87,12 +108,14 @@ function stripLegacyThemePill(html: string): string {
 // `quiz` adds the answer-capture bridge (lessons, not references). `theme`, when
 // given, makes the artifact app-themed: the legacy pill is stripped, the initial
 // theme is baked in, and the theme bridge is added so the parent can flip it live.
-// References pass no theme and stay on their authored (light) styling — ADR 0011.
-export function buildSrcDoc(html: string, opts: { quiz: boolean; theme?: Theme }): string {
+// `themeCss` additionally injects the dark palette — set for References, which
+// (unlike lessons) don't bundle their own dark CSS. ADR 0011.
+export function buildSrcDoc(html: string, opts: { quiz: boolean; theme?: Theme; themeCss?: boolean }): string {
   let doc = html;
   if (opts.theme) {
     doc = stripLegacyThemePill(doc);
     doc = setRootTheme(doc, opts.theme);
+    if (opts.themeCss) doc = injectReferenceDarkCss(doc);
   }
   const scripts = HEIGHT_BRIDGE + (opts.quiz ? QUIZ_BRIDGE : "") + (opts.theme ? THEME_BRIDGE : "");
   // Inject before the LAST </body>. A first-match replace is unsafe: an assembled

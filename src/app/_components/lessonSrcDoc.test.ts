@@ -35,12 +35,23 @@ describe("buildSrcDoc", () => {
     expect(out).not.toContain("theme-toggle");
   });
 
-  it("leaves a reference untouched: no theme, no quiz/theme bridge, height only", () => {
+  it("leaves a reference untouched when no theme is given: height bridge only", () => {
     const ref = `<!DOCTYPE html><html lang="en"><head></head><body><p>ref</p></body></html>`;
     const out = buildSrcDoc(ref, { quiz: false });
     expect(out).not.toContain("data-theme");
     expect(out).not.toContain("__lessonTheme"); // no theme bridge
     expect(out).not.toContain("data-correct"); // no quiz bridge
     expect(out).toContain("reportHeight"); // height bridge still present
+  });
+
+  it("themes a reference: bakes theme, injects the dark palette into <head>, adds the bridge", () => {
+    const ref = `<!DOCTYPE html><html lang="en"><head><style>:root{--paper:#fbf7f0}</style></head><body><div class="term"><div class="name">x</div></div></body></html>`;
+    const out = buildSrcDoc(ref, { quiz: false, theme: "dark", themeCss: true });
+    expect(out).toContain('data-theme="dark"'); // baked on <html>
+    expect(out).toContain("__lessonTheme"); // theme bridge present
+    expect(out).toContain(':root[data-theme="dark"]'); // dark palette override
+    expect(out).toContain("#1b1815"); // dark --paper value
+    // Palette must land inside <head> so it applies before the body renders.
+    expect(out.indexOf(":root[data-theme")).toBeLessThan(out.indexOf("</head>"));
   });
 });
