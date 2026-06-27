@@ -70,3 +70,11 @@ _Avoid_: Invite, link, permission, grant (as separate terms), public link
 **Viewer**:
 The User on the receiving end of a Share — has read-only access to a Topic they do not own. A Viewer sees everything in the Topic (Lessons, References, Resources, the owner's Questions and Replies, the owner's Progress) but writes nothing: they cannot add Resources, edit the Mission, ask Questions, mark Progress, or fire the Routine. A Viewer must have an account (distinct from a "guest"). Shared Topics appear in the Viewer's "Shared with me" section.
 _Avoid_: Guest, collaborator, member, recipient
+
+**Allowlist**:
+The set of emails permitted to create an account — the private-alpha admission gate. An email must be on the Allowlist to sign up; removing one closes off *new* sign-ups for it but does not evict an account that already exists (a sign-up gate, not a session gate). Site-wide, not per-Topic.
+_Avoid_: Whitelist, allowed emails, AUTH_ALLOWED_EMAILS (the retired env-var form)
+
+**Admin**:
+The single User who governs the Allowlist — adds and removes admitted emails. Site-wide and distinct from a Topic's **owner** (a User owns the Topics they create; the Admin owns admission to the app). Exactly one Admin exists; the Admin's own admission is fixed and cannot be removed through the portal.
+_Avoid_: Owner (that is the Topic owner), superuser, moderator
