@@ -15,12 +15,12 @@ the `AUTH_ALLOWED_EMAILS` environment variable, read synchronously inside the
 Password provider's `profile()` ([convex/auth.ts](../../convex/auth.ts)).
 Changing who may join means the operator has to run
 `npx convex env set AUTH_ALLOWED_EMAILS "…" --prod` from a terminal and redeploy
-the env. The operator (`jonathan@y-knot.io`) wants to admit and remove people
+the env. The operator (`jvorster63@gmail.com`) wants to admit and remove people
 from inside the running app, not from a CLI.
 
 ## Solution
 
-A single **Admin** (`jonathan@y-knot.io`) gets a dedicated `/admin` page listing
+A single **Admin** (`jvorster63@gmail.com`) gets a dedicated `/admin` page listing
 the admitted emails, with a field to add one and a per-row control to remove
 one. The Allowlist becomes a Convex table edited at runtime; the Admin's own row
 is shown but cannot be removed through the portal.
@@ -93,7 +93,7 @@ env var is retired. An empty table admits nobody.
   accounts' sign-in is unaffected (a deliberate change from the env era, which
   also blocked sign-in; see ADR 0011).
 - **One-time migration** reads `AUTH_ALLOWED_EMAILS`, writes a normalised
-  `whitelist` row per email, and sets `isAdmin` on `jonathan@y-knot.io`. Run once
+  `whitelist` row per email, and sets `isAdmin` on `jvorster63@gmail.com`. Run once
   against prod; idempotent on re-run.
 - **`/admin` route** (`src/app/admin/page.tsx`): client-guarded by `amIAdmin`
   (non-admins get a not-authorised view, no controls). Renders the list with the

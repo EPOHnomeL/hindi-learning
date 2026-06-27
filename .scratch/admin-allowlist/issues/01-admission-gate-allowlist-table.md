@@ -30,7 +30,7 @@ foundation tracer bullet: schema → backend → auth flow → migration.
   already exists is unaffected (sign-in not blocked). Remove the old env-based
   check from `profile()`.
 - A one-time migration reads `AUTH_ALLOWED_EMAILS`, writes a normalised row per
-  email, and sets `isAdmin` on `jonathan@y-knot.io`. Idempotent on re-run.
+  email, and sets `isAdmin` on `jvorster63@gmail.com`. Idempotent on re-run.
 
 The Admin portal UI and the add/remove mutations are issue 02 — this slice only
 needs `seedEmail` / the migration to put rows in.

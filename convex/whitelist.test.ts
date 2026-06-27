@@ -55,7 +55,7 @@ test("isAdmitted: matches case-insensitively and ignores surrounding whitespace"
 
 test("addEmail: the Admin admits an email, normalised, and re-adding is a no-op", async () => {
   const t = convexTest(schema, modules);
-  const admin = await seedAdmin(t, "jonathan@y-knot.io");
+  const admin = await seedAdmin(t, "jvorster63@gmail.com");
 
   await asUser(t, admin).mutation(api.whitelist.addEmail, { email: "  New.Learner@Example.com " });
   expect(await t.query(internal.whitelist.isAdmitted, { email: "new.learner@example.com" })).toBe(true);
@@ -70,13 +70,13 @@ test("addEmail: the Admin admits an email, normalised, and re-adding is a no-op"
 
 test("addEmail: obviously malformed input is rejected", async () => {
   const t = convexTest(schema, modules);
-  const admin = await seedAdmin(t, "jonathan@y-knot.io");
+  const admin = await seedAdmin(t, "jvorster63@gmail.com");
   await expect(asUser(t, admin).mutation(api.whitelist.addEmail, { email: "not-an-email" })).rejects.toThrow();
 });
 
 test("addEmail: a non-Admin caller is rejected", async () => {
   const t = convexTest(schema, modules);
-  await seedAdmin(t, "jonathan@y-knot.io");
+  await seedAdmin(t, "jvorster63@gmail.com");
   const intruder = await seedUser(t, "intruder@example.com");
   await expect(
     asUser(t, intruder).mutation(api.whitelist.addEmail, { email: "sneaky@example.com" }),
@@ -87,7 +87,7 @@ test("addEmail: a non-Admin caller is rejected", async () => {
 
 test("removeEmail: the Admin removes an ordinary email", async () => {
   const t = convexTest(schema, modules);
-  const admin = await seedAdmin(t, "jonathan@y-knot.io");
+  const admin = await seedAdmin(t, "jvorster63@gmail.com");
   await asUser(t, admin).mutation(api.whitelist.addEmail, { email: "learner@example.com" });
 
   await asUser(t, admin).mutation(api.whitelist.removeEmail, { email: "learner@example.com" });
@@ -96,17 +96,17 @@ test("removeEmail: the Admin removes an ordinary email", async () => {
 
 test("removeEmail: refuses to remove the Admin's own row", async () => {
   const t = convexTest(schema, modules);
-  const admin = await seedAdmin(t, "jonathan@y-knot.io");
+  const admin = await seedAdmin(t, "jvorster63@gmail.com");
   await expect(
-    asUser(t, admin).mutation(api.whitelist.removeEmail, { email: "jonathan@y-knot.io" }),
+    asUser(t, admin).mutation(api.whitelist.removeEmail, { email: "jvorster63@gmail.com" }),
   ).rejects.toThrow();
   // The Admin is still admitted.
-  expect(await t.query(internal.whitelist.isAdmitted, { email: "jonathan@y-knot.io" })).toBe(true);
+  expect(await t.query(internal.whitelist.isAdmitted, { email: "jvorster63@gmail.com" })).toBe(true);
 });
 
 test("removeEmail: a non-Admin caller is rejected", async () => {
   const t = convexTest(schema, modules);
-  await seedAdmin(t, "jonathan@y-knot.io");
+  await seedAdmin(t, "jvorster63@gmail.com");
   await t.mutation(internal.whitelist.seedEmail, { email: "learner@example.com" });
   const intruder = await seedUser(t, "intruder@example.com");
   await expect(
@@ -117,24 +117,24 @@ test("removeEmail: a non-Admin caller is rejected", async () => {
 
 test("list: the Admin sees every admitted email with its Admin flag", async () => {
   const t = convexTest(schema, modules);
-  const admin = await seedAdmin(t, "jonathan@y-knot.io");
+  const admin = await seedAdmin(t, "jvorster63@gmail.com");
   await asUser(t, admin).mutation(api.whitelist.addEmail, { email: "learner@example.com" });
 
   const list = await asUser(t, admin).query(api.whitelist.list, {});
   const byEmail = Object.fromEntries(list.map((r) => [r.email, r.isAdmin]));
-  expect(byEmail).toEqual({ "jonathan@y-knot.io": true, "learner@example.com": false });
+  expect(byEmail).toEqual({ "jvorster63@gmail.com": true, "learner@example.com": false });
 });
 
 test("list: a non-Admin caller is rejected", async () => {
   const t = convexTest(schema, modules);
-  await seedAdmin(t, "jonathan@y-knot.io");
+  await seedAdmin(t, "jvorster63@gmail.com");
   const intruder = await seedUser(t, "intruder@example.com");
   await expect(asUser(t, intruder).query(api.whitelist.list, {})).rejects.toThrow();
 });
 
 test("amIAdmin: true for the Admin, false for a non-Admin, false when unauthenticated", async () => {
   const t = convexTest(schema, modules);
-  const admin = await seedAdmin(t, "jonathan@y-knot.io");
+  const admin = await seedAdmin(t, "jvorster63@gmail.com");
   const intruder = await seedUser(t, "intruder@example.com");
 
   expect(await asUser(t, admin).query(api.whitelist.amIAdmin, {})).toBe(true);

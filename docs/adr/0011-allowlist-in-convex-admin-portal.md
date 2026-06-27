@@ -26,7 +26,7 @@ account's sign-in.
 - **Storage:** a `whitelist` table of `{ email, isAdmin }`, `by_email` index.
   Emails normalised lower-case + trimmed; adds are idempotent.
 - **Admin:** the table itself carries `isAdmin`. Exactly one Admin
-  (`jonathan@y-knot.io`). The Admin row is non-removable through the portal; the
+  (`jvorster63@gmail.com`). The Admin row is non-removable through the portal; the
   portal only adds/removes ordinary admitted emails (no in-app promotion).
 - **Bootstrap:** a one-time migration reads the current `AUTH_ALLOWED_EMAILS`,
   writes a row per email, and flags the Admin. The env var is retired afterward.

@@ -141,7 +141,7 @@ export const seedEmail = internalMutation({
 
 // The single fixed Admin (PRD/ADR 0011). Flagged by the migration; the portal
 // shows but won't remove this row.
-const ADMIN_EMAIL = "jonathan@y-knot.io";
+const ADMIN_EMAIL = "jvorster63@gmail.com";
 
 // One-time migration off `AUTH_ALLOWED_EMAILS` (ADR 0011): admit each email the
 // env var listed, flag the Admin, and ensure the Admin is admitted even if the

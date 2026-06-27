@@ -13,7 +13,7 @@ Vocabulary: **Allowlist**, **Admin** in [`CONTEXT.md`](../../../CONTEXT.md).
 
 ## What to build
 
-Give the single **Admin** (`jonathan@y-knot.io`) an in-app page to manage the
+Give the single **Admin** (`jvorster63@gmail.com`) an in-app page to manage the
 **Allowlist** end-to-end — the Admin-gated mutations plus the UI that drives
 them.
 
