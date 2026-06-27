@@ -2,9 +2,10 @@
 
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { Reader } from "./Reader";
 import { useResourceUpload } from "./useResourceUpload";
 
 type Course = {
@@ -24,17 +25,13 @@ type SharedCourse = {
   completedCount: number;
 };
 
-// The home dashboard. Picks a course → opens the Reader; otherwise shows the
-// course grid (create / edit / open). View state is local — instant, no routing.
+// The home dashboard (`/`): the course grid (create / edit / open) plus the
+// "Shared with me" section. Opening a course is now a real navigation to
+// /courses/[slug] (ADR 0012), not a local view toggle.
 export function Dashboard() {
-  const [openSlug, setOpenSlug] = useState<string | null>(null);
-  if (openSlug) return <Reader topicSlug={openSlug} onExit={() => setOpenSlug(null)} />;
-  return <CourseGrid onOpen={setOpenSlug} />;
-}
-
-function CourseGrid({ onOpen }: { onOpen: (slug: string) => void }) {
   const courses = useQuery(api.content.dashboard);
   const { signOut } = useAuthActions();
+  const router = useRouter();
 
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
@@ -43,7 +40,7 @@ function CourseGrid({ onOpen }: { onOpen: (slug: string) => void }) {
           <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Served Teach</h1>
           <p className="mt-0.5 text-sm text-soft">Your courses</p>
         </div>
-        <button onClick={() => void signOut()} className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
+        <button onClick={() => void signOut().then(() => router.replace("/"))} className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
           Sign out
         </button>
       </header>
@@ -57,19 +54,19 @@ function CourseGrid({ onOpen }: { onOpen: (slug: string) => void }) {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {courses.map((c) => (
-            <CourseCard key={c.slug} course={c} onOpen={() => onOpen(c.slug)} />
+            <CourseCard key={c.slug} course={c} />
           ))}
-          <NewCourseCard onCreated={onOpen} />
+          <NewCourseCard />
         </div>
       )}
 
-      <SharedSection onOpen={onOpen} />
+      <SharedSection />
     </div>
   );
 }
 
 // Courses other learners have shared with me — read-only. Hidden when none.
-function SharedSection({ onOpen }: { onOpen: (slug: string) => void }) {
+function SharedSection() {
   const shared = useQuery(api.shares.listSharedTopics);
   if (!shared || shared.length === 0) return null;
   return (
@@ -78,7 +75,7 @@ function SharedSection({ onOpen }: { onOpen: (slug: string) => void }) {
       <p className="mb-4 text-sm text-soft">Courses others have shared with you — view only.</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {shared.map((c) => (
-          <SharedCourseCard key={c.slug} course={c} onOpen={() => onOpen(c.slug)} />
+          <SharedCourseCard key={c.slug} course={c} />
         ))}
       </div>
     </section>
@@ -87,7 +84,7 @@ function SharedSection({ onOpen }: { onOpen: (slug: string) => void }) {
 
 // A shared course: same shape as CourseCard but attributed to its owner and with
 // no Edit/Share controls — a Viewer reads, never writes.
-function SharedCourseCard({ course, onOpen }: { course: SharedCourse; onOpen: () => void }) {
+function SharedCourseCard({ course }: { course: SharedCourse }) {
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
   return (
     <article className="flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
@@ -117,17 +114,17 @@ function SharedCourseCard({ course, onOpen }: { course: SharedCourse; onOpen: ()
         </div>
       </div>
 
-      <button
-        onClick={onOpen}
-        className="w-full rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90"
+      <Link
+        href={`/courses/${course.slug}`}
+        className="w-full rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
       >
         Open course
-      </button>
+      </Link>
     </article>
   );
 }
 
-function CourseCard({ course, onOpen }: { course: Course; onOpen: () => void }) {
+function CourseCard({ course }: { course: Course }) {
   const [editing, setEditing] = useState(false);
   const [sharing, setSharing] = useState(false);
   const requestSetup = useAction(api.routine.requestSetup);
@@ -202,12 +199,12 @@ function CourseCard({ course, onOpen }: { course: Course; onOpen: () => void }) 
       )}
 
       <div className="flex items-center gap-2">
-        <button
-          onClick={onOpen}
-          className="flex-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90"
+        <Link
+          href={`/courses/${course.slug}`}
+          className="flex-1 rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
         >
           Open course
-        </button>
+        </Link>
         <button
           onClick={() => setEditing(true)}
           className="rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
@@ -336,10 +333,11 @@ function CardEditor({ course, onDone }: { course: Course; onDone: () => void }) 
 
 // Seed a new course (title + free-text "why"); the Routine drafts the Mission +
 // first Lesson on its next run. On create, open it so they can upload Resources.
-function NewCourseCard({ onCreated }: { onCreated: (slug: string) => void }) {
+function NewCourseCard() {
   const seedTopic = useMutation(api.content.seedTopic);
   const requestSetup = useAction(api.routine.requestSetup);
   const { uploadFile, addLink } = useResourceUpload();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [why, setWhy] = useState("");
@@ -393,7 +391,7 @@ function NewCourseCard({ onCreated }: { onCreated: (slug: string) => void }) {
           setLinks([]);
           setFiles([]);
           setOpen(false);
-          onCreated(slug);
+          router.push(`/courses/${slug}`);
         } finally {
           setBusy(false);
         }
