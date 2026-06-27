@@ -17,6 +17,7 @@ import type * as lib from "../lib.js";
 import type * as resources from "../resources.js";
 import type * as routine from "../routine.js";
 import type * as shares from "../shares.js";
+import type * as whitelist from "../whitelist.js";
 
 import type {
   ApiFromModules,
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   resources: typeof resources;
   routine: typeof routine;
   shares: typeof shares;
+  whitelist: typeof whitelist;
 }>;
 
 /**

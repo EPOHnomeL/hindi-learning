@@ -9,6 +9,16 @@ import { v } from "convex/values";
 export default defineSchema({
   ...authTables,
 
+  // The Allowlist (ADR 0011): the set of emails permitted to sign up, managed at
+  // runtime by the single Admin instead of the old `AUTH_ALLOWED_EMAILS` env var.
+  // Emails are stored already-normalised (trimmed, lower-cased) so a lookup at
+  // sign-up never misses on casing/whitespace. `isAdmin` marks the one Admin row,
+  // which the portal shows but refuses to remove. An empty table admits nobody.
+  whitelist: defineTable({
+    email: v.string(),
+    isAdmin: v.optional(v.boolean()),
+  }).index("by_email", ["email"]),
+
   // A subject space, owned by its creator. `ownerId` is optional only so the
   // schema push accepts the pre-existing unowned Hindi row; `ensureTopic`
   // backfills it. `seq` orders a user's Topics in the switcher. `by_slug` stays
