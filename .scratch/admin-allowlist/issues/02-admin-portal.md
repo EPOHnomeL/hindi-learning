@@ -1,6 +1,9 @@
 # 02 — Admin portal (`/admin` route + Allowlist mutations)
 
-Status: ready-for-agent
+Status: done (commit 42fc3f3). Backend + tests landed with issue 01; this slice
+added the `/admin` route (App Router `(app)` group) + AdminPanel UI. Built
+against the post-ADR-0012 routing, not the old Dashboard view-toggle the issue
+text describes.
 
 ## Parent
 
