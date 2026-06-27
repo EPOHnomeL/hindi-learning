@@ -1,6 +1,8 @@
 # 01 — Admission gate backed by the Allowlist table
 
-Status: ready-for-agent
+Status: done (commits 78780d1 backend, 455d2e3 auth gate). Ops follow-up
+outstanding: run `npx convex run whitelist:migrateFromEnv --prod`, then unset
+`AUTH_ALLOWED_EMAILS`. Unblocks issue 02.
 
 ## Parent
 
