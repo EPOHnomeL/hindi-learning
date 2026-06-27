@@ -97,11 +97,23 @@
       "skillPath": "skills/productivity/handoff/SKILL.md",
       "computedHash": "b7c38b5061b73217e5478f9446fc403be17ce311d4c23a108cc37b5b4604fa37"
     },
+    "implement": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/implement/SKILL.md",
+      "computedHash": "a29d88494f7365d9df383b22a1df8411088d636d6c328f4a6e11d039143d166f"
+    },
     "improve-codebase-architecture": {
       "source": "mattpocock/skills",
       "sourceType": "github",
       "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
       "computedHash": "4c4d2b6da48482c1a054aca0e09eafd61cdcbebe2bda10abd3f355bf5f6fc57c"
+    },
+    "loop-me": {
+      "source": "mattpocock/skills",
+      "sourceType": "github",
+      "skillPath": "skills/in-progress/loop-me/SKILL.md",
+      "computedHash": "c36514ed0c932e8e245149a678f72de0cf2c3858612e2b4b7ec244e0070bf430"
     },
     "ponytail": {
       "source": "DietrichGebert/ponytail",
