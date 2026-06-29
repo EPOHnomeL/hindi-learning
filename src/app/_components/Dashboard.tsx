@@ -4,8 +4,9 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { parseMarkdown, type Span } from "./markdown";
 import { useResourceUpload } from "./useResourceUpload";
 
 type Course = {
@@ -135,6 +136,7 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
 function CourseCard({ course }: { course: Course }) {
   const [editing, setEditing] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [showMission, setShowMission] = useState(false);
   const requestSetup = useAction(api.routine.requestSetup);
   const [setup, setSetup] = useState<"idle" | "starting" | "started" | "error">("idle");
 
@@ -167,9 +169,22 @@ function CourseCard({ course }: { course: Course }) {
         )}
       </div>
 
-      <p className="mb-4 line-clamp-2 min-h-10 text-sm text-soft">
-        {course.mission ?? (course.status === "seeded" ? "Your teacher is preparing the first lesson." : "No mission yet.")}
-      </p>
+      {course.mission ? (
+        <button
+          onClick={() => setShowMission(true)}
+          title="View full mission"
+          className="mb-4 line-clamp-2 min-h-10 text-left text-sm text-soft transition-colors hover:text-accent"
+        >
+          {course.mission}
+        </button>
+      ) : (
+        <p className="mb-4 min-h-10 text-sm text-soft">
+          {course.status === "seeded" ? "Your teacher is preparing the first lesson." : "No mission yet."}
+        </p>
+      )}
+      {showMission && course.mission && (
+        <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />
+      )}
 
       {/* Progress */}
       <div className="mb-4 mt-auto">
@@ -230,6 +245,82 @@ function CourseCard({ course }: { course: Course }) {
       </div>
     </article>
   );
+}
+
+// The Mission rendered as Markdown in a popup. Uses the native <dialog> element,
+// so Esc-to-close, the backdrop, and focus trapping come for free (no UI dep).
+function MissionDialog({ title, mission, onClose }: { title: string; mission: string; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => ref.current?.showModal(), []);
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === ref.current) ref.current?.close(); // click outside the content = backdrop
+      }}
+      className="m-auto w-[90vw] max-w-lg rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+        <h2 className="min-w-0 truncate text-base font-semibold text-accent">{title}</h2>
+        <button onClick={() => ref.current?.close()} aria-label="Close" className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
+          ✕
+        </button>
+      </div>
+      <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+        <Markdown source={mission} />
+      </div>
+    </dialog>
+  );
+}
+
+function Markdown({ source }: { source: string }) {
+  return (
+    <div className="flex flex-col gap-3 text-sm leading-relaxed text-ink">
+      {parseMarkdown(source).map((b, i) => {
+        if (b.kind === "heading") {
+          const Tag = `h${Math.min(b.level + 1, 6)}` as "h2" | "h3" | "h4" | "h5" | "h6";
+          return (
+            <Tag key={i} className="font-semibold text-accent">
+              {renderSpans(b.spans)}
+            </Tag>
+          );
+        }
+        if (b.kind === "list") {
+          const Tag = b.ordered ? "ol" : "ul";
+          return (
+            <Tag key={i} className={`ml-5 flex flex-col gap-1 ${b.ordered ? "list-decimal" : "list-disc"}`}>
+              {b.items.map((item, j) => (
+                <li key={j}>{renderSpans(item)}</li>
+              ))}
+            </Tag>
+          );
+        }
+        return <p key={i}>{renderSpans(b.spans)}</p>;
+      })}
+    </div>
+  );
+}
+
+function renderSpans(spans: Span[]) {
+  return spans.map((s, i) => {
+    switch (s.kind) {
+      case "strong":
+        return <strong key={i} className="font-semibold text-ink">{s.text}</strong>;
+      case "em":
+        return <em key={i}>{s.text}</em>;
+      case "code":
+        return <code key={i} className="rounded bg-hi px-1 py-0.5 text-[0.85em]">{s.text}</code>;
+      case "link":
+        return (
+          <a key={i} href={s.href} target="_blank" rel="noopener noreferrer" className="text-accent2 underline underline-offset-2">
+            {s.text}
+          </a>
+        );
+      default:
+        return <span key={i}>{s.text}</span>;
+    }
+  });
 }
 
 // Share a course with another learner by their account email (read-only access).
