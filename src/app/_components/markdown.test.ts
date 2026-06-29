@@ -24,4 +24,12 @@ describe("parseMarkdown", () => {
       { kind: "list", ordered: false, items: [[{ kind: "text", text: "one" }], [{ kind: "text", text: "two" }]] },
     ]);
   });
+
+  it("starts a heading/list even with no blank line before it", () => {
+    expect(parseMarkdown("## Success\n- one\n- two\nMore.")).toEqual([
+      { kind: "heading", level: 2, spans: [{ kind: "text", text: "Success" }] },
+      { kind: "list", ordered: false, items: [[{ kind: "text", text: "one" }], [{ kind: "text", text: "two" }]] },
+      { kind: "para", spans: [{ kind: "text", text: "More." }] },
+    ]);
+  });
 });

@@ -45,23 +45,50 @@ export function parseInline(text: string): Span[] {
 
 export function parseMarkdown(src: string): Block[] {
   const blocks: Block[] = [];
-  for (const chunk of src.replace(/\r\n/g, "\n").trim().split(/\n{2,}/)) {
-    if (!chunk.trim()) continue;
-    const lines = chunk.split("\n");
-    const ordered = lines.every((l) => /^\s*\d+\.\s+/.test(l));
-    const bullet = lines.every((l) => /^\s*[-*]\s+/.test(l));
-    if (ordered || bullet) {
-      const items = lines.map((l) => parseInline(l.replace(/^\s*(?:\d+\.|[-*])\s+/, "")));
-      blocks.push({ kind: "list", ordered, items });
+  let para: string[] = [];
+  let list: { kind: "list"; ordered: boolean; items: Span[][] } | null = null;
+
+  // Headings and lists are their own blocks even with no blank line around them
+  // (Missions often pack a `## heading` straight onto its list), so parse line by
+  // line and flush the open paragraph/list when a new block kind starts.
+  const flushPara = () => {
+    if (para.length) blocks.push({ kind: "para", spans: parseInline(para.join(" ")) });
+    para = [];
+  };
+  const flushList = () => {
+    if (list) blocks.push(list);
+    list = null;
+  };
+
+  for (const line of src.replace(/\r\n/g, "\n").split("\n")) {
+    if (!line.trim()) {
+      flushPara();
+      flushList();
       continue;
     }
-    const h = /^(#{1,6})\s+(.*)$/.exec(lines[0] ?? "");
-    if (h && lines.length === 1) {
+    const h = /^(#{1,6})\s+(.*)$/.exec(line);
+    if (h) {
+      flushPara();
+      flushList();
       blocks.push({ kind: "heading", level: h[1]!.length, spans: parseInline(h[2]!) });
       continue;
     }
-    // Paragraph: soft line breaks collapse to spaces (CommonMark soft break).
-    blocks.push({ kind: "para", spans: parseInline(lines.join(" ")) });
+    const item = /^\s*(?:(\d+\.)|[-*])\s+(.*)$/.exec(line);
+    if (item) {
+      flushPara();
+      const ordered = item[1] != null;
+      if (!list || list.ordered !== ordered) {
+        flushList();
+        list = { kind: "list", ordered, items: [] };
+      }
+      list.items.push(parseInline(item[2]!));
+      continue;
+    }
+    // Plain text: soft line breaks collapse to spaces (CommonMark soft break).
+    flushList();
+    para.push(line);
   }
+  flushPara();
+  flushList();
   return blocks;
 }
