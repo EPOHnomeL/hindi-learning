@@ -30,6 +30,7 @@ type SharedCourse = {
 // /courses/[slug] (ADR 0012), not a local view toggle.
 export function Dashboard() {
   const courses = useQuery(api.content.dashboard);
+  const amAdmin = useQuery(api.whitelist.amIAdmin);
   const { signOut } = useAuthActions();
   const router = useRouter();
 
@@ -40,9 +41,16 @@ export function Dashboard() {
           <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Served Teach</h1>
           <p className="mt-0.5 text-sm text-soft">Your courses</p>
         </div>
-        <button onClick={() => void signOut().then(() => router.replace("/"))} className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
-          Sign out
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {amAdmin && (
+            <Link href="/admin" className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
+              Admin
+            </Link>
+          )}
+          <button onClick={() => void signOut().then(() => router.replace("/"))} className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
+            Sign out
+          </button>
+        </div>
       </header>
 
       {courses === undefined ? (
