@@ -53,22 +53,24 @@ test("addResource dedupes identical bytes — one row, redundant blob dropped", 
   expect(await t.run((ctx) => ctx.db.system.get(sid2))).toBeNull(); // redundant blob deleted
 });
 
-test("resources are owner+topic scoped; uploading to an unowned topic throws", async () => {
+test("resources are owner+topic scoped; a non-owner sees nothing and can't upload", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
   const bob = await seedUser(t, "bob@example.com");
   await seedTopic(t, alice, "hindi");
-  await seedTopic(t, bob, "hindi"); // bob has his own same-slug topic
+  await seedTopic(t, bob, "spanish"); // distinct slugs — slugs are globally unique
 
   const sid = await storeBlob(t, "alice doc");
   await asUser(t, alice).mutation(api.resources.addResource, { topicSlug: "hindi", filename: "a.pdf", storageId: sid });
 
-  // bob's "hindi" is a different topic — none of alice's resources leak in
+  // bob's own topic has no resources, and alice's "hindi" (which bob neither owns
+  // nor has shared to him) reads as empty — listResources is owner-or-Viewer gated.
+  expect(await asUser(t, bob).query(api.resources.listResources, { topicSlug: "spanish" })).toEqual([]);
   expect(await asUser(t, bob).query(api.resources.listResources, { topicSlug: "hindi" })).toEqual([]);
-  // uploading to a slug bob doesn't own is rejected
+  // uploading to a topic bob doesn't own is rejected
   const sid2 = await storeBlob(t, "x");
   await expect(
-    asUser(t, bob).mutation(api.resources.addResource, { topicSlug: "spanish", filename: "x.pdf", storageId: sid2 }),
+    asUser(t, bob).mutation(api.resources.addResource, { topicSlug: "hindi", filename: "x.pdf", storageId: sid2 }),
   ).rejects.toThrow();
 });
 
