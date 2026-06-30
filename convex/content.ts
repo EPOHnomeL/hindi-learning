@@ -58,6 +58,10 @@ export const dashboard = query({
           title: t.title,
           status: t.status ?? "active",
           mission: t.mission ?? null,
+          // The owner's own Public link token (null when private) — drives the
+          // "Public" badge and the SharePanel's link controls. Owner-only query,
+          // so this is never exposed to anyone but the owner.
+          publicToken: t.publicToken ?? null,
           seq: t.seq,
           creationTime: t._creationTime,
           ...counts,

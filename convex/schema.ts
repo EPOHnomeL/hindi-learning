@@ -34,10 +34,15 @@ export default defineSchema({
     seed: v.optional(v.string()),
     mission: v.optional(v.string()),
     status: v.optional(v.union(v.literal("seeded"), v.literal("active"))),
+    // Public link (issue 07 / ADR 0013): an unguessable token granting anonymous
+    // read-only access. Present while the Topic is public; cleared (truly revoked)
+    // when made private. `by_public_token` is the Guest read seam's lookup.
+    publicToken: v.optional(v.string()),
   })
     .index("by_slug", ["slug"])
     .index("by_owner", ["ownerId"])
-    .index("by_owner_slug", ["ownerId", "slug"]),
+    .index("by_owner_slug", ["ownerId", "slug"])
+    .index("by_public_token", ["publicToken"]),
 
   // Immutable once published. A replacement carries `supersededBy` (the key of
   // the lesson that retired it). `key` is the filename stem, e.g.

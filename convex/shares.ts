@@ -27,6 +27,32 @@ export const shareTopic = mutation({
   },
 });
 
+// A 256-bit URL-safe token (hex). The credential a Public link carries — long
+// enough that guessing is infeasible (ADR 0013), so no rate-limiting needed.
+function mintPublicToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// Turn a Topic's Public link on or off (owner-only). `isPublic: true` always
+// mints a *fresh* token — so this serves both "make public" and "regenerate"
+// (the old link dies at once); `false` clears it, truly revoking access. Returns
+// the new token, or null when made private. (ADR 0013: one token per Topic.)
+export const setTopicPublic = mutation({
+  args: { topicSlug: v.string(), isPublic: v.boolean() },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, { topicSlug, isPublic }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const publicToken = isPublic ? mintPublicToken() : undefined;
+    await ctx.db.patch(topic._id, { publicToken });
+    return publicToken ?? null;
+  },
+});
+
 // The Topics shared *with* the caller — the "Shared with me" feed. Each card
 // carries the owner's email (attribution) and the same live counts as the
 // owner's dashboard, so it renders like a CourseCard. Read-only; no writes.
