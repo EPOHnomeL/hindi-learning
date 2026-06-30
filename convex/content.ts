@@ -114,6 +114,27 @@ export const renameTopic = mutation({
   },
 });
 
+// The reader's per-course header: the Topic's title plus the caller's access
+// level ("owner" vs read-only "viewer"). Resolves through the owner-or-Viewer
+// gate, so a Viewer gets the title (their owner-only `listTopics` never carries
+// the shared Topic) and the UI learns whether to show write controls. `null`
+// when signed-out or with no access — the route then renders not-found.
+export const courseHeader = query({
+  args: { topicSlug: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({ title: v.string(), role: v.union(v.literal("owner"), v.literal("viewer")) }),
+  ),
+  handler: async (ctx, { topicSlug }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    if (!topic) return null;
+    const role = topic.ownerId === userId ? ("owner" as const) : ("viewer" as const);
+    return { title: topic.title, role };
+  },
+});
+
 export const listLessons = query({
   args: { topicSlug: v.string() },
   handler: async (ctx, { topicSlug }) => {

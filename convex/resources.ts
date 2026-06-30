@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic } from "./lib";
+import { assertAdmin, getOwnedTopic, getViewableTopic } from "./lib";
 
 // Learner-uploaded Resources (PRD §Resources). Standard Convex 3-step upload:
 // `generateUploadUrl` → client POSTs the file → `addResource` records the row.
@@ -149,13 +149,15 @@ export const cacheProcessedResource = mutation({
   },
 });
 
-// The learner's Resources for a Topic (owner+topic scoped).
+// The Topic's Resources, for the owner or a read-only Viewer. Owner-or-Viewer
+// gated so a Viewer sees the list and gets working open/signed links (PRD story
+// 15); adding/recording Resources stays owner-only.
 export const listResources = query({
   args: { topicSlug: v.string() },
   handler: async (ctx, { topicSlug }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic) return [];
     const rows = await ctx.db
       .query("resources")

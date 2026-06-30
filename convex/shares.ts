@@ -37,6 +37,7 @@ export const listSharedTopics = query({
       slug: v.string(),
       title: v.string(),
       ownerEmail: v.union(v.string(), v.null()),
+      mission: v.union(v.string(), v.null()),
       lessonCount: v.number(),
       completedCount: v.number(),
     }),
@@ -58,6 +59,7 @@ export const listSharedTopics = query({
           slug: topic.slug,
           title: topic.title,
           ownerEmail: owner?.email ?? null,
+          mission: topic.mission ?? null,
           ...counts,
         };
       }),

@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic } from "./lib";
+import { assertAdmin, getOwnedTopic, getViewableTopic } from "./lib";
 
 // The conversation loop (PRD §4–§5). Reader writes responses/progress/questions
 // for the signed-in learner, scoped to the active Topic so identical lesson keys
@@ -60,18 +60,22 @@ export const setProgress = mutation({
   },
 });
 
-// The learner's per-lesson progress in a Topic, so the reader can show what's
-// done (live).
+// The owner's per-lesson progress in a Topic, so the reader can show what's
+// done (live). Resolves through the owner-or-Viewer gate and reads the *owner's*
+// rows (a Topic has one owner): the owner sees their own, and a Viewer sees the
+// owner's Progress read-only — they have none of their own (PRD: no per-Viewer
+// Progress). Writes (setProgress) stay owner-only.
 export const myProgress = query({
   args: { topicSlug: v.string() },
   handler: async (ctx, { topicSlug }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
-    if (!topic) return [];
+    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    if (!topic?.ownerId) return [];
+    const ownerId = topic.ownerId;
     const rows = await ctx.db
       .query("progress")
-      .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id).eq("userId", userId))
+      .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id).eq("userId", ownerId))
       .collect();
     return rows.map((p) => ({ lessonKey: p.lessonKey, status: p.status }));
   },
@@ -86,17 +90,21 @@ export const askQuestion = mutation({
   },
 });
 
-// The learner's own questions + replies in a Topic, newest first (live).
+// The owner's questions + replies in a Topic, newest first (live). Owner-or-
+// Viewer gated, reading the *owner's* thread: the owner sees their own Q&A, and
+// a Viewer sees it read-only (PRD story 16). Asking (askQuestion) stays
+// owner-only, so a Viewer reads the thread but can't add to it.
 export const myQuestions = query({
   args: { topicSlug: v.string() },
   handler: async (ctx, { topicSlug }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
-    if (!topic) return [];
+    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    if (!topic?.ownerId) return [];
+    const ownerId = topic.ownerId;
     const rows = await ctx.db
       .query("questions")
-      .withIndex("by_topic_user", (q) => q.eq("topicId", topic._id).eq("userId", userId))
+      .withIndex("by_topic_user", (q) => q.eq("topicId", topic._id).eq("userId", ownerId))
       .collect();
     return rows
       .sort((a, b) => b._creationTime - a._creationTime)
