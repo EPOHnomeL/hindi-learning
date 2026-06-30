@@ -1,6 +1,8 @@
 # 03 — Mission, read-only for Viewers
 
-Status: ready-for-agent
+Status: done (commits 0898055 carries the Mission on `listSharedTopics`, 9f9889d
+shows it read-only on the shared card via the existing popup, fe9548c tests).
+`editMission` / `renameTopic` / re-seed were already owner-only.
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Share**, **Viewer**). Spec: [`../PRD.md`](../PRD.md).
 

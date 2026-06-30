@@ -1,6 +1,8 @@
 # 04 — Questions, read-only for Viewers
 
-Status: ready-for-agent
+Status: done (commits 0898055 widens `myQuestions` to the owner's thread, 9f9889d
+drops the ask form for Viewers while keeping the thread visible, fe9548c tests).
+`askQuestion` was already owner-only.
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Share**, **Viewer**). Spec: [`../PRD.md`](../PRD.md).
 

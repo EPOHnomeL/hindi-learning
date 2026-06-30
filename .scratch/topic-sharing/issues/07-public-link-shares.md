@@ -1,6 +1,9 @@
 # 07 — Public read-only link shares (anonymous Viewers)
 
-Status: needs-triage
+Status: needs-triage — deferred on 2026-06-30 when the account-Viewer read-only
+work (issues 02–05) shipped. Some product decisions were captured in
+conversation (see "Decisions captured" below); the design pass / ADR below is
+still outstanding before building.
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Share**, **Viewer**). Spec: [`../PRD.md`](../PRD.md) — this lifts the "Anonymous / public links" item out of that PRD's **Out of Scope**.
 
@@ -39,6 +42,25 @@ gate in the way. This issue is the backend + read-only view behind that route.
   Lesson (`/share/[token]/lessons/[key]`)?
 - **Write-blocking.** Anonymous holders write nothing (no Progress, no Questions,
   no Resources) — same load-bearing server-side guarantee as account-Viewers.
+
+## Decisions captured (2026-06-30, pending grill + ADR)
+
+Provisional answers from the conversation that deferred this issue — confirm
+under a real grill before building, they don't replace the design pass:
+
+- **Scope of a public Viewer:** **full mirror** — an anonymous holder sees
+  everything an account-Viewer sees (Lessons, References, Resources, the owner's
+  Questions/Replies, and Progress). (Reconsider against the anti-enumeration /
+  privacy note below — a forwardable link is a weaker credential than an account.)
+- **Token model:** **one on/off link per Topic.** "Share publicly" mints an
+  unguessable token; turning it off — or "Regenerate" — revokes it immediately.
+  Leaning to a `publicToken` field on `topics` (+ a `by_public_token` index)
+  over a separate relation, since it's single-token. Still needs the
+  unguessable-token + real-revocation guarantees.
+- **Still open (unchanged):** concept naming vs. the glossary's `Avoid: public
+  link`, whole-Topic vs. per-Lesson deep links, and the token-authorized read
+  seam (parallel to the owner-or-Viewer resolver, since auth-scoped reader
+  queries can't serve an unauthenticated caller).
 
 ## Depends on
 

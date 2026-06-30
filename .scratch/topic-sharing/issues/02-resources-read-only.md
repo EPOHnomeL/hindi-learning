@@ -1,6 +1,9 @@
 # 02 — Resources, read-only for Viewers
 
-Status: ready-for-agent
+Status: done (commits 0898055 widens `listResources` to owner-or-Viewer, 9f9889d
+hides the upload/link controls for Viewers, fe9548c tests). `addResource` /
+`addUrlResource` were already owner-only; there is no delete-Resource mutation,
+so nothing to block there.
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Share**, **Viewer**). Spec: [`../PRD.md`](../PRD.md).
 

@@ -1,6 +1,10 @@
 # 05 — Progress, read-only for Viewers
 
-Status: ready-for-agent
+Status: done (commits 0898055 widens `myProgress` to the owner's marks, 2e130b3
+owner-gates the next-lesson/setup routine fires, 9f9889d hides Mark-complete and
+Generate-next and skips the auto "opened"/quiz writes, fe9548c tests).
+`setProgress`/`recordResponse` were already owner-only; 2e130b3 closed the
+load-bearing hole where a Viewer could fire authoring on the owner's Frontier.
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Share**, **Viewer**). Spec: [`../PRD.md`](../PRD.md).
 
