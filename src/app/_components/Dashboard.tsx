@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { parseMarkdown, type Span } from "./markdown";
+import { missionPreview, parseMarkdown, type Span } from "./markdown";
 import { useResourceUpload } from "./useResourceUpload";
 
 type Course = {
@@ -112,7 +112,7 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
           title="View full mission"
           className="mb-1 line-clamp-2 min-h-10 text-left text-sm text-soft transition-colors hover:text-accent"
         >
-          {course.mission}
+          {missionPreview(course.mission)}
         </button>
       )}
       {showMission && course.mission && (
@@ -197,7 +197,7 @@ function CourseCard({ course }: { course: Course }) {
           title="View full mission"
           className="mb-4 line-clamp-2 min-h-10 text-left text-sm text-soft transition-colors hover:text-accent"
         >
-          {course.mission}
+          {missionPreview(course.mission)}
         </button>
       ) : (
         <p className="mb-4 min-h-10 text-sm text-soft">
@@ -281,7 +281,7 @@ function MissionDialog({ title, mission, onClose }: { title: string; mission: st
       onClick={(e) => {
         if (e.target === ref.current) ref.current?.close(); // click outside the content = backdrop
       }}
-      className="m-auto w-[90vw] max-w-lg rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
+      className="m-auto w-[92vw] max-w-2xl rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
     >
       <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
         <h2 className="min-w-0 truncate text-base font-semibold text-accent">{title}</h2>
@@ -289,7 +289,7 @@ function MissionDialog({ title, mission, onClose }: { title: string; mission: st
           ✕
         </button>
       </div>
-      <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+      <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
         <Markdown source={mission} />
       </div>
     </dialog>
