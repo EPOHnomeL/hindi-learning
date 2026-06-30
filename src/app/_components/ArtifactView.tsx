@@ -38,7 +38,7 @@ export function ArtifactView({
 // initial theme is baked into srcDoc and later changes are pushed live via
 // postMessage so a toggle re-skins without reloading (ADR 0011). `themeCss`
 // injects the dark palette too — set for references, which don't ship their own.
-function Frame({ html, withBridge, theme, themeCss }: { html: string; withBridge: boolean; theme?: Theme; themeCss?: boolean }) {
+export function Frame({ html, withBridge, theme, themeCss }: { html: string; withBridge: boolean; theme?: Theme; themeCss?: boolean }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   // Read theme via a ref so changing it does NOT rebuild srcDoc (which would
   // reload the iframe, losing scroll + answered-quiz state). The bake only needs

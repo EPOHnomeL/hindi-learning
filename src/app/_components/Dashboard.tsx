@@ -14,6 +14,7 @@ type Course = {
   title: string;
   status: "seeded" | "active";
   mission: string | null;
+  publicToken: string | null;
   lessonCount: number;
   completedCount: number;
 };
@@ -180,9 +181,14 @@ function CourseCard({ course }: { course: Course }) {
     <article className="flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
       <div className="mb-2 flex items-start justify-between gap-2">
         <h2 className="min-w-0 text-lg font-semibold leading-snug text-ink">{course.title}</h2>
-        {course.status === "seeded" && (
-          <span className="shrink-0 rounded-full bg-hi px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent">Setting up</span>
-        )}
+        <div className="flex shrink-0 items-center gap-1">
+          {course.publicToken && (
+            <span className="rounded-full bg-accent2/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent2" title="A public link is live">Public</span>
+          )}
+          {course.status === "seeded" && (
+            <span className="rounded-full bg-hi px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent">Setting up</span>
+          )}
+        </div>
       </div>
 
       {course.mission ? (
@@ -339,9 +345,25 @@ function renderSpans(spans: Span[]) {
   });
 }
 
-// Share a course with another learner by their account email (read-only access).
-// Slice 01: add-by-email only; listing/revoking current Viewers is issue 06.
+// The Topic's sharing controls: share with a known account (a Share → Viewer),
+// and the anonymous Public link (issue 07 / ADR 0013). Two distinct sections —
+// "Share" stays account-to-account; the Public link is the account-less form.
 function SharePanel({ course, onDone }: { course: Course; onDone: () => void }) {
+  return (
+    <div className="flex flex-col gap-4 rounded-2xl border border-gold/50 bg-card p-5 shadow-sm">
+      <ShareByEmail course={course} />
+      <hr className="border-line" />
+      <PublicLinkControls course={course} />
+      <button type="button" onClick={onDone} className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi">
+        Done
+      </button>
+    </div>
+  );
+}
+
+// Share with another learner by account email (read-only Viewer access).
+// Slice 01: add-by-email only; listing/revoking current Viewers is issue 06.
+function ShareByEmail({ course }: { course: Course }) {
   const shareTopic = useMutation(api.shares.shareTopic);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -350,7 +372,7 @@ function SharePanel({ course, onDone }: { course: Course; onDone: () => void }) 
 
   return (
     <form
-      className="flex flex-col gap-2 rounded-2xl border border-gold/50 bg-card p-5 shadow-sm"
+      className="flex flex-col gap-2"
       onSubmit={async (e) => {
         e.preventDefault();
         const addr = email.trim();
@@ -368,30 +390,100 @@ function SharePanel({ course, onDone }: { course: Course; onDone: () => void }) 
         }
       }}
     >
-      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Share “{course.title}”</label>
+      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Share “{course.title}” with a person</label>
       <p className="text-sm text-soft">They’ll get read-only access — view your lessons, but not edit anything.</p>
-      <input
-        autoFocus
-        type="email"
-        value={email}
-        onChange={(e) => {
-          setEmail(e.target.value);
-          setError(null);
-        }}
-        placeholder="Their account email"
-        className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
-      />
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      {sharedWith && <p className="text-xs text-accent2">Shared with {sharedWith}.</p>}
-      <div className="mt-1 flex gap-2">
-        <button type="submit" disabled={busy} className="flex-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60">
+      <div className="flex gap-2">
+        <input
+          autoFocus
+          type="email"
+          value={email}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setError(null);
+          }}
+          placeholder="Their account email"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+        />
+        <button type="submit" disabled={busy} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60">
           {busy ? "Sharing…" : "Share"}
         </button>
-        <button type="button" onClick={onDone} className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi">
-          Done
-        </button>
       </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      {sharedWith && <p className="text-xs text-accent2">Shared with {sharedWith}.</p>}
     </form>
+  );
+}
+
+// The anonymous Public link: a single on/off token per Topic. "Make public" /
+// "Regenerate" both mint a fresh token (old link dies); "Turn off" revokes.
+// The token is read live from the dashboard query (course.publicToken).
+function PublicLinkControls({ course }: { course: Course }) {
+  const setPublic = useMutation(api.shares.setTopicPublic);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const url = course.publicToken ? `${origin}/share/${course.publicToken}` : null;
+
+  const run = async (isPublic: boolean) => {
+    setBusy(true);
+    try {
+      await setPublic({ topicSlug: course.slug, isPublic });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Public link</label>
+      {url ? (
+        <>
+          <div className="flex gap-1">
+            <input
+              readOnly
+              value={url}
+              onFocus={(e) => e.currentTarget.select()}
+              className="min-w-0 flex-1 rounded-lg border border-line bg-hi px-2 py-1.5 text-xs text-ink focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard?.writeText(url).then(
+                  () => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  },
+                  () => {/* clipboard blocked — the field is selectable to copy by hand */},
+                );
+              }}
+              className="shrink-0 rounded-lg bg-accent2 px-3 py-1.5 text-xs font-medium text-white"
+            >
+              {copied ? "Copied" : "Copy"}
+            </button>
+          </div>
+          <p className="text-xs text-soft">
+            Anyone with this link can see this course’s lessons, references, resources, and your questions &amp; progress — no account needed.
+          </p>
+          <div className="mt-1 flex gap-2">
+            <button type="button" disabled={busy} onClick={() => void run(true)} className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft hover:bg-hi disabled:opacity-60">
+              Regenerate
+            </button>
+            <button type="button" disabled={busy} onClick={() => void run(false)} className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft hover:bg-hi disabled:opacity-60">
+              Turn off
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-soft">
+            Off — only you and people you’ve shared with can see this course. Making it public lets <em>anyone with the link</em> read the lessons, references, resources, and your questions &amp; progress — no account needed.
+          </p>
+          <button type="button" disabled={busy} onClick={() => void run(true)} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60">
+            {busy ? "Working…" : "Make public"}
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 

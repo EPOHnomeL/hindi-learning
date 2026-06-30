@@ -14,6 +14,7 @@ import type * as content from "../content.js";
 import type * as crons from "../crons.js";
 import type * as http from "../http.js";
 import type * as lib from "../lib.js";
+import type * as public_ from "../public.js";
 import type * as resources from "../resources.js";
 import type * as routine from "../routine.js";
 import type * as shares from "../shares.js";
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   http: typeof http;
   lib: typeof lib;
+  public: typeof public_;
   resources: typeof resources;
   routine: typeof routine;
   shares: typeof shares;
