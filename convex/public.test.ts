@@ -103,3 +103,17 @@ test("setTopicPublic: regenerate invalidates the old token, make-private revokes
     asUser(t, stranger).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true }),
   ).rejects.toThrow();
 });
+
+test("the read seam is identity-agnostic: any signed-in user (and the owner) read a public Topic by token", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const someoneElse = await seedUser(t, "else@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi");
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>a</p>" }));
+  const token = await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true });
+
+  // No Share needed — the token alone grants the read, regardless of who's asking.
+  expect(await asUser(t, someoneElse).query(api.public.publicCourse, { token: token! })).toMatchObject({ title: "Hindi" });
+  // The owner opening their own share URL previews the same Guest view.
+  expect(await asUser(t, owner).query(api.public.publicCourse, { token: token! })).toMatchObject({ title: "Hindi" });
+});

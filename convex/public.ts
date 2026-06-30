@@ -26,6 +26,37 @@ async function topicByPublicToken(ctx: QueryCtx, token: string): Promise<Doc<"to
 // field the authed side adds without it being deliberately re-listed.
 export const publicCourse = query({
   args: { token: v.string() },
+  // Explicit output allowlist — this is anonymous, public-internet-facing, so a
+  // Guest can never receive a field unless it's listed here.
+  returns: v.union(
+    v.null(),
+    v.object({
+      title: v.string(),
+      lessons: v.array(v.object({ key: v.string(), seq: v.number(), title: v.string() })),
+      references: v.array(v.object({ key: v.string(), title: v.string() })),
+      resources: v.array(
+        v.object({
+          id: v.id("resources"),
+          filename: v.string(),
+          status: v.union(v.literal("raw"), v.literal("processing"), v.literal("ready")),
+          kind: v.union(v.literal("file"), v.literal("url")),
+          url: v.union(v.string(), v.null()),
+        }),
+      ),
+      progress: v.array(
+        v.object({ lessonKey: v.string(), status: v.union(v.literal("opened"), v.literal("completed")) }),
+      ),
+      questions: v.array(
+        v.object({
+          id: v.id("questions"),
+          lessonKey: v.string(),
+          text: v.string(),
+          status: v.union(v.literal("open"), v.literal("answered")),
+          reply: v.union(v.string(), v.null()),
+        }),
+      ),
+    }),
+  ),
   handler: async (ctx, { token }) => {
     const topic = await topicByPublicToken(ctx, token);
     if (!topic) return null;
@@ -83,6 +114,7 @@ export const publicCourse = query({
 // or a superseded Lesson (mirrors the authed getLesson).
 export const publicLesson = query({
   args: { token: v.string(), key: v.string() },
+  returns: v.union(v.null(), v.object({ key: v.string(), seq: v.number(), title: v.string(), html: v.string() })),
   handler: async (ctx, { token, key }) => {
     const topic = await topicByPublicToken(ctx, token);
     if (!topic) return null;
@@ -98,6 +130,7 @@ export const publicLesson = query({
 // One Reference's HTML for a Guest. Null for an unknown/wrong token or key.
 export const publicReference = query({
   args: { token: v.string(), key: v.string() },
+  returns: v.union(v.null(), v.object({ key: v.string(), title: v.string(), html: v.string() })),
   handler: async (ctx, { token, key }) => {
     const topic = await topicByPublicToken(ctx, token);
     if (!topic) return null;

@@ -33,8 +33,8 @@ path) deserve recording.
   creator already asked), not a leak. A future per-Topic opt-out (e.g. "don't
   share my questions") is deferred to `.scratch/topic-sharing/issues/08`.
 - **One token per Topic, stored as an optional `publicToken` field on `topics`**
-  (+ a `by_public_token` index), not a separate relation. ~256-bit random
-  (base64url, Web Crypto), never derived from the slug. "Make public" mints it;
+  (+ a `by_public_token` index), not a separate relation. 256-bit random
+  (hex via Web Crypto `getRandomValues`), never derived from the slug. "Make public" mints it;
   "Regenerate" overwrites it; **"Turn off" clears the field** — so off means
   *truly revoked* and re-enabling later mints a brand-new link. No "disabled but
   remembered" state.

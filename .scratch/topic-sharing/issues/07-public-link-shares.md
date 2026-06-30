@@ -18,7 +18,7 @@ reserved (the route was never built — this issue stands it up).
 ## Acceptance
 
 - **Token on the Topic.** An optional `publicToken` field on `topics` + a
-  `by_public_token` index. Minted with the Web Crypto API (~256-bit, base64url,
+  `by_public_token` index. Minted with the Web Crypto API (256-bit, hex,
   not slug-derived). One token per Topic.
 - **Owner mutations (owner-only):** `makeTopicPublic` mints/sets the token,
   `regeneratePublicLink` overwrites it (old link dies at once), `makeTopicPrivate`
