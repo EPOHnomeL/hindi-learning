@@ -28,14 +28,23 @@ export function CourseIndex({ slug }: { slug: string }) {
 // A single Lesson. Reads `frontierKey` from the course context for the
 // "generate next lesson" affordance, and marks its replies seen on open.
 export function LessonPane({ slug, lessonKey }: { slug: string; lessonKey: string }) {
-  const { markSeen, frontierKey } = useCourse();
+  const { markSeen, frontierKey, canWrite } = useCourse();
   useEffect(() => {
     markSeen(lessonKey);
   }, [lessonKey, markSeen]);
-  return <ArtifactView kind="lesson" artifactKey={lessonKey} topicSlug={slug} isFrontier={frontierKey === lessonKey} />;
+  return (
+    <ArtifactView
+      kind="lesson"
+      artifactKey={lessonKey}
+      topicSlug={slug}
+      isFrontier={frontierKey === lessonKey}
+      readOnly={!canWrite}
+    />
+  );
 }
 
 // A single Reference. Never the Frontier, nothing to mark seen.
 export function ReferencePane({ slug, refKey }: { slug: string; refKey: string }) {
-  return <ArtifactView kind="reference" artifactKey={refKey} topicSlug={slug} isFrontier={false} />;
+  const { canWrite } = useCourse();
+  return <ArtifactView kind="reference" artifactKey={refKey} topicSlug={slug} isFrontier={false} readOnly={!canWrite} />;
 }

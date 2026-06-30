@@ -22,6 +22,7 @@ type SharedCourse = {
   slug: string;
   title: string;
   ownerEmail: string | null;
+  mission: string | null;
   lessonCount: number;
   completedCount: number;
 };
@@ -94,6 +95,7 @@ function SharedSection() {
 // A shared course: same shape as CourseCard but attributed to its owner and with
 // no Edit/Share controls — a Viewer reads, never writes.
 function SharedCourseCard({ course }: { course: SharedCourse }) {
+  const [showMission, setShowMission] = useState(false);
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
   return (
     <article className="flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
@@ -102,7 +104,21 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
         <span className="shrink-0 rounded-full bg-hi px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent">Shared</span>
       </div>
 
-      <p className="mb-4 min-h-10 text-sm text-soft">
+      {/* The owner's Mission, read-only (same popup as the owner's card). */}
+      {course.mission && (
+        <button
+          onClick={() => setShowMission(true)}
+          title="View full mission"
+          className="mb-1 line-clamp-2 min-h-10 text-left text-sm text-soft transition-colors hover:text-accent"
+        >
+          {course.mission}
+        </button>
+      )}
+      {showMission && course.mission && (
+        <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />
+      )}
+
+      <p className="mb-4 text-xs text-soft">
         Shared by <span className="text-ink">{course.ownerEmail ?? "another learner"}</span>
       </p>
 

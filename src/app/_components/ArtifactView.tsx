@@ -19,14 +19,18 @@ export function ArtifactView({
   artifactKey,
   topicSlug,
   isFrontier,
+  readOnly,
 }: {
   kind: "lesson" | "reference";
   artifactKey: string;
   topicSlug: string;
   isFrontier: boolean;
+  // True for a read-only Viewer: hide every write control and skip the writes
+  // the reader normally makes (progress, quiz responses). Reads stay live.
+  readOnly: boolean;
 }) {
   if (kind === "reference") return <ReferenceView refKey={artifactKey} topicSlug={topicSlug} />;
-  return <LessonView lessonKey={artifactKey} topicSlug={topicSlug} isFrontier={isFrontier} />;
+  return <LessonView lessonKey={artifactKey} topicSlug={topicSlug} isFrontier={isFrontier} readOnly={readOnly} />;
 }
 
 // Fills its flex parent; min height keeps it usable when the column is short
@@ -88,21 +92,35 @@ function Frame({ html, withBridge, theme, themeCss }: { html: string; withBridge
   );
 }
 
-function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; topicSlug: string; isFrontier: boolean }) {
+function LessonView({
+  lessonKey,
+  topicSlug,
+  isFrontier,
+  readOnly,
+}: {
+  lessonKey: string;
+  topicSlug: string;
+  isFrontier: boolean;
+  readOnly: boolean;
+}) {
   const { theme } = useTheme();
   const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey });
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
   const setProgress = useMutation(api.capture.setProgress);
 
+  // For a Viewer this is the *owner's* completion (read-only); for the owner,
+  // their own.
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
 
   useEffect(() => {
-    if (lesson) void setProgress({ topicSlug, lessonKey, status: "opened" });
+    // A Viewer never writes the owner's Progress (the mutation would reject anyway).
+    if (lesson && !readOnly) void setProgress({ topicSlug, lessonKey, status: "opened" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lesson?.key]);
+  }, [lesson?.key, readOnly]);
 
   useEffect(() => {
+    if (readOnly) return; // Viewers' quiz attempts aren't recorded against the owner.
     function onMessage(e: MessageEvent) {
       const d = e.data as { __lesson?: boolean; type?: string; quizId?: string; answer?: unknown; correct?: unknown };
       if (d?.__lesson && d.type === "response" && d.quizId) {
@@ -111,7 +129,7 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [topicSlug, lessonKey, recordResponse]);
+  }, [topicSlug, lessonKey, recordResponse, readOnly]);
 
   if (lesson === undefined) return <p className="text-soft">Loading…</p>;
   if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
@@ -124,30 +142,37 @@ function LessonView({ lessonKey, topicSlug, isFrontier }: { lessonKey: string; t
         <div className="sticky top-12 z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
           <div className="flex shrink-0 items-center gap-2">
-            {isFrontier && completed && <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />}
-            <button
-              onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
-              disabled={completed}
-              className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                completed
-                  ? "cursor-default border-accent2 bg-accent2 text-white"
-                  : "border-accent text-accent hover:bg-hi"
-              }`}
-            >
-              {completed ? "✓ Completed" : "Mark complete"}
-            </button>
+            {!readOnly && isFrontier && completed && <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />}
+            {readOnly ? (
+              // A Viewer can't change Progress, but sees the owner's completion.
+              completed && (
+                <span className="rounded-lg border border-accent2 bg-accent2 px-3 py-1.5 text-sm text-white">✓ Completed</span>
+              )
+            ) : (
+              <button
+                onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
+                disabled={completed}
+                className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                  completed
+                    ? "cursor-default border-accent2 bg-accent2 text-white"
+                    : "border-accent text-accent hover:bg-hi"
+                }`}
+              >
+                {completed ? "✓ Completed" : "Mark complete"}
+              </button>
+            )}
           </div>
         </div>
         <Frame html={lesson.html} withBridge theme={theme} />
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
             scrolling, no slide-up trigger. Desktop uses the side column instead. */}
         <div className="p-3 md:hidden">
-          <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} variant="inline" />
+          <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} variant="inline" readOnly={readOnly} />
         </div>
       </div>
       {/* Desktop: persistent ask column on the right. */}
       <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
-        <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} />
+        <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} readOnly={readOnly} />
       </aside>
     </div>
   );
@@ -239,9 +264,21 @@ function ReferenceView({ refKey, topicSlug }: { refKey: string; topicSlug: strin
   );
 }
 
-// Ask the teacher a question and see the reply once answered (live).
+// Ask the teacher a question and see the reply once answered (live). For a
+// read-only Viewer the ask form is gone, but the owner's existing Questions and
+// Replies stay visible (PRD story 21).
 // `panel` is the desktop side column; `inline` sits at the end of the lesson on mobile.
-function QuestionBox({ topicSlug, lessonKey, variant = "panel" }: { topicSlug: string; lessonKey: string; variant?: "panel" | "inline" }) {
+function QuestionBox({
+  topicSlug,
+  lessonKey,
+  variant = "panel",
+  readOnly,
+}: {
+  topicSlug: string;
+  lessonKey: string;
+  variant?: "panel" | "inline";
+  readOnly: boolean;
+}) {
   const questions = useQuery(api.capture.myQuestions, { topicSlug });
   const askQuestion = useMutation(api.capture.askQuestion);
   const [text, setText] = useState("");
@@ -255,20 +292,25 @@ function QuestionBox({ topicSlug, lessonKey, variant = "panel" }: { topicSlug: s
           : "flex h-full flex-col rounded-xl border border-line bg-card p-4"
       }
     >
-      <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-accent2">Ask about this lesson</h3>
-      <form
-        className="flex gap-2"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const t = text.trim();
-          if (!t) return;
-          setText("");
-          await askQuestion({ topicSlug, lessonKey, text: t });
-        }}
-      >
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Your question…" className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none" />
-        <button type="submit" className="rounded-lg bg-accent2 px-3 py-2 text-sm text-white hover:bg-accent2/90">Ask</button>
-      </form>
+      <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-accent2">
+        {readOnly ? "Questions & replies" : "Ask about this lesson"}
+      </h3>
+      {!readOnly && (
+        <form
+          className="flex gap-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const t = text.trim();
+            if (!t) return;
+            setText("");
+            await askQuestion({ topicSlug, lessonKey, text: t });
+          }}
+        >
+          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Your question…" className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none" />
+          <button type="submit" className="rounded-lg bg-accent2 px-3 py-2 text-sm text-white hover:bg-accent2/90">Ask</button>
+        </form>
+      )}
+      {readOnly && mine.length === 0 && <p className="text-sm text-soft">No questions on this lesson yet.</p>}
       <ul className={`mt-3 flex flex-col gap-3 ${variant === "inline" ? "" : "min-h-0 flex-1 overflow-y-auto"}`}>
         {mine.map((q) => (
           <li key={q.id} className="text-sm">

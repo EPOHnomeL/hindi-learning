@@ -20,6 +20,10 @@ const SEEN_KEY = "hindi:answers-seen";
 type CourseCtx = {
   frontierKey: string | null;
   markSeen: (lessonKey: string) => void;
+  // False for a read-only Viewer (a Topic shared with them): the reader then
+  // hides every write control. Defaults false while access is still loading, so
+  // a Viewer never sees a control flash before it's hidden.
+  canWrite: boolean;
 };
 const Ctx = createContext<CourseCtx | null>(null);
 
@@ -34,13 +38,15 @@ export function useCourse(): CourseCtx {
 // swaps only `children`, so the queries below run once and the sidebar never
 // remounts. Fixed by `slug` from the URL.
 export function CourseShell({ slug, children }: { slug: string; children: React.ReactNode }) {
-  const topics = useQuery(api.content.listTopics);
+  // One viewable query carries both the title (a Viewer's owner-only `listTopics`
+  // never includes a shared Topic) and the caller's role. Owners can write;
+  // Viewers get a read-only reader.
+  const header = useQuery(api.content.courseHeader, { topicSlug: slug });
+  const canWrite = header?.role === "owner";
   const { signOut } = useAuthActions();
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
-
-  const activeTopic = topics?.find((t) => t.slug === slug) ?? null;
 
   const lessons = useQuery(api.content.listLessons, { topicSlug: slug });
   const references = useQuery(api.content.listReferences, { topicSlug: slug });
@@ -93,7 +99,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   useEffect(() => setMenuOpen(false), [pathname]);
 
   return (
-    <Ctx.Provider value={{ frontierKey: frontier, markSeen }}>
+    <Ctx.Provider value={{ frontierKey: frontier, markSeen, canWrite }}>
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
         {/* Mobile top bar: hamburger opens the lesson selector. */}
         <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 md:hidden">
@@ -104,7 +110,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               <line x1="3" y1="18" x2="21" y2="18" />
             </svg>
           </button>
-          <h1 className="text-base font-semibold tracking-tight text-accent">{activeTopic?.title ?? "…"}</h1>
+          <h1 className="text-base font-semibold tracking-tight text-accent">{header?.title ?? "…"}</h1>
         </header>
 
         {menuOpen && <div onClick={() => setMenuOpen(false)} aria-hidden className="fixed inset-0 z-40 bg-black/40 md:hidden" />}
@@ -129,7 +135,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               Sign out
             </button>
           </div>
-          <h1 className="mb-4 truncate text-lg font-semibold tracking-tight text-accent">{activeTopic?.title ?? "…"}</h1>
+          <h1 className="mb-4 truncate text-lg font-semibold tracking-tight text-accent">{header?.title ?? "…"}</h1>
 
           <nav className="flex flex-col gap-1">
             <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">Lessons</p>
@@ -153,7 +159,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               </NavItem>
             ))}
 
-            <ResourcesSection topicSlug={slug} />
+            <ResourcesSection topicSlug={slug} canWrite={canWrite} />
           </nav>
 
           <ThemeToggle />
@@ -222,7 +228,7 @@ function NavItem({
 
 // The active Topic's Resources — PDFs (uploaded) and links — each opening in a
 // new tab. Add more by uploading a file or pasting a link.
-function ResourcesSection({ topicSlug }: { topicSlug: string }) {
+function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite: boolean }) {
   const resources = useQuery(api.resources.listResources, { topicSlug });
   const { uploadFile, addLink } = useResourceUpload();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -267,53 +273,58 @@ function ResourcesSection({ topicSlug }: { topicSlug: string }) {
         ),
       )}
 
-      <input
-        ref={inputRef}
-        type="file"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void run(() => uploadFile(topicSlug, file));
-        }}
-      />
-      {adding ? (
-        <form
-          className="mt-1 flex gap-1"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const link = linkDraft.trim();
-            if (!link) return;
-            setLinkDraft("");
-            setAdding(false);
-            void run(() => addLink(topicSlug, link));
-          }}
-        >
+      {/* Add controls are owner-only; a Viewer sees the list but can't add. */}
+      {canWrite && (
+        <>
           <input
-            autoFocus
-            value={linkDraft}
-            onChange={(e) => setLinkDraft(e.target.value)}
-            placeholder="https://…"
-            className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-sm focus:border-gold focus:outline-none"
+            ref={inputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void run(() => uploadFile(topicSlug, file));
+            }}
           />
-          <button type="submit" className="rounded-lg bg-accent2 px-2 py-1 text-xs text-white">Add</button>
-        </form>
-      ) : (
-        <div className="mt-1 flex gap-2">
-          <button
-            onClick={() => inputRef.current?.click()}
-            disabled={busy}
-            className="flex-1 rounded-lg border border-dashed border-line px-2.5 py-2.5 text-left text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
-          >
-            {busy ? "Working…" : "+ Upload PDF"}
-          </button>
-          <button
-            onClick={() => setAdding(true)}
-            disabled={busy}
-            className="rounded-lg border border-dashed border-line px-3 py-2.5 text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
-          >
-            + Link
-          </button>
-        </div>
+          {adding ? (
+            <form
+              className="mt-1 flex gap-1"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const link = linkDraft.trim();
+                if (!link) return;
+                setLinkDraft("");
+                setAdding(false);
+                void run(() => addLink(topicSlug, link));
+              }}
+            >
+              <input
+                autoFocus
+                value={linkDraft}
+                onChange={(e) => setLinkDraft(e.target.value)}
+                placeholder="https://…"
+                className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-sm focus:border-gold focus:outline-none"
+              />
+              <button type="submit" className="rounded-lg bg-accent2 px-2 py-1 text-xs text-white">Add</button>
+            </form>
+          ) : (
+            <div className="mt-1 flex gap-2">
+              <button
+                onClick={() => inputRef.current?.click()}
+                disabled={busy}
+                className="flex-1 rounded-lg border border-dashed border-line px-2.5 py-2.5 text-left text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
+              >
+                {busy ? "Working…" : "+ Upload PDF"}
+              </button>
+              <button
+                onClick={() => setAdding(true)}
+                disabled={busy}
+                className="rounded-lg border border-dashed border-line px-3 py-2.5 text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
+              >
+                + Link
+              </button>
+            </div>
+          )}
+        </>
       )}
     </>
   );
