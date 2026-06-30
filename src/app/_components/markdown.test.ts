@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseInline, parseMarkdown } from "./markdown";
+import { missionPreview, parseInline, parseMarkdown } from "./markdown";
 
 describe("parseInline", () => {
   it("splits bold from surrounding text", () => {
@@ -31,5 +31,20 @@ describe("parseMarkdown", () => {
       { kind: "list", ordered: false, items: [[{ kind: "text", text: "one" }], [{ kind: "text", text: "two" }]] },
       { kind: "para", spans: [{ kind: "text", text: "More." }] },
     ]);
+  });
+});
+
+describe("missionPreview", () => {
+  it("returns the first prose paragraph, stripping the Mission heading and markers", () => {
+    const src = "# Mission: Hindi\n## Why\nRead the **Hindi Bible** in its _original_ form.";
+    expect(missionPreview(src)).toBe("Read the Hindi Bible in its original form.");
+  });
+
+  it("falls back to the first non-Mission heading when there's no paragraph", () => {
+    expect(missionPreview("# Mission: Hindi\n## Why I want this\n- a\n- b")).toBe("Why I want this");
+  });
+
+  it("falls back to the first list item when there's no paragraph or other heading", () => {
+    expect(missionPreview("# Mission: Hindi\n- first goal\n- second goal")).toBe("first goal");
   });
 });

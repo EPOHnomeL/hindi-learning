@@ -43,6 +43,32 @@ export function parseInline(text: string): Span[] {
   return spans;
 }
 
+// A clean plain-text preview of a Mission for the course-card blurb: the first
+// paragraph of prose (the actual "why"), with the redundant "# Mission: X" heading
+// and all Markdown markers stripped. The card clamps it to two lines. Falls back to
+// the first meaningful heading/list item, then to the raw text with markers removed.
+export function missionPreview(src: string): string {
+  const blocks = parseMarkdown(src);
+  const text = (spans: Span[]) => spans.map((s) => s.text).join("").trim();
+
+  for (const b of blocks) {
+    if (b.kind === "para") {
+      const t = text(b.spans);
+      if (t) return t;
+    }
+  }
+  for (const b of blocks) {
+    if (b.kind === "heading") {
+      const t = text(b.spans);
+      if (t && !/^mission\b/i.test(t)) return t;
+    } else if (b.kind === "list" && b.items.length) {
+      const t = text(b.items[0]!);
+      if (t) return t;
+    }
+  }
+  return src.replace(/[#*_`>]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 export function parseMarkdown(src: string): Block[] {
   const blocks: Block[] = [];
   let para: string[] = [];
