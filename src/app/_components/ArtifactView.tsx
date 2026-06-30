@@ -283,6 +283,7 @@ function QuestionBox({
   const questions = useQuery(api.capture.myQuestions, { topicSlug });
   const askQuestion = useMutation(api.capture.askQuestion);
   const [text, setText] = useState("");
+  const [expanded, setExpanded] = useState<{ text: string; reply: string } | null>(null);
   const mine = questions?.filter((q) => q.lessonKey === lessonKey) ?? [];
 
   return (
@@ -318,7 +319,18 @@ function QuestionBox({
             <p className="font-medium text-ink">{q.text}</p>
             {q.reply ? (
               <div className="mt-1.5 rounded-lg border-l-2 border-accent2 bg-hi px-3 py-2">
-                <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-accent2">Teacher</p>
+                <div className="mb-0.5 flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-accent2">Teacher</p>
+                  {variant === "panel" && (
+                    <button
+                      type="button"
+                      onClick={() => setExpanded({ text: q.text, reply: q.reply! })}
+                      className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-soft transition-colors hover:bg-card hover:text-accent"
+                    >
+                      ⤢ View
+                    </button>
+                  )}
+                </div>
                 <Markdown source={q.reply} className="flex flex-col gap-2 text-sm leading-relaxed text-ink" />
               </div>
             ) : (
@@ -327,6 +339,37 @@ function QuestionBox({
           </li>
         ))}
       </ul>
+      {expanded && <QaDialog question={expanded.text} reply={expanded.reply} onClose={() => setExpanded(null)} />}
     </div>
+  );
+}
+
+// One Q&A opened in a comfortable reading width — the desktop ask column is only
+// md:w-80, too narrow for long replies. ponytail: a near-twin of Dashboard's
+// MissionDialog (native <dialog> → free Esc/backdrop/focus-trap); extract to a
+// shared module if a third use appears.
+function QaDialog({ question, reply, onClose }: { question: string; reply: string; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => ref.current?.showModal(), []);
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === ref.current) ref.current?.close(); // click outside the content = backdrop
+      }}
+      className="m-auto w-[92vw] max-w-2xl rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
+    >
+      <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-3">
+        <h2 className="min-w-0 text-base font-semibold text-ink">{question}</h2>
+        <button onClick={() => ref.current?.close()} aria-label="Close" className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
+          ✕
+        </button>
+      </div>
+      <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
+        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent2">Teacher</p>
+        <Markdown source={reply} className="flex flex-col gap-3 text-base leading-relaxed text-ink" />
+      </div>
+    </dialog>
   );
 }
