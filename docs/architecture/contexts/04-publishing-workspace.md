@@ -22,7 +22,7 @@ Each script has a `:prod` twin in `package.json`; all share the env/target helpe
 
 | Script | Does | Hub fn |
 | --- | --- | --- |
-| [`claim`](/scripts/claim.ts#L15) | Hands this run one locked Topic; prints the slug to **stdout only** (so `SLUG=$(pnpm -s claim:prod)` works). | [`routine.claimWork`](/convex/routine.ts#L189-L202) |
+| [`claim`](/scripts/claim.ts#L17) | Hands this run one locked Topic; prints the slug to **stdout only** (so `SLUG=$(pnpm -s claim:prod)` works) and writes the Topic's owner to `.env.local` as `OWNER_EMAIL` for the owner-scoped steps. | [`routine.claimWork`](/convex/routine.ts#L196-L211) |
 | [`materialise`](/scripts/materialise.ts#L14) | Pulls the Topic's full context into `topics/<slug>/` — lessons, references, resource blobs, learning records, `CAPTURE.json`, and `MISSION.md` **or** `SEED.md`. | [`routine.materialiseTopic`](/convex/routine.ts#L294-L365) |
 | [`review`](/scripts/review.ts#L10) | Prints live learner state (open [[Question]]s, quiz [[Response]]s, [[Progress]]). | `capture.reviewState` |
 | [`reply`](/scripts/reply.ts#L17) | Answers one open Question; it flips to `answered` and shows inline in the Reader. | `capture.replyToQuestion` |

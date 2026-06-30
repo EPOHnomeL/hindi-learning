@@ -39,9 +39,10 @@ stateDiagram-v2
 - **Fire:** [`fireForTopic`](/convex/routine.ts#L210-L239) POSTs the external Routine URL with an
   **empty body** ([ADR 0008](/docs/adr/0008-next-lesson-routine-gate-in-convex.md) — the fire body is
   closed). On a fire error it calls `failGeneration` to release the lock.
-- **Claim:** the fired run calls [`claimWork`](/convex/routine.ts#L189-L202) with its `runId`; this
-  hands it the oldest locked-but-unclaimed Topic. This is how a closed fire body still serves many
-  Topics — and how `fire-all` gives each concurrent run a distinct one.
+- **Claim:** the fired run calls [`claimWork`](/convex/routine.ts#L196-L211) with its `runId`; this
+  hands it the oldest locked-but-unclaimed Topic **and that Topic's owner email** — so the
+  owner-scoped steps (materialise/review/publish) need no human-supplied `OWNER_EMAIL`. This is how a
+  closed fire body still serves many Topics — and how `fire-all` gives each concurrent run a distinct one.
 - **Report:** [`reportGeneration`](/convex/routine.ts#L159-L181) closes the loop with `published`
   (→ `idle`, Frontier advanced), `nothing` (→ `caughtUp`, debounced), or `failed`.
 

@@ -57,7 +57,7 @@ re-pasted. The loop, in brief:
 ### Cloud environment
 
 - **Setup script:** `corepack enable` + `pnpm install --frozen-lockfile` + `python3 -m pip install pymupdf` (pymupdf renders `Handbook.pdf` pages for grounding).
-- **Env vars (set in the routine's cloud env):** `PUBLISH_SECRET`, `CONVEX_PROD_URL`.
+- **Env vars (set in the routine's cloud env):** `PUBLISH_SECRET`, `CONVEX_PROD_URL`. `OWNER_EMAIL` is **not** set here — `claim:prod` resolves the claimed Topic's owner and writes it to `.env.local` for the owner-scoped steps, so the run is self-sufficient.
 
 ---
 
@@ -116,7 +116,7 @@ The teach CLI (`scripts/`, wired in `package.json`):
 
 | Command | Does |
 | --- | --- |
-| `pnpm -s run claim:prod` | Claim one ready Topic for this run; prints its slug (or `none`). |
+| `pnpm -s run claim:prod` | Claim one ready Topic for this run; prints its slug (or `none`) and writes its owner to `.env.local` as `OWNER_EMAIL` for the owner-scoped steps. |
 | `pnpm run materialise:prod --topic <slug>` | Pull the Topic's Mission/Seed, lessons, learning records, references, resources, and capture into `topics/<slug>/`. |
 | `pnpm run review:prod --topic <slug>` | Print live open questions + per-lesson responses/progress. |
 | `pnpm run reply:prod <id> "<answer>"` | Answer an open question (shows inline in the reader). |
@@ -137,6 +137,7 @@ succeeds but the commit is stranded, leaving the live site ahead of `main` — i
 | --- | --- | --- |
 | `claim:prod` prints `none` on every run | No Topic is locked-and-unclaimed: nothing seeded/ready, or the lock is stuck `generating` | Confirm a Topic is seeded or has a completed Frontier; a crashed run's lock self-heals after the 10-min stale window, then re-fires. |
 | `materialise:/publish:prod` errors in the cloud | trailing slash on `CONVEX_PROD_URL` (ConvexHttpClient rejects it) | `scripts/_env.ts` strips trailing slashes; ensure the var is the bare `https://<name>.convex.cloud`. |
+| `materialise:prod` → "No owned Topic … nothing to materialise" / "Missing OWNER_EMAIL" | the run can't determine the Topic's owner | Normally auto-handled: `claim:prod` resolves the owner from the claimed Topic and writes `OWNER_EMAIL` to `.env.local`. This only surfaces if the Topic has **no owner on record** (legacy/unowned `ownerId`) — back-fill the Topic's owner, or set `OWNER_EMAIL` manually for that run. |
 | `publish:prod` → "No workspace at topics/<slug>/" | publish ran before materialise (or for the wrong slug) | Run `materialise:prod --topic <slug>` first; publish reads the materialised workspace, not the repo root. |
 | Fire returns an error | missing `anthropic-version` header, bad token, or a non-empty body | Fire with the header + Bearer token + empty body (§4). |
 | Lesson generated ahead of the learner | a manual/`curl` fire raced the gate | Fire via the reader button (gated), not a raw fire (§4); a raw fire with no locked Topic now no-ops (`claimWork` returns nothing). |

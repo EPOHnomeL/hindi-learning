@@ -21,9 +21,12 @@ Do these steps IN ORDER:
 
 1. CLAIM your topic:
        SLUG=$(pnpm -s run claim:prod)
-   This atomically claims one ready topic and prints its slug. If it prints
-   "none", there is nothing to do — skip straight to step 8 and report `nothing`
-   for no slug is needed there; just end the run. Never guess or hardcode a slug.
+   This atomically claims one ready topic and prints its slug. It also resolves
+   that topic's OWNER and records it (OWNER_EMAIL in .env.local) for the
+   owner-scoped steps below — you never need to know or set the owner yourself.
+   If it prints "none", there is nothing to do — skip straight to step 8 and
+   report `nothing` (no slug is needed there); just end the run. Never guess or
+   hardcode a slug.
 
 2. MATERIALISE its context from the backend:
        pnpm run materialise:prod --topic "$SLUG"
