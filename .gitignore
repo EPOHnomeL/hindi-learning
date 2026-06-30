@@ -47,3 +47,8 @@ yarn-error.log*
 
 # scratch handbook page renders (scripts/render_pages.py output)
 /scripts/_pages/
+
+# ephemeral per-Topic workspace materialised by the cloud Routine from Convex
+# (ADR 0009: Convex is the source of truth; this is a transient working copy,
+# never committed back to git).
+/topics/
