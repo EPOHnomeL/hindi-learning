@@ -1,8 +1,14 @@
 # 07 — Public link shares (anonymous Guests)
 
-Status: ready-for-agent. Designed in the 2026-06-30 grill; foundational choices
-recorded in [ADR 0013](../../../docs/adr/0013-public-link-shares.md) and the
-**Public link** / **Guest** terms in [`CONTEXT.md`](../../../CONTEXT.md).
+Status: done (commits 6f61050 backend — schema `publicToken`, `setTopicPublic`,
+the token-authorized `convex/public.ts` read seam; d99ff56 frontend —
+`/share/[token]` Guest reader + SharePanel Public-link controls + Public badge;
+e574d75 review fixes — route `no-referrer`, public-query return validators,
+identity-agnostic read test). TDD'd at the Convex seam; passed a Standards+Spec
+review. Designed in the 2026-06-30 grill; foundational choices in
+[ADR 0013](../../../docs/adr/0013-public-link-shares.md) and the **Public link** /
+**Guest** terms in [`CONTEXT.md`](../../../CONTEXT.md). Follow-up: issue 08
+(per-Topic privacy controls).
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Public link**, **Guest**). Spec: [`../PRD.md`](../PRD.md) — lifts the "Anonymous / public links" item out of that PRD's **Out of Scope**.
 
