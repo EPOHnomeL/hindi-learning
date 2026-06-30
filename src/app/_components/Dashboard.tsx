@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { missionPreview, parseMarkdown, type Span } from "./markdown";
+import { Markdown } from "./MarkdownView";
+import { missionPreview } from "./markdown";
 import { useResourceUpload } from "./useResourceUpload";
 
 type Course = {
@@ -294,55 +295,6 @@ function MissionDialog({ title, mission, onClose }: { title: string; mission: st
       </div>
     </dialog>
   );
-}
-
-function Markdown({ source }: { source: string }) {
-  return (
-    <div className="flex flex-col gap-3 text-sm leading-relaxed text-ink">
-      {parseMarkdown(source).map((b, i) => {
-        if (b.kind === "heading") {
-          const Tag = `h${Math.min(b.level + 1, 6)}` as "h2" | "h3" | "h4" | "h5" | "h6";
-          return (
-            <Tag key={i} className="font-semibold text-accent">
-              {renderSpans(b.spans)}
-            </Tag>
-          );
-        }
-        if (b.kind === "list") {
-          const Tag = b.ordered ? "ol" : "ul";
-          return (
-            <Tag key={i} className={`ml-5 flex flex-col gap-1 ${b.ordered ? "list-decimal" : "list-disc"}`}>
-              {b.items.map((item, j) => (
-                <li key={j}>{renderSpans(item)}</li>
-              ))}
-            </Tag>
-          );
-        }
-        return <p key={i}>{renderSpans(b.spans)}</p>;
-      })}
-    </div>
-  );
-}
-
-function renderSpans(spans: Span[]) {
-  return spans.map((s, i) => {
-    switch (s.kind) {
-      case "strong":
-        return <strong key={i} className="font-semibold text-ink">{s.text}</strong>;
-      case "em":
-        return <em key={i}>{s.text}</em>;
-      case "code":
-        return <code key={i} className="rounded bg-hi px-1 py-0.5 text-[0.85em]">{s.text}</code>;
-      case "link":
-        return (
-          <a key={i} href={s.href} target="_blank" rel="noopener noreferrer" className="text-accent2 underline underline-offset-2">
-            {s.text}
-          </a>
-        );
-      default:
-        return <span key={i}>{s.text}</span>;
-    }
-  });
 }
 
 // The Topic's sharing controls: share with a known account (a Share → Viewer),

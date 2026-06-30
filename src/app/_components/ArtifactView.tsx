@@ -4,6 +4,7 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { buildSrcDoc, themeMessage, type Theme } from "./lessonSrcDoc";
+import { Markdown } from "./MarkdownView";
 import { useTheme } from "./ThemeContext";
 
 // Mirror of the server's stale threshold (convex/routine.ts STALE_MS): a run
@@ -318,7 +319,7 @@ function QuestionBox({
             {q.reply ? (
               <div className="mt-1.5 rounded-lg border-l-2 border-accent2 bg-hi px-3 py-2">
                 <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-accent2">Teacher</p>
-                <p className="text-ink">{q.reply}</p>
+                <Markdown source={q.reply} className="flex flex-col gap-2 text-sm leading-relaxed text-ink" />
               </div>
             ) : (
               <p className="mt-1 text-xs text-soft">Waiting for your teacher…</p>
