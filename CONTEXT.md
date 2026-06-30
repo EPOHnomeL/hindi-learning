@@ -86,3 +86,15 @@ _Avoid_: Whitelist, allowed emails, AUTH_ALLOWED_EMAILS (the retired env-var for
 **Admin**:
 The single User who governs the Allowlist — adds and removes admitted emails. Site-wide and distinct from a Topic's **owner** (a User owns the Topics they create; the Admin owns admission to the app). Exactly one Admin exists; the Admin's own admission is fixed and cannot be removed through the portal.
 _Avoid_: Owner (that is the Topic owner), superuser, moderator
+
+## Productisation (proposed — [ADR 0014](docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md))
+
+These two terms are the canonical names for the two commercial lines that ride the same provider-agnostic teaching runtime. Proposed, not yet built; the internal alpha is effectively the **Managed line** running on the operator's own key.
+
+**Managed line**:
+The tier where the operator runs the teaching compute on Claude — prompt-tuned and quality-guaranteed — metered and billed to the customer, with zero model configuration for them. The "easy and expensive" line.
+_Avoid_: Hosted tier, premium plan, pro
+
+**BYOK line**:
+The tier where the customer supplies their own OpenAI-compatible key + model and configures it themselves, paying their vendor directly. Quality is guaranteed on Claude only; every other model is *reachable* through the gateway but its quality is the customer's responsibility. The "configure it yourself" line.
+_Avoid_: Self-hosted, free tier, self-serve (BYOK is about the key, not the hosting)
