@@ -65,11 +65,19 @@ _Avoid_: Latest, head, tip, edge
 
 **Share**:
 A grant giving one existing User read-only access to a single Topic owned by another User. Created by the Topic's owner, who supplies the recipient's account email — the Share only forms if an account with that email already exists. Revocable by the owner at any time; removed when its Topic is deleted. A Topic may have many Shares (shared with several Users); a Share never confers write access.
-_Avoid_: Invite, link, permission, grant (as separate terms), public link
+_Avoid_: Invite, link, permission, grant (as separate terms). Distinct from a **Public link** — a Share is always targeted to a known account; a Public link is anonymous and account-less.
 
 **Viewer**:
-The User on the receiving end of a Share — has read-only access to a Topic they do not own. A Viewer sees everything in the Topic (Lessons, References, Resources, the owner's Questions and Replies, the owner's Progress) but writes nothing: they cannot add Resources, edit the Mission, ask Questions, mark Progress, or fire the Routine. A Viewer must have an account (distinct from a "guest"). Shared Topics appear in the Viewer's "Shared with me" section.
-_Avoid_: Guest, collaborator, member, recipient
+The User on the receiving end of a Share — has read-only access to a Topic they do not own. A Viewer sees everything in the Topic (Lessons, References, Resources, the owner's Questions and Replies, the owner's Progress) but writes nothing: they cannot add Resources, edit the Mission, ask Questions, mark Progress, or fire the Routine. A Viewer must have an account, and is distinct from a **Guest** (the anonymous holder of a Public link). Shared Topics appear in the Viewer's "Shared with me" section.
+_Avoid_: collaborator, member, recipient
+
+**Public link**:
+An unguessable token granting *anonymous*, read-only access to a single Topic — the account-less, capability-based counterpart to a Share. The token *is* the credential: anyone holding the link reads the Topic on the web without signing in. Minted by the Topic's owner ("make public") and revoked by turning it off or regenerating it, which invalidates the old link immediately. A Topic is **public** while a Public link is live and **private** otherwise. Confers read-only access only; a Guest writes nothing.
+_Avoid_: Share (the account-bound grant), Publish (the teach→Hub push), invite, public share
+
+**Guest**:
+The anonymous holder of a **Public link** — reads a public Topic on the web with no account and no identity, recognised only by possession of the token. A Guest sees the same content a Viewer does — the Topic's Lessons, References, Resources, and the owner's Questions, Replies, and Progress — but reaches it through the token rather than an account, and writes nothing (leaves no Progress, Responses, or Questions of their own). On a public Topic the owner's Q&A is treated as a feature, not a leak: a Guest learns from the questions the creator already asked. (A future per-Topic control may let an owner exclude Q&A from a Public link — deferred, [issue 08](.scratch/topic-sharing/issues/08-public-link-content-privacy-controls.md).)
+_Avoid_: Viewer (the signed-in, account-bound reader), User, visitor, anonymous user
 
 **Allowlist**:
 The set of emails permitted to create an account — the private-alpha admission gate. An email must be on the Allowlist to sign up; removing one closes off *new* sign-ups for it but does not evict an account that already exists (a sign-up gate, not a session gate). Site-wide, not per-Topic.
