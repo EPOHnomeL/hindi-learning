@@ -238,11 +238,28 @@ async function fireForTopic(ctx: ActionCtx, topicSlug: string, manual: boolean):
   }
 }
 
-// The reader button. Auth-gated; the gate inside still enforces the rest.
+// Does the signed-in caller own this Topic? The fire actions are owner-only —
+// a Viewer must never trigger authoring on the owner's behalf (PRD story 22) —
+// but actions have no `ctx.db`, so they check ownership through this query
+// (which runs with the action's forwarded identity).
+export const callerOwnsTopic = internalQuery({
+  args: { topicSlug: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, { topicSlug }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return false;
+    return (await getOwnedTopic(ctx, userId, topicSlug)) !== null;
+  },
+});
+
+// The reader button. Owner-only (a Viewer can read but never fire authoring);
+// the gate inside still enforces the rest.
 export const requestNextLesson = action({
   args: { topicSlug: v.string() },
   handler: async (ctx, { topicSlug }): Promise<FireResult> => {
-    if (!(await getAuthUserId(ctx))) throw new Error("unauthenticated");
+    if (!(await ctx.runQuery(internal.routine.callerOwnsTopic, { topicSlug }))) {
+      throw new Error("topic not found");
+    }
     return await fireForTopic(ctx, topicSlug, true);
   },
 });
@@ -256,7 +273,9 @@ export const requestNextLesson = action({
 export const requestSetup = action({
   args: { topicSlug: v.string() },
   handler: async (ctx, { topicSlug }): Promise<FireResult> => {
-    if (!(await getAuthUserId(ctx))) throw new Error("unauthenticated");
+    if (!(await ctx.runQuery(internal.routine.callerOwnsTopic, { topicSlug }))) {
+      throw new Error("topic not found");
+    }
     return await fireForTopic(ctx, topicSlug, false);
   },
 });
