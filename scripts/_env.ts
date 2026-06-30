@@ -1,7 +1,7 @@
 // Minimal env loader for the teach CLI (publish/review/reply). Reads
 // .env.local (written by `npx convex dev`) and .env into process.env without a
 // dependency, then exposes the two values the CLI needs.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 function load(file: string) {
   if (!existsSync(file)) return;
@@ -63,8 +63,30 @@ export function topicArg(): string {
   return slug && !slug.startsWith("--") ? slug : "hindi";
 }
 
+// Upsert one KEY=value into .env.local so a *later* teach-CLI step (a fresh
+// process) picks it up through `load(".env.local")` above. `claim` uses this to
+// hand the resolved Topic owner to the owner-scoped steps (materialise/review/
+// publish) — they each `load()` it at startup — so no human sets OWNER_EMAIL.
+// Replaces an existing line for the key, else appends; idempotent across runs.
+export function persistEnvLocal(key: string, value: string): void {
+  const file = ".env.local";
+  const line = `${key}=${value}`;
+  const lines = (existsSync(file) ? readFileSync(file, "utf8") : "").split(/\r?\n/);
+  const re = new RegExp(`^\\s*${key}\\s*=`);
+  const idx = lines.findIndex((l) => re.test(l));
+  if (idx >= 0) {
+    lines[idx] = line;
+  } else {
+    while (lines.length && lines[lines.length - 1] === "") lines.pop();
+    lines.push(line);
+  }
+  writeFileSync(file, `${lines.join("\n")}\n`);
+}
+
 // The email of the user who owns the published Topic. The publish path has no
 // auth identity, so the owner is named here; the user must already be registered.
+// In the Routine, `claim` resolves this from the claimed Topic and persists it to
+// .env.local (via persistEnvLocal), so the cloud env need not set it by hand.
 export function ownerEmail(): string {
   const email = process.env.OWNER_EMAIL;
   if (!email) {

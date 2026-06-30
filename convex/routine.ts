@@ -185,10 +185,17 @@ export const reportGeneration = mutation({
 // A fired run can't be told its Topic (the Fire body is closed, ADR 0008), so it
 // calls this to atomically grab one locked-but-unclaimed Topic and stamp its
 // runId. Concurrent fires (fire-all) each claim a distinct Topic; surplus fires
-// get null and no-op. Returns the claimed Topic's slug, or null if none waiting.
+// get null and no-op. Returns the claimed Topic's slug AND its owner's email, or
+// null if none waiting.
+//
+// The owner email matters: the run learns *which learner* it's authoring for only
+// here, and the owner-scoped steps (materialise/review/publish) need it. It's
+// intrinsic to the claimed Topic (`ownerId`), so we resolve it rather than make a
+// human supply OWNER_EMAIL out of band. `null` only if the Topic has no owner on
+// record (legacy/unowned) — the caller then falls back to a manual OWNER_EMAIL.
 export const claimWork = mutation({
   args: { secret: v.string(), runId: v.string() },
-  handler: async (ctx, { secret, runId }): Promise<{ topicSlug: string } | null> => {
+  handler: async (ctx, { secret, runId }): Promise<{ topicSlug: string; ownerEmail: string | null } | null> => {
     assertAdmin(secret);
     const rows = await ctx.db.query("generation").collect();
     const candidate = rows
@@ -197,7 +204,9 @@ export const claimWork = mutation({
     if (!candidate) return null;
     await ctx.db.patch(candidate._id, { claimedAt: Date.now(), runId });
     const topic = await ctx.db.get(candidate.topicId);
-    return topic ? { topicSlug: topic.slug } : null;
+    if (!topic) return null;
+    const owner = topic.ownerId ? await ctx.db.get(topic.ownerId) : null;
+    return { topicSlug: topic.slug, ownerEmail: owner?.email ?? null };
   },
 });
 

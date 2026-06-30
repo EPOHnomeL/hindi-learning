@@ -37,7 +37,22 @@ test("claimWork hands out each locked-but-unclaimed topic once, then null", asyn
   const c = await t.mutation(api.routine.claimWork, { secret, runId: "r3" });
 
   expect([a?.topicSlug, b?.topicSlug].sort()).toEqual(["hindi", "spanish"]);
+  // claimWork hands back the owner too, so the run never needs a human-supplied
+  // OWNER_EMAIL for the owner-scoped steps that follow.
+  expect(a?.ownerEmail).toBe("alice@example.com");
+  expect(b?.ownerEmail).toBe("alice@example.com");
   expect(c).toBeNull(); // french was already claimed; nothing left
+});
+
+test("claimWork returns ownerEmail null for an unowned topic", async () => {
+  const t = convexTest(schema, modules);
+  // A legacy/unowned Topic (no ownerId) — claimWork can't resolve an email, so it
+  // returns null and the caller falls back to a manual OWNER_EMAIL.
+  const orphan = await t.run((ctx) => ctx.db.insert("topics", { slug: "orphan", title: "Orphan" }));
+  await t.run((ctx) => ctx.db.insert("generation", { topicId: orphan, status: "generating", startedAt: 1 }));
+
+  const claimed = await t.mutation(api.routine.claimWork, { secret: "test-secret", runId: "r1" });
+  expect(claimed).toMatchObject({ topicSlug: "orphan", ownerEmail: null });
 });
 
 test("claimWork rejects a bad secret", async () => {
