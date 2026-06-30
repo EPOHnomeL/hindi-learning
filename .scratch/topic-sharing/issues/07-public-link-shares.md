@@ -1,74 +1,66 @@
-# 07 — Public read-only link shares (anonymous Viewers)
+# 07 — Public link shares (anonymous Guests)
 
-Status: needs-triage — deferred on 2026-06-30 when the account-Viewer read-only
-work (issues 02–05) shipped. Some product decisions were captured in
-conversation (see "Decisions captured" below); the design pass / ADR below is
-still outstanding before building.
+Status: ready-for-agent. Designed in the 2026-06-30 grill; foundational choices
+recorded in [ADR 0013](../../../docs/adr/0013-public-link-shares.md) and the
+**Public link** / **Guest** terms in [`CONTEXT.md`](../../../CONTEXT.md).
 
-Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Share**, **Viewer**). Spec: [`../PRD.md`](../PRD.md) — this lifts the "Anonymous / public links" item out of that PRD's **Out of Scope**.
+Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Public link**, **Guest**). Spec: [`../PRD.md`](../PRD.md) — lifts the "Anonymous / public links" item out of that PRD's **Out of Scope**.
 
 ## Want
 
-Let an owner share a Topic via an **anonymous link** that anyone can open
-read-only, without an account. Today a **Share** is account-bound: `shareTopic`
-resolves an email against `users` and only the matching signed-in **Viewer** can
-read it. This adds a second, capability-based form: a link carrying an
-unguessable **token** grants read-only access to whoever holds it.
+Let an owner mint an unguessable **Public link** that lets anyone open a Topic
+read-only, with no account. This is a second, capability-based form of read
+access alongside the account-bound **Share**: a token *is* the credential, and
+its anonymous holder is a **Guest**. Fills the ungated `/share/[token]` route
+that [ADR 0012](../../../docs/adr/0012-app-router-url-addressable-navigation.md)
+reserved (the route was never built — this issue stands it up).
 
-Surfaced during the App Router routing work (see the `url-routing` feature /
-PRD): the routing design reserves an **ungated** `/share/[token]` route outside
-the authed `(app)` route group precisely so this can be built without an auth
-gate in the way. This issue is the backend + read-only view behind that route.
+## Acceptance
 
-## Open questions (needs a design pass — grill before building)
+- **Token on the Topic.** An optional `publicToken` field on `topics` + a
+  `by_public_token` index. Minted with the Web Crypto API (~256-bit, base64url,
+  not slug-derived). One token per Topic.
+- **Owner mutations (owner-only):** `makeTopicPublic` mints/sets the token,
+  `regeneratePublicLink` overwrites it (old link dies at once), `makeTopicPrivate`
+  clears it. "Off" forgets the token; re-enabling mints a fresh one.
+- **Token-authorized read seam** in `convex/public.ts` (queries only — no public
+  mutations): `publicCourse`, `publicLessons`, `publicLesson`, `publicReferences`,
+  `publicReference`, `publicResources`, `publicProgress`, `publicQuestions`. Each
+  takes the `token`, resolves the Topic via `by_public_token`, and returns the
+  same shapes as the authed reader (share the row-shaping helpers). An invalid or
+  absent token returns uniform `null`/`[]` — never reveals a Topic exists.
+- **Full mirror.** A Guest sees Lessons, References, Resources, and the owner's
+  Questions/Replies and Progress — read-only (per ADR 0013; opt-out is **08**).
+- **Ungated route mirroring the authed reader:** `/share/[token]` (→ first
+  Lesson), `/share/[token]/lessons/[key]`, `/share/[token]/references/[key]`,
+  *outside* the `(app)` group. Guest chrome is minimal (title + read-only reader,
+  no sign-out / no dashboard link / no sign-up CTA). Quizzes stay interactive but
+  record nothing. `rel="noreferrer"` on outbound links + `Referrer-Policy:
+  no-referrer` on the route.
+- **Owner UI:** a "Public link" section in the existing `SharePanel` (alongside
+  the email-Share section) — a toggle that mints + shows the copyable URL, plus
+  Regenerate and Turn off, and a plain enable-time disclosure ("anyone with this
+  link can see this course's lessons, references, resources, and your questions &
+  progress — no account needed"). A **"Public" badge** on the owner's dashboard
+  card while a link is live. Any signed-in user opening a share URL sees the Guest
+  view (owner preview).
+- **Tests (Convex seam):** a Guest read works with a valid token and returns
+  `null`/`[]` for a wrong/cleared token; regenerate invalidates the old token;
+  turning private kills access; there are no public mutations to write with.
 
-- **Concept naming.** The glossary's **Share** explicitly lists `_Avoid_: public
-  link`. Is a link-share a second *kind* of Share, or a new top-level term
-  (e.g. **Public link** / **Link share**)? CONTEXT.md must be reconciled — this
-  reverses a documented decision and likely warrants an ADR (it was a real
-  trade-off the topic-sharing PRD called out as deferred).
-- **Token model.** One token per Topic, or many (revocable individually)? Stored
-  where — a field on `topics`, or a new `shareLinks` relation? How is it minted,
-  rotated, revoked? Unguessable (random, not derived from `slug`).
-- **Scope of a public Viewer.** The PRD's account-Viewer sees Lessons,
-  References, Resources, the owner's Questions/Replies, and Progress. Does an
-  anonymous holder see the same set, or a narrower one (e.g. Lessons +
-  References only, no Questions/Progress)?
-- **Backend read path.** Auth-scoped reader queries can't serve an unauthenticated
-  caller. Needs token-authorized read functions that authorize via the token
-  instead of the signed-in user — a parallel read seam to the owner-or-Viewer
-  resolver.
-- **Granularity.** Link to a whole Topic only, or also deep-link to a single
-  Lesson (`/share/[token]/lessons/[key]`)?
-- **Write-blocking.** Anonymous holders write nothing (no Progress, no Questions,
-  no Resources) — same load-bearing server-side guarantee as account-Viewers.
+## Decisions & deliberate non-goals (from the grill)
 
-## Decisions captured (2026-06-30, pending grill + ADR)
-
-Provisional answers from the conversation that deferred this issue — confirm
-under a real grill before building, they don't replace the design pass:
-
-- **Scope of a public Viewer:** **full mirror** — an anonymous holder sees
-  everything an account-Viewer sees (Lessons, References, Resources, the owner's
-  Questions/Replies, and Progress). (Reconsider against the anti-enumeration /
-  privacy note below — a forwardable link is a weaker credential than an account.)
-- **Token model:** **one on/off link per Topic.** "Share publicly" mints an
-  unguessable token; turning it off — or "Regenerate" — revokes it immediately.
-  Leaning to a `publicToken` field on `topics` (+ a `by_public_token` index)
-  over a separate relation, since it's single-token. Still needs the
-  unguessable-token + real-revocation guarantees.
-- **Still open (unchanged):** concept naming vs. the glossary's `Avoid: public
-  link`, whole-Topic vs. per-Lesson deep links, and the token-authorized read
-  seam (parallel to the owner-or-Viewer resolver, since auth-scoped reader
-  queries can't serve an unauthenticated caller).
+- **Signed-URL gap (accepted):** `publicResources` hands a Guest a signed blob
+  URL that outlives revocation until it expires. Bounded and documented (ADR
+  0013); a token-checked blob proxy is out of scope.
+- **One link per Topic** — a `shareLinks` relation / multiple revocable links is
+  out of scope.
+- **No rate-limiting** — a 256-bit token makes brute force infeasible.
+- **No per-facet privacy control** — full mirror is the default; the opt-out is
+  **08**.
 
 ## Depends on
 
-- `url-routing` feature — the public `/share/[token]` route lands as part of that
-  work; this issue fills it with real data.
-- Builds on the `shares` read-gate widening from **01**.
-
-## Notes
-
-- Anti-enumeration matters more here than for account-shares: a token is the
-  whole credential, so it must be long and random, and revocation must be real.
+- Builds on the `shares` read-gate widening from **01–05** (the owner-or-Viewer
+  resolver and the row shapes the public reads mirror).
+- The ungated route seam from ADR 0012.
