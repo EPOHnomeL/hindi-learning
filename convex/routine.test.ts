@@ -17,6 +17,16 @@ async function seedUser(t: ReturnType<typeof convexTest>, email: string) {
 async function seedTopic(t: ReturnType<typeof convexTest>, ownerId: Id<"users">, slug: string) {
   return await t.run((ctx) => ctx.db.insert("topics", { ownerId, slug, title: slug }));
 }
+// `userId|session` is the subject shape Convex Auth's getAuthUserId parses back.
+function asUser(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
+  return t.withIdentity({ subject: `${userId}|session` });
+}
+// A signed-in Admin: a user account plus their Admin row in the Allowlist.
+async function seedAdmin(t: ReturnType<typeof convexTest>, email: string) {
+  const userId = await seedUser(t, email);
+  await t.mutation(internal.whitelist.seedEmail, { email, isAdmin: true });
+  return userId;
+}
 
 test("claimWork hands out each locked-but-unclaimed topic once, then null", async () => {
   const t = convexTest(schema, modules);
@@ -153,4 +163,25 @@ test("the on-demand button is rate-limited per topic; the daily cron is not", as
   expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: false, reason: "rate-limited" });
   // ...but the daily cron (manual=false) still fires.
   expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: false })).toMatchObject({ acquired: true });
+});
+
+test("the Admin bypasses the on-demand cooldown", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "jvorster63@gmail.com");
+  const topicId = await seedTopic(t, admin, "hindi");
+  await t.run(async (ctx) => {
+    await ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1", html: "<p>x</p>" });
+    await ctx.db.insert("progress", { userId: admin, topicId, lessonKey: "0001", status: "completed" });
+  });
+
+  // First manual fire acquires (and stamps lastManualFireAt).
+  expect(await asUser(t, admin).mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: true });
+  // Simulate the run finishing — back to idle, lastManualFireAt retained.
+  await t.run(async (ctx) => {
+    const gen = await ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique();
+    await ctx.db.patch(gen!._id, { status: "idle", startedAt: undefined, claimedAt: undefined, runId: undefined });
+  });
+  // A second manual fire within the cooldown still acquires — the Admin is exempt,
+  // where a non-Admin owner would be rate-limited (see the test above).
+  expect(await asUser(t, admin).mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: true });
 });

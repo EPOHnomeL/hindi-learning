@@ -56,8 +56,9 @@ function looksLikeEmail(email: string): boolean {
 // The Admin test, shared by the throwing guard and the non-throwing query:
 // the caller is the Admin iff their account email has an `isAdmin` Allowlist
 // row. Identity is derived server-side (never a client arg), so the route guard
-// stays UX-only and the API can't be bypassed.
-async function isCallerAdmin(ctx: MutationCtx | QueryCtx): Promise<boolean> {
+// stays UX-only and the API can't be bypassed. Exported so other domains (e.g.
+// the generation gate's Admin cooldown bypass) can ask the same question.
+export async function isCallerAdmin(ctx: MutationCtx | QueryCtx): Promise<boolean> {
   const userId = await getAuthUserId(ctx);
   if (!userId) return false;
   const user = await ctx.db.get(userId);

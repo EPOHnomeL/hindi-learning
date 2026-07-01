@@ -14,6 +14,7 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { assertAdmin, getOwnedTopic, topicBySlug } from "./lib";
+import { isCallerAdmin } from "./whitelist";
 
 // The next-lesson Routine (ADR 0008). One cloud Claude Code routine, fired two
 // ways through one gate: a daily Convex cron (`dailyFire`) and the reader button
@@ -118,7 +119,16 @@ export const tryAcquireGeneration = internalMutation({
         return { acquired: false, reason: "caught-up" };
       }
       // The button is capped to once per cooldown; the cron (manual=false) isn't.
-      if (manual && gen.lastManualFireAt !== undefined && now - gen.lastManualFireAt < MANUAL_COOLDOWN_MS) {
+      // The Admin bypasses the cap: they drive authoring and aren't the runaway-
+      // usage risk it guards against (issue 08). Identity propagates from the
+      // owner-only action, so admin-ness is derived server-side, never a client
+      // arg. Checked last so the DB lookup only runs for an otherwise-capped fire.
+      if (
+        manual &&
+        gen.lastManualFireAt !== undefined &&
+        now - gen.lastManualFireAt < MANUAL_COOLDOWN_MS &&
+        !(await isCallerAdmin(ctx))
+      ) {
         return { acquired: false, reason: "rate-limited" };
       }
     }
