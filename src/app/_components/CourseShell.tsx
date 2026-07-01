@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useResourceUpload } from "./useResourceUpload";
 import { completedKeys, frontierKey, seenAfterOpening, unseenReplyKeys } from "./readerDerive";
@@ -252,28 +253,9 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
     <>
       <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">Resources</p>
       {resources?.length === 0 && <p className="px-2 text-sm text-soft">No resources yet.</p>}
-      {resources?.map((r) =>
-        r.url ? (
-          <a
-            key={r.id}
-            href={r.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-sm text-ink transition-colors hover:bg-hi md:py-1.5"
-          >
-            <span className="min-w-0 truncate">
-              <span aria-hidden className="mr-1 text-soft">{r.kind === "url" ? "🔗" : "📄"}</span>
-              {r.filename}
-            </span>
-            {r.status !== "ready" && r.status !== "raw" && <span className="shrink-0 text-xs text-soft">{r.status}</span>}
-          </a>
-        ) : (
-          <div key={r.id} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm text-soft">
-            <span className="min-w-0 truncate">{r.filename}</span>
-            <span className="shrink-0 text-xs">{r.status}</span>
-          </div>
-        ),
-      )}
+      {resources?.map((r) => (
+        <ResourceItem key={r.id} resource={r} />
+      ))}
 
       {/* Add controls are owner-only; a Viewer sees the list but can't add. */}
       {canWrite && (

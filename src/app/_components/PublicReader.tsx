@@ -8,6 +8,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { Frame } from "./ArtifactView";
 import { Markdown } from "./MarkdownView";
+import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { firstLessonKey } from "./readerDerive";
 
@@ -91,22 +92,9 @@ export function PublicCourseShell({ token, children }: { token: string; children
             {course.resources.length > 0 && (
               <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">Resources</p>
             )}
-            {course.resources.map((r) =>
-              r.url ? (
-                <a
-                  key={r.id}
-                  href={r.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 rounded-lg px-2.5 py-2.5 text-sm text-ink transition-colors hover:bg-hi md:py-1.5"
-                >
-                  <span aria-hidden className="text-soft">{r.kind === "url" ? "🔗" : "📄"}</span>
-                  <span className="min-w-0 truncate">{r.filename}</span>
-                </a>
-              ) : (
-                <div key={r.id} className="px-2 py-1.5 text-sm text-soft">{r.filename}</div>
-              ),
-            )}
+            {course.resources.map((r) => (
+              <ResourceItem key={r.id} resource={r} />
+            ))}
           </nav>
 
           <ThemeToggle />
