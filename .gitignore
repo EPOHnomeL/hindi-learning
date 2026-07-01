@@ -39,6 +39,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# transient per-run teaching workspace: the Routine materialises each Topic from
+# Convex into topics/<slug>/ at run time and never commits it (ADR 0009 — Convex
+# is the source of truth). Untracked, so `git status` stays clean and the stop
+# hook has nothing to deliberate over.
+/topics/
+
 # typescript
 *.tsbuildinfo
 
