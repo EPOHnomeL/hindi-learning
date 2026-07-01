@@ -14,7 +14,10 @@ import { useTheme } from "./ThemeContext";
 const STALE_MS = 10 * 60 * 1000;
 
 // Mirror of routine.ts MANUAL_COOLDOWN_MS: after an on-demand fire the button
-// is disabled for this window so the daily schedule is the primary path.
+// is disabled for this window so the daily schedule is the primary path. The
+// Admin is exempt (mirrors the server-side bypass in tryAcquireGeneration) —
+// otherwise the button stays hidden behind "Generated today" even though a
+// manual fire would be accepted.
 const MANUAL_COOLDOWN_MS = 20 * 60 * 60 * 1000;
 
 export function ArtifactView({
@@ -218,6 +221,7 @@ function LessonView({
 // button unmounts.
 function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; frontierKey: string }) {
   const gen = useQuery(api.routine.generationStatus, { topicSlug });
+  const amAdmin = useQuery(api.whitelist.amIAdmin);
   const requestNext = useAction(api.routine.requestNextLesson);
   const [pending, setPending] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -234,7 +238,11 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
 
   const stale = generating && gen?.startedAt != null && now - gen.startedAt > STALE_MS;
   const caughtUp = status === "caughtUp" && gen?.frontierKey === frontierKey;
-  const rateLimited = gen?.lastManualFireAt != null && now - gen.lastManualFireAt < MANUAL_COOLDOWN_MS;
+  // The Admin bypasses the cooldown (mirrors tryAcquireGeneration). While amAdmin
+  // is still loading (undefined) we treat the caller as non-Admin, so the gate
+  // only relaxes once we've confirmed they're the Admin.
+  const rateLimited =
+    amAdmin !== true && gen?.lastManualFireAt != null && now - gen.lastManualFireAt < MANUAL_COOLDOWN_MS;
 
   async function fire() {
     setPending(true);
