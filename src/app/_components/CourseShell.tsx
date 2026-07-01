@@ -139,7 +139,9 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
 
           <nav className="flex flex-col gap-1">
             <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">Lessons</p>
-            {lessons?.length === 0 && <p className="px-2 text-sm text-soft">No lessons published yet.</p>}
+            {lessons?.length === 0 && (
+              <p className="px-2 text-sm text-soft">{canWrite ? "Preparing your first lesson…" : "No lessons published yet."}</p>
+            )}
             {lessons?.map((l) => (
               <NavItem
                 key={l.key}
