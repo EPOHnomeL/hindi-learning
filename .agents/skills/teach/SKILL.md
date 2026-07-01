@@ -46,7 +46,9 @@ Fluency can give the user an illusory sense of mastery, but storage strength is 
 
 ## Lessons
 
-A lesson is the main thing you produce — the unit in which knowledge and skills reach the user. Each lesson is one self-contained HTML file, saved to `./lessons/` and titled `0001-<dash-case-name>.html` where the number increments each time.
+A lesson is the main thing you produce — the unit in which knowledge and skills reach the user. Each lesson is one HTML file, saved to `./lessons/` and titled `0001-<dash-case-name>.html` where the number increments each time.
+
+> **Mechanics live in [AUTHORING.md](./AUTHORING.md)** — the file shape (a lean fragment; the shared `<head>`/design system and quiz `<script>` are wrapped on at publish, so author content only), the exact captured-quiz markup, component classes, reader cross-link routes, citation format, and immutability/`supersedes`. Read it once instead of rediscovering conventions from `publish.ts`, the partials, or a prior lesson. This section and below are the *why*; AUTHORING.md is the *how*.
 
 A lesson should be **beautiful** — clean, readable typography and layout — since the user will return to these later to review. Think Tufte.
 
