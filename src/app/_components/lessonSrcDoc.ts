@@ -60,6 +60,33 @@ const THEME_BRIDGE = `<script>(function(){
   });
 }());<\/script>`;
 
+// NAV_BRIDGE (all artifacts): the artifact runs in a sandboxed iframe with only
+// `allow-scripts` — no allow-top-navigation, no allow-same-origin. A bare <a>
+// click therefore navigates the IFRAME, not the app: an internal /courses link
+// would reload the whole app into the opaque-origin sandbox (auth/localStorage
+// then throw → "client-side exception"), and external links get refused by their
+// frame-ancestors policy. So intercept clicks and hand the resolved href to the
+// parent, which routes internal links via the app router and opens external ones
+// in a new tab. In-page (#fragment) links are left alone so they still scroll.
+const NAV_BRIDGE = `<script>(function(){
+  function post(m){ try{ parent.postMessage(Object.assign({__lesson:true}, m), '*'); }catch(e){} }
+  function onClick(e){
+    if(e.type==='auxclick' && e.button!==1) return; // only middle-click among aux buttons
+    if(e.defaultPrevented) return;
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if(!a) return;
+    var raw = a.getAttribute('href') || '';
+    if(raw.charAt(0)==='#') return; // in-page anchor — let it scroll within the frame
+    var href = a.href; // resolved against the parent document's base URL
+    if(!/^https?:/i.test(href)) return; // ignore mailto:, tel:, javascript:, etc.
+    e.preventDefault();
+    var newTab = e.metaKey || e.ctrlKey || e.shiftKey || e.button===1 || a.target==='_blank';
+    post({type:'navigate', href: href, newTab: newTab});
+  }
+  document.addEventListener('click', onClick, true);
+  document.addEventListener('auxclick', onClick, true);
+}());<\/script>`;
+
 // The message the parent posts to an iframe's THEME_BRIDGE to re-skin it live.
 export function themeMessage(theme: Theme): { __lessonTheme: true; theme: Theme } {
   return { __lessonTheme: true, theme };
@@ -105,6 +132,8 @@ function stripLegacyThemePill(html: string): string {
 }
 
 // Assemble the iframe document for a served artifact from its stored HTML.
+// Every artifact gets the height + nav bridges (the nav bridge forwards link
+// clicks to the parent so cross-lesson/external links work despite the sandbox).
 // `quiz` adds the answer-capture bridge (lessons, not references). `theme`, when
 // given, makes the artifact app-themed: the legacy pill is stripped, the initial
 // theme is baked in, and the theme bridge is added so the parent can flip it live.
@@ -117,7 +146,7 @@ export function buildSrcDoc(html: string, opts: { quiz: boolean; theme?: Theme; 
     doc = setRootTheme(doc, opts.theme);
     if (opts.themeCss) doc = injectReferenceDarkCss(doc);
   }
-  const scripts = HEIGHT_BRIDGE + (opts.quiz ? QUIZ_BRIDGE : "") + (opts.theme ? THEME_BRIDGE : "");
+  const scripts = HEIGHT_BRIDGE + NAV_BRIDGE + (opts.quiz ? QUIZ_BRIDGE : "") + (opts.theme ? THEME_BRIDGE : "");
   // Inject before the LAST </body>. A first-match replace is unsafe: an assembled
   // lesson can carry an authoring comment (or a code sample) that contains a
   // literal "</body>" earlier in the document, and injecting there would bury the

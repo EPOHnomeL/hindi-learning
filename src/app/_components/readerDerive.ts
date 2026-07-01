@@ -36,6 +36,20 @@ export function unseenReplyKeys(
   return keys;
 }
 
+// Resolve an internal link clicked inside an artifact to the path the app should
+// route to. Lessons author cross-links as the owner's `/courses/<slug>/…` routes
+// (AUTHORING.md §5). A signed-in owner/viewer routes there directly; but a Guest
+// on the public reader (`/share/<token>/…`) can't open `/courses/…`, so rewrite
+// a `/courses/<slug>/(lessons|references)/<key>` target into the share context,
+// preserving the artifact kind + key. Non-artifact or already-share paths pass
+// through unchanged.
+export function internalNavTarget(targetPath: string, currentPath: string): string {
+  const share = currentPath.match(/^\/share\/([^/]+)/);
+  if (!share) return targetPath;
+  const m = targetPath.match(/^\/courses\/[^/]+\/(lessons|references)\/(.+)$/);
+  return m ? `/share/${share[1]}/${m[1]}/${m[2]}` : targetPath;
+}
+
 // Opening a lesson counts as seeing its teacher Replies. Returns the next `seen`
 // set with that lesson's replied-Question ids added — or the *same* reference
 // when there's nothing new, so a React state setter can skip a re-render.

@@ -3,9 +3,34 @@ import {
   completedKeys,
   firstLessonKey,
   frontierKey,
+  internalNavTarget,
   seenAfterOpening,
   unseenReplyKeys,
 } from "./readerDerive";
+
+describe("internalNavTarget", () => {
+  it("passes an owner/viewer course link through unchanged", () => {
+    expect(internalNavTarget("/courses/biz/lessons/0001-x", "/courses/biz/lessons/0004-y")).toBe(
+      "/courses/biz/lessons/0001-x",
+    );
+  });
+
+  it("remaps a cross-lesson link into the share context for a Guest", () => {
+    expect(internalNavTarget("/courses/biz/lessons/0001-x", "/share/tok123/lessons/0004-y")).toBe(
+      "/share/tok123/lessons/0001-x",
+    );
+  });
+
+  it("remaps a reference link into the share context too", () => {
+    expect(internalNavTarget("/courses/biz/references/ref-1", "/share/tok123/lessons/0004-y")).toBe(
+      "/share/tok123/references/ref-1",
+    );
+  });
+
+  it("leaves a non-artifact same-origin path alone even in a share context", () => {
+    expect(internalNavTarget("/Handbook.pdf", "/share/tok123/lessons/0004-y")).toBe("/Handbook.pdf");
+  });
+});
 
 describe("firstLessonKey", () => {
   it("returns the first lesson's key (listLessons is seq-ascending)", () => {

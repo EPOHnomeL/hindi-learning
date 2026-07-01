@@ -44,6 +44,19 @@ describe("buildSrcDoc", () => {
     expect(out).toContain("reportHeight"); // height bridge still present
   });
 
+  it("injects the nav bridge into every artifact (lesson and reference)", () => {
+    // Links inside the sandboxed iframe can't navigate the app on their own, so
+    // the click-forwarding bridge must ship with every artifact regardless of
+    // quiz/theme options.
+    const lesson = buildSrcDoc(LESSON, { quiz: true, theme: "dark" });
+    expect(lesson).toContain("type:'navigate'");
+    const ref = `<!DOCTYPE html><html lang="en"><head></head><body><a href="/courses/x/lessons/0001-y">L1</a></body></html>`;
+    const out = buildSrcDoc(ref, { quiz: false });
+    expect(out).toContain("type:'navigate'"); // forwards clicks even with no quiz/theme
+    expect(out).toContain("auxclick"); // middle-click handled too
+    expect(out.indexOf("type:'navigate'")).toBeLessThan(out.lastIndexOf("</body>"));
+  });
+
   it("themes a reference: bakes theme, injects the dark palette into <head>, adds the bridge", () => {
     const ref = `<!DOCTYPE html><html lang="en"><head><style>:root{--paper:#fbf7f0}</style></head><body><div class="term"><div class="name">x</div></div></body></html>`;
     const out = buildSrcDoc(ref, { quiz: false, theme: "dark", themeCss: true });

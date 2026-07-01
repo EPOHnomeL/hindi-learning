@@ -1,10 +1,12 @@
 "use client";
 
 import { useAction, useMutation, useQuery } from "convex/react";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { buildSrcDoc, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
+import { internalNavTarget } from "./readerDerive";
 import { useTheme } from "./ThemeContext";
 
 // Mirror of the server's stale threshold (convex/routine.ts STALE_MS): a run
@@ -41,6 +43,7 @@ export function ArtifactView({
 // injects the dark palette too — set for references, which don't ship their own.
 export function Frame({ html, withBridge, theme, themeCss }: { html: string; withBridge: boolean; theme?: Theme; themeCss?: boolean }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const router = useRouter();
   // Read theme via a ref so changing it does NOT rebuild srcDoc (which would
   // reload the iframe, losing scroll + answered-quiz state). The bake only needs
   // the value at build time; the effect below handles live changes.
@@ -79,6 +82,35 @@ export function Frame({ html, withBridge, theme, themeCss }: { html: string; wit
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
   }, []);
+
+  // Links inside the sandboxed artifact can't navigate the app themselves (no
+  // allow-top-navigation), so the nav bridge forwards each click here. Internal
+  // links route through the app (SPA nav, no full reload); everything else opens
+  // in a new tab so the lesson stays put. Only messages from THIS iframe count.
+  useEffect(() => {
+    function onNav(e: MessageEvent) {
+      if (e.source !== iframeRef.current?.contentWindow) return;
+      const d = e.data as { __lesson?: boolean; type?: string; href?: unknown; newTab?: unknown };
+      if (!(d?.__lesson && d.type === "navigate" && typeof d.href === "string")) return;
+      let url: URL;
+      try {
+        url = new URL(d.href);
+      } catch {
+        return;
+      }
+      if (url.protocol !== "http:" && url.protocol !== "https:") return;
+      const internal = url.origin === window.location.origin;
+      if (internal) {
+        const path = internalNavTarget(url.pathname, window.location.pathname) + url.search + url.hash;
+        if (d.newTab) window.open(path, "_blank", "noopener,noreferrer");
+        else router.push(path);
+      } else {
+        window.open(d.href, "_blank", "noopener,noreferrer");
+      }
+    }
+    window.addEventListener("message", onNav);
+    return () => window.removeEventListener("message", onNav);
+  }, [router]);
 
   // Full-bleed on mobile (edge-to-edge, no side border/rounding); a bordered card
   // that fills and scrolls internally on desktop.
