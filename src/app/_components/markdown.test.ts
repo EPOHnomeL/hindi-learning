@@ -32,6 +32,24 @@ describe("parseMarkdown", () => {
       { kind: "para", spans: [{ kind: "text", text: "More." }] },
     ]);
   });
+
+  it("captures a fenced code block verbatim, without inline parsing", () => {
+    expect(parseMarkdown("Run:\n```\nnpm i\n**not bold**\n```\nDone.")).toEqual([
+      { kind: "para", spans: [{ kind: "text", text: "Run:" }] },
+      { kind: "code", text: "npm i\n**not bold**" },
+      { kind: "para", spans: [{ kind: "text", text: "Done." }] },
+    ]);
+  });
+
+  it("closes an unterminated fence at end of input", () => {
+    expect(parseMarkdown("```\nx = 1")).toEqual([{ kind: "code", text: "x = 1" }]);
+  });
+
+  it("groups consecutive blockquote lines into one quote with inline formatting", () => {
+    expect(parseMarkdown("> a **b**\n> c")).toEqual([
+      { kind: "quote", spans: [{ kind: "text", text: "a " }, { kind: "strong", text: "b" }, { kind: "text", text: " c" }] },
+    ]);
+  });
 });
 
 describe("missionPreview", () => {

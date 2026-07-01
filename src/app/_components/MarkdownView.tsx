@@ -27,6 +27,20 @@ export function Markdown({ source, className }: { source: string; className?: st
             </Tag>
           );
         }
+        if (b.kind === "code") {
+          return (
+            <pre key={i} className="overflow-x-auto rounded-lg bg-hi px-3 py-2 text-[0.8em] leading-relaxed text-ink">
+              <code>{b.text}</code>
+            </pre>
+          );
+        }
+        if (b.kind === "quote") {
+          return (
+            <blockquote key={i} className="border-l-2 border-line pl-3 text-soft">
+              {renderSpans(b.spans)}
+            </blockquote>
+          );
+        }
         return <p key={i}>{renderSpans(b.spans)}</p>;
       })}
     </div>

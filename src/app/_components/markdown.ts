@@ -1,8 +1,10 @@
 // ponytail: common-subset Markdown (headings, bold, italic, inline code, links,
-// bullet/numbered lists, paragraphs) parsed to a small block tree — enough for a
-// Mission blurb. No dep; the renderer turns these into React elements, so there's
-// no raw HTML and no XSS surface. Ceiling: no tables/blockquotes/nested lists —
-// if Missions ever need those, swap in react-markdown instead of growing this.
+// bullet/numbered lists, paragraphs, fenced code blocks, blockquotes) parsed to a
+// small block tree. Started life sized for a Mission blurb; now also renders whole
+// uploaded Markdown Resources in-app. No dep; the renderer turns these into React
+// elements, so there's no raw HTML and no XSS surface. Ceiling: no tables or nested
+// lists — if a Resource ever needs those, swap in react-markdown instead of growing
+// this.
 
 export type Span =
   | { kind: "text"; text: string }
@@ -14,7 +16,9 @@ export type Span =
 export type Block =
   | { kind: "heading"; level: number; spans: Span[] }
   | { kind: "para"; spans: Span[] }
-  | { kind: "list"; ordered: boolean; items: Span[][] };
+  | { kind: "list"; ordered: boolean; items: Span[][] }
+  | { kind: "code"; text: string }
+  | { kind: "quote"; spans: Span[] };
 
 // Order matters: code first (so * inside `code` isn't read as bold), then bold,
 // then italic, then links.
@@ -73,10 +77,14 @@ export function parseMarkdown(src: string): Block[] {
   const blocks: Block[] = [];
   let para: string[] = [];
   let list: { kind: "list"; ordered: boolean; items: Span[][] } | null = null;
+  let quote: string[] = [];
+  // While a ``` fence is open, `fence` holds its raw lines and every line is
+  // literal (no inline parsing) until the closing fence.
+  let fence: string[] | null = null;
 
-  // Headings and lists are their own blocks even with no blank line around them
-  // (Missions often pack a `## heading` straight onto its list), so parse line by
-  // line and flush the open paragraph/list when a new block kind starts.
+  // Headings, lists, and quotes are their own blocks even with no blank line
+  // around them (Missions often pack a `## heading` straight onto its list), so
+  // parse line by line and flush the open block when a new kind starts.
   const flushPara = () => {
     if (para.length) blocks.push({ kind: "para", spans: parseInline(para.join(" ")) });
     para = [];
@@ -85,23 +93,53 @@ export function parseMarkdown(src: string): Block[] {
     if (list) blocks.push(list);
     list = null;
   };
+  const flushQuote = () => {
+    if (quote.length) blocks.push({ kind: "quote", spans: parseInline(quote.join(" ")) });
+    quote = [];
+  };
+  const flushAll = () => {
+    flushPara();
+    flushList();
+    flushQuote();
+  };
 
   for (const line of src.replace(/\r\n/g, "\n").split("\n")) {
+    // Inside a fence, only the closing ``` ends it; everything else is verbatim.
+    if (fence) {
+      if (/^\s*```/.test(line)) {
+        blocks.push({ kind: "code", text: fence.join("\n") });
+        fence = null;
+      } else {
+        fence.push(line);
+      }
+      continue;
+    }
+    if (/^\s*```/.test(line)) {
+      flushAll();
+      fence = [];
+      continue;
+    }
     if (!line.trim()) {
-      flushPara();
-      flushList();
+      flushAll();
       continue;
     }
     const h = /^(#{1,6})\s+(.*)$/.exec(line);
     if (h) {
+      flushAll();
+      blocks.push({ kind: "heading", level: h[1]!.length, spans: parseInline(h[2]!) });
+      continue;
+    }
+    const q = /^\s*>\s?(.*)$/.exec(line);
+    if (q) {
       flushPara();
       flushList();
-      blocks.push({ kind: "heading", level: h[1]!.length, spans: parseInline(h[2]!) });
+      quote.push(q[1]!);
       continue;
     }
     const item = /^\s*(?:(\d+\.)|[-*])\s+(.*)$/.exec(line);
     if (item) {
       flushPara();
+      flushQuote();
       const ordered = item[1] != null;
       if (!list || list.ordered !== ordered) {
         flushList();
@@ -112,9 +150,11 @@ export function parseMarkdown(src: string): Block[] {
     }
     // Plain text: soft line breaks collapse to spaces (CommonMark soft break).
     flushList();
+    flushQuote();
     para.push(line);
   }
-  flushPara();
-  flushList();
+  // An unterminated fence still renders the lines it captured.
+  if (fence) blocks.push({ kind: "code", text: fence.join("\n") });
+  flushAll();
   return blocks;
 }
