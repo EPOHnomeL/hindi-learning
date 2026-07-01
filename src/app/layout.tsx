@@ -6,9 +6,14 @@ import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 
 export const metadata: Metadata = {
-  title: "Hindi — Served Teach",
-  description: "Your Hindi lessons, grounded in reading the Bible (BSI OV).",
-  icons: [{ rel: "icon", url: "/favicon.ico" }],
+  title: "My Course",
+  description: "Your courses — lessons grounded in reading.",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "any" },
+    ],
+  },
 };
 
 const spectral = Spectral({

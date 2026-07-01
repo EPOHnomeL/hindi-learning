@@ -1,29 +1,45 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
-import { getOwnedTopic, topicLessonCounts } from "./lib";
+import { getOwnedTopic, normaliseEmail, topicLessonCounts } from "./lib";
 
 // Sharing: an owner grants another existing User read-only access to a Topic
 // (a Share). The Viewer then sees it in "Shared with me" and reads it through
 // the owner-or-Viewer resolver (getViewableTopic). Writes stay owner-only.
 
-// Share a Topic with another User, named by their account email. Owner-only;
-// the recipient account must already exist. (Self/duplicate/no-account edge
-// cases are issue 06; this is the happy path.)
+// Share a Topic with a person, named by email. Owner-only. If the recipient has
+// an account, they get a read-only Share now ("shared"); if not, the invite is
+// held as a pending Share ("pending") and claimed when they sign up (see
+// `claimPendingShares`). Both paths are idempotent. Sign-up stays Admin-gated by
+// the Allowlist (ADR 0011) — inviting an email does not itself open sign-up.
 export const shareTopic = mutation({
   args: { topicSlug: v.string(), email: v.string() },
-  returns: v.null(),
+  returns: v.union(v.literal("shared"), v.literal("pending")),
   handler: async (ctx, { topicSlug, email }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
     const topic = await getOwnedTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
+    const addr = normaliseEmail(email);
     const viewer = await ctx.db
       .query("users")
-      .withIndex("email", (q) => q.eq("email", email))
+      .withIndex("email", (q) => q.eq("email", addr))
       .unique();
-    if (!viewer) throw new Error(`no account for ${email}`);
-    await ctx.db.insert("shares", { topicId: topic._id, viewerId: viewer._id });
+    if (viewer) {
+      const already = await ctx.db
+        .query("shares")
+        .withIndex("by_topic_viewer", (q) => q.eq("topicId", topic._id).eq("viewerId", viewer._id))
+        .unique();
+      if (!already) await ctx.db.insert("shares", { topicId: topic._id, viewerId: viewer._id });
+      return "shared";
+    }
+    // No account yet — hold the invite until they sign up.
+    const existing = await ctx.db
+      .query("pendingShares")
+      .withIndex("by_topic_email", (q) => q.eq("topicId", topic._id).eq("email", addr))
+      .unique();
+    if (!existing) await ctx.db.insert("pendingShares", { topicId: topic._id, email: addr });
+    return "pending";
   },
 });
 

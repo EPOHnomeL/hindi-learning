@@ -1,7 +1,35 @@
-import type { QueryCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 
 // Shared backend helpers. (Plain module — no Convex functions registered here.)
+
+// Trim + lower-case — the one email normalisation used everywhere a person is
+// named by address (shares, invites), matching how Convex Auth stores
+// `users.email` and how the Allowlist stores its rows. Without it a lookup would
+// miss on casing/whitespace alone.
+export function normaliseEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+// Turn any pending Shares (invites) for a freshly-created account into real
+// Shares. Called from the sign-up callback right after the `users` row is
+// inserted, so an email invited before it had an account gains read access the
+// moment it signs up. Idempotent per (Topic, Viewer): skips a Topic already
+// shared, and clears the invite either way.
+export async function claimPendingShares(ctx: MutationCtx, userId: Id<"users">, email: string): Promise<void> {
+  const pending = await ctx.db
+    .query("pendingShares")
+    .withIndex("by_email", (q) => q.eq("email", normaliseEmail(email)))
+    .collect();
+  for (const invite of pending) {
+    const already = await ctx.db
+      .query("shares")
+      .withIndex("by_topic_viewer", (q) => q.eq("topicId", invite.topicId).eq("viewerId", userId))
+      .unique();
+    if (!already) await ctx.db.insert("shares", { topicId: invite.topicId, viewerId: userId });
+    await ctx.db.delete(invite._id);
+  }
+}
 
 // Guards the PUBLISH_SECRET-protected mutations the teach CLI / cloud agent call.
 export function assertAdmin(secret: string) {

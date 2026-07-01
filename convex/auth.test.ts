@@ -74,6 +74,32 @@ test("sign-up normalises the stored email, so casing can't mint a second identit
   expect(users.map((u) => u.email)).toEqual(["admitted@example.com"]);
 });
 
+test("signing up claims a Share invited before the account existed", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(internal.whitelist.seedEmail, { email: "invitee@example.com" });
+
+  // An owner invited invitee@ to a Topic while they still had no account, so it
+  // was held as a pending Share.
+  const topicId = await t.run(async (ctx) => {
+    const owner = await ctx.db.insert("users", { email: "owner@example.com" });
+    const topicId = await ctx.db.insert("topics", { ownerId: owner, slug: "hindi", title: "Hindi", status: "active" });
+    await ctx.db.insert("pendingShares", { topicId, email: "invitee@example.com" });
+    return topicId;
+  });
+
+  await signUp(t, "invitee@example.com", "hunter2-strong");
+
+  // On sign-up the invite became a real Share, and the pending row is gone.
+  const { sharedTopicIds, pending } = await t.run(async (ctx) => {
+    const user = await ctx.db.query("users").withIndex("email", (q) => q.eq("email", "invitee@example.com")).unique();
+    const shares = await ctx.db.query("shares").withIndex("by_viewer", (q) => q.eq("viewerId", user!._id)).collect();
+    const pending = await ctx.db.query("pendingShares").withIndex("by_email", (q) => q.eq("email", "invitee@example.com")).collect();
+    return { sharedTopicIds: shares.map((s) => s.topicId), pending };
+  });
+  expect(sharedTopicIds).toEqual([topicId]);
+  expect(pending).toEqual([]);
+});
+
 test("an existing account still signs in after its email is removed (sign-up gate only)", async () => {
   const t = convexTest(schema, modules);
   await t.mutation(internal.whitelist.seedEmail, { email: "admitted@example.com" });

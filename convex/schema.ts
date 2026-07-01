@@ -166,6 +166,21 @@ export default defineSchema({
     .index("by_topic", ["topicId"])
     .index("by_topic_viewer", ["topicId", "viewerId"]),
 
+  // A pending Share: an invite to an email that has *no account yet*. Recorded
+  // when an owner shares to an unregistered address, and turned into a real Share
+  // by `claimPendingShares` the moment that email signs up. Sign-up itself stays
+  // gated by the Admin's Allowlist (ADR 0011) — an invite does not open that door.
+  // `by_email` is the claim-on-sign-up lookup; `by_topic_email` dedups an invite
+  // (at most one per (Topic, email)); `by_topic` lists a Topic's open invites and
+  // would cascade on Topic delete.
+  pendingShares: defineTable({
+    topicId: v.id("topics"),
+    email: v.string(),
+  })
+    .index("by_email", ["email"])
+    .index("by_topic", ["topicId"])
+    .index("by_topic_email", ["topicId", "email"]),
+
   // A question the learner asked from inside a lesson; the teacher replies.
   questions: defineTable({
     userId: v.id("users"),

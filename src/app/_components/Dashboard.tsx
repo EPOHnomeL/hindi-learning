@@ -313,14 +313,15 @@ function SharePanel({ course, onDone }: { course: Course; onDone: () => void }) 
   );
 }
 
-// Share with another learner by account email (read-only Viewer access).
-// Slice 01: add-by-email only; listing/revoking current Viewers is issue 06.
+// Share with another learner by email (read-only Viewer access). If they already
+// have an account they get access at once; if not, the invite is held and turns
+// into access the moment they sign up. Listing/revoking Viewers is issue 06.
 function ShareByEmail({ course }: { course: Course }) {
   const shareTopic = useMutation(api.shares.shareTopic);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sharedWith, setSharedWith] = useState<string | null>(null);
+  const [done, setDone] = useState<{ email: string; status: "shared" | "pending" } | null>(null);
 
   return (
     <form
@@ -332,18 +333,18 @@ function ShareByEmail({ course }: { course: Course }) {
         setBusy(true);
         setError(null);
         try {
-          await shareTopic({ topicSlug: course.slug, email: addr });
-          setSharedWith(addr);
+          const status = await shareTopic({ topicSlug: course.slug, email: addr });
+          setDone({ email: addr, status });
           setEmail("");
         } catch {
-          setError("Couldn't share — check the email belongs to a registered account.");
+          setError("Couldn’t share — please try again.");
         } finally {
           setBusy(false);
         }
       }}
     >
       <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Share “{course.title}” with a person</label>
-      <p className="text-sm text-soft">They’ll get read-only access — view your lessons, but not edit anything.</p>
+      <p className="text-sm text-soft">They’ll get read-only access — view your lessons, but not edit anything. No account yet? They’ll get access the moment they sign up.</p>
       <div className="flex gap-2">
         <input
           autoFocus
@@ -352,8 +353,9 @@ function ShareByEmail({ course }: { course: Course }) {
           onChange={(e) => {
             setEmail(e.target.value);
             setError(null);
+            setDone(null);
           }}
-          placeholder="Their account email"
+          placeholder="Their email"
           className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
         />
         <button type="submit" disabled={busy} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60">
@@ -361,7 +363,8 @@ function ShareByEmail({ course }: { course: Course }) {
         </button>
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
-      {sharedWith && <p className="text-xs text-accent2">Shared with {sharedWith}.</p>}
+      {done?.status === "shared" && <p className="text-xs text-accent2">Shared with {done.email}.</p>}
+      {done?.status === "pending" && <p className="text-xs text-accent2">Invited {done.email} — they’ll get access when they sign up.</p>}
     </form>
   );
 }

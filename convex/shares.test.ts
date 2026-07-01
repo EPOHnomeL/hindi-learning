@@ -107,6 +107,35 @@ test("listSharedTopics returns Topics shared with the caller, attributed to the 
   expect(await asUser(t, owner).query(api.shares.listSharedTopics, {})).toEqual([]);
 });
 
+test("sharing to a registered account grants a Share immediately (no pending invite)", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  await seedUser(t, "viewer@example.com");
+  await seedTopic(t, owner, "hindi", "Hindi");
+
+  const status = await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "viewer@example.com" });
+  expect(status).toBe("shared");
+  // Nothing is left waiting — the account already existed.
+  expect(await t.run((ctx) => ctx.db.query("pendingShares").collect())).toEqual([]);
+});
+
+test("sharing to an email with no account yet records a pending invite, not an error", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  await seedTopic(t, owner, "hindi", "Hindi");
+
+  // Different casing on the second invite — normalisation means it's the same
+  // person, so the invite is idempotent (one pending row, not two).
+  const status = await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "Future@Example.com" });
+  expect(status).toBe("pending");
+  await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "future@example.com" });
+
+  const pending = await t.run((ctx) =>
+    ctx.db.query("pendingShares").withIndex("by_email", (q) => q.eq("email", "future@example.com")).collect(),
+  );
+  expect(pending.length).toBe(1);
+});
+
 test("shareTopic is owner-only: a non-owner cannot share someone else's Topic", async () => {
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");

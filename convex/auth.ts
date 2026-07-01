@@ -1,6 +1,7 @@
 import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
+import { claimPendingShares } from "./lib";
 
 // Convex Auth (PRD §6 — auth must "just work"). Email + password to start;
 // add OAuth providers here later if wanted. No JWT/cookie plumbing of our own.
@@ -38,7 +39,11 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       if (!admitted) {
         throw new Error("This workspace is private — sign-ups are closed.");
       }
-      return await ctx.db.insert("users", { email });
+      // New account admitted → claim any Shares invited to this email before it
+      // existed (pending invites become real Shares; see `claimPendingShares`).
+      const userId = await ctx.db.insert("users", { email });
+      await claimPendingShares(ctx, userId, email);
+      return userId;
     },
   },
 });
