@@ -532,19 +532,35 @@ function NewCourseCard() {
         const t = title.trim();
         if (!t) return;
         setBusy(true);
+        // Snapshot the chosen Resources before we reset the form and navigate away.
+        const chosenLinks = links;
+        const chosenFiles = files;
         try {
           const { slug } = await seedTopic({ title: t, why: why.trim() });
-          for (const l of links) await addLink(slug, l);
-          for (const f of files) await uploadFile(slug, f);
-          // Kick off setup immediately, once Resources are attached — no waiting
-          // for the daily cron. Best-effort: if the fire can't land, the card
-          // still shows "Setting up" (with a "Set up now" retry) and the cron
-          // picks it up anyway, so a failure here must not block creation.
-          try {
-            await requestSetup({ topicSlug: slug });
-          } catch (err) {
-            console.warn("couldn't start setup immediately; the routine will pick it up", err);
-          }
+          // Land on the new course immediately so the learner sees its "setting up"
+          // page right away — instead of watching this form sit in "Creating…"
+          // (next to the card the reactive dashboard has already rendered) for the
+          // length of the uploads. Attaching Resources and kicking off setup then
+          // run in the background: these promises outlive this component, so a
+          // rejection must not surface as an unhandled rejection (hence the catches).
+          void (async () => {
+            try {
+              await Promise.all([
+                ...chosenLinks.map((l) => addLink(slug, l)),
+                ...chosenFiles.map((f) => uploadFile(slug, f)),
+              ]);
+            } catch (err) {
+              console.warn("some resources couldn't be attached", err);
+            }
+            // Kick off setup once Resources are attached — no waiting for the daily
+            // cron. Best-effort: if the fire can't land, the card still shows
+            // "Setting up" (with a "Set up now" retry) and the cron picks it up.
+            try {
+              await requestSetup({ topicSlug: slug });
+            } catch (err) {
+              console.warn("couldn't start setup immediately; the routine will pick it up", err);
+            }
+          })();
           setTitle("");
           setWhy("");
           setLinks([]);
