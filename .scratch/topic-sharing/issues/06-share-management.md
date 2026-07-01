@@ -20,7 +20,8 @@ panel from **01**.
 - Edge cases:
   - sharing to one's **own** email is refused;
   - sharing to an email **already** shared is idempotent (no duplicate, no error);
-  - sharing to an email with **no account** errors clearly;
+  - sharing to an email with **no account** is held as a *pending Share* and
+    claimed on sign-up (done — `pendingShares`, `claimPendingShares`), not an error;
   - **deleting a Topic** removes its Shares (no dangling Viewer references).
 - Tests (Convex seam) cover the lifecycle (share / list / revoke / many Viewers)
   and each edge case.

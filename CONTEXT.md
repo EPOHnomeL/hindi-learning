@@ -64,8 +64,8 @@ The highest-ordered, non-superseded Lesson in a Topic — the learner's leading 
 _Avoid_: Latest, head, tip, edge
 
 **Share**:
-A grant giving one existing User read-only access to a single Topic owned by another User. Created by the Topic's owner, who supplies the recipient's account email — the Share only forms if an account with that email already exists. Revocable by the owner at any time; removed when its Topic is deleted. A Topic may have many Shares (shared with several Users); a Share never confers write access.
-_Avoid_: Invite, link, permission, grant (as separate terms). Distinct from a **Public link** — a Share is always targeted to a known account; a Public link is anonymous and account-less.
+A grant giving one User read-only access to a single Topic owned by another User. Created by the Topic's owner, who supplies the recipient's email. If an account with that email already exists the Share takes effect at once; if not, it is held as a **pending Share** and forms automatically the moment that email signs up — sign-up itself stays gated by the **Allowlist**, so an invite does not by itself let a stranger in. Revocable by the owner at any time; removed when its Topic is deleted. A Topic may have many Shares (shared with several Users); a Share never confers write access.
+_Avoid_: link, permission, grant (as separate terms); "invite" as a *separate* concept — a pending Share is still a Share, just not yet in effect. Distinct from a **Public link** — a Share is always targeted to a specific person by email; a Public link is anonymous and account-less.
 
 **Viewer**:
 The User on the receiving end of a Share — has read-only access to a Topic they do not own. A Viewer sees everything in the Topic (Lessons, References, Resources, the owner's Questions and Replies, the owner's Progress) but writes nothing: they cannot add Resources, edit the Mission, ask Questions, mark Progress, or fire the Routine. A Viewer must have an account, and is distinct from a **Guest** (the anonymous holder of a Public link). Shared Topics appear in the Viewer's "Shared with me" section.
