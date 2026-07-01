@@ -40,33 +40,44 @@ Do these steps IN ORDER:
      - CAPTURE.json    their open questions, quiz responses, and progress
    Work INSIDE topics/$SLUG/ from here on. Never read another topic's files.
 
-3. READ the teach skill — `.agents/skills/teach/SKILL.md` — and follow it to the
-   letter. Treat topics/$SLUG/ as the teaching workspace it describes. Ground
-   every fact in the topic's resources/ and references — never trust your own
-   memory; verify quoted source text character-for-character.
+3. READ two files, and ONLY these, to know how to work:
+     - `.agents/skills/teach/SKILL.md`     — the teaching judgement (ZPD,
+       fluency vs. storage strength, mission-grounding). Follow it to the letter.
+     - `.agents/skills/teach/AUTHORING.md` — the mechanical contract (lesson file
+       shape, exact quiz markup, components, cross-link routes, citations,
+       immutability, publish).
+   AUTHORING.md is authoritative for mechanics: you do NOT need to open the
+   `*-FORMAT.md` files (except when actually writing a glossary/record), the
+   `lessons/_partials/`, `publish.ts`, or a prior lesson to rediscover
+   conventions — that spelunking is the cold-start tax this contract removes.
+   Treat topics/$SLUG/ as the teaching workspace. Ground every fact in the
+   topic's resources/ and references — never trust your own memory; verify
+   quoted source text character-for-character, and reuse sources already
+   verified in the workspace instead of re-fetching them.
 
 4. MISSION: if topics/$SLUG/MISSION.md does NOT exist yet (only SEED.md does),
    the topic is freshly seeded — draft the mission from the Seed + Resources and
    write it to topics/$SLUG/MISSION.md before authoring the first lesson.
 
-5. REVIEW + REPLY (your evidence for the zone of proximal development):
-       pnpm run review:prod --topic "$SLUG"
-   Prints open questions and per-lesson quiz responses/progress (also in
-   CAPTURE.json). Then answer EVERY open question, each grounded in the
-   resources/references:
+5. ANSWER open questions (your evidence for the zone of proximal development):
+   topics/$SLUG/CAPTURE.json — already materialised in step 2 — carries every
+   open question, quiz response, and progress marker. READ IT DIRECTLY; do NOT
+   run a separate `review:prod` pull (it is a redundant second round-trip —
+   `review` stays only as a human convenience, off this hot path).
+   - If capture.openQuestions is EMPTY, skip this step entirely — do not spend a
+     turn confirming there is nothing to answer.
+   - Otherwise answer EVERY open question, each grounded in the resources/references:
        pnpm run reply:prod <question-id> "<answer>"
    If several questions circle one confusion, let it shape the next lesson.
 
-6. AUTHOR exactly ONE new lesson into topics/$SLUG/lessons/, per SKILL.md:
-   - 00NN-<dash-case-name>.html, <title> = "Lesson N · <display title>",
-     teaching ONE tightly-scoped thing in the learner's ZPD.
-   - Use the captured-quiz markup (.quiz[data-correct] + .opt[data-k], and
-     .quiz.fill[data-answer]); no API calls inside the lesson. Cite sources.
+6. AUTHOR exactly ONE new lesson into topics/$SLUG/lessons/, following
+   AUTHORING.md for all mechanics (copy the lessons/_template.html skeleton;
+   lean fragment only; exact captured-quiz markup; cross-link routes; citations;
+   immutability/`supersedes`). It teaches ONE tightly-scoped thing in the
+   learner's ZPD. Also:
    - Update the relevant references — especially the glossary — to stay current.
    - Write a new topics/$SLUG/learning-records/00NN-<dash-case-name>.md capturing
      what this advanced and the next ZPD step.
-   - Lessons are IMMUTABLE once published — never edit a published lesson; write
-     a new one with <meta name="supersedes" content="<old-id>"> instead.
    - A lesson opened-but-incomplete or with wrong answers means the learner is
      likely stuck — reinforce/correct rather than racing ahead. If there is
      genuinely no material left to add (mission complete), skip to step 8 and

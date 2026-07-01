@@ -49,14 +49,14 @@ re-pasted. The loop, in brief:
 2. `pnpm run materialise:prod --topic "$SLUG"` — pull the Topic's context into `topics/$SLUG/` and work there.
 3. Read `.agents/skills/teach/SKILL.md`; treat `topics/$SLUG/` as its workspace.
 4. If only `SEED.md` exists (no `MISSION.md`), draft the Mission from the Seed + Resources.
-5. `pnpm run review:prod --topic "$SLUG"` + `pnpm run reply:prod <id> "<answer>"` for every open question.
+5. Read `topics/$SLUG/CAPTURE.json` (already materialised) for open questions; `pnpm run reply:prod <id> "<answer>"` for each — skip entirely if none. No separate `review:prod` on the hot path.
 6. Author **exactly one** lesson into `topics/$SLUG/lessons/` (+ updated references, a new learning record).
 7. `pnpm run publish:prod --topic "$SLUG"` — publish mission/lesson/record/refs to Convex. **No git commit** (ADR 0009).
 8. `pnpm run report:prod <published|nothing|failed> "$SLUG" ["error"]` — **always**, even on failure, to release the lock.
 
 ### Cloud environment
 
-- **Setup script:** `corepack enable` + `pnpm install --frozen-lockfile` + `python3 -m pip install pymupdf` (pymupdf renders `Handbook.pdf` pages for grounding).
+- **Setup script:** set the cloud env's Setup field to exactly **`bash scripts/setup.sh`** — the canonical, version-controlled setup ([scripts/setup.sh](../scripts/setup.sh)): `corepack enable` + `pnpm install --frozen-lockfile` + `python3 -m pip install pymupdf` (pymupdf renders `Handbook.pdf` pages for grounding), then a smoke check that `tsx` + `convex` resolve so a broken install fails **here** instead of surfacing mid-run as a manual "let me install first". Keeping it in the repo stops it drifting from an external text box.
 - **Env vars (set in the routine's cloud env):** `PUBLISH_SECRET`, `CONVEX_PROD_URL`. `OWNER_EMAIL` is **not** set here — `claim:prod` resolves the claimed Topic's owner and writes it to `.env.local` for the owner-scoped steps, so the run is self-sufficient.
 
 ---
@@ -118,7 +118,7 @@ The teach CLI (`scripts/`, wired in `package.json`):
 | --- | --- |
 | `pnpm -s run claim:prod` | Claim one ready Topic for this run; prints its slug (or `none`) and writes its owner to `.env.local` as `OWNER_EMAIL` for the owner-scoped steps. |
 | `pnpm run materialise:prod --topic <slug>` | Pull the Topic's Mission/Seed, lessons, learning records, references, resources, and capture into `topics/<slug>/`. |
-| `pnpm run review:prod --topic <slug>` | Print live open questions + per-lesson responses/progress. |
+| `pnpm run review:prod --topic <slug>` | Print live open questions + per-lesson responses/progress. **Human convenience only** — the Routine reads the same data from the materialised `CAPTURE.json`, not this command. |
 | `pnpm run reply:prod <id> "<answer>"` | Answer an open question (shows inline in the reader). |
 | `pnpm run publish:prod --topic <slug>` | Push `topics/<slug>/` (mission, lessons, learning records, references) to prod Convex (idempotent; lessons + records insert-once, references upsert on change). |
 | `pnpm run report:prod <outcome> <slug> ["err"]` | Release the generation lock (`published`/`nothing`/`failed`). |
