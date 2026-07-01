@@ -623,10 +623,11 @@ function NewCourseCard() {
         </button>
       </div>
       <label className="cursor-pointer rounded-lg border border-dashed border-line px-2 py-1.5 text-center text-sm text-soft hover:bg-hi">
-        + Attach PDF{files.length > 0 ? "s" : ""}
+        + Attach file{files.length > 0 ? "s" : ""} (PDF or Markdown)
         <input
           type="file"
           multiple
+          accept=".pdf,.md,.markdown,application/pdf,text/markdown"
           className="hidden"
           onChange={(e) => {
             const picked = Array.from(e.target.files ?? []);

@@ -228,8 +228,8 @@ function NavItem({
   );
 }
 
-// The active Topic's Resources — PDFs (uploaded) and links — each opening in a
-// new tab. Add more by uploading a file or pasting a link.
+// The active Topic's Resources — files (PDF or Markdown, uploaded) and links —
+// each opening in a new tab. Add more by uploading a file or pasting a link.
 function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite: boolean }) {
   const resources = useQuery(api.resources.listResources, { topicSlug });
   const { uploadFile, addLink } = useResourceUpload();
@@ -281,6 +281,7 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
           <input
             ref={inputRef}
             type="file"
+            accept=".pdf,.md,.markdown,application/pdf,text/markdown"
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -315,7 +316,7 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
                 disabled={busy}
                 className="flex-1 rounded-lg border border-dashed border-line px-2.5 py-2.5 text-left text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
               >
-                {busy ? "Working…" : "+ Upload PDF"}
+                {busy ? "Working…" : "+ Upload file"}
               </button>
               <button
                 onClick={() => setAdding(true)}
