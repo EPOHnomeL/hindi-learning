@@ -5,7 +5,10 @@
     <!-- Vendored from upstream@9aa1d25e0c9180cefff7e4f1e2c7302a9f874bf0. Do NOT hand-edit; run scripts/refresh-spa.mjs. Repo-specific seams are marked `SKILL: replace`. -->
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <base href="/docs/architecture/" />
-    <title>Served Teach App — Knowledge Bank</title>
+    <title>My Course — Knowledge Bank</title>
+    <!-- The app's book mark. Repo-root-relative (served by `serve .`, like the
+         SPA's /CONTEXT.md refs) so it resolves past the /docs/architecture/ <base>. -->
+    <link rel="icon" href="/public/icon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link
       href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=JetBrains+Mono&display=swap"
@@ -150,7 +153,9 @@
         align-items: center;
         gap: 9px;
       }
-      .brand .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); }
+      /* The app's open-book brand mark (src/app/_components/Logo.tsx), drawn
+         with currentColor so it picks up the terracotta accent in both themes. */
+      .brand .brand-logo { width: 22px; height: 22px; flex-shrink: 0; color: var(--primary); }
       .brand small {
         display: block;
         color: var(--muted-fg);
@@ -981,8 +986,12 @@
     <div class="app">
       <aside class="sidebar">
         <div class="brand">
-          <span class="dot"></span>
-          <div>Served Teach<small>Knowledge Bank</small></div>
+          <svg class="brand-logo" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="My Course">
+            <path d="M16 9 C 12.5 7, 8 7, 4.5 8 L 4.5 22 C 8 21, 12.5 21, 16 23" />
+            <path d="M16 9 C 19.5 7, 24 7, 27.5 8 L 27.5 22 C 24 21, 19.5 21, 16 23" />
+            <path d="M16 9 L 16 23" />
+          </svg>
+          <div>My Course<small>Knowledge Bank</small></div>
         </div>
 
         <div class="nav-group">Overview</div>
