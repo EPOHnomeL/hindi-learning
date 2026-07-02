@@ -179,12 +179,9 @@ function LessonView({
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
           <div className="flex shrink-0 items-center gap-2">
             {!readOnly && isFrontier && completed && <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />}
-            {readOnly ? (
-              // A Viewer can't change Progress, but sees the owner's completion.
-              completed && (
-                <span className="rounded-lg border border-accent2 bg-accent2 px-3 py-1.5 text-sm text-white">✓ Completed</span>
-              )
-            ) : (
+            {/* Only the owner sees the completion control; a Viewer of a shared
+                course gets no read-only badge (issue: declutter shared views). */}
+            {!readOnly && (
               <button
                 onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
                 disabled={completed}

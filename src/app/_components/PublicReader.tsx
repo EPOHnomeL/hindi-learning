@@ -90,11 +90,31 @@ export function PublicCourseShell({ token, children }: { token: string; children
             ))}
 
             {course.resources.length > 0 && (
-              <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">Resources</p>
+              <details className="group mt-1">
+                <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 pt-4 pb-2 text-xs font-semibold uppercase tracking-wider text-accent2 hover:text-accent [&::-webkit-details-marker]:hidden">
+                  Resources
+                  <svg
+                    aria-hidden
+                    className="mr-1 transition-transform duration-200 group-open:rotate-180"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </summary>
+                <div className="flex flex-col gap-1">
+                  {course.resources.map((r) => (
+                    <ResourceItem key={r.id} resource={r} />
+                  ))}
+                </div>
+              </details>
             )}
-            {course.resources.map((r) => (
-              <ResourceItem key={r.id} resource={r} />
-            ))}
           </nav>
 
           <ThemeToggle />
@@ -153,7 +173,6 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
   const { theme } = useTheme();
   const { course } = useGuestCourse();
   const lesson = useQuery(api.public.publicLesson, { token, key: lessonKey });
-  const completed = course.progress.some((p) => p.lessonKey === lessonKey && p.status === "completed");
   const qa = course.questions.filter((q) => q.lessonKey === lessonKey);
 
   if (lesson === undefined) return <p className="text-soft">Loading…</p>;
@@ -164,10 +183,6 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
       <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3">
         <div className="sticky top-12 z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
-          {/* The owner's completion, read-only — a Guest can't change Progress. */}
-          {completed && (
-            <span className="shrink-0 rounded-lg border border-accent2 bg-accent2 px-3 py-1.5 text-sm text-white">✓ Completed</span>
-          )}
         </div>
         {/* Quizzes stay interactive (self-check); nothing is recorded for a Guest. */}
         <Frame html={lesson.html} withBridge theme={theme} />
