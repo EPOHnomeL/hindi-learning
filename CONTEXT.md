@@ -1,4 +1,4 @@
-# Served Teach App Glossary
+# My Course Glossary
 
 The domain language for an app that serves teach-skill lessons to the web and feeds learner interactions back to Claude Code. This glossary is the canonical vocabulary — explainers, issues, schema names, and code should adhere to it.
 

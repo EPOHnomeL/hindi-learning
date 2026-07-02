@@ -1,17 +1,21 @@
 {
-  "generatedAt": "2026-06-27T08:45:59.890Z",
+  "generatedAt": "2026-07-02T06:48:34.131Z",
   "files": {
     "/docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md": {
       "title": "Asynchronous, hub-mediated teaching loop (no live tutor on the web)",
       "updated": "2026-06-09T19:50:08+02:00",
       "backlinks": [
         {
+          "path": "/docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md",
+          "title": "Provider-agnostic teaching runtime with two compute lines: a managed Claude line (quality-guaranteed) and a BYOK gateway line (any OpenAI-compatible model)"
+        },
+        {
           "path": "/docs/architecture/contexts/02-reader.md",
           "title": "Reader"
         },
         {
           "path": "/docs/architecture/overview.md",
-          "title": "Served Teach App — Technical Overview"
+          "title": "My Course — Technical Overview"
         }
       ]
     },
@@ -45,7 +49,7 @@
       "backlinks": [
         {
           "path": "/CONTEXT.md",
-          "title": "Served Teach App Glossary"
+          "title": "My Course Glossary"
         }
       ]
     },
@@ -84,6 +88,10 @@
           "title": "The teaching compute is a swappable adapter: shared claude.ai Routine now, per-owner Agent-SDK worker later"
         },
         {
+          "path": "/docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md",
+          "title": "Provider-agnostic teaching runtime with two compute lines: a managed Claude line (quality-guaranteed) and a BYOK gateway line (any OpenAI-compatible model)"
+        },
+        {
           "path": "/docs/architecture/contexts/01-hub-content.md",
           "title": "Hub & Content Model"
         },
@@ -97,7 +105,7 @@
         },
         {
           "path": "/docs/architecture/overview.md",
-          "title": "Served Teach App — Technical Overview"
+          "title": "My Course — Technical Overview"
         },
         {
           "path": "/docs/routine-prompt.md",
@@ -105,7 +113,7 @@
         },
         {
           "path": "/CONTEXT.md",
-          "title": "Served Teach App Glossary"
+          "title": "My Course Glossary"
         }
       ]
     },
@@ -118,6 +126,10 @@
           "title": "Next-lesson Routine: gate in Convex, API-only routine, one routine for all Topics"
         },
         {
+          "path": "/docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md",
+          "title": "Provider-agnostic teaching runtime with two compute lines: a managed Claude line (quality-guaranteed) and a BYOK gateway line (any OpenAI-compatible model)"
+        },
+        {
           "path": "/docs/architecture/contexts/03-teaching-routine.md",
           "title": "Teaching Routine"
         }
@@ -125,7 +137,7 @@
     },
     "/docs/adr/0011-allowlist-in-convex-admin-portal.md": {
       "title": "The Allowlist lives in Convex and is managed by an in-app Admin, gating sign-up only",
-      "updated": "2026-06-27T10:22:05+02:00",
+      "updated": "2026-06-27T15:38:45+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/05-access-sharing.md",
@@ -148,8 +160,27 @@
       "updated": "2026-06-27T10:34:53+02:00",
       "backlinks": [
         {
+          "path": "/docs/adr/0013-public-link-shares.md",
+          "title": "Public link shares (anonymous, read-only Topic links)"
+        },
+        {
           "path": "/docs/architecture/contexts/02-reader.md",
           "title": "Reader"
+        }
+      ]
+    },
+    "/docs/adr/0013-public-link-shares.md": {
+      "title": "Public link shares (anonymous, read-only Topic links)",
+      "updated": "2026-06-30T10:00:02+02:00",
+      "backlinks": []
+    },
+    "/docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md": {
+      "title": "Provider-agnostic teaching runtime with two compute lines: a managed Claude line (quality-guaranteed) and a BYOK gateway line (any OpenAI-compatible model)",
+      "updated": "2026-06-30T11:43:49+02:00",
+      "backlinks": [
+        {
+          "path": "/CONTEXT.md",
+          "title": "My Course Glossary"
         }
       ]
     },
@@ -170,7 +201,7 @@
     },
     "/docs/architecture/contexts/01-hub-content.md": {
       "title": "Hub & Content Model",
-      "updated": "2026-06-27T10:34:54+02:00",
+      "updated": "2026-06-27T10:46:00+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/02-reader.md",
@@ -182,13 +213,13 @@
         },
         {
           "path": "/docs/architecture/overview.md",
-          "title": "Served Teach App — Technical Overview"
+          "title": "My Course — Technical Overview"
         }
       ]
     },
     "/docs/architecture/contexts/02-reader.md": {
       "title": "Reader",
-      "updated": "2026-06-27T10:34:54+02:00",
+      "updated": "2026-06-27T10:46:00+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/01-hub-content.md",
@@ -200,13 +231,13 @@
         },
         {
           "path": "/docs/architecture/overview.md",
-          "title": "Served Teach App — Technical Overview"
+          "title": "My Course — Technical Overview"
         }
       ]
     },
     "/docs/architecture/contexts/03-teaching-routine.md": {
       "title": "Teaching Routine",
-      "updated": "2026-06-27T10:34:54+02:00",
+      "updated": "2026-06-30T11:25:34+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/01-hub-content.md",
@@ -222,13 +253,13 @@
         },
         {
           "path": "/docs/architecture/overview.md",
-          "title": "Served Teach App — Technical Overview"
+          "title": "My Course — Technical Overview"
         }
       ]
     },
     "/docs/architecture/contexts/04-publishing-workspace.md": {
       "title": "Publishing & Workspace",
-      "updated": "2026-06-27T10:34:54+02:00",
+      "updated": "2026-06-30T11:25:34+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/01-hub-content.md",
@@ -240,13 +271,13 @@
         },
         {
           "path": "/docs/architecture/overview.md",
-          "title": "Served Teach App — Technical Overview"
+          "title": "My Course — Technical Overview"
         }
       ]
     },
     "/docs/architecture/contexts/05-access-sharing.md": {
       "title": "Access & Sharing",
-      "updated": "2026-06-27T10:34:54+02:00",
+      "updated": "2026-06-27T10:46:00+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/01-hub-content.md",
@@ -254,12 +285,12 @@
         },
         {
           "path": "/docs/architecture/overview.md",
-          "title": "Served Teach App — Technical Overview"
+          "title": "My Course — Technical Overview"
         }
       ]
     },
     "/docs/architecture/overview.md": {
-      "title": "Served Teach App — Technical Overview",
+      "title": "My Course — Technical Overview",
       "updated": "2026-06-27T10:34:54+02:00",
       "backlinks": []
     },
@@ -270,7 +301,7 @@
     },
     "/docs/routine-prompt.md": {
       "title": "The next-lesson Routine — canonical Instructions",
-      "updated": "2026-06-26T18:46:45+02:00",
+      "updated": "2026-07-01T10:36:57+02:00",
       "backlinks": [
         {
           "path": "/docs/routine.md",
@@ -280,7 +311,7 @@
     },
     "/docs/routine.md": {
       "title": "The next-lesson Routine — operational runbook",
-      "updated": "2026-06-26T18:46:45+02:00",
+      "updated": "2026-07-01T10:36:57+02:00",
       "backlinks": [
         {
           "path": "/docs/adr/0008-next-lesson-routine-gate-in-convex.md",
@@ -293,8 +324,8 @@
       ]
     },
     "/CONTEXT.md": {
-      "title": "Served Teach App Glossary",
-      "updated": "2026-06-27T10:22:05+02:00",
+      "title": "My Course Glossary",
+      "updated": "2026-07-01T14:56:10+02:00",
       "backlinks": [
         {
           "path": "/docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md",
@@ -302,7 +333,7 @@
         },
         {
           "path": "/docs/architecture/overview.md",
-          "title": "Served Teach App — Technical Overview"
+          "title": "My Course — Technical Overview"
         },
         {
           "path": "/docs/routine.md",

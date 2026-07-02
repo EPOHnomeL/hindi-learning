@@ -3,7 +3,7 @@ slug: overview
 name: Overview
 ---
 
-# Served Teach App — Technical Overview
+# My Course — Technical Overview
 
 An app that serves **Lessons** (self-contained HTML artifacts authored by Claude Code's teach skill)
 to the web and feeds learner interactions back to Claude Code — an asynchronous, hub-mediated
