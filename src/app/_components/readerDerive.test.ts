@@ -4,6 +4,7 @@ import {
   firstLessonKey,
   frontierKey,
   internalNavTarget,
+  nextLessonKey,
   seenAfterOpening,
   unseenReplyKeys,
 } from "./readerDerive";
@@ -57,6 +58,28 @@ describe("frontierKey", () => {
 
   it("returns null when there are no lessons", () => {
     expect(frontierKey([])).toBe(null);
+  });
+});
+
+describe("nextLessonKey", () => {
+  const lessons = [
+    { key: "0001-alpha", seq: 1, title: "Alpha" },
+    { key: "0002-beta", seq: 2, title: "Beta" },
+    { key: "0003-gamma", seq: 3, title: "Gamma" },
+  ];
+
+  it("returns the following lesson's key", () => {
+    expect(nextLessonKey(lessons, "0001-alpha")).toBe("0002-beta");
+    expect(nextLessonKey(lessons, "0002-beta")).toBe("0003-gamma");
+  });
+
+  it("returns null on the last lesson (the Frontier)", () => {
+    expect(nextLessonKey(lessons, "0003-gamma")).toBe(null);
+  });
+
+  it("returns null when the key isn't found or the list is empty", () => {
+    expect(nextLessonKey(lessons, "nope")).toBe(null);
+    expect(nextLessonKey([], "0001-alpha")).toBe(null);
   });
 });
 

@@ -19,6 +19,16 @@ export function frontierKey(lessons: readonly LessonLite[]): string | null {
   return lessons[lessons.length - 1]?.key ?? null;
 }
 
+// The lesson immediately after `currentKey` in seq order, or null when the
+// current key is the last (Frontier) or isn't found. `listLessons` is
+// seq-ascending, so "next" is simply the following array entry. Powers the
+// reader's "Next lesson →" navigation for read-only Viewers and Guests.
+export function nextLessonKey(lessons: readonly LessonLite[], currentKey: string): string | null {
+  const i = lessons.findIndex((l) => l.key === currentKey);
+  if (i < 0 || i + 1 >= lessons.length) return null;
+  return lessons[i + 1]!.key;
+}
+
 // The lessonKeys the learner has completed, for the sidebar's ✓ ticks. "opened"
 // is progress without completion, so it does not count as done.
 export function completedKeys(progress: readonly ProgressLite[]): Set<string> {
