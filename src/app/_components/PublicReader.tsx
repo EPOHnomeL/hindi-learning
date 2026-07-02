@@ -10,7 +10,7 @@ import { Frame } from "./ArtifactView";
 import { Markdown } from "./MarkdownView";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
-import { firstLessonKey } from "./readerDerive";
+import { firstLessonKey, nextLessonKey } from "./readerDerive";
 
 // The Guest reader (issue 07 / ADR 0013): the read-only `/share/[token]` view an
 // anonymous Guest sees. It mirrors the authed reader's shape but reaches data
@@ -174,6 +174,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
   const { course } = useGuestCourse();
   const lesson = useQuery(api.public.publicLesson, { token, key: lessonKey });
   const qa = course.questions.filter((q) => q.lessonKey === lessonKey);
+  const next = nextLessonKey(course.lessons, lessonKey);
 
   if (lesson === undefined) return <p className="text-soft">Loading…</p>;
   if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
@@ -183,6 +184,14 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
       <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3">
         <div className="sticky top-12 z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
+          {next && (
+            <Link
+              href={`/share/${token}/lessons/${next}`}
+              className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90"
+            >
+              Next lesson →
+            </Link>
+          )}
         </div>
         {/* Quizzes stay interactive (self-check); nothing is recorded for a Guest. */}
         <Frame html={lesson.html} withBridge theme={theme} />

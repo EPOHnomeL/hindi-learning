@@ -1,6 +1,7 @@
 "use client";
 
 import { useAction, useMutation, useQuery } from "convex/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
@@ -26,6 +27,7 @@ export function ArtifactView({
   topicSlug,
   isFrontier,
   readOnly,
+  nextLessonKey,
 }: {
   kind: "lesson" | "reference";
   artifactKey: string;
@@ -34,9 +36,20 @@ export function ArtifactView({
   // True for a read-only Viewer: hide every write control and skip the writes
   // the reader normally makes (progress, quiz responses). Reads stay live.
   readOnly: boolean;
+  // The next lesson's key in seq order (null on the last lesson). A read-only
+  // Viewer gets a "Next lesson →" link in place of the owner's controls.
+  nextLessonKey?: string | null;
 }) {
   if (kind === "reference") return <ReferenceView refKey={artifactKey} topicSlug={topicSlug} />;
-  return <LessonView lessonKey={artifactKey} topicSlug={topicSlug} isFrontier={isFrontier} readOnly={readOnly} />;
+  return (
+    <LessonView
+      lessonKey={artifactKey}
+      topicSlug={topicSlug}
+      isFrontier={isFrontier}
+      readOnly={readOnly}
+      nextLessonKey={nextLessonKey ?? null}
+    />
+  );
 }
 
 // Fills its flex parent; min height keeps it usable when the column is short
@@ -133,11 +146,13 @@ function LessonView({
   topicSlug,
   isFrontier,
   readOnly,
+  nextLessonKey,
 }: {
   lessonKey: string;
   topicSlug: string;
   isFrontier: boolean;
   readOnly: boolean;
+  nextLessonKey: string | null;
 }) {
   const { theme } = useTheme();
   const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey });
@@ -179,9 +194,18 @@ function LessonView({
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
           <div className="flex shrink-0 items-center gap-2">
             {!readOnly && isFrontier && completed && <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />}
-            {/* Only the owner sees the completion control; a Viewer of a shared
-                course gets no read-only badge (issue: declutter shared views). */}
-            {!readOnly && (
+            {readOnly ? (
+              // A Viewer of a shared course can't change Progress; instead of a
+              // read-only badge, offer plain navigation to the next lesson.
+              nextLessonKey && (
+                <Link
+                  href={`/courses/${topicSlug}/lessons/${nextLessonKey}`}
+                  className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90"
+                >
+                  Next lesson →
+                </Link>
+              )
+            ) : (
               <button
                 onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
                 disabled={completed}

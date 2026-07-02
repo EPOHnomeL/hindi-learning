@@ -9,7 +9,7 @@ import { api } from "../../../convex/_generated/api";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useResourceUpload } from "./useResourceUpload";
-import { completedKeys, frontierKey, seenAfterOpening, unseenReplyKeys } from "./readerDerive";
+import { completedKeys, frontierKey, nextLessonKey, seenAfterOpening, unseenReplyKeys } from "./readerDerive";
 
 // localStorage key for answered-question ids the learner has already seen.
 const SEEN_KEY = "hindi:answers-seen";
@@ -25,6 +25,9 @@ type CourseCtx = {
   // hides every write control. Defaults false while access is still loading, so
   // a Viewer never sees a control flash before it's hidden.
   canWrite: boolean;
+  // The lesson after the given one in seq order (null on the last / unknown).
+  // Powers the Viewer's "Next lesson →" link in place of write controls.
+  nextKey: (lessonKey: string) => string | null;
 };
 const Ctx = createContext<CourseCtx | null>(null);
 
@@ -70,6 +73,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const completed = completedKeys(progress ?? []);
   const unseenAnswers = unseenReplyKeys(questions ?? [], seen);
   const frontier = frontierKey(lessons ?? []);
+  const nextKey = useCallback((lessonKey: string) => nextLessonKey(lessons ?? [], lessonKey), [lessons]);
 
   // Opening a lesson counts as seeing its replies — persist the new set so the dot
   // stays cleared across reloads. No-ops (same reference) when nothing is new.
@@ -100,7 +104,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   useEffect(() => setMenuOpen(false), [pathname]);
 
   return (
-    <Ctx.Provider value={{ frontierKey: frontier, markSeen, canWrite }}>
+    <Ctx.Provider value={{ frontierKey: frontier, markSeen, canWrite, nextKey }}>
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
         {/* Mobile top bar: hamburger opens the lesson selector. */}
         <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 md:hidden">
@@ -250,67 +254,85 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
   }
 
   return (
-    <>
-      <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">Resources</p>
-      {resources?.length === 0 && <p className="px-2 text-sm text-soft">No resources yet.</p>}
-      {resources?.map((r) => (
-        <ResourceItem key={r.id} resource={r} />
-      ))}
+    <details className="group mt-1">
+      <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 pt-4 pb-2 text-xs font-semibold uppercase tracking-wider text-accent2 hover:text-accent [&::-webkit-details-marker]:hidden">
+        Resources
+        <svg
+          aria-hidden
+          className="mr-1 transition-transform duration-200 group-open:rotate-180"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </summary>
+      <div className="flex flex-col gap-1">
+        {resources?.length === 0 && <p className="px-2 text-sm text-soft">No resources yet.</p>}
+        {resources?.map((r) => (
+          <ResourceItem key={r.id} resource={r} />
+        ))}
 
-      {/* Add controls are owner-only; a Viewer sees the list but can't add. */}
-      {canWrite && (
-        <>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".pdf,.md,.markdown,application/pdf,text/markdown"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) void run(() => uploadFile(topicSlug, file));
-            }}
-          />
-          {adding ? (
-            <form
-              className="mt-1 flex gap-1"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const link = linkDraft.trim();
-                if (!link) return;
-                setLinkDraft("");
-                setAdding(false);
-                void run(() => addLink(topicSlug, link));
+        {/* Add controls are owner-only; a Viewer sees the list but can't add. */}
+        {canWrite && (
+          <>
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".pdf,.md,.markdown,application/pdf,text/markdown"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void run(() => uploadFile(topicSlug, file));
               }}
-            >
-              <input
-                autoFocus
-                value={linkDraft}
-                onChange={(e) => setLinkDraft(e.target.value)}
-                placeholder="https://…"
-                className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-sm focus:border-gold focus:outline-none"
-              />
-              <button type="submit" className="rounded-lg bg-accent2 px-2 py-1 text-xs text-white">Add</button>
-            </form>
-          ) : (
-            <div className="mt-1 flex gap-2">
-              <button
-                onClick={() => inputRef.current?.click()}
-                disabled={busy}
-                className="flex-1 rounded-lg border border-dashed border-line px-2.5 py-2.5 text-left text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
+            />
+            {adding ? (
+              <form
+                className="mt-1 flex gap-1"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const link = linkDraft.trim();
+                  if (!link) return;
+                  setLinkDraft("");
+                  setAdding(false);
+                  void run(() => addLink(topicSlug, link));
+                }}
               >
-                {busy ? "Working…" : "+ Upload file"}
-              </button>
-              <button
-                onClick={() => setAdding(true)}
-                disabled={busy}
-                className="rounded-lg border border-dashed border-line px-3 py-2.5 text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
-              >
-                + Link
-              </button>
-            </div>
-          )}
-        </>
-      )}
-    </>
+                <input
+                  autoFocus
+                  value={linkDraft}
+                  onChange={(e) => setLinkDraft(e.target.value)}
+                  placeholder="https://…"
+                  className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-sm focus:border-gold focus:outline-none"
+                />
+                <button type="submit" className="rounded-lg bg-accent2 px-2 py-1 text-xs text-white">Add</button>
+              </form>
+            ) : (
+              <div className="mt-1 flex gap-2">
+                <button
+                  onClick={() => inputRef.current?.click()}
+                  disabled={busy}
+                  className="flex-1 rounded-lg border border-dashed border-line px-2.5 py-2.5 text-left text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
+                >
+                  {busy ? "Working…" : "+ Upload file"}
+                </button>
+                <button
+                  onClick={() => setAdding(true)}
+                  disabled={busy}
+                  className="rounded-lg border border-dashed border-line px-3 py-2.5 text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
+                >
+                  + Link
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </details>
   );
 }
