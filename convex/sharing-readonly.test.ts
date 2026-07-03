@@ -50,10 +50,12 @@ test("courseHeader reports the role: owner, viewer, or null for a stranger", asy
   expect(await asUser(t, owner).query(api.content.courseHeader, { topicSlug: "hindi" })).toEqual({
     title: "Hindi",
     role: "owner",
+    status: "active",
   });
   expect(await asUser(t, viewer).query(api.content.courseHeader, { topicSlug: "hindi" })).toEqual({
     title: "Hindi",
     role: "viewer",
+    status: "active",
   });
   // A non-Viewer can't even learn the Topic's title (private Topics don't leak).
   expect(await asUser(t, stranger).query(api.content.courseHeader, { topicSlug: "hindi" })).toBeNull();

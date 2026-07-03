@@ -137,6 +137,34 @@ export const renameTopic = mutation({
   },
 });
 
+// Owner-driven Completion (ADR 0015): the owner concludes their own course — the
+// escape hatch for open-ended missions the teach skill won't auto-terminate.
+// Owner-only (a Viewer is refused by the owner gate, PRD story 9); once
+// `completed`, the Routine's gate stops authoring. `reopenCourse` is the inverse,
+// returning a completed course to `active` so authoring resumes — it never
+// touches an earned Certificate (slice 2).
+export const endCourse = mutation({
+  args: { topicSlug: v.string() },
+  handler: async (ctx, { topicSlug }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    await ctx.db.patch(topic._id, { status: "completed" });
+  },
+});
+
+export const reopenCourse = mutation({
+  args: { topicSlug: v.string() },
+  handler: async (ctx, { topicSlug }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    await ctx.db.patch(topic._id, { status: "active" });
+  },
+});
+
 // The reader's per-course header: the Topic's title plus the caller's access
 // level ("owner" vs read-only "viewer"). Resolves through the owner-or-Viewer
 // gate, so a Viewer gets the title (their owner-only `listTopics` never carries
@@ -146,7 +174,13 @@ export const courseHeader = query({
   args: { topicSlug: v.string() },
   returns: v.union(
     v.null(),
-    v.object({ title: v.string(), role: v.union(v.literal("owner"), v.literal("viewer")) }),
+    v.object({
+      title: v.string(),
+      role: v.union(v.literal("owner"), v.literal("viewer")),
+      // The reader reads `status` to switch affordances: `completed` (ADR 0015)
+      // hides "Generate next lesson" and shows the owner's Reopen control.
+      status: v.union(v.literal("seeded"), v.literal("active"), v.literal("completed")),
+    }),
   ),
   handler: async (ctx, { topicSlug }) => {
     const userId = await getAuthUserId(ctx);
@@ -154,7 +188,7 @@ export const courseHeader = query({
     const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic) return null;
     const role = topic.ownerId === userId ? ("owner" as const) : ("viewer" as const);
-    return { title: topic.title, role };
+    return { title: topic.title, role, status: topic.status ?? "active" };
   },
 });
 
@@ -267,6 +301,21 @@ export const publishMission = mutation({
     const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
     if (!topic) throw new Error("topic not found");
     await ctx.db.patch(topic._id, { mission, status: "active" });
+  },
+});
+
+// The teach skill's termination call (ADR 0015): when the Mission's "Success
+// looks like" outcomes are substantially met (see SKILL.md "Terminating a
+// course"), the run marks the Topic `completed` so the Routine's gate stops
+// authoring. Secret-guarded like the other teach write-backs; resolves by slug
+// (the run knows its Topic's slug), the twin of the owner's `endCourse`.
+export const completeCourse = mutation({
+  args: { secret: v.string(), topicSlug: v.string() },
+  handler: async (ctx, { secret, topicSlug }) => {
+    assertAdmin(secret);
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    await ctx.db.patch(topic._id, { status: "completed" });
   },
 });
 

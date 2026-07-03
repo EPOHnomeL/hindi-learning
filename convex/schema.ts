@@ -33,7 +33,9 @@ export default defineSchema({
     // the legacy hindi row (pre-seed) is accepted; issue 09 sets it `active`.
     seed: v.optional(v.string()),
     mission: v.optional(v.string()),
-    status: v.optional(v.union(v.literal("seeded"), v.literal("active"))),
+    // `completed` (ADR 0015) is terminal: the Routine's gate refuses it, so a
+    // finished course stops authoring. Reopen returns it to `active`.
+    status: v.optional(v.union(v.literal("seeded"), v.literal("active"), v.literal("completed"))),
     // Public link (issue 07 / ADR 0013): an unguessable token granting anonymous
     // read-only access. Present while the Topic is public; cleared (truly revoked)
     // when made private. `by_public_token` is the Guest read seam's lookup.

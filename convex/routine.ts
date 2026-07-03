@@ -128,6 +128,12 @@ export const tryAcquireGeneration = internalMutation({
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return { acquired: false, reason: "no-topic" };
 
+    // A completed course (ADR 0015) never authors again — the load-bearing "stop
+    // authoring" guarantee. Refuse before the Frontier check, so the daily cron,
+    // the reader button, and setup all no-op; `reopenCourse` (status → active)
+    // lifts it. The soft `caughtUp` state is a separate, non-terminal concern.
+    if (topic.status === "completed") return { acquired: false, reason: "completed" };
+
     const frontier = await frontierLesson(ctx, topic._id);
     if (!frontier) {
       // Bootstrap (issue 07): a Seeded Topic with no Lessons fires once to draft
