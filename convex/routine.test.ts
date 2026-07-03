@@ -143,26 +143,26 @@ test("the bootstrap gate fires a seeded topic with no lessons; a plain empty top
   expect(plain).toMatchObject({ acquired: false, reason: "no-frontier" });
 });
 
-test("the on-demand button is rate-limited per topic; the daily cron is not", async () => {
+test("the on-demand button is capped to one manual fire per user per day, across topics; the daily cron is not", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
-  const topicId = await seedTopic(t, alice, "hindi");
+  const hindi = await seedTopic(t, alice, "hindi");
+  // A second course, also ready to fire (seeded → bootstrap gate passes), so the
+  // only thing that can block a fire on it is the per-user daily cap.
+  await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "spanish", title: "Spanish", status: "seeded" }));
   await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1", html: "<p>x</p>" });
-    await ctx.db.insert("progress", { userId: alice, topicId, lessonKey: "0001", status: "completed" });
+    await ctx.db.insert("lessons", { topicId: hindi, key: "0001", seq: 1, title: "L1", html: "<p>x</p>" });
+    await ctx.db.insert("progress", { userId: alice, topicId: hindi, lessonKey: "0001", status: "completed" });
   });
+  const asAlice = asUser(t, alice);
 
-  // First manual fire acquires (and stamps lastManualFireAt).
-  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: true });
-  // Simulate the run finishing — back to idle, lastManualFireAt retained.
-  await t.run(async (ctx) => {
-    const gen = await ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique();
-    await ctx.db.patch(gen!._id, { status: "idle", startedAt: undefined, claimedAt: undefined, runId: undefined });
-  });
-  // A second manual fire within the cooldown is rate-limited...
-  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: false, reason: "rate-limited" });
-  // ...but the daily cron (manual=false) still fires.
-  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: false })).toMatchObject({ acquired: true });
+  // First manual fire acquires (and stamps lastManualFireAt on the hindi lock row).
+  expect(await asAlice.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: true });
+  // A manual fire on a DIFFERENT course is now rate-limited too — the cap is per
+  // user across all their courses, not per topic.
+  expect(await asAlice.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "spanish", manual: true })).toMatchObject({ acquired: false, reason: "rate-limited" });
+  // ...but the daily cron (manual=false) still fires that course.
+  expect(await asAlice.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "spanish", manual: false })).toMatchObject({ acquired: true });
 });
 
 test("the Admin bypasses the on-demand cooldown", async () => {

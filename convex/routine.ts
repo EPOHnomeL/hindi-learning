@@ -27,9 +27,11 @@ import { isCallerAdmin } from "./whitelist";
 // A run stuck "generating" past this is treated as crashed and re-fireable.
 const STALE_MS = 10 * 60 * 1000;
 
-// The on-demand button can fire a Topic at most once per this window; the daily
-// cron is the primary authoring path (issue 08 — bounds Claude usage).
-const MANUAL_COOLDOWN_MS = 20 * 60 * 60 * 1000;
+// The on-demand button caps a user to one manual fire per this window; the daily
+// cron is the primary authoring path (issue 08 — bounds Claude usage). The cap is
+// per USER (across all their Topics), not per Topic, so "1 additional lesson per
+// day" holds even for a learner with several courses.
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // The Frontier: highest-seq non-superseded Lesson, or null if the Topic has none.
 async function frontierLesson(ctx: QueryCtx, topicId: Id<"topics">): Promise<Doc<"lessons"> | null> {
@@ -67,6 +69,26 @@ async function generationRow(ctx: QueryCtx, topicId: Id<"topics">): Promise<Doc<
     .query("generation")
     .withIndex("by_topic", (q) => q.eq("topicId", topicId))
     .unique();
+}
+
+// Has this user fired the on-demand button within the trailing DAY_MS, on ANY of
+// their Topics? Each Topic's lock row stamps `lastManualFireAt` on a manual fire
+// (retained across reports), so the per-user cap is just the max of those across
+// the user's Topics. Backs the "1 additional lesson per user per day" gate.
+async function userFiredManuallyWithinDay(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  now: number,
+): Promise<boolean> {
+  const topics = await ctx.db
+    .query("topics")
+    .withIndex("by_owner", (q) => q.eq("ownerId", userId))
+    .collect();
+  for (const topic of topics) {
+    const gen = await generationRow(ctx, topic._id);
+    if (gen?.lastManualFireAt !== undefined && now - gen.lastManualFireAt < DAY_MS) return true;
+  }
+  return false;
 }
 
 // ---- Reader status ---------------------------------------------------------
@@ -128,17 +150,19 @@ export const tryAcquireGeneration = internalMutation({
       if (gen.status === "caughtUp" && gen.frontierKey === frontierKey) {
         return { acquired: false, reason: "caught-up" };
       }
-      // The button is capped to once per cooldown; the cron (manual=false) isn't.
-      // The Admin bypasses the cap: they drive authoring and aren't the runaway-
-      // usage risk it guards against (issue 08). Identity propagates from the
-      // owner-only action, so admin-ness is derived server-side, never a client
-      // arg. Checked last so the DB lookup only runs for an otherwise-capped fire.
-      if (
-        manual &&
-        gen.lastManualFireAt !== undefined &&
-        now - gen.lastManualFireAt < MANUAL_COOLDOWN_MS &&
-        !(await isCallerAdmin(ctx))
-      ) {
+    }
+    // The on-demand button is capped to one manual fire per user per day, across
+    // ALL their Topics — so a learner with several courses can't advance every one
+    // at once and spike Claude usage (issue 08). The cron (manual=false) is the
+    // primary authoring path and isn't capped. The Admin bypasses the cap: they
+    // drive authoring and aren't the runaway-usage risk it guards against; admin-
+    // ness is derived server-side from the forwarded identity, never a client arg.
+    // Runs whether or not THIS Topic has a lock row yet (the user may have fired a
+    // different Topic), so it sits outside the per-Topic branch above. Checked last
+    // so the per-user scan only runs for an otherwise-acceptable manual fire.
+    if (manual && !(await isCallerAdmin(ctx))) {
+      const userId = await getAuthUserId(ctx);
+      if (userId && (await userFiredManuallyWithinDay(ctx, userId, now))) {
         return { acquired: false, reason: "rate-limited" };
       }
     }

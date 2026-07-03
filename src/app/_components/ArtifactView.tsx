@@ -14,12 +14,14 @@ import { useTheme } from "./ThemeContext";
 // stuck "generating" past this is treated as crashed and offered for retry.
 const STALE_MS = 10 * 60 * 1000;
 
-// Mirror of routine.ts MANUAL_COOLDOWN_MS: after an on-demand fire the button
-// is disabled for this window so the daily schedule is the primary path. The
-// Admin is exempt (mirrors the server-side bypass in tryAcquireGeneration) —
-// otherwise the button stays hidden behind "Generated today" even though a
-// manual fire would be accepted.
-const MANUAL_COOLDOWN_MS = 20 * 60 * 60 * 1000;
+// Mirror of routine.ts DAY_MS: the on-demand cap is one manual fire per user per
+// day. This mirror is per-Topic (the viewed course's own fire), a proactive hint
+// for the common single-course case; the authoritative per-user cap (across all a
+// learner's courses) is enforced server-side and reflected reactively via the
+// fire result below. The Admin is exempt (mirrors the server-side bypass) —
+// otherwise the button stays hidden behind "Generated today" even though a manual
+// fire would be accepted.
+const MANUAL_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export function ArtifactView({
   kind,
@@ -243,6 +245,9 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
   const amAdmin = useQuery(api.whitelist.amIAdmin);
   const requestNext = useAction(api.routine.requestNextLesson);
   const [pending, setPending] = useState(false);
+  // Set when a fire comes back rate-limited — i.e. the per-user daily cap was hit
+  // on another course, which the per-Topic mirror below can't see ahead of time.
+  const [capped, setCapped] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const status = gen?.status ?? "idle";
@@ -266,7 +271,11 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
   async function fire() {
     setPending(true);
     try {
-      await requestNext({ topicSlug });
+      const res = await requestNext({ topicSlug });
+      // A fire blocked by the per-user daily cap comes back rate-limited (it never
+      // throws), so reflect it — the learner has already used today's on-demand
+      // lesson, possibly on a different course.
+      if (res && !res.fired && res.reason === "rate-limited") setCapped(true);
     } finally {
       setPending(false);
     }
@@ -282,9 +291,9 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
       </span>
     );
   }
-  if (rateLimited && status !== "failed") {
+  if ((rateLimited || capped) && status !== "failed") {
     return (
-      <span className="text-sm text-soft" title="The daily schedule will continue authoring — this caps on-demand runs.">
+      <span className="text-sm text-soft" title="The daily schedule will continue authoring — this caps on-demand runs to one per day.">
         ✓ Generated today
       </span>
     );
