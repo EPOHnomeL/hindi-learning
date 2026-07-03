@@ -16,8 +16,12 @@ _Avoid_: Backend, database (when speaking about its role as the channel)
 Formerly the R2 bucket of HTML blobs. Retired: Lesson/Reference HTML is now a field on its Hub row ([ADR 0007](docs/adr/0007-nextjs-convex-rebuild.md)), and Resource blobs live in the Hub's file storage ([ADR 0009](docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md)). Not a current concept.
 
 **Progress**:
-A reader's relationship to a single Lesson: `unseen → opened → completed`. Cheap metadata, distinct from Responses, that lets the web show "you're here / next" and lets Claude Code spot a learner who opened a lesson but left no Responses (stuck). Per-reader: the owner and each Viewer of a shared Topic track their own, keyed by their account, so a Viewer starts clean on a Topic shared with them. A Guest (no account) has no server-side Progress — only per-device ticks in the browser, set by pressing "Next lesson". The Routine's Frontier gate reads the *owner's* Progress, never a Viewer's. Not a heavyweight entity.
+A reader's relationship to a single Lesson: `unseen → opened → completed`. Cheap metadata, distinct from Responses, that lets the web show "you're here / next" and lets Claude Code spot a learner who opened a lesson but left no Responses (stuck). Per-reader: the owner and each Viewer of a shared Topic track their own, keyed by their account, so a Viewer starts clean on a Topic shared with them. A Guest (no account) has no server-side Progress — only per-device ticks in the browser, set by pressing "Next lesson". The Routine's Frontier gate reads the *owner's* Progress, never a Viewer's. Distinct from a Topic's **Completion** (the whole course being finished, not one Lesson read). Not a heavyweight entity.
 _Avoid_: Status (overloaded), completion, engagement
+
+**Completion**:
+The terminal state of a Topic whose curriculum is finished — no further Lessons will ever be authored (`status: completed`). Declared by the teach skill when the Mission's "Success looks like" outcomes are substantially achieved, or by the owner ending their own course; it closes the Routine's authoring gate so the loop stops rather than buffering Lessons forever (see [ADR 0015](docs/adr/0015-course-completion-and-certificates.md)). Reversible — reopening a Topic returns it to `active` and authoring resumes. Distinct from a Lesson's Progress of `completed` (one reader's read of one Lesson) and from being **caught up** (the teacher has nothing new *for now*, but the course is not over).
+_Avoid_: Terminate, finished, done, archived (as separate terms); "complete" for a single Lesson's Progress
 
 **Topic**:
 A single subject a learner is studying (e.g. Hindi), owned by one User and grounding one Mission, a body of Lessons and References, and the Resources that feed them. A User may own many Topics ("teach me anything"), each isolated to its owner. A Topic is born one of two ways: in a teach-skill workspace, or **seeded** from the dashboard (a title, a "why", and uploaded Resources) and fleshed out by the Routine.
@@ -60,7 +64,7 @@ The minimal input that brings a Topic into being from the dashboard — a title,
 _Avoid_: Draft, stub, request
 
 **Frontier**:
-The highest-ordered, non-superseded Lesson in a Topic — the learner's leading edge. The Routine authors the next Lesson only once the learner has marked the Frontier `completed`, so a Topic holds at most one unread Lesson beyond what's done (a buffer of one). When the learner completes the Frontier, the reader offers to fire the Routine for the next one.
+The highest-ordered, non-superseded Lesson in a Topic — the learner's leading edge. The Routine authors the next Lesson only once the learner has marked the Frontier `completed`, so a Topic holds at most one unread Lesson beyond what's done (a buffer of one). When the learner completes the Frontier, the reader offers to fire the Routine for the next one — unless the Topic has reached **Completion**, in which case authoring is closed and the reader offers the **Certificate** instead.
 _Avoid_: Latest, head, tip, edge
 
 **Share**:
@@ -78,6 +82,10 @@ _Avoid_: Share (the account-bound grant), Publish (the teach→Hub push), invite
 **Guest**:
 The anonymous holder of a **Public link** — reads a public Topic on the web with no account and no identity, recognised only by possession of the token. A Guest sees the same content a Viewer does — the Topic's Lessons, References, Resources, and the owner's Questions, Replies, and Progress — but reaches it through the token rather than an account, and writes nothing server-side (no Responses or Questions of their own). Their only state is per-device Progress ticks kept in the browser (localStorage), set by pressing "Next lesson" — nothing reaches the Hub. On a public Topic the owner's Q&A is treated as a feature, not a leak: a Guest learns from the questions the creator already asked. (A future per-Topic control may let an owner exclude Q&A from a Public link — deferred, [issue 08](.scratch/topic-sharing/issues/08-public-link-content-privacy-controls.md).)
 _Avoid_: Viewer (the signed-in, account-bound reader), User, visitor, anonymous user
+
+**Certificate**:
+Durable proof that a specific signed-in User completed a specific Topic *on the platform* — earned when the Topic reaches **Completion** and that User has marked every non-superseded Lesson `completed`. Both an owner and a shared **Viewer** can earn one for the same Topic (each their own, keyed to their account); an anonymous **Guest** cannot — a Certificate must attribute to an account, and a Guest's Progress lives only in their browser. Issued once per (User, Topic) and immutable: a frozen snapshot of the learner's chosen display name, the course title, the Lesson count, and the issue date, unaffected if the Topic is later reopened and extended. It carries its own unguessable token — a **Certificate link**, the account-less, capability-based counterpart to a **Public link** that reveals only the achievement (name, course, date), never the Topic's Lessons — and prints to PDF. See [ADR 0015](docs/adr/0015-course-completion-and-certificates.md).
+_Avoid_: Diploma, badge, award, credential; Completion (that is the Topic state, not the per-learner proof); "share" for the Certificate link
 
 **Allowlist**:
 The set of emails permitted to create an account — the private-alpha admission gate. An email must be on the Allowlist to sign up; removing one closes off *new* sign-ups for it but does not evict an account that already exists (a sign-up gate, not a session gate). Site-wide, not per-Topic.
