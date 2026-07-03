@@ -28,7 +28,7 @@ best single thing to read.
 | [`resources`](/convex/schema.ts#L61-L73) | lifecycle | A [[Resource]]: a `file` (blob in `_storage`) or a `url`. `raw → processing → ready`. Deduped by `(topicId, contentHash)`. |
 | [`learningRecords`](/convex/schema.ts#L80-L87) | append-only | The teacher's per-Lesson notes; ground the next ZPD step. Insert-once like lessons. |
 | [`responses`](/convex/schema.ts#L104-L113) | capture | First quiz answer only. Indexes lead with `topicId` so keys never collide across Topics. |
-| [`progress`](/convex/schema.ts#L118-L125) | capture | Per-lesson `opened → completed`. `by_topic_lesson` lets the gate ask "completed?" with no user. |
+| [`progress`](/convex/schema.ts) | capture | Per-lesson `opened → completed`, one row per (Topic, User, Lesson). Every reader tracks their own via `by_topic_user_lesson`; the gate reads the *owner's* rows. |
 | [`questions`](/convex/schema.ts#L165-L174) | capture | An unprompted [[Question]]: `open → answered`, with the teacher's `reply`. |
 | [`generation`](/convex/schema.ts#L131-L150) | lock | The [Teaching Routine](03-teaching-routine.md)'s single-flight lock. See that page. |
 | [`shares`](/convex/schema.ts#L156-L162) | grant | A [[Share]]. See [Access & Sharing](05-access-sharing.md). |

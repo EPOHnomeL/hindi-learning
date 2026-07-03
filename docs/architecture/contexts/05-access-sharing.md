@@ -39,15 +39,17 @@ The read-side authorization lives in one helper —
 [`getViewableTopic`](/convex/lib.ts#L31-L40): return the Topic if the caller **owns** it, else if a
 `shares` row matches `(topicId, viewerId)` on `by_topic_viewer`. Every content read query
 (`listLessons`, `getLesson`, `listReferences`, `getReference`) routes through it. Writes route through
-`getOwnedTopic` instead, so a Viewer is read-only by construction.
+`getOwnedTopic` instead, so a Viewer is read-only by construction — the one exception is
+`setProgress`, which routes through `getViewableTopic` so a Viewer tracks their **own** Progress.
 
 [shares.ts](/convex/shares.ts): the owner calls
 [`shareTopic`](/convex/shares.ts#L13-L28) naming the Topic and the Viewer's **email** — the account
 must already exist or the call throws. [`listSharedTopics`](/convex/shares.ts#L33-L67) powers the
-Viewer's "Shared with me" feed (showing the owner's email and the **owner's** progress).
+Viewer's "Shared with me" feed (showing the owner's email and the **Viewer's own** progress counts).
 
-A Viewer **can** read all Lessons/References and see their own dashboard entry; a Viewer **cannot**
-edit the Mission, rename, add Resources, ask Questions, mark Progress, fire the Routine, or re-share.
+A Viewer **can** read all Lessons/References, see their own dashboard entry, and track their **own**
+Progress (`opened`/`completed`, starting clean on a shared Topic); a Viewer **cannot** edit the
+Mission, rename, add Resources, ask Questions, record quiz Responses, fire the Routine, or re-share.
 
 ## Gotchas
 

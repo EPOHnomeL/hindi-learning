@@ -16,7 +16,7 @@ _Avoid_: Backend, database (when speaking about its role as the channel)
 Formerly the R2 bucket of HTML blobs. Retired: Lesson/Reference HTML is now a field on its Hub row ([ADR 0007](docs/adr/0007-nextjs-convex-rebuild.md)), and Resource blobs live in the Hub's file storage ([ADR 0009](docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md)). Not a current concept.
 
 **Progress**:
-The learner's relationship to a single Lesson: `unseen → opened → completed`. Cheap metadata, distinct from Responses, that lets the web show "you're here / next" and lets Claude Code spot a learner who opened a lesson but left no Responses (stuck). Not a heavyweight entity.
+A reader's relationship to a single Lesson: `unseen → opened → completed`. Cheap metadata, distinct from Responses, that lets the web show "you're here / next" and lets Claude Code spot a learner who opened a lesson but left no Responses (stuck). Per-reader: the owner and each Viewer of a shared Topic track their own, keyed by their account, so a Viewer starts clean on a Topic shared with them. A Guest (no account) has no server-side Progress — only per-device ticks in the browser, set by pressing "Next lesson". The Routine's Frontier gate reads the *owner's* Progress, never a Viewer's. Not a heavyweight entity.
 _Avoid_: Status (overloaded), completion, engagement
 
 **Topic**:
@@ -68,7 +68,7 @@ A grant giving one User read-only access to a single Topic owned by another User
 _Avoid_: link, permission, grant (as separate terms); "invite" as a *separate* concept — a pending Share is still a Share, just not yet in effect. Distinct from a **Public link** — a Share is always targeted to a specific person by email; a Public link is anonymous and account-less.
 
 **Viewer**:
-The User on the receiving end of a Share — has read-only access to a Topic they do not own. A Viewer sees everything in the Topic (Lessons, References, Resources, the owner's Questions and Replies, the owner's Progress) but writes nothing: they cannot add Resources, edit the Mission, ask Questions, mark Progress, or fire the Routine. A Viewer must have an account, and is distinct from a **Guest** (the anonymous holder of a Public link). Shared Topics appear in the Viewer's "Shared with me" section.
+The User on the receiving end of a Share — has read-only access to a Topic they do not own. A Viewer sees everything in the Topic (Lessons, References, Resources, the owner's Questions and Replies) and tracks their **own** Progress (starting clean on the shared Topic), but otherwise writes nothing: they cannot add Resources, edit the Mission, ask Questions, record Responses, or fire the Routine. A Viewer must have an account, and is distinct from a **Guest** (the anonymous holder of a Public link). Shared Topics appear in the Viewer's "Shared with me" section, with their own completion counts.
 _Avoid_: collaborator, member, recipient
 
 **Public link**:
@@ -76,7 +76,7 @@ An unguessable token granting *anonymous*, read-only access to a single Topic �
 _Avoid_: Share (the account-bound grant), Publish (the teach→Hub push), invite, public share
 
 **Guest**:
-The anonymous holder of a **Public link** — reads a public Topic on the web with no account and no identity, recognised only by possession of the token. A Guest sees the same content a Viewer does — the Topic's Lessons, References, Resources, and the owner's Questions, Replies, and Progress — but reaches it through the token rather than an account, and writes nothing (leaves no Progress, Responses, or Questions of their own). On a public Topic the owner's Q&A is treated as a feature, not a leak: a Guest learns from the questions the creator already asked. (A future per-Topic control may let an owner exclude Q&A from a Public link — deferred, [issue 08](.scratch/topic-sharing/issues/08-public-link-content-privacy-controls.md).)
+The anonymous holder of a **Public link** — reads a public Topic on the web with no account and no identity, recognised only by possession of the token. A Guest sees the same content a Viewer does — the Topic's Lessons, References, Resources, and the owner's Questions, Replies, and Progress — but reaches it through the token rather than an account, and writes nothing server-side (no Responses or Questions of their own). Their only state is per-device Progress ticks kept in the browser (localStorage), set by pressing "Next lesson" — nothing reaches the Hub. On a public Topic the owner's Q&A is treated as a feature, not a leak: a Guest learns from the questions the creator already asked. (A future per-Topic control may let an owner exclude Q&A from a Public link — deferred, [issue 08](.scratch/topic-sharing/issues/08-public-link-content-privacy-controls.md).)
 _Avoid_: Viewer (the signed-in, account-bound reader), User, visitor, anonymous user
 
 **Allowlist**:
