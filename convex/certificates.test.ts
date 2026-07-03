@@ -191,3 +191,30 @@ test("a certificate survives reopen + extend + re-complete unchanged (not re-min
   expect(reclaim.token).toBe(cert.token);
   expect(reclaim.lessonCount).toBe(1);
 });
+
+test("publicCertificate returns only the allowlisted achievement fields; a bad/absent token → null", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  await addLesson(t, topicId, "0001", 1);
+  await complete(t, alice, topicId, "0001");
+  const cert = await asUser(t, alice).mutation(api.certificates.claimCertificate, {
+    topicSlug: "hindi",
+    name: "Alice Kumar",
+  });
+
+  // Anonymous read (no identity) by token returns exactly the achievement.
+  const pub = await t.query(api.certificates.publicCertificate, { token: cert.token });
+  expect(pub).toEqual({
+    learnerName: "Alice Kumar",
+    courseTitle: "Hindi",
+    issuedAt: cert.issuedAt,
+    lessonCount: 1,
+  });
+  // The allowlist is exact — never the email, userId, topicId, or the token.
+  expect(Object.keys(pub!).sort()).toEqual(["courseTitle", "issuedAt", "learnerName", "lessonCount"]);
+
+  // A made-up / empty token reveals nothing — uniform null, no enumeration.
+  expect(await t.query(api.certificates.publicCertificate, { token: "not-a-real-token" })).toBeNull();
+  expect(await t.query(api.certificates.publicCertificate, { token: "" })).toBeNull();
+});

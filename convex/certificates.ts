@@ -141,3 +141,36 @@ export const claimCertificate = mutation({
     return { token, learnerName, courseTitle, lessonCount, issuedAt: row._creationTime };
   },
 });
+
+// The anonymous Certificate read seam (ADR 0015) — the exact shape of public.ts.
+// Authorized by TOKEN, never getAuthUserId, so it backs the account-less
+// /certificate/[token] page. The `returns` validator is an explicit output
+// allowlist: the achievement only (name, course, issue date, lesson count) —
+// never the email, userId, topicId, or any Lesson content. A missing/invalid
+// token returns uniform null, so certificates can't be enumerated.
+export const publicCertificate = query({
+  args: { token: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      learnerName: v.string(),
+      courseTitle: v.string(),
+      issuedAt: v.number(),
+      lessonCount: v.number(),
+    }),
+  ),
+  handler: async (ctx, { token }) => {
+    if (!token) return null;
+    const row = await ctx.db
+      .query("certificates")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .unique();
+    if (!row) return null;
+    return {
+      learnerName: row.learnerName,
+      courseTitle: row.courseTitle,
+      issuedAt: row._creationTime,
+      lessonCount: row.lessonCount,
+    };
+  },
+});
