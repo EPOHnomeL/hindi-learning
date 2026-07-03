@@ -79,9 +79,16 @@ Do these steps IN ORDER:
    - Write a new topics/$SLUG/learning-records/00NN-<dash-case-name>.md capturing
      what this advanced and the next ZPD step.
    - A lesson opened-but-incomplete or with wrong answers means the learner is
-     likely stuck — reinforce/correct rather than racing ahead. If there is
-     genuinely no material left to add (mission complete), skip to step 8 and
-     report `nothing`.
+     likely stuck — reinforce/correct rather than racing ahead.
+   - TERMINATE vs. pause: judge the course against the mission's "Success looks
+     like" outcomes (see SKILL.md "Terminating a Course"). If they are
+     substantially met or the ZPD is exhausted, END the course instead of
+     authoring: run `pnpm run complete:prod "$SLUG"`, then skip to step 8 and
+     report `nothing`. This is the terminal `completed` state (gate stops, reader
+     shows the certificate) — reversible only by the owner. Do NOT terminate
+     lifelong/open-ended missions; leave those to the owner. If you simply have
+     nothing to add *today* (but the mission isn't done), do NOT complete — just
+     skip to step 8 and report `nothing`.
 
 7. PUBLISH to the backend (the source of truth):
        pnpm run publish:prod --topic "$SLUG"

@@ -26,7 +26,9 @@
     "reply": "tsx scripts/reply.ts",
     "reply:prod": "tsx scripts/reply.ts --prod",
     "report": "tsx scripts/report.ts",
-    "report:prod": "tsx scripts/report.ts --prod"
+    "report:prod": "tsx scripts/report.ts --prod",
+    "complete": "tsx scripts/complete.ts",
+    "complete:prod": "tsx scripts/complete.ts --prod"
   },
   "dependencies": {
     "@auth/core": "0.37.0",

@@ -80,6 +80,27 @@ Failing to understand the mission will mean knowledge acquisition is not grounde
 
 Missions may change as the user develops more skills and knowledge. This is normal - make sure to update the `MISSION.md` and add a learning record to capture the change. Confirm with the user before changing the mission.
 
+## Terminating a Course
+
+A course is not infinite. Once the mission is achieved it should **end** — stop generating new lessons — rather than manufacturing busywork past the point of value. A finished course that keeps offering "just one more lesson" cheapens the achievement and wastes the learner's effort. There is *arriving*, not just endless motion.
+
+Each run, before authoring, judge the course against the mission's **"Success looks like"** outcomes (see [MISSION-FORMAT.md](./MISSION-FORMAT.md)):
+
+- **Terminate** when those outcomes are **substantially met**, or when the zone of proximal development is genuinely exhausted — the returns on another lesson have diminished to noise and you'd be padding, not teaching. This is a judgement against the mission, not a lesson count: there is no fixed syllabus length and no lesson quota.
+- **Keep going** when there is a real next step in the ZPD that advances the mission. When genuinely unsure, author the lesson: under-terminating is cheap to undo (the course reopens), whereas over-terminating robs the learner of the ending.
+
+Terminating is **not** the same as "nothing to add right now". Reporting `nothing` is a soft, re-fireable pause (the learner may complete more and fire again); terminating is the terminal end of the course. Use termination only when the mission is done, not when you're merely caught up for today.
+
+In the cloud Routine, terminate by calling the backend (the twin of `publish` / `report`) instead of authoring a lesson:
+
+```sh
+pnpm run complete:prod "$SLUG"
+```
+
+then report `nothing` for the run. This sets the course's terminal `completed` state: the authoring gate refuses it, the reader stops offering "Generate next lesson", and an eligible learner can earn their certificate. It is reversible — the **owner** can reopen the course from the app if their goals grow later.
+
+**Lifelong or open-ended missions** (e.g. "keep improving my Hindi forever", "stay fit for life") may legitimately *never* auto-complete — there is no discrete outcome to satisfy. Do **not** force these to a finish. Leave them to the learner's own "Mark course complete" action, and keep teaching while there is a worthwhile next step in the ZPD.
+
 ## Zone Of Proximal Development
 
 Each lesson, the user should always feel as if they are being challenged 'just enough'.
