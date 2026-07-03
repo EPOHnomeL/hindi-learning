@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
-import { getOwnedTopic, normaliseEmail, topicLessonCounts } from "./lib";
+import { getOwnedTopic, mintToken, normaliseEmail, topicLessonCounts } from "./lib";
 
 // Sharing: an owner grants another existing User read-only access to a Topic
 // (a Share). The Viewer then sees it in "Shared with me" and reads it through
@@ -43,14 +43,6 @@ export const shareTopic = mutation({
   },
 });
 
-// A 256-bit URL-safe token (hex). The credential a Public link carries — long
-// enough that guessing is infeasible (ADR 0013), so no rate-limiting needed.
-function mintPublicToken(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 // Turn a Topic's Public link on or off (owner-only). `isPublic: true` always
 // mints a *fresh* token — so this serves both "make public" and "regenerate"
 // (the old link dies at once); `false` clears it, truly revoking access. Returns
@@ -63,7 +55,7 @@ export const setTopicPublic = mutation({
     if (!userId) throw new Error("unauthenticated");
     const topic = await getOwnedTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
-    const publicToken = isPublic ? mintPublicToken() : undefined;
+    const publicToken = isPublic ? mintToken() : undefined;
     await ctx.db.patch(topic._id, { publicToken });
     return publicToken ?? null;
   },

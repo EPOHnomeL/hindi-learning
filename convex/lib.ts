@@ -31,6 +31,15 @@ export async function claimPendingShares(ctx: MutationCtx, userId: Id<"users">, 
   }
 }
 
+// A 256-bit URL-safe token (hex) from Web Crypto — the credential a capability
+// link carries: a Public link (ADR 0013) or a Certificate link (ADR 0015). Long
+// enough that guessing is infeasible, so no rate-limiting is needed.
+export function mintToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 // Guards the PUBLISH_SECRET-protected mutations the teach CLI / cloud agent call.
 export function assertAdmin(secret: string) {
   const expected = process.env.PUBLISH_SECRET;

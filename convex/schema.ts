@@ -183,6 +183,25 @@ export default defineSchema({
     .index("by_topic", ["topicId"])
     .index("by_topic_email", ["topicId", "email"]),
 
+  // An earned Certificate (ADR 0015): one immutable row per (User, Topic),
+  // minted when the caller claims it (Topic `completed` + all non-superseded
+  // Lessons in their own Progress). `learnerName` / `courseTitle` / `lessonCount`
+  // are snapshots frozen at issue — reopening/extending the Topic never rewrites
+  // them; the issue date is the row's `_creationTime`. `token` is a 256-bit hex
+  // capability (the Certificate link), distinct from a Topic's `publicToken`.
+  // `by_token` is the anonymous public read; `by_topic_user` is the dedup +
+  // "does this caller already have one?" lookup.
+  certificates: defineTable({
+    topicId: v.id("topics"),
+    userId: v.id("users"),
+    token: v.string(),
+    learnerName: v.string(),
+    courseTitle: v.string(),
+    lessonCount: v.number(),
+  })
+    .index("by_token", ["token"])
+    .index("by_topic_user", ["topicId", "userId"]),
+
   // A question the learner asked from inside a lesson; the teacher replies.
   questions: defineTable({
     userId: v.id("users"),
