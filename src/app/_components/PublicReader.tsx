@@ -4,7 +4,7 @@ import { useQuery } from "convex/react";
 import { type FunctionReturnType } from "convex/server";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { Frame } from "./ArtifactView";
 import { Markdown } from "./MarkdownView";
@@ -20,8 +20,20 @@ import { firstLessonKey, nextLessonKey } from "./readerDerive";
 
 type GuestCourse = NonNullable<FunctionReturnType<typeof api.public.publicCourse>>;
 
-// The course bundle + token, fetched once in the layout and read by the panes.
-const Ctx = createContext<{ token: string; course: GuestCourse } | null>(null);
+// A Guest has no account, so their Progress can't be stored server-side. Instead
+// the sidebar's ✓ ticks live in localStorage, per device and per Public link
+// token, and are set when the Guest presses "Next lesson".
+const DONE_KEY = "hindi:guest-done";
+
+// The course bundle + token, plus the Guest's per-device completed set, fetched/
+// loaded once in the layout and read by the panes.
+type GuestCtx = {
+  token: string;
+  course: GuestCourse;
+  completed: ReadonlySet<string>;
+  markComplete: (lessonKey: string) => void;
+};
+const Ctx = createContext<GuestCtx | null>(null);
 function useGuestCourse() {
   const c = useContext(Ctx);
   if (!c) throw new Error("useGuestCourse must be used within PublicCourseShell");
@@ -40,6 +52,34 @@ export function PublicCourseShell({ token, children }: { token: string; children
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => setMenuOpen(false), [pathname]);
 
+  // The Guest's completed lessons (per device, per token). Loaded from localStorage
+  // on mount; `markComplete` adds one and persists. No account, so this is all
+  // client-side.
+  const [completed, setCompleted] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`${DONE_KEY}:${token}`);
+      if (raw) setCompleted(new Set(JSON.parse(raw) as string[]));
+    } catch {
+      /* unavailable or corrupt storage — start empty */
+    }
+  }, [token]);
+  const markComplete = useCallback(
+    (lessonKey: string) => {
+      setCompleted((prev) => {
+        if (prev.has(lessonKey)) return prev;
+        const next = new Set(prev).add(lessonKey);
+        try {
+          localStorage.setItem(`${DONE_KEY}:${token}`, JSON.stringify([...next]));
+        } catch {
+          /* ignore */
+        }
+        return next;
+      });
+    },
+    [token],
+  );
+
   if (course === undefined) return <Centered>Loading…</Centered>;
   if (course === null) return <Centered>This link isn’t available — the owner may have turned it off.</Centered>;
 
@@ -48,7 +88,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
   const base = `/share/${token}`;
 
   return (
-    <Ctx.Provider value={{ token, course }}>
+    <Ctx.Provider value={{ token, course, completed, markComplete }}>
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
         <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 md:hidden">
           <button onClick={() => setMenuOpen(true)} aria-label="Open lessons" className="rounded-lg p-1.5 text-ink hover:bg-hi">
@@ -75,7 +115,12 @@ export function PublicCourseShell({ token, children }: { token: string; children
             <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">Lessons</p>
             {course.lessons.length === 0 && <p className="px-2 text-sm text-soft">No lessons published yet.</p>}
             {course.lessons.map((l) => (
-              <NavItem key={l.key} href={`${base}/lessons/${l.key}`} active={!isRef && activeKey === l.key}>
+              <NavItem
+                key={l.key}
+                href={`${base}/lessons/${l.key}`}
+                active={!isRef && activeKey === l.key}
+                done={completed.has(l.key)}
+              >
                 {l.seq}. {l.title.split("—")[0]!.trim()}
               </NavItem>
             ))}
@@ -126,15 +171,30 @@ export function PublicCourseShell({ token, children }: { token: string; children
   );
 }
 
-function NavItem({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
+function NavItem({
+  href,
+  active,
+  done = false,
+  children,
+}: {
+  href: string;
+  active: boolean;
+  done?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <Link
       href={href}
-      className={`rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors md:py-1.5 ${
+      className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors md:py-1.5 ${
         active ? "bg-accent text-white" : "text-ink hover:bg-hi"
       }`}
     >
-      {children}
+      <span className="min-w-0">{children}</span>
+      {done && (
+        <span aria-label="completed" title="Completed" className={`shrink-0 text-xs ${active ? "text-white" : "text-accent2"}`}>
+          ✓
+        </span>
+      )}
     </Link>
   );
 }
@@ -171,7 +231,7 @@ export function PublicCourseIndex({ token }: { token: string }) {
 
 export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKey: string }) {
   const { theme } = useTheme();
-  const { course } = useGuestCourse();
+  const { course, markComplete } = useGuestCourse();
   const lesson = useQuery(api.public.publicLesson, { token, key: lessonKey });
   const qa = course.questions.filter((q) => q.lessonKey === lessonKey);
   const next = nextLessonKey(course.lessons, lessonKey);
@@ -187,6 +247,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
           {next && (
             <Link
               href={`/share/${token}/lessons/${next}`}
+              onClick={() => markComplete(lessonKey)}
               className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90"
             >
               Next lesson →

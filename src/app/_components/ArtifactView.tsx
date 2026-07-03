@@ -33,8 +33,9 @@ export function ArtifactView({
   artifactKey: string;
   topicSlug: string;
   isFrontier: boolean;
-  // True for a read-only Viewer: hide every write control and skip the writes
-  // the reader normally makes (progress, quiz responses). Reads stay live.
+  // True for a shared Viewer: hide the owner-only controls (quiz-response
+  // recording, asking Questions, next-lesson authoring). Progress is NOT gated by
+  // this — a Viewer tracks their own (see setProgress). Reads stay live.
   readOnly: boolean;
   // The next lesson's key in seq order (null on the last lesson). A read-only
   // Viewer gets a "Next lesson →" link in place of the owner's controls.
@@ -160,15 +161,14 @@ function LessonView({
   const recordResponse = useMutation(api.capture.recordResponse);
   const setProgress = useMutation(api.capture.setProgress);
 
-  // For a Viewer this is the *owner's* completion (read-only); for the owner,
-  // their own.
+  // The caller's own completion — an owner's, or a Viewer's own on a shared course.
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
 
   useEffect(() => {
-    // A Viewer never writes the owner's Progress (the mutation would reject anyway).
-    if (lesson && !readOnly) void setProgress({ topicSlug, lessonKey, status: "opened" });
+    // Owner or Viewer: opening a lesson marks it opened in the caller's own Progress.
+    if (lesson) void setProgress({ topicSlug, lessonKey, status: "opened" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lesson?.key, readOnly]);
+  }, [lesson?.key]);
 
   useEffect(() => {
     if (readOnly) return; // Viewers' quiz attempts aren't recorded against the owner.
@@ -193,30 +193,28 @@ function LessonView({
         <div className="sticky top-12 z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
           <div className="flex shrink-0 items-center gap-2">
+            {/* Authoring is owner-only; a Viewer never fires the next lesson. */}
             {!readOnly && isFrontier && completed && <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />}
-            {readOnly ? (
-              // A Viewer of a shared course can't change Progress; instead of a
-              // read-only badge, offer plain navigation to the next lesson.
-              nextLessonKey && (
-                <Link
-                  href={`/courses/${topicSlug}/lessons/${nextLessonKey}`}
-                  className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90"
-                >
-                  Next lesson →
-                </Link>
-              )
-            ) : (
-              <button
-                onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
-                disabled={completed}
-                className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                  completed
-                    ? "cursor-default border-accent2 bg-accent2 text-white"
-                    : "border-accent text-accent hover:bg-hi"
-                }`}
+            {/* Mark complete writes the caller's own Progress — owner or Viewer. */}
+            <button
+              onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
+              disabled={completed}
+              className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                completed
+                  ? "cursor-default border-accent2 bg-accent2 text-white"
+                  : "border-accent text-accent hover:bg-hi"
+              }`}
+            >
+              {completed ? "✓ Completed" : "Mark complete"}
+            </button>
+            {/* A Viewer also gets plain navigation to the next lesson. */}
+            {readOnly && nextLessonKey && (
+              <Link
+                href={`/courses/${topicSlug}/lessons/${nextLessonKey}`}
+                className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90"
               >
-                {completed ? "✓ Completed" : "Mark complete"}
-              </button>
+                Next lesson →
+              </Link>
             )}
           </div>
         </div>
