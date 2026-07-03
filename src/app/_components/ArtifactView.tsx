@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { CertificateControl } from "./Certificate";
 import { buildSrcDoc, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
 import { internalNavTarget } from "./readerDerive";
@@ -207,6 +208,9 @@ function LessonView({
             {!readOnly && !courseCompleted && isFrontier && completed && (
               <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />
             )}
+            {/* On a completed course, offer the Certificate (claim / view) in its
+                place — for owner and Viewer alike. Self-hides until eligible. */}
+            {courseCompleted && <CertificateControl topicSlug={topicSlug} />}
             {/* Mark complete writes the caller's own Progress — owner or Viewer. */}
             <button
               onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
