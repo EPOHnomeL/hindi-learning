@@ -43,3 +43,21 @@ body {
 .font-deva {
   font-family: var(--font-deva);
 }
+
+/* Certificate print-to-PDF (ADR 0015): the /certificate/[token] page prints as a
+   single clean page. Hide the on-screen controls (`.no-print`), drop the page's
+   own padding/centering, and flatten the card's shadow/border so it reads as a
+   printed document rather than a UI card. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  .cert-print-page {
+    min-height: auto;
+    padding: 0;
+  }
+  .cert-card {
+    box-shadow: none;
+    border-color: var(--color-gold);
+  }
+}

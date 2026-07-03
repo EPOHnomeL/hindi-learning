@@ -61,6 +61,49 @@ export function CertificateControl({ topicSlug, className }: { topicSlug: string
   );
 }
 
+// The public Certificate link (ADR 0015) + a jump to the printable page. The
+// link is always-on in v1 (low-sensitivity content), so there's no on/off toggle
+// here — just copy and open. `rel="noreferrer"` keeps the token out of the
+// Referer header, matching the Public-link posture.
+function CertificateLinkActions({ token }: { token: string }) {
+  const [copied, setCopied] = useState(false);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const url = `${origin}/certificate/${token}`;
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Share this certificate</label>
+      <div className="flex gap-1">
+        <input
+          readOnly
+          value={url}
+          onFocus={(e) => e.currentTarget.select()}
+          className="min-w-0 flex-1 rounded-lg border border-line bg-hi px-2 py-1.5 text-xs text-ink focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            navigator.clipboard?.writeText(url).then(
+              () => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              },
+              () => {
+                /* clipboard blocked — the field is selectable to copy by hand */
+              },
+            );
+          }}
+          className="shrink-0 rounded-lg bg-accent2 px-3 py-1.5 text-xs font-medium text-white"
+        >
+          {copied ? "Copied" : "Copy link"}
+        </button>
+      </div>
+      <a href={url} target="_blank" rel="noreferrer" className="text-center text-xs text-soft transition-colors hover:text-accent">
+        Open the public page to download a PDF →
+      </a>
+    </div>
+  );
+}
+
 // The claim/view modal. `certificate` is passed live from the control (one
 // subscription): while null and eligible it shows the name form; the moment the
 // claim lands, the reactive query repopulates it and the same dialog flips to the
@@ -100,7 +143,10 @@ function CertificateDialog({
       </div>
       <div className="px-6 py-6">
         {certificate ? (
-          <CertificateCard {...certificate} />
+          <div className="flex flex-col gap-4">
+            <CertificateCard {...certificate} />
+            {certificate.token && <CertificateLinkActions token={certificate.token} />}
+          </div>
         ) : (
           <form
             className="flex flex-col gap-3"
@@ -137,5 +183,41 @@ function CertificateDialog({
         )}
       </div>
     </dialog>
+  );
+}
+
+// The anonymous /certificate/[token] page (ADR 0015): renders the earned
+// Certificate from the token-only publicCertificate query — no account needed.
+// Reuses CertificateCard so the public and in-app views can't drift. "Download"
+// prints to PDF via the browser (the print stylesheet strips the chrome). A
+// missing/invalid token gets a uniform not-found — no existence signal.
+export function PublicCertificatePage({ token }: { token: string }) {
+  const cert = useQuery(api.certificates.publicCertificate, { token });
+  if (cert === undefined) {
+    return <main className="flex min-h-dvh items-center justify-center p-8 text-sm text-soft">Loading…</main>;
+  }
+  if (cert === null) {
+    return (
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-3 p-8 text-center">
+        <span className="text-3xl" aria-hidden>
+          🎓
+        </span>
+        <h1 className="text-lg font-semibold text-accent">Certificate not found</h1>
+        <p className="max-w-sm text-sm text-soft">This certificate link isn’t available.</p>
+      </main>
+    );
+  }
+  return (
+    <main className="cert-print-page mx-auto flex min-h-dvh max-w-xl flex-col items-center justify-center gap-6 px-4 py-12">
+      <div className="w-full">
+        <CertificateCard {...cert} />
+      </div>
+      <button
+        onClick={() => window.print()}
+        className="no-print rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90"
+      >
+        Download PDF
+      </button>
+    </main>
   );
 }
