@@ -52,7 +52,7 @@ export const dashboard = query({
       .collect();
     const cards = await Promise.all(
       topics.map(async (t) => {
-        const counts = await topicLessonCounts(ctx, t._id);
+        const counts = await topicLessonCounts(ctx, t._id, userId);
         return {
           slug: t.slug,
           title: t.title,

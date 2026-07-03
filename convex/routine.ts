@@ -42,14 +42,24 @@ async function frontierLesson(ctx: QueryCtx, topicId: Id<"topics">): Promise<Doc
   return null;
 }
 
-async function isCompleted(ctx: QueryCtx, topicId: Id<"topics">, lessonKey: string): Promise<boolean> {
-  // Scoped to this Topic: an identical lessonKey in another Topic must not count.
-  // A Topic has one owner, so any completed row for it is the owner's.
-  const rows = await ctx.db
+async function isCompleted(
+  ctx: QueryCtx,
+  topicId: Id<"topics">,
+  ownerId: Id<"users"> | undefined,
+  lessonKey: string,
+): Promise<boolean> {
+  // The gate advances the *owner's* curriculum, so only the owner's completion
+  // counts — a Viewer's Progress must never fire authoring. No owner (legacy
+  // unowned Topic) → nothing to gate on. Scoped to this Topic so an identical
+  // lessonKey in another Topic can't count.
+  if (!ownerId) return false;
+  const row = await ctx.db
     .query("progress")
-    .withIndex("by_topic_lesson", (q) => q.eq("topicId", topicId).eq("lessonKey", lessonKey))
-    .collect();
-  return rows.some((p) => p.status === "completed");
+    .withIndex("by_topic_user_lesson", (q) =>
+      q.eq("topicId", topicId).eq("userId", ownerId).eq("lessonKey", lessonKey),
+    )
+    .unique();
+  return row?.status === "completed";
 }
 
 async function generationRow(ctx: QueryCtx, topicId: Id<"topics">): Promise<Doc<"generation"> | null> {
@@ -101,7 +111,7 @@ export const tryAcquireGeneration = internalMutation({
       // Bootstrap (issue 07): a Seeded Topic with no Lessons fires once to draft
       // the Mission + Lesson 1. Any other Topic with no Frontier just no-ops.
       if (topic.status !== "seeded") return { acquired: false, reason: "no-frontier" };
-    } else if (!(await isCompleted(ctx, topic._id, frontier.key))) {
+    } else if (!(await isCompleted(ctx, topic._id, topic.ownerId, frontier.key))) {
       return { acquired: false, reason: "frontier-not-completed" };
     }
     // The lock key: the completed Frontier, or a sentinel for the bootstrap fire.
@@ -373,9 +383,10 @@ export const materialiseTopic = query({
       .query("responses")
       .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
       .collect();
+    // The run authors for the owner, so materialise the owner's Progress only.
     const progress = await ctx.db
       .query("progress")
-      .withIndex("by_topic_lesson", (q) => q.eq("topicId", topic._id))
+      .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id).eq("userId", owner._id))
       .collect();
 
     return {

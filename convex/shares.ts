@@ -96,7 +96,9 @@ export const listSharedTopics = query({
         const topic = await ctx.db.get(s.topicId);
         if (!topic) return null;
         const owner = topic.ownerId ? await ctx.db.get(topic.ownerId) : null;
-        const counts = await topicLessonCounts(ctx, topic._id);
+        // Counts are the Viewer's own progress on the shared Topic (fresh until
+        // they mark lessons), not the owner's.
+        const counts = await topicLessonCounts(ctx, topic._id, userId);
         return {
           slug: topic.slug,
           title: topic.title,

@@ -1,13 +1,14 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
 
 // Read-only Viewers (topic-sharing issues 02–05): a Viewer reads the owner's
-// Resources, Mission, Questions/Replies, and Progress, but every write is
-// refused server-side. Exercised at the Convex function seam, like shares.test.ts.
+// Resources, Mission, and Questions/Replies, but those writes are refused
+// server-side. Progress is the exception — a Viewer tracks their OWN, starting
+// clean on a shared Topic. Exercised at the Convex function seam, like shares.test.ts.
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -148,22 +149,33 @@ test("a Viewer reads the owner's Questions and Replies but cannot ask", async ()
   expect(ownerThread).toHaveLength(1);
 });
 
-// ---- 05: Progress, read-only for Viewers -----------------------------------
+// ---- 05: Progress, per-Viewer (their own, starting clean) ------------------
 
-test("a Viewer sees the owner's Progress but cannot mark complete, record, or fire authoring", async () => {
+test("a Viewer tracks their own Progress, starting clean and independent of the owner's", async () => {
   const t = convexTest(schema, modules);
   const { owner, viewer } = await sharedFixture(t);
   await asUser(t, owner).mutation(api.capture.setProgress, { topicSlug: "hindi", lessonKey: "0001-a", status: "completed" });
 
-  // Read: the Viewer sees the owner's completion (they have none of their own).
+  // The Viewer starts clean — the owner's completion is not theirs.
+  expect(await asUser(t, viewer).query(api.capture.myProgress, { topicSlug: "hindi" })).toEqual([]);
+
+  // The Viewer marks their own; it's recorded against them, not the owner.
+  await asUser(t, viewer).mutation(api.capture.setProgress, { topicSlug: "hindi", lessonKey: "0001-a", status: "completed" });
   expect(await asUser(t, viewer).query(api.capture.myProgress, { topicSlug: "hindi" })).toEqual([
     { lessonKey: "0001-a", status: "completed" },
   ]);
 
-  // Write: progress + quiz response are refused.
-  await expect(
-    asUser(t, viewer).mutation(api.capture.setProgress, { topicSlug: "hindi", lessonKey: "0001-a", status: "completed" }),
-  ).rejects.toThrow();
+  // The owner's Progress is unchanged by the Viewer's write.
+  expect(await asUser(t, owner).query(api.capture.myProgress, { topicSlug: "hindi" })).toEqual([
+    { lessonKey: "0001-a", status: "completed" },
+  ]);
+});
+
+test("a Viewer still cannot record quiz responses or fire authoring", async () => {
+  const t = convexTest(schema, modules);
+  const { owner, viewer } = await sharedFixture(t);
+
+  // Quiz responses stay owner-only — a Viewer's attempts aren't recorded.
   await expect(
     asUser(t, viewer).mutation(api.capture.recordResponse, {
       topicSlug: "hindi",
@@ -182,6 +194,35 @@ test("a Viewer sees the owner's Progress but cannot mark complete, record, or fi
   // completed — so no external fire is attempted).
   const fired = await asUser(t, owner).action(api.routine.requestNextLesson, { topicSlug: "hindi" });
   expect(fired.fired).toBe(false);
+});
+
+test("a Viewer completing the Frontier does not open the owner's authoring gate", async () => {
+  const t = convexTest(schema, modules);
+  const { viewer } = await sharedFixture(t);
+
+  // The Viewer completes the only (Frontier) lesson in their own Progress.
+  await asUser(t, viewer).mutation(api.capture.setProgress, { topicSlug: "hindi", lessonKey: "0001-a", status: "completed" });
+
+  // The gate is owner-scoped: a Viewer's completion must never fire authoring.
+  const acq = await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi" });
+  expect(acq).toMatchObject({ acquired: false, reason: "frontier-not-completed" });
+});
+
+test("Shared-with-me counts reflect the Viewer's own progress, not the owner's", async () => {
+  const t = convexTest(schema, modules);
+  const { owner, viewer } = await sharedFixture(t);
+
+  // The owner completes the lesson; the Viewer's card still reads 0/1.
+  await asUser(t, owner).mutation(api.capture.setProgress, { topicSlug: "hindi", lessonKey: "0001-a", status: "completed" });
+  expect(await asUser(t, viewer).query(api.shares.listSharedTopics, {})).toMatchObject([
+    { slug: "hindi", lessonCount: 1, completedCount: 0 },
+  ]);
+
+  // Once the Viewer completes it, their card reads 1/1.
+  await asUser(t, viewer).mutation(api.capture.setProgress, { topicSlug: "hindi", lessonKey: "0001-a", status: "completed" });
+  expect(await asUser(t, viewer).query(api.shares.listSharedTopics, {})).toMatchObject([
+    { slug: "hindi", lessonCount: 1, completedCount: 1 },
+  ]);
 });
 
 // ---- Cross-check: the owner's experience is unchanged ----------------------

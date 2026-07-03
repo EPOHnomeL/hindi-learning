@@ -91,11 +91,15 @@ test("listSharedTopics returns Topics shared with the caller, attributed to the 
   await t.run(async (ctx) => {
     await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>a</p>" });
     await ctx.db.insert("lessons", { topicId, key: "0002-b", seq: 2, title: "B", html: "<p>b</p>" });
+    // The owner completed both, but counts on the shared card are the Viewer's own.
     await ctx.db.insert("progress", { userId: owner, topicId, lessonKey: "0001-a", status: "completed" });
+    await ctx.db.insert("progress", { userId: owner, topicId, lessonKey: "0002-b", status: "completed" });
+    // The Viewer has completed one of the two.
+    await ctx.db.insert("progress", { userId: viewer, topicId, lessonKey: "0001-a", status: "completed" });
   });
   await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "viewer@example.com" });
 
-  // The Viewer sees the shared Topic, attributed to the owner, with counts.
+  // The Viewer sees the shared Topic, attributed to the owner, with THEIR OWN counts.
   const shared = await asUser(t, viewer).query(api.shares.listSharedTopics, {});
   expect(shared).toMatchObject([
     { slug: "hindi", title: "Hindi", ownerEmail: "owner@example.com", lessonCount: 2, completedCount: 1 },

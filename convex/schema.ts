@@ -117,17 +117,17 @@ export default defineSchema({
     .index("by_topic_user_lesson_quiz", ["topicId", "userId", "lessonKey", "quizId"])
     .index("by_topic", ["topicId"]),
 
-  // Per-lesson reading state. `by_topic_lesson` lets the Routine's gate ask "is
-  // this Topic's lesson completed?" without a user (the daily cron has none); a
-  // Topic has one owner, so any completed row for it is the owner's.
+  // Per-lesson reading state, one row per (Topic, User, Lesson). Every reader —
+  // the owner or a shared Viewer — tracks their own Progress here, keyed by their
+  // userId, so a Viewer starts clean on a Topic shared with them. Every read is
+  // user-scoped through `by_topic_user_lesson`; the Routine's gate reads the
+  // *owner's* rows (a Viewer's completion must not fire authoring).
   progress: defineTable({
     userId: v.id("users"),
     topicId: v.id("topics"),
     lessonKey: v.string(),
     status: v.union(v.literal("opened"), v.literal("completed")),
-  })
-    .index("by_topic_user_lesson", ["topicId", "userId", "lessonKey"])
-    .index("by_topic_lesson", ["topicId", "lessonKey"]),
+  }).index("by_topic_user_lesson", ["topicId", "userId", "lessonKey"]),
 
   // The next-lesson Routine's single-flight lock, one row per Topic (see ADR
   // 0008). `frontierKey` is the lesson the in-flight (or last) run fired for;

@@ -68,19 +68,20 @@ export async function getViewableTopic(ctx: QueryCtx, userId: Id<"users">, slug:
 }
 
 // A Topic's live progress counts for a dashboard/Shared-with-me card: how many
-// non-superseded Lessons it has, and how many are completed. Progress is the
-// owner's (one owner per Topic), so the counts are owner-relative — a Viewer
-// sees where the owner is.
+// non-superseded Lessons it has, and how many `userId` has completed. Progress is
+// per-reader, so the counts are the caller's own — an owner sees their own
+// progress; a Viewer sees theirs (fresh on a shared Topic), not the owner's.
 export async function topicLessonCounts(
   ctx: QueryCtx,
   topicId: Id<"topics">,
+  userId: Id<"users">,
 ): Promise<{ lessonCount: number; completedCount: number }> {
   const lessons = (
     await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect()
   ).filter((l) => !l.supersededBy);
   const progress = await ctx.db
     .query("progress")
-    .withIndex("by_topic_lesson", (q) => q.eq("topicId", topicId))
+    .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topicId).eq("userId", userId))
     .collect();
   const done = new Set(progress.filter((p) => p.status === "completed").map((p) => p.lessonKey));
   return { lessonCount: lessons.length, completedCount: lessons.filter((l) => done.has(l.key)).length };

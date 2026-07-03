@@ -41,11 +41,15 @@ export const recordResponse = mutation({
   },
 });
 
+// Per-reader Progress: anyone with access (owner or shared Viewer) marks their
+// own, keyed by their userId. A Viewer thus starts clean on a shared Topic (they
+// have no rows) and their Progress never touches the owner's.
 export const setProgress = mutation({
   args: { topicSlug: v.string(), lessonKey: v.string(), status: v.union(v.literal("opened"), v.literal("completed")) },
   handler: async (ctx, { topicSlug, lessonKey, status }) => {
     const userId = await requireUser(ctx);
-    const topic = await requireOwnedTopic(ctx, userId, topicSlug);
+    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
     const existing = await ctx.db
       .query("progress")
       .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id).eq("userId", userId).eq("lessonKey", lessonKey))
@@ -60,22 +64,20 @@ export const setProgress = mutation({
   },
 });
 
-// The owner's per-lesson progress in a Topic, so the reader can show what's
-// done (live). Resolves through the owner-or-Viewer gate and reads the *owner's*
-// rows (a Topic has one owner): the owner sees their own, and a Viewer sees the
-// owner's Progress read-only — they have none of their own (PRD: no per-Viewer
-// Progress). Writes (setProgress) stay owner-only.
+// The caller's own per-lesson progress in a Topic, so the reader can show what's
+// done (live). Resolves through the owner-or-Viewer gate and reads the *caller's*
+// rows: an owner sees their own, and a Viewer sees their own (fresh on a Topic
+// shared with them), never the owner's.
 export const myProgress = query({
   args: { topicSlug: v.string() },
   handler: async (ctx, { topicSlug }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const topic = await getViewableTopic(ctx, userId, topicSlug);
-    if (!topic?.ownerId) return [];
-    const ownerId = topic.ownerId;
+    if (!topic) return [];
     const rows = await ctx.db
       .query("progress")
-      .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id).eq("userId", ownerId))
+      .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id).eq("userId", userId))
       .collect();
     return rows.map((p) => ({ lessonKey: p.lessonKey, status: p.status }));
   },
@@ -143,9 +145,10 @@ export const reviewState = query({
       .query("responses")
       .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
       .collect();
+    // The learner is the owner — read their Progress, not any Viewer's.
     const progress = await ctx.db
       .query("progress")
-      .withIndex("by_topic_lesson", (q) => q.eq("topicId", topic._id))
+      .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id).eq("userId", owner._id))
       .collect();
     return {
       openQuestions: open.map((q) => ({ id: q._id, lessonKey: q.lessonKey, text: q.text })),
