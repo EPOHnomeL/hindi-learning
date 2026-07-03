@@ -44,6 +44,29 @@ body {
   font-family: var(--font-deva);
 }
 
+/* Completion celebration reveal (ADR 0015): the certificate card scales+fades in
+   once when a learner becomes eligible. `prefers-reduced-motion` skips it (the
+   confetti is likewise suppressed in JS), so motion-sensitive users get the card
+   with no animation. */
+@keyframes cert-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.cert-reveal {
+  animation: cert-reveal 320ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cert-reveal {
+    animation: none;
+  }
+}
+
 /* Certificate print-to-PDF (ADR 0015): the /certificate/[token] page prints as a
    single clean page. Hide the on-screen controls (`.no-print`), drop the page's
    own padding/centering, and flatten the card's shadow/border so it reads as a

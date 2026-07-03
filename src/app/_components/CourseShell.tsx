@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { CompletionCelebration } from "./Certificate";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useResourceUpload } from "./useResourceUpload";
@@ -182,6 +183,11 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
 
         <section className="min-w-0 flex-1 md:overflow-hidden md:p-4">{children}</section>
       </div>
+      {/* Completion celebration (ADR 0015): fires once per device when the caller
+          is newly eligible or just-earned on a completed course — owner or Viewer.
+          Mounted once per course here (not per lesson), so it never re-triggers on
+          lesson switches. */}
+      {courseCompleted && <CompletionCelebration topicSlug={slug} />}
     </Ctx.Provider>
   );
 }

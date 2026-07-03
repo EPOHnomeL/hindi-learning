@@ -104,10 +104,59 @@ function CertificateLinkActions({ token }: { token: string }) {
   );
 }
 
-// The claim/view modal. `certificate` is passed live from the control (one
-// subscription): while null and eligible it shows the name form; the moment the
-// claim lands, the reactive query repopulates it and the same dialog flips to the
-// earned card — no manual close/reopen.
+// The shared inner content for both the plain view dialog and the celebration:
+// the earned card + share actions, or the name form that claims. `certificate` is
+// live from the caller's query, so the moment a claim lands this flips from form
+// to card — the in-app dialog and the celebration can't drift apart.
+function CertificateBody({ topicSlug, certificate }: { topicSlug: string; certificate: CertificateData | null }) {
+  const claim = useMutation(api.certificates.claimCertificate);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  if (certificate) {
+    return (
+      <div className="flex flex-col gap-4">
+        <CertificateCard {...certificate} />
+        {certificate.token && <CertificateLinkActions token={certificate.token} />}
+      </div>
+    );
+  }
+  return (
+    <form
+      className="flex flex-col gap-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        try {
+          await claim({ topicSlug, name: name.trim() });
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Your name"
+        className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+      />
+      <p className="text-xs text-soft">Leave blank to use your account name.</p>
+      <button
+        type="submit"
+        disabled={busy}
+        className="mt-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+      >
+        {busy ? "Creating…" : "Create certificate"}
+      </button>
+    </form>
+  );
+}
+
+// The plain claim/view modal (from the persistent control). `certificate` is
+// passed live from the control; while null and eligible it shows the name form,
+// and the moment the claim lands the reactive query repopulates it and the same
+// dialog flips to the earned card — no manual close/reopen.
 function CertificateDialog({
   topicSlug,
   certificate,
@@ -117,9 +166,6 @@ function CertificateDialog({
   certificate: CertificateData | null;
   onClose: () => void;
 }) {
-  const claim = useMutation(api.certificates.claimCertificate);
-  const [name, setName] = useState("");
-  const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => ref.current?.showModal(), []);
 
@@ -132,7 +178,8 @@ function CertificateDialog({
       }}
       className="m-auto w-[92vw] max-w-lg rounded-2xl border border-line bg-paper p-0 text-ink shadow-xl backdrop:bg-black/40"
     >
-      <div className="flex items-center justify-end border-b border-line px-3 py-2">
+      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">
+        <h2 className="text-sm font-semibold text-accent">{certificate ? "Your certificate" : "Claim your certificate"}</h2>
         <button
           onClick={() => ref.current?.close()}
           aria-label="Close"
@@ -142,45 +189,101 @@ function CertificateDialog({
         </button>
       </div>
       <div className="px-6 py-6">
-        {certificate ? (
-          <div className="flex flex-col gap-4">
-            <CertificateCard {...certificate} />
-            {certificate.token && <CertificateLinkActions token={certificate.token} />}
-          </div>
-        ) : (
-          <form
-            className="flex flex-col gap-3"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              setBusy(true);
-              try {
-                await claim({ topicSlug, name: name.trim() });
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            <h2 className="text-lg font-semibold text-accent">Claim your certificate</h2>
-            <p className="text-sm text-soft">
-              You’ve finished this course. Enter the name to print on your certificate (leave blank to use your account
-              name).
-            </p>
-            <input
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
-            />
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-            >
-              {busy ? "Creating…" : "Create certificate"}
-            </button>
-          </form>
-        )}
+        <CertificateBody topicSlug={topicSlug} certificate={certificate} />
+      </div>
+    </dialog>
+  );
+}
+
+// localStorage marker so the celebration fires once per Certificate, per device
+// — the same per-device pattern as the reader's seen-replies / Guest ticks.
+const CELEBRATED_KEY = "hindi:cert-celebrated";
+
+// One-shot confetti burst. Lazy-imported so it stays out of the public certificate
+// page bundle, and skipped entirely under `prefers-reduced-motion` (canvas-confetti
+// also honours it internally as a backstop).
+function fireConfetti() {
+  if (typeof window === "undefined") return;
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+  void import("canvas-confetti").then(({ default: confetti }) => {
+    confetti({ particleCount: 140, spread: 75, origin: { y: 0.6 }, disableForReducedMotion: true });
+  });
+}
+
+// The completion celebration (ADR 0015): a one-shot confetti burst + a certificate
+// card reveal, shown the first time a learner is newly eligible or just-earned on
+// a completed course — for whoever becomes eligible (owner or Viewer), whenever
+// they next load it, not only at the instant of "Mark complete". Wraps slice 2's
+// claim flow (CertificateBody): the name field completes the claim, then the same
+// dialog flips to the earned card + download/share CTA. Fires once per Certificate
+// via a per-device localStorage marker, so revisiting a completed lesson doesn't
+// re-trigger it; dismissing without claiming still leaves the persistent
+// "Claim your certificate" control (CertificateControl) for later.
+export function CompletionCelebration({ topicSlug }: { topicSlug: string }) {
+  const data = useQuery(api.certificates.myCertificate, { topicSlug });
+  const [show, setShow] = useState(false);
+  const ref = useRef<HTMLDialogElement>(null);
+  const firedRef = useRef(false);
+
+  useEffect(() => {
+    if (firedRef.current || !data) return;
+    if (!data.certificate && !data.eligible) return; // not yet finished / no access
+    let seen = false;
+    try {
+      seen = localStorage.getItem(`${CELEBRATED_KEY}:${topicSlug}`) === "1";
+    } catch {
+      /* storage unavailable — celebrate anyway, just don't persist suppression */
+    }
+    if (seen) return;
+    firedRef.current = true;
+    try {
+      localStorage.setItem(`${CELEBRATED_KEY}:${topicSlug}`, "1");
+    } catch {
+      /* ignore */
+    }
+    setShow(true);
+    fireConfetti();
+  }, [data, topicSlug]);
+
+  useEffect(() => {
+    if (show) ref.current?.showModal();
+  }, [show]);
+
+  if (!show || !data) return null;
+  const certificate = data.certificate;
+  return (
+    <dialog
+      ref={ref}
+      onClose={() => setShow(false)}
+      onClick={(e) => {
+        if (e.target === ref.current) ref.current?.close();
+      }}
+      className="m-auto w-[92vw] max-w-lg rounded-2xl border border-line bg-paper p-0 text-ink shadow-xl backdrop:bg-black/40"
+    >
+      <div className="flex items-center justify-end px-3 py-2">
+        <button
+          onClick={() => ref.current?.close()}
+          aria-label="Close"
+          className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="cert-reveal px-6 pb-8 pt-1 text-center">
+        <p className="text-4xl" aria-hidden>
+          🎉
+        </p>
+        <h2 className="mt-2 text-xl font-semibold text-accent">
+          {certificate ? "Your certificate is ready" : "You finished the course!"}
+        </h2>
+        <p className="mt-1 text-sm text-soft">
+          {certificate
+            ? "Keep it, download it as a PDF, or share the link."
+            : "Add the name to print on your certificate."}
+        </p>
+        <div className="mt-5 text-left">
+          <CertificateBody topicSlug={topicSlug} certificate={certificate} />
+        </div>
       </div>
     </dialog>
   );
