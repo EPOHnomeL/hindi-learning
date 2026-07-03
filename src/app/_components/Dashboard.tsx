@@ -14,7 +14,7 @@ import { useResourceUpload } from "./useResourceUpload";
 type Course = {
   slug: string;
   title: string;
-  status: "seeded" | "active";
+  status: "seeded" | "active" | "completed";
   mission: string | null;
   publicToken: string | null;
   lessonCount: number;

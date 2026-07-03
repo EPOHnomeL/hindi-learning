@@ -91,7 +91,7 @@ function CourseStatus({ variant }: { variant: "loading" | "opening" | "preparing
 // A single Lesson. Reads `frontierKey` from the course context for the
 // "generate next lesson" affordance, and marks its replies seen on open.
 export function LessonPane({ slug, lessonKey }: { slug: string; lessonKey: string }) {
-  const { markSeen, frontierKey, canWrite, nextKey } = useCourse();
+  const { markSeen, frontierKey, canWrite, completed, nextKey } = useCourse();
   useEffect(() => {
     markSeen(lessonKey);
   }, [lessonKey, markSeen]);
@@ -102,6 +102,7 @@ export function LessonPane({ slug, lessonKey }: { slug: string; lessonKey: strin
       topicSlug={slug}
       isFrontier={frontierKey === lessonKey}
       readOnly={!canWrite}
+      courseCompleted={completed}
       nextLessonKey={nextKey(lessonKey)}
     />
   );

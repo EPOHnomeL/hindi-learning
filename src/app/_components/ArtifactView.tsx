@@ -29,6 +29,7 @@ export function ArtifactView({
   topicSlug,
   isFrontier,
   readOnly,
+  courseCompleted = false,
   nextLessonKey,
 }: {
   kind: "lesson" | "reference";
@@ -39,6 +40,9 @@ export function ArtifactView({
   // recording, asking Questions, next-lesson authoring). Progress is NOT gated by
   // this — a Viewer tracks their own (see setProgress). Reads stay live.
   readOnly: boolean;
+  // True once the Topic is `completed` (ADR 0015): authoring has stopped, so the
+  // reader never offers "Generate next lesson" even on the completed Frontier.
+  courseCompleted?: boolean;
   // The next lesson's key in seq order (null on the last lesson). A read-only
   // Viewer gets a "Next lesson →" link in place of the owner's controls.
   nextLessonKey?: string | null;
@@ -50,6 +54,7 @@ export function ArtifactView({
       topicSlug={topicSlug}
       isFrontier={isFrontier}
       readOnly={readOnly}
+      courseCompleted={courseCompleted}
       nextLessonKey={nextLessonKey ?? null}
     />
   );
@@ -149,12 +154,14 @@ function LessonView({
   topicSlug,
   isFrontier,
   readOnly,
+  courseCompleted,
   nextLessonKey,
 }: {
   lessonKey: string;
   topicSlug: string;
   isFrontier: boolean;
   readOnly: boolean;
+  courseCompleted: boolean;
   nextLessonKey: string | null;
 }) {
   const { theme } = useTheme();
@@ -195,8 +202,11 @@ function LessonView({
         <div className="sticky top-12 z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
           <div className="flex shrink-0 items-center gap-2">
-            {/* Authoring is owner-only; a Viewer never fires the next lesson. */}
-            {!readOnly && isFrontier && completed && <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />}
+            {/* Authoring is owner-only and stops once the course is completed
+                (ADR 0015): no "Generate next lesson" on a finished course. */}
+            {!readOnly && !courseCompleted && isFrontier && completed && (
+              <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />
+            )}
             {/* Mark complete writes the caller's own Progress — owner or Viewer. */}
             <button
               onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}

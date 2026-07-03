@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
@@ -25,6 +25,9 @@ type CourseCtx = {
   // hides every write control. Defaults false while access is still loading, so
   // a Viewer never sees a control flash before it's hidden.
   canWrite: boolean;
+  // True once the Topic is `completed` (ADR 0015): the reader stops offering
+  // "Generate next lesson". Defaults false while the header is still loading.
+  completed: boolean;
   // The lesson after the given one in seq order (null on the last / unknown).
   // Powers the Viewer's "Next lesson →" link in place of write controls.
   nextKey: (lessonKey: string) => string | null;
@@ -47,6 +50,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   // Viewers get a read-only reader.
   const header = useQuery(api.content.courseHeader, { topicSlug: slug });
   const canWrite = header?.role === "owner";
+  const courseCompleted = header?.status === "completed";
   const { signOut } = useAuthActions();
   const router = useRouter();
   const pathname = usePathname();
@@ -104,7 +108,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   useEffect(() => setMenuOpen(false), [pathname]);
 
   return (
-    <Ctx.Provider value={{ frontierKey: frontier, markSeen, canWrite, nextKey }}>
+    <Ctx.Provider value={{ frontierKey: frontier, markSeen, canWrite, completed: courseCompleted, nextKey }}>
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
         {/* Mobile top bar: hamburger opens the lesson selector. */}
         <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 md:hidden">
@@ -169,6 +173,10 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             <ResourcesSection topicSlug={slug} canWrite={canWrite} />
           </nav>
 
+          {/* Owner-only course lifecycle (ADR 0015): conclude the course, or reopen
+              a completed one. Absent for Viewers (PRD story 9). */}
+          {canWrite && header && <CompletionControls slug={slug} completed={courseCompleted} />}
+
           <ThemeToggle />
         </aside>
 
@@ -191,6 +199,101 @@ function ThemeToggle() {
       <span>{dark ? "Dark" : "Light"} mode</span>
       <span aria-hidden className="text-base">{dark ? "☾" : "☀"}</span>
     </button>
+  );
+}
+
+// Owner-only course lifecycle (ADR 0015). "Mark course complete" ends authoring —
+// behind a confirmation, since it stops the Routine (PRD story 6); "Reopen course"
+// returns a completed course to `active` so lessons generate again. Gated by
+// `canWrite` at the call site, so a Viewer never sees either.
+function CompletionControls({ slug, completed }: { slug: string; completed: boolean }) {
+  const endCourse = useMutation(api.content.endCourse);
+  const reopenCourse = useMutation(api.content.reopenCourse);
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  if (completed) {
+    return (
+      <button
+        onClick={() => {
+          setBusy(true);
+          void reopenCourse({ topicSlug: slug }).finally(() => setBusy(false));
+        }}
+        disabled={busy}
+        className="mb-2 flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
+      >
+        ↻ Reopen course
+      </button>
+    );
+  }
+
+  return (
+    <>
+      <button
+        onClick={() => setConfirming(true)}
+        className="mb-2 flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
+      >
+        ✓ Mark course complete
+      </button>
+      {confirming && (
+        <ConfirmDialog
+          title="Mark this course complete?"
+          body="This ends the course — no more lessons will be generated. You can reopen it later if your goals grow."
+          confirmLabel={busy ? "Ending…" : "Mark complete"}
+          onConfirm={() => {
+            setBusy(true);
+            void endCourse({ topicSlug: slug }).finally(() => {
+              setBusy(false);
+              setConfirming(false);
+            });
+          }}
+          onClose={() => setConfirming(false)}
+        />
+      )}
+    </>
+  );
+}
+
+// A native <dialog> yes/no confirm — Esc, backdrop click, and focus-trap for
+// free (ponytail: same pattern as ArtifactView's QaDialog / Dashboard's
+// MissionDialog; extract to a shared module if a fourth use appears).
+function ConfirmDialog({
+  title,
+  body,
+  confirmLabel,
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => ref.current?.showModal(), []);
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === ref.current) ref.current?.close(); // backdrop click
+      }}
+      className="m-auto w-[92vw] max-w-md rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
+    >
+      <div className="px-6 py-5">
+        <h2 className="text-base font-semibold text-accent">{title}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-soft">{body}</p>
+        <div className="mt-5 flex justify-end gap-2">
+          <button onClick={() => ref.current?.close()} className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi">
+            Cancel
+          </button>
+          <button onClick={onConfirm} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90">
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 
