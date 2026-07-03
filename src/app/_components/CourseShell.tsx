@@ -175,8 +175,11 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
           </nav>
 
           {/* Owner-only course lifecycle (ADR 0015): conclude the course, or reopen
-              a completed one. Absent for Viewers (PRD story 9). */}
-          {canWrite && header && <CompletionControls slug={slug} completed={courseCompleted} />}
+              a completed one. Absent for Viewers (PRD story 9), and while still
+              `seeded` — a course that hasn't drafted a Lesson can't be completed. */}
+          {canWrite && header && header.status !== "seeded" && (
+            <CompletionControls slug={slug} completed={courseCompleted} />
+          )}
 
           <ThemeToggle />
         </aside>
@@ -246,6 +249,7 @@ function CompletionControls({ slug, completed }: { slug: string; completed: bool
           title="Mark this course complete?"
           body="This ends the course — no more lessons will be generated. You can reopen it later if your goals grow."
           confirmLabel={busy ? "Ending…" : "Mark complete"}
+          confirmDisabled={busy}
           onConfirm={() => {
             setBusy(true);
             void endCourse({ topicSlug: slug }).finally(() => {
@@ -267,12 +271,14 @@ function ConfirmDialog({
   title,
   body,
   confirmLabel,
+  confirmDisabled = false,
   onConfirm,
   onClose,
 }: {
   title: string;
   body: string;
   confirmLabel: string;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }) {
@@ -294,7 +300,11 @@ function ConfirmDialog({
           <button onClick={() => ref.current?.close()} className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi">
             Cancel
           </button>
-          <button onClick={onConfirm} className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90">
+          <button
+            onClick={onConfirm}
+            disabled={confirmDisabled}
+            className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+          >
             {confirmLabel}
           </button>
         </div>

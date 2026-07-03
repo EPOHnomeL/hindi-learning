@@ -76,6 +76,24 @@ test("reopenCourse (owner-only) returns a completed Topic to active", async () =
   expect(await statusOf(t, topicId)).toBe("active");
 });
 
+test("endCourse refuses a seeded course — a course that hasn't started can't be completed", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  // A freshly seeded course (no Mission/Lessons yet).
+  const topicId = await t.run((ctx) =>
+    ctx.db.insert("topics", { ownerId: alice, slug: "greek", title: "Greek", status: "seeded" }),
+  );
+
+  await expect(asUser(t, alice).mutation(api.content.endCourse, { topicSlug: "greek" })).rejects.toThrow();
+  // Still seeded → the Routine's bootstrap can still fire it (would be stranded if
+  // it had flipped to completed and then reopened to active).
+  expect(await statusOf(t, topicId)).toBe("seeded");
+  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "greek" })).toMatchObject({
+    acquired: true,
+    frontierKey: "(seed)",
+  });
+});
+
 test("the gate refuses a completed Topic and resumes after reopen", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");

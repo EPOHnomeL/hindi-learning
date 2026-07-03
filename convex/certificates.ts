@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getViewableTopic, mintToken } from "./lib";
+import { getViewableTopic, mintToken, topicLessonCounts } from "./lib";
 import { decodeEntities } from "./content";
 
 // Certificates (ADR 0015). Two auth models live in this file, kept apart:
@@ -13,22 +13,15 @@ import { decodeEntities } from "./content";
 //     exact shape of public.ts, authorized by token and never by getAuthUserId,
 //     with an explicit output allowlist.
 
-// Eligibility is derived, never stored: the Topic is `completed` AND every
-// non-superseded Lesson is in this caller's own completed Progress. Reuses the
-// same non-superseded filter as the Frontier and the same per-caller Progress
-// read as capture.myProgress, so it can't drift from what the reader shows.
+// Eligibility is derived, never stored: the Topic is `completed` AND the caller
+// has completed every non-superseded Lesson. Reuses `topicLessonCounts` — the
+// same counts the dashboard progress bar shows — so eligibility can't drift from
+// what the learner sees. An empty course (no non-superseded Lessons) certifies
+// nothing.
 async function isEligible(ctx: QueryCtx, topic: Doc<"topics">, userId: Id<"users">): Promise<boolean> {
   if (topic.status !== "completed") return false;
-  const lessons = (
-    await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
-  ).filter((l) => !l.supersededBy);
-  if (lessons.length === 0) return false; // an empty course certifies nothing
-  const progress = await ctx.db
-    .query("progress")
-    .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id).eq("userId", userId))
-    .collect();
-  const done = new Set(progress.filter((p) => p.status === "completed").map((p) => p.lessonKey));
-  return lessons.every((l) => done.has(l.key));
+  const { lessonCount, completedCount } = await topicLessonCounts(ctx, topic._id, userId);
+  return lessonCount > 0 && completedCount === lessonCount;
 }
 
 async function certificateFor(ctx: QueryCtx, topicId: Id<"topics">, userId: Id<"users">) {
@@ -118,11 +111,12 @@ export const claimCertificate = mutation({
       };
     }
 
-    if (!(await isEligible(ctx, topic, userId))) throw new Error("not eligible");
+    // Re-check eligibility and snapshot the lesson count from one read (the same
+    // counts the dashboard shows). lessonCount is frozen onto the Certificate.
+    if (topic.status !== "completed") throw new Error("not eligible");
+    const { lessonCount, completedCount } = await topicLessonCounts(ctx, topic._id, userId);
+    if (lessonCount === 0 || completedCount !== lessonCount) throw new Error("not eligible");
 
-    const lessonCount = (
-      await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
-    ).filter((l) => !l.supersededBy).length;
     const user = await ctx.db.get(userId);
     const fallback = (user?.email ?? "Learner").split("@")[0]!;
     const learnerName = name.trim() || fallback;

@@ -150,6 +150,11 @@ export const endCourse = mutation({
     if (!userId) throw new Error("unauthenticated");
     const topic = await getOwnedTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
+    // A seeded course hasn't started — there's nothing to complete, and marking it
+    // `completed` would strand it: the Routine's bootstrap fires only for `seeded`
+    // (routine.ts), so a reopen (→ active) could never draft its first Lesson.
+    // Keeping "completed ⟹ was active" also makes `reopenCourse` → active correct.
+    if (topic.status === "seeded") throw new Error("course hasn't started");
     await ctx.db.patch(topic._id, { status: "completed" });
   },
 });
