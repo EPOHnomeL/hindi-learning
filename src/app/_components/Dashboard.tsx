@@ -511,6 +511,7 @@ function NewCourseCard() {
   const [files, setFiles] = useState<File[]>([]);
   const [linkDraft, setLinkDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const addDraftLink = () => {
     const l = linkDraft.trim();
@@ -539,6 +540,7 @@ function NewCourseCard() {
         const t = title.trim();
         if (!t) return;
         setBusy(true);
+        setError(null);
         // Snapshot the chosen Resources before we reset the form and navigate away.
         const chosenLinks = links;
         const chosenFiles = files;
@@ -574,6 +576,10 @@ function NewCourseCard() {
           setFiles([]);
           setOpen(false);
           router.push(`/courses/${slug}`);
+        } catch {
+          // The server caps new courses to one per day; surface that (the most
+          // likely reason a valid title fails) rather than leaving the form stuck.
+          setError("You can create one new course per day. Please try again tomorrow.");
         } finally {
           setBusy(false);
         }
@@ -643,6 +649,8 @@ function NewCourseCard() {
           }}
         />
       </label>
+
+      {error && <p className="text-xs text-red-600">{error}</p>}
 
       <div className="mt-1 flex gap-2">
         <button type="submit" disabled={busy} className="flex-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60">

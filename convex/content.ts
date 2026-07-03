@@ -3,6 +3,11 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { assertAdmin, getOwnedTopic, getViewableTopic, topicBySlug, topicLessonCounts } from "./lib";
+import { isCallerAdmin } from "./whitelist";
+
+// A learner may seed at most one new course per this window — an anti-abuse / cost
+// cap that mirrors the routine's per-user on-demand cap. Rolling 24h window.
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Lessons & references. Reader queries are auth-gated and owner-scoped: a Topic
 // is resolved by (owner = signed-in user, slug), so one learner never sees
@@ -81,6 +86,20 @@ export const seedTopic = mutation({
   handler: async (ctx, { title, why }): Promise<{ slug: string }> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
+    // One new course per user per day (issue 08 — bounds Claude usage). The Admin
+    // is exempt (they drive the app and aren't the runaway-usage risk this guards
+    // against, mirroring the routine's on-demand bypass). Checked against the
+    // user's most recent Topic, so their first course is never blocked.
+    if (!(await isCallerAdmin(ctx))) {
+      const newest = await ctx.db
+        .query("topics")
+        .withIndex("by_owner", (q) => q.eq("ownerId", userId))
+        .order("desc")
+        .first();
+      if (newest && Date.now() - newest._creationTime < DAY_MS) {
+        throw new Error("You can create one new course per day. Please try again tomorrow.");
+      }
+    }
     const base = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "topic";
     let slug = base;
     for (let n = 2; await topicBySlug(ctx, slug); n++) slug = `${base}-${n}`;

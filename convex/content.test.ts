@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { decodeEntities } from "./content";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
@@ -136,15 +136,39 @@ test("ensureTopic rejects a bad secret and an unknown owner", async () => {
 test("seedTopic creates a seeded topic; identical titles get distinct slugs", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
-  const as = asUser(t, alice);
+  // Slugs are globally unique, so two learners naming a course the same still get
+  // distinct slugs. Two users also keeps each within the one-course-per-day cap.
+  const bob = await seedUser(t, "bob@example.com");
 
-  const r1 = await as.mutation(api.content.seedTopic, { title: "Koine Greek!", why: "read the NT" });
-  const r2 = await as.mutation(api.content.seedTopic, { title: "Koine Greek!", why: "again" });
+  const r1 = await asUser(t, alice).mutation(api.content.seedTopic, { title: "Koine Greek!", why: "read the NT" });
+  const r2 = await asUser(t, bob).mutation(api.content.seedTopic, { title: "Koine Greek!", why: "again" });
   expect(r1.slug).toBe("koine-greek");
   expect(r2.slug).toBe("koine-greek-2");
 
-  const topics = await as.query(api.content.listTopics, {});
+  const topics = await asUser(t, alice).query(api.content.listTopics, {});
   expect(topics.find((x) => x.slug === "koine-greek")).toMatchObject({ title: "Koine Greek!", status: "seeded", mission: null });
+});
+
+test("seedTopic caps a non-Admin to one new course per day; the Admin is exempt", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const as = asUser(t, alice);
+
+  // First course of the day is allowed; a second within the day is refused.
+  await as.mutation(api.content.seedTopic, { title: "Greek", why: "NT" });
+  await expect(as.mutation(api.content.seedTopic, { title: "Latin", why: "Vulgate" })).rejects.toThrow(
+    /one new course per day/,
+  );
+
+  // The Admin drives the app and is exempt from the cap.
+  const adminEmail = "admin@example.com";
+  const admin = await seedUser(t, adminEmail);
+  await t.mutation(internal.whitelist.seedEmail, { email: adminEmail, isAdmin: true });
+  const asAdmin = asUser(t, admin);
+  await asAdmin.mutation(api.content.seedTopic, { title: "One", why: "a" });
+  await asAdmin.mutation(api.content.seedTopic, { title: "Two", why: "b" }); // not blocked
+  const adminTopics = await asAdmin.query(api.content.listTopics, {});
+  expect(adminTopics.map((x) => x.slug).sort()).toEqual(["one", "two"]);
 });
 
 test("editMission sets the learner's mission (owner-scoped); publishMission flips status to active", async () => {
