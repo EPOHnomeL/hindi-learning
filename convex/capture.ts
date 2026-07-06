@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, getViewableTopic } from "./lib";
+import { assertAdmin, getOwnedTopic, getViewableTopic, readableLang, SOURCE_LANG } from "./lib";
 
 // The conversation loop (PRD §4–§5). Reader writes responses/progress/questions
 // for the signed-in learner, scoped to the active Topic so identical lesson keys
@@ -97,26 +97,46 @@ export const askQuestion = mutation({
 // a Viewer sees it read-only (PRD story 16). Asking (askQuestion) stays
 // owner-only, so a Viewer reads the thread but can't add to it.
 export const myQuestions = query({
-  args: { topicSlug: v.string() },
-  handler: async (ctx, { topicSlug }) => {
+  args: { topicSlug: v.string(), lang: v.optional(v.string()) },
+  handler: async (ctx, { topicSlug, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic?.ownerId) return [];
     const ownerId = topic.ownerId;
+    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
+    if (!effLang) return [];
     const rows = await ctx.db
       .query("questions")
       .withIndex("by_topic_user", (q) => q.eq("topicId", topic._id).eq("userId", ownerId))
       .collect();
+    // Translated Q&A for the current Edition (kind "question", keyed by the
+    // question _id), falling back to the source text/reply per row.
+    const tmap =
+      effLang === SOURCE_LANG
+        ? new Map<string, { text?: string; reply?: string }>()
+        : new Map(
+            (
+              await ctx.db
+                .query("translations")
+                .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", effLang))
+                .collect()
+            )
+              .filter((t) => t.kind === "question")
+              .map((t) => [t.key, { text: t.text, reply: t.reply }]),
+          );
     return rows
       .sort((a, b) => b._creationTime - a._creationTime)
-      .map((q) => ({
-        id: q._id,
-        lessonKey: q.lessonKey,
-        text: q.text,
-        status: q.status,
-        reply: q.reply ?? null,
-      }));
+      .map((q) => {
+        const t = tmap.get(q._id);
+        return {
+          id: q._id,
+          lessonKey: q.lessonKey,
+          text: t?.text ?? q.text,
+          status: q.status,
+          reply: (q.reply ? (t?.reply ?? q.reply) : null) ?? null,
+        };
+      });
   },
 });
 

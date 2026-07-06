@@ -2,8 +2,9 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getViewableTopic, mintToken, topicLessonCounts } from "./lib";
+import { getViewableTopic, mintToken, readableLang, SOURCE_LANG, topicLessonCounts } from "./lib";
 import { decodeEntities } from "./content";
+import { langInfo } from "./languages";
 
 // Certificates (ADR 0015). Two auth models live in this file, kept apart:
 //   - `myCertificate` / `claimCertificate` are AUTHED and owner-or-Viewer gated
@@ -49,6 +50,8 @@ export const myCertificate = query({
           courseTitle: v.string(),
           lessonCount: v.number(),
           issuedAt: v.number(),
+          // The Edition the certificate was earned in (course-translation).
+          lang: v.string(),
         }),
       ),
       eligible: v.boolean(),
@@ -68,6 +71,7 @@ export const myCertificate = query({
           courseTitle: row.courseTitle,
           lessonCount: row.lessonCount,
           issuedAt: row._creationTime,
+          lang: row.lang ?? SOURCE_LANG,
         },
         // Already earned — nothing left to claim.
         eligible: false,
@@ -85,15 +89,16 @@ export const myCertificate = query({
 // the email's local-part so the email itself never lands on a certificate.
 // courseTitle + lessonCount are snapshotted at issue and never rewritten.
 export const claimCertificate = mutation({
-  args: { topicSlug: v.string(), name: v.string() },
+  args: { topicSlug: v.string(), name: v.string(), lang: v.optional(v.string()) },
   returns: v.object({
     token: v.string(),
     learnerName: v.string(),
     courseTitle: v.string(),
     lessonCount: v.number(),
     issuedAt: v.number(),
+    lang: v.string(),
   }),
-  handler: async (ctx, { topicSlug, name }) => {
+  handler: async (ctx, { topicSlug, name, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
     const topic = await getViewableTopic(ctx, userId, topicSlug);
@@ -108,6 +113,7 @@ export const claimCertificate = mutation({
         courseTitle: existing.courseTitle,
         lessonCount: existing.lessonCount,
         issuedAt: existing._creationTime,
+        lang: existing.lang ?? SOURCE_LANG,
       };
     }
 
@@ -120,7 +126,20 @@ export const claimCertificate = mutation({
     const user = await ctx.db.get(userId);
     const fallback = (user?.email ?? "Learner").split("@")[0]!;
     const learnerName = name.trim() || fallback;
-    const courseTitle = decodeEntities(topic.title);
+    // Snapshot the title of the Edition the learner completed in — a Viewer who
+    // only holds the Spanish edition earns a Spanish-titled certificate.
+    const effLang = (await readableLang(ctx, topic, userId, lang ?? null)) ?? SOURCE_LANG;
+    let courseTitle = topic.title;
+    if (effLang !== SOURCE_LANG) {
+      const t = await ctx.db
+        .query("translations")
+        .withIndex("by_topic_lang_kind_key", (q) =>
+          q.eq("topicId", topic._id).eq("lang", effLang).eq("kind", "title").eq("key", ""),
+        )
+        .unique();
+      if (t?.text) courseTitle = t.text;
+    }
+    courseTitle = decodeEntities(courseTitle);
     const token = mintToken();
 
     const id = await ctx.db.insert("certificates", {
@@ -130,9 +149,10 @@ export const claimCertificate = mutation({
       learnerName,
       courseTitle,
       lessonCount,
+      lang: effLang,
     });
     const row = (await ctx.db.get(id))!;
-    return { token, learnerName, courseTitle, lessonCount, issuedAt: row._creationTime };
+    return { token, learnerName, courseTitle, lessonCount, issuedAt: row._creationTime, lang: effLang };
   },
 });
 
@@ -151,6 +171,10 @@ export const publicCertificate = query({
       courseTitle: v.string(),
       issuedAt: v.number(),
       lessonCount: v.number(),
+      // The Edition's language + direction, so the public page renders RTL
+      // titles correctly (course-translation). Never leaks Topic content.
+      lang: v.string(),
+      dir: v.union(v.literal("ltr"), v.literal("rtl")),
     }),
   ),
   handler: async (ctx, { token }) => {
@@ -160,11 +184,14 @@ export const publicCertificate = query({
       .withIndex("by_token", (q) => q.eq("token", token))
       .unique();
     if (!row) return null;
+    const lang = row.lang ?? SOURCE_LANG;
     return {
       learnerName: row.learnerName,
       courseTitle: row.courseTitle,
       issuedAt: row._creationTime,
       lessonCount: row.lessonCount,
+      lang,
+      dir: langInfo(lang).rtl ? ("rtl" as const) : ("ltr" as const),
     };
   },
 });
