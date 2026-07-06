@@ -126,8 +126,59 @@ body {
   transition: opacity 220ms ease-out;
 }
 
-/* Motion-sensitive: no tilt, no shimmer, no spotlight — still the full styled card
-   (medallion, foil colours), just static. */
+/* Showcase (the standalone public page): larger, more theatrical. A warm outer
+   glow lifts the card off the page, the foil reads stronger, and an ambient shine
+   sweep crosses it every few seconds so the premium treatment is visible at rest
+   (not only on hover). All of it still collapses to the flat document in print and
+   under prefers-reduced-motion (overrides below). */
+.cert-card--showcase {
+  box-shadow:
+    0 18px 60px -18px rgba(184, 138, 46, 0.45),
+    0 2px 10px rgba(0, 0, 0, 0.08);
+}
+html[data-theme="dark"] .cert-card--showcase {
+  box-shadow:
+    0 20px 70px -18px rgba(216, 171, 87, 0.38),
+    0 2px 14px rgba(0, 0, 0, 0.55);
+}
+.cert-card--showcase .cert-sheen {
+  opacity: 0.75;
+}
+.cert-shine {
+  border-radius: inherit;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.6) 50%, transparent 58%);
+  background-size: 250% 100%;
+  mix-blend-mode: screen;
+  animation: cert-shine 5s ease-in-out infinite;
+}
+@keyframes cert-shine {
+  0% {
+    background-position: 160% 0;
+  }
+  55%,
+  100% {
+    background-position: -60% 0;
+  }
+}
+/* Entrance for the public view — a soft fade + rise. Lives on a wrapper, not the
+   card, so it never fights the card's pointer-tilt transform. */
+.cert-enter {
+  animation: cert-enter 550ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes cert-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Motion-sensitive: no tilt, no shimmer, no spotlight, no shine sweep, no
+   entrance — still the full styled card (medallion, foil colours, glow), just
+   static. */
 @media (prefers-reduced-motion: reduce) {
   .cert-card {
     transform: none;
@@ -136,8 +187,12 @@ body {
   .cert-sheen {
     animation: none;
   }
-  .cert-glow {
+  .cert-glow,
+  .cert-shine {
     display: none;
+  }
+  .cert-enter {
+    animation: none;
   }
 }
 
@@ -154,15 +209,20 @@ body {
     min-height: auto;
     padding: 0;
   }
-  .cert-card {
+  .cert-card,
+  .cert-card--showcase {
     box-shadow: none;
     border-color: var(--color-gold);
     transform: none !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  .cert-enter {
+    animation: none;
+  }
   .cert-sheen,
-  .cert-glow {
+  .cert-glow,
+  .cert-shine {
     display: none !important;
   }
   .cert-medallion {

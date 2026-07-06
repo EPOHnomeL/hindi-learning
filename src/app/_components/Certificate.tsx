@@ -16,18 +16,21 @@ export type CertificateData = {
   issuedAt: number;
   emblem: CertificateEmblem;
   token?: string;
+  // The larger, more theatrical treatment for the standalone public page (vs. the
+  // compact in-app dialogs). Presentational only.
+  showcase?: boolean;
 };
 
 // The Emblem itself, inside the card's medallion. An image is raster-only and
 // served same-origin (ADR 0017), so a plain <img> is safe and prints predictably;
 // a glyph is inert text. Decorative — the achievement is spelled out below it — so
-// it carries no alt text.
-function EmblemMark({ emblem }: { emblem: CertificateEmblem }) {
+// it carries no alt text. `large` scales the glyph up for the showcase view.
+function EmblemMark({ emblem, large }: { emblem: CertificateEmblem; large?: boolean }) {
   if (emblem.kind === "image") {
     return <img src={emblem.url} alt="" className="cert-emblem-img h-full w-full rounded-full object-cover" />;
   }
   return (
-    <span className="cert-emblem-glyph text-4xl leading-none" aria-hidden>
+    <span className={`cert-emblem-glyph leading-none ${large ? "text-5xl sm:text-6xl" : "text-4xl"}`} aria-hidden>
       {emblem.glyph}
     </span>
   );
@@ -66,27 +69,38 @@ function onCardLeave(e: React.MouseEvent<HTMLDivElement>) {
 // fetching, so the surfaces can't drift. Carries the subject's Emblem in a metallic
 // medallion, a holographic foil sheen, and a pointer tilt/spotlight (ADR 0017) —
 // all CSS (globals.css `.cert-*`), degrading to a flat engraved document under
-// print + reduced-motion. Brand: "My Course".
-export function CertificateCard({ learnerName, courseTitle, lessonCount, issuedAt, emblem }: CertificateData) {
+// print + reduced-motion. `showcase` (the public page) makes it larger and more
+// theatrical — a warm outer glow, a stronger foil, and an ambient shine sweep —
+// while the compact dialogs stay compact. Brand: "My Course".
+export function CertificateCard({ learnerName, courseTitle, lessonCount, issuedAt, emblem, showcase }: CertificateData) {
   const date = new Date(issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  const pad = showcase ? "px-10 py-14 sm:px-14 sm:py-16" : "px-8 py-10";
+  const medallion = showcase ? "h-24 w-24 sm:h-28 sm:w-28" : "h-20 w-20";
+  const nameSize = showcase ? "text-3xl sm:text-4xl" : "text-2xl";
+  const titleSize = showcase ? "text-2xl sm:text-3xl" : "text-xl";
   return (
     <div
-      className="cert-card relative isolate overflow-hidden rounded-2xl border-2 border-gold/60 bg-card px-8 py-10 text-center shadow-sm"
+      className={`cert-card relative isolate overflow-hidden rounded-2xl border-2 border-gold/60 bg-card text-center shadow-sm ${pad} ${
+        showcase ? "cert-card--showcase" : ""
+      }`}
       onMouseMove={onCardMove}
       onMouseLeave={onCardLeave}
     >
       <div className="cert-sheen pointer-events-none absolute inset-0" aria-hidden />
       <div className="cert-glow pointer-events-none absolute inset-0" aria-hidden />
+      {showcase && <div className="cert-shine pointer-events-none absolute inset-0" aria-hidden />}
       <div className="pointer-events-none absolute inset-2 rounded-xl border border-gold/30" aria-hidden />
       <div className="relative z-10">
-        <div className="cert-medallion mx-auto mb-5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-gold/70">
-          <EmblemMark emblem={emblem} />
+        <div
+          className={`cert-medallion mx-auto mb-5 flex items-center justify-center overflow-hidden rounded-full border-2 border-gold/70 ${medallion}`}
+        >
+          <EmblemMark emblem={emblem} large={showcase} />
         </div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent2">Certificate of Completion</p>
         <p className="mt-6 text-sm text-soft">This certifies that</p>
-        <p className="mt-1 text-2xl font-semibold text-accent">{learnerName}</p>
+        <p className={`mt-1 font-semibold text-accent ${nameSize}`}>{learnerName}</p>
         <p className="mt-4 text-sm text-soft">has completed the course</p>
-        <p className="mt-1 text-xl font-semibold text-ink">{courseTitle}</p>
+        <p className={`mt-1 font-semibold text-ink ${titleSize}`}>{courseTitle}</p>
         <p className="mt-6 text-sm text-soft">
           {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"} · {date}
         </p>
@@ -513,9 +527,9 @@ export function PublicCertificatePage({ token }: { token: string }) {
     );
   }
   return (
-    <main className="cert-print-page mx-auto flex min-h-dvh max-w-xl flex-col items-center justify-center gap-6 px-4 py-12">
-      <div className="w-full">
-        <CertificateCard {...cert} />
+    <main className="cert-print-page mx-auto flex min-h-dvh max-w-2xl flex-col items-center justify-center gap-6 px-4 py-12">
+      <div className="cert-enter w-full">
+        <CertificateCard {...cert} showcase />
       </div>
       <button
         onClick={() => window.print()}
