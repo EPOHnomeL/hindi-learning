@@ -25,6 +25,9 @@ next-env.d.ts
 .DS_Store
 *.pem
 
+# grill-my-knowledge skill: source of truth is .agents/skills/; .claude/ is a local symlink
+/.claude/skills/grill-my-knowledge
+
 # debug
 npm-debug.log*
 yarn-debug.log*

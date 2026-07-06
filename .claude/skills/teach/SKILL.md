@@ -91,13 +91,22 @@ Each run, before authoring, judge the course against the mission's **"Success lo
 
 Terminating is **not** the same as "nothing to add right now". Reporting `nothing` is a soft, re-fireable pause (the learner may complete more and fire again); terminating is the terminal end of the course. Use termination only when the mission is done, not when you're merely caught up for today.
 
+### Choosing the Emblem
+
+When you terminate, give the course an **Emblem** — the mark of its subject that appears on the certificate (see [ADR 0017](../../../docs/adr/0017-topic-emblem-on-certificates.md)). Supply both, so the certificate is never blank and always has a fallback:
+
+- **An image.** Find a fitting, recognisable image for the subject (a lotus for a Hindi course, a barbell for a fitness course). **Normalise it before uploading**: a small **square raster** — PNG, JPEG, or WebP (SVG is rejected) — roughly 256×256 and under ~100 KB, so it prints predictably and stays cheap on the anonymous page. Save it to a local file and pass its path.
+- **A fallback glyph.** A single emoji or short character for the same subject (🪷, 🏋️, 🎼). It stands in when there's no image, so always include one.
+
+The backend fetches nothing and processes nothing — it stores exactly the bytes you upload and serves them **same-origin**. The **owner** may override your choice from the app afterwards, and their choice always wins; never worry about clobbering it (the backend guarantees it).
+
 In the cloud Routine, terminate by calling the backend (the twin of `publish` / `report`) instead of authoring a lesson:
 
 ```sh
-pnpm run complete:prod "$SLUG"
+pnpm run complete:prod "$SLUG" --image ./emblem.png --glyph "🪷"
 ```
 
-then report `nothing` for the run. This sets the course's terminal `completed` state: the authoring gate refuses it, the reader stops offering "Generate next lesson", and an eligible learner can earn their certificate. It is reversible — the **owner** can reopen the course from the app if their goals grow later.
+Both `--image` and `--glyph` are optional (a lifelong mission or a subject you can't picture may pass just a glyph, or neither — a course with no Emblem falls back to a generic 🎓). Then report `nothing` for the run. This sets the course's terminal `completed` state: the authoring gate refuses it, the reader stops offering "Generate next lesson", and an eligible learner can earn their certificate. It is reversible — the **owner** can reopen the course from the app if their goals grow later.
 
 **Lifelong or open-ended missions** (e.g. "keep improving my Hindi forever", "stay fit for life") may legitimately *never* auto-complete — there is no discrete outcome to satisfy. Do **not** force these to a finish. Leave them to the learner's own "Mark course complete" action, and keep teaching while there is a worthwhile next step in the ZPD.
 

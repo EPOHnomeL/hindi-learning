@@ -1,3 +1,5 @@
+import { isDevanagari } from "../../../convex/languages";
+
 export type Theme = "light" | "dark";
 
 // Injected into the iframe. Three concerns, kept separate:
@@ -116,12 +118,51 @@ function injectReferenceDarkCss(html: string): string {
   return i === -1 ? REFERENCE_DARK_CSS + html : html.slice(0, i) + REFERENCE_DARK_CSS + html.slice(i);
 }
 
+// A translated Edition swaps the lesson's prose text nodes for the target
+// language, but the design system's body font — 'Spectral',Georgia,'Times New
+// Roman' — has no Devanagari glyphs. So a Hindi/Marathi/Nepali Edition's prose
+// fell through to the browser's default Devanagari face at a size tuned for
+// Latin: small and cramped (course-translation). Two parts, for the whole
+// Devanagari-script set:
+//  - load the same Noto Devanagari faces the taught content (.deva/.verse/.word)
+//    already uses. Lessons ship this <link> in head.html already (a duplicate is
+//    harmless — the browser dedupes); References don't, so this covers both.
+//  - splice those faces into the body chain AFTER 'Spectral', so per-glyph
+//    fallback keeps Latin (proper nouns, code) in Spectral while Devanagari
+//    resolves to Noto — and bump size/leading, which the script needs to read at
+//    the same weight as Latin. `html body` (0,0,2) outranks the base `body`
+//    (0,0,1) rule; the design system's explicit .deva/.verse/.word sizes have
+//    higher specificity still, so only unclassed prose is touched.
+const DEVANAGARI_CSS = `<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
+<style>html body{font-family:'Spectral','Noto Serif Devanagari','Noto Sans Devanagari',Georgia,serif; font-size:20px; line-height:1.82;}</style>`;
+
+// Inject the Devanagari font + size bump before </head> so it applies before paint.
+function injectDevanagariCss(html: string): string {
+  const i = html.indexOf("</head>");
+  return i === -1 ? DEVANAGARI_CSS + html : html.slice(0, i) + DEVANAGARI_CSS + html.slice(i);
+}
+
 // Bake the selected theme onto the root <html> so the lesson renders in the
 // right palette with no flash.
 function setRootTheme(html: string, theme: Theme): string {
   return html.replace(/<html\b([^>]*)>/i, (_m, attrs: string) => {
     const cleaned = attrs.replace(/\s+data-theme=(["']).*?\1/i, "");
     return `<html${cleaned} data-theme="${theme}">`;
+  });
+}
+
+// Bake the served Edition's text direction + language onto the root <html>, so a
+// translated lesson renders RTL and with the right `lang` for hyphenation/screen
+// readers (course-translation). Mirrors setRootTheme: strip any authored dir/lang
+// and stamp the Edition's. The stored lesson HTML ships `<html lang="en">`, which
+// this overwrites for a translated Edition.
+function setRootDirLang(html: string, dir?: "ltr" | "rtl", lang?: string): string {
+  if (!dir && !lang) return html;
+  return html.replace(/<html\b([^>]*)>/i, (_m, attrs: string) => {
+    let cleaned = attrs;
+    if (dir) cleaned = cleaned.replace(/\s+dir=(["']).*?\1/i, "");
+    if (lang) cleaned = cleaned.replace(/\s+lang=(["']).*?\1/i, "");
+    return `<html${cleaned}${dir ? ` dir="${dir}"` : ""}${lang ? ` lang="${lang}"` : ""}>`;
   });
 }
 
@@ -141,14 +182,22 @@ function stripLegacyThemePill(html: string): string {
 // given, makes the artifact app-themed: the legacy pill is stripped, the initial
 // theme is baked in, and the theme bridge is added so the parent can flip it live.
 // `themeCss` additionally injects the dark palette — set for References, which
-// (unlike lessons) don't bundle their own dark CSS. ADR 0011.
-export function buildSrcDoc(html: string, opts: { quiz: boolean; theme?: Theme; themeCss?: boolean }): string {
+// (unlike lessons) don't bundle their own dark CSS. ADR 0011. `dir`/`lang`, when
+// given, stamp the served Edition's text direction + language onto <html> so a
+// translated Edition renders RTL/localised (course-translation); a Devanagari
+// `lang` also gets the Devanagari font + size bump so its prose is legible.
+export function buildSrcDoc(
+  html: string,
+  opts: { quiz: boolean; theme?: Theme; themeCss?: boolean; dir?: "ltr" | "rtl"; lang?: string },
+): string {
   let doc = html;
   if (opts.theme) {
     doc = stripLegacyThemePill(doc);
     doc = setRootTheme(doc, opts.theme);
     if (opts.themeCss) doc = injectReferenceDarkCss(doc);
   }
+  doc = setRootDirLang(doc, opts.dir, opts.lang);
+  if (opts.lang && isDevanagari(opts.lang)) doc = injectDevanagariCss(doc);
   const scripts = HEIGHT_BRIDGE + NAV_BRIDGE + (opts.quiz ? QUIZ_BRIDGE : "") + (opts.theme ? THEME_BRIDGE : "");
   // Inject before the LAST </body>. A first-match replace is unsafe: an assembled
   // lesson can carry an authoring comment (or a code sample) that contains a

@@ -1,20 +1,50 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { decodeEntities } from "./content";
+import { SOURCE_LANG } from "./lib";
+import { langInfo } from "./languages";
 
 // The Guest read seam (issue 07 / ADR 0013). Every function here authorizes by
 // the Public link token, NOT by getAuthUserId — these serve anonymous Guests.
 // Queries only: a Guest has no mutations to call, so write-blocking is structural.
-// An invalid/absent token resolves to no Topic and returns null/[], so nothing
+// An invalid/absent token resolves to no Edition and returns null/[], so nothing
 // reveals whether a Topic exists.
+//
+// A token identifies ONE Edition (course-translation): a per-language
+// `publicLinks` row, or the legacy per-Topic `topics.publicToken` (English). The
+// Guest is fixed to that Edition — content is served in its language, falling
+// back to the English source per item.
 
-async function topicByPublicToken(ctx: QueryCtx, token: string): Promise<Doc<"topics"> | null> {
+async function resolveEdition(ctx: QueryCtx, token: string): Promise<{ topic: Doc<"topics">; lang: string } | null> {
   if (!token) return null;
-  return await ctx.db
+  const link = await ctx.db
+    .query("publicLinks")
+    .withIndex("by_token", (q) => q.eq("token", token))
+    .unique();
+  if (link) {
+    const topic = await ctx.db.get(link.topicId);
+    return topic ? { topic, lang: link.lang } : null;
+  }
+  const topic = await ctx.db
     .query("topics")
     .withIndex("by_public_token", (q) => q.eq("publicToken", token))
     .unique();
+  return topic ? { topic, lang: SOURCE_LANG } : null;
+}
+
+// One Edition's translated rows, keyed `${kind}:${key}` (empty for English).
+async function editionMap(
+  ctx: QueryCtx,
+  topicId: Id<"topics">,
+  lang: string,
+): Promise<Map<string, Doc<"translations">>> {
+  if (lang === SOURCE_LANG) return new Map();
+  const rows = await ctx.db
+    .query("translations")
+    .withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", lang))
+    .collect();
+  return new Map(rows.map((r) => [`${r.kind}:${r.key}`, r]));
 }
 
 // Everything a Guest needs to render the course shell + read-only panels, in one
@@ -32,6 +62,9 @@ export const publicCourse = query({
     v.null(),
     v.object({
       title: v.string(),
+      // The Edition this token serves + its text direction (course-translation).
+      lang: v.string(),
+      dir: v.union(v.literal("ltr"), v.literal("rtl")),
       lessons: v.array(v.object({ key: v.string(), seq: v.number(), title: v.string() })),
       references: v.array(v.object({ key: v.string(), title: v.string() })),
       resources: v.array(
@@ -58,20 +91,22 @@ export const publicCourse = query({
     }),
   ),
   handler: async (ctx, { token }) => {
-    const topic = await topicByPublicToken(ctx, token);
-    if (!topic) return null;
+    const resolved = await resolveEdition(ctx, token);
+    if (!resolved) return null;
+    const { topic, lang } = resolved;
+    const tmap = await editionMap(ctx, topic._id, lang);
 
     const lessons = (
       await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
     )
       .filter((l) => !l.supersededBy)
-      .map((l) => ({ key: l.key, seq: l.seq, title: decodeEntities(l.title) }));
+      .map((l) => ({ key: l.key, seq: l.seq, title: decodeEntities(tmap.get(`lesson:${l.key}`)?.title ?? l.title) }));
 
     const references = (
       await ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()
     )
       .sort((a, b) => a.key.localeCompare(b.key))
-      .map((r) => ({ key: r.key, title: decodeEntities(r.title) }));
+      .map((r) => ({ key: r.key, title: decodeEntities(tmap.get(`reference:${r.key}`)?.title ?? r.title) }));
 
     const resources = await Promise.all(
       (await ctx.db.query("resources").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()).map(
@@ -103,10 +138,29 @@ export const publicCourse = query({
             .collect()
         )
           .sort((a, b) => b._creationTime - a._creationTime)
-          .map((q) => ({ id: q._id, lessonKey: q.lessonKey, text: q.text, status: q.status, reply: q.reply ?? null }))
+          .map((q) => {
+            const t = tmap.get(`question:${q._id}`);
+            return {
+              id: q._id,
+              lessonKey: q.lessonKey,
+              text: t?.text ?? q.text,
+              status: q.status,
+              reply: (q.reply ? (t?.reply ?? q.reply) : null) ?? null,
+            };
+          })
       : [];
 
-    return { title: decodeEntities(topic.title), lessons, references, resources, progress, questions };
+    const title = decodeEntities(tmap.get("title:")?.text ?? topic.title);
+    return {
+      title,
+      lang,
+      dir: langInfo(lang).rtl ? ("rtl" as const) : ("ltr" as const),
+      lessons,
+      references,
+      resources,
+      progress,
+      questions,
+    };
   },
 });
 
@@ -116,14 +170,29 @@ export const publicLesson = query({
   args: { token: v.string(), key: v.string() },
   returns: v.union(v.null(), v.object({ key: v.string(), seq: v.number(), title: v.string(), html: v.string() })),
   handler: async (ctx, { token, key }) => {
-    const topic = await topicByPublicToken(ctx, token);
-    if (!topic) return null;
+    const resolved = await resolveEdition(ctx, token);
+    if (!resolved) return null;
+    const { topic, lang } = resolved;
     const lesson = await ctx.db
       .query("lessons")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     if (!lesson || lesson.supersededBy) return null;
-    return { key: lesson.key, seq: lesson.seq, title: decodeEntities(lesson.title), html: lesson.html };
+    const t =
+      lang === SOURCE_LANG
+        ? null
+        : await ctx.db
+            .query("translations")
+            .withIndex("by_topic_lang_kind_key", (q) =>
+              q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "lesson").eq("key", key),
+            )
+            .unique();
+    return {
+      key: lesson.key,
+      seq: lesson.seq,
+      title: decodeEntities(t?.title ?? lesson.title),
+      html: t?.html ?? lesson.html,
+    };
   },
 });
 
@@ -132,12 +201,23 @@ export const publicReference = query({
   args: { token: v.string(), key: v.string() },
   returns: v.union(v.null(), v.object({ key: v.string(), title: v.string(), html: v.string() })),
   handler: async (ctx, { token, key }) => {
-    const topic = await topicByPublicToken(ctx, token);
-    if (!topic) return null;
+    const resolved = await resolveEdition(ctx, token);
+    if (!resolved) return null;
+    const { topic, lang } = resolved;
     const ref = await ctx.db
       .query("references")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
-    return ref ? { key: ref.key, title: decodeEntities(ref.title), html: ref.html } : null;
+    if (!ref) return null;
+    const t =
+      lang === SOURCE_LANG
+        ? null
+        : await ctx.db
+            .query("translations")
+            .withIndex("by_topic_lang_kind_key", (q) =>
+              q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "reference").eq("key", key),
+            )
+            .unique();
+    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), html: t?.html ?? ref.html };
   },
 });

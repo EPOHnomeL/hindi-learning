@@ -13,12 +13,15 @@ import type * as capture from "../capture.js";
 import type * as certificates from "../certificates.js";
 import type * as content from "../content.js";
 import type * as crons from "../crons.js";
+import type * as emblem from "../emblem.js";
 import type * as http from "../http.js";
+import type * as languages from "../languages.js";
 import type * as lib from "../lib.js";
 import type * as public_ from "../public.js";
 import type * as resources from "../resources.js";
 import type * as routine from "../routine.js";
 import type * as shares from "../shares.js";
+import type * as translate from "../translate.js";
 import type * as whitelist from "../whitelist.js";
 
 import type {
@@ -33,12 +36,15 @@ declare const fullApi: ApiFromModules<{
   certificates: typeof certificates;
   content: typeof content;
   crons: typeof crons;
+  emblem: typeof emblem;
   http: typeof http;
+  languages: typeof languages;
   lib: typeof lib;
   public: typeof public_;
   resources: typeof resources;
   routine: typeof routine;
   shares: typeof shares;
+  translate: typeof translate;
   whitelist: typeof whitelist;
 }>;
 

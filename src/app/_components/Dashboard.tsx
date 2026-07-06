@@ -2,11 +2,14 @@
 
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import { type FunctionReturnType } from "convex/server";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { LANGUAGES, langInfo } from "../../../convex/languages";
 import { CertificateControl } from "./Certificate";
+import { withLang } from "./editionUrl";
 import { Logo } from "./Logo";
 import { Markdown } from "./MarkdownView";
 import { missionPreview } from "./markdown";
@@ -20,6 +23,8 @@ type Course = {
   publicToken: string | null;
   lessonCount: number;
   completedCount: number;
+  // Ready translation Editions (language codes), shown as chips (course-translation).
+  editions: string[];
 };
 
 type SharedCourse = {
@@ -29,7 +34,12 @@ type SharedCourse = {
   mission: string | null;
   lessonCount: number;
   completedCount: number;
+  // The Edition languages this Viewer holds — chips + which one to open in.
+  langs: { lang: string; name: string; native: string; rtl: boolean }[];
 };
+
+// One row of the owner's Editions panel, straight from api.translate.editions.
+type Edition = NonNullable<FunctionReturnType<typeof api.translate.editions>>["editions"][number];
 
 // The home dashboard (`/`): the course grid (create / edit / open) plus the
 // "Shared with me" section. Opening a course is now a real navigation to
@@ -82,6 +92,26 @@ export function Dashboard() {
   );
 }
 
+// A course's ready Edition languages, as small pills (course-translation). Shown
+// on the owner's cards (the translations they've made) and the Viewer's shared
+// cards (the Editions they hold). RTL endonyms render right-to-left.
+function LangChips({ langs }: { langs: { lang: string; native: string; rtl: boolean }[] }) {
+  if (langs.length === 0) return null;
+  return (
+    <div className="mb-3 flex flex-wrap gap-1">
+      {langs.map((l) => (
+        <span
+          key={l.lang}
+          dir={l.rtl ? "rtl" : undefined}
+          className="rounded-full bg-hi px-2 py-0.5 text-[11px] font-medium text-accent2"
+        >
+          {l.native}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 // Courses other learners have shared with me — read-only. Hidden when none.
 function SharedSection() {
   const shared = useQuery(api.shares.listSharedTopics);
@@ -125,9 +155,11 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
         <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />
       )}
 
-      <p className="mb-4 text-xs text-soft">
+      <p className="mb-3 text-xs text-soft">
         Shared by <span className="text-ink">{course.ownerEmail ?? "another learner"}</span>
       </p>
+
+      <LangChips langs={course.langs} />
 
       <div className="mb-4 mt-auto">
         <div className="mb-1 flex items-center justify-between text-xs text-soft">
@@ -152,8 +184,14 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
         className="mb-2 w-full rounded-lg bg-gold/20 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-gold/30"
       />
 
+      {/* Open in the Edition the card's title is shown in — English if the Viewer
+          holds it, else their first Edition (mirrors listSharedTopics' `preferred`),
+          so the title and what "Open course" opens can't disagree. */}
       <Link
-        href={`/courses/${course.slug}`}
+        href={withLang(
+          `/courses/${course.slug}`,
+          course.langs.some((l) => l.lang === "en") ? "en" : course.langs[0]?.lang,
+        )}
         className="w-full rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
       >
         Open course
@@ -219,6 +257,14 @@ function CourseCard({ course }: { course: Course }) {
       {showMission && course.mission && (
         <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />
       )}
+
+      {/* Ready translation Editions (course-translation). Managed under Share. */}
+      <LangChips
+        langs={course.editions.map((code) => {
+          const i = langInfo(code);
+          return { lang: i.code, native: i.native, rtl: !!i.rtl };
+        })}
+      />
 
       {/* Progress */}
       <div className="mb-4 mt-auto">
@@ -314,15 +360,30 @@ function MissionDialog({ title, mission, onClose }: { title: string; mission: st
   );
 }
 
-// The Topic's sharing controls: share with a known account (a Share → Viewer),
-// and the anonymous Public link (issue 07 / ADR 0013). Two distinct sections —
-// "Share" stays account-to-account; the Public link is the account-less form.
+// The Topic's Editions panel (course-translation): the source English Edition
+// plus each translation, each with its own sharing (by-email → Viewer, and the
+// anonymous Public link), plus controls to add or remove a language. Replaces the
+// old single-Edition Share panel — English sharing now lives in its Edition row.
+// Live translation status comes free from the reactive `editions` query.
 function SharePanel({ course, onDone }: { course: Course; onDone: () => void }) {
+  const data = useQuery(api.translate.editions, { topicSlug: course.slug });
   return (
     <div className="flex flex-col gap-4 rounded-2xl border border-gold/50 bg-card p-5 shadow-sm">
-      <ShareByEmail course={course} />
-      <hr className="border-line" />
-      <PublicLinkControls course={course} />
+      <h3 className="truncate text-sm font-semibold text-accent">Editions of “{course.title}”</h3>
+      {data === undefined ? (
+        <p className="text-sm text-soft">Loading…</p>
+      ) : data === null ? (
+        <p className="text-sm text-soft">Couldn’t load editions.</p>
+      ) : (
+        <>
+          <div className="flex flex-col gap-2">
+            {data.editions.map((ed) => (
+              <EditionRow key={ed.lang} slug={course.slug} edition={ed} />
+            ))}
+          </div>
+          <AddLanguage slug={course.slug} editions={data.editions} completed={data.completed} />
+        </>
+      )}
       <button type="button" onClick={onDone} className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi">
         Done
       </button>
@@ -330,10 +391,191 @@ function SharePanel({ course, onDone }: { course: Course; onDone: () => void }) 
   );
 }
 
-// Share with another learner by email (read-only Viewer access). If they already
-// have an account they get access at once; if not, the invite is held and turns
-// into access the moment they sign up. Listing/revoking Viewers is issue 06.
-function ShareByEmail({ course }: { course: Course }) {
+// One Edition's row: its endonym (+ Source/RTL tags) and live status, and — once
+// ready — a shareCount summary, a toggle into its share controls, and (for a
+// translation) a Remove. English is the source and can't be removed.
+function EditionRow({ slug, edition }: { slug: string; edition: Edition }) {
+  const remove = useMutation(api.translate.removeEdition);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <div className="rounded-xl border border-line p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="truncate text-sm font-medium text-ink" dir={edition.rtl ? "rtl" : undefined}>
+            {edition.native}
+          </span>
+          {edition.source && (
+            <span className="shrink-0 rounded-full bg-hi px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent2">
+              Source
+            </span>
+          )}
+          {edition.rtl && (
+            <span className="shrink-0 rounded-full bg-hi px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-soft">
+              RTL
+            </span>
+          )}
+        </div>
+        <EditionStatus slug={slug} edition={edition} />
+      </div>
+
+      {edition.status === "ready" && (
+        <>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="min-w-0 truncate text-xs text-soft">
+              {edition.shareCount === 0
+                ? "Not shared"
+                : `${edition.shareCount} ${edition.shareCount === 1 ? "share" : "shares"}`}
+              {edition.publicToken ? " · public link on" : ""}
+            </span>
+            <div className="flex shrink-0 items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                className="rounded-lg border border-line px-2.5 py-1 text-xs text-soft transition-colors hover:bg-hi hover:text-accent"
+              >
+                {open ? "Hide" : "Share"}
+              </button>
+              {!edition.source && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setBusy(true);
+                    void remove({ topicSlug: slug, lang: edition.lang }).finally(() => setBusy(false));
+                  }}
+                  className="rounded-lg border border-line px-2.5 py-1 text-xs text-soft transition-colors hover:bg-hi hover:text-red-600 disabled:opacity-60"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+          {open && (
+            <div className="mt-3 flex flex-col gap-4 border-t border-line pt-3">
+              <ShareByEmail slug={slug} lang={edition.lang} />
+              <PublicLinkControls slug={slug} lang={edition.lang} publicToken={edition.publicToken} />
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// The Edition's live translation status: a progress line while translating, a
+// retry on a failed run (re-runs startTranslation, which only reschedules the
+// items that changed/failed), and "Ready" (with a failed-item count if any) once
+// usable.
+function EditionStatus({ slug, edition }: { slug: string; edition: Edition }) {
+  const retry = useAction(api.translate.startTranslation);
+  const [busy, setBusy] = useState(false);
+
+  if (edition.status === "translating") {
+    return (
+      <span className="shrink-0 animate-pulse text-xs text-soft">
+        Translating {edition.done}/{edition.total}…
+      </span>
+    );
+  }
+  if (edition.status === "failed") {
+    return (
+      <button
+        type="button"
+        disabled={busy}
+        title="Some items failed to translate — retry them"
+        onClick={() => {
+          setBusy(true);
+          void retry({ topicSlug: slug, lang: edition.lang }).finally(() => setBusy(false));
+        }}
+        className="shrink-0 rounded-lg border border-line px-2.5 py-1 text-xs text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
+      >
+        Failed — retry
+      </button>
+    );
+  }
+  return (
+    <span className="shrink-0 text-xs font-medium text-accent2">
+      {edition.failed > 0 ? `Ready · ${edition.failed} failed` : "Ready"}
+    </span>
+  );
+}
+
+// Add a translation Edition: a searchable pick from LANGUAGES (excluding the
+// Editions already present) that kicks off a bulk translation. Only a completed
+// course is translatable (its content is frozen), so when it isn't, this shows
+// the unlock hint instead of the picker.
+function AddLanguage({ slug, editions, completed }: { slug: string; editions: Edition[]; completed: boolean }) {
+  const start = useAction(api.translate.startTranslation);
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  if (!completed) {
+    return (
+      <p className="rounded-lg border border-dashed border-line px-3 py-2 text-xs text-soft">
+        Translation unlocks once the course is marked complete.
+      </p>
+    );
+  }
+
+  const present = new Set(editions.map((e) => e.lang));
+  const needle = q.trim().toLowerCase();
+  const matches = needle
+    ? LANGUAGES.filter(
+        (l) =>
+          !present.has(l.code) &&
+          (l.name.toLowerCase().includes(needle) ||
+            l.native.toLowerCase().includes(needle) ||
+            l.code.toLowerCase().includes(needle)),
+      ).slice(0, 8)
+    : [];
+
+  const add = (code: string) => {
+    setBusy(true);
+    setQ("");
+    void start({ topicSlug: slug, lang: code }).finally(() => setBusy(false));
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Add a language</label>
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        disabled={busy}
+        placeholder="Search languages…"
+        className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none disabled:opacity-60"
+      />
+      {matches.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {matches.map((l) => (
+            <li key={l.code}>
+              <button
+                type="button"
+                onClick={() => add(l.code)}
+                className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-1.5 text-left text-sm text-ink transition-colors hover:bg-hi"
+              >
+                <span dir={l.rtl ? "rtl" : undefined}>{l.native}</span>
+                <span className="shrink-0 text-xs text-soft">
+                  {l.name}
+                  {l.rtl ? " · RTL" : ""}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {needle && matches.length === 0 && <p className="text-xs text-soft">No matching language.</p>}
+    </div>
+  );
+}
+
+// Share one Edition with another learner by email (read-only Viewer access). If
+// they already have an account they get access at once; if not, the invite is
+// held and turns into access the moment they sign up. Scoped to `lang` — a Viewer
+// gets exactly the Edition(s) shared with them.
+function ShareByEmail({ slug, lang }: { slug: string; lang: string }) {
   const shareTopic = useMutation(api.shares.shareTopic);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -350,7 +592,7 @@ function ShareByEmail({ course }: { course: Course }) {
         setBusy(true);
         setError(null);
         try {
-          const status = await shareTopic({ topicSlug: course.slug, email: addr });
+          const status = await shareTopic({ topicSlug: slug, email: addr, lang });
           setDone({ email: addr, status });
           setEmail("");
         } catch {
@@ -360,11 +602,10 @@ function ShareByEmail({ course }: { course: Course }) {
         }
       }}
     >
-      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Share “{course.title}” with a person</label>
-      <p className="text-sm text-soft">They’ll get read-only access — view your lessons, but not edit anything. No account yet? They’ll get access the moment they sign up.</p>
+      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Share with a person</label>
+      <p className="text-sm text-soft">They’ll get read-only access to this edition — view your lessons, but not edit anything. No account yet? They’ll get access the moment they sign up.</p>
       <div className="flex gap-2">
         <input
-          autoFocus
           type="email"
           value={email}
           onChange={(e) => {
@@ -386,20 +627,21 @@ function ShareByEmail({ course }: { course: Course }) {
   );
 }
 
-// The anonymous Public link: a single on/off token per Topic. "Make public" /
-// "Regenerate" both mint a fresh token (old link dies); "Turn off" revokes.
-// The token is read live from the dashboard query (course.publicToken).
-function PublicLinkControls({ course }: { course: Course }) {
-  const setPublic = useMutation(api.shares.setTopicPublic);
+// The anonymous Public link for one Edition. "Make public" / "Regenerate" both
+// mint a fresh token (old link dies); "Turn off" revokes. Uses setEditionPublic
+// (English maps to the legacy per-Topic token under the hood); the token is read
+// live from the reactive editions query (edition.publicToken).
+function PublicLinkControls({ slug, lang, publicToken }: { slug: string; lang: string; publicToken: string | null }) {
+  const setPublic = useMutation(api.shares.setEditionPublic);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const url = course.publicToken ? `${origin}/share/${course.publicToken}` : null;
+  const url = publicToken ? `${origin}/share/${publicToken}` : null;
 
   const run = async (isPublic: boolean) => {
     setBusy(true);
     try {
-      await setPublic({ topicSlug: course.slug, isPublic });
+      await setPublic({ topicSlug: slug, lang, isPublic });
     } finally {
       setBusy(false);
     }

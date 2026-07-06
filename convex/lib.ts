@@ -3,6 +3,17 @@ import type { Doc, Id } from "./_generated/dataModel";
 
 // Shared backend helpers. (Plain module — no Convex functions registered here.)
 
+// The source language every course is authored in (the medium the teach skill
+// writes). It is the default Edition: `translations` rows exist only for OTHER
+// languages, and a Share/pendingShare/Certificate with no `lang` reads as this.
+export const SOURCE_LANG = "en";
+
+// A Share's granted Edition language. Legacy Shares (pre course-translation)
+// carry no `lang` and grant the English edition.
+export function shareLang(s: Doc<"shares">): string {
+  return s.lang ?? SOURCE_LANG;
+}
+
 // Trim + lower-case — the one email normalisation used everywhere a person is
 // named by address (shares, invites), matching how Convex Auth stores
 // `users.email` and how the Allowlist stores its rows. Without it a lookup would
@@ -22,11 +33,17 @@ export async function claimPendingShares(ctx: MutationCtx, userId: Id<"users">, 
     .withIndex("by_email", (q) => q.eq("email", normaliseEmail(email)))
     .collect();
   for (const invite of pending) {
-    const already = await ctx.db
+    const lang = invite.lang ?? SOURCE_LANG;
+    // Dedup per (Topic, Viewer, Edition): a Viewer may hold several Shares on one
+    // Topic (one per language), so match on lang, not just the pair. In-memory —
+    // legacy rows carry no `lang`, which an index `.eq` can't match cleanly.
+    const existing = await ctx.db
       .query("shares")
       .withIndex("by_topic_viewer", (q) => q.eq("topicId", invite.topicId).eq("viewerId", userId))
-      .unique();
-    if (!already) await ctx.db.insert("shares", { topicId: invite.topicId, viewerId: userId });
+      .collect();
+    if (!existing.some((s) => shareLang(s) === lang)) {
+      await ctx.db.insert("shares", { topicId: invite.topicId, viewerId: userId, lang });
+    }
     await ctx.db.delete(invite._id);
   }
 }
@@ -38,6 +55,19 @@ export function mintToken(): string {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// A cheap, stable 32-bit string hash (FNV-1a) as hex. Used only to detect
+// whether a source item changed since it was last translated (staleness), so a
+// re-translate can skip unchanged items — not for security. Synchronous, unlike
+// crypto.subtle, so it's usable inside a query/mutation without awaiting.
+export function hashString(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16);
 }
 
 // Guards the PUBLISH_SECRET-protected mutations the teach CLI / cloud agent call.
@@ -69,11 +99,59 @@ export async function getViewableTopic(ctx: QueryCtx, userId: Id<"users">, slug:
   const topic = await topicBySlug(ctx, slug);
   if (!topic) return null;
   if (topic.ownerId === userId) return topic;
+  // Any Share (in any language) grants topic-level visibility; WHICH Edition the
+  // Viewer may read is resolved separately by `readableLang`. `.first()` (not
+  // `.unique()`): a Viewer can now hold several Shares on one Topic.
   const share = await ctx.db
     .query("shares")
     .withIndex("by_topic_viewer", (q) => q.eq("topicId", topic._id).eq("viewerId", userId))
-    .unique();
+    .first();
   return share ? topic : null;
+}
+
+// ---- Editions (course-translation) -----------------------------------------
+
+// The Edition languages a Viewer holds on a Topic (from their Shares).
+export async function viewerLangs(ctx: QueryCtx, topicId: Id<"topics">, userId: Id<"users">): Promise<Set<string>> {
+  const shares = await ctx.db
+    .query("shares")
+    .withIndex("by_topic_viewer", (q) => q.eq("topicId", topicId).eq("viewerId", userId))
+    .collect();
+  return new Set(shares.map(shareLang));
+}
+
+// The set of Editions the caller may read on a Topic. The owner holds the source
+// English edition plus every language with a READY translation job (a generated
+// Edition); a Viewer holds the languages their Shares grant; anyone else nothing.
+export async function heldLangs(ctx: QueryCtx, topic: Doc<"topics">, userId: Id<"users">): Promise<Set<string>> {
+  if (topic.ownerId === userId) {
+    const jobs = await ctx.db
+      .query("translationJobs")
+      .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
+      .collect();
+    const langs = new Set<string>([SOURCE_LANG]);
+    for (const j of jobs) if (j.status === "ready") langs.add(j.lang);
+    return langs;
+  }
+  return await viewerLangs(ctx, topic._id, userId);
+}
+
+// Which Edition to actually serve, given the caller's request. Honours
+// `requested` only if the caller holds it (you can't self-serve a language by
+// editing the URL — it must be shared with you / owned); otherwise falls back to
+// the English edition if held, else a deterministic held language; null if the
+// caller holds no Edition at all.
+export async function readableLang(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  userId: Id<"users">,
+  requested?: string | null,
+): Promise<string | null> {
+  const held = await heldLangs(ctx, topic, userId);
+  if (held.size === 0) return null;
+  if (requested && held.has(requested)) return requested;
+  if (held.has(SOURCE_LANG)) return SOURCE_LANG;
+  return [...held].sort()[0]!;
 }
 
 // A Topic's live progress counts for a dashboard/Shared-with-me card: how many

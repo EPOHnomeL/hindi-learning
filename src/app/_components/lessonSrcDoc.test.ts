@@ -57,6 +57,27 @@ describe("buildSrcDoc", () => {
     expect(out.indexOf("type:'navigate'")).toBeLessThan(out.lastIndexOf("</body>"));
   });
 
+  it("serves a Devanagari Edition in the Noto Devanagari webfont, into <head>", () => {
+    const out = buildSrcDoc(LESSON, { quiz: true, dir: "ltr", lang: "hi" });
+    expect(out).toContain('lang="hi"'); // Edition lang stamped
+    expect(out).toContain("Noto+Serif+Devanagari"); // webfont link
+    expect(out).toContain("'Noto Serif Devanagari'"); // spliced into the body chain
+    expect(out).toContain("font-size:20px"); // size bump for the script
+    // Font override must land inside <head> so it applies before the body renders.
+    expect(out.indexOf("Noto Serif Devanagari")).toBeLessThan(out.indexOf("</head>"));
+  });
+
+  it("resolves the script from the base subtag and covers Marathi too", () => {
+    expect(buildSrcDoc(LESSON, { quiz: true, lang: "hi-IN" })).toContain("'Noto Serif Devanagari'");
+    expect(buildSrcDoc(LESSON, { quiz: true, lang: "mr" })).toContain("'Noto Serif Devanagari'");
+  });
+
+  it("leaves a Latin-script Edition's font untouched", () => {
+    const out = buildSrcDoc(LESSON, { quiz: true, dir: "ltr", lang: "es" });
+    expect(out).toContain('lang="es"');
+    expect(out).not.toContain("Noto Serif Devanagari"); // no font override for Spanish
+  });
+
   it("themes a reference: bakes theme, injects the dark palette into <head>, adds the bridge", () => {
     const ref = `<!DOCTYPE html><html lang="en"><head><style>:root{--paper:#fbf7f0}</style></head><body><div class="term"><div class="name">x</div></div></body></html>`;
     const out = buildSrcDoc(ref, { quiz: false, theme: "dark", themeCss: true });
