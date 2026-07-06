@@ -134,16 +134,23 @@ export function CertificateControl({ topicSlug, className }: { topicSlug: string
     "rounded-lg bg-gold/20 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-gold/30";
 
   // Earned: "View" opens the standalone public certificate page in a new tab —
-  // the shareable, printable surface — rather than an in-app dialog. Eligible but
-  // not yet earned: open the claim dialog.
+  // the shareable, printable surface — rather than an in-app dialog. A real anchor
+  // (not window.open) so the new tab is never popup-blocked: window.open with a
+  // features string opens a *popup*, which browsers silently blocked on the
+  // deployed domain (it "worked" only on localhost). `inline-flex … justify-center`
+  // makes the anchor lay out like the button it replaces — a centred label, and
+  // full-width when the caller passes `w-full`. Eligible but not yet earned: open
+  // the claim dialog.
   if (certificate) {
     return (
-      <button
-        onClick={() => window.open(`/certificate/${certificate.token}`, "_blank", "noopener,noreferrer")}
-        className={btnClass}
+      <a
+        href={`/certificate/${certificate.token}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`inline-flex items-center justify-center ${btnClass}`}
       >
         🎓 View your certificate
-      </button>
+      </a>
     );
   }
   return (
@@ -308,20 +315,27 @@ function fireConfetti() {
   });
 }
 
-// The completion celebration (ADR 0015): a one-shot confetti burst + a certificate
-// card reveal, shown the first time a learner is newly eligible or just-earned on
-// a completed course — for whoever becomes eligible (owner or Viewer), whenever
-// they next load it, not only at the instant of "Mark complete". Wraps slice 2's
-// claim flow (CertificateBody): the name field completes the claim, then the same
-// dialog flips to the earned card + download/share CTA. Fires once per Certificate
-// via a per-device localStorage marker, so revisiting a completed lesson doesn't
-// re-trigger it; dismissing without claiming still leaves the persistent
-// "Claim your certificate" control (CertificateControl) for later.
+// The completion moment (ADR 0015): the first time a learner is eligible or
+// just-earned on a completed course — owner or Viewer, whenever they next load it,
+// not only at the instant of "Mark complete" — auto-mint the Certificate (blank
+// name → the account email's local-part) and open its standalone page in a new
+// tab, alongside a one-shot confetti burst. This replaces the old in-app claim
+// dialog: no name prompt, no modal. Fires once per device via a per-device
+// localStorage marker, so revisiting a completed lesson doesn't re-trigger it.
+// `window.open` from this (non-click) effect is popup-blocked by most browsers, so
+// when the tab doesn't open we fall back to a small, dismissible banner — a
+// one-click, never-blocked anchor. The persistent CertificateControl remains the
+// way to view it again later.
 export function CompletionCelebration({ topicSlug }: { topicSlug: string }) {
   const data = useQuery(api.certificates.myCertificate, { topicSlug });
-  const [show, setShow] = useState(false);
-  const ref = useRef<HTMLDialogElement>(null);
+  const claim = useMutation(api.certificates.claimCertificate);
+  // The Edition being read (course-translation) — snapshot its title onto the
+  // certificate, so finishing the Spanish edition earns a Spanish-titled one.
+  const lang = useEditionLang();
   const firedRef = useRef(false);
+  // The earned token, surfaced only when the auto-opened tab was popup-blocked —
+  // then this renders a one-click fallback link instead of nothing.
+  const [blockedToken, setBlockedToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (firedRef.current || !data) return;
@@ -333,57 +347,49 @@ export function CompletionCelebration({ topicSlug }: { topicSlug: string }) {
       /* storage unavailable — celebrate anyway, just don't persist suppression */
     }
     if (seen) return;
-    firedRef.current = true;
-    try {
-      localStorage.setItem(`${CELEBRATED_KEY}:${topicSlug}`, "1");
-    } catch {
-      /* ignore */
-    }
-    setShow(true);
-    fireConfetti();
-  }, [data, topicSlug]);
+    firedRef.current = true; // guard against a double-fire within this mount
 
-  useEffect(() => {
-    if (show) ref.current?.showModal();
-  }, [show]);
+    void (async () => {
+      // Reuse an already-earned certificate; otherwise mint one now (blank name →
+      // the account email's local-part). Only mark the device as celebrated once we
+      // hold a token, so a transient claim failure retries on the next load rather
+      // than silently swallowing the moment.
+      let token = data.certificate?.token ?? null;
+      if (!token) {
+        try {
+          const cert = await claim({ topicSlug, name: "", lang: lang ?? undefined });
+          token = cert.token;
+        } catch {
+          return; // no longer eligible / raced — the persistent control still offers it
+        }
+      }
+      try {
+        localStorage.setItem(`${CELEBRATED_KEY}:${topicSlug}`, "1");
+      } catch {
+        /* ignore */
+      }
+      fireConfetti();
+      const opened = window.open(`/certificate/${token}`, "_blank", "noopener,noreferrer");
+      if (!opened) setBlockedToken(token); // popup-blocked — offer a one-click link
+    })();
+  }, [data, topicSlug, claim, lang]);
 
-  if (!show || !data) return null;
-  const certificate = data.certificate;
+  if (!blockedToken) return null;
   return (
-    <dialog
-      ref={ref}
-      onClose={() => setShow(false)}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close();
-      }}
-      className="m-auto w-[92vw] max-w-lg rounded-2xl border border-line bg-paper p-0 text-ink shadow-xl backdrop:bg-black/40"
-    >
-      <div className="flex items-center justify-end px-3 py-2">
-        <button
-          onClick={() => ref.current?.close()}
-          aria-label="Close"
-          className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
-        >
-          ✕
-        </button>
-      </div>
-      <div className="cert-reveal px-6 pb-8 pt-1 text-center">
-        <p className="text-4xl" aria-hidden>
-          🎉
-        </p>
-        <h2 className="mt-2 text-xl font-semibold text-accent">
-          {certificate ? "Your certificate is ready" : "You finished the course!"}
-        </h2>
-        <p className="mt-1 text-sm text-soft">
-          {certificate
-            ? "Keep it, download it as a PDF, or share the link."
-            : "Add the name to print on your certificate."}
-        </p>
-        <div className="mt-5 text-left">
-          <CertificateBody topicSlug={topicSlug} certificate={certificate} />
-        </div>
-      </div>
-    </dialog>
+    <div className="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-[92vw] max-w-sm items-center justify-between gap-3 rounded-2xl border border-gold/50 bg-card px-4 py-3 text-sm shadow-xl">
+      <span className="flex items-center gap-2 text-accent">
+        <span aria-hidden>🎉</span> Your certificate is ready.
+      </span>
+      <a
+        href={`/certificate/${blockedToken}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => setBlockedToken(null)}
+        className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90"
+      >
+        View →
+      </a>
+    </div>
   );
 }
 
