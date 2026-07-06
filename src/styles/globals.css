@@ -164,16 +164,23 @@ html[data-theme="dark"] .cert-card--showcase {
 /* ─────────────────────────────────────────────────────────────────────────
    A4-landscape "real certificate" — the standalone /certificate/[token] page.
    ─────────────────────────────────────────────────────────────────────────
-   The whole document is sized in container units (`container-type: inline-size`
-   + `cqw`), so every element — type, medallion, frame, seal — scales as one
-   block from phone to wide desktop, and the ratio holds. Decorative layers (a
-   guilloché weave, a double gold frame, filigree corners, a foil wax seal,
-   signature rules) sit beneath the z-10 content layer and opt into
-   print-color-adjust so the engraving survives the PDF (see @media print). */
+   Everything is sized off one design unit, `--u`: on screen it is `1cqw` (via
+   the `.cert-doc-shell` container-query context), so the whole document scales
+   as one block from phone to wide desktop. In print `--u` is overridden to a
+   fixed `mm` (see @media print), so the printed layout never depends on
+   container-query units — Chromium resolves those incorrectly while printing,
+   which overflowed the text into the card's clip. Decorative layers (guilloché
+   weave, double gold frame, filigree corners, foil wax seal, signature rules)
+   sit beneath the z-10 content and opt into print-color-adjust so the engraving
+   survives the PDF. */
 
-/* The stage behind the document: a warm, softly-lit backdrop so the paper lifts
-   off the page. Theme-aware; flattened to white in print. */
+/* The stage behind the document: a warm, softly-lit backdrop with slowly
+   drifting aurora blobs and a faint floating gold-fleck field, so the paper
+   sits in an atmosphere rather than on a flat page. Theme-aware; the motion is
+   suppressed under prefers-reduced-motion and everything flattens for print. */
 .cert-stage {
+  position: relative;
+  overflow: hidden;
   background:
     radial-gradient(130% 120% at 50% -10%, rgba(184, 138, 46, 0.14), transparent 55%),
     radial-gradient(120% 120% at 50% 115%, rgba(63, 111, 94, 0.12), transparent 55%),
@@ -185,25 +192,59 @@ html[data-theme="dark"] .cert-stage {
     radial-gradient(120% 120% at 50% 115%, rgba(121, 179, 155, 0.12), transparent 55%),
     #141110;
 }
+/* Aurora blobs — three soft coloured lights drifting behind the card. */
+.cert-stage::before {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  z-index: 0;
+  background:
+    radial-gradient(38% 38% at 22% 30%, rgba(184, 138, 46, 0.28), transparent 60%),
+    radial-gradient(42% 42% at 78% 68%, rgba(63, 111, 94, 0.22), transparent 60%),
+    radial-gradient(34% 34% at 62% 18%, rgba(216, 171, 87, 0.2), transparent 60%);
+  filter: blur(40px);
+  animation: cert-aurora 22s ease-in-out infinite alternate;
+}
+/* A drifting field of fine gold flecks, faded out toward the edges. */
+.cert-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: radial-gradient(rgba(184, 138, 46, 0.55) 1px, transparent 1.6px);
+  background-size: 46px 46px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 45%, #000 30%, transparent 78%);
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 45%, #000 30%, transparent 78%);
+  opacity: 0.22;
+  animation: cert-drift 26s linear infinite;
+}
+@keyframes cert-aurora {
+  from { transform: translate3d(-3%, -2%, 0) rotate(0deg) scale(1.05); }
+  to { transform: translate3d(4%, 3%, 0) rotate(10deg) scale(1.18); }
+}
+@keyframes cert-drift {
+  from { background-position: 0 0; }
+  to { background-position: 460px 460px; }
+}
 
-/* The shell owns the container-query context so every `cqw` below — including
-   the card's own padding/border — resolves against the card's width, not the
-   viewport (an element is a container for its descendants, not for itself). */
+/* The shell owns the container-query context so `--u: 1cqw` resolves against the
+   card's width (an element is a container for its descendants, not for itself). */
 .cert-doc-shell {
   container-type: inline-size;
   width: 100%;
   max-width: min(94vw, 1040px);
 }
 .cert-doc {
+  --u: 1cqw;
   aspect-ratio: 297 / 210;
   width: 100%;
-  padding: 5.5cqw 7cqw;
+  padding: calc(5.5 * var(--u)) calc(7 * var(--u));
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  border: 0.28cqw solid color-mix(in srgb, var(--color-gold) 70%, transparent);
-  border-radius: 1.1cqw;
+  border: calc(0.28 * var(--u)) solid color-mix(in srgb, var(--color-gold) 70%, transparent);
+  border-radius: calc(1.1 * var(--u));
 }
 
 /* Guilloché weave — fine engine-turned lines crossed with a faint rosette, the
@@ -211,51 +252,51 @@ html[data-theme="dark"] .cert-stage {
 .cert-doc-weave {
   border-radius: inherit;
   background-image:
-    repeating-linear-gradient(45deg, transparent 0 0.9cqw, color-mix(in srgb, var(--color-accent2) 24%, transparent) 0.9cqw 1cqw),
-    repeating-linear-gradient(-45deg, transparent 0 0.9cqw, color-mix(in srgb, var(--color-gold) 24%, transparent) 0.9cqw 1cqw),
-    repeating-radial-gradient(circle at 50% 46%, transparent 0 1.4cqw, color-mix(in srgb, var(--color-gold) 30%, transparent) 1.4cqw 1.55cqw);
+    repeating-linear-gradient(45deg, transparent 0 calc(0.9 * var(--u)), color-mix(in srgb, var(--color-accent2) 24%, transparent) calc(0.9 * var(--u)) calc(1 * var(--u))),
+    repeating-linear-gradient(-45deg, transparent 0 calc(0.9 * var(--u)), color-mix(in srgb, var(--color-gold) 24%, transparent) calc(0.9 * var(--u)) calc(1 * var(--u))),
+    repeating-radial-gradient(circle at 50% 46%, transparent 0 calc(1.4 * var(--u)), color-mix(in srgb, var(--color-gold) 30%, transparent) calc(1.4 * var(--u)) calc(1.55 * var(--u)));
   opacity: 0.1;
 }
 
 /* Double gold frame, inset from the card edge; ::after is the thin inner line. */
 .cert-doc-frame {
-  inset: 3.2cqw;
-  border: 0.3cqw solid color-mix(in srgb, var(--color-gold) 55%, transparent);
-  border-radius: 0.7cqw;
+  inset: calc(3.2 * var(--u));
+  border: calc(0.3 * var(--u)) solid color-mix(in srgb, var(--color-gold) 55%, transparent);
+  border-radius: calc(0.7 * var(--u));
 }
 .cert-doc-frame::after {
   content: "";
   position: absolute;
-  inset: 0.85cqw;
-  border: 0.1cqw solid color-mix(in srgb, var(--color-gold) 45%, transparent);
-  border-radius: 0.4cqw;
+  inset: calc(0.85 * var(--u));
+  border: calc(0.1 * var(--u)) solid color-mix(in srgb, var(--color-gold) 45%, transparent);
+  border-radius: calc(0.4 * var(--u));
 }
 
 /* Filigree corners (one SVG, flipped into each corner). */
 .cert-corner {
-  width: 8.5cqw;
-  height: 8.5cqw;
+  width: calc(8.5 * var(--u));
+  height: calc(8.5 * var(--u));
   color: var(--color-gold);
   opacity: 0.9;
 }
-.cert-corner--tl { top: 2.4cqw; left: 2.4cqw; }
-.cert-corner--tr { top: 2.4cqw; right: 2.4cqw; transform: scaleX(-1); }
-.cert-corner--bl { bottom: 2.4cqw; left: 2.4cqw; transform: scaleY(-1); }
-.cert-corner--br { bottom: 2.4cqw; right: 2.4cqw; transform: scale(-1); }
+.cert-corner--tl { top: calc(2.4 * var(--u)); left: calc(2.4 * var(--u)); }
+.cert-corner--tr { top: calc(2.4 * var(--u)); right: calc(2.4 * var(--u)); transform: scaleX(-1); }
+.cert-corner--bl { bottom: calc(2.4 * var(--u)); left: calc(2.4 * var(--u)); transform: scaleY(-1); }
+.cert-corner--br { bottom: calc(2.4 * var(--u)); right: calc(2.4 * var(--u)); transform: scale(-1); }
 
 /* The medallion + Emblem scale with the document. */
 .cert-doc .cert-medallion {
-  width: 12cqw;
-  height: 12cqw;
-  margin-bottom: 2.2cqw;
-  border: 0.32cqw solid color-mix(in srgb, var(--color-gold) 75%, transparent);
+  width: calc(12 * var(--u));
+  height: calc(12 * var(--u));
+  margin-bottom: calc(2.2 * var(--u));
+  border: calc(0.32 * var(--u)) solid color-mix(in srgb, var(--color-gold) 75%, transparent);
 }
 .cert-doc .cert-emblem-glyph {
-  font-size: 6.6cqw;
+  font-size: calc(6.6 * var(--u));
 }
 
 .cert-doc-eyebrow {
-  font-size: 1.45cqw;
+  font-size: calc(1.45 * var(--u));
   font-weight: 600;
   letter-spacing: 0.4em;
   text-indent: 0.4em;
@@ -263,32 +304,32 @@ html[data-theme="dark"] .cert-stage {
   color: var(--color-accent2);
 }
 .cert-doc-pre {
-  font-size: 1.6cqw;
+  font-size: calc(1.6 * var(--u));
   font-style: italic;
   color: var(--color-soft);
 }
 .cert-doc-pre--lead {
-  margin-top: 2.4cqw;
+  margin-top: calc(2.4 * var(--u));
 }
 .cert-doc-name {
-  margin-top: 0.6cqw;
-  font-size: 5cqw;
+  margin-top: calc(0.6 * var(--u));
+  font-size: calc(5 * var(--u));
   line-height: 1.04;
   font-weight: 600;
   color: var(--color-accent);
   max-width: 88%;
 }
 .cert-doc-title {
-  margin-top: 0.5cqw;
-  font-size: 3.1cqw;
+  margin-top: calc(0.5 * var(--u));
+  font-size: calc(3.1 * var(--u));
   line-height: 1.12;
   font-weight: 600;
   color: var(--color-ink);
   max-width: 84%;
 }
 .cert-doc-meta {
-  margin-top: 2.2cqw;
-  font-size: 1.55cqw;
+  margin-top: calc(2.2 * var(--u));
+  font-size: calc(1.55 * var(--u));
   letter-spacing: 0.04em;
   color: var(--color-soft);
 }
@@ -298,21 +339,21 @@ html[data-theme="dark"] .cert-stage {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1cqw;
+  gap: calc(1 * var(--u));
   width: 44%;
-  margin: 1.6cqw 0 1.3cqw;
+  margin: calc(1.6 * var(--u)) 0 calc(1.3 * var(--u));
   color: color-mix(in srgb, var(--color-gold) 70%, transparent);
 }
 .cert-doc-rule-line {
   flex: 1;
-  height: 0.1cqw;
+  height: calc(0.1 * var(--u));
   background: linear-gradient(90deg, transparent, currentColor);
 }
 .cert-doc-rule-line:last-child {
   background: linear-gradient(90deg, currentColor, transparent);
 }
 .cert-doc-diamond {
-  font-size: 1.7cqw;
+  font-size: calc(1.7 * var(--u));
   color: var(--color-gold);
 }
 
@@ -321,36 +362,36 @@ html[data-theme="dark"] .cert-stage {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 4cqw;
+  gap: calc(4 * var(--u));
   width: 100%;
-  margin-top: 3cqw;
+  margin-top: calc(3 * var(--u));
 }
 .cert-doc-sig {
   display: flex;
   width: 30%;
   flex-direction: column;
   align-items: center;
-  gap: 0.7cqw;
+  gap: calc(0.7 * var(--u));
 }
 .cert-doc-sig-mark {
-  font-size: 2.6cqw;
+  font-size: calc(2.6 * var(--u));
   font-style: italic;
   line-height: 1;
   white-space: nowrap;
   color: var(--color-accent);
 }
 .cert-doc-sig-mark--date {
-  font-size: 1.9cqw;
+  font-size: calc(1.9 * var(--u));
   font-style: normal;
   color: var(--color-ink);
 }
 .cert-doc-sig-line {
   width: 100%;
-  height: 0.12cqw;
+  height: calc(0.12 * var(--u));
   background: color-mix(in srgb, var(--color-ink) 45%, transparent);
 }
 .cert-doc-sig-label {
-  font-size: 1.05cqw;
+  font-size: calc(1.05 * var(--u));
   letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--color-soft);
@@ -360,8 +401,8 @@ html[data-theme="dark"] .cert-stage {
 .cert-doc-seal {
   position: relative;
   display: flex;
-  width: 10cqw;
-  height: 10cqw;
+  width: calc(10 * var(--u));
+  height: calc(10 * var(--u));
   flex: none;
   align-items: center;
   justify-content: center;
@@ -371,19 +412,19 @@ html[data-theme="dark"] .cert-stage {
     radial-gradient(circle at 36% 30%, rgba(255, 255, 255, 0.7), transparent 44%),
     conic-gradient(from 210deg, #e9c877, #8a6a1f, #f0d38a, #7c5e1c, #d8ab57, #8a6a1f, #e9c877);
   box-shadow:
-    inset 0 0.25cqw 0.5cqw rgba(255, 255, 255, 0.55),
-    inset 0 -0.4cqw 0.7cqw rgba(0, 0, 0, 0.32),
-    0 0.35cqw 0.9cqw rgba(0, 0, 0, 0.22);
+    inset 0 calc(0.25 * var(--u)) calc(0.5 * var(--u)) rgba(255, 255, 255, 0.55),
+    inset 0 calc(-0.4 * var(--u)) calc(0.7 * var(--u)) rgba(0, 0, 0, 0.32),
+    0 calc(0.35 * var(--u)) calc(0.9 * var(--u)) rgba(0, 0, 0, 0.22);
 }
 .cert-doc-seal::before {
   content: "";
   position: absolute;
-  inset: 0.7cqw;
+  inset: calc(0.7 * var(--u));
   border-radius: 50%;
-  border: 0.14cqw dashed rgba(74, 56, 19, 0.55);
+  border: calc(0.14 * var(--u)) dashed rgba(74, 56, 19, 0.55);
 }
 .cert-doc-seal-star {
-  font-size: 4.2cqw;
+  font-size: calc(4.2 * var(--u));
   line-height: 1;
 }
 /* Entrance for the public view — a soft fade + rise. Lives on a wrapper, not the
@@ -420,6 +461,10 @@ html[data-theme="dark"] .cert-stage {
   .cert-enter {
     animation: none;
   }
+  .cert-stage::before,
+  .cert-stage::after {
+    animation: none;
+  }
 }
 
 /* Certificate print-to-PDF (ADR 0015 + 0017): the /certificate/[token] page prints
@@ -441,6 +486,10 @@ html[data-theme="dark"] .cert-stage {
   .cert-stage {
     background: #fff !important;
   }
+  .cert-stage::before,
+  .cert-stage::after {
+    display: none !important;
+  }
   .cert-print-page {
     min-height: auto;
     padding: 0;
@@ -454,14 +503,17 @@ html[data-theme="dark"] .cert-stage {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-  /* Fill the physical A4-landscape sheet exactly, as one page. The shell drives
-     the width so `cqw` inside resolves against the 297mm sheet. */
+  /* Fill the physical A4-landscape sheet exactly, as one page. `--u` becomes a
+     fixed mm here (1cqw of the 297mm sheet ≈ 2.97mm), so the printed layout is
+     independent of container-query units — which Chromium mis-resolves in print
+     and which was clipping the text. */
   .cert-doc-shell {
     width: 297mm !important;
     max-width: none !important;
   }
   .cert-doc {
-    width: 100% !important;
+    --u: 2.97mm;
+    width: 297mm !important;
     height: 210mm !important;
     aspect-ratio: auto !important;
     border-radius: 0 !important;

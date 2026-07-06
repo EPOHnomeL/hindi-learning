@@ -688,12 +688,12 @@ export function PublicCertificatePage({ token }: { token: string }) {
     <main className="cert-stage cert-print-page flex min-h-dvh w-full flex-col items-center justify-center gap-7 px-4 py-10">
       {/* Apply the Edition's direction so an RTL-titled certificate renders
           correctly (course-translation). */}
-      <div className="cert-enter flex w-full max-w-6xl justify-center" dir={cert.dir}>
+      <div className="cert-enter relative z-10 flex w-full max-w-6xl justify-center" dir={cert.dir}>
         <CertificateCard {...cert} showcase />
       </div>
       <button
         onClick={() => window.print()}
-        className="no-print rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
+        className="no-print relative z-10 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
       >
         Download PDF
       </button>
