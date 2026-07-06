@@ -10,6 +10,7 @@ import { Frame } from "./ArtifactView";
 import { Markdown } from "./MarkdownView";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
+import { useHideOnScroll } from "./useHideOnScroll";
 import { firstLessonKey, nextLessonKey } from "./readerDerive";
 
 // The Guest reader (issue 07 / ADR 0013): the read-only `/share/[token]` view an
@@ -50,6 +51,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
   const course = useQuery(api.public.publicCourse, { token });
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const navHidden = useHideOnScroll();
   useEffect(() => setMenuOpen(false), [pathname]);
 
   // The Guest's completed lessons (per device, per token). Loaded from localStorage
@@ -90,7 +92,11 @@ export function PublicCourseShell({ token, children }: { token: string; children
   return (
     <Ctx.Provider value={{ token, course, completed, markComplete }}>
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
-        <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 md:hidden">
+        <header
+          className={`sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 transition-transform duration-300 md:hidden ${
+            navHidden ? "-translate-y-full" : "translate-y-0"
+          }`}
+        >
           <button onClick={() => setMenuOpen(true)} aria-label="Open lessons" className="rounded-lg p-1.5 text-ink hover:bg-hi">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="3" y1="6" x2="21" y2="6" />
@@ -231,6 +237,7 @@ export function PublicCourseIndex({ token }: { token: string }) {
 
 export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKey: string }) {
   const { theme } = useTheme();
+  const navHidden = useHideOnScroll();
   const { course, markComplete } = useGuestCourse();
   const lesson = useQuery(api.public.publicLesson, { token, key: lessonKey });
   const qa = course.questions.filter((q) => q.lessonKey === lessonKey);
@@ -242,7 +249,11 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
   return (
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
       <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3">
-        <div className="sticky top-12 z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">
+        <div
+          className={`sticky z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
+            navHidden ? "top-0" : "top-12"
+          }`}
+        >
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
           {next && (
             <Link
@@ -294,12 +305,19 @@ function GuestQuestions({ qa }: { qa: GuestCourse["questions"] }) {
 
 export function PublicReferencePane({ token, refKey }: { token: string; refKey: string }) {
   const { theme } = useTheme();
+  const navHidden = useHideOnScroll();
   const ref = useQuery(api.public.publicReference, { token, key: refKey });
   if (ref === undefined) return <p className="text-soft">Loading…</p>;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3">
-      <h2 className="sticky top-12 z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">{ref.title}</h2>
+      <h2
+        className={`sticky z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
+          navHidden ? "top-0" : "top-12"
+        }`}
+      >
+        {ref.title}
+      </h2>
       <Frame html={ref.html} withBridge={false} theme={theme} themeCss />
     </div>
   );

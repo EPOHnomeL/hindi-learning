@@ -9,6 +9,7 @@ import { api } from "../../../convex/_generated/api";
 import { CompletionCelebration } from "./Certificate";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
+import { useHideOnScroll } from "./useHideOnScroll";
 import { useResourceUpload } from "./useResourceUpload";
 import { completedKeys, frontierKey, nextLessonKey, seenAfterOpening, unseenReplyKeys } from "./readerDerive";
 
@@ -56,6 +57,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const navHidden = useHideOnScroll();
 
   const lessons = useQuery(api.content.listLessons, { topicSlug: slug });
   const references = useQuery(api.content.listReferences, { topicSlug: slug });
@@ -111,8 +113,13 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   return (
     <Ctx.Provider value={{ frontierKey: frontier, markSeen, canWrite, completed: courseCompleted, nextKey }}>
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
-        {/* Mobile top bar: hamburger opens the lesson selector. */}
-        <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 md:hidden">
+        {/* Mobile top bar: hamburger opens the lesson selector. Slides away on
+            scroll-down for a fuller-screen read (useHideOnScroll). */}
+        <header
+          className={`sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 transition-transform duration-300 md:hidden ${
+            navHidden ? "-translate-y-full" : "translate-y-0"
+          }`}
+        >
           <button onClick={() => setMenuOpen(true)} aria-label="Open lessons" className="rounded-lg p-1.5 text-ink hover:bg-hi">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="3" y1="6" x2="21" y2="6" />
