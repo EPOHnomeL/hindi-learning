@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, getViewableTopic, heldLangs, readableLang, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import { assertAdmin, editionPrice, getOwnedTopic, heldLangs, previewLessonKey, resolveReaderEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
 import { isCallerAdmin } from "./whitelist";
@@ -240,7 +240,10 @@ export const courseHeader = query({
     v.null(),
     v.object({
       title: v.string(),
-      role: v.union(v.literal("owner"), v.literal("viewer")),
+      // The caller's access level to the served Edition (paid marketplace). An
+      // `entitled` buyer reads exactly like a `viewer`; a `preview` caller sees
+      // only the free first Lesson of a paid Edition (the rest is locked).
+      role: v.union(v.literal("owner"), v.literal("viewer"), v.literal("entitled"), v.literal("preview")),
       // The reader reads `status` to switch affordances: `completed` (ADR 0015)
       // hides "Generate next lesson" and shows the owner's Reopen control.
       status: v.union(v.literal("seeded"), v.literal("active"), v.literal("completed")),
@@ -251,18 +254,37 @@ export const courseHeader = query({
       editions: v.array(
         v.object({ lang: v.string(), name: v.string(), native: v.string(), rtl: v.boolean() }),
       ),
+      // Present only for a `preview` caller: the paid Edition's price and which
+      // Lesson is the free Preview, so the reader can render the paygate.
+      paywall: v.optional(
+        v.object({ amount: v.number(), currency: v.string(), previewKey: v.union(v.string(), v.null()) }),
+      ),
     }),
   ),
   handler: async (ctx, { topicSlug, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
-    if (!effLang) return null;
-    const role = topic.ownerId === userId ? ("owner" as const) : ("viewer" as const);
+    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    if (level === "none") return null;
+    const role =
+      level === "owner"
+        ? ("owner" as const)
+        : level === "entitled"
+          ? ("entitled" as const)
+          : level === "preview"
+            ? ("preview" as const)
+            : ("viewer" as const);
     const t = await trOne(ctx, topic._id, effLang, "title", "");
     const editions = await switcherEditions(ctx, topic, userId);
+    let paywall: { amount: number; currency: string; previewKey: string | null } | undefined;
+    if (level === "preview") {
+      const price = await editionPrice(ctx, topic._id, effLang);
+      if (price) {
+        paywall = { amount: price.amount, currency: price.currency, previewKey: await previewLessonKey(ctx, topic._id) };
+      }
+    }
     return {
       title: decodeEntities(t?.text ?? topic.title),
       role,
@@ -270,6 +292,7 @@ export const courseHeader = query({
       lang: effLang,
       dir: langInfo(effLang).rtl ? ("rtl" as const) : ("ltr" as const),
       editions,
+      paywall,
     };
   },
 });
@@ -279,10 +302,13 @@ export const listLessons = query({
   handler: async (ctx, { topicSlug, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return [];
-    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
-    if (!effLang) return [];
+    // The table of contents is served in full even to a `preview` caller (only
+    // the Lesson *bodies* past the Preview are locked, in getLesson); `none` is
+    // not-found (a free Edition the caller holds no grant to).
+    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    if (level === "none") return [];
     const lessons = (
       await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
     ).filter((l) => !l.supersededBy);
@@ -300,22 +326,24 @@ export const getLesson = query({
   handler: async (ctx, { topicSlug, key, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
-    if (!effLang) return null;
+    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    if (level === "none") return null;
     const lesson = await ctx.db
       .query("lessons")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     if (!lesson || lesson.supersededBy) return null;
     const t = await trOne(ctx, topic._id, effLang, "lesson", key);
-    return {
-      key: lesson.key,
-      seq: lesson.seq,
-      title: decodeEntities(t?.title ?? lesson.title),
-      html: t?.html ?? lesson.html,
-    };
+    const title = decodeEntities(t?.title ?? lesson.title);
+    // Paygate: on a paid Edition the caller doesn't hold (`preview`), only the
+    // Preview — the lowest-ordered non-superseded Lesson — is served; every other
+    // Lesson returns an explicit `locked` marker, distinct from a not-found null.
+    if (level === "preview" && key !== (await previewLessonKey(ctx, topic._id))) {
+      return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
+    }
+    return { key: lesson.key, seq: lesson.seq, title, html: t?.html ?? lesson.html, locked: false };
   },
 });
 
@@ -324,10 +352,13 @@ export const listReferences = query({
   handler: async (ctx, { topicSlug, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return [];
-    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
-    if (!effLang) return [];
+    // References are past the Preview, but their titles ride along in the table
+    // of contents even for a `preview` caller (the bodies are locked in
+    // getReference). `none` is not-found.
+    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    if (level === "none") return [];
     const refs = await ctx.db
       .query("references")
       .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
@@ -344,17 +375,20 @@ export const getReference = query({
   handler: async (ctx, { topicSlug, key, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
-    if (!effLang) return null;
+    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    if (level === "none") return null;
     const ref = await ctx.db
       .query("references")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     if (!ref) return null;
     const t = await trOne(ctx, topic._id, effLang, "reference", key);
-    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), html: t?.html ?? ref.html };
+    const title = decodeEntities(t?.title ?? ref.title);
+    // References sit entirely past the Preview — locked for a `preview` caller.
+    if (level === "preview") return { key: ref.key, title, html: "", locked: true };
+    return { key: ref.key, title, html: t?.html ?? ref.html, locked: false };
   },
 });
 
