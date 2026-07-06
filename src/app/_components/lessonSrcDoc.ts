@@ -122,21 +122,26 @@ function injectReferenceDarkCss(html: string): string {
 // language, but the design system's body font — 'Spectral',Georgia,'Times New
 // Roman' — has no Devanagari glyphs. So a Hindi/Marathi/Nepali Edition's prose
 // fell through to the browser's default Devanagari face at a size tuned for
-// Latin: small and cramped (course-translation). Two parts, for the whole
+// Latin: small and cramped (course-translation). Three parts, for the whole
 // Devanagari-script set:
 //  - load the same Noto Devanagari faces the taught content (.deva/.verse/.word)
 //    already uses. Lessons ship this <link> in head.html already (a duplicate is
 //    harmless — the browser dedupes); References don't, so this covers both.
 //  - splice those faces into the body chain AFTER 'Spectral', so per-glyph
 //    fallback keeps Latin (proper nouns, code) in Spectral while Devanagari
-//    resolves to Noto — and bump size/leading, which the script needs to read at
-//    the same weight as Latin. `html body` (0,0,2) outranks the base `body`
-//    (0,0,1) rule; the design system's explicit .deva/.verse/.word sizes have
-//    higher specificity still, so only unclassed prose is touched.
+//    resolves to Noto; nudge line-height up for matra/conjunct clearance.
+//  - scale the WHOLE lesson up with `zoom`. Devanagari reads ~2px smaller than
+//    Latin at the same font-size, and the design system sizes everything in px
+//    (not rem), so there's no root knob to grow text from — and bumping only the
+//    body font-size leaves the notes/quiz/recap chrome small. `zoom` scales the
+//    entire px scale uniformly and, unlike `transform:scale`, still contributes
+//    to layout height, so the iframe's HEIGHT_BRIDGE measures the scaled document
+//    correctly. Tune the factor here if it reads too large/small.
 const DEVANAGARI_CSS = `<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
-<style>html body{font-family:'Spectral','Noto Serif Devanagari','Noto Sans Devanagari',Georgia,serif; font-size:20px; line-height:1.82;}</style>`;
+<style>html{zoom:1.2;}
+html body{font-family:'Spectral','Noto Serif Devanagari','Noto Sans Devanagari',Georgia,serif; line-height:1.75;}</style>`;
 
-// Inject the Devanagari font + size bump before </head> so it applies before paint.
+// Inject the Devanagari font + zoom before </head> so it applies before paint.
 function injectDevanagariCss(html: string): string {
   const i = html.indexOf("</head>");
   return i === -1 ? DEVANAGARI_CSS + html : html.slice(0, i) + DEVANAGARI_CSS + html.slice(i);
