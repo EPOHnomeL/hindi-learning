@@ -160,6 +160,232 @@ html[data-theme="dark"] .cert-card--showcase {
     background-position: -60% 0;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   A4-landscape "real certificate" — the standalone /certificate/[token] page.
+   ─────────────────────────────────────────────────────────────────────────
+   The whole document is sized in container units (`container-type: inline-size`
+   + `cqw`), so every element — type, medallion, frame, seal — scales as one
+   block from phone to wide desktop, and the ratio holds. Decorative layers (a
+   guilloché weave, a double gold frame, filigree corners, a foil wax seal,
+   signature rules) sit beneath the z-10 content layer and opt into
+   print-color-adjust so the engraving survives the PDF (see @media print). */
+
+/* The stage behind the document: a warm, softly-lit backdrop so the paper lifts
+   off the page. Theme-aware; flattened to white in print. */
+.cert-stage {
+  background:
+    radial-gradient(130% 120% at 50% -10%, rgba(184, 138, 46, 0.14), transparent 55%),
+    radial-gradient(120% 120% at 50% 115%, rgba(63, 111, 94, 0.12), transparent 55%),
+    var(--color-paper);
+}
+html[data-theme="dark"] .cert-stage {
+  background:
+    radial-gradient(130% 120% at 50% -10%, rgba(216, 171, 87, 0.16), transparent 55%),
+    radial-gradient(120% 120% at 50% 115%, rgba(121, 179, 155, 0.12), transparent 55%),
+    #141110;
+}
+
+/* The shell owns the container-query context so every `cqw` below — including
+   the card's own padding/border — resolves against the card's width, not the
+   viewport (an element is a container for its descendants, not for itself). */
+.cert-doc-shell {
+  container-type: inline-size;
+  width: 100%;
+  max-width: min(94vw, 1040px);
+}
+.cert-doc {
+  aspect-ratio: 297 / 210;
+  width: 100%;
+  padding: 5.5cqw 7cqw;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 0.28cqw solid color-mix(in srgb, var(--color-gold) 70%, transparent);
+  border-radius: 1.1cqw;
+}
+
+/* Guilloché weave — fine engine-turned lines crossed with a faint rosette, the
+   texture of an engraved document. Kept very low-contrast so type stays crisp. */
+.cert-doc-weave {
+  border-radius: inherit;
+  background-image:
+    repeating-linear-gradient(45deg, transparent 0 0.9cqw, color-mix(in srgb, var(--color-accent2) 24%, transparent) 0.9cqw 1cqw),
+    repeating-linear-gradient(-45deg, transparent 0 0.9cqw, color-mix(in srgb, var(--color-gold) 24%, transparent) 0.9cqw 1cqw),
+    repeating-radial-gradient(circle at 50% 46%, transparent 0 1.4cqw, color-mix(in srgb, var(--color-gold) 30%, transparent) 1.4cqw 1.55cqw);
+  opacity: 0.1;
+}
+
+/* Double gold frame, inset from the card edge; ::after is the thin inner line. */
+.cert-doc-frame {
+  inset: 3.2cqw;
+  border: 0.3cqw solid color-mix(in srgb, var(--color-gold) 55%, transparent);
+  border-radius: 0.7cqw;
+}
+.cert-doc-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0.85cqw;
+  border: 0.1cqw solid color-mix(in srgb, var(--color-gold) 45%, transparent);
+  border-radius: 0.4cqw;
+}
+
+/* Filigree corners (one SVG, flipped into each corner). */
+.cert-corner {
+  width: 8.5cqw;
+  height: 8.5cqw;
+  color: var(--color-gold);
+  opacity: 0.9;
+}
+.cert-corner--tl { top: 2.4cqw; left: 2.4cqw; }
+.cert-corner--tr { top: 2.4cqw; right: 2.4cqw; transform: scaleX(-1); }
+.cert-corner--bl { bottom: 2.4cqw; left: 2.4cqw; transform: scaleY(-1); }
+.cert-corner--br { bottom: 2.4cqw; right: 2.4cqw; transform: scale(-1); }
+
+/* The medallion + Emblem scale with the document. */
+.cert-doc .cert-medallion {
+  width: 12cqw;
+  height: 12cqw;
+  margin-bottom: 2.2cqw;
+  border: 0.32cqw solid color-mix(in srgb, var(--color-gold) 75%, transparent);
+}
+.cert-doc .cert-emblem-glyph {
+  font-size: 6.6cqw;
+}
+
+.cert-doc-eyebrow {
+  font-size: 1.45cqw;
+  font-weight: 600;
+  letter-spacing: 0.4em;
+  text-indent: 0.4em;
+  text-transform: uppercase;
+  color: var(--color-accent2);
+}
+.cert-doc-pre {
+  font-size: 1.6cqw;
+  font-style: italic;
+  color: var(--color-soft);
+}
+.cert-doc-pre--lead {
+  margin-top: 2.4cqw;
+}
+.cert-doc-name {
+  margin-top: 0.6cqw;
+  font-size: 5cqw;
+  line-height: 1.04;
+  font-weight: 600;
+  color: var(--color-accent);
+  max-width: 88%;
+}
+.cert-doc-title {
+  margin-top: 0.5cqw;
+  font-size: 3.1cqw;
+  line-height: 1.12;
+  font-weight: 600;
+  color: var(--color-ink);
+  max-width: 84%;
+}
+.cert-doc-meta {
+  margin-top: 2.2cqw;
+  font-size: 1.55cqw;
+  letter-spacing: 0.04em;
+  color: var(--color-soft);
+}
+
+/* Flourished divider under the name. */
+.cert-doc-rule {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1cqw;
+  width: 44%;
+  margin: 1.6cqw 0 1.3cqw;
+  color: color-mix(in srgb, var(--color-gold) 70%, transparent);
+}
+.cert-doc-rule-line {
+  flex: 1;
+  height: 0.1cqw;
+  background: linear-gradient(90deg, transparent, currentColor);
+}
+.cert-doc-rule-line:last-child {
+  background: linear-gradient(90deg, currentColor, transparent);
+}
+.cert-doc-diamond {
+  font-size: 1.7cqw;
+  color: var(--color-gold);
+}
+
+/* Footer: issuer signature · foil seal · date signature. */
+.cert-doc-footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4cqw;
+  width: 100%;
+  margin-top: 3cqw;
+}
+.cert-doc-sig {
+  display: flex;
+  width: 30%;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7cqw;
+}
+.cert-doc-sig-mark {
+  font-size: 2.6cqw;
+  font-style: italic;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--color-accent);
+}
+.cert-doc-sig-mark--date {
+  font-size: 1.9cqw;
+  font-style: normal;
+  color: var(--color-ink);
+}
+.cert-doc-sig-line {
+  width: 100%;
+  height: 0.12cqw;
+  background: color-mix(in srgb, var(--color-ink) 45%, transparent);
+}
+.cert-doc-sig-label {
+  font-size: 1.05cqw;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--color-soft);
+}
+
+/* Foil wax seal — a struck gold coin with a ridged rim and a star. */
+.cert-doc-seal {
+  position: relative;
+  display: flex;
+  width: 10cqw;
+  height: 10cqw;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #4a3813;
+  background:
+    radial-gradient(circle at 36% 30%, rgba(255, 255, 255, 0.7), transparent 44%),
+    conic-gradient(from 210deg, #e9c877, #8a6a1f, #f0d38a, #7c5e1c, #d8ab57, #8a6a1f, #e9c877);
+  box-shadow:
+    inset 0 0.25cqw 0.5cqw rgba(255, 255, 255, 0.55),
+    inset 0 -0.4cqw 0.7cqw rgba(0, 0, 0, 0.32),
+    0 0.35cqw 0.9cqw rgba(0, 0, 0, 0.22);
+}
+.cert-doc-seal::before {
+  content: "";
+  position: absolute;
+  inset: 0.7cqw;
+  border-radius: 50%;
+  border: 0.14cqw dashed rgba(74, 56, 19, 0.55);
+}
+.cert-doc-seal-star {
+  font-size: 4.2cqw;
+  line-height: 1;
+}
 /* Entrance for the public view — a soft fade + rise. Lives on a wrapper, not the
    card, so it never fights the card's pointer-tilt transform. */
 .cert-enter {
@@ -202,12 +428,23 @@ html[data-theme="dark"] .cert-card--showcase {
    printed document, and opt the gold/medallion colour into print so the engraved
    look survives (`print-color-adjust: exact`). */
 @media print {
+  /* The certificate is the only intentional print target, so the page box is
+     A4 landscape with no margin: the showcase document fills the sheet exactly
+     (297×210mm) and its own frame provides the border. */
+  @page {
+    size: A4 landscape;
+    margin: 0;
+  }
   .no-print {
     display: none !important;
+  }
+  .cert-stage {
+    background: #fff !important;
   }
   .cert-print-page {
     min-height: auto;
     padding: 0;
+    overflow: hidden;
   }
   .cert-card,
   .cert-card--showcase {
@@ -217,6 +454,18 @@ html[data-theme="dark"] .cert-card--showcase {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+  /* Fill the physical A4-landscape sheet exactly, as one page. The shell drives
+     the width so `cqw` inside resolves against the 297mm sheet. */
+  .cert-doc-shell {
+    width: 297mm !important;
+    max-width: none !important;
+  }
+  .cert-doc {
+    width: 100% !important;
+    height: 210mm !important;
+    aspect-ratio: auto !important;
+    border-radius: 0 !important;
+  }
   .cert-enter {
     animation: none;
   }
@@ -225,7 +474,11 @@ html[data-theme="dark"] .cert-card--showcase {
   .cert-shine {
     display: none !important;
   }
-  .cert-medallion {
+  .cert-medallion,
+  .cert-doc-weave,
+  .cert-doc-frame,
+  .cert-corner,
+  .cert-doc-seal {
     box-shadow: none;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;

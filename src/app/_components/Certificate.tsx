@@ -69,50 +69,127 @@ function onCardLeave(e: React.MouseEvent<HTMLDivElement>) {
   el.style.setProperty("--glow-o", "0");
 }
 
-// The visual Certificate — a self-contained card, reused in-app (the claim/view
-// dialog below), on the completion celebration, and on the anonymous
-// /certificate/[token] page (with its print-to-PDF). Presentational only; no data
-// fetching, so the surfaces can't drift. Carries the subject's Emblem in a metallic
-// medallion, a holographic foil sheen, and a pointer tilt/spotlight (ADR 0017) —
-// all CSS (globals.css `.cert-*`), degrading to a flat engraved document under
-// print + reduced-motion. `showcase` (the public page) makes it larger and more
-// theatrical — a warm outer glow, a stronger foil, and an ambient shine sweep —
-// while the compact dialogs stay compact. Brand: "My Course".
-export function CertificateCard({ learnerName, courseTitle, lessonCount, issuedAt, lang, emblem, showcase }: CertificateData) {
+// The visual Certificate. Presentational only; no data fetching, so its surfaces
+// can't drift. Two treatments off the same props:
+//   - compact (`CertificateCompact`) — the in-app claim dialog: a small framed
+//     card with the metallic medallion + foil + pointer tilt (ADR 0017).
+//   - showcase (`CertificateShowcase`) — the standalone /certificate/[token]
+//     page: a full A4-landscape document with a double gold frame, filigree
+//     corners, a guilloché weave, a foil wax seal, and signature rules. Sized in
+//     container units so it scales as one block from phone to desktop and prints
+//     to a true A4 page (globals.css `.cert-doc*`, `@media print`).
+// Both degrade to a flat engraved document under print + reduced-motion. Brand:
+// "My Course".
+export function CertificateCard(props: CertificateData) {
+  return props.showcase ? <CertificateShowcase {...props} /> : <CertificateCompact {...props} />;
+}
+
+function CertificateCompact({ learnerName, courseTitle, lessonCount, issuedAt, lang, emblem }: CertificateData) {
   const date = new Date(issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
-  const pad = showcase ? "px-10 py-14 sm:px-14 sm:py-16" : "px-8 py-10";
-  const medallion = showcase ? "h-24 w-24 sm:h-28 sm:w-28" : "h-20 w-20";
-  const nameSize = showcase ? "text-3xl sm:text-4xl" : "text-2xl";
-  const titleSize = showcase ? "text-2xl sm:text-3xl" : "text-xl";
   return (
     <div
       dir={langDir(lang)}
-      className={`cert-card relative isolate overflow-hidden rounded-2xl border-2 border-gold/60 bg-card text-center shadow-sm ${pad} ${
-        showcase ? "cert-card--showcase" : ""
-      }`}
+      className="cert-card relative isolate overflow-hidden rounded-2xl border-2 border-gold/60 bg-card px-8 py-10 text-center shadow-sm"
       onMouseMove={onCardMove}
       onMouseLeave={onCardLeave}
     >
       <div className="cert-sheen pointer-events-none absolute inset-0" aria-hidden />
       <div className="cert-glow pointer-events-none absolute inset-0" aria-hidden />
-      {showcase && <div className="cert-shine pointer-events-none absolute inset-0" aria-hidden />}
       <div className="pointer-events-none absolute inset-2 rounded-xl border border-gold/30" aria-hidden />
       <div className="relative z-10">
-        <div
-          className={`cert-medallion mx-auto mb-5 flex items-center justify-center overflow-hidden rounded-full border-2 border-gold/70 ${medallion}`}
-        >
-          <EmblemMark emblem={emblem} large={showcase} />
+        <div className="cert-medallion mx-auto mb-5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-gold/70">
+          <EmblemMark emblem={emblem} />
         </div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent2">Certificate of Completion</p>
         <p className="mt-6 text-sm text-soft">This certifies that</p>
-        <p className={`mt-1 font-semibold text-accent ${nameSize}`}>{learnerName}</p>
+        <p className="mt-1 text-2xl font-semibold text-accent">{learnerName}</p>
         <p className="mt-4 text-sm text-soft">has completed the course</p>
-        <p className={`mt-1 font-semibold text-ink ${titleSize}`}>{courseTitle}</p>
+        <p className="mt-1 text-xl font-semibold text-ink">{courseTitle}</p>
         <p className="mt-6 text-sm text-soft">
           {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"} · {date}
         </p>
         <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-accent2">My Course</p>
       </div>
+    </div>
+  );
+}
+
+// One filigree corner ornament, flipped into each of the four corners by its
+// modifier class (globals.css `.cert-corner--*`). Decorative, so aria-hidden.
+function CertCorner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
+  return (
+    <svg
+      className={`cert-corner cert-corner--${pos} pointer-events-none absolute`}
+      viewBox="0 0 100 100"
+      fill="none"
+      aria-hidden
+    >
+      <path d="M6 48C6 24 24 6 48 6" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M6 32C6 17 17 6 32 6" stroke="currentColor" strokeWidth="1" />
+      <path d="M12 66C12 42 26 30 44 30" stroke="currentColor" strokeWidth="0.7" opacity="0.55" />
+      <circle cx="48" cy="48" r="2.4" fill="currentColor" />
+    </svg>
+  );
+}
+
+function CertificateShowcase({ learnerName, courseTitle, lessonCount, issuedAt, lang, emblem }: CertificateData) {
+  const date = new Date(issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  return (
+    // The shell owns the container-query context (`container-type: inline-size`),
+    // so every `cqw` inside — including the card's own padding — resolves against
+    // the card's width and the whole document scales as one unit.
+    <div className="cert-doc-shell mx-auto w-full">
+    <div
+      dir={langDir(lang)}
+      className="cert-card cert-card--showcase cert-doc relative isolate w-full overflow-hidden bg-card"
+      onMouseMove={onCardMove}
+      onMouseLeave={onCardLeave}
+    >
+      <div className="cert-doc-weave pointer-events-none absolute inset-0" aria-hidden />
+      <div className="cert-sheen pointer-events-none absolute inset-0" aria-hidden />
+      <div className="cert-glow pointer-events-none absolute inset-0" aria-hidden />
+      <div className="cert-shine pointer-events-none absolute inset-0" aria-hidden />
+      <div className="cert-doc-frame pointer-events-none absolute" aria-hidden />
+      <CertCorner pos="tl" />
+      <CertCorner pos="tr" />
+      <CertCorner pos="bl" />
+      <CertCorner pos="br" />
+
+      <div className="relative z-10 flex w-full flex-col items-center">
+        <div className="cert-medallion flex items-center justify-center overflow-hidden rounded-full">
+          <EmblemMark emblem={emblem} large />
+        </div>
+        <p className="cert-doc-eyebrow">Certificate of Completion</p>
+        <p className="cert-doc-pre cert-doc-pre--lead">This certifies that</p>
+        <p className="cert-doc-name">{learnerName}</p>
+        <div className="cert-doc-rule" aria-hidden>
+          <span className="cert-doc-rule-line" />
+          <span className="cert-doc-diamond">✦</span>
+          <span className="cert-doc-rule-line" />
+        </div>
+        <p className="cert-doc-pre">has completed the course</p>
+        <p className="cert-doc-title">{courseTitle}</p>
+        <p className="cert-doc-meta">
+          Completed {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"}
+        </p>
+
+        <div className="cert-doc-footer">
+          <div className="cert-doc-sig">
+            <span className="cert-doc-sig-mark">My Course</span>
+            <span className="cert-doc-sig-line" />
+            <span className="cert-doc-sig-label">Issued by</span>
+          </div>
+          <div className="cert-doc-seal" aria-hidden>
+            <span className="cert-doc-seal-star">★</span>
+          </div>
+          <div className="cert-doc-sig">
+            <span className="cert-doc-sig-mark cert-doc-sig-mark--date">{date}</span>
+            <span className="cert-doc-sig-line" />
+            <span className="cert-doc-sig-label">Date issued</span>
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
   );
 }
@@ -608,15 +685,15 @@ export function PublicCertificatePage({ token }: { token: string }) {
     );
   }
   return (
-    <main className="cert-print-page mx-auto flex min-h-dvh max-w-2xl flex-col items-center justify-center gap-6 px-4 py-12">
+    <main className="cert-stage cert-print-page flex min-h-dvh w-full flex-col items-center justify-center gap-7 px-4 py-10">
       {/* Apply the Edition's direction so an RTL-titled certificate renders
           correctly (course-translation). */}
-      <div className="cert-enter w-full" dir={cert.dir}>
+      <div className="cert-enter flex w-full max-w-6xl justify-center" dir={cert.dir}>
         <CertificateCard {...cert} showcase />
       </div>
       <button
         onClick={() => window.print()}
-        className="no-print rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90"
+        className="no-print rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
       >
         Download PDF
       </button>
