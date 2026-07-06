@@ -17,6 +17,7 @@ import type * as emblem from "../emblem.js";
 import type * as http from "../http.js";
 import type * as languages from "../languages.js";
 import type * as lib from "../lib.js";
+import type * as market from "../market.js";
 import type * as public_ from "../public.js";
 import type * as resources from "../resources.js";
 import type * as routine from "../routine.js";
@@ -40,6 +41,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   languages: typeof languages;
   lib: typeof lib;
+  market: typeof market;
   public: typeof public_;
   resources: typeof resources;
   routine: typeof routine;
