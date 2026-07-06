@@ -121,18 +121,30 @@ export function CertificateControl({ topicSlug, className }: { topicSlug: string
   if (!data) return null;
   const { certificate, eligible } = data;
   if (!certificate && !eligible) return null;
+
+  const btnClass =
+    className ??
+    "rounded-lg bg-gold/20 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-gold/30";
+
+  // Earned: "View" opens the standalone public certificate page in a new tab —
+  // the shareable, printable surface — rather than an in-app dialog. Eligible but
+  // not yet earned: open the claim dialog.
+  if (certificate) {
+    return (
+      <button
+        onClick={() => window.open(`/certificate/${certificate.token}`, "_blank", "noopener,noreferrer")}
+        className={btnClass}
+      >
+        🎓 View your certificate
+      </button>
+    );
+  }
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className={
-          className ??
-          "rounded-lg bg-gold/20 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-gold/30"
-        }
-      >
-        🎓 {certificate ? "View your certificate" : "Claim your certificate"}
+      <button onClick={() => setOpen(true)} className={btnClass}>
+        🎓 Claim your certificate
       </button>
-      {open && <CertificateDialog topicSlug={topicSlug} certificate={certificate} onClose={() => setOpen(false)} />}
+      {open && <CertificateDialog topicSlug={topicSlug} certificate={null} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -375,12 +387,37 @@ function errorText(e: unknown, fallback: string): string {
   return i >= 0 ? m.slice(i + marker.length).split("\n")[0]!.trim() : fallback;
 }
 
+// Downscale an owner-uploaded image to a small square raster before upload. The
+// backend caps Emblem images at 256KB (ADR 0017) and a phone photo or screenshot
+// is far larger — the teach CLI normalises server-side, but an owner uploading
+// from the browser needs the same treatment here or the upload is refused. Draws
+// a centre-cropped 256px square (cover) onto a canvas and encodes WebP (an allowed
+// type, and comfortably under the cap). Returns the encoded blob.
+async function normaliseEmblemImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const SIZE = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = SIZE;
+  canvas.height = SIZE;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Couldn’t process that image.");
+  const scale = Math.max(SIZE / bitmap.width, SIZE / bitmap.height); // cover: fill the square
+  const w = bitmap.width * scale;
+  const h = bitmap.height * scale;
+  ctx.drawImage(bitmap, (SIZE - w) / 2, (SIZE - h) / 2, w, h);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
+  if (!blob) throw new Error("Couldn’t process that image.");
+  return blob;
+}
+
 // Owner-only: curate the course's Emblem (ADR 0017, PRD stories 9-14) — set a
-// glyph (emoji / short character) or upload an image. The image reuses the
-// standard Resource upload flow (generateUploadUrl → POST → record), and the
-// server validates it (raster, size-capped; a Viewer is refused regardless). An
-// owner override wins over the AI default, so this is how an owner picks their own
-// mark. Gated by `canWrite` at the call site.
+// glyph (emoji / short character) or upload an image. The image is resized
+// client-side (normaliseEmblemImage) then uploaded via the standard Resource flow
+// (generateUploadUrl → POST → record); the server validates it (raster,
+// size-capped; a Viewer is refused regardless). An owner override wins over the AI
+// default, so this is how an owner picks their own mark. Gated by `canWrite` at
+// the call site.
 export function EmblemControl({ topicSlug, className }: { topicSlug: string; className?: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -408,6 +445,16 @@ function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () =
   const [glyph, setGlyph] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The just-saved Emblem, shown as a confirming preview so the owner sees the
+  // change land — it otherwise only surfaces on a future certificate, so the
+  // dialog used to just close with no feedback. An image preview is a local object
+  // URL of the resized blob, revoked when it's replaced or the dialog unmounts.
+  const [saved, setSaved] = useState<{ kind: "glyph"; glyph: string } | { kind: "image"; url: string } | null>(null);
+  useEffect(() => {
+    return () => {
+      if (saved?.kind === "image") URL.revokeObjectURL(saved.url);
+    };
+  }, [saved]);
 
   async function saveGlyph() {
     if (!glyph.trim()) return;
@@ -415,7 +462,7 @@ function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () =
     setError(null);
     try {
       await setEmblem({ topicSlug, emblem: { kind: "glyph", glyph } });
-      ref.current?.close();
+      setSaved({ kind: "glyph", glyph: glyph.trim() });
     } catch (e) {
       setError(errorText(e, "Couldn’t set that glyph."));
     } finally {
@@ -427,12 +474,13 @@ function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () =
     setBusy(true);
     setError(null);
     try {
+      const blob = await normaliseEmblemImage(file);
       const url = await generateUploadUrl();
-      const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "image/webp" }, body: blob });
       if (!res.ok) throw new Error("upload failed");
       const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
-      await setEmblem({ topicSlug, emblem: { kind: "image", storageId, contentType: file.type } });
-      ref.current?.close();
+      await setEmblem({ topicSlug, emblem: { kind: "image", storageId, contentType: "image/webp" } });
+      setSaved({ kind: "image", url: URL.createObjectURL(blob) });
     } catch (e) {
       setError(errorText(e, "Couldn’t upload that image."));
     } finally {
@@ -461,9 +509,25 @@ function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () =
       </div>
       <div className="flex flex-col gap-5 px-6 py-6">
         <p className="text-xs text-soft">
-          The mark of your subject, shown on the certificate. Set an emoji or short character, or upload a small image
-          (PNG, JPEG, or WebP). Your choice overrides the automatic one.
+          The mark of your subject, shown on the certificate. Set an emoji or short character, or upload an image (it’s
+          resized to a small square automatically). Your choice overrides the automatic one.
         </p>
+
+        {saved && (
+          <div className="flex items-center gap-3 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gold/60 bg-card">
+              {saved.kind === "image" ? (
+                <img src={saved.url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-2xl leading-none">{saved.glyph}</span>
+              )}
+            </div>
+            <p className="text-xs font-medium text-accent">
+              Emblem updated ✓ It appears on certificates earned from here on — ones already claimed keep their original
+              mark.
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Glyph</label>
@@ -493,6 +557,7 @@ function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () =
             disabled={busy}
             onChange={(e) => {
               const f = e.target.files?.[0];
+              e.target.value = ""; // let the same file be re-picked after an error
               if (f) void uploadImage(f);
             }}
             className="text-sm text-soft file:mr-3 file:rounded-lg file:border-0 file:bg-accent2 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white"
