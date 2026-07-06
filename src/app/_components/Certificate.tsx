@@ -22,18 +22,21 @@ export type CertificateData = {
   lang: string;
   emblem: CertificateEmblem;
   token?: string;
+  // The larger, more theatrical treatment for the standalone public page (vs. the
+  // compact in-app dialogs). Presentational only.
+  showcase?: boolean;
 };
 
 // The Emblem itself, inside the card's medallion. An image is raster-only and
 // served same-origin (ADR 0017), so a plain <img> is safe and prints predictably;
 // a glyph is inert text. Decorative — the achievement is spelled out below it — so
-// it carries no alt text.
-function EmblemMark({ emblem }: { emblem: CertificateEmblem }) {
+// it carries no alt text. `large` scales the glyph up for the showcase view.
+function EmblemMark({ emblem, large }: { emblem: CertificateEmblem; large?: boolean }) {
   if (emblem.kind === "image") {
     return <img src={emblem.url} alt="" className="cert-emblem-img h-full w-full rounded-full object-cover" />;
   }
   return (
-    <span className="cert-emblem-glyph text-4xl leading-none" aria-hidden>
+    <span className={`cert-emblem-glyph leading-none ${large ? "text-5xl sm:text-6xl" : "text-4xl"}`} aria-hidden>
       {emblem.glyph}
     </span>
   );
@@ -72,28 +75,39 @@ function onCardLeave(e: React.MouseEvent<HTMLDivElement>) {
 // fetching, so the surfaces can't drift. Carries the subject's Emblem in a metallic
 // medallion, a holographic foil sheen, and a pointer tilt/spotlight (ADR 0017) —
 // all CSS (globals.css `.cert-*`), degrading to a flat engraved document under
-// print + reduced-motion. Brand: "My Course".
-export function CertificateCard({ learnerName, courseTitle, lessonCount, issuedAt, lang, emblem }: CertificateData) {
+// print + reduced-motion. `showcase` (the public page) makes it larger and more
+// theatrical — a warm outer glow, a stronger foil, and an ambient shine sweep —
+// while the compact dialogs stay compact. Brand: "My Course".
+export function CertificateCard({ learnerName, courseTitle, lessonCount, issuedAt, lang, emblem, showcase }: CertificateData) {
   const date = new Date(issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  const pad = showcase ? "px-10 py-14 sm:px-14 sm:py-16" : "px-8 py-10";
+  const medallion = showcase ? "h-24 w-24 sm:h-28 sm:w-28" : "h-20 w-20";
+  const nameSize = showcase ? "text-3xl sm:text-4xl" : "text-2xl";
+  const titleSize = showcase ? "text-2xl sm:text-3xl" : "text-xl";
   return (
     <div
       dir={langDir(lang)}
-      className="cert-card relative isolate overflow-hidden rounded-2xl border-2 border-gold/60 bg-card px-8 py-10 text-center shadow-sm"
+      className={`cert-card relative isolate overflow-hidden rounded-2xl border-2 border-gold/60 bg-card text-center shadow-sm ${pad} ${
+        showcase ? "cert-card--showcase" : ""
+      }`}
       onMouseMove={onCardMove}
       onMouseLeave={onCardLeave}
     >
       <div className="cert-sheen pointer-events-none absolute inset-0" aria-hidden />
       <div className="cert-glow pointer-events-none absolute inset-0" aria-hidden />
+      {showcase && <div className="cert-shine pointer-events-none absolute inset-0" aria-hidden />}
       <div className="pointer-events-none absolute inset-2 rounded-xl border border-gold/30" aria-hidden />
       <div className="relative z-10">
-        <div className="cert-medallion mx-auto mb-5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-gold/70">
-          <EmblemMark emblem={emblem} />
+        <div
+          className={`cert-medallion mx-auto mb-5 flex items-center justify-center overflow-hidden rounded-full border-2 border-gold/70 ${medallion}`}
+        >
+          <EmblemMark emblem={emblem} large={showcase} />
         </div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent2">Certificate of Completion</p>
         <p className="mt-6 text-sm text-soft">This certifies that</p>
-        <p className="mt-1 text-2xl font-semibold text-accent">{learnerName}</p>
+        <p className={`mt-1 font-semibold text-accent ${nameSize}`}>{learnerName}</p>
         <p className="mt-4 text-sm text-soft">has completed the course</p>
-        <p className="mt-1 text-xl font-semibold text-ink">{courseTitle}</p>
+        <p className={`mt-1 font-semibold text-ink ${titleSize}`}>{courseTitle}</p>
         <p className="mt-6 text-sm text-soft">
           {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"} · {date}
         </p>
@@ -114,18 +128,30 @@ export function CertificateControl({ topicSlug, className }: { topicSlug: string
   if (!data) return null;
   const { certificate, eligible } = data;
   if (!certificate && !eligible) return null;
+
+  const btnClass =
+    className ??
+    "rounded-lg bg-gold/20 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-gold/30";
+
+  // Earned: "View" opens the standalone public certificate page in a new tab —
+  // the shareable, printable surface — rather than an in-app dialog. Eligible but
+  // not yet earned: open the claim dialog.
+  if (certificate) {
+    return (
+      <button
+        onClick={() => window.open(`/certificate/${certificate.token}`, "_blank", "noopener,noreferrer")}
+        className={btnClass}
+      >
+        🎓 View your certificate
+      </button>
+    );
+  }
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className={
-          className ??
-          "rounded-lg bg-gold/20 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-gold/30"
-        }
-      >
-        🎓 {certificate ? "View your certificate" : "Claim your certificate"}
+      <button onClick={() => setOpen(true)} className={btnClass}>
+        🎓 Claim your certificate
       </button>
-      {open && <CertificateDialog topicSlug={topicSlug} certificate={certificate} onClose={() => setOpen(false)} />}
+      {open && <CertificateDialog topicSlug={topicSlug} certificate={null} onClose={() => setOpen(false)} />}
     </>
   );
 }
@@ -371,12 +397,37 @@ function errorText(e: unknown, fallback: string): string {
   return i >= 0 ? m.slice(i + marker.length).split("\n")[0]!.trim() : fallback;
 }
 
+// Downscale an owner-uploaded image to a small square raster before upload. The
+// backend caps Emblem images at 256KB (ADR 0017) and a phone photo or screenshot
+// is far larger — the teach CLI normalises server-side, but an owner uploading
+// from the browser needs the same treatment here or the upload is refused. Draws
+// a centre-cropped 256px square (cover) onto a canvas and encodes WebP (an allowed
+// type, and comfortably under the cap). Returns the encoded blob.
+async function normaliseEmblemImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const SIZE = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = SIZE;
+  canvas.height = SIZE;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Couldn’t process that image.");
+  const scale = Math.max(SIZE / bitmap.width, SIZE / bitmap.height); // cover: fill the square
+  const w = bitmap.width * scale;
+  const h = bitmap.height * scale;
+  ctx.drawImage(bitmap, (SIZE - w) / 2, (SIZE - h) / 2, w, h);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.9));
+  if (!blob) throw new Error("Couldn’t process that image.");
+  return blob;
+}
+
 // Owner-only: curate the course's Emblem (ADR 0017, PRD stories 9-14) — set a
-// glyph (emoji / short character) or upload an image. The image reuses the
-// standard Resource upload flow (generateUploadUrl → POST → record), and the
-// server validates it (raster, size-capped; a Viewer is refused regardless). An
-// owner override wins over the AI default, so this is how an owner picks their own
-// mark. Gated by `canWrite` at the call site.
+// glyph (emoji / short character) or upload an image. The image is resized
+// client-side (normaliseEmblemImage) then uploaded via the standard Resource flow
+// (generateUploadUrl → POST → record); the server validates it (raster,
+// size-capped; a Viewer is refused regardless). An owner override wins over the AI
+// default, so this is how an owner picks their own mark. Gated by `canWrite` at
+// the call site.
 export function EmblemControl({ topicSlug, className }: { topicSlug: string; className?: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -404,6 +455,16 @@ function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () =
   const [glyph, setGlyph] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The just-saved Emblem, shown as a confirming preview so the owner sees the
+  // change land — it otherwise only surfaces on a future certificate, so the
+  // dialog used to just close with no feedback. An image preview is a local object
+  // URL of the resized blob, revoked when it's replaced or the dialog unmounts.
+  const [saved, setSaved] = useState<{ kind: "glyph"; glyph: string } | { kind: "image"; url: string } | null>(null);
+  useEffect(() => {
+    return () => {
+      if (saved?.kind === "image") URL.revokeObjectURL(saved.url);
+    };
+  }, [saved]);
 
   async function saveGlyph() {
     if (!glyph.trim()) return;
@@ -411,7 +472,7 @@ function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () =
     setError(null);
     try {
       await setEmblem({ topicSlug, emblem: { kind: "glyph", glyph } });
-      ref.current?.close();
+      setSaved({ kind: "glyph", glyph: glyph.trim() });
     } catch (e) {
       setError(errorText(e, "Couldn’t set that glyph."));
     } finally {
@@ -423,12 +484,13 @@ function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () =
     setBusy(true);
     setError(null);
     try {
+      const blob = await normaliseEmblemImage(file);
       const url = await generateUploadUrl();
-      const res = await fetch(url, { method: "POST", headers: { "Content-Type": file.type }, body: file });
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "image/webp" }, body: blob });
       if (!res.ok) throw new Error("upload failed");
       const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
-      await setEmblem({ topicSlug, emblem: { kind: "image", storageId, contentType: file.type } });
-      ref.current?.close();
+      await setEmblem({ topicSlug, emblem: { kind: "image", storageId, contentType: "image/webp" } });
+      setSaved({ kind: "image", url: URL.createObjectURL(blob) });
     } catch (e) {
       setError(errorText(e, "Couldn’t upload that image."));
     } finally {
@@ -457,9 +519,25 @@ function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () =
       </div>
       <div className="flex flex-col gap-5 px-6 py-6">
         <p className="text-xs text-soft">
-          The mark of your subject, shown on the certificate. Set an emoji or short character, or upload a small image
-          (PNG, JPEG, or WebP). Your choice overrides the automatic one.
+          The mark of your subject, shown on the certificate. Set an emoji or short character, or upload an image (it’s
+          resized to a small square automatically). Your choice overrides the automatic one.
         </p>
+
+        {saved && (
+          <div className="flex items-center gap-3 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gold/60 bg-card">
+              {saved.kind === "image" ? (
+                <img src={saved.url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-2xl leading-none">{saved.glyph}</span>
+              )}
+            </div>
+            <p className="text-xs font-medium text-accent">
+              Emblem updated ✓ It appears on certificates earned from here on — ones already claimed keep their original
+              mark.
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2">
           <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Glyph</label>
@@ -489,6 +567,7 @@ function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () =
             disabled={busy}
             onChange={(e) => {
               const f = e.target.files?.[0];
+              e.target.value = ""; // let the same file be re-picked after an error
               if (f) void uploadImage(f);
             }}
             className="text-sm text-soft file:mr-3 file:rounded-lg file:border-0 file:bg-accent2 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white"
@@ -523,11 +602,11 @@ export function PublicCertificatePage({ token }: { token: string }) {
     );
   }
   return (
-    <main className="cert-print-page mx-auto flex min-h-dvh max-w-xl flex-col items-center justify-center gap-6 px-4 py-12">
+    <main className="cert-print-page mx-auto flex min-h-dvh max-w-2xl flex-col items-center justify-center gap-6 px-4 py-12">
       {/* Apply the Edition's direction so an RTL-titled certificate renders
           correctly (course-translation). */}
-      <div className="w-full" dir={cert.dir}>
-        <CertificateCard {...cert} />
+      <div className="cert-enter w-full" dir={cert.dir}>
+        <CertificateCard {...cert} showcase />
       </div>
       <button
         onClick={() => window.print()}
