@@ -1,26 +1,20 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
-import {
-  action,
-  internalAction,
-  internalMutation,
-  internalQuery,
-  mutation,
-  query,
-  type MutationCtx,
-  type QueryCtx,
-} from "./_generated/server";
+import { action, internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getOwnedTopic, hashString, SOURCE_LANG, shareLang } from "./lib";
+import { assertAdmin, getOwnedTopic, hashString, SOURCE_LANG, shareLang, topicBySlug } from "./lib";
 import { isKnownLang, langInfo } from "./languages";
 
-// Course translation (Editions). An owner-triggered Convex action fans out one
-// Claude Messages-API call per item over the scheduler, writing a `translations`
-// row per successful item and a live `translationJobs` row for progress. No LLM
-// runs in the web app (ADR 0001): this is backend/action work, kicked off by the
-// owner and observed reactively. Only a `completed` course can be translated —
-// which freezes its content, so an Edition never drifts stale under the reader.
+// Course translation (Editions), driven by the cloud **translate Routine** — the
+// sibling of the next-lesson Routine (routine.ts), reusing its lock → claim →
+// materialise → publish → report shape. No LLM and no Anthropic API key run in
+// the app (ADR 0001 still holds): an owner fires the routine for one *completed*
+// course + language; a fired cloud run claims the (Topic, language) job,
+// materialises the source from Convex, translates it with its own Claude access,
+// and publishes each item back through the PUBLISH_SECRET-guarded seams below.
+// Only a `completed` course is translatable — its content is frozen, so an
+// Edition never drifts stale under the reader.
 
 const kindV = v.union(
   v.literal("lesson"),
@@ -33,9 +27,9 @@ type Kind = "lesson" | "reference" | "mission" | "title" | "question";
 
 // ---- Source enumeration + staleness hashing -------------------------------
 
-// The hash of a source item's content, used to skip re-translating unchanged
-// items on a re-translate. Must be computed identically in `collectItems`
-// (enumerate) and `getSourceItem` (per-item read), so both route through here.
+// The hash of a source item's content — stamped onto the translation so a later
+// re-translate can skip unchanged items. Must be computed identically wherever a
+// source item is read, so both `collectItems` and `readSource` route through here.
 function itemHash(kind: Kind, f: { title?: string; html?: string; text?: string; reply?: string }): string {
   if (kind === "lesson" || kind === "reference") return hashString((f.title ?? "") + "|" + (f.html ?? ""));
   if (kind === "question") return hashString((f.text ?? "") + "|" + (f.reply ?? ""));
@@ -44,9 +38,9 @@ function itemHash(kind: Kind, f: { title?: string; html?: string; text?: string;
 
 type Item = { kind: Kind; key: string; hash: string };
 
-// Every translatable item of a Topic: its title, mission (if any), each
-// non-superseded Lesson + Reference, and the owner's Q&A. Lesson/reference HTML
-// isn't returned here (enumeration only) — the per-item action re-reads it.
+// Every translatable item of a Topic — its title, mission (if any), and each
+// non-superseded Lesson + Reference. Used only to seed the job's `total`; the run
+// re-reads the content itself via `materialiseTopic`.
 async function collectItems(ctx: QueryCtx, topic: Doc<"topics">): Promise<Item[]> {
   const items: Item[] = [];
   items.push({ kind: "title", key: "", hash: itemHash("title", { text: topic.title }) });
@@ -60,83 +54,153 @@ async function collectItems(ctx: QueryCtx, topic: Doc<"topics">): Promise<Item[]
   const refs = await ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect();
   for (const r of refs) items.push({ kind: "reference", key: r.key, hash: itemHash("reference", r) });
 
-  if (topic.ownerId) {
-    const ownerId = topic.ownerId;
-    const questions = await ctx.db
-      .query("questions")
-      .withIndex("by_topic_user", (q) => q.eq("topicId", topic._id).eq("userId", ownerId))
-      .collect();
-    for (const q of questions) items.push({ kind: "question", key: q._id, hash: itemHash("question", q) });
-  }
+  // ponytail: Q&A translation dropped in the routine cut-over — materialiseTopic
+  // exposes only open questions (no replies), so a run can't faithfully render
+  // them. Re-add as its own item stream if learners want translated Q&A.
   return items;
 }
 
-// ---- Owner: start / re-translate an Edition -------------------------------
+// The source content for one item, read fresh so `publishTranslation` can stamp
+// its source hash and structurally validate the returned HTML. Null if the item
+// vanished (e.g. a Lesson superseded) — the run then simply doesn't publish it.
+async function readSource(
+  ctx: QueryCtx,
+  topicId: Id<"topics">,
+  kind: Kind,
+  key: string,
+): Promise<{ title?: string; html?: string; text?: string; reply?: string; hash: string } | null> {
+  const topic = await ctx.db.get(topicId);
+  if (!topic) return null;
+  if (kind === "title") return { text: topic.title, hash: itemHash("title", { text: topic.title }) };
+  if (kind === "mission") {
+    if (!topic.mission) return null;
+    return { text: topic.mission, hash: itemHash("mission", { text: topic.mission }) };
+  }
+  if (kind === "lesson") {
+    const l = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
+      .unique();
+    if (!l || l.supersededBy) return null;
+    return { title: l.title, html: l.html, hash: itemHash("lesson", l) };
+  }
+  if (kind === "reference") {
+    const r = await ctx.db
+      .query("references")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
+      .unique();
+    if (!r) return null;
+    return { title: r.title, html: r.html, hash: itemHash("reference", r) };
+  }
+  // question
+  const q = await ctx.db.get(key as Id<"questions">);
+  if (!q || q.topicId !== topicId) return null;
+  return { text: q.text, reply: q.reply ?? "", hash: itemHash("question", q) };
+}
 
-// Bulk-translate a completed course into `lang`. Owner-only, completed-gated (no
-// cap in the alpha). Idempotent re-translate: only items whose source content
-// changed since last time (by hash) are scheduled, so re-running is cheap and
-// never re-bills unchanged Lessons. Seeds/updates the job, then fans out.
-export const startTranslation = mutation({
+// ---- Owner: fire a translate run -------------------------------------------
+
+type AcquireResult =
+  | { acquired: true; topicSlug: string; lang: string; total: number }
+  | { acquired: false; reason: string };
+
+// Check the gate + grab the lock in one transaction (mirrors
+// `routine.tryAcquireGeneration`). Owner-only, completed-gated, known-language,
+// and single-flight: refuses a language that's already `translating` — otherwise
+// a re-run would double-fire the routine. Seeds/refreshes the job `translating`
+// with the item `total`. The ONLY place that decides to translate.
+export const tryAcquireTranslation = internalMutation({
   args: { topicSlug: v.string(), lang: v.string() },
-  returns: v.object({ total: v.number(), scheduled: v.number() }),
-  handler: async (ctx, { topicSlug, lang }) => {
+  handler: async (ctx, { topicSlug, lang }): Promise<AcquireResult> => {
     const userId = await getAuthUserId(ctx);
-    if (!userId) throw new Error("unauthenticated");
-    if (lang === SOURCE_LANG) throw new Error("cannot translate to the source language");
-    // Only an offered language may be translated: bounds the set of Editions a
-    // Topic can spawn (each is billed Claude calls), and keeps `lang` safe to
-    // reflect into reader markup. Grow the menu by extending LANGUAGES.
-    if (!isKnownLang(lang)) throw new Error("unsupported language");
+    if (!userId) return { acquired: false, reason: "unauthenticated" };
+    if (lang === SOURCE_LANG) return { acquired: false, reason: "source-language" };
+    // Only an offered language may be translated: bounds the Editions a Topic can
+    // spawn (each fires a billable run) and keeps `lang` safe to reflect into markup.
+    if (!isKnownLang(lang)) return { acquired: false, reason: "unsupported-language" };
     const topic = await getOwnedTopic(ctx, userId, topicSlug);
-    if (!topic) throw new Error("topic not found");
-    // Only a completed course is translatable — its content is frozen, so the
-    // Edition can't go stale as the Routine authors more Lessons.
-    if ((topic.status ?? "active") !== "completed") throw new Error("only a completed course can be translated");
+    if (!topic) return { acquired: false, reason: "no-topic" };
+    // Frozen content only — an Edition can't go stale under the reader (ADR 0015).
+    if ((topic.status ?? "active") !== "completed") return { acquired: false, reason: "not-completed" };
 
-    const items = await collectItems(ctx, topic);
-    const existing = await ctx.db
-      .query("translations")
-      .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", lang))
-      .collect();
-    const have = new Map(existing.map((t) => [`${t.kind}:${t.key}`, t.sourceHash]));
-    const stale = items.filter((it) => have.get(`${it.kind}:${it.key}`) !== it.hash);
-
-    const total = items.length;
-    const done = total - stale.length; // items already fresh count as done
-    const patch = {
-      status: (stale.length > 0 ? "translating" : "ready") as "translating" | "ready",
-      total,
-      done,
-      failed: 0,
-      error: undefined,
-    };
     const job = await ctx.db
       .query("translationJobs")
       .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", lang))
       .unique();
-    // Re-entrancy guard: a language already mid-translation must finish before
-    // another run. Otherwise a re-run recomputes staleness from committed rows
-    // only — items still in flight (no row yet) get re-scheduled and billed a
-    // second time, and the double-counted `done` can trip the job to "ready"
-    // before the tail lands, letting an owner share/publish an Edition whose
-    // last items silently fall back to English. A stuck job (should not happen)
-    // is recoverable via removeEdition, which clears it.
-    if (job && job.status === "translating") {
-      throw new Error("a translation is already in progress for this language");
-    }
+    // Single-flight: a language already mid-translation must finish (or be removed)
+    // before another fire — else the run is triggered twice for one Edition.
+    if (job && job.status === "translating") return { acquired: false, reason: "already-translating" };
+
+    const total = (await collectItems(ctx, topic)).length;
+    const patch = {
+      status: "translating" as const,
+      total,
+      done: 0,
+      failed: 0,
+      error: undefined,
+      claimedAt: undefined, // fresh lock — unclaimed until a fired run grabs it
+      runId: undefined,
+    };
     if (job) await ctx.db.patch(job._id, patch);
     else await ctx.db.insert("translationJobs", { topicId: topic._id, lang, ...patch });
+    return { acquired: true, topicSlug, lang, total };
+  },
+});
 
-    for (const it of stale) {
-      await ctx.scheduler.runAfter(0, internal.translate.translateItem, {
-        topicId: topic._id,
-        lang,
-        kind: it.kind,
-        key: it.key,
-      });
+// Release the lock when the fire itself fails to land (network / config). The run
+// never started, so this is an internal failure, not a run report.
+export const failTranslation = internalMutation({
+  args: { topicSlug: v.string(), lang: v.string(), error: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, lang, error }): Promise<null> => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return null;
+    const job = await ctx.db
+      .query("translationJobs")
+      .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", lang))
+      .unique();
+    if (job) await ctx.db.patch(job._id, { status: "failed", error, claimedAt: undefined, runId: undefined });
+    return null;
+  },
+});
+
+type FireResult = { fired: boolean; reason?: string; error?: string };
+
+// Owner: translate a completed course into `lang` by firing the translate
+// Routine (mirrors `routine.requestNextLesson`). Acquire the lock, then POST the
+// routine's Fire URL; on a failed fire, release the lock. Idempotent re-translate
+// is a re-fire once the prior run is no longer `translating`.
+export const startTranslation = action({
+  args: { topicSlug: v.string(), lang: v.string() },
+  handler: async (ctx, { topicSlug, lang }): Promise<FireResult> => {
+    const acq: AcquireResult = await ctx.runMutation(internal.translate.tryAcquireTranslation, { topicSlug, lang });
+    if (!acq.acquired) {
+      // The client surfaces these as errors (same messages as before the routine cut-over).
+      if (acq.reason === "no-topic" || acq.reason === "unauthenticated") throw new Error("topic not found");
+      if (acq.reason === "not-completed") throw new Error("only a completed course can be translated");
+      if (acq.reason === "unsupported-language") throw new Error("unsupported language");
+      if (acq.reason === "source-language") throw new Error("cannot translate to the source language");
+      if (acq.reason === "already-translating") throw new Error("a translation is already in progress for this language");
+      return { fired: false, reason: acq.reason };
     }
-    return { total, scheduled: stale.length };
+    try {
+      const url = process.env.TRANSLATE_FIRE_URL;
+      const token = process.env.TRANSLATE_FIRE_TOKEN;
+      if (!url || !token) throw new Error("TRANSLATE_FIRE_URL / TRANSLATE_FIRE_TOKEN not set");
+      // Closed body (ADR 0008): the run learns its (Topic, language) from
+      // `claimTranslation`, not the fire body.
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json", "anthropic-version": "2023-06-01", authorization: `Bearer ${token}` },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) throw new Error(`fire ${res.status}: ${await res.text()}`);
+      return { fired: true };
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      await ctx.runMutation(internal.translate.failTranslation, { topicSlug, lang, error });
+      return { fired: false, reason: "fire-error", error };
+    }
   },
 });
 
@@ -176,258 +240,153 @@ export const removeEdition = mutation({
   },
 });
 
-// ---- Per-item translation (scheduler → Claude → save) ---------------------
+// ---- The run's seams (PUBLISH_SECRET-guarded) ------------------------------
 
-type SourceItem = {
-  courseTitle: string;
-  courseMission: string | null;
-  title?: string;
-  html?: string;
-  text?: string;
-  reply?: string;
-  hash: string;
-};
-
-// The source content for one item, read fresh (the action has no db access).
-// Returns null if the item vanished (e.g. a Lesson superseded) — the action then
-// records a skip so the job still completes.
-export const getSourceItem = internalQuery({
-  args: { topicId: v.id("topics"), kind: kindV, key: v.string() },
-  returns: v.union(
-    v.null(),
-    v.object({
-      courseTitle: v.string(),
-      courseMission: v.union(v.string(), v.null()),
-      title: v.optional(v.string()),
-      html: v.optional(v.string()),
-      text: v.optional(v.string()),
-      reply: v.optional(v.string()),
-      hash: v.string(),
-    }),
-  ),
-  handler: async (ctx, { topicId, kind, key }): Promise<SourceItem | null> => {
-    const topic = await ctx.db.get(topicId);
+// A fired run can't be told its (Topic, language) — the Fire body is closed (ADR
+// 0008) — so it calls this to atomically grab one locked-but-unclaimed
+// translation job and stamp its runId. Returns the claimed Topic slug, target
+// language, and owner email (for the owner-scoped materialise/publish), or null
+// if none waiting. Mirrors `routine.claimWork`.
+export const claimTranslation = mutation({
+  args: { secret: v.string(), runId: v.string() },
+  handler: async (
+    ctx,
+    { secret, runId },
+  ): Promise<{ topicSlug: string; lang: string; ownerEmail: string | null } | null> => {
+    assertAdmin(secret);
+    // ponytail: full scan of the lock table (mirrors routine.claimWork) — one row
+    // per (Topic, language), so tiny in practice. Add a `by_status` index if the
+    // edition count ever grows large enough to matter.
+    const jobs = await ctx.db.query("translationJobs").collect();
+    const candidate = jobs
+      .filter((j) => j.status === "translating" && j.claimedAt === undefined)
+      .sort((a, b) => a._creationTime - b._creationTime)[0];
+    if (!candidate) return null;
+    await ctx.db.patch(candidate._id, { claimedAt: Date.now(), runId });
+    const topic = await ctx.db.get(candidate.topicId);
     if (!topic) return null;
-    const base = { courseTitle: topic.title, courseMission: topic.mission ?? null };
-    if (kind === "title") return { ...base, text: topic.title, hash: itemHash("title", { text: topic.title }) };
-    if (kind === "mission") {
-      if (!topic.mission) return null;
-      return { ...base, text: topic.mission, hash: itemHash("mission", { text: topic.mission }) };
-    }
-    if (kind === "lesson") {
-      const l = await ctx.db
-        .query("lessons")
-        .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
-        .unique();
-      if (!l || l.supersededBy) return null;
-      return { ...base, title: l.title, html: l.html, hash: itemHash("lesson", l) };
-    }
-    if (kind === "reference") {
-      const r = await ctx.db
-        .query("references")
-        .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
-        .unique();
-      if (!r) return null;
-      return { ...base, title: r.title, html: r.html, hash: itemHash("reference", r) };
-    }
-    // question
-    const q = await ctx.db.get(key as Id<"questions">);
-    if (!q || q.topicId !== topicId) return null;
-    return { ...base, text: q.text, reply: q.reply ?? "", hash: itemHash("question", q) };
+    const owner = topic.ownerId ? await ctx.db.get(topic.ownerId) : null;
+    return { topicSlug: topic.slug, lang: candidate.lang, ownerEmail: owner?.email ?? null };
   },
 });
 
-export const translateItem = internalAction({
-  args: { topicId: v.id("topics"), lang: v.string(), kind: kindV, key: v.string() },
-  returns: v.null(),
-  handler: async (ctx, { topicId, lang, kind, key }): Promise<null> => {
-    const src: SourceItem | null = await ctx.runQuery(internal.translate.getSourceItem, { topicId, kind, key });
-    if (!src) {
-      await ctx.runMutation(internal.translate.saveTranslation, { topicId, lang, kind, key, outcome: "skip", sourceHash: "" });
-      return null;
-    }
-    try {
-      const out = await translateViaClaude(kind, lang, src);
-      await ctx.runMutation(internal.translate.saveTranslation, {
-        topicId,
-        lang,
-        kind,
-        key,
-        outcome: "ok",
-        sourceHash: src.hash,
-        ...out,
-      });
-    } catch (e) {
-      const error = e instanceof Error ? e.message : String(e);
-      await ctx.runMutation(internal.translate.saveTranslation, {
-        topicId,
-        lang,
-        kind,
-        key,
-        outcome: "failed",
-        sourceHash: src.hash,
-        error,
-      });
-    }
-    return null;
-  },
-});
-
-export const saveTranslation = internalMutation({
+// Publish one translated item back to the Hub and tick the job (mirrors the
+// teach-CLI publish path). Owner-scoped by email (the run has no auth identity).
+// Re-reads the source to stamp its hash and, for a Lesson, to reject a
+// translation whose quiz-marker counts changed (positional scoring must survive)
+// — a rejected/vanished item is skipped, leaving the English fallback. A missing
+// job means the Edition was removed mid-run: skip, so no orphan row is inserted.
+export const publishTranslation = mutation({
   args: {
-    topicId: v.id("topics"),
+    secret: v.string(),
+    ownerEmail: v.string(),
+    topicSlug: v.string(),
     lang: v.string(),
     kind: kindV,
     key: v.string(),
-    outcome: v.union(v.literal("ok"), v.literal("failed"), v.literal("skip")),
-    sourceHash: v.string(),
     title: v.optional(v.string()),
     html: v.optional(v.string()),
     text: v.optional(v.string()),
     reply: v.optional(v.string()),
+  },
+  returns: v.object({ status: v.union(v.literal("saved"), v.literal("skipped")) }),
+  handler: async (ctx, a): Promise<{ status: "saved" | "skipped" }> => {
+    assertAdmin(a.secret);
+    const owner = await ctx.db.query("users").withIndex("email", (q) => q.eq("email", a.ownerEmail)).unique();
+    if (!owner) throw new Error("owner not found");
+    const topic = await getOwnedTopic(ctx, owner._id, a.topicSlug);
+    if (!topic) throw new Error("topic not found");
+
+    const job = await ctx.db
+      .query("translationJobs")
+      .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", a.lang))
+      .unique();
+    if (!job) return { status: "skipped" }; // Edition removed mid-run — no orphan rows.
+
+    const src = await readSource(ctx, topic._id, a.kind, a.key);
+    if (!src) return { status: "skipped" }; // source vanished — leave the English fallback.
+
+    const html = a.html !== undefined ? stripFence(a.html) : undefined;
+    // A structural drift in a Lesson's quiz markers would break positional scoring
+    // — skip it (English fallback) rather than ship a broken quiz.
+    if (a.kind === "lesson" && html !== undefined && !quizStructureMatches(src.html ?? "", html)) {
+      return { status: "skipped" };
+    }
+
+    const row = {
+      topicId: topic._id,
+      lang: a.lang,
+      kind: a.kind,
+      key: a.key,
+      title: a.title,
+      html,
+      text: a.text,
+      reply: a.reply,
+      sourceHash: src.hash,
+    };
+    const existing = await ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) =>
+        q.eq("topicId", topic._id).eq("lang", a.lang).eq("kind", a.kind).eq("key", a.key),
+      )
+      .unique();
+    if (existing) await ctx.db.replace(existing._id, row);
+    else await ctx.db.insert("translations", row);
+    await ctx.db.patch(job._id, { done: job.done + 1 });
+    return { status: "saved" };
+  },
+});
+
+// The run's final report, releasing the lock (mirrors `routine.reportGeneration`).
+// "ready" makes the Edition usable — any item the run didn't publish counts as
+// `failed` and falls back to English in the reader; "failed" surfaces a retry.
+export const reportTranslation = mutation({
+  args: {
+    secret: v.string(),
+    topicSlug: v.string(),
+    lang: v.string(),
+    outcome: v.union(v.literal("ready"), v.literal("failed")),
     error: v.optional(v.string()),
   },
   returns: v.null(),
-  handler: async (ctx: MutationCtx, a): Promise<null> => {
-    if (a.outcome === "ok") {
-      const existing = await ctx.db
-        .query("translations")
-        .withIndex("by_topic_lang_kind_key", (q) =>
-          q.eq("topicId", a.topicId).eq("lang", a.lang).eq("kind", a.kind).eq("key", a.key),
-        )
-        .unique();
-      const row = {
-        topicId: a.topicId,
-        lang: a.lang,
-        kind: a.kind,
-        key: a.key,
-        title: a.title,
-        html: a.html,
-        text: a.text,
-        reply: a.reply,
-        sourceHash: a.sourceHash,
-      };
-      if (existing) await ctx.db.replace(existing._id, row);
-      else await ctx.db.insert("translations", row);
-    }
+  handler: async (ctx, { secret, topicSlug, lang, outcome, error }): Promise<null> => {
+    assertAdmin(secret);
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) throw new Error("topic not found");
     const job = await ctx.db
       .query("translationJobs")
-      .withIndex("by_topic_lang", (q) => q.eq("topicId", a.topicId).eq("lang", a.lang))
+      .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", lang))
       .unique();
     if (!job) return null;
-    const done = job.done + (a.outcome === "failed" ? 0 : 1);
-    const failed = job.failed + (a.outcome === "failed" ? 1 : 0);
-    const complete = done + failed >= job.total;
-    // Any successful item makes the Edition usable ("ready", failures shown as a
-    // count); only an all-failed run is "failed".
-    const status = complete ? (done > 0 ? "ready" : "failed") : "translating";
-    await ctx.db.patch(job._id, { done, failed, status, error: a.error ?? job.error });
+    const clear = { claimedAt: undefined, runId: undefined };
+    if (outcome === "ready") {
+      await ctx.db.patch(job._id, { status: "ready", failed: Math.max(0, job.total - job.done), error: undefined, ...clear });
+    } else {
+      await ctx.db.patch(job._id, { status: "failed", error: error ?? "translation run failed", ...clear });
+    }
     return null;
   },
 });
 
-// ---- The Claude Messages API call -----------------------------------------
+// ---- Translation-fidelity guard --------------------------------------------
 
-// Faithful HTML translation: preserve ALL structure/scripts/ids/data-* and the
-// object of study; translate only human-readable prose. The hard rules matter —
-// quiz scoring reads data-correct/data-k/data-answer positionally (lessonSrcDoc).
-function htmlSystem(lang: string, src: SourceItem): string {
-  const name = langInfo(lang).name;
-  const mission = src.courseMission ? `\nMission: ${src.courseMission.slice(0, 500)}` : "";
-  return [
-    `You are a professional translator localizing an interactive HTML lesson from a self-paced course into ${name} (${lang}).`,
-    ``,
-    `Course: ${src.courseTitle}${mission}`,
-    ``,
-    `Output ONLY the translated HTML — no markdown fences, no commentary. Your entire reply must be valid HTML that can replace the original verbatim.`,
-    ``,
-    `Preserve EXACTLY, unchanged:`,
-    `- every tag, attribute, class, and id`,
-    `- all data-* attributes, especially data-correct, data-k, data-answer, data-alt (quiz scoring reads these; they must not change)`,
-    `- every <script> and <style> block, and all inline JS/CSS`,
-    `- href/src values and URLs`,
-    `- the number and order of elements — never add, remove, reorder, or merge anything, especially .quiz blocks and their .opt options (quiz identity is positional)`,
-    ``,
-    `Translate into ${name} ONLY the human-readable text: visible text nodes and the human-readable values of title, alt, placeholder, and aria-label.`,
-    ``,
-    `Do NOT translate the OBJECT OF STUDY — any foreign-language material the course teaches (vocabulary, example sentences, non-Latin scripts), code, proper nouns, or the values inside data-answer / data-alt. Leave all of it exactly as-is. When unsure whether a token is being taught rather than explained, leave it unchanged.`,
-  ].join("\n");
-}
-
-function textSystem(lang: string, src: SourceItem, what: string): string {
-  const name = langInfo(lang).name;
-  return `Translate the following ${what} into ${name} (${lang}). Output ONLY the translation — no quotes, no commentary. Preserve any HTML tags, markdown, code, proper nouns, and foreign-language study material unchanged; translate only the natural-language prose. Course: ${src.courseTitle}.`;
-}
-
-async function translateViaClaude(
-  kind: Kind,
-  lang: string,
-  src: SourceItem,
-): Promise<{ title?: string; html?: string; text?: string; reply?: string }> {
-  if (kind === "lesson" || kind === "reference") {
-    const title = await callClaude(textSystem(lang, src, "short title"), src.title ?? "");
-    const html = stripFence(await callClaude(htmlSystem(lang, src), src.html ?? ""));
-    if (kind === "lesson") validateHtmlStructure(src.html ?? "", html);
-    return { title, html };
-  }
-  if (kind === "title") return { text: await callClaude(textSystem(lang, src, "course title"), src.text ?? "") };
-  if (kind === "mission") return { text: await callClaude(textSystem(lang, src, "course mission"), src.text ?? "") };
-  // question
-  const text = await callClaude(textSystem(lang, src, "learner's question"), src.text ?? "");
-  const reply = src.reply ? await callClaude(textSystem(lang, src, "teacher's reply"), src.reply) : undefined;
-  return { text, reply };
-}
-
-// One Claude Messages-API call via fetch (default Convex runtime — no "use node").
-// Model defaults to Opus 4.8; set TRANSLATION_MODEL=claude-sonnet-5 to trade some
-// fidelity for cost. No temperature/top_p (rejected on 4.8), no thinking field.
-async function callClaude(system: string, user: string): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
-  if (!user.trim()) return "";
-  const model = process.env.TRANSLATION_MODEL || "claude-opus-4-8";
-  const maxTokens = Number(process.env.TRANSLATION_MAX_TOKENS || "16000");
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] }),
-  });
-  if (!res.ok) throw new Error(`anthropic ${res.status}: ${(await res.text()).slice(0, 300)}`);
-  const data = (await res.json()) as { stop_reason?: string; content?: Array<{ type?: string; text?: string }> };
-  if (data.stop_reason === "refusal") throw new Error("translation refused by safety classifier");
-  if (data.stop_reason === "max_tokens") throw new Error("translation truncated — raise TRANSLATION_MAX_TOKENS");
-  const text = (data.content ?? [])
-    .filter((b) => b?.type === "text")
-    .map((b) => b.text ?? "")
-    .join("")
-    .trim();
-  if (!text) throw new Error("empty translation");
-  return text;
-}
-
-// Defensive: strip a ```html … ``` fence if the model wraps the document.
+// Defensive: strip a ```html … ``` fence if the run wraps the document.
 function stripFence(s: string): string {
   const m = s.trim().match(/^```(?:html)?\s*([\s\S]*?)\s*```$/i);
   return m ? m[1]!.trim() : s.trim();
 }
 
-// A cheap structural guard: the count of quiz-scoring markers must survive
-// translation. A mismatch means the model added/dropped/renamed a quiz or
-// option — which would break positional quiz scoring — so fail the item (falls
-// back to the English source in the reader) rather than ship a broken lesson.
-function validateHtmlStructure(source: string, out: string): void {
+// True when the quiz-scoring markers survived translation unchanged. The reader
+// derives quiz identity positionally and reads data-correct/data-answer/data-k
+// (lessonSrcDoc), so a changed count means a broken quiz.
+function quizStructureMatches(source: string, out: string): boolean {
   for (const re of [/data-correct=/g, /data-answer=/g, /data-k=/g]) {
-    const a = (source.match(re) ?? []).length;
-    const b = (out.match(re) ?? []).length;
-    if (a !== b) throw new Error(`quiz structure changed in translation (${re.source}: ${a}→${b})`);
+    if ((source.match(re) ?? []).length !== (out.match(re) ?? []).length) return false;
   }
+  return true;
 }
 
-// ---- Owner: the Editions panel data ---------------------------------------
+// ---- Owner: the Editions panel data ----------------------------------------
 
 // The owner's Editions of a Topic: English (the source, always ready) plus one
 // per translation job, each with live status + how many Shares and a Public link

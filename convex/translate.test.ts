@@ -1,9 +1,14 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { expect, test } from "vitest";
-import { api } from "./_generated/api";
+import { beforeAll, expect, test } from "vitest";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
+
+// The translate Routine's publish seams are PUBLISH_SECRET-guarded (assertAdmin).
+beforeAll(() => {
+  process.env.PUBLISH_SECRET = "test-secret";
+});
 
 // Course translation (Editions). An Edition = (Topic, language) is the unit of
 // access: the owner holds English + every ready translation; a Viewer holds only
@@ -121,9 +126,12 @@ test("courseHeader exposes only the Editions the caller holds", async () => {
   expect(bobEn!.lang).toBe("ur");
 });
 
-// ---- startTranslation: owner + completed gate ------------------------------
+// ---- tryAcquireTranslation: the gate + lock that fires the routine ----------
+// (startTranslation is a thin action: acquire, then POST the translate-routine
+// fire URL. The gate holds all the db logic and is tested directly, mirroring
+// routine.tryAcquireGeneration; the fetch itself isn't unit-tested.)
 
-test("startTranslation is owner-only and completed-only, and seeds a job", async () => {
+test("tryAcquireTranslation gates on owner + completed + known language, and seeds the job", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
   const bob = await seedUser(t, "bob@example.com");
@@ -131,58 +139,132 @@ test("startTranslation is owner-only and completed-only, and seeds a job", async
   await addLesson(t, activeId, "0001", 1);
 
   // Not completed → refused.
-  await expect(
-    asUser(t, alice).mutation(api.translate.startTranslation, { topicSlug: "active-course", lang: "es" }),
-  ).rejects.toThrow(/completed/);
+  expect(
+    await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "active-course", lang: "es" }),
+  ).toMatchObject({ acquired: false, reason: "not-completed" });
 
   const doneId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
   await addLesson(t, doneId, "0001", 1);
   // A non-owner can't translate someone else's course.
-  await expect(
-    asUser(t, bob).mutation(api.translate.startTranslation, { topicSlug: "hindi", lang: "es" }),
-  ).rejects.toThrow(/not found/);
+  expect(
+    await asUser(t, bob).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" }),
+  ).toMatchObject({ acquired: false, reason: "no-topic" });
   // Can't translate into the source language.
-  await expect(
-    asUser(t, alice).mutation(api.translate.startTranslation, { topicSlug: "hindi", lang: "en" }),
-  ).rejects.toThrow(/source language/);
+  expect(
+    await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "en" }),
+  ).toMatchObject({ acquired: false, reason: "source-language" });
 
-  // Owner + completed → schedules the title + the one lesson, seeds the job.
-  const res = await asUser(t, alice).mutation(api.translate.startTranslation, { topicSlug: "hindi", lang: "es" });
-  expect(res).toEqual({ total: 2, scheduled: 2 });
+  // Owner + completed + known language → seeds the job "translating" with the item total.
+  expect(
+    await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" }),
+  ).toMatchObject({ acquired: true, total: 2 });
   const job = await t.run((ctx) =>
     ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", doneId).eq("lang", "es")).unique(),
   );
   expect(job).toMatchObject({ status: "translating", total: 2, done: 0 });
 });
 
-test("startTranslation refuses an unsupported language (bounds Edition fan-out + junk codes)", async () => {
+test("tryAcquireTranslation refuses an unsupported language (bounds Edition fan-out + junk codes)", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
   const topicId = await seedTopic(t, alice, "hindi", "Hindi");
   await addLesson(t, topicId, "0001", 1);
-  // A non-menu / junk code is rejected before any job is seeded or work scheduled,
-  // so an owner can't spawn unbounded billable Editions from arbitrary strings.
-  await expect(
-    asUser(t, alice).mutation(api.translate.startTranslation, { topicSlug: "hindi", lang: "x1" }),
-  ).rejects.toThrow(/unsupported language/);
+  // A non-menu / junk code is rejected before any job is seeded, so an owner can't
+  // spawn unbounded billable Editions from arbitrary strings.
+  expect(
+    await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "x1" }),
+  ).toMatchObject({ acquired: false, reason: "unsupported-language" });
   const job = await t.run((ctx) =>
     ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "x1")).unique(),
   );
   expect(job).toBeNull();
 });
 
-test("startTranslation refuses to re-run while a job is still translating (no double-schedule)", async () => {
+test("tryAcquireTranslation refuses to re-run while a job is still translating (single-flight)", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
   const topicId = await seedTopic(t, alice, "hindi", "Hindi");
   await addLesson(t, topicId, "0001", 1);
-  const first = await asUser(t, alice).mutation(api.translate.startTranslation, { topicSlug: "hindi", lang: "es" });
-  expect(first.scheduled).toBeGreaterThan(0); // job is now "translating", items in flight
-  // A second run before the tail lands is refused — otherwise in-flight items are
-  // re-scheduled (double-billed) and the job can flip "ready" while incomplete.
-  await expect(
-    asUser(t, alice).mutation(api.translate.startTranslation, { topicSlug: "hindi", lang: "es" }),
-  ).rejects.toThrow(/in progress/);
+  expect(
+    await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" }),
+  ).toMatchObject({ acquired: true });
+  // Job is now "translating"; a second acquire is refused — otherwise the routine
+  // double-fires and the job could flip "ready" while items are still in flight.
+  expect(
+    await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" }),
+  ).toMatchObject({ acquired: false, reason: "already-translating" });
+});
+
+// ---- The translate Routine's seams (PUBLISH_SECRET-guarded) -----------------
+
+test("claim → publish → report round-trips one Edition, and the reader serves it", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  await addLesson(t, topicId, "0001", 1);
+  // Owner fires: seeds the job "translating" (total = title + the one lesson = 2).
+  await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" });
+
+  const secret = "test-secret";
+  // The run claims the pending Edition — it learns the (Topic, language, owner).
+  const claim = await t.mutation(api.translate.claimTranslation, { secret, runId: "r1" });
+  expect(claim).toMatchObject({ topicSlug: "hindi", lang: "es", ownerEmail: "alice@example.com" });
+  // A second claim finds nothing — the job is now claimed (single-flight).
+  expect(await t.mutation(api.translate.claimTranslation, { secret, runId: "r2" })).toBeNull();
+
+  // The run publishes the translated title + lesson.
+  expect(
+    await t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "title", key: "", text: "Hindi (es)" }),
+  ).toEqual({ status: "saved" });
+  expect(
+    await t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "lesson", key: "0001", title: "Lección", html: "<p>es</p>" }),
+  ).toEqual({ status: "saved" });
+
+  // The run reports ready → the job is usable, done ticked, nothing failed.
+  await t.mutation(api.translate.reportTranslation, { secret, topicSlug: "hindi", lang: "es", outcome: "ready" });
+  const job = await t.run((ctx) =>
+    ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique(),
+  );
+  expect(job).toMatchObject({ status: "ready", done: 2, failed: 0 });
+  // The owner now reads the Spanish edition (they hold every ready Edition).
+  expect(await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "es" })).toMatchObject({
+    html: "<p>es</p>",
+    title: "Lección",
+  });
+});
+
+test("publishTranslation skips a lesson whose quiz structure changed (no row, English fallback)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1", html: '<div data-correct="a"></div>' }));
+  await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" });
+
+  // The translated HTML dropped the quiz marker → rejected; no row written.
+  expect(
+    await t.mutation(api.translate.publishTranslation, {
+      secret: "test-secret",
+      ownerEmail: "alice@example.com",
+      topicSlug: "hindi",
+      lang: "es",
+      kind: "lesson",
+      key: "0001",
+      title: "L1",
+      html: "<div></div>",
+    }),
+  ).toEqual({ status: "skipped" });
+  const row = await t.run((ctx) =>
+    ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "es").eq("kind", "lesson").eq("key", "0001"))
+      .unique(),
+  );
+  expect(row).toBeNull();
+});
+
+test("the translate Routine seams reject a bad secret", async () => {
+  const t = convexTest(schema, modules);
+  await expect(t.mutation(api.translate.claimTranslation, { secret: "wrong", runId: "r1" })).rejects.toThrow();
 });
 
 test("editions lists English + each job with share counts", async () => {

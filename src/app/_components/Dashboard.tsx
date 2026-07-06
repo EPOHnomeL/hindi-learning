@@ -469,7 +469,7 @@ function EditionRow({ slug, edition }: { slug: string; edition: Edition }) {
 // items that changed/failed), and "Ready" (with a failed-item count if any) once
 // usable.
 function EditionStatus({ slug, edition }: { slug: string; edition: Edition }) {
-  const retry = useMutation(api.translate.startTranslation);
+  const retry = useAction(api.translate.startTranslation);
   const [busy, setBusy] = useState(false);
 
   if (edition.status === "translating") {
@@ -507,7 +507,7 @@ function EditionStatus({ slug, edition }: { slug: string; edition: Edition }) {
 // course is translatable (its content is frozen), so when it isn't, this shows
 // the unlock hint instead of the picker.
 function AddLanguage({ slug, editions, completed }: { slug: string; editions: Edition[]; completed: boolean }) {
-  const start = useMutation(api.translate.startTranslation);
+  const start = useAction(api.translate.startTranslation);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
 

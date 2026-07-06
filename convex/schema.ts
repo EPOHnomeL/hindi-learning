@@ -282,11 +282,14 @@ export default defineSchema({
     .index("by_topic_lang", ["topicId", "lang"])
     .index("by_topic_lang_kind_key", ["topicId", "lang", "kind", "key"]),
 
-  // One translation job per (Topic, language) — the Editions panel's live status.
-  // Seeded by `startTranslation` on a completed course; each item's
-  // `saveTranslation` ticks `done`/`failed`. `total` counts all translatable
-  // items. status: "translating" → "ready" once done+failed === total (or
-  // "failed" on a fatal error before items run). Reused (patched) on re-translate.
+  // One translation job per (Topic, language) — the Editions panel's live status
+  // AND the single-flight lock for the translate Routine (mirrors `generation`).
+  // Seeded "translating" by `startTranslation` on a completed course, which then
+  // fires the routine; the fired run claims it (`claimTranslation` stamps
+  // `claimedAt`/`runId`), `publishTranslation` ticks `done` per item, and
+  // `reportTranslation` flips it "ready" (unpublished items → `failed`, English
+  // fallback) or "failed". `total` counts translatable items. Reused (patched) on
+  // re-translate.
   translationJobs: defineTable({
     topicId: v.id("topics"),
     lang: v.string(),
@@ -295,6 +298,9 @@ export default defineSchema({
     done: v.number(),
     failed: v.number(),
     error: v.optional(v.string()),
+    // Set when a fired run claims this job; keeps a second run from grabbing it.
+    claimedAt: v.optional(v.number()),
+    runId: v.optional(v.string()),
   })
     .index("by_topic", ["topicId"])
     .index("by_topic_lang", ["topicId", "lang"]),
