@@ -106,3 +106,24 @@ _Avoid_: Hosted tier, premium plan, pro
 **BYOK line**:
 The tier where the customer supplies their own OpenAI-compatible key + model and configures it themselves, paying their vendor directly. Quality is guaranteed on Claude only; every other model is *reachable* through the gateway but its quality is the customer's responsibility. The "configure it yourself" line.
 _Avoid_: Self-hosted, free tier, self-serve (BYOK is about the key, not the hosting)
+
+## Monetisation (proposed — [ADR 0016](docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md))
+
+Proposed, not yet built. These name the concepts a **paid course marketplace** introduces on top of the free-distribution model: vetted **Sellers** list finished courses, buyers purchase one-time lifetime **Entitlements**, and the platform *facilitates* payments through Stripe Connect (Express) — taking an application fee while each Seller stays the merchant of record for their own sales. This is the first time the platform charges for *consuming* content.
+
+**Entitlement**:
+An account's purchased, permanent right to read a paid Topic's gated content — every Lesson past the free first one, plus their References. One per (buyer, Topic), created when a purchase succeeds and never expiring (one-time, lifetime). The presence of the row *is* the access; it attributes to an account (like a Certificate) and never to a Guest. Distinct from a **Share** (a free grant from an owner) and a **Public link** (free anonymous access): an Entitlement is **bought**, not granted.
+_Avoid_: Purchase, licence, subscription (it is one-time, not recurring), access grant, enrollment (the deferred per-learner-progress concept — not this)
+
+**Seller**:
+A User the **Admin** has explicitly granted the **can-sell** capability (a per-user flag in the admin portal, *distinct from* the Allowlist that merely admits the account) **and** who has completed Stripe **Express** onboarding — billing + address details / KYC — so they can receive payouts. A Seller sets a Topic's price and is the **merchant of record** for their own sales; the platform only facilitates and takes an application fee. Being on the **Allowlist** lets you *exist*; the can-sell grant lets you *charge*.
+_Avoid_: Author (collides with the Routine *authoring* Lessons), Vendor, Creator, Merchant, Sponsor (the internal-studio term)
+
+**Preview**:
+On a paid Topic, the free first Lesson — readable without an Entitlement by anyone, including a Guest. The teaser that sits before the paygate; continuing past it requires a buyer account and an Entitlement.
+_Avoid_: Free trial, sample, demo, taster
+
+**How monetisation reshapes existing terms** (proposed):
+- **Allowlist** keeps its meaning (who may create an account) but selling is now gated by the *separate* Admin-granted **can-sell** capability, not by the Allowlist. Buyers are admitted by **payment**, bypassing the Allowlist entirely — so account creation is no longer purely a private-alpha gate for them.
+- **Guest** / **Public link** semantics **fork by course**: a **free** Topic keeps today's full anonymous read access; a **paid** Topic exposes only the **Preview** through a Public link / to a Guest, and the rest requires an Entitlement (which a Guest structurally cannot hold).
+- The **buyer role** is intentionally left unnamed for now — it would collide with the generic "learner" used throughout this glossary. It is defined operationally as "a User holding an Entitlement" until the deferred roles/enrollment work names it.
