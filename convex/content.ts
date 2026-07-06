@@ -1,8 +1,9 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, getViewableTopic, topicBySlug, topicLessonCounts } from "./lib";
+import { mutation, query, type QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import { assertAdmin, getOwnedTopic, getViewableTopic, heldLangs, readableLang, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import { langInfo } from "./languages";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
 import { isCallerAdmin } from "./whitelist";
 
@@ -25,6 +26,52 @@ export function decodeEntities(s: string): string {
   return s.replace(/&(amp|lt|gt|quot|#39|apos);/g, (_, e) =>
     ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'" })[e as string] ?? _,
   );
+}
+
+// ---- Editions (course translation) ----------------------------------------
+
+// One translated item for an Edition, or null (source language, or not yet
+// translated — the caller then falls back to the English source row).
+async function trOne(
+  ctx: QueryCtx,
+  topicId: Id<"topics">,
+  lang: string,
+  kind: "lesson" | "reference" | "mission" | "title" | "question",
+  key: string,
+): Promise<Doc<"translations"> | null> {
+  if (lang === SOURCE_LANG) return null;
+  return await ctx.db
+    .query("translations")
+    .withIndex("by_topic_lang_kind_key", (q) =>
+      q.eq("topicId", topicId).eq("lang", lang).eq("kind", kind).eq("key", key),
+    )
+    .unique();
+}
+
+// All of one Edition's translated rows for a Topic, keyed `${kind}:${key}` — a
+// single read for list queries. Empty for the source language.
+async function editionMap(ctx: QueryCtx, topicId: Id<"topics">, lang: string): Promise<Map<string, Doc<"translations">>> {
+  if (lang === SOURCE_LANG) return new Map();
+  const rows = await ctx.db
+    .query("translations")
+    .withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", lang))
+    .collect();
+  return new Map(rows.map((r) => [`${r.kind}:${r.key}`, r]));
+}
+
+// The Editions the caller may switch between on a Topic (owner: source + every
+// ready translation; Viewer: their granted languages), with display metadata.
+async function switcherEditions(ctx: QueryCtx, topic: Doc<"topics">, userId: Id<"users">) {
+  const held = await heldLangs(ctx, topic, userId);
+  return [...held].sort().map((l) => {
+    const i = langInfo(l);
+    return {
+      lang: l,
+      name: l === SOURCE_LANG ? "English" : i.name,
+      native: l === SOURCE_LANG ? "English" : i.native,
+      rtl: l === SOURCE_LANG ? false : !!i.rtl,
+    };
+  });
 }
 
 // ---- Reader (learner) ------------------------------------------------------
@@ -59,6 +106,16 @@ export const dashboard = query({
     const cards = await Promise.all(
       topics.map(async (t) => {
         const counts = await topicLessonCounts(ctx, t._id, userId);
+        // Ready translation Editions, for the card's language chips (grouping the
+        // course's languages together in one place, per the design).
+        const jobs = await ctx.db
+          .query("translationJobs")
+          .withIndex("by_topic", (q) => q.eq("topicId", t._id))
+          .collect();
+        const editions = jobs
+          .filter((j) => j.status === "ready")
+          .map((j) => j.lang)
+          .sort();
         return {
           slug: t.slug,
           title: t.title,
@@ -68,6 +125,7 @@ export const dashboard = query({
           // "Public" badge and the SharePanel's link controls. Owner-only query,
           // so this is never exposed to anyone but the owner.
           publicToken: t.publicToken ?? null,
+          editions,
           seq: t.seq,
           creationTime: t._creationTime,
           ...counts,
@@ -177,7 +235,7 @@ export const reopenCourse = mutation({
 // the shared Topic) and the UI learns whether to show write controls. `null`
 // when signed-out or with no access — the route then renders not-found.
 export const courseHeader = query({
-  args: { topicSlug: v.string() },
+  args: { topicSlug: v.string(), lang: v.optional(v.string()) },
   returns: v.union(
     v.null(),
     v.object({
@@ -186,80 +244,117 @@ export const courseHeader = query({
       // The reader reads `status` to switch affordances: `completed` (ADR 0015)
       // hides "Generate next lesson" and shows the owner's Reopen control.
       status: v.union(v.literal("seeded"), v.literal("active"), v.literal("completed")),
+      // The Edition actually being served (honours `lang` only if the caller
+      // holds it), its text direction, and the Editions they can switch to.
+      lang: v.string(),
+      dir: v.union(v.literal("ltr"), v.literal("rtl")),
+      editions: v.array(
+        v.object({ lang: v.string(), name: v.string(), native: v.string(), rtl: v.boolean() }),
+      ),
     }),
   ),
-  handler: async (ctx, { topicSlug }) => {
+  handler: async (ctx, { topicSlug, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic) return null;
+    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
+    if (!effLang) return null;
     const role = topic.ownerId === userId ? ("owner" as const) : ("viewer" as const);
-    return { title: topic.title, role, status: topic.status ?? "active" };
+    const t = await trOne(ctx, topic._id, effLang, "title", "");
+    const editions = await switcherEditions(ctx, topic, userId);
+    return {
+      title: decodeEntities(t?.text ?? topic.title),
+      role,
+      status: topic.status ?? "active",
+      lang: effLang,
+      dir: langInfo(effLang).rtl ? ("rtl" as const) : ("ltr" as const),
+      editions,
+    };
   },
 });
 
 export const listLessons = query({
-  args: { topicSlug: v.string() },
-  handler: async (ctx, { topicSlug }) => {
+  args: { topicSlug: v.string(), lang: v.optional(v.string()) },
+  handler: async (ctx, { topicSlug, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic) return [];
-    const lessons = await ctx.db
-      .query("lessons")
-      .withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id))
-      .collect();
-    return lessons
-      .filter((l) => !l.supersededBy)
-      .map((l) => ({ key: l.key, seq: l.seq, title: decodeEntities(l.title) }));
+    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
+    if (!effLang) return [];
+    const lessons = (
+      await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
+    ).filter((l) => !l.supersededBy);
+    const tmap = await editionMap(ctx, topic._id, effLang);
+    return lessons.map((l) => ({
+      key: l.key,
+      seq: l.seq,
+      title: decodeEntities(tmap.get(`lesson:${l.key}`)?.title ?? l.title),
+    }));
   },
 });
 
 export const getLesson = query({
-  args: { topicSlug: v.string(), key: v.string() },
-  handler: async (ctx, { topicSlug, key }) => {
+  args: { topicSlug: v.string(), key: v.string(), lang: v.optional(v.string()) },
+  handler: async (ctx, { topicSlug, key, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic) return null;
+    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
+    if (!effLang) return null;
     const lesson = await ctx.db
       .query("lessons")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     if (!lesson || lesson.supersededBy) return null;
-    return { key: lesson.key, seq: lesson.seq, title: decodeEntities(lesson.title), html: lesson.html };
+    const t = await trOne(ctx, topic._id, effLang, "lesson", key);
+    return {
+      key: lesson.key,
+      seq: lesson.seq,
+      title: decodeEntities(t?.title ?? lesson.title),
+      html: t?.html ?? lesson.html,
+    };
   },
 });
 
 export const listReferences = query({
-  args: { topicSlug: v.string() },
-  handler: async (ctx, { topicSlug }) => {
+  args: { topicSlug: v.string(), lang: v.optional(v.string()) },
+  handler: async (ctx, { topicSlug, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
     const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic) return [];
+    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
+    if (!effLang) return [];
     const refs = await ctx.db
       .query("references")
       .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
       .collect();
+    const tmap = await editionMap(ctx, topic._id, effLang);
     return refs
       .sort((a, b) => a.key.localeCompare(b.key))
-      .map((r) => ({ key: r.key, title: decodeEntities(r.title) }));
+      .map((r) => ({ key: r.key, title: decodeEntities(tmap.get(`reference:${r.key}`)?.title ?? r.title) }));
   },
 });
 
 export const getReference = query({
-  args: { topicSlug: v.string(), key: v.string() },
-  handler: async (ctx, { topicSlug, key }) => {
+  args: { topicSlug: v.string(), key: v.string(), lang: v.optional(v.string()) },
+  handler: async (ctx, { topicSlug, key, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
     const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic) return null;
+    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
+    if (!effLang) return null;
     const ref = await ctx.db
       .query("references")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
-    return ref ? { key: ref.key, title: decodeEntities(ref.title), html: ref.html } : null;
+    if (!ref) return null;
+    const t = await trOne(ctx, topic._id, effLang, "reference", key);
+    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), html: t?.html ?? ref.html };
   },
 });
 

@@ -169,13 +169,17 @@ export default defineSchema({
     lastManualFireAt: v.optional(v.number()),
   }).index("by_topic", ["topicId"]),
 
-  // A Share: grants one Viewer read-only access to one Topic they don't own.
-  // Created by the owner. `by_viewer` powers "Shared with me"; `by_topic` lists
-  // a Topic's Viewers (and cascades on delete); `by_topic_viewer` is the read-gate
-  // check and the dedup key (at most one Share per (Topic, Viewer)).
+  // A Share: grants one Viewer read-only access to one **Edition** — a
+  // (Topic, language) pair (course-translation). `lang` is the granted edition's
+  // BCP-47 code; a Viewer may hold several Shares on one Topic (one per language).
+  // `lang` is optional so pre-translation rows read as the English edition ("en").
+  // `by_viewer` powers "Shared with me"; `by_topic` lists a Topic's Viewers (and
+  // cascades on delete); `by_topic_viewer` lists a Viewer's Editions on a Topic
+  // (dedup is done in-memory over these, since legacy rows carry no `lang`).
   shares: defineTable({
     topicId: v.id("topics"),
     viewerId: v.id("users"),
+    lang: v.optional(v.string()),
   })
     .index("by_viewer", ["viewerId"])
     .index("by_topic", ["topicId"])
@@ -187,14 +191,17 @@ export default defineSchema({
   // gated by the Admin's Allowlist (ADR 0011) — an invite does not open that door.
   // `by_email` is the claim-on-sign-up lookup; `by_topic_email` dedups an invite
   // (at most one per (Topic, email)); `by_topic` lists a Topic's open invites and
-  // would cascade on Topic delete.
+  // would cascade on Topic delete. `lang` names the invited Edition (optional →
+  // English), so an invite claimed at sign-up becomes a language-scoped Share.
   pendingShares: defineTable({
     topicId: v.id("topics"),
     email: v.string(),
+    lang: v.optional(v.string()),
   })
     .index("by_email", ["email"])
     .index("by_topic", ["topicId"])
-    .index("by_topic_email", ["topicId", "email"]),
+    .index("by_topic_email", ["topicId", "email"])
+    .index("by_topic_email_lang", ["topicId", "email", "lang"]),
 
   // An earned Certificate (ADR 0015): one immutable row per (User, Topic),
   // minted when the caller claims it (Topic `completed` + all non-superseded
@@ -211,6 +218,10 @@ export default defineSchema({
     learnerName: v.string(),
     courseTitle: v.string(),
     lessonCount: v.number(),
+    // The Edition the learner completed in (course-translation): the certificate
+    // snapshots the title + text direction of that language. Optional so
+    // pre-translation certificates read as the English edition ("en").
+    lang: v.optional(v.string()),
     // The Emblem frozen at claim (ADR 0017), a snapshot of the Topic's Emblem
     // alongside `courseTitle`/`lessonCount` — no `ownerSet`, since precedence is
     // already resolved. `imageId` references an immutable blob, so it always
@@ -238,4 +249,73 @@ export default defineSchema({
   })
     .index("by_topic_user", ["topicId", "userId"])
     .index("by_topic_status", ["topicId", "status"]),
+
+  // ---- Course translation (Editions) ---------------------------------------
+
+  // A translated projection of one source (English) item into one language. The
+  // source rows (lessons/references/topics/questions) stay untouched and
+  // immutable; a row here holds the rendered-in-`lang` version. A MISSING row
+  // means the reader falls back to the English source — so a row exists only for
+  // a *successful* translation (failures live on the job, never as a bad row).
+  // `sourceHash` is a hash of the source content this was translated from, so a
+  // re-translate can skip items whose source is unchanged. `kind` selects which
+  // field carries the payload: lesson/reference → title + html; title/mission →
+  // text; question → text (the question) + reply. `key` is the lesson/reference
+  // key, the question `_id`, or "" for the Topic-level title/mission.
+  translations: defineTable({
+    topicId: v.id("topics"),
+    lang: v.string(), // BCP-47 code, e.g. "es", "ur" — never "en" (that's the source)
+    kind: v.union(
+      v.literal("lesson"),
+      v.literal("reference"),
+      v.literal("mission"),
+      v.literal("title"),
+      v.literal("question"),
+    ),
+    key: v.string(),
+    title: v.optional(v.string()),
+    html: v.optional(v.string()),
+    text: v.optional(v.string()),
+    reply: v.optional(v.string()),
+    sourceHash: v.string(),
+  })
+    .index("by_topic_lang", ["topicId", "lang"])
+    .index("by_topic_lang_kind_key", ["topicId", "lang", "kind", "key"]),
+
+  // One translation job per (Topic, language) — the Editions panel's live status
+  // AND the single-flight lock for the translate Routine (mirrors `generation`).
+  // Seeded "translating" by `startTranslation` on a completed course, which then
+  // fires the routine; the fired run claims it (`claimTranslation` stamps
+  // `claimedAt`/`runId`), `publishTranslation` ticks `done` per item, and
+  // `reportTranslation` flips it "ready" (unpublished items → `failed`, English
+  // fallback) or "failed". `total` counts translatable items. Reused (patched) on
+  // re-translate.
+  translationJobs: defineTable({
+    topicId: v.id("topics"),
+    lang: v.string(),
+    status: v.union(v.literal("translating"), v.literal("ready"), v.literal("failed")),
+    total: v.number(),
+    done: v.number(),
+    failed: v.number(),
+    error: v.optional(v.string()),
+    // Set when a fired run claims this job; keeps a second run from grabbing it.
+    claimedAt: v.optional(v.number()),
+    runId: v.optional(v.string()),
+  })
+    .index("by_topic", ["topicId"])
+    .index("by_topic_lang", ["topicId", "lang"]),
+
+  // A per-Edition Public link: an unguessable token granting anonymous read-only
+  // access to ONE (Topic, language) Edition — the account-less counterpart to a
+  // language-scoped Share. Supersedes the single per-Topic `topics.publicToken`,
+  // which is still honoured as a legacy English link (public.ts) so existing
+  // links survive with no migration. `by_token` is the Guest read seam.
+  publicLinks: defineTable({
+    topicId: v.id("topics"),
+    lang: v.string(),
+    token: v.string(),
+  })
+    .index("by_token", ["token"])
+    .index("by_topic", ["topicId"])
+    .index("by_topic_lang", ["topicId", "lang"]),
 });

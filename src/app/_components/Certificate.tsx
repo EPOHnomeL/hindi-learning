@@ -3,6 +3,8 @@
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { useEditionLang } from "./editionUrl";
+import { langDir } from "../../../convex/languages";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 // The resolved Emblem (ADR 0017) as the read seams return it — an image resolves
@@ -14,6 +16,10 @@ export type CertificateData = {
   courseTitle: string;
   lessonCount: number;
   issuedAt: number;
+  // The Edition's language (course-translation): the card derives its text
+  // direction from this, so an RTL-titled certificate reads correctly on every
+  // surface (in-app dialog, celebration, and the public page) from one source.
+  lang: string;
   emblem: CertificateEmblem;
   token?: string;
   // The larger, more theatrical treatment for the standalone public page (vs. the
@@ -72,7 +78,7 @@ function onCardLeave(e: React.MouseEvent<HTMLDivElement>) {
 // print + reduced-motion. `showcase` (the public page) makes it larger and more
 // theatrical — a warm outer glow, a stronger foil, and an ambient shine sweep —
 // while the compact dialogs stay compact. Brand: "My Course".
-export function CertificateCard({ learnerName, courseTitle, lessonCount, issuedAt, emblem, showcase }: CertificateData) {
+export function CertificateCard({ learnerName, courseTitle, lessonCount, issuedAt, lang, emblem, showcase }: CertificateData) {
   const date = new Date(issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
   const pad = showcase ? "px-10 py-14 sm:px-14 sm:py-16" : "px-8 py-10";
   const medallion = showcase ? "h-24 w-24 sm:h-28 sm:w-28" : "h-20 w-20";
@@ -80,6 +86,7 @@ export function CertificateCard({ learnerName, courseTitle, lessonCount, issuedA
   const titleSize = showcase ? "text-2xl sm:text-3xl" : "text-xl";
   return (
     <div
+      dir={langDir(lang)}
       className={`cert-card relative isolate overflow-hidden rounded-2xl border-2 border-gold/60 bg-card text-center shadow-sm ${pad} ${
         showcase ? "cert-card--showcase" : ""
       }`}
@@ -198,6 +205,9 @@ function CertificateLinkActions({ token }: { token: string }) {
 // to card — the in-app dialog and the celebration can't drift apart.
 function CertificateBody({ topicSlug, certificate }: { topicSlug: string; certificate: CertificateData | null }) {
   const claim = useMutation(api.certificates.claimCertificate);
+  // The Edition the learner is reading (course-translation) — snapshot its title
+  // onto the certificate, so a Viewer reading Spanish earns a Spanish-titled one.
+  const lang = useEditionLang();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -216,7 +226,7 @@ function CertificateBody({ topicSlug, certificate }: { topicSlug: string; certif
         e.preventDefault();
         setBusy(true);
         try {
-          await claim({ topicSlug, name: name.trim() });
+          await claim({ topicSlug, name: name.trim(), lang: lang ?? undefined });
         } finally {
           setBusy(false);
         }
@@ -593,7 +603,9 @@ export function PublicCertificatePage({ token }: { token: string }) {
   }
   return (
     <main className="cert-print-page mx-auto flex min-h-dvh max-w-2xl flex-col items-center justify-center gap-6 px-4 py-12">
-      <div className="cert-enter w-full">
+      {/* Apply the Edition's direction so an RTL-titled certificate renders
+          correctly (course-translation). */}
+      <div className="cert-enter w-full" dir={cert.dir}>
         <CertificateCard {...cert} showcase />
       </div>
       <button

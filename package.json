@@ -28,7 +28,13 @@
     "report": "tsx scripts/report.ts",
     "report:prod": "tsx scripts/report.ts --prod",
     "complete": "tsx scripts/complete.ts",
-    "complete:prod": "tsx scripts/complete.ts --prod"
+    "complete:prod": "tsx scripts/complete.ts --prod",
+    "claim-translation": "tsx scripts/claim-translation.ts",
+    "claim-translation:prod": "tsx scripts/claim-translation.ts --prod",
+    "publish-translation": "tsx scripts/publish-translation.ts",
+    "publish-translation:prod": "tsx scripts/publish-translation.ts --prod",
+    "report-translation": "tsx scripts/report-translation.ts",
+    "report-translation:prod": "tsx scripts/report-translation.ts --prod"
   },
   "dependencies": {
     "@auth/core": "0.37.0",

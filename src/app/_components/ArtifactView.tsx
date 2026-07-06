@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { CertificateControl } from "./Certificate";
+import { useEditionLang, withLang } from "./editionUrl";
 import { buildSrcDoc, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
 import { internalNavTarget } from "./readerDerive";
@@ -33,6 +34,8 @@ export function ArtifactView({
   readOnly,
   courseCompleted = false,
   nextLessonKey,
+  dir,
+  contentLang,
 }: {
   kind: "lesson" | "reference";
   artifactKey: string;
@@ -48,8 +51,13 @@ export function ArtifactView({
   // The next lesson's key in seq order (null on the last lesson). A read-only
   // Viewer gets a "Next lesson →" link in place of the owner's controls.
   nextLessonKey?: string | null;
+  // The served Edition's direction + language (course-translation), baked onto
+  // the artifact iframe so a translated Edition renders RTL/localised.
+  dir?: "ltr" | "rtl";
+  contentLang?: string;
 }) {
-  if (kind === "reference") return <ReferenceView refKey={artifactKey} topicSlug={topicSlug} />;
+  if (kind === "reference")
+    return <ReferenceView refKey={artifactKey} topicSlug={topicSlug} dir={dir} contentLang={contentLang} />;
   return (
     <LessonView
       lessonKey={artifactKey}
@@ -58,6 +66,8 @@ export function ArtifactView({
       readOnly={readOnly}
       courseCompleted={courseCompleted}
       nextLessonKey={nextLessonKey ?? null}
+      dir={dir}
+      contentLang={contentLang}
     />
   );
 }
@@ -67,7 +77,23 @@ export function ArtifactView({
 // initial theme is baked into srcDoc and later changes are pushed live via
 // postMessage so a toggle re-skins without reloading (ADR 0011). `themeCss`
 // injects the dark palette too — set for references, which don't ship their own.
-export function Frame({ html, withBridge, theme, themeCss }: { html: string; withBridge: boolean; theme?: Theme; themeCss?: boolean }) {
+export function Frame({
+  html,
+  withBridge,
+  theme,
+  themeCss,
+  dir,
+  lang,
+}: {
+  html: string;
+  withBridge: boolean;
+  theme?: Theme;
+  themeCss?: boolean;
+  // The served Edition's text direction + language, baked onto <html> so a
+  // translated lesson renders RTL/localised (course-translation).
+  dir?: "ltr" | "rtl";
+  lang?: string;
+}) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const router = useRouter();
   // Read theme via a ref so changing it does NOT rebuild srcDoc (which would
@@ -76,8 +102,8 @@ export function Frame({ html, withBridge, theme, themeCss }: { html: string; wit
   const themeRef = useRef(theme);
   themeRef.current = theme;
   const srcDoc = useMemo(
-    () => buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss }),
-    [html, withBridge, themeCss],
+    () => buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss, dir, lang }),
+    [html, withBridge, themeCss, dir, lang],
   );
 
   // Push theme changes into the already-loaded iframe (no reload). Also fires
@@ -158,6 +184,8 @@ function LessonView({
   readOnly,
   courseCompleted,
   nextLessonKey,
+  dir,
+  contentLang,
 }: {
   lessonKey: string;
   topicSlug: string;
@@ -165,10 +193,13 @@ function LessonView({
   readOnly: boolean;
   courseCompleted: boolean;
   nextLessonKey: string | null;
+  dir?: "ltr" | "rtl";
+  contentLang?: string;
 }) {
   const { theme } = useTheme();
+  const lang = useEditionLang();
   const navHidden = useHideOnScroll();
-  const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey });
+  const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey, lang: lang ?? undefined });
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
   const setProgress = useMutation(api.capture.setProgress);
@@ -233,7 +264,7 @@ function LessonView({
             {/* A Viewer also gets plain navigation to the next lesson. */}
             {readOnly && nextLessonKey && (
               <Link
-                href={`/courses/${topicSlug}/lessons/${nextLessonKey}`}
+                href={withLang(`/courses/${topicSlug}/lessons/${nextLessonKey}`, lang)}
                 className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90"
               >
                 Next lesson →
@@ -241,7 +272,7 @@ function LessonView({
             )}
           </div>
         </div>
-        <Frame html={lesson.html} withBridge theme={theme} />
+        <Frame html={lesson.html} withBridge theme={theme} dir={dir} lang={contentLang} />
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
             scrolling, no slide-up trigger. Desktop uses the side column instead. */}
         <div className="p-3 md:hidden">
@@ -339,10 +370,21 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
   );
 }
 
-function ReferenceView({ refKey, topicSlug }: { refKey: string; topicSlug: string }) {
+function ReferenceView({
+  refKey,
+  topicSlug,
+  dir,
+  contentLang,
+}: {
+  refKey: string;
+  topicSlug: string;
+  dir?: "ltr" | "rtl";
+  contentLang?: string;
+}) {
   const { theme } = useTheme();
+  const lang = useEditionLang();
   const navHidden = useHideOnScroll();
-  const ref = useQuery(api.content.getReference, { topicSlug, key: refKey });
+  const ref = useQuery(api.content.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
   if (ref === undefined) return <p className="text-soft">Loading…</p>;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   return (
@@ -356,7 +398,7 @@ function ReferenceView({ refKey, topicSlug }: { refKey: string; topicSlug: strin
       </h2>
       {/* References carry no dark CSS of their own, so themeCss injects the dark
           palette (ADR 0011) — the theme then flips them with the rest of the app. */}
-      <Frame html={ref.html} withBridge={false} theme={theme} themeCss />
+      <Frame html={ref.html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} />
     </div>
   );
 }
@@ -376,7 +418,8 @@ function QuestionBox({
   variant?: "panel" | "inline";
   readOnly: boolean;
 }) {
-  const questions = useQuery(api.capture.myQuestions, { topicSlug });
+  const lang = useEditionLang();
+  const questions = useQuery(api.capture.myQuestions, { topicSlug, lang: lang ?? undefined });
   const askQuestion = useMutation(api.capture.askQuestion);
   const [text, setText] = useState("");
   const [expanded, setExpanded] = useState<{ text: string; reply: string } | null>(null);
