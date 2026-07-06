@@ -13,7 +13,7 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getOwnedTopic, hashString, SOURCE_LANG, shareLang } from "./lib";
-import { langInfo } from "./languages";
+import { isKnownLang, langInfo } from "./languages";
 
 // Course translation (Editions). An owner-triggered Convex action fans out one
 // Claude Messages-API call per item over the scheduler, writing a `translations`
@@ -84,6 +84,10 @@ export const startTranslation = mutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
     if (lang === SOURCE_LANG) throw new Error("cannot translate to the source language");
+    // Only an offered language may be translated: bounds the set of Editions a
+    // Topic can spawn (each is billed Claude calls), and keeps `lang` safe to
+    // reflect into reader markup. Grow the menu by extending LANGUAGES.
+    if (!isKnownLang(lang)) throw new Error("unsupported language");
     const topic = await getOwnedTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
     // Only a completed course is translatable — its content is frozen, so the
@@ -111,6 +115,16 @@ export const startTranslation = mutation({
       .query("translationJobs")
       .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", lang))
       .unique();
+    // Re-entrancy guard: a language already mid-translation must finish before
+    // another run. Otherwise a re-run recomputes staleness from committed rows
+    // only — items still in flight (no row yet) get re-scheduled and billed a
+    // second time, and the double-counted `done` can trip the job to "ready"
+    // before the tail lands, letting an owner share/publish an Edition whose
+    // last items silently fall back to English. A stuck job (should not happen)
+    // is recoverable via removeEdition, which clears it.
+    if (job && job.status === "translating") {
+      throw new Error("a translation is already in progress for this language");
+    }
     if (job) await ctx.db.patch(job._id, patch);
     else await ctx.db.insert("translationJobs", { topicId: topic._id, lang, ...patch });
 

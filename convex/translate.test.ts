@@ -155,6 +155,36 @@ test("startTranslation is owner-only and completed-only, and seeds a job", async
   expect(job).toMatchObject({ status: "translating", total: 2, done: 0 });
 });
 
+test("startTranslation refuses an unsupported language (bounds Edition fan-out + junk codes)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi");
+  await addLesson(t, topicId, "0001", 1);
+  // A non-menu / junk code is rejected before any job is seeded or work scheduled,
+  // so an owner can't spawn unbounded billable Editions from arbitrary strings.
+  await expect(
+    asUser(t, alice).mutation(api.translate.startTranslation, { topicSlug: "hindi", lang: "x1" }),
+  ).rejects.toThrow(/unsupported language/);
+  const job = await t.run((ctx) =>
+    ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "x1")).unique(),
+  );
+  expect(job).toBeNull();
+});
+
+test("startTranslation refuses to re-run while a job is still translating (no double-schedule)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi");
+  await addLesson(t, topicId, "0001", 1);
+  const first = await asUser(t, alice).mutation(api.translate.startTranslation, { topicSlug: "hindi", lang: "es" });
+  expect(first.scheduled).toBeGreaterThan(0); // job is now "translating", items in flight
+  // A second run before the tail lands is refused — otherwise in-flight items are
+  // re-scheduled (double-billed) and the job can flip "ready" while incomplete.
+  await expect(
+    asUser(t, alice).mutation(api.translate.startTranslation, { topicSlug: "hindi", lang: "es" }),
+  ).rejects.toThrow(/in progress/);
+});
+
 test("editions lists English + each job with share counts", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
@@ -199,6 +229,26 @@ test("shareTopic grants one Edition; a Viewer of a non-ready language is refused
   // Bob shows up in "Shared with me" holding the Spanish Edition.
   const shared = await asUser(t, bob).query(api.shares.listSharedTopics, {});
   expect(shared[0]!.langs.map((l) => l.lang)).toEqual(["es"]);
+});
+
+test("setEditionPublic refuses a non-English edition that isn't ready, but always allows revoke", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi");
+  await addLesson(t, topicId, "0001", 1);
+  // No ready Spanish Edition → publishing a Spanish link (which would just serve
+  // English under an "es" label) is refused, mirroring shareTopic.
+  await expect(
+    asUser(t, alice).mutation(api.shares.setEditionPublic, { topicSlug: "hindi", lang: "es", isPublic: true }),
+  ).rejects.toThrow(/isn't ready/);
+  // Once the Edition is ready, publishing mints a token.
+  await addReadyJob(t, topicId, "es");
+  const token = await asUser(t, alice).mutation(api.shares.setEditionPublic, { topicSlug: "hindi", lang: "es", isPublic: true });
+  expect(typeof token).toBe("string");
+  // Revoking never requires readiness — cleanup must always work.
+  expect(
+    await asUser(t, alice).mutation(api.shares.setEditionPublic, { topicSlug: "hindi", lang: "es", isPublic: false }),
+  ).toBeNull();
 });
 
 test("a per-Edition public link serves that language; a legacy token serves English", async () => {

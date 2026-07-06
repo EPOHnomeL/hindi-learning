@@ -105,6 +105,14 @@ export const setEditionPublic = mutation({
       if (existing) await ctx.db.delete(existing._id);
       return null;
     }
+    // Publishing a non-English link requires a ready Edition (mirrors shareTopic)
+    // — no public link for a language that was never translated, which would just
+    // serve English under a foreign-language label.
+    const job = await ctx.db
+      .query("translationJobs")
+      .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", lang))
+      .unique();
+    if (!job || job.status !== "ready") throw new Error("that language edition isn't ready yet");
     const token = mintToken();
     if (existing) await ctx.db.patch(existing._id, { token });
     else await ctx.db.insert("publicLinks", { topicId: topic._id, lang, token });

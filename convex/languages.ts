@@ -92,6 +92,16 @@ export const LANGUAGES: LanguageInfo[] = [
 
 const BY_CODE = new Map(LANGUAGES.map((l) => [l.code, l]));
 
+// True when `code` is one of the offered languages (the picker menu). The
+// translation mutations gate on this so an owner can only create an Edition for
+// a known ISO/BCP-47 code — which caps fan-out cost (a bounded set of target
+// languages, no arbitrary junk codes billed to the Claude key) and keeps the
+// code safe to reflect into reader markup (`lang="…"`). The reader still renders
+// any stored code via `langInfo`'s graceful fallback; this only gates creation.
+export function isKnownLang(code: string): boolean {
+  return BY_CODE.has(code);
+}
+
 // True when a language code's script is right-to-left. Checks the base subtag
 // (e.g. "fa-AF" → "fa"), so an unlisted regional RTL variant still resolves.
 export function isRtl(code: string): boolean {
