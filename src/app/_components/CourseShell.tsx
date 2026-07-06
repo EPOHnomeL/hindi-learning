@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { CompletionCelebration } from "./Certificate";
+import { LANG_KEY, useEditionLang, withLang } from "./editionUrl";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useResourceUpload } from "./useResourceUpload";
@@ -32,6 +33,11 @@ type CourseCtx = {
   // The lesson after the given one in seq order (null on the last / unknown).
   // Powers the Viewer's "Next lesson →" link in place of write controls.
   nextKey: (lessonKey: string) => string | null;
+  // The served Edition's text direction + language (course-translation), from the
+  // header. Threaded to the artifact iframe so a translated Edition renders
+  // RTL/localised. Defaults to ltr/en while the header is still loading.
+  dir: "ltr" | "rtl";
+  contentLang: string;
 };
 const Ctx = createContext<CourseCtx | null>(null);
 
@@ -49,7 +55,11 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   // One viewable query carries both the title (a Viewer's owner-only `listTopics`
   // never includes a shared Topic) and the caller's role. Owners can write;
   // Viewers get a read-only reader.
-  const header = useQuery(api.content.courseHeader, { topicSlug: slug });
+  // The Edition being read (course-translation): `?lang` from the URL, threaded
+  // into every content query so the sidebar + nav follow the chosen language.
+  // Progress is language-agnostic, so `myProgress` never takes `lang`.
+  const lang = useEditionLang();
+  const header = useQuery(api.content.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
   const canWrite = header?.role === "owner";
   const courseCompleted = header?.status === "completed";
   const { signOut } = useAuthActions();
@@ -57,10 +67,10 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const lessons = useQuery(api.content.listLessons, { topicSlug: slug });
-  const references = useQuery(api.content.listReferences, { topicSlug: slug });
+  const lessons = useQuery(api.content.listLessons, { topicSlug: slug, lang: lang ?? undefined });
+  const references = useQuery(api.content.listReferences, { topicSlug: slug, lang: lang ?? undefined });
   const progress = useQuery(api.capture.myProgress, { topicSlug: slug });
-  const questions = useQuery(api.capture.myQuestions, { topicSlug: slug });
+  const questions = useQuery(api.capture.myQuestions, { topicSlug: slug, lang: lang ?? undefined });
 
   // Answered-question ids already seen (client-only, per device). A lesson with a
   // reply not in this set gets a notification dot; opening that lesson marks its
@@ -109,7 +119,17 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   useEffect(() => setMenuOpen(false), [pathname]);
 
   return (
-    <Ctx.Provider value={{ frontierKey: frontier, markSeen, canWrite, completed: courseCompleted, nextKey }}>
+    <Ctx.Provider
+      value={{
+        frontierKey: frontier,
+        markSeen,
+        canWrite,
+        completed: courseCompleted,
+        nextKey,
+        dir: header?.dir ?? "ltr",
+        contentLang: header?.lang ?? "en",
+      }}
+    >
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
         {/* Mobile top bar: hamburger opens the lesson selector. */}
         <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 md:hidden">
@@ -155,7 +175,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             {lessons?.map((l) => (
               <NavItem
                 key={l.key}
-                href={`/courses/${slug}/lessons/${l.key}`}
+                href={withLang(`/courses/${slug}/lessons/${l.key}`, lang)}
                 active={!isRef && activeKey === l.key}
                 done={completed.has(l.key)}
                 notify={unseenAnswers.has(l.key)}
@@ -166,7 +186,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
 
             <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">References</p>
             {references?.map((r) => (
-              <NavItem key={r.key} href={`/courses/${slug}/references/${r.key}`} active={isRef && activeKey === r.key}>
+              <NavItem key={r.key} href={withLang(`/courses/${slug}/references/${r.key}`, lang)} active={isRef && activeKey === r.key}>
                 {r.title}
               </NavItem>
             ))}
@@ -181,7 +201,15 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             <CompletionControls slug={slug} completed={courseCompleted} />
           )}
 
-          <ThemeToggle />
+          {/* Edition switcher + theme toggle, pinned together at the sidebar
+              bottom. The switcher only appears when there's more than one Edition
+              to choose between (English + at least one ready translation). */}
+          <div className="mt-auto flex flex-col gap-2 pt-2">
+            {header && header.editions.length > 1 && (
+              <LanguageSwitcher editions={header.editions} current={header.lang} />
+            )}
+            <ThemeToggle />
+          </div>
         </aside>
 
         <section className="min-w-0 flex-1 md:overflow-hidden md:p-4">{children}</section>
@@ -195,7 +223,8 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   );
 }
 
-// Light/Dark toggle pinned to the bottom of the sidebar (ADR 0011).
+// Light/Dark toggle pinned (with the Edition switcher) to the bottom of the
+// sidebar (ADR 0011). The `mt-auto` that pins the group lives on the wrapper.
 function ThemeToggle() {
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
@@ -203,11 +232,53 @@ function ThemeToggle() {
     <button
       onClick={toggle}
       aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-      className="mt-auto flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
+      className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
     >
       <span>{dark ? "Dark" : "Light"} mode</span>
       <span aria-hidden className="text-base">{dark ? "☾" : "☀"}</span>
     </button>
+  );
+}
+
+// The Edition switcher (course-translation): swap the reader between the Editions
+// the caller holds. Selecting one navigates the current page with `?lang=<code>`
+// (English omits the param, keeping its URLs clean) and remembers the choice
+// per-device, so reopening a course lands back in that language. Rendered next to
+// ThemeToggle; only mounted when there's more than one Edition.
+function LanguageSwitcher({
+  editions,
+  current,
+}: {
+  editions: { lang: string; name: string; native: string; rtl: boolean }[];
+  current: string;
+}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft">
+      <label htmlFor="edition-lang" className="shrink-0">Language</label>
+      <select
+        id="edition-lang"
+        value={current}
+        onChange={(e) => {
+          const code = e.target.value;
+          try {
+            localStorage.setItem(LANG_KEY, code);
+          } catch {
+            /* storage disabled — the switch still applies for this session */
+          }
+          router.push(withLang(pathname, code));
+        }}
+        className="min-w-0 flex-1 rounded-md border border-line bg-card px-2 py-1 text-sm text-ink focus:border-gold focus:outline-none"
+      >
+        {editions.map((ed) => (
+          <option key={ed.lang} value={ed.lang} dir={ed.rtl ? "rtl" : "ltr"}>
+            {ed.native}
+            {ed.rtl ? " (RTL)" : ""}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 

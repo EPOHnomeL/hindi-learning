@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { api } from "../../../convex/_generated/api";
 import { ArtifactView } from "./ArtifactView";
 import { useCourse } from "./CourseShell";
+import { LANG_KEY, useEditionLang, withLang } from "./editionUrl";
 import { firstLessonKey, frontierKey } from "./readerDerive";
 
 // The course index (`/courses/[slug]`): redirect to a Lesson so the URL always
@@ -14,8 +15,9 @@ import { firstLessonKey, frontierKey } from "./readerDerive";
 // not `push`, so "back" from the lesson goes to the dashboard rather than
 // bouncing through here again.
 export function CourseIndex({ slug }: { slug: string }) {
-  const lessons = useQuery(api.content.listLessons, { topicSlug: slug });
-  const header = useQuery(api.content.courseHeader, { topicSlug: slug });
+  const lang = useEditionLang();
+  const lessons = useQuery(api.content.listLessons, { topicSlug: slug, lang: lang ?? undefined });
+  const header = useQuery(api.content.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
   const router = useRouter();
 
   // Wait for both the lessons and the caller's role before choosing a target,
@@ -28,8 +30,21 @@ export function CourseIndex({ slug }: { slug: string }) {
         : firstLessonKey(lessons);
 
   useEffect(() => {
-    if (target) router.replace(`/courses/${slug}/lessons/${target}`);
-  }, [target, slug, router]);
+    if (!target) return;
+    // Preserve the URL's Edition; failing that, reopen in the last-used one
+    // (per-device) when the caller still holds it — otherwise plain English.
+    let effLang = lang;
+    if (!effLang && header) {
+      let stored: string | null = null;
+      try {
+        stored = localStorage.getItem(LANG_KEY);
+      } catch {
+        /* storage unavailable — fall through to English */
+      }
+      if (stored && stored !== "en" && header.editions.some((e) => e.lang === stored)) effLang = stored;
+    }
+    router.replace(withLang(`/courses/${slug}/lessons/${target}`, effLang));
+  }, [target, slug, router, lang, header]);
 
   if (lessons === undefined) return <CourseStatus variant="loading" />;
   if (lessons.length === 0)
@@ -91,7 +106,7 @@ function CourseStatus({ variant }: { variant: "loading" | "opening" | "preparing
 // A single Lesson. Reads `frontierKey` from the course context for the
 // "generate next lesson" affordance, and marks its replies seen on open.
 export function LessonPane({ slug, lessonKey }: { slug: string; lessonKey: string }) {
-  const { markSeen, frontierKey, canWrite, completed, nextKey } = useCourse();
+  const { markSeen, frontierKey, canWrite, completed, nextKey, dir, contentLang } = useCourse();
   useEffect(() => {
     markSeen(lessonKey);
   }, [lessonKey, markSeen]);
@@ -104,12 +119,24 @@ export function LessonPane({ slug, lessonKey }: { slug: string; lessonKey: strin
       readOnly={!canWrite}
       courseCompleted={completed}
       nextLessonKey={nextKey(lessonKey)}
+      dir={dir}
+      contentLang={contentLang}
     />
   );
 }
 
 // A single Reference. Never the Frontier, nothing to mark seen.
 export function ReferencePane({ slug, refKey }: { slug: string; refKey: string }) {
-  const { canWrite } = useCourse();
-  return <ArtifactView kind="reference" artifactKey={refKey} topicSlug={slug} isFrontier={false} readOnly={!canWrite} />;
+  const { canWrite, dir, contentLang } = useCourse();
+  return (
+    <ArtifactView
+      kind="reference"
+      artifactKey={refKey}
+      topicSlug={slug}
+      isFrontier={false}
+      readOnly={!canWrite}
+      dir={dir}
+      contentLang={contentLang}
+    />
+  );
 }

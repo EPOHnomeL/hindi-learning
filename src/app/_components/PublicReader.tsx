@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { langInfo } from "../../../convex/languages";
 import { Frame } from "./ArtifactView";
 import { Markdown } from "./MarkdownView";
 import { ResourceItem } from "./ResourceItem";
@@ -109,7 +110,16 @@ export function PublicCourseShell({ token, children }: { token: string; children
           }`}
         >
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-accent2">Public course</p>
-          <h1 className="mb-4 truncate text-lg font-semibold tracking-tight text-accent">{course.title}</h1>
+          <div className="mb-4">
+            <h1 className="truncate text-lg font-semibold tracking-tight text-accent">{course.title}</h1>
+            {/* The Edition this token serves (course-translation). A Guest holds the
+                one language their link is for — no switcher, just a small label. */}
+            {course.lang !== "en" && (
+              <p className="mt-0.5 text-xs text-soft" dir={course.dir}>
+                {langInfo(course.lang).native}
+              </p>
+            )}
+          </div>
 
           <nav className="flex flex-col gap-1">
             <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">Lessons</p>
@@ -255,7 +265,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
           )}
         </div>
         {/* Quizzes stay interactive (self-check); nothing is recorded for a Guest. */}
-        <Frame html={lesson.html} withBridge theme={theme} />
+        <Frame html={lesson.html} withBridge theme={theme} dir={course.dir} lang={course.lang} />
         <div className="p-3 md:hidden">
           <GuestQuestions qa={qa} />
         </div>
@@ -294,13 +304,14 @@ function GuestQuestions({ qa }: { qa: GuestCourse["questions"] }) {
 
 export function PublicReferencePane({ token, refKey }: { token: string; refKey: string }) {
   const { theme } = useTheme();
+  const { course } = useGuestCourse();
   const ref = useQuery(api.public.publicReference, { token, key: refKey });
   if (ref === undefined) return <p className="text-soft">Loading…</p>;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3">
       <h2 className="sticky top-12 z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">{ref.title}</h2>
-      <Frame html={ref.html} withBridge={false} theme={theme} themeCss />
+      <Frame html={ref.html} withBridge={false} theme={theme} themeCss dir={course.dir} lang={course.lang} />
     </div>
   );
 }

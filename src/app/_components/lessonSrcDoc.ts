@@ -125,6 +125,21 @@ function setRootTheme(html: string, theme: Theme): string {
   });
 }
 
+// Bake the served Edition's text direction + language onto the root <html>, so a
+// translated lesson renders RTL and with the right `lang` for hyphenation/screen
+// readers (course-translation). Mirrors setRootTheme: strip any authored dir/lang
+// and stamp the Edition's. The stored lesson HTML ships `<html lang="en">`, which
+// this overwrites for a translated Edition.
+function setRootDirLang(html: string, dir?: "ltr" | "rtl", lang?: string): string {
+  if (!dir && !lang) return html;
+  return html.replace(/<html\b([^>]*)>/i, (_m, attrs: string) => {
+    let cleaned = attrs;
+    if (dir) cleaned = cleaned.replace(/\s+dir=(["']).*?\1/i, "");
+    if (lang) cleaned = cleaned.replace(/\s+lang=(["']).*?\1/i, "");
+    return `<html${cleaned}${dir ? ` dir="${dir}"` : ""}${lang ? ` lang="${lang}"` : ""}>`;
+  });
+}
+
 // Already-published lessons are immutable (ADR 0003), so their HTML still carries
 // the old floating theme pill (the <script> that injected a `.theme-toggle` button
 // and auto-darkened from the OS). The app now owns theming (ADR 0011), so strip
@@ -141,14 +156,20 @@ function stripLegacyThemePill(html: string): string {
 // given, makes the artifact app-themed: the legacy pill is stripped, the initial
 // theme is baked in, and the theme bridge is added so the parent can flip it live.
 // `themeCss` additionally injects the dark palette — set for References, which
-// (unlike lessons) don't bundle their own dark CSS. ADR 0011.
-export function buildSrcDoc(html: string, opts: { quiz: boolean; theme?: Theme; themeCss?: boolean }): string {
+// (unlike lessons) don't bundle their own dark CSS. ADR 0011. `dir`/`lang`, when
+// given, stamp the served Edition's text direction + language onto <html> so a
+// translated Edition renders RTL/localised (course-translation).
+export function buildSrcDoc(
+  html: string,
+  opts: { quiz: boolean; theme?: Theme; themeCss?: boolean; dir?: "ltr" | "rtl"; lang?: string },
+): string {
   let doc = html;
   if (opts.theme) {
     doc = stripLegacyThemePill(doc);
     doc = setRootTheme(doc, opts.theme);
     if (opts.themeCss) doc = injectReferenceDarkCss(doc);
   }
+  doc = setRootDirLang(doc, opts.dir, opts.lang);
   const scripts = HEIGHT_BRIDGE + NAV_BRIDGE + (opts.quiz ? QUIZ_BRIDGE : "") + (opts.theme ? THEME_BRIDGE : "");
   // Inject before the LAST </body>. A first-match replace is unsafe: an assembled
   // lesson can carry an authoring comment (or a code sample) that contains a

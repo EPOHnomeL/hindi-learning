@@ -3,6 +3,7 @@
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { useEditionLang } from "./editionUrl";
 
 export type CertificateData = {
   learnerName: string;
@@ -110,6 +111,9 @@ function CertificateLinkActions({ token }: { token: string }) {
 // to card — the in-app dialog and the celebration can't drift apart.
 function CertificateBody({ topicSlug, certificate }: { topicSlug: string; certificate: CertificateData | null }) {
   const claim = useMutation(api.certificates.claimCertificate);
+  // The Edition the learner is reading (course-translation) — snapshot its title
+  // onto the certificate, so a Viewer reading Spanish earns a Spanish-titled one.
+  const lang = useEditionLang();
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -128,7 +132,7 @@ function CertificateBody({ topicSlug, certificate }: { topicSlug: string; certif
         e.preventDefault();
         setBusy(true);
         try {
-          await claim({ topicSlug, name: name.trim() });
+          await claim({ topicSlug, name: name.trim(), lang: lang ?? undefined });
         } finally {
           setBusy(false);
         }
@@ -312,7 +316,9 @@ export function PublicCertificatePage({ token }: { token: string }) {
   }
   return (
     <main className="cert-print-page mx-auto flex min-h-dvh max-w-xl flex-col items-center justify-center gap-6 px-4 py-12">
-      <div className="w-full">
+      {/* Apply the Edition's direction so an RTL-titled certificate renders
+          correctly (course-translation). */}
+      <div className="w-full" dir={cert.dir}>
         <CertificateCard {...cert} />
       </div>
       <button
