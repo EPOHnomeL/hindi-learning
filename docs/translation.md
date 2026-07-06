@@ -4,88 +4,106 @@ How the course-translation feature is wired: what performs the translation, the
 env it needs, the data it writes, and the access model. This is the **how it's
 plumbed**; the **why** (one Topic + many language *renderings*, an **Edition**
 as the unit of access, translation gated to *completed* courses) is the
-course-translation grilling design. Sibling of [routine.md](routine.md), which
-covers the separate next-lesson Routine.
+course-translation grilling design. Translation now runs on the **same cloud
+Routine machinery** as the next-lesson teacher — so this is a sibling of
+[routine.md](routine.md); read that for how a routine is fired, claims work, and
+publishes back.
 
-> The one operator step is provisioning the API key (below). Everything else —
-> triggering, progress, retries — is in-app and in-repo.
+> Translation runs on the cloud **translate Routine**, not an in-app API key.
+> The operator step is standing up that routine (its Fire URL/token) and the
+> shared `PUBLISH_SECRET` — see §3. Everything else (triggering, progress,
+> retries) is in-app.
 
 ---
 
 ## 1. In one paragraph
 
 When an owner opens the **Editions** panel on a **completed** course and adds a
-language, `translate.startTranslation` seeds a per-`(Topic, language)`
-`translationJobs` row and fans out one `internal.translate.translateItem`
-scheduled action per translatable item — the title, mission, each non-superseded
-Lesson and Reference, and the owner's Q&A. Each action calls the **Claude
-Messages API** directly (`https://api.anthropic.com/v1/messages`), writes a
-`translations` row for that item, and ticks the job; the reader updates
-reactively. The reader serves an Edition's content from `translations`, falling
-back to the English source per item, and only to callers who **hold** that
-Edition. Re-running is idempotent — only items whose source changed (by hash)
-are re-translated.
+language, `translate.startTranslation` (an action) seeds a per-`(Topic, language)`
+`translationJobs` row `translating` and **fires the translate Routine** (a cloud
+Claude Code run, closed fire body — ADR 0008). The fired run claims the pending
+Edition (`claimTranslation` → Topic slug + target language + owner), materialises
+the source from Convex into `topics/<slug>/`, translates the title, mission, and
+each non-superseded Lesson + Reference (following the fidelity rules), publishes
+each item back via `publishTranslation`, and finishes with `reportTranslation`.
+The reader serves an Edition's content from `translations`, falling back to the
+English source per item, and only to callers who **hold** that Edition.
 
 ---
 
-## 2. The compute (Convex, in-repo)
+## 2. The compute (the translate Routine)
 
-There is **no claude.ai Routine and no external agent** for translation — it's a
-**Convex action calling the Messages API with `fetch`** (default runtime, no
-`"use node"`). This is the small, self-contained instance of the ADR-0014
-"programmatic runtime on Claude" direction; [ADR 0001](adr/0001-asynchronous-hub-mediated-teaching-loop.md)
-still holds (no LLM runs in the web app — this is backend/action work).
+Translation is done by the **translate Routine** — the sibling of the next-lesson
+teacher (routine.md), reusing its lock → claim → materialise → publish → report
+shape. **No LLM and no Anthropic API key run in the app** ([ADR 0001](adr/0001-asynchronous-hub-mediated-teaching-loop.md)
+holds): the cloud run uses its own Claude access. The app only fires the routine
+and accepts the `PUBLISH_SECRET`-guarded writeback.
 
-Functions in [`convex/translate.ts`](../convex/translate.ts):
+Convex functions in [`convex/translate.ts`](../convex/translate.ts):
 
 | Function | Kind | Role |
 | --- | --- | --- |
-| `startTranslation` | mutation (owner, completed-gated) | Seed/refresh the job, fan out one action per stale item. |
+| `startTranslation` | action (owner, completed-gated) | Acquire the lock, then POST the routine's Fire URL. |
+| `tryAcquireTranslation` | internalMutation | The gate + lock: owner + completed + known-language + single-flight; seeds the job `translating` with the item `total`. |
 | `removeEdition` | mutation (owner) | Delete an Edition's translations, job, Shares, and Public link. |
-| `translateItem` | internalAction | Translate one item via Claude, save it, tick the job. |
-| `getSourceItem` | internalQuery | Read one item's source content (the action has no DB access). |
-| `saveTranslation` | internalMutation | Upsert the `translations` row + advance the job. |
+| `claimTranslation` | mutation (`PUBLISH_SECRET`) | The run grabs one locked-but-unclaimed `(Topic, language)` job + owner. |
+| `publishTranslation` | mutation (`PUBLISH_SECRET`) | Upsert one translated item + tick the job; re-reads the source to stamp its hash and reject a quiz-structure drift. |
+| `reportTranslation` | mutation (`PUBLISH_SECRET`) | Finalise the job `ready` (unpublished items → `failed`, English fallback) or `failed`. |
 | `editions` | query (owner) | The Editions panel data (per-language status + share/link counts). |
 
+The cloud run's steps (repo `pnpm` scripts, mirroring the teacher routine):
+
+1. `SLUG=$(pnpm -s run claim-translation:prod)` — claim one pending Edition (or
+   `none` → end). Persists `TRANSLATE_LANG` + `OWNER_EMAIL` to `.env.local`.
+2. `pnpm run materialise:prod --topic "$SLUG"` — pull the source into `topics/$SLUG/`.
+3. Follow [`.agents/skills/translate/SKILL.md`](../.agents/skills/translate/SKILL.md);
+   write translations into `topics/$SLUG/translations/$TRANSLATE_LANG/`.
+4. `pnpm run publish-translation:prod --topic "$SLUG"` — publish each translated item.
+5. `pnpm run report-translation:prod ready "$SLUG"` — always, even on failure.
+
 ---
 
-## 3. Env / config (operator sets these on the Convex deployment)
+## 3. Env / config (operator sets these)
 
-Set on the **Convex deployment** (not the repo, not Vercel):
+**On the Convex deployment:**
 
-| Var | Required | Default | Purpose |
-| --- | --- | --- | --- |
-| `ANTHROPIC_API_KEY` | **yes** | — | Auth for the Messages API. The operator's key (the Managed-line model) — cost is billed to the operator. |
-| `TRANSLATION_MODEL` | no | `claude-opus-4-8` | The model. Set to `claude-sonnet-5` to trade some fidelity for lower cost. |
-| `TRANSLATION_MAX_TOKENS` | no | `16000` | Per-item output cap. Raise if a large Lesson trips `translation truncated`. |
+| Var | Required | Purpose |
+| --- | --- | --- |
+| `PUBLISH_SECRET` | **yes** | Guards claim/publish/report — the *same* secret the teacher routine uses. |
+| `TRANSLATE_FIRE_URL` | **yes** | The translate Routine's Fire endpoint, POSTed to kick off a run. |
+| `TRANSLATE_FIRE_TOKEN` | **yes** | Bearer token for that Fire endpoint. |
 
 ```sh
-npx convex env set --prod ANTHROPIC_API_KEY sk-ant-...
-npx convex env set --prod TRANSLATION_MODEL claude-sonnet-5   # optional
-# omit --prod for the dev deployment
+npx convex env set --prod TRANSLATE_FIRE_URL https://…
+npx convex env set --prod TRANSLATE_FIRE_TOKEN …
+# PUBLISH_SECRET is already set for the teacher routine — reuse it.
 ```
 
-**The request shape** (kept minimal on purpose): `POST /v1/messages` with headers
-`x-api-key`, `anthropic-version: 2023-06-01`, `content-type: application/json`;
-body `{ model, max_tokens, system, messages }`. No `temperature`/`top_p` (they
-400 on Opus 4.8 / Sonnet 5) and no `thinking` field. A `stop_reason` of
-`refusal` or `max_tokens` fails that one item (it falls back to English in the
-reader and is counted on the job).
+**The cloud translate Routine** (a claude.ai routine, sibling of
+`teacher-next-lesson`): it clones the repo, then runs the five steps in §2. Its
+cloud env needs `PUBLISH_SECRET` and `CONVEX_PROD_URL` (identical to the teacher
+routine). Point `TRANSLATE_FIRE_URL` / `TRANSLATE_FIRE_TOKEN` (above) at this
+routine's Fire endpoint.
+
+There is **no** `ANTHROPIC_API_KEY` / `TRANSLATION_MODEL` / `TRANSLATION_MAX_TOKENS`
+any more — the cloud run owns the model choice.
 
 ---
 
-## 4. Translation fidelity (the prompt's hard rules)
+## 4. Translation fidelity (the hard rules)
 
-Lesson/Reference HTML is translated with strict preservation: every tag,
+The rules live in the `translate` skill
+([`.agents/skills/translate/SKILL.md`](../.agents/skills/translate/SKILL.md)):
+Lesson/Reference HTML is translated with strict preservation — every tag,
 attribute, class, id, `data-*` (especially `data-correct` / `data-k` /
-`data-answer` / `data-alt`), `<script>`/`<style>`, and element order are kept
-verbatim; only human-readable prose is translated; the **object of study** (the
-language being taught, code, proper nouns) is left unchanged. This matters
-because quiz scoring is **positional** — the reader's iframe bridge derives quiz
-IDs from DOM order and reads `data-correct`/`data-k`/`data-answer`
-([lessonSrcDoc.ts](../src/app/_components/lessonSrcDoc.ts)). A post-translation
-check fails any Lesson whose quiz-marker counts changed rather than shipping a
-broken quiz.
+`data-answer` / `data-alt`), `<script>`/`<style>`, and element order kept
+verbatim; only human-readable prose translated; the **object of study** (the
+language being taught, code, proper nouns) left unchanged. This matters because
+quiz scoring is **positional** — the reader's iframe bridge derives quiz IDs from
+DOM order and reads `data-correct`/`data-k`/`data-answer`
+([lessonSrcDoc.ts](../src/app/_components/lessonSrcDoc.ts)). As a server-side
+safety net, `publishTranslation` re-checks each Lesson's quiz-marker counts and
+**skips** a drifted item (it falls back to English) rather than store a broken quiz.
 
 ---
 
@@ -95,7 +113,10 @@ broken quiz.
   `(topicId, lang, kind, key)`. A **missing** row ⇒ the reader falls back to the
   English source, so a row exists only for a *successful* translation.
 - **`translationJobs`** — one per `(topicId, lang)`; live
-  `status`/`total`/`done`/`failed` drives the Editions panel.
+  `status`/`total`/`done`/`failed` drives the Editions panel **and** is the
+  single-flight lock (`claimedAt`/`runId`) the routine claims against. Seeded
+  `translating` by `startTranslation`; `publishTranslation` ticks `done`;
+  `reportTranslation` flips it `ready`/`failed`.
 - Sharing an Edition also touches `shares.lang` / `pendingShares.lang` and the
   `publicLinks` table (see §6).
 
@@ -118,15 +139,20 @@ can't be self-served by editing the URL. Progress and Certificates stay
 per-Topic; a Certificate snapshots the title + text direction of the Edition the
 learner completed in.
 
+> **Confidentiality note:** a non-English share/link still exposes the English
+> *source* for any item that isn't (yet) translated — the per-item fallback. So
+> "share only the translated Edition" is not a confidentiality boundary. Tracked
+> in `.scratch/course-translation/issues/05-…`.
+
 ---
 
 ## 7. Known failure modes
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
-| Job errors `ANTHROPIC_API_KEY not set` | env var missing on the deployment | `npx convex env set` it (§3). |
-| Item fails `translation truncated` | Lesson HTML exceeded the output cap | raise `TRANSLATION_MAX_TOKENS`; re-translate (only the failed item re-runs). |
-| Item fails `quiz structure changed in translation` | the model added/dropped/renamed a quiz marker | re-translate; if persistent, use `TRANSLATION_MODEL=claude-opus-4-8` (higher fidelity). |
-| Item fails `translation refused by safety classifier` | a `refusal` stop_reason | rare for course content; re-translate or edit the source. |
+| `startTranslation` errors `TRANSLATE_FIRE_URL / TRANSLATE_FIRE_TOKEN not set` | env missing on the deployment | `npx convex env set` them (§3). |
+| Add-language does nothing / Edition never leaves `translating` | the cloud translate Routine isn't set up, isn't firing, or crashed mid-run | check the routine exists and its logs; a stuck job is cleared by removing the Edition and re-adding it. |
+| A translated item still shows English | that item's row is missing (never translated, failed, or a quiz-structure skip) | re-translate the Edition (the panel's retry); the reader falls back to English per item until it lands. |
+| Editions panel shows `Ready · N failed` | the run didn't publish N items (skipped or errored) | retry; if a Lesson keeps failing, its translated quiz markers drifted — the skill must preserve them. |
 | Owner can't translate a course | the course isn't `completed` | mark it complete first — translation is gated on Completion. |
-| A translated item still shows English | that item's row is missing (never translated, or failed) | re-translate the Edition; the reader falls back to English per item until it lands. |
+| "unsupported language" | the target isn't in the offered `LANGUAGES` menu | pick a listed language (extend `convex/languages.ts` to grow the menu). |
