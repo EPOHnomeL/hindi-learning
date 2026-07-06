@@ -184,9 +184,14 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
         className="mb-2 w-full rounded-lg bg-gold/20 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-gold/30"
       />
 
-      {/* Open in the first Edition the Viewer holds (English adds no ?lang). */}
+      {/* Open in the Edition the card's title is shown in — English if the Viewer
+          holds it, else their first Edition (mirrors listSharedTopics' `preferred`),
+          so the title and what "Open course" opens can't disagree. */}
       <Link
-        href={withLang(`/courses/${course.slug}`, course.langs[0]?.lang)}
+        href={withLang(
+          `/courses/${course.slug}`,
+          course.langs.some((l) => l.lang === "en") ? "en" : course.langs[0]?.lang,
+        )}
         className="w-full rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
       >
         Open course

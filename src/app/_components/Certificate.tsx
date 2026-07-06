@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { useEditionLang } from "./editionUrl";
+import { langDir } from "../../../convex/languages";
 import type { Id } from "../../../convex/_generated/dataModel";
 
 // The resolved Emblem (ADR 0017) as the read seams return it — an image resolves
@@ -15,6 +16,10 @@ export type CertificateData = {
   courseTitle: string;
   lessonCount: number;
   issuedAt: number;
+  // The Edition's language (course-translation): the card derives its text
+  // direction from this, so an RTL-titled certificate reads correctly on every
+  // surface (in-app dialog, celebration, and the public page) from one source.
+  lang: string;
   emblem: CertificateEmblem;
   token?: string;
 };
@@ -68,10 +73,11 @@ function onCardLeave(e: React.MouseEvent<HTMLDivElement>) {
 // medallion, a holographic foil sheen, and a pointer tilt/spotlight (ADR 0017) —
 // all CSS (globals.css `.cert-*`), degrading to a flat engraved document under
 // print + reduced-motion. Brand: "My Course".
-export function CertificateCard({ learnerName, courseTitle, lessonCount, issuedAt, emblem }: CertificateData) {
+export function CertificateCard({ learnerName, courseTitle, lessonCount, issuedAt, lang, emblem }: CertificateData) {
   const date = new Date(issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
   return (
     <div
+      dir={langDir(lang)}
       className="cert-card relative isolate overflow-hidden rounded-2xl border-2 border-gold/60 bg-card px-8 py-10 text-center shadow-sm"
       onMouseMove={onCardMove}
       onMouseLeave={onCardLeave}
