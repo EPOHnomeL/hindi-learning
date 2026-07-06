@@ -4,6 +4,31 @@ import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { getViewableTopic, mintToken, topicLessonCounts } from "./lib";
 import { decodeEntities } from "./content";
+import { resolveEmblem, resolvedEmblemValidator, snapshotEmblem } from "./emblem";
+
+// The earned-Certificate shape shared by the authed seams (`myCertificate` and
+// `claimCertificate`): the achievement plus its resolved Emblem (ADR 0017). The
+// Emblem is resolved fresh on every read (an image is a same-origin signed URL),
+// so a frozen `imageId` always yields a current URL.
+const earnedCertificateValidator = v.object({
+  token: v.string(),
+  learnerName: v.string(),
+  courseTitle: v.string(),
+  lessonCount: v.number(),
+  issuedAt: v.number(),
+  emblem: resolvedEmblemValidator,
+});
+
+async function certificatePayload(ctx: QueryCtx, row: Doc<"certificates">) {
+  return {
+    token: row.token,
+    learnerName: row.learnerName,
+    courseTitle: row.courseTitle,
+    lessonCount: row.lessonCount,
+    issuedAt: row._creationTime,
+    emblem: await resolveEmblem(ctx, row.emblem),
+  };
+}
 
 // Certificates (ADR 0015). Two auth models live in this file, kept apart:
 //   - `myCertificate` / `claimCertificate` are AUTHED and owner-or-Viewer gated
@@ -41,16 +66,7 @@ export const myCertificate = query({
   returns: v.union(
     v.null(),
     v.object({
-      certificate: v.union(
-        v.null(),
-        v.object({
-          token: v.string(),
-          learnerName: v.string(),
-          courseTitle: v.string(),
-          lessonCount: v.number(),
-          issuedAt: v.number(),
-        }),
-      ),
+      certificate: v.union(v.null(), earnedCertificateValidator),
       eligible: v.boolean(),
     }),
   ),
@@ -61,17 +77,8 @@ export const myCertificate = query({
     if (!topic) return null;
     const row = await certificateFor(ctx, topic._id, userId);
     if (row) {
-      return {
-        certificate: {
-          token: row.token,
-          learnerName: row.learnerName,
-          courseTitle: row.courseTitle,
-          lessonCount: row.lessonCount,
-          issuedAt: row._creationTime,
-        },
-        // Already earned — nothing left to claim.
-        eligible: false,
-      };
+      // Already earned — nothing left to claim.
+      return { certificate: await certificatePayload(ctx, row), eligible: false };
     }
     return { certificate: null, eligible: await isEligible(ctx, topic, userId) };
   },
@@ -86,30 +93,16 @@ export const myCertificate = query({
 // courseTitle + lessonCount are snapshotted at issue and never rewritten.
 export const claimCertificate = mutation({
   args: { topicSlug: v.string(), name: v.string() },
-  returns: v.object({
-    token: v.string(),
-    learnerName: v.string(),
-    courseTitle: v.string(),
-    lessonCount: v.number(),
-    issuedAt: v.number(),
-  }),
+  returns: earnedCertificateValidator,
   handler: async (ctx, { topicSlug, name }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
     const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
 
-    // Idempotent: an existing Certificate wins, unchanged.
+    // Idempotent: an existing Certificate wins, unchanged (its frozen Emblem too).
     const existing = await certificateFor(ctx, topic._id, userId);
-    if (existing) {
-      return {
-        token: existing.token,
-        learnerName: existing.learnerName,
-        courseTitle: existing.courseTitle,
-        lessonCount: existing.lessonCount,
-        issuedAt: existing._creationTime,
-      };
-    }
+    if (existing) return await certificatePayload(ctx, existing);
 
     // Re-check eligibility and snapshot the lesson count from one read (the same
     // counts the dashboard shows). lessonCount is frozen onto the Certificate.
@@ -123,6 +116,10 @@ export const claimCertificate = mutation({
     const courseTitle = decodeEntities(topic.title);
     const token = mintToken();
 
+    // Freeze the Topic's Emblem onto the row, exactly as title/lessonCount are
+    // frozen — a later reopen + re-fetch or owner change never rewrites it (ADR
+    // 0017). An `imageId` references an immutable blob, so it always resolves.
+    const emblem = snapshotEmblem(topic.emblem);
     const id = await ctx.db.insert("certificates", {
       topicId: topic._id,
       userId,
@@ -130,9 +127,10 @@ export const claimCertificate = mutation({
       learnerName,
       courseTitle,
       lessonCount,
+      ...(emblem ? { emblem } : {}),
     });
     const row = (await ctx.db.get(id))!;
-    return { token, learnerName, courseTitle, lessonCount, issuedAt: row._creationTime };
+    return await certificatePayload(ctx, row);
   },
 });
 
@@ -141,7 +139,9 @@ export const claimCertificate = mutation({
 // /certificate/[token] page. The `returns` validator is an explicit output
 // allowlist: the achievement only (name, course, issue date, lesson count) —
 // never the email, userId, topicId, or any Lesson content. A missing/invalid
-// token returns uniform null, so certificates can't be enumerated.
+// token returns uniform null, so certificates can't be enumerated. The allowlist
+// grows by exactly one field — the resolved Emblem (ADR 0017): a same-origin image
+// URL or a short glyph, never the email, userId, topicId, token, or Lesson content.
 export const publicCertificate = query({
   args: { token: v.string() },
   returns: v.union(
@@ -151,6 +151,7 @@ export const publicCertificate = query({
       courseTitle: v.string(),
       issuedAt: v.number(),
       lessonCount: v.number(),
+      emblem: resolvedEmblemValidator,
     }),
   ),
   handler: async (ctx, { token }) => {
@@ -165,6 +166,7 @@ export const publicCertificate = query({
       courseTitle: row.courseTitle,
       issuedAt: row._creationTime,
       lessonCount: row.lessonCount,
+      emblem: await resolveEmblem(ctx, row.emblem),
     };
   },
 });

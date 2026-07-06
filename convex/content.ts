@@ -3,6 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { assertAdmin, getOwnedTopic, getViewableTopic, topicBySlug, topicLessonCounts } from "./lib";
+import { assertEmblemImage, normaliseGlyph } from "./emblem";
 import { isCallerAdmin } from "./whitelist";
 
 // A learner may seed at most one new course per this window — an anti-abuse / cost
@@ -314,13 +315,45 @@ export const publishMission = mutation({
 // course"), the run marks the Topic `completed` so the Routine's gate stops
 // authoring. Secret-guarded like the other teach write-backs; resolves by slug
 // (the run knows its Topic's slug), the twin of the owner's `endCourse`.
+//
+// The teach skill also supplies the default Emblem here (ADR 0017): an
+// already-uploaded image reference (via `generateProcessedUploadUrl`) and/or a
+// fallback glyph, normalised + uploaded skill-side. It is applied only when the
+// owner has not set their own (`ownerSet`) — so the fixed precedence (owner
+// override → AI image → AI glyph → generic default) holds regardless of which
+// path wrote first. An owner-ended course (no model in the loop) supplies none
+// and falls back to the generic default at read.
 export const completeCourse = mutation({
-  args: { secret: v.string(), topicSlug: v.string() },
-  handler: async (ctx, { secret, topicSlug }) => {
+  args: {
+    secret: v.string(),
+    topicSlug: v.string(),
+    emblem: v.optional(
+      v.object({
+        storageId: v.optional(v.id("_storage")),
+        contentType: v.optional(v.string()),
+        glyph: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (ctx, { secret, topicSlug, emblem }) => {
     assertAdmin(secret);
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) throw new Error("topic not found");
     await ctx.db.patch(topic._id, { status: "completed" });
+
+    // The AI default never overwrites an owner override. Validate the image the
+    // same way the owner path does (raster, size-capped) — both feed the anonymous
+    // page. The AI emblem carries no `ownerSet`, so a later owner override still
+    // wins.
+    if (emblem && !topic.emblem?.ownerSet) {
+      const next: { imageId?: Id<"_storage">; glyph?: string } = {};
+      if (emblem.storageId) {
+        await assertEmblemImage(ctx, emblem.storageId, emblem.contentType ?? "");
+        next.imageId = emblem.storageId;
+      }
+      if (emblem.glyph) next.glyph = normaliseGlyph(emblem.glyph);
+      if (next.imageId || next.glyph) await ctx.db.patch(topic._id, { emblem: next });
+    }
   },
 });
 
