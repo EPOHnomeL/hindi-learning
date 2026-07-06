@@ -27,9 +27,13 @@ document.querySelectorAll('.quiz[data-correct]').forEach(function(q){
   });
 });
 document.querySelectorAll('.quiz.fill').forEach(function(q){
-  var ans=(q.getAttribute('data-answer')||'').trim(), alt=(q.getAttribute('data-alt')||'').trim();
   var input=q.querySelector('input'), btn=q.querySelector('button'), fb=q.querySelector('.fb');
-  function norm(s){return (s||'').replace(/\s+/g,' ').trim();}
+  // Case- and whitespace-insensitive. Mobile keyboards auto-capitalise the first
+  // letter, so a learner typing "Blessed" must still match an authored "blessed".
+  // Mirrors the reader's QUIZ_BRIDGE scoring (lessonSrcDoc.ts) so what the learner
+  // SEES and what gets captured back agree.
+  function norm(s){return (s||'').replace(/\s+/g,' ').trim().toLowerCase();}
+  var ans=norm(q.getAttribute('data-answer')), alt=norm(q.getAttribute('data-alt'));
   function check(){
     var v=norm(input.value);
     if(v===ans||(alt&&v===alt)){ fb.innerHTML=q.getAttribute('data-ok')||'✓ Correct.';

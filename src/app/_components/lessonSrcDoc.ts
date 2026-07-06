@@ -39,13 +39,16 @@ const QUIZ_BRIDGE = `<script>(function(){
       });
     });
   });
+  // Case- and whitespace-insensitive, matching the in-lesson visual layer
+  // (foot.html) so what the learner SEES and what we capture always agree.
+  function normFill(s){ return (s||'').replace(/\\s+/g,' ').trim().toLowerCase(); }
   document.querySelectorAll('.quiz.fill[data-answer]').forEach(function(quiz,i){
     var id = quiz.id || ('fill-'+i);
-    var answer = (quiz.getAttribute('data-answer')||'').trim().toLowerCase();
+    var answer = normFill(quiz.getAttribute('data-answer'));
     var input = quiz.querySelector('input');
     var btn = quiz.querySelector('[data-check]') || quiz.querySelector('button');
     if(btn && input) btn.addEventListener('click', function(){
-      var v=(input.value||'').trim().toLowerCase();
+      var v=normFill(input.value);
       post({type:'response', quizId:id, answer:input.value, correct: v===answer});
     });
   });
