@@ -210,9 +210,13 @@ test("publicCertificate returns only the allowlisted achievement fields; a bad/a
     courseTitle: "Hindi",
     issuedAt: cert.issuedAt,
     lessonCount: 1,
+    // Edition metadata (course-translation): a certificate earned in the source
+    // course reads as English, LTR.
+    lang: "en",
+    dir: "ltr",
   });
   // The allowlist is exact — never the email, userId, topicId, or the token.
-  expect(Object.keys(pub!).sort()).toEqual(["courseTitle", "issuedAt", "learnerName", "lessonCount"]);
+  expect(Object.keys(pub!).sort()).toEqual(["courseTitle", "dir", "issuedAt", "lang", "learnerName", "lessonCount"]);
 
   // A made-up / empty token reveals nothing — uniform null, no enumeration.
   expect(await t.query(api.certificates.publicCertificate, { token: "not-a-real-token" })).toBeNull();

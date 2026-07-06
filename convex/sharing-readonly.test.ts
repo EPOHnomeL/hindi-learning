@@ -47,15 +47,20 @@ test("courseHeader reports the role: owner, viewer, or null for a stranger", asy
   const t = convexTest(schema, modules);
   const { owner, viewer, stranger } = await sharedFixture(t);
 
+  // Editions metadata (course-translation): with no translations, both the owner
+  // and a legacy (English) Viewer see just the source English edition.
+  const enEdition = { lang: "en", dir: "ltr" as const, editions: [{ lang: "en", name: "English", native: "English", rtl: false }] };
   expect(await asUser(t, owner).query(api.content.courseHeader, { topicSlug: "hindi" })).toEqual({
     title: "Hindi",
     role: "owner",
     status: "active",
+    ...enEdition,
   });
   expect(await asUser(t, viewer).query(api.content.courseHeader, { topicSlug: "hindi" })).toEqual({
     title: "Hindi",
     role: "viewer",
     status: "active",
+    ...enEdition,
   });
   // A non-Viewer can't even learn the Topic's title (private Topics don't leak).
   expect(await asUser(t, stranger).query(api.content.courseHeader, { topicSlug: "hindi" })).toBeNull();
