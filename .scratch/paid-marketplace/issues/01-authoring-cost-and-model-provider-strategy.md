@@ -13,6 +13,12 @@ commit blind. A paid course must be fully authored *before* it is listed
 ([ADR 0016](../../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md)),
 so this cost is spent up front, on a course that may or may not sell.
 
+**Translation cost is the same problem, one layer out.** Selling in a specific language
+means selling an **Edition**, and translated Editions are produced on the *operator's*
+Claude key (course-translation feature). So a sold translated Edition carries an
+operator cost the platform's cut must recoup — the same funding question as authoring,
+and it should be answered together.
+
 ## Open questions to resolve
 
 - **Who funds authoring** (the fork parked in the grilling):

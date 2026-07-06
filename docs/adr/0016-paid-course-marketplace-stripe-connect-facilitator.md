@@ -7,13 +7,15 @@ status: proposed
 Status: proposed (product-direction decision from the 2026-07-06 grilling session)
 
 A paid **marketplace** is added on top of the free-distribution model: vetted
-**Sellers** list finished courses, buyers purchase a one-time lifetime
-**Entitlement** (first Lesson free, then pay to continue), and the platform
-**facilitates** payments through **Stripe Connect (Express)** — taking an
-application fee while each Seller remains the **merchant of record** for their own
-sales. This is the first time the platform charges for *consuming* content,
-inverting the roadmap's "serving is free, money is in authoring" assumption for
-paid courses.
+**Sellers** list finished courses *in specific languages*, buyers purchase a
+one-time lifetime **Entitlement** to one **Edition** (a `(Topic, language)` pair;
+first Lesson free, then pay to continue), and the platform **facilitates** payments
+through **Stripe Connect (Express)** — taking an application fee while each Seller
+remains the **merchant of record** for their own sales. This is the first time the
+platform charges for *consuming* content, inverting the roadmap's "serving is free,
+money is in authoring" assumption for paid courses. It **builds on the
+course-translation feature's Edition model** — selling is scoped to an Edition, the
+same grain as its language-scoped Shares and per-Edition Public links.
 
 ## Context
 
@@ -55,14 +57,23 @@ That collides with three shipped concepts:
   the Seller then completes Stripe Express onboarding (billing + address / KYC)
   before they can charge. On the Allowlist = you may *exist*; can-sell = you may
   *charge*.
-- **Unit of sale: a one-time, lifetime Entitlement per (buyer, Topic).** It
-  unlocks every Lesson past the free first one plus their References. Subscription
+- **Unit of sale: a one-time, lifetime Entitlement per Edition — `(buyer, Topic,
+  language)`.** It unlocks every Lesson past the free first one plus their
+  References, *in that Edition's language*. The Entitlement is the **paid
+  counterpart to a language-scoped Share**, and like a Share is scoped to one
+  Edition (buying the Spanish Edition does not unlock the Urdu one). Subscription
   was rejected (churn/dunning/revocation fights the immutable-Lesson + Certificate
   model — what happens to an earned Certificate when access lapses?); per-lesson
   à la carte was rejected (a checkout every Lesson is high friction for a
   sequential course).
-- **First Lesson is the free Preview.** A Guest / unpaid visitor reads Lesson 1;
-  continuing requires a buyer account + an Entitlement.
+- **Price is per Edition, not per Topic.** A Seller chooses which language Editions
+  of a finished course to sell and prices each independently; an Edition with no
+  price is not for sale. (Rejected: one Topic price for any/all Editions — it
+  doesn't express "sell in a specific language" and breaks the per-Edition access
+  grain the course-translation feature established.)
+- **First Lesson is the free Preview, per Edition.** A Guest / unpaid visitor reads
+  the first Lesson *in the Edition's language*; continuing requires a buyer account
+  + an Entitlement for that Edition.
 - **Payment admits buyers; the Allowlist is redefined to gate *selling*, not
   *existence*.** A successful purchase auto-creates an account for the buyer,
   bypassing the Allowlist (which stays the gate for who may sell). This is the
@@ -104,9 +115,20 @@ That collides with three shipped concepts:
 - **Public buyers break the private-alpha assumption.** Account creation is no
   longer Allowlist-gated for buyers; the abuse surface grows; the Admin's
   governance shifts to gating **Sellers** (the can-sell grant).
-- **Read seams fork on paid-vs-free + Entitlement.** Free Topics keep full
-  anonymous access; paid Topics expose only the Preview. `convex/public.ts`
-  (Guest) and `convex/shares.ts` (Viewer) reads must branch accordingly.
+- **Read seams fork on paid-vs-free + Entitlement, at the Edition grain.** The
+  course-translation feature already gates reads per Edition (owner, language-scoped
+  Share, per-Edition Public link); this feature **adds one more way to hold an
+  Edition** — an Entitlement. A free Edition keeps its anonymous access; a paid
+  Edition exposes only its Preview until the caller holds an Entitlement for it.
+- **Depends on the course-translation feature (Editions).** This design assumes the
+  language-scoped Share, the per-Edition Public link, and the per-Edition read
+  gating are in place. Course-translation should land first, or this branch must
+  rebase onto it — the schema and read seams it edits are that feature's.
+- **Translation is operator-funded, so a sold translated Edition has a cost the cut
+  must recoup.** Translation runs on the operator's Claude key (gated to `completed`
+  courses). When a Seller sells a *translated* Edition the operator paid to produce,
+  the application fee must cover that cost — folded into the deferred economics
+  ([issue 01](../../.scratch/paid-marketplace/issues/01-authoring-cost-and-model-provider-strategy.md)).
 - **International reach is asymmetric.** Buyers pay in local currency via Stripe
   **Adaptive Pricing** (150+ countries; currency *presentment* only, not PPP
   discounting). Seller **payouts** are limited to Stripe-supported +

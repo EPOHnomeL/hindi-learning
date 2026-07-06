@@ -3,13 +3,20 @@
 Status: ready-for-agent
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — **Seller**, **Entitlement**,
-> **Preview**, plus Topic, Guest, Viewer, Public link, Allowlist, Admin, Certificate.
-> Direction: [ADR 0016](../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md).
+> **Preview**, **Edition**, plus Topic, Guest, Viewer, Public link, Allowlist, Admin,
+> Certificate. Direction: [ADR 0016](../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md).
 > Also respects [ADR 0001](../../docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md)
 > (no LLM in the web app), [ADR 0011](../../docs/adr/0011-allowlist-in-convex-admin-portal.md)
 > (Allowlist / Admin portal), [ADR 0013](../../docs/adr/0013-public-link-shares.md)
 > (Public link), and [ADR 0015](../../docs/adr/0015-course-completion-and-certificates.md)
 > (account-bound Certificates). Deferred economics: [issue 01](issues/01-authoring-cost-and-model-provider-strategy.md).
+>
+> **Depends on the course-translation feature.** What is sold is an **Edition** — a
+> `(Topic, language)` pair, the unit of content access it introduces — so a course is
+> bought and priced *in a specific language*. That feature already makes **Shares
+> language-scoped** and **Public links per-Edition**; this PRD adds the paid twin. It
+> should land first (or this work rebases onto it): the schema and read seams below
+> are shared with it.
 
 ## Problem Statement
 
@@ -34,17 +41,22 @@ rest:
 A paid **marketplace** layered on top of the existing free model, per
 [ADR 0016](../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md):
 
-- A course is **free or paid at the Seller's choice.** A Topic with **no price** is
-  free and behaves exactly as it does today (Share and Public link unchanged). A
-  Topic with a **price** is paid: its first Lesson is the free **Preview**, and
-  everything past it requires an **Entitlement**.
+- What is sold is an **Edition** — a `(Topic, language)` pair. Each Edition is
+  **free or paid at the Seller's choice**, priced **independently**: an Edition with
+  **no price** is free and behaves exactly as it does today (its language-scoped Share
+  and per-Edition Public link unchanged); an Edition with a **price** is paid — its
+  first Lesson (in that language) is the free **Preview**, and everything past it
+  requires an **Entitlement** for that Edition.
 - A trusted User is made a **Seller** in two steps: the **Admin** grants a *can-sell*
   capability, and the Seller completes Stripe onboarding (billing and address / KYC).
-  Only a Seller whose payouts are enabled may price a course.
-- A learner reads the **Preview**, pays once in their local currency, and receives a
-  one-time **lifetime Entitlement** that unlocks every Lesson past the Preview plus
-  their **References**. The platform **facilitates** the payment and takes a cut; the
-  Seller remains the **merchant of record**.
+  Only a Seller whose payouts are enabled may price an Edition, and only on a
+  finished (completed) course.
+- A learner reads the **Preview** of the language they want, pays once in their local
+  currency, and receives a one-time **lifetime Entitlement** to *that Edition* —
+  unlocking every Lesson past the Preview plus its **References**, in that language.
+  Buying the Spanish Edition does not unlock the Urdu one. The platform
+  **facilitates** the payment and takes a cut; the Seller remains the **merchant of
+  record**.
 - **Payment admits the buyer.** A successful purchase provisions an account for the
   buyer's email, bypassing the **Allowlist** — which is redefined to gate *selling*,
   not *existence*. A buyer's account carries no selling or authoring privilege.
@@ -122,33 +134,56 @@ A paid **marketplace** layered on top of the existing free model, per
 32. As a buyer, I want an **Entitlement** to give me the same read access a **Viewer**
     has — Lessons, References, and my own Progress — so that a paid reader is a
     first-class reader, not a special case.
+33. As a **Seller**, I want to choose which language **Editions** of my finished course
+    to sell and price each one independently, so that I can, say, offer the Spanish
+    Edition at a different price from the English original — or not sell some languages
+    at all.
+34. As a buyer, I want to see which language **Editions** of a course are for sale and
+    at what price, so that I can buy the one I want to learn in.
+35. As a buyer, I want to read the free **Preview** in the language of the Edition I am
+    considering, so that I judge the translation quality before paying for that Edition.
+36. As a buyer, I want my **Entitlement** scoped to the Edition I bought, so that buying
+    the Spanish Edition unlocks Spanish — and if I later want Urdu, I buy that Edition
+    too.
+37. As a buyer who finishes a paid **Edition**, I want my **Certificate** to record the
+    language I completed in, so that the proof reflects the Edition I actually studied.
 
 ## Implementation Decisions
 
-- **Free-or-paid is a property of the Topic.** A Topic carries an optional price
-  (amount in minor units + currency). **Price present ⇒ paid; absent ⇒ free**, and a
-  free Topic keeps today's behaviour untouched.
-- **All access resolves at one seam.** Extend the existing viewable-topic resolver so
-  that an **Entitlement** holder is treated as a **Viewer** everywhere — read access,
-  their own **Progress**, and **Certificate** eligibility — with no per-surface change.
-  A single `resolveTopicAccess` helper returns `owner | viewer | entitled | preview |
-  none`. The **Preview gate** (a paid Topic shows only the Preview to a caller with no
-  Entitlement) is the *only* new read branch; both the authed reader and the Guest
-  reader consult the one helper.
-- **Preview = the lowest-ordered non-superseded Lesson**, using the same
-  non-superseded filter the **Frontier** already uses.
-- **The Entitlement is a stored relation**, one row per (buyer, Topic), permanent
-  (one-time, lifetime); the presence of the row *is* the access.
-- **Buyer admission mirrors the pending-Share pattern.** A purchase mints an
-  **email-keyed pending Entitlement** that is converted into a real Entitlement the
-  moment that email has an account, by a claim step invoked from the sign-up callback
-  (the twin of the existing pending-Share claim). The **Allowlist** admission gate is
-  widened to admit an email that holds a paid purchase. A buyer account gains **no**
-  sell/author capability.
+- **Free-or-paid is a property of the Edition, not the Topic.** Each sellable
+  **Edition** `(Topic, language)` carries an optional price (amount in minor units +
+  currency), stored per `(Topic, language)`. **Price present ⇒ that Edition is paid;
+  absent ⇒ free.** A Seller may price some languages and leave others free/unsold.
+- **Access resolves at one seam, at the Edition grain — extending the
+  course-translation feature's per-Edition gating.** That feature already decides who
+  *holds* an Edition (owner, language-scoped Share, per-Edition Public link); this
+  feature adds **one more holder: an Entitlement**. The resolver returns, for a
+  requested Edition, `owner | viewer | entitled | preview | none`, and an entitled
+  holder is treated as a **Viewer** of that Edition everywhere — read access, their own
+  **Progress** (per-Topic), and **Certificate** eligibility — with no per-surface
+  change. The **Preview gate** (a paid Edition shows only its Preview to a caller who
+  does not hold it) is the *only* new read branch; the authed reader and the Guest
+  reader both consult the one resolver.
+- **Preview = the lowest-ordered non-superseded Lesson of the requested Edition**
+  (that language's rendering), using the same non-superseded filter the **Frontier**
+  uses; it falls back to the English source per the translation feature's rules.
+- **The Entitlement is a stored relation**, one row per **(buyer, Topic, language)**,
+  permanent (one-time, lifetime); the presence of the row *is* access to that Edition.
+- **Buyer admission mirrors the language-scoped pending-Share pattern.** A purchase
+  mints an **email-keyed pending Entitlement carrying the `lang`** that is converted
+  into a real Entitlement the moment that email has an account, by a claim step invoked
+  from the sign-up callback (the twin of the existing pending-Share claim, which is now
+  itself language-scoped). The **Allowlist** admission gate is widened to admit an email
+  that holds a paid purchase. A buyer account gains **no** sell/author capability.
 - **Selling is a capability, modelled as a Sellers relation** holding the Admin
   *can-sell* grant plus the Stripe connected-account id and its `chargesEnabled` /
-  `payoutsEnabled` flags. Pricing is guarded on `payoutsEnabled`; the grant is distinct
-  from onboarding completion, and CONTEXT's **Seller** requires both.
+  `payoutsEnabled` flags. The grant is distinct from onboarding completion, and
+  CONTEXT's **Seller** requires both.
+- **Pricing is per Edition.** A separate listing records the price for a
+  `(Topic, language)` Edition; a Seller sets/clears each independently and may sell
+  only some languages. Pricing is guarded on `payoutsEnabled` **and** a `completed`
+  course (an Edition only exists to sell once the course is finished — and
+  translation itself is gated to completion by the course-translation feature).
 - **Payments use Stripe Connect with Express connected accounts and direct charges plus
   an application fee.** The Seller is the merchant of record and bears Stripe fees;
   the platform takes the application fee. Local-currency presentment uses Adaptive
@@ -171,13 +206,15 @@ A paid **marketplace** layered on top of the existing free model, per
 caller gets, and the effect of a purchase/refund event — never implementation detail,
 UI, or styling. Stripe is mocked at the action boundary; no test calls Stripe.
 
-- **Seam 1 — the access resolver (primary, the only new logic).** Test
-  `resolveTopicAccess` / the extended viewable-topic resolver as a **truth table**
-  across `(owner, viewer, entitled, preview, none) × (paid, free)`: on a paid Topic an
-  unentitled caller (Guest or signed-in) gets **only the Preview** content and a
-  "locked" marker for the rest (never a bare `null` that reads as 404), while owner,
-  Viewer, and entitled callers get everything; a **free** Topic is unchanged. Prior
-  art: the read-only sharing tests and the Guest public-read tests.
+- **Seam 1 — the access resolver (primary, the only new logic).** Test the
+  Edition-aware resolver as a **truth table** across `(owner, viewer, entitled,
+  preview, none) × (paid, free)` **for a requested Edition**: on a paid Edition an
+  unentitled caller (Guest or signed-in) gets **only that Edition's Preview** content
+  and a "locked" marker for the rest (never a bare `null` that reads as 404), while
+  owner, language-scoped Viewer, and entitled callers get everything in that language;
+  a **free** Edition is unchanged. Assert Edition-scoping: an Entitlement for `es` does
+  **not** unlock `ur`. Prior art: the course-translation per-Edition read tests, the
+  read-only sharing tests, and the Guest public-read tests.
 - **Seam 2 — the purchase lifecycle.** Test the webhook + claim: a bad signature is
   rejected; a `checkout.session.completed` event mints access **once** and is
   idempotent on replay; when an account exists it mints an Entitlement, and when it
@@ -213,10 +250,19 @@ UI, or styling. Stripe is mocked at the action boundary; no test calls Stripe.
 - The **take-rate** and the **refund policy** are the two open business decisions;
   they are config, not architecture, and were flagged as unresolved in the grilling
   session that produced this PRD. Pick them before wiring the checkout slice.
-- Extending the viewable-topic resolver to entitled callers is what makes a buyer able
+- Extending the resolver to entitled callers is what makes a buyer able
   to earn a **Certificate** ([ADR 0015](../../docs/adr/0015-course-completion-and-certificates.md))
   — a deliberate, free consequence of the entitled-≡-Viewer decision, not a special
-  case.
+  case. The Certificate already snapshots the Edition's `lang`, so a buyer's proof
+  reflects the language they completed in with no extra work.
+- **Dependency & ordering:** this rides the course-translation feature's Edition model
+  (language-scoped Shares, per-Edition Public links, per-Edition read gating). That
+  feature must land first, or this branch rebases onto it — they share `schema.ts` and
+  the read seams. Building against the pre-Edition schema would have to be redone.
+- **Translation cost coupling:** translated Editions are produced on the *operator's*
+  Claude key. Selling a translated Edition therefore has a cost the platform's cut must
+  recoup — this joins the deferred authoring/translation economics
+  ([issue 01](issues/01-authoring-cost-and-model-provider-strategy.md)).
 - **Build order:** the Entitlement model + access seam first (unblocked); then the
   *can-sell* grant + Stripe onboarding and the pricing/checkout/webhook (both need
   Stripe provisioning and the two business decisions); then the read-seam fork +

@@ -2,13 +2,19 @@
 
 Status: needs-triage
 
-Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Seller**, **Admin**). Spec: [`../PRD.md`](../PRD.md). Decision: [ADR 0016](../../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md).
+Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Seller**, **Admin**, **Edition**). Spec: [`../PRD.md`](../PRD.md). Decision: [ADR 0016](../../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md).
+
+> **Edition update:** what a Seller ultimately prices is a per-**Edition**
+> `(Topic, language)` listing (issue 02/04). This issue is only the seller *capability*
+> + onboarding; it is unaffected by the Edition grain except that the `payoutsEnabled`
+> gate below protects per-Edition pricing.
 
 ## Want
 
 The path by which a user becomes a **Seller**: the Admin grants **can-sell**, the
 user completes Stripe **Express** onboarding (billing + address / KYC), and the
-platform learns whether they can be paid — so pricing (issue 04) can be gated on it.
+platform learns whether they can be paid — so per-Edition pricing (issue 04) can be
+gated on it.
 
 ## Acceptance
 
@@ -32,8 +38,8 @@ platform learns whether they can be paid — so pricing (issue 04) can be gated 
 - **A `mySellerStatus` query** (authed, self): `not-granted | granted-not-onboarded |
   onboarding-incomplete | ready`, driving the dashboard's "become a Seller" affordance
   and gating the price control (issue 04).
-- **Guard**: only a `sellers` row with `payoutsEnabled === true` may price a Topic
-  (enforced in issue 04's pricing mutation; the flag is defined here).
+- **Guard**: only a `sellers` row with `payoutsEnabled === true` may price an **Edition**
+  (enforced in issue 04's per-Edition pricing mutation; the flag is defined here).
 
 ## Depends on
 
