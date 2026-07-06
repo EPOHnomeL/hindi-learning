@@ -110,6 +110,22 @@ export function isRtl(code: string): boolean {
   return RTL_CODES.has(code.toLowerCase()) || RTL_CODES.has(base);
 }
 
+// BCP-47 subtags written in the Devanagari script. The lesson design system's
+// body font ('Spectral',Georgia,…) carries no Devanagari glyphs, so a translated
+// Edition in one of these renders its prose in a browser-default face sized for
+// Latin — small and cramped. `buildSrcDoc` consults this to serve those Editions
+// in the Noto Devanagari webfont the taught content already uses (course-
+// translation). Extend as more Devanagari languages join the picker.
+const DEVANAGARI_CODES = new Set(["hi", "mr", "ne", "sa"]);
+
+// True when a language code's script is Devanagari. Checks the base subtag
+// (e.g. "hi-IN" → "hi"), mirroring isRtl, so a regional variant still resolves.
+export function isDevanagari(code: string): boolean {
+  if (!code) return false;
+  const base = code.split("-")[0]!.toLowerCase();
+  return DEVANAGARI_CODES.has(code.toLowerCase()) || DEVANAGARI_CODES.has(base);
+}
+
 // Metadata for any code — a listed language, or a graceful fallback for a code
 // outside the menu (name = the code, native = the code, rtl from the script set).
 export function langInfo(code: string): LanguageInfo {
