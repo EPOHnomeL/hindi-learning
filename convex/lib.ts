@@ -106,7 +106,18 @@ export async function getViewableTopic(ctx: QueryCtx, userId: Id<"users">, slug:
     .query("shares")
     .withIndex("by_topic_viewer", (q) => q.eq("topicId", topic._id).eq("viewerId", userId))
     .first();
-  return share ? topic : null;
+  if (share) return topic;
+  // An **Entitlement** (paid marketplace, ADR 0016) grants the same topic-level
+  // visibility as a Share — an entitled buyer is a Viewer of the Edition they
+  // bought (their own Progress, Resources, Certificate eligibility all follow for
+  // free). A caller with neither a Share nor an Entitlement (e.g. a Preview-only
+  // visitor) still gets null here and reaches paid content only via the reader's
+  // resolver, never the owner/Viewer write & capture seams.
+  const entitlement = await ctx.db
+    .query("entitlements")
+    .withIndex("by_topic_user", (q) => q.eq("topicId", topic._id).eq("userId", userId))
+    .first();
+  return entitlement ? topic : null;
 }
 
 // ---- Editions (course-translation) -----------------------------------------
@@ -120,9 +131,21 @@ export async function viewerLangs(ctx: QueryCtx, topicId: Id<"topics">, userId: 
   return new Set(shares.map(shareLang));
 }
 
+// The Edition languages a buyer holds on a Topic (from their Entitlements). The
+// paid twin of `viewerLangs` (ADR 0016). Entitlements always carry a `lang`.
+export async function entitledLangs(ctx: QueryCtx, topicId: Id<"topics">, userId: Id<"users">): Promise<Set<string>> {
+  const rows = await ctx.db
+    .query("entitlements")
+    .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
+    .collect();
+  return new Set(rows.map((e) => e.lang));
+}
+
 // The set of Editions the caller may read on a Topic. The owner holds the source
 // English edition plus every language with a READY translation job (a generated
-// Edition); a Viewer holds the languages their Shares grant; anyone else nothing.
+// Edition); a non-owner holds the languages their Shares grant PLUS the languages
+// they have an Entitlement for (an entitled buyer reads their Edition exactly like
+// a Viewer, ADR 0016); anyone else nothing.
 export async function heldLangs(ctx: QueryCtx, topic: Doc<"topics">, userId: Id<"users">): Promise<Set<string>> {
   if (topic.ownerId === userId) {
     const jobs = await ctx.db
@@ -133,7 +156,9 @@ export async function heldLangs(ctx: QueryCtx, topic: Doc<"topics">, userId: Id<
     for (const j of jobs) if (j.status === "ready") langs.add(j.lang);
     return langs;
   }
-  return await viewerLangs(ctx, topic._id, userId);
+  const shared = await viewerLangs(ctx, topic._id, userId);
+  for (const l of await entitledLangs(ctx, topic._id, userId)) shared.add(l);
+  return shared;
 }
 
 // Which Edition to actually serve, given the caller's request. Honours
@@ -152,6 +177,97 @@ export async function readableLang(
   if (requested && held.has(requested)) return requested;
   if (held.has(SOURCE_LANG)) return SOURCE_LANG;
   return [...held].sort()[0]!;
+}
+
+// ---- Paid marketplace: the Edition access resolver (ADR 0016) ---------------
+
+// The caller's relationship to a requested Edition. `owner`/`viewer`/`entitled`
+// read the whole Edition; `preview` gets only the free first Lesson of a PAID
+// Edition; `none` is not-found (a free Edition the caller holds no grant to).
+export type EditionAccess = "owner" | "viewer" | "entitled" | "preview" | "none";
+
+// The price of an Edition (Topic, language), or null when the Edition is free.
+// The PRESENCE of a listing row is the single source of truth for "paid".
+export async function editionPrice(
+  ctx: QueryCtx,
+  topicId: Id<"topics">,
+  lang: string,
+): Promise<Doc<"listings"> | null> {
+  return await ctx.db
+    .query("listings")
+    .withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", lang))
+    .unique();
+}
+
+// THE access decision for a specific Edition (Topic, lang) and caller — the one
+// place read access is resolved (PRD: "access resolves at one seam, at the
+// Edition grain"). Both readers consult it: the authed reader passes the signed-in
+// `userId`; the Guest reader passes `userId: null` with `publicGrant: true` once
+// its per-Edition Public link has authorised this exact Edition.
+//
+//   owner    — the Topic's owner (full; never paywalled on their own course)
+//   viewer   — holds a language-scoped Share for this Edition (full)
+//   entitled — holds an Entitlement for this Edition (full; treated ≡ Viewer)
+//   preview  — no hold, but the Edition is PAID: only the free Preview is served
+//   none     — no hold and the Edition is free: not-found (unchanged free gate)
+//
+// A valid Public link is itself a grant: on a FREE Edition it yields `viewer`
+// (today's anonymous full read); on a PAID Edition it yields `preview`.
+export async function editionAccessLevel(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  lang: string,
+  userId: Id<"users"> | null,
+  publicGrant = false,
+): Promise<EditionAccess> {
+  if (userId && topic.ownerId === userId) return "owner";
+  if (userId) {
+    if ((await viewerLangs(ctx, topic._id, userId)).has(lang)) return "viewer";
+    if ((await entitledLangs(ctx, topic._id, userId)).has(lang)) return "entitled";
+  }
+  const paid = (await editionPrice(ctx, topic._id, lang)) !== null;
+  if (publicGrant) return paid ? "preview" : "viewer";
+  return paid ? "preview" : "none";
+}
+
+// The Preview of an Edition: the key of the lowest-ordered non-superseded Lesson
+// (the same non-superseded filter the Frontier uses). The Lesson's language
+// rendering is handled by the reader's normal translation fallback. Null when the
+// course has no readable Lesson yet.
+export async function previewLessonKey(ctx: QueryCtx, topicId: Id<"topics">): Promise<string | null> {
+  const lessons = (
+    await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect()
+  ).filter((l) => !l.supersededBy);
+  if (lessons.length === 0) return null;
+  return lessons.sort((a, b) => a.seq - b.seq)[0]!.key;
+}
+
+// The authed reader's per-request resolution: which Edition to serve AND the
+// caller's access level to it — the single seam every authed reader query calls.
+// Composes Edition selection (held-Edition switching, unchanged) with the paygate:
+//   - A non-owner's SPECIFIC request is classified as-is, so navigating to a paid
+//     Edition they don't hold shows THAT Edition's Preview (an `es` hold never
+//     silently redirects a `ur` request). It only falls back to a held Edition
+//     when the requested one is genuinely not-found (free + unheld).
+//   - The owner, and any request-less call, use the held-Edition selection
+//     (`readableLang`) unchanged, reaching the paygate only when nothing is held.
+export async function resolveReaderEdition(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  userId: Id<"users">,
+  requested?: string | null,
+): Promise<{ lang: string; level: EditionAccess }> {
+  if (requested && topic.ownerId !== userId) {
+    const level = await editionAccessLevel(ctx, topic, requested, userId);
+    if (level !== "none") return { lang: requested, level };
+    const held = await readableLang(ctx, topic, userId, null);
+    if (held) return { lang: held, level: await editionAccessLevel(ctx, topic, held, userId) };
+    return { lang: requested, level: "none" };
+  }
+  const effLang = await readableLang(ctx, topic, userId, requested ?? null);
+  if (effLang !== null) return { lang: effLang, level: await editionAccessLevel(ctx, topic, effLang, userId) };
+  const lang = requested ?? SOURCE_LANG;
+  return { lang, level: await editionAccessLevel(ctx, topic, lang, userId) };
 }
 
 // A Topic's live progress counts for a dashboard/Shared-with-me card: how many

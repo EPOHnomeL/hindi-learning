@@ -318,4 +318,43 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_topic", ["topicId"])
     .index("by_topic_lang", ["topicId", "lang"]),
+
+  // ---- Monetisation (paid marketplace, ADR 0016) ---------------------------
+
+  // The price of one **Edition** — a (Topic, language) pair. The PRESENCE of a
+  // listing row is what makes an Edition **paid**; its absence means the Edition
+  // is free and behaves exactly as course-translation serves it today. `amount`
+  // is in the currency's minor units (e.g. cents) and `currency` is a lower-case
+  // ISO-4217 code (Stripe's convention). One row per Edition — `by_topic_lang`
+  // is the price lookup the access resolver consults; `by_topic` lists a Topic's
+  // priced Editions (and cascades on Topic delete). In Slice 1 the price is set
+  // by a temporary Admin/dev mutation; Slice 2 replaces that with a Seller action.
+  listings: defineTable({
+    topicId: v.id("topics"),
+    lang: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+  })
+    .index("by_topic", ["topicId"])
+    .index("by_topic_lang", ["topicId", "lang"]),
+
+  // An **Entitlement**: an account's purchased, permanent right to read one paid
+  // **Edition** — a (Topic, language) pair — past its free **Preview**. One row
+  // per (buyer, Topic, language); the presence of the row *is* the access. It is
+  // the paid twin of a language-scoped Share: an entitled buyer is treated as a
+  // Viewer of that Edition everywhere (read access, own Progress, Certificate
+  // eligibility), and — like a Share — is scoped to one language (buying `es`
+  // does not unlock `ur`). Never expires. `by_topic_user` is the resolver's hold
+  // check (a buyer may hold several, one per language — matched in-memory like
+  // Shares); `by_topic` cascades on Topic delete; `by_user` backs "my purchases".
+  // In Slice 1 rows are minted by a temporary Admin/dev grant; Slice 3 mints them
+  // from a verified Stripe webhook.
+  entitlements: defineTable({
+    userId: v.id("users"),
+    topicId: v.id("topics"),
+    lang: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_topic", ["topicId"])
+    .index("by_topic_user", ["topicId", "userId"]),
 });
