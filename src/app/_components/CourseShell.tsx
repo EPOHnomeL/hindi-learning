@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { CompletionCelebration } from "./Certificate";
+import { CompletionCelebration, EmblemControl } from "./Certificate";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
@@ -183,9 +183,14 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
 
           {/* Owner-only course lifecycle (ADR 0015): conclude the course, or reopen
               a completed one. Absent for Viewers (PRD story 9), and while still
-              `seeded` — a course that hasn't drafted a Lesson can't be completed. */}
+              `seeded` — a course that hasn't drafted a Lesson can't be completed.
+              The Emblem control (ADR 0017) sits alongside it: the owner curates the
+              subject's mark on the certificate, overriding the automatic default. */}
           {canWrite && header && header.status !== "seeded" && (
-            <CompletionControls slug={slug} completed={courseCompleted} />
+            <>
+              <EmblemControl topicSlug={slug} />
+              <CompletionControls slug={slug} completed={courseCompleted} />
+            </>
           )}
 
           <ThemeToggle />
