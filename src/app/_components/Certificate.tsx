@@ -33,29 +33,65 @@ function EmblemMark({ emblem }: { emblem: CertificateEmblem }) {
   );
 }
 
+// A pointer-tracked tilt + spotlight for the card (ADR 0017). Sets CSS custom
+// properties directly on the element (no React state → no re-render), and the CSS
+// gates the visual off under prefers-reduced-motion / print — but we also bail out
+// of the JS under reduced-motion so nothing moves at all.
+const TILT_MAX_DEG = 7;
+function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+}
+function onCardMove(e: React.MouseEvent<HTMLDivElement>) {
+  if (prefersReducedMotion()) return;
+  const el = e.currentTarget;
+  const r = el.getBoundingClientRect();
+  const px = (e.clientX - r.left) / r.width; // 0 (left) → 1 (right)
+  const py = (e.clientY - r.top) / r.height; // 0 (top) → 1 (bottom)
+  el.style.setProperty("--rx", `${(px - 0.5) * 2 * TILT_MAX_DEG}deg`);
+  el.style.setProperty("--ry", `${(0.5 - py) * 2 * TILT_MAX_DEG}deg`);
+  el.style.setProperty("--mx", `${px * 100}%`);
+  el.style.setProperty("--my", `${py * 100}%`);
+  el.style.setProperty("--glow-o", "1");
+}
+function onCardLeave(e: React.MouseEvent<HTMLDivElement>) {
+  const el = e.currentTarget;
+  el.style.setProperty("--rx", "0deg");
+  el.style.setProperty("--ry", "0deg");
+  el.style.setProperty("--glow-o", "0");
+}
+
 // The visual Certificate — a self-contained card, reused in-app (the claim/view
 // dialog below), on the completion celebration, and on the anonymous
 // /certificate/[token] page (with its print-to-PDF). Presentational only; no data
-// fetching, so the surfaces can't drift. Carries the subject's Emblem in a
-// medallion (ADR 0017); the premium on-screen treatment layers on via CSS
-// (globals.css `.cert-*`). Brand: "My Course".
+// fetching, so the surfaces can't drift. Carries the subject's Emblem in a metallic
+// medallion, a holographic foil sheen, and a pointer tilt/spotlight (ADR 0017) —
+// all CSS (globals.css `.cert-*`), degrading to a flat engraved document under
+// print + reduced-motion. Brand: "My Course".
 export function CertificateCard({ learnerName, courseTitle, lessonCount, issuedAt, emblem }: CertificateData) {
   const date = new Date(issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
   return (
-    <div className="cert-card relative overflow-hidden rounded-2xl border-2 border-gold/60 bg-card px-8 py-10 text-center shadow-sm">
+    <div
+      className="cert-card relative isolate overflow-hidden rounded-2xl border-2 border-gold/60 bg-card px-8 py-10 text-center shadow-sm"
+      onMouseMove={onCardMove}
+      onMouseLeave={onCardLeave}
+    >
+      <div className="cert-sheen pointer-events-none absolute inset-0" aria-hidden />
+      <div className="cert-glow pointer-events-none absolute inset-0" aria-hidden />
       <div className="pointer-events-none absolute inset-2 rounded-xl border border-gold/30" aria-hidden />
-      <div className="cert-medallion mx-auto mb-5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-gold/70 bg-hi/60">
-        <EmblemMark emblem={emblem} />
+      <div className="relative z-10">
+        <div className="cert-medallion mx-auto mb-5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-gold/70">
+          <EmblemMark emblem={emblem} />
+        </div>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent2">Certificate of Completion</p>
+        <p className="mt-6 text-sm text-soft">This certifies that</p>
+        <p className="mt-1 text-2xl font-semibold text-accent">{learnerName}</p>
+        <p className="mt-4 text-sm text-soft">has completed the course</p>
+        <p className="mt-1 text-xl font-semibold text-ink">{courseTitle}</p>
+        <p className="mt-6 text-sm text-soft">
+          {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"} · {date}
+        </p>
+        <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-accent2">My Course</p>
       </div>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent2">Certificate of Completion</p>
-      <p className="mt-6 text-sm text-soft">This certifies that</p>
-      <p className="mt-1 text-2xl font-semibold text-accent">{learnerName}</p>
-      <p className="mt-4 text-sm text-soft">has completed the course</p>
-      <p className="mt-1 text-xl font-semibold text-ink">{courseTitle}</p>
-      <p className="mt-6 text-sm text-soft">
-        {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"} · {date}
-      </p>
-      <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-accent2">My Course</p>
     </div>
   );
 }
