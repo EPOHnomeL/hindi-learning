@@ -13,6 +13,7 @@ import type * as capture from "../capture.js";
 import type * as certificates from "../certificates.js";
 import type * as content from "../content.js";
 import type * as crons from "../crons.js";
+import type * as emblem from "../emblem.js";
 import type * as http from "../http.js";
 import type * as languages from "../languages.js";
 import type * as lib from "../lib.js";
@@ -35,6 +36,7 @@ declare const fullApi: ApiFromModules<{
   certificates: typeof certificates;
   content: typeof content;
   crons: typeof crons;
+  emblem: typeof emblem;
   http: typeof http;
   languages: typeof languages;
   lib: typeof lib;

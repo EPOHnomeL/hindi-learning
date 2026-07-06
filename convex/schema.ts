@@ -40,6 +40,19 @@ export default defineSchema({
     // read-only access. Present while the Topic is public; cleared (truly revoked)
     // when made private. `by_public_token` is the Guest read seam's lookup.
     publicToken: v.optional(v.string()),
+    // The Topic's Emblem (ADR 0017): the mark of the subject shown on its
+    // Certificate. Resolves image → glyph → generic default. `imageId` points at
+    // an immutable Hub blob (a re-set mints a new blob, never overwrites, so a
+    // `storageId` frozen onto an earned Certificate always resolves); `glyph` is
+    // the emoji/short-char fallback. `ownerSet` marks an owner override so the AI
+    // default (`completeCourse`) never clobbers it, regardless of write order.
+    emblem: v.optional(
+      v.object({
+        imageId: v.optional(v.id("_storage")),
+        glyph: v.optional(v.string()),
+        ownerSet: v.optional(v.boolean()),
+      }),
+    ),
   })
     .index("by_slug", ["slug"])
     .index("by_owner", ["ownerId"])
@@ -209,6 +222,18 @@ export default defineSchema({
     // snapshots the title + text direction of that language. Optional so
     // pre-translation certificates read as the English edition ("en").
     lang: v.optional(v.string()),
+    // The Emblem frozen at claim (ADR 0017), a snapshot of the Topic's Emblem
+    // alongside `courseTitle`/`lessonCount` — no `ownerSet`, since precedence is
+    // already resolved. `imageId` references an immutable blob, so it always
+    // resolves even after the Topic's Emblem is later changed. Optional: rows
+    // minted before this feature (and Topics with no Emblem) carry none, resolving
+    // to the generic default glyph at read.
+    emblem: v.optional(
+      v.object({
+        imageId: v.optional(v.id("_storage")),
+        glyph: v.optional(v.string()),
+      }),
+    ),
   })
     .index("by_token", ["token"])
     .index("by_topic_user", ["topicId", "userId"]),

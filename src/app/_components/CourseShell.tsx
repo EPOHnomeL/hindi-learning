@@ -6,10 +6,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { CompletionCelebration } from "./Certificate";
+import { CompletionCelebration, EmblemControl } from "./Certificate";
 import { LANG_KEY, useEditionLang, withLang } from "./editionUrl";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
+import { useHideOnScroll } from "./useHideOnScroll";
 import { useResourceUpload } from "./useResourceUpload";
 import { completedKeys, frontierKey, nextLessonKey, seenAfterOpening, unseenReplyKeys } from "./readerDerive";
 
@@ -66,6 +67,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const router = useRouter();
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
+  const navHidden = useHideOnScroll();
 
   const lessons = useQuery(api.content.listLessons, { topicSlug: slug, lang: lang ?? undefined });
   const references = useQuery(api.content.listReferences, { topicSlug: slug, lang: lang ?? undefined });
@@ -131,8 +133,13 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
       }}
     >
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
-        {/* Mobile top bar: hamburger opens the lesson selector. */}
-        <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 md:hidden">
+        {/* Mobile top bar: hamburger opens the lesson selector. Slides away on
+            scroll-down for a fuller-screen read (useHideOnScroll). */}
+        <header
+          className={`sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 transition-transform duration-300 md:hidden ${
+            navHidden ? "-translate-y-full" : "translate-y-0"
+          }`}
+        >
           <button onClick={() => setMenuOpen(true)} aria-label="Open lessons" className="rounded-lg p-1.5 text-ink hover:bg-hi">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="3" y1="6" x2="21" y2="6" />
@@ -196,9 +203,14 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
 
           {/* Owner-only course lifecycle (ADR 0015): conclude the course, or reopen
               a completed one. Absent for Viewers (PRD story 9), and while still
-              `seeded` — a course that hasn't drafted a Lesson can't be completed. */}
+              `seeded` — a course that hasn't drafted a Lesson can't be completed.
+              The Emblem control (ADR 0017) sits alongside it: the owner curates the
+              subject's mark on the certificate, overriding the automatic default. */}
           {canWrite && header && header.status !== "seeded" && (
-            <CompletionControls slug={slug} completed={courseCompleted} />
+            <>
+              <EmblemControl topicSlug={slug} />
+              <CompletionControls slug={slug} completed={courseCompleted} />
+            </>
           )}
 
           {/* Edition switcher + theme toggle, pinned together at the sidebar

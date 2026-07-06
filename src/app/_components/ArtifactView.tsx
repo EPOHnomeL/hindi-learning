@@ -11,6 +11,7 @@ import { buildSrcDoc, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
 import { internalNavTarget } from "./readerDerive";
 import { useTheme } from "./ThemeContext";
+import { useHideOnScroll } from "./useHideOnScroll";
 
 // Mirror of the server's stale threshold (convex/routine.ts STALE_MS): a run
 // stuck "generating" past this is treated as crashed and offered for retry.
@@ -197,6 +198,7 @@ function LessonView({
 }) {
   const { theme } = useTheme();
   const lang = useEditionLang();
+  const navHidden = useHideOnScroll();
   const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey, lang: lang ?? undefined });
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
@@ -230,8 +232,13 @@ function LessonView({
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
       {/* Lesson column — fills the available height on desktop; grows with content on mobile. */}
       <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3">
-        {/* Title + actions: a sticky bar under the mobile header; inline on desktop. */}
-        <div className="sticky top-12 z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">
+        {/* Title + actions: a sticky bar under the mobile header; inline on desktop.
+            Rises to the top edge in step with the header as it hides on scroll. */}
+        <div
+          className={`sticky z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
+            navHidden ? "top-0" : "top-12"
+          }`}
+        >
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
           <div className="flex shrink-0 items-center gap-2">
             {/* Authoring is owner-only and stops once the course is completed
@@ -376,12 +383,19 @@ function ReferenceView({
 }) {
   const { theme } = useTheme();
   const lang = useEditionLang();
+  const navHidden = useHideOnScroll();
   const ref = useQuery(api.content.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
   if (ref === undefined) return <p className="text-soft">Loading…</p>;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3">
-      <h2 className="sticky top-12 z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0">{ref.title}</h2>
+      <h2
+        className={`sticky z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
+          navHidden ? "top-0" : "top-12"
+        }`}
+      >
+        {ref.title}
+      </h2>
       {/* References carry no dark CSS of their own, so themeCss injects the dark
           palette (ADR 0011) — the theme then flips them with the rest of the app. */}
       <Frame html={ref.html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} />
@@ -459,7 +473,7 @@ function QuestionBox({
                 <Markdown source={q.reply} className="flex flex-col gap-2 text-sm leading-relaxed text-ink" />
               </div>
             ) : (
-              <p className="mt-1 text-xs text-soft">Waiting for your teacher…</p>
+              <p className="mt-1 text-xs text-soft">Waiting for your teacher — your question will be answered once the next lesson is generated.</p>
             )}
           </li>
         ))}
