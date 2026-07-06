@@ -27,6 +27,9 @@ mkdirSync(`${base}/references`, { recursive: true });
 mkdirSync(`${base}/resources`, { recursive: true });
 mkdirSync(`${base}/learning-records`, { recursive: true });
 
+// The course title as plain text — the teach run ignores it; the translate run
+// reads it as the source for the title Edition (it isn't inside any lesson file).
+writeFileSync(`${base}/TITLE.txt`, ctx.topic.title);
 for (const l of ctx.lessons) writeFileSync(`${base}/lessons/${l.key}.html`, l.html);
 for (const r of ctx.references) writeFileSync(`${base}/references/${r.key}.html`, r.html);
 for (const lr of ctx.learningRecords) writeFileSync(`${base}/learning-records/${lr.key}.md`, lr.markdown);
