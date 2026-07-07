@@ -62,7 +62,7 @@ describe("buildSrcDoc", () => {
     expect(out).toContain('lang="hi"'); // Edition lang stamped
     expect(out).toContain("Noto+Serif+Devanagari"); // webfont link
     expect(out).toContain("'Noto Serif Devanagari'"); // spliced into the body chain
-    expect(out).toContain("font-size:20px"); // size bump for the script
+    expect(out).toContain("zoom:1.2"); // whole-lesson scale-up for the script
     // Font override must land inside <head> so it applies before the body renders.
     expect(out.indexOf("Noto Serif Devanagari")).toBeLessThan(out.indexOf("</head>"));
   });

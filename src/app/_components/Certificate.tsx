@@ -6,6 +6,8 @@ import { api } from "../../../convex/_generated/api";
 import { useEditionLang } from "./editionUrl";
 import { langDir } from "../../../convex/languages";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { Icon } from "./icons";
+import { Menu, MenuItem } from "./ui";
 
 // The resolved Emblem (ADR 0017) as the read seams return it — an image resolves
 // to a same-origin URL, otherwise a glyph (a subject emoji or the generic default).
@@ -69,50 +71,127 @@ function onCardLeave(e: React.MouseEvent<HTMLDivElement>) {
   el.style.setProperty("--glow-o", "0");
 }
 
-// The visual Certificate — a self-contained card, reused in-app (the claim/view
-// dialog below), on the completion celebration, and on the anonymous
-// /certificate/[token] page (with its print-to-PDF). Presentational only; no data
-// fetching, so the surfaces can't drift. Carries the subject's Emblem in a metallic
-// medallion, a holographic foil sheen, and a pointer tilt/spotlight (ADR 0017) —
-// all CSS (globals.css `.cert-*`), degrading to a flat engraved document under
-// print + reduced-motion. `showcase` (the public page) makes it larger and more
-// theatrical — a warm outer glow, a stronger foil, and an ambient shine sweep —
-// while the compact dialogs stay compact. Brand: "My Course".
-export function CertificateCard({ learnerName, courseTitle, lessonCount, issuedAt, lang, emblem, showcase }: CertificateData) {
+// The visual Certificate. Presentational only; no data fetching, so its surfaces
+// can't drift. Two treatments off the same props:
+//   - compact (`CertificateCompact`) — the in-app claim dialog: a small framed
+//     card with the metallic medallion + foil + pointer tilt (ADR 0017).
+//   - showcase (`CertificateShowcase`) — the standalone /certificate/[token]
+//     page: a full A4-landscape document with a double gold frame, filigree
+//     corners, a guilloché weave, a foil wax seal, and signature rules. Sized in
+//     container units so it scales as one block from phone to desktop and prints
+//     to a true A4 page (globals.css `.cert-doc*`, `@media print`).
+// Both degrade to a flat engraved document under print + reduced-motion. Brand:
+// "My Course".
+export function CertificateCard(props: CertificateData) {
+  return props.showcase ? <CertificateShowcase {...props} /> : <CertificateCompact {...props} />;
+}
+
+function CertificateCompact({ learnerName, courseTitle, lessonCount, issuedAt, lang, emblem }: CertificateData) {
   const date = new Date(issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
-  const pad = showcase ? "px-10 py-14 sm:px-14 sm:py-16" : "px-8 py-10";
-  const medallion = showcase ? "h-24 w-24 sm:h-28 sm:w-28" : "h-20 w-20";
-  const nameSize = showcase ? "text-3xl sm:text-4xl" : "text-2xl";
-  const titleSize = showcase ? "text-2xl sm:text-3xl" : "text-xl";
   return (
     <div
       dir={langDir(lang)}
-      className={`cert-card relative isolate overflow-hidden rounded-2xl border-2 border-gold/60 bg-card text-center shadow-sm ${pad} ${
-        showcase ? "cert-card--showcase" : ""
-      }`}
+      className="cert-card relative isolate overflow-hidden rounded-2xl border-2 border-gold/60 bg-card px-8 py-10 text-center shadow-sm"
       onMouseMove={onCardMove}
       onMouseLeave={onCardLeave}
     >
       <div className="cert-sheen pointer-events-none absolute inset-0" aria-hidden />
       <div className="cert-glow pointer-events-none absolute inset-0" aria-hidden />
-      {showcase && <div className="cert-shine pointer-events-none absolute inset-0" aria-hidden />}
       <div className="pointer-events-none absolute inset-2 rounded-xl border border-gold/30" aria-hidden />
       <div className="relative z-10">
-        <div
-          className={`cert-medallion mx-auto mb-5 flex items-center justify-center overflow-hidden rounded-full border-2 border-gold/70 ${medallion}`}
-        >
-          <EmblemMark emblem={emblem} large={showcase} />
+        <div className="cert-medallion mx-auto mb-5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-gold/70">
+          <EmblemMark emblem={emblem} />
         </div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent2">Certificate of Completion</p>
         <p className="mt-6 text-sm text-soft">This certifies that</p>
-        <p className={`mt-1 font-semibold text-accent ${nameSize}`}>{learnerName}</p>
+        <p className="mt-1 text-2xl font-semibold text-accent">{learnerName}</p>
         <p className="mt-4 text-sm text-soft">has completed the course</p>
-        <p className={`mt-1 font-semibold text-ink ${titleSize}`}>{courseTitle}</p>
+        <p className="mt-1 text-xl font-semibold text-ink">{courseTitle}</p>
         <p className="mt-6 text-sm text-soft">
           {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"} · {date}
         </p>
         <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-accent2">My Course</p>
       </div>
+    </div>
+  );
+}
+
+// One filigree corner ornament, flipped into each of the four corners by its
+// modifier class (globals.css `.cert-corner--*`). Decorative, so aria-hidden.
+function CertCorner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
+  return (
+    <svg
+      className={`cert-corner cert-corner--${pos} pointer-events-none absolute`}
+      viewBox="0 0 100 100"
+      fill="none"
+      aria-hidden
+    >
+      <path d="M6 48C6 24 24 6 48 6" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M6 32C6 17 17 6 32 6" stroke="currentColor" strokeWidth="1" />
+      <path d="M12 66C12 42 26 30 44 30" stroke="currentColor" strokeWidth="0.7" opacity="0.55" />
+      <circle cx="48" cy="48" r="2.4" fill="currentColor" />
+    </svg>
+  );
+}
+
+function CertificateShowcase({ learnerName, courseTitle, lessonCount, issuedAt, lang, emblem }: CertificateData) {
+  const date = new Date(issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  return (
+    // The shell owns the container-query context (`container-type: inline-size`),
+    // so every `cqw` inside — including the card's own padding — resolves against
+    // the card's width and the whole document scales as one unit.
+    <div className="cert-doc-shell mx-auto w-full">
+    <div
+      dir={langDir(lang)}
+      className="cert-card cert-card--showcase cert-doc relative isolate w-full overflow-hidden bg-card"
+      onMouseMove={onCardMove}
+      onMouseLeave={onCardLeave}
+    >
+      <div className="cert-doc-weave pointer-events-none absolute inset-0" aria-hidden />
+      <div className="cert-sheen pointer-events-none absolute inset-0" aria-hidden />
+      <div className="cert-glow pointer-events-none absolute inset-0" aria-hidden />
+      <div className="cert-shine pointer-events-none absolute inset-0" aria-hidden />
+      <div className="cert-doc-frame pointer-events-none absolute" aria-hidden />
+      <CertCorner pos="tl" />
+      <CertCorner pos="tr" />
+      <CertCorner pos="bl" />
+      <CertCorner pos="br" />
+
+      <div className="relative z-10 flex w-full flex-col items-center">
+        <div className="cert-medallion flex items-center justify-center overflow-hidden rounded-full">
+          <EmblemMark emblem={emblem} large />
+        </div>
+        <p className="cert-doc-eyebrow">Certificate of Completion</p>
+        <p className="cert-doc-pre cert-doc-pre--lead">This certifies that</p>
+        <p className="cert-doc-name">{learnerName}</p>
+        <div className="cert-doc-rule" aria-hidden>
+          <span className="cert-doc-rule-line" />
+          <span className="cert-doc-diamond">✦</span>
+          <span className="cert-doc-rule-line" />
+        </div>
+        <p className="cert-doc-pre">has completed the course</p>
+        <p className="cert-doc-title">{courseTitle}</p>
+        <p className="cert-doc-meta">
+          Completed {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"}
+        </p>
+
+        <div className="cert-doc-footer">
+          <div className="cert-doc-sig">
+            <span className="cert-doc-sig-mark">My Course</span>
+            <span className="cert-doc-sig-line" />
+            <span className="cert-doc-sig-label">Issued by</span>
+          </div>
+          <div className="cert-doc-seal" aria-hidden>
+            <span className="cert-doc-seal-star">★</span>
+          </div>
+          <div className="cert-doc-sig">
+            <span className="cert-doc-sig-mark cert-doc-sig-mark--date">{date}</span>
+            <span className="cert-doc-sig-line" />
+            <span className="cert-doc-sig-label">Date issued</span>
+          </div>
+        </div>
+      </div>
+    </div>
     </div>
   );
 }
@@ -147,18 +226,68 @@ export function CertificateControl({ topicSlug, className }: { topicSlug: string
         href={`/certificate/${certificate.token}`}
         target="_blank"
         rel="noopener noreferrer"
-        className={`inline-flex items-center justify-center ${btnClass}`}
+        className={`inline-flex items-center justify-center gap-2 ${btnClass}`}
       >
-        🎓 View your certificate
+        <Icon name="award" className="h-4 w-4" /> View your certificate
       </a>
     );
   }
   return (
     <>
-      <button onClick={() => setOpen(true)} className={btnClass}>
-        🎓 Claim your certificate
+      <button onClick={() => setOpen(true)} className={`inline-flex items-center justify-center gap-2 ${btnClass}`}>
+        <Icon name="award" className="h-4 w-4" /> Claim your certificate
       </button>
       {open && <CertificateDialog topicSlug={topicSlug} certificate={null} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+// A completed course card's ⋯ overflow (UI redesign): the certificate lives here
+// rather than as a full-width bar on the card face. Renders "View certificate"
+// (opens the standalone public page in a new tab) once earned, or "Claim
+// certificate" (opens the claim dialog) while eligible — with a gold dot on the ⋯
+// trigger to flag the unclaimed one. Self-hides (no ⋯ at all) when there's no
+// certificate to offer, so the card never shows an empty menu. Owner and Viewer
+// alike — myCertificate is owner-or-Viewer gated server-side.
+export function CourseCertMenu({ topicSlug }: { topicSlug: string }) {
+  const data = useQuery(api.certificates.myCertificate, { topicSlug });
+  const [claiming, setClaiming] = useState(false);
+  if (!data) return null;
+  const { certificate, eligible } = data;
+  if (!certificate && !eligible) return null;
+  const unclaimed = !certificate && eligible;
+
+  return (
+    <>
+      <Menu triggerLabel="Certificate" dot={unclaimed}>
+        {(close) =>
+          certificate ? (
+            <MenuItem
+              icon="award"
+              iconTone="gold"
+              trailingIcon="ext"
+              href={`/certificate/${certificate.token}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={close}
+            >
+              View certificate
+            </MenuItem>
+          ) : (
+            <MenuItem
+              icon="award"
+              iconTone="gold"
+              onClick={() => {
+                close();
+                setClaiming(true);
+              }}
+            >
+              Claim certificate
+            </MenuItem>
+          )
+        }
+      </Menu>
+      {claiming && <CertificateDialog topicSlug={topicSlug} certificate={null} onClose={() => setClaiming(false)} />}
     </>
   );
 }
@@ -432,39 +561,23 @@ async function normaliseEmblemImage(file: File): Promise<Blob> {
 // client-side (normaliseEmblemImage) then uploaded via the standard Resource flow
 // (generateUploadUrl → POST → record); the server validates it (raster,
 // size-capped; a Viewer is refused regardless). An owner override wins over the AI
-// default, so this is how an owner picks their own mark. Gated by `canWrite` at
-// the call site.
-export function EmblemControl({ topicSlug, className }: { topicSlug: string; className?: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className={
-          className ??
-          "mb-2 flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
-        }
-      >
-        ✦ Set certificate emblem
-      </button>
-      {open && <EmblemDialog topicSlug={topicSlug} onClose={() => setOpen(false)} />}
-    </>
-  );
-}
-
-function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () => void }) {
+// default, so this is how an owner picks their own mark.
+//
+// A section (heading + controls, no dialog chrome), folded into the course
+// settings dialog (UI redesign) rather than standing alone. Gated by `canWrite`
+// at the call site.
+export function EmblemSection({ topicSlug }: { topicSlug: string }) {
   const setEmblem = useMutation(api.emblem.setTopicEmblem);
   const generateUploadUrl = useMutation(api.resources.generateUploadUrl);
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => ref.current?.showModal(), []);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const [glyph, setGlyph] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // The just-saved Emblem, shown as a confirming preview so the owner sees the
-  // change land — it otherwise only surfaces on a future certificate, so the
-  // dialog used to just close with no feedback. An image preview is a local object
-  // URL of the resized blob, revoked when it's replaced or the dialog unmounts.
+  // The just-saved Emblem, shown as a confirming preview in the medallion so the
+  // owner sees the change land — it otherwise only surfaces on a future
+  // certificate. An image preview is a local object URL of the resized blob,
+  // revoked when it's replaced or the section unmounts.
   const [saved, setSaved] = useState<{ kind: "glyph"; glyph: string } | { kind: "image"; url: string } | null>(null);
   useEffect(() => {
     return () => {
@@ -505,49 +618,25 @@ function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () =
   }
 
   return (
-    <dialog
-      ref={ref}
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close();
-      }}
-      className="m-auto w-[92vw] max-w-md rounded-2xl border border-line bg-paper p-0 text-ink shadow-xl backdrop:bg-black/40"
-    >
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">
-        <h2 className="text-sm font-semibold text-accent">Certificate emblem</h2>
-        <button
-          onClick={() => ref.current?.close()}
-          aria-label="Close"
-          className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
-        >
-          ✕
-        </button>
-      </div>
-      <div className="flex flex-col gap-5 px-6 py-6">
-        <p className="text-xs text-soft">
-          The mark of your subject, shown on the certificate. Set an emoji or short character, or upload an image (it’s
-          resized to a small square automatically). Your choice overrides the automatic one.
-        </p>
-
-        {saved && (
-          <div className="flex items-center gap-3 rounded-lg border border-gold/40 bg-gold/10 px-3 py-2">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full border border-gold/60 bg-card">
-              {saved.kind === "image" ? (
-                <img src={saved.url} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="text-2xl leading-none">{saved.glyph}</span>
-              )}
-            </div>
-            <p className="text-xs font-medium text-accent">
-              Emblem updated ✓ It appears on certificates earned from here on — ones already claimed keep their original
-              mark.
-            </p>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Glyph</label>
-          <div className="flex gap-1">
+    <div>
+      <h4 className="text-[13px] font-bold text-ink">Certificate emblem</h4>
+      <p className="mt-1 text-[12.5px] text-soft">
+        The mark of your subject on the certificate. Set an emoji or short character, or upload an image (resized to a
+        small square). Your choice overrides the automatic one.
+      </p>
+      <div className="mt-4 flex items-start gap-4">
+        <div className="cert-medallion flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-gold/70">
+          {saved?.kind === "image" ? (
+            <img src={saved.url} alt="" className="h-full w-full object-cover" />
+          ) : saved?.kind === "glyph" ? (
+            <span className="text-2xl leading-none">{saved.glyph}</span>
+          ) : (
+            <Icon name="award" className="h-6 w-6 text-white/85" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-accent2">Glyph</label>
+          <div className="flex gap-1.5">
             <input
               value={glyph}
               onChange={(e) => setGlyph(e.target.value)}
@@ -563,26 +652,39 @@ function EmblemDialog({ topicSlug, onClose }: { topicSlug: string; onClose: () =
               Save
             </button>
           </div>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Or upload an image</label>
+          <label className="mb-1.5 mt-3 block text-[11px] font-bold uppercase tracking-wide text-accent2">
+            Or upload an image
+          </label>
           <input
+            ref={fileRef}
             type="file"
             accept="image/png,image/jpeg,image/webp"
+            className="hidden"
             disabled={busy}
             onChange={(e) => {
               const f = e.target.files?.[0];
               e.target.value = ""; // let the same file be re-picked after an error
               if (f) void uploadImage(f);
             }}
-            className="text-sm text-soft file:mr-3 file:rounded-lg file:border-0 file:bg-accent2 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white"
           />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:border-transparent hover:bg-hi hover:text-accent disabled:opacity-60"
+          >
+            <Icon name="upload" className="h-4 w-4" /> Choose image…
+          </button>
+          {saved && (
+            <p className="mt-3 text-xs font-medium text-accent">
+              Emblem updated — it appears on certificates earned from here on; ones already claimed keep their original
+              mark.
+            </p>
+          )}
+          {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
         </div>
-
-        {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       </div>
-    </dialog>
+    </div>
   );
 }
 
@@ -608,15 +710,15 @@ export function PublicCertificatePage({ token }: { token: string }) {
     );
   }
   return (
-    <main className="cert-print-page mx-auto flex min-h-dvh max-w-2xl flex-col items-center justify-center gap-6 px-4 py-12">
+    <main className="cert-stage cert-print-page flex min-h-dvh w-full flex-col items-center justify-center gap-7 px-4 py-10">
       {/* Apply the Edition's direction so an RTL-titled certificate renders
           correctly (course-translation). */}
-      <div className="cert-enter w-full" dir={cert.dir}>
+      <div className="cert-enter relative z-10 flex w-full max-w-6xl justify-center" dir={cert.dir}>
         <CertificateCard {...cert} showcase />
       </div>
       <button
         onClick={() => window.print()}
-        className="no-print rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90"
+        className="no-print relative z-10 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
       >
         Download PDF
       </button>
