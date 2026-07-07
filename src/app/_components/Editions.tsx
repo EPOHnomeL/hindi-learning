@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { LANGUAGES } from "../../../convex/languages";
 import { Icon } from "./icons";
+import { formatPrice } from "./Paygate";
 import { Dialog } from "./ui";
 
 // One row of the owner's Editions panel, straight from api.translate.editions.
@@ -80,7 +81,7 @@ export function EditionsDialog({ topicSlug, title, onClose }: { topicSlug: strin
               onAdded={(code) => setTab(code)}
             />
           ) : active ? (
-            <EditionPanel topicSlug={topicSlug} title={title} edition={active} />
+            <EditionPanel topicSlug={topicSlug} title={title} edition={active} completed={data.completed} />
           ) : null}
         </>
       )}
@@ -119,7 +120,17 @@ function EditionTab({ edition, active, onSelect }: { edition: Edition; active: b
 // The active edition's panel. Ready editions get the share controls; a
 // translating one shows progress, a failed one shows retry — both with a quiet
 // Remove (translations only; the source can't be removed).
-function EditionPanel({ topicSlug, title, edition }: { topicSlug: string; title: string; edition: Edition }) {
+function EditionPanel({
+  topicSlug,
+  title,
+  edition,
+  completed,
+}: {
+  topicSlug: string;
+  title: string;
+  edition: Edition;
+  completed: boolean;
+}) {
   if (edition.status === "translating") {
     const pct = edition.total > 0 ? Math.round((edition.done / edition.total) * 100) : 0;
     return (
@@ -158,6 +169,7 @@ function EditionPanel({ topicSlug, title, edition }: { topicSlug: string; title:
     <div className="flex flex-col gap-4">
       <InviteByEmail topicSlug={topicSlug} lang={edition.lang} />
       <PublicLinkToggle topicSlug={topicSlug} lang={edition.lang} publicToken={edition.publicToken} />
+      <SellEdition topicSlug={topicSlug} lang={edition.lang} native={edition.native} rtl={edition.rtl} completed={completed} />
       <div className="flex flex-col items-start gap-2 border-t border-line pt-4">
         {/* The people/access list is deferred to a dedicated dashboard (issue
             filed) — this stays a quiet, non-interactive pointer for now. */}
@@ -319,6 +331,243 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
           >
             <Icon name="refresh" className="h-3.75 w-3.75" /> Regenerate link
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Two-decimal currencies this ships with (matches Paygate.formatPrice's 2-decimal
+// assumption — no zero-decimal currency like JPY, whose minor unit differs).
+const SELL_CURRENCIES = ["USD", "EUR", "GBP", "INR", "CAD", "AUD"];
+
+// "Sell this edition" (paid marketplace, ADR 0016, Slice 2). Prices ONE Edition
+// of a completed course. Setting a price makes the Edition paid (its first Lesson
+// stays a free Preview; the rest needs a purchase); clearing it makes it free
+// again. Guarded to a payouts-enabled Seller: a not-yet-Seller sees a "Set up
+// selling" gate (Admin grant → Stripe payout onboarding) instead of the control.
+// gold = paid/price throughout (the design system's monetisation colour).
+function SellEdition({
+  topicSlug,
+  lang,
+  native,
+  rtl,
+  completed,
+}: {
+  topicSlug: string;
+  lang: string;
+  native: string;
+  rtl: boolean;
+  completed: boolean;
+}) {
+  const status = useQuery(api.sellers.sellerStatus);
+  const pricing = useQuery(api.market.editionPricing, { topicSlug });
+  const setPrice = useMutation(api.market.setEditionPrice);
+  const clearPrice = useMutation(api.market.clearEditionPrice);
+  const startOnboarding = useAction(api.sellers.startOnboarding);
+
+  const current = pricing?.find((p) => p.lang === lang) ?? null;
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState("USD");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Only a completed course is sellable (its content is frozen) — mirror the
+  // AddLanguage "complete first" hint rather than showing a dead control.
+  if (!completed) {
+    return (
+      <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-line px-3 py-2.5 text-[12.5px] text-soft">
+        <Icon name="tag" className="h-4 w-4 shrink-0" />
+        <span>Selling opens once the course is marked complete.</span>
+      </div>
+    );
+  }
+
+  // Seller gate: not a payouts-enabled Seller yet → the two-step "set up selling"
+  // path (Admin grant, then Stripe onboarding), never the price control.
+  if (status !== "ready") {
+    const beginOnboarding = async () => {
+      setBusy(true);
+      setError(null);
+      try {
+        const { url } = await startOnboarding({ returnPath: "/?onboarding=return" });
+        window.location.href = url;
+      } catch {
+        setError("Couldn’t open Stripe onboarding — please try again.");
+        setBusy(false);
+      }
+    };
+    return (
+      <div className="flex items-start gap-3 rounded-xl border border-dashed border-line px-3.5 py-3 text-[13px] leading-relaxed text-soft">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-hi text-accent">
+          <Icon name="tag" className="h-4.5 w-4.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          {status === undefined ? (
+            <span>Checking your seller status…</span>
+          ) : status === "not-granted" ? (
+            <span>
+              <b className="font-semibold text-ink">Sell this course.</b> Selling is enabled by the workspace admin —
+              ask them to turn it on for your account.
+            </span>
+          ) : (
+            <>
+              <span>
+                <b className="font-semibold text-ink">
+                  {status === "granted-not-onboarded" ? "Set up payouts to sell." : "Finish your payout setup."}
+                </b>{" "}
+                Connect a Stripe account to receive payments; then you can price this edition.
+              </span>
+              <div className="mt-2.5">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void beginOnboarding()}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+                >
+                  {busy ? "Opening…" : status === "granted-not-onboarded" ? "Set up selling" : "Continue setup"}
+                </button>
+              </div>
+              {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Ready Seller: the price control. Header shows the current state + a toggle to
+  // the editor; the editor sets/updates the price or stops selling.
+  const openEditor = () => {
+    setAmount(current ? (current.amount / 100).toFixed(2) : "");
+    setCurrency(current?.currency.toUpperCase() ?? "USD");
+    setError(null);
+    setOpen((o) => !o);
+  };
+  const save = async () => {
+    const minor = Math.round(parseFloat(amount) * 100);
+    if (!Number.isFinite(minor) || minor <= 0) {
+      setError("Enter a price greater than zero.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await setPrice({ topicSlug, lang, amount: minor, currency });
+      setOpen(false);
+    } catch {
+      setError("Couldn’t save the price — please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const stopSelling = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await clearPrice({ topicSlug, lang });
+      setOpen(false);
+    } catch {
+      setError("Couldn’t update — please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={`rounded-xl border bg-card p-3.5 ${current ? "border-gold/40" : "border-line"}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${
+              current ? "bg-gold/15 text-gold" : "bg-hi text-soft"
+            }`}
+          >
+            <Icon name="tag" className="h-4.5 w-4.5" />
+          </span>
+          <div className="min-w-0">
+            <b className="block text-[13.5px] font-semibold text-ink">Sell this edition</b>
+            <span className="text-[11.5px] text-soft">
+              {current ? (
+                <>
+                  Paid · <span className="font-semibold text-gold">{formatPrice(current.amount, current.currency)}</span> ·
+                  first lesson free
+                </>
+              ) : (
+                <>
+                  Free — set a price to sell{" "}
+                  <span dir={rtl ? "rtl" : undefined}>{native}</span>
+                </>
+              )}
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={openEditor}
+          className={`shrink-0 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+            current
+              ? "border border-line text-soft hover:bg-hi hover:text-accent"
+              : "bg-gold/20 text-accent hover:bg-gold/30"
+          }`}
+        >
+          {current ? "Edit price" : "Set a price"}
+        </button>
+      </div>
+
+      {open && (
+        <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
+          <div className="flex flex-wrap items-end gap-2.5">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">Price</span>
+              <input
+                value={amount}
+                inputMode="decimal"
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setError(null);
+                }}
+                placeholder="0.00"
+                className="w-32 rounded-lg border border-line bg-card px-3 py-2 text-sm tabular-nums focus:border-gold focus:outline-none"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">Currency</span>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-28 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+              >
+                {SELL_CURRENCIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void save()}
+              className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+            >
+              {busy ? "Saving…" : "Save"}
+            </button>
+          </div>
+          {error && <p className="text-xs text-danger">{error}</p>}
+          {current ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void stopSelling()}
+              className="inline-flex items-center gap-1.5 self-start text-[12.5px] text-soft transition-colors hover:text-danger disabled:opacity-60"
+            >
+              <Icon name="x" className="h-3.75 w-3.75" /> Stop selling — make this edition free
+            </button>
+          ) : (
+            <p className="text-xs text-soft">Each language is priced on its own — sell some editions, keep others free.</p>
+          )}
         </div>
       )}
     </div>

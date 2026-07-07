@@ -4,7 +4,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
 import { CourseCertMenu } from "./Certificate";
@@ -12,6 +12,7 @@ import { CourseSettingsDialog } from "./CourseSettings";
 import { EditionsDialog } from "./Editions";
 import { withLang } from "./editionUrl";
 import { Icon } from "./icons";
+import { formatPrice } from "./Paygate";
 import { Logo } from "./Logo";
 import { Markdown } from "./MarkdownView";
 import { missionPreview } from "./markdown";
@@ -58,8 +59,22 @@ type PurchasedCourse = {
 export function Dashboard() {
   const courses = useQuery(api.content.dashboard);
   const amAdmin = useQuery(api.whitelist.amIAdmin);
+  const refreshOnboarding = useAction(api.sellers.refreshOnboarding);
   const { signOut } = useAuthActions();
   const router = useRouter();
+
+  // Returning from Stripe Express onboarding (paid marketplace, ADR 0016): the
+  // hosted flow sends the seller back to `/?onboarding=…`. Pull their fresh
+  // account flags once, so sellerStatus (and the pricing controls) update, then
+  // strip the param so a refresh doesn't re-trigger it.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.get("onboarding")) return;
+    void refreshOnboarding().catch(() => {});
+    params.delete("onboarding");
+    const qs = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+  }, [refreshOnboarding]);
 
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
@@ -158,6 +173,21 @@ function StatusPill({ course }: { course: Course }) {
   return null;
 }
 
+// A course's paid Editions, as a single gold pill (paid marketplace, ADR 0016).
+// Shown on the owner card in place of the status pill: a marketplace listing is
+// the most salient state, and only a completed course can be priced. "from" when
+// several Editions are priced (they may differ in price/currency).
+function PaidPill({ pricing }: { pricing: { amount: number; currency: string }[] }) {
+  const min = pricing.reduce((a, b) => (b.amount < a.amount ? b : a));
+  return (
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
+      <Icon name="tag" className="h-3 w-3" />
+      {pricing.length > 1 ? "from " : ""}
+      {formatPrice(min.amount, min.currency)}
+    </span>
+  );
+}
+
 function CourseCard({ course }: { course: Course }) {
   const [showMission, setShowMission] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -168,6 +198,10 @@ function CourseCard({ course }: { course: Course }) {
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
   const complete = course.status === "completed";
   const seeded = course.status === "seeded";
+  // Only a completed course can carry a listing, so only then is a price lookup
+  // worthwhile. A priced course shows the gold "Paid" pill instead of "Complete".
+  const pricing = useQuery(api.market.editionPricing, complete ? { topicSlug: course.slug } : "skip");
+  const priced = pricing && pricing.length > 0 ? pricing : null;
 
   const editions = course.editions.map((code) => {
     const i = langInfo(code);
@@ -192,7 +226,7 @@ function CourseCard({ course }: { course: Course }) {
     >
       <div className="mb-2.5 flex items-start justify-between gap-2.5">
         <h2 className="min-w-0 text-lg font-semibold leading-snug tracking-tight text-ink">{course.title}</h2>
-        <StatusPill course={course} />
+        {priced ? <PaidPill pricing={priced} /> : <StatusPill course={course} />}
       </div>
 
       {course.mission ? (
