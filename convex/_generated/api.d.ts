@@ -21,6 +21,7 @@ import type * as market from "../market.js";
 import type * as public_ from "../public.js";
 import type * as resources from "../resources.js";
 import type * as routine from "../routine.js";
+import type * as sellers from "../sellers.js";
 import type * as shares from "../shares.js";
 import type * as translate from "../translate.js";
 import type * as whitelist from "../whitelist.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   public: typeof public_;
   resources: typeof resources;
   routine: typeof routine;
+  sellers: typeof sellers;
   shares: typeof shares;
   translate: typeof translate;
   whitelist: typeof whitelist;

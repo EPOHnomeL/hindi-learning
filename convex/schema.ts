@@ -357,4 +357,27 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_topic", ["topicId"])
     .index("by_topic_user", ["topicId", "userId"]),
+
+  // A **Seller**'s capability record (ADR 0016). Selling is a two-gate capability:
+  // the PRESENCE of a row is the Admin's **can-sell** grant, and Stripe Express
+  // onboarding then fills the connected-account id and its capability flags. A
+  // Seller (CONTEXT) requires BOTH — granted AND `payoutsEnabled` — and only then
+  // may price an Edition. Revoking can-sell deletes this row (which stops *new*
+  // pricing) but never touches already-sold Entitlements. One row per user.
+  // `by_user` is the grant/status lookup; `by_stripe_account` lets the Stripe
+  // `account.updated` webhook find the Seller from the event's connected-account id.
+  sellers: defineTable({
+    userId: v.id("users"),
+    // Absent until the granted user starts Stripe Express onboarding; set once and
+    // reused across onboarding retries (a re-start returns a fresh account link for
+    // the SAME account, never a second connected account).
+    stripeAccountId: v.optional(v.string()),
+    // Mirrored from the Stripe account's capabilities on onboarding return and via
+    // the account.updated webhook. `payoutsEnabled` is the gate on pricing/selling;
+    // both default false until Stripe reports the account fully enabled.
+    chargesEnabled: v.boolean(),
+    payoutsEnabled: v.boolean(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_stripe_account", ["stripeAccountId"]),
 });

@@ -231,37 +231,21 @@ test("Admin grant flips a caller from Preview to full; revoke flips it back", as
   });
 });
 
-test("grant and pricing mutations are Admin-only; pricing makes an Edition paid/free", async () => {
+test("grant/revoke Entitlement are Admin-only temp tools (Slice 3 replaces them)", async () => {
   const t = convexTest(schema, modules);
-  const { topicId } = await fixture(t);
-  const admin = await seedAdmin(t, "admin@example.com");
+  await fixture(t);
+  await seedAdmin(t, "admin@example.com");
   const bob = await seedUser(t, "bob@example.com");
   await seedUser(t, "carol@example.com");
 
-  // A non-Admin cannot grant or price.
+  // A non-Admin cannot grant or revoke an Entitlement. (Pricing is no longer an
+  // Admin tool — it's the Seller action, covered in sellers.test.ts.)
   await expect(
     asUser(t, bob).mutation(api.market.grantEntitlement, { email: "carol@example.com", topicSlug: "hindi", lang: "en" }),
   ).rejects.toThrow();
   await expect(
-    asUser(t, bob).mutation(api.market.setEditionPrice, { topicSlug: "hindi", lang: "en", amount: 500, currency: "usd" }),
+    asUser(t, bob).mutation(api.market.revokeEntitlement, { email: "carol@example.com", topicSlug: "hindi", lang: "en" }),
   ).rejects.toThrow();
-
-  // Admin sets a price → the Edition is now paid (unentitled callers see Preview).
-  await asUser(t, admin).mutation(api.market.setEditionPrice, { topicSlug: "hindi", lang: "en", amount: 500, currency: "USD" });
-  expect(await asUser(t, admin).query(api.market.editionPricing, { topicSlug: "hindi" })).toEqual([
-    { lang: "en", amount: 500, currency: "usd" }, // currency normalised lower-case
-  ]);
-  const carolId = (await t.run((ctx) =>
-    ctx.db.query("users").withIndex("email", (q) => q.eq("email", "carol@example.com")).unique(),
-  ))!._id;
-  expect(await asUser(t, carolId).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
-    locked: true,
-  });
-
-  // Admin clears the price → free again (stranger is back to not-found).
-  await asUser(t, admin).mutation(api.market.clearEditionPrice, { topicSlug: "hindi", lang: "en" });
-  expect(await asUser(t, admin).query(api.market.editionPricing, { topicSlug: "hindi" })).toEqual([]);
-  expect(await asUser(t, carolId).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toBeNull();
 });
 
 test("an entitled buyer gets Viewer semantics — own Progress, but no Responses", async () => {

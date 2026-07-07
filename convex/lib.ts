@@ -179,6 +179,42 @@ export async function readableLang(
   return [...held].sort()[0]!;
 }
 
+// ---- Paid marketplace: Sellers (ADR 0016) -----------------------------------
+
+// A Seller's onboarding stage, derived from their `sellers` row (see schema):
+//   not-granted          — no row: the Admin has not granted can-sell
+//   granted-not-onboarded — granted, but Stripe onboarding not started (no account)
+//   onboarding-incomplete — Stripe account exists but payouts not yet enabled
+//   ready                 — payouts enabled: the Seller may price and be paid
+// A Seller (CONTEXT) is only `ready` when both gates are satisfied.
+export type SellerStatus =
+  | "not-granted"
+  | "granted-not-onboarded"
+  | "onboarding-incomplete"
+  | "ready";
+
+// The caller's Seller row, or null when can-sell was never granted.
+export async function getSeller(ctx: QueryCtx, userId: Id<"users">): Promise<Doc<"sellers"> | null> {
+  return await ctx.db
+    .query("sellers")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .unique();
+}
+
+// Map a Seller row (or its absence) to the onboarding stage the self-status query
+// and the pricing guard both read. `payoutsEnabled` is the single gate on `ready`.
+export function sellerStatusOf(seller: Doc<"sellers"> | null): SellerStatus {
+  if (!seller) return "not-granted";
+  if (!seller.stripeAccountId) return "granted-not-onboarded";
+  return seller.payoutsEnabled ? "ready" : "onboarding-incomplete";
+}
+
+// Whether the caller may price/sell right now — granted AND payouts-enabled. The
+// guard the real (Slice 2) pricing action enforces, replacing Slice 1's Admin gate.
+export async function isReadySeller(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
+  return sellerStatusOf(await getSeller(ctx, userId)) === "ready";
+}
+
 // ---- Paid marketplace: the Edition access resolver (ADR 0016) ---------------
 
 // The caller's relationship to a requested Edition. `owner`/`viewer`/`entitled`

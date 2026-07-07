@@ -2,33 +2,54 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { editionPrice, normaliseEmail, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import {
+  editionPrice,
+  getOwnedTopic,
+  heldLangs,
+  isReadySeller,
+  normaliseEmail,
+  SOURCE_LANG,
+  topicBySlug,
+  topicLessonCounts,
+} from "./lib";
 import { langInfo } from "./languages";
 import { isCallerAdmin } from "./whitelist";
 
-// Paid marketplace (ADR 0016) — Slice 1 backend spine.
+// Paid marketplace (ADR 0016) — the Edition **listing** (price) and
+// **Entitlement** grants. A listing's PRESENCE makes an Edition paid; an
+// Entitlement is a buyer's permanent right to read one paid Edition past its free
+// Preview (the access resolver in lib.ts reads both).
 //
-// This module owns the Edition **listing** (price) and **Entitlement** grants.
-// A listing's PRESENCE makes an Edition paid; an Entitlement is a buyer's
-// permanent right to read one paid Edition past its free Preview (the access
-// resolver in lib.ts reads both). The set-price and grant mutations here are
-// TEMPORARY Admin/dev tools so the whole paygate is demoable before Stripe
-// exists: Slice 2 replaces set/clearEditionPrice with a Seller pricing action
-// (guarded on payouts-enabled + a completed course), and Slice 3 replaces
-// grant/revokeEntitlement with a signature-verified Stripe webhook. Every write
-// here is Admin-gated so the temporary tools can't be poked by a normal user.
+// Pricing (set/clearEditionPrice) is the **Seller** action (Slice 2): the course
+// OWNER, once they are a payouts-enabled Seller, prices each Edition of their
+// *completed* course independently — no Stripe call, just the listing the access
+// resolver reads. The `grant/revokeEntitlement` mutations are still TEMPORARY
+// Admin/dev tools (Slice 3 replaces them with a signature-verified Stripe webhook).
 
-// Both grant/price paths are Admin-only in Slice 1 (identity derived server-side,
-// never a client arg) — the same boundary the Allowlist portal uses.
 const CURRENCY = /^[a-z]{3}$/;
 
-// Set (or update) the price of an Edition (Topic, language), making it paid.
-// TEMP Admin/dev tool — Slice 2's Seller pricing action supersedes it.
+// Set (or update) the price of an Edition (Topic, language), making it paid — the
+// Seller pricing action (Slice 2). The caller must OWN the course, be a
+// payouts-enabled Seller, and the course must be `completed`; the Edition must be
+// one the owner holds (the source language or a ready translation). Setting a
+// price is a pure DB write (the flag the access resolver reads) — no Stripe here.
 export const setEditionPrice = mutation({
   args: { topicSlug: v.string(), lang: v.string(), amount: v.number(), currency: v.string() },
   returns: v.null(),
   handler: async (ctx, { topicSlug, lang, amount, currency }) => {
-    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("forbidden");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("not your course");
+    if (!(await isReadySeller(ctx, userId))) {
+      throw new Error("you must be an approved Seller with payouts enabled to price a course");
+    }
+    if (topic.status !== "completed") throw new Error("only a completed course can be priced");
+    // Only an Edition the owner actually holds (English source, or a language with
+    // a ready translation) is sellable — you can't price a language you can't serve.
+    if (!(await heldLangs(ctx, topic, userId)).has(lang)) {
+      throw new Error("that edition isn't ready to sell");
+    }
     // A bounded positive integer in minor units. `Number.isInteger` rejects NaN,
     // Infinity, and fractions; the ceiling keeps a stray value from becoming an
     // absurd price (well above any real course, comfortably under Stripe's max).
@@ -37,8 +58,6 @@ export const setEditionPrice = mutation({
     }
     const cur = currency.trim().toLowerCase();
     if (!CURRENCY.test(cur)) throw new Error("currency must be a 3-letter ISO-4217 code");
-    const topic = await topicBySlug(ctx, topicSlug);
-    if (!topic) throw new Error("topic not found");
     const existing = await editionPrice(ctx, topic._id, lang);
     if (existing) await ctx.db.patch(existing._id, { amount, currency: cur });
     else await ctx.db.insert("listings", { topicId: topic._id, lang, amount, currency: cur });
@@ -47,14 +66,16 @@ export const setEditionPrice = mutation({
 });
 
 // Clear an Edition's price, making it free again (its Share / Public link revert
-// to today's free behaviour). TEMP Admin/dev tool. No-op if it wasn't priced.
+// to today's free behaviour). Owner-only — an owner can always un-list, even if
+// their can-sell grant later lapsed. No-op if it wasn't priced.
 export const clearEditionPrice = mutation({
   args: { topicSlug: v.string(), lang: v.string() },
   returns: v.null(),
   handler: async (ctx, { topicSlug, lang }) => {
-    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
-    const topic = await topicBySlug(ctx, topicSlug);
-    if (!topic) throw new Error("topic not found");
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("forbidden");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("not your course");
     const existing = await editionPrice(ctx, topic._id, lang);
     if (existing) await ctx.db.delete(existing._id);
     return null;
