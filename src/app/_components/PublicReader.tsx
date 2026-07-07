@@ -8,7 +8,9 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
 import { Frame } from "./ArtifactView";
+import { Icon } from "./icons";
 import { Markdown } from "./MarkdownView";
+import { Paygate } from "./Paygate";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
@@ -90,6 +92,13 @@ export function PublicCourseShell({ token, children }: { token: string; children
   const activeKey = decodeURIComponent(pathname.split("/").pop() ?? "");
   const base = `/share/${token}`;
 
+  // Paid marketplace (ADR 0016): a Public link to a PAID Edition serves a Guest
+  // only the free Preview + the table of contents (`publicCourse.paywall` is
+  // present). Everything past the Preview is locked in the nav; the Preview Lesson
+  // itself is flagged Free. A free Edition has no paywall and reads as before.
+  const preview = !!course.paywall;
+  const previewKey = course.paywall?.previewKey ?? null;
+
   return (
     <Ctx.Provider value={{ token, course, completed, markComplete }}>
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
@@ -136,6 +145,8 @@ export function PublicCourseShell({ token, children }: { token: string; children
                 href={`${base}/lessons/${l.key}`}
                 active={!isRef && activeKey === l.key}
                 done={completed.has(l.key)}
+                locked={preview && l.key !== previewKey}
+                free={preview && l.key === previewKey}
               >
                 {l.seq}. {l.title.split("—")[0]!.trim()}
               </NavItem>
@@ -145,7 +156,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
               <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">References</p>
             )}
             {course.references.map((r) => (
-              <NavItem key={r.key} href={`${base}/references/${r.key}`} active={isRef && activeKey === r.key}>
+              <NavItem key={r.key} href={`${base}/references/${r.key}`} active={isRef && activeKey === r.key} locked={preview}>
                 {r.title}
               </NavItem>
             ))}
@@ -191,26 +202,44 @@ function NavItem({
   href,
   active,
   done = false,
+  locked = false,
+  free = false,
   children,
 }: {
   href: string;
   active: boolean;
   done?: boolean;
+  // Paid marketplace: `locked` marks content past the free Preview (lock icon,
+  // muted label); `free` flags the Preview lesson. Both stay navigable.
+  locked?: boolean;
+  free?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <Link
       href={href}
       className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors md:py-1.5 ${
-        active ? "bg-accent text-white" : "text-ink hover:bg-hi"
+        active ? "bg-accent text-white" : locked ? "text-soft hover:bg-hi" : "text-ink hover:bg-hi"
       }`}
     >
       <span className="min-w-0">{children}</span>
-      {done && (
-        <span aria-label="completed" title="Completed" className={`shrink-0 text-xs ${active ? "text-white" : "text-accent2"}`}>
-          ✓
-        </span>
-      )}
+      <span className="flex shrink-0 items-center gap-1.5">
+        {free && (
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+              active ? "bg-white/20 text-white" : "bg-accent2/15 text-accent2"
+            }`}
+          >
+            Free
+          </span>
+        )}
+        {done && (
+          <span aria-label="completed" title="Completed" className={`text-xs ${active ? "text-white" : "text-accent2"}`}>
+            ✓
+          </span>
+        )}
+        {locked && <Icon name="lock" className={`h-3.5 w-3.5 ${active ? "text-white" : "text-soft"}`} />}
+      </span>
     </Link>
   );
 }
@@ -256,6 +285,19 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
   if (lesson === undefined) return <p className="text-soft">Loading…</p>;
   if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
 
+  // Paid marketplace: on a paid Edition's Public link a Guest gets the paygate for
+  // every Lesson past the free Preview (the reader returns `locked`).
+  const editionName = course.lang !== "en" ? langInfo(course.lang).native : undefined;
+  if (lesson.locked) {
+    return (
+      <div className="flex min-h-full flex-col gap-1">
+        <h2 className="truncate px-3 py-2 text-lg font-semibold md:px-0">{lesson.title}</h2>
+        <Paygate kind="lesson" paywall={course.paywall ?? null} courseTitle={course.title} editionName={editionName} />
+      </div>
+    );
+  }
+  const preview = !!course.paywall;
+
   return (
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
       <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3">
@@ -277,13 +319,18 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
         </div>
         {/* Quizzes stay interactive (self-check); nothing is recorded for a Guest. */}
         <Frame html={lesson.html} withBridge theme={theme} dir={course.dir} lang={course.lang} />
-        <div className="p-3 md:hidden">
-          <GuestQuestions qa={qa} />
-        </div>
+        {/* Q&A sits past the paygate — withheld from a paid-Edition Guest. */}
+        {!preview && (
+          <div className="p-3 md:hidden">
+            <GuestQuestions qa={qa} />
+          </div>
+        )}
       </div>
-      <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
-        <GuestQuestions qa={qa} />
-      </aside>
+      {!preview && (
+        <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
+          <GuestQuestions qa={qa} />
+        </aside>
+      )}
     </div>
   );
 }
@@ -320,6 +367,21 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
   const ref = useQuery(api.public.publicReference, { token, key: refKey });
   if (ref === undefined) return <p className="text-soft">Loading…</p>;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
+  // Paid marketplace: References sit past the free Preview — the paygate for a
+  // Guest on a paid Edition.
+  if (ref.locked) {
+    return (
+      <div className="flex min-h-full flex-col gap-1">
+        <h2 className="truncate px-3 py-2 text-lg font-semibold md:px-0">{ref.title}</h2>
+        <Paygate
+          kind="reference"
+          paywall={course.paywall ?? null}
+          courseTitle={course.title}
+          editionName={course.lang !== "en" ? langInfo(course.lang).native : undefined}
+        />
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3">
       <h2
