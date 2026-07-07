@@ -292,7 +292,14 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
     return (
       <div className="flex min-h-full flex-col gap-1">
         <h2 className="truncate px-3 py-2 text-lg font-semibold md:px-0">{lesson.title}</h2>
-        <Paygate kind="lesson" paywall={course.paywall ?? null} courseTitle={course.title} editionName={editionName} />
+        <Paygate
+          kind="lesson"
+          paywall={course.paywall ?? null}
+          courseTitle={course.title}
+          editionName={editionName}
+          topicSlug={course.slug}
+          lang={course.lang}
+        />
       </div>
     );
   }
@@ -378,6 +385,8 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
           paywall={course.paywall ?? null}
           courseTitle={course.title}
           editionName={course.lang !== "en" ? langInfo(course.lang).native : undefined}
+          topicSlug={course.slug}
+          lang={course.lang}
         />
       </div>
     );

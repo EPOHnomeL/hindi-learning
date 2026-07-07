@@ -244,7 +244,7 @@ function LessonView({
     return (
       <div className="flex min-h-full flex-col gap-1">
         <h2 className="truncate px-3 py-2 text-lg font-semibold md:px-0">{lesson.title}</h2>
-        <Paygate kind="lesson" paywall={header?.paywall ?? null} courseTitle={header?.title} />
+        <Paygate kind="lesson" paywall={header?.paywall ?? null} courseTitle={header?.title} topicSlug={topicSlug} lang={lang ?? "en"} />
       </div>
     );
   }
@@ -423,7 +423,7 @@ function ReferenceView({
     return (
       <div className="flex min-h-full flex-col gap-1">
         <h2 className="truncate px-3 py-2 text-lg font-semibold md:px-0">{ref.title}</h2>
-        <Paygate kind="reference" paywall={header?.paywall ?? null} courseTitle={header?.title} />
+        <Paygate kind="reference" paywall={header?.paywall ?? null} courseTitle={header?.title} topicSlug={topicSlug} lang={lang ?? "en"} />
       </div>
     );
   }

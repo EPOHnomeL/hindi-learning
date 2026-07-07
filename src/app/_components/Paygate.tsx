@@ -1,16 +1,17 @@
 "use client";
 
+import { useAction } from "convex/react";
 import { useState } from "react";
+import { api } from "../../../convex/_generated/api";
 import { Icon } from "./icons";
 import { Dialog } from "./ui";
 
 // The paygate (paid marketplace, ADR 0016). A caller reading a PAID Edition they
 // don't hold gets the free Preview (the first Lesson); every other Lesson and
 // Reference renders this in place of the content — an explicit locked state, never
-// a blank pane. Slice 1 has no checkout yet (that's Slice 3, Stripe), so the buy
-// dialog's final step is disabled with an honest note; the rest of the flow — the
-// price, the "first lesson free" framing, the account-on-purchase promise — is in
-// place for that slice to wire up.
+// a blank pane. The buy dialog opens Stripe Checkout (Slice 3): its final step
+// calls `market.startCheckout` and redirects to Stripe. Access is granted only by
+// the verified webhook on return, never by the redirect itself.
 
 export type Paywall = { amount: number; currency: string; previewKey: string | null };
 
@@ -31,11 +32,17 @@ export function Paygate({
   kind,
   courseTitle,
   editionName,
+  topicSlug,
+  lang,
 }: {
   paywall: Paywall | null;
   kind: "lesson" | "reference";
   courseTitle?: string;
   editionName?: string;
+  // The Edition to buy (paid marketplace) — passed by both readers. When present,
+  // the buy dialog can start checkout; absent, it degrades to an unavailable note.
+  topicSlug?: string;
+  lang?: string;
 }) {
   const [buying, setBuying] = useState(false);
   const price = paywall ? formatPrice(paywall.amount, paywall.currency) : null;
@@ -68,26 +75,59 @@ export function Paygate({
         </p>
       </div>
       {buying && (
-        <BuyDialog price={price} courseTitle={courseTitle} editionName={editionName} onClose={() => setBuying(false)} />
+        <BuyDialog
+          price={price}
+          courseTitle={courseTitle}
+          editionName={editionName}
+          topicSlug={topicSlug}
+          lang={lang}
+          onClose={() => setBuying(false)}
+        />
       )}
     </div>
   );
 }
 
-// The purchase summary. In Slice 1 the checkout button is deliberately disabled —
-// payments (Stripe Connect) arrive in Slice 3 — so this states plainly that
-// checkout is coming rather than dead-ending on a click that does nothing.
+// The purchase summary → Stripe Checkout (Slice 3). "Continue to checkout" calls
+// `market.startCheckout` (a direct charge on the Seller's connected account with
+// the platform fee) and redirects to Stripe's hosted page; on return, the
+// signature-verified webhook grants access — never this redirect. Falls back to
+// an "unavailable" note if the caller couldn't supply the Edition to buy.
 function BuyDialog({
   price,
   courseTitle,
   editionName,
+  topicSlug,
+  lang,
   onClose,
 }: {
   price: string | null;
   courseTitle?: string;
   editionName?: string;
+  topicSlug?: string;
+  lang?: string;
   onClose: () => void;
 }) {
+  const startCheckout = useAction(api.market.startCheckout);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canBuy = !!topicSlug && !!lang;
+
+  const checkout = async () => {
+    if (!canBuy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const returnPath =
+        typeof window !== "undefined" ? window.location.pathname + window.location.search : undefined;
+      const { url } = await startCheckout({ topicSlug: topicSlug!, lang: lang!, returnPath });
+      window.location.href = url;
+    } catch {
+      setError("Couldn’t start checkout — please try again in a moment.");
+      setBusy(false);
+    }
+  };
+
   return (
     <Dialog title="Unlock this course" onClose={onClose}>
       <div className="flex items-start justify-between gap-3">
@@ -109,13 +149,19 @@ function BuyDialog({
       </div>
 
       <button
-        disabled
-        title="Secure checkout is coming soon"
-        className="mt-4 w-full cursor-not-allowed rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white opacity-45"
+        disabled={!canBuy || busy}
+        onClick={() => void checkout()}
+        className="mt-4 w-full rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
       >
-        Continue to checkout{price ? ` · ${price}` : ""}
+        {busy ? "Redirecting to checkout…" : `Continue to checkout${price ? ` · ${price}` : ""}`}
       </button>
-      <p className="mt-2.5 text-center text-xs text-soft">Secure checkout is coming soon — we’re setting up payments.</p>
+      {error ? (
+        <p className="mt-2.5 text-center text-xs text-danger">{error}</p>
+      ) : (
+        <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-xs text-soft">
+          <Icon name="globe" className="h-3.5 w-3.5 text-accent2" /> Shown in your local currency · pay once, keep forever
+        </p>
+      )}
       <p className="mt-1 text-center text-xs text-soft">No account? Buying will create one for you.</p>
     </Dialog>
   );
