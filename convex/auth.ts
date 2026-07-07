@@ -1,7 +1,7 @@
 import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
 import { internal } from "./_generated/api";
-import { claimPendingShares } from "./lib";
+import { claimPendingEntitlements, claimPendingShares, hasPendingEntitlement } from "./lib";
 
 // Convex Auth (PRD §6 — auth must "just work"). Email + password to start;
 // add OAuth providers here later if wanted. No JWT/cookie plumbing of our own.
@@ -35,14 +35,21 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       // Existing account → sign-in/link, not a new sign-up: no gate.
       if (existingUserId !== null) return existingUserId;
       const email = String(profile.email ?? "").trim().toLowerCase();
-      const admitted = await ctx.runQuery(internal.whitelist.isAdmitted, { email });
+      // Admission (ADR 0011 + ADR 0016): the Allowlist admits invited emails, and
+      // a **paid purchase** admits a buyer even while sign-up is otherwise closed —
+      // payment gates *existence*, the can-sell grant gates *selling*. Either opens
+      // the door.
+      const admitted =
+        (await ctx.runQuery(internal.whitelist.isAdmitted, { email })) || (await hasPendingEntitlement(ctx, email));
       if (!admitted) {
         throw new Error("This workspace is private — sign-ups are closed.");
       }
-      // New account admitted → claim any Shares invited to this email before it
-      // existed (pending invites become real Shares; see `claimPendingShares`).
+      // New account admitted → claim anything waiting on this email before it
+      // existed: pending Shares become real Shares, and pending Entitlements (paid
+      // purchases) become real Entitlements.
       const userId = await ctx.db.insert("users", { email });
       await claimPendingShares(ctx, userId, email);
+      await claimPendingEntitlements(ctx, userId, email);
       return userId;
     },
   },

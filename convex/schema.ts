@@ -353,10 +353,49 @@ export default defineSchema({
     userId: v.id("users"),
     topicId: v.id("topics"),
     lang: v.string(),
+    // The Stripe PaymentIntent that paid for this Edition (paid marketplace) — the
+    // key a refund / chargeback (Slice 4) revokes by. Optional: rows from the temp
+    // Admin grant (Slice 1) and legacy grants carry none, so a refund never
+    // matches them. `by_payment_intent` is the refund revoke lookup.
+    stripePaymentIntentId: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_topic", ["topicId"])
-    .index("by_topic_user", ["topicId", "userId"]),
+    .index("by_topic_user", ["topicId", "userId"])
+    .index("by_payment_intent", ["stripePaymentIntentId"]),
+
+  // A **pending Entitlement** (ADR 0016): a paid purchase for an email that has
+  // *no account yet* — the paid twin of a `pendingShares` invite. Minted by the
+  // purchase webhook when the buyer's email has no `users` row, and turned into a
+  // real (language-scoped) Entitlement by `claimPendingEntitlements` the moment
+  // that email signs up. Carries the `lang` so the claimed access is scoped to the
+  // Edition bought. `by_email` is the claim-on-sign-up lookup and the Allowlist
+  // admission check (a paid email may sign up though sign-up is otherwise closed);
+  // `by_topic_email_lang` dedups a purchase; `by_topic` cascades on Topic delete.
+  pendingEntitlements: defineTable({
+    email: v.string(),
+    topicId: v.id("topics"),
+    lang: v.string(),
+    // The Stripe PaymentIntent that paid for this purchase, so a later refund /
+    // chargeback (Slice 4) revokes deterministically — a Charge does NOT inherit
+    // its PaymentIntent's metadata, so this id is the reliable link back. Optional
+    // for rows minted by the temp Admin grant (no payment). Copied onto the real
+    // Entitlement when the buyer claims it. `by_payment_intent` is the refund seam.
+    stripePaymentIntentId: v.optional(v.string()),
+  })
+    .index("by_email", ["email"])
+    .index("by_topic", ["topicId"])
+    .index("by_topic_email_lang", ["topicId", "email", "lang"])
+    .index("by_payment_intent", ["stripePaymentIntentId"]),
+
+  // The webhook idempotency ledger (ADR 0016): one row per Stripe event id we have
+  // already processed. The purchase/refund webhook records the event id inside the
+  // same mutation that mints/revokes access, so a replayed event (Stripe retries)
+  // is a no-op — it never double-grants or double-revokes. `by_event` is the seen?
+  // lookup.
+  stripeEvents: defineTable({
+    eventId: v.string(),
+  }).index("by_event", ["eventId"]),
 
   // A **Seller**'s capability record (ADR 0016). Selling is a two-gate capability:
   // the PRESENCE of a row is the Admin's **can-sell** grant, and Stripe Express

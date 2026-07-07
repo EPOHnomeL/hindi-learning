@@ -1,18 +1,23 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query } from "./_generated/server";
+import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
   editionPrice,
   getOwnedTopic,
+  getSeller,
   heldLangs,
   isReadySeller,
   normaliseEmail,
+  sellerStatusOf,
   SOURCE_LANG,
   topicBySlug,
   topicLessonCounts,
 } from "./lib";
 import { langInfo } from "./languages";
+import { applicationFee, appUrl, stripeClient } from "./stripe";
 import { isCallerAdmin } from "./whitelist";
 
 // Paid marketplace (ADR 0016) — the Edition **listing** (price) and
@@ -219,5 +224,189 @@ export const revokeEntitlement = mutation({
       .collect();
     for (const e of rows) if (e.lang === lang) await ctx.db.delete(e._id);
     return null;
+  },
+});
+
+// ---- Purchase lifecycle (Slice 3 / 4): the money path ----------------------
+//
+// Access is granted ONLY by the signature-verified Stripe webhook (http.ts),
+// never from the client success redirect — the HTTP action verifies the event
+// and calls the two internal mutations below. Both are **idempotent on the Stripe
+// event id** (Stripe retries deliveries): the same event never double-grants or
+// double-revokes. Stripe is mocked at the action boundary; these mutations are
+// pure Convex and fully tested.
+
+// Whether this Stripe event has already been processed. Records it (inside the
+// same transaction as the mint/revoke, so a rollback un-records it) and returns
+// true if it was seen before — the caller no-ops on true.
+async function alreadyProcessed(ctx: MutationCtx, eventId: string): Promise<boolean> {
+  const seen = await ctx.db
+    .query("stripeEvents")
+    .withIndex("by_event", (q) => q.eq("eventId", eventId))
+    .unique();
+  if (seen) return true;
+  await ctx.db.insert("stripeEvents", { eventId });
+  return false;
+}
+
+// Grant access on a completed purchase (`checkout.session.completed`). If an
+// account exists for the buyer's email, mint the Entitlement for that Edition;
+// otherwise mint an email-keyed **pending** Entitlement that becomes real when
+// that email signs up (`claimPendingEntitlements`). Idempotent per event and per
+// (buyer, Topic, language) — a replay, or a buyer who already holds it, is a no-op.
+export const fulfillPurchase = internalMutation({
+  args: {
+    eventId: v.string(),
+    topicId: v.id("topics"),
+    lang: v.string(),
+    email: v.string(),
+    paymentIntentId: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, { eventId, topicId, lang, email: rawEmail, paymentIntentId }) => {
+    if (await alreadyProcessed(ctx, eventId)) return null;
+    const email = normaliseEmail(rawEmail);
+    const user = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", email))
+      .unique();
+    if (user) {
+      const existing = await ctx.db
+        .query("entitlements")
+        .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", user._id))
+        .collect();
+      if (!existing.some((e) => e.lang === lang)) {
+        await ctx.db.insert("entitlements", { userId: user._id, topicId, lang, stripePaymentIntentId: paymentIntentId });
+      }
+    } else {
+      const existing = await ctx.db
+        .query("pendingEntitlements")
+        .withIndex("by_topic_email_lang", (q) => q.eq("topicId", topicId).eq("email", email).eq("lang", lang))
+        .unique();
+      if (!existing) {
+        await ctx.db.insert("pendingEntitlements", { email, topicId, lang, stripePaymentIntentId: paymentIntentId });
+      }
+    }
+    return null;
+  },
+});
+
+// Revoke access on a refund / dispute (Slice 4 — DEFENSIVE: the product offers no
+// refunds, but if Stripe ever reports a refund or chargeback we keep access
+// honest). Keyed on the PaymentIntent that paid for it (the deterministic link a
+// Charge doesn't carry via metadata): deletes the Entitlement it minted — or the
+// pending one if the buyer never signed up — leaving every other Edition/purchase
+// untouched. Idempotent per event; a replay finds nothing to delete.
+export const revokePurchaseByPaymentIntent = internalMutation({
+  args: { eventId: v.string(), paymentIntentId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { eventId, paymentIntentId }) => {
+    if (await alreadyProcessed(ctx, eventId)) return null;
+    const ents = await ctx.db
+      .query("entitlements")
+      .withIndex("by_payment_intent", (q) => q.eq("stripePaymentIntentId", paymentIntentId))
+      .collect();
+    for (const e of ents) await ctx.db.delete(e._id);
+    const pending = await ctx.db
+      .query("pendingEntitlements")
+      .withIndex("by_payment_intent", (q) => q.eq("stripePaymentIntentId", paymentIntentId))
+      .collect();
+    for (const p of pending) await ctx.db.delete(p._id);
+    return null;
+  },
+});
+
+// What the checkout action needs about an Edition to open a Stripe session: the
+// price, the display title in that language, and the Seller's connected account
+// + readiness. Null when the Edition isn't for sale. Internal (the action's read).
+export const checkoutInfo = internalQuery({
+  args: { topicSlug: v.string(), lang: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      topicId: v.id("topics"),
+      lang: v.string(),
+      title: v.string(),
+      amount: v.number(),
+      currency: v.string(),
+      sellerAccountId: v.union(v.string(), v.null()),
+      sellerReady: v.boolean(),
+    }),
+  ),
+  handler: async (ctx, { topicSlug, lang }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return null;
+    const listing = await editionPrice(ctx, topic._id, lang);
+    if (!listing) return null; // not for sale
+    const seller = topic.ownerId ? await getSeller(ctx, topic.ownerId) : null;
+    // The display title in the requested language (translated title, else source).
+    let title = topic.title;
+    if (lang !== SOURCE_LANG) {
+      const t = await ctx.db
+        .query("translations")
+        .withIndex("by_topic_lang_kind_key", (q) =>
+          q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "title").eq("key", ""),
+        )
+        .unique();
+      if (t?.text) title = t.text;
+    }
+    return {
+      topicId: topic._id,
+      lang,
+      title,
+      amount: listing.amount,
+      currency: listing.currency,
+      sellerAccountId: seller?.stripeAccountId ?? null,
+      sellerReady: sellerStatusOf(seller) === "ready",
+    };
+  },
+});
+
+// Start a purchase (Slice 3) — available to Guests. Creates a Stripe Checkout
+// session as a **direct charge on the Seller's connected account** with the
+// platform **application fee** (15%, see stripe.applicationFee), presenting the
+// price in the buyer's local currency (Adaptive Pricing, enabled on the account).
+// Access is NOT granted here — only the verified webhook grants it. Returns the
+// hosted checkout URL for the client to redirect to.
+export const startCheckout = action({
+  args: { topicSlug: v.string(), lang: v.string(), returnPath: v.optional(v.string()) },
+  returns: v.object({ url: v.string() }),
+  handler: async (ctx, { topicSlug, lang, returnPath }): Promise<{ url: string }> => {
+    const info = await ctx.runQuery(internal.market.checkoutInfo, { topicSlug, lang });
+    if (!info) throw new Error("this edition isn't for sale");
+    if (!info.sellerReady || !info.sellerAccountId) {
+      throw new Error("this course isn't available for purchase right now");
+    }
+    const stripe = stripeClient();
+    const editionName = info.lang === SOURCE_LANG ? "English" : langInfo(info.lang).name;
+    const back = returnPath ?? `/courses/${topicSlug}${info.lang === SOURCE_LANG ? "" : `?lang=${info.lang}`}`;
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: "payment",
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: info.currency,
+              unit_amount: info.amount,
+              product_data: { name: `${info.title} — ${editionName} edition` },
+            },
+          },
+        ],
+        // Direct charge + application fee: the request runs on the connected
+        // account (options below), so the charge is the Seller's and the platform
+        // skims `application_fee_amount`. Metadata carries what the webhook grants.
+        payment_intent_data: {
+          application_fee_amount: applicationFee(info.amount),
+          metadata: { topicId: info.topicId, lang: info.lang },
+        },
+        metadata: { topicId: info.topicId, lang: info.lang },
+        success_url: appUrl(`${back}${back.includes("?") ? "&" : "?"}purchase=success`),
+        cancel_url: appUrl(back),
+      },
+      { stripeAccount: info.sellerAccountId },
+    );
+    if (!session.url) throw new Error("Stripe did not return a checkout URL");
+    return { url: session.url };
   },
 });

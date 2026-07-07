@@ -48,6 +48,47 @@ export async function claimPendingShares(ctx: MutationCtx, userId: Id<"users">, 
   }
 }
 
+// Turn any pending Entitlements (paid purchases) for a freshly-created account
+// into real Entitlements — the paid twin of `claimPendingShares` (ADR 0016).
+// Called from the sign-up callback right after the `users` row is inserted, so an
+// email that PAID before it had an account gains its purchased read access the
+// moment it signs up. Idempotent per (Topic, buyer, language): skips a language
+// already entitled, and clears the pending row either way.
+export async function claimPendingEntitlements(ctx: MutationCtx, userId: Id<"users">, email: string): Promise<void> {
+  const pending = await ctx.db
+    .query("pendingEntitlements")
+    .withIndex("by_email", (q) => q.eq("email", normaliseEmail(email)))
+    .collect();
+  for (const purchase of pending) {
+    const existing = await ctx.db
+      .query("entitlements")
+      .withIndex("by_topic_user", (q) => q.eq("topicId", purchase.topicId).eq("userId", userId))
+      .collect();
+    if (!existing.some((e) => e.lang === purchase.lang)) {
+      await ctx.db.insert("entitlements", {
+        topicId: purchase.topicId,
+        userId,
+        lang: purchase.lang,
+        // Carry the PaymentIntent forward so a later refund still revokes cleanly.
+        stripePaymentIntentId: purchase.stripePaymentIntentId,
+      });
+    }
+    await ctx.db.delete(purchase._id);
+  }
+}
+
+// Whether this email holds a paid purchase awaiting an account — the Allowlist
+// admission widening (ADR 0016): a buyer may sign up though sign-up is otherwise
+// closed, because payment admitted them. Reads pending Entitlements only: a *real*
+// Entitlement already implies an account, so it never matters at sign-up.
+export async function hasPendingEntitlement(ctx: QueryCtx, email: string): Promise<boolean> {
+  const row = await ctx.db
+    .query("pendingEntitlements")
+    .withIndex("by_email", (q) => q.eq("email", normaliseEmail(email)))
+    .first();
+  return row !== null;
+}
+
 // A 256-bit URL-safe token (hex) from Web Crypto — the credential a capability
 // link carries: a Public link (ADR 0013) or a Certificate link (ADR 0015). Long
 // enough that guessing is infeasible, so no rate-limiting is needed.

@@ -28,3 +28,41 @@ export function appUrl(path = "/"): string {
   if (!base) throw new Error("SITE_URL is not set — provision it as a Convex env var");
   return new URL(path, base).toString();
 }
+
+// The platform's take-rate in basis points (the application fee on each sale).
+// Config, not architecture (PRD): the owner chose 15% — `PLATFORM_FEE_BPS=1500`.
+// Defaults to 1500 so a missing env var doesn't silently zero the platform's cut;
+// bounded to [0, 10000] (0–100%) so a stray value can't invert the economics.
+export function platformFeeBps(): number {
+  const raw = Number(process.env.PLATFORM_FEE_BPS ?? "1500");
+  if (!Number.isFinite(raw) || raw < 0 || raw > 10_000) return 1500;
+  return Math.round(raw);
+}
+
+// The application fee (minor units) for a sale of `amount` minor units.
+export function applicationFee(amount: number): number {
+  return Math.round((amount * platformFeeBps()) / 10_000);
+}
+
+// The Stripe webhook endpoint's signing secret (whsec_…), for signature
+// verification in the HTTP action. Read lazily; absent ⇒ every event is rejected.
+export function webhookSecret(): string {
+  const secret = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) throw new Error("STRIPE_WEBHOOK_SECRET is not set — provision it as a Convex env var");
+  return secret;
+}
+
+// Verify a Stripe webhook's signature and parse it — the sole gate on the
+// purchase/refund path (access is never granted from the client redirect). Uses
+// the async verifier + Web-Crypto provider (the Convex runtime has no Node
+// crypto). THROWS on a bad/absent signature, so the HTTP action rejects it.
+export async function constructWebhookEvent(payload: string, signature: string): Promise<Stripe.Event> {
+  const stripe = stripeClient();
+  return await stripe.webhooks.constructEventAsync(
+    payload,
+    signature,
+    webhookSecret(),
+    undefined,
+    Stripe.createSubtleCryptoProvider(),
+  );
+}

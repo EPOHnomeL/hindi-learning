@@ -78,6 +78,9 @@ export const publicCourse = query({
     v.null(),
     v.object({
       title: v.string(),
+      // The Topic slug — not secret (it's the course identifier), exposed so a
+      // Guest on a paid Edition can start checkout (paid marketplace, ADR 0016).
+      slug: v.string(),
       // The Edition this token serves + its text direction (course-translation).
       lang: v.string(),
       dir: v.union(v.literal("ltr"), v.literal("rtl")),
@@ -188,6 +191,7 @@ export const publicCourse = query({
     }
     return {
       title,
+      slug: topic.slug,
       lang,
       dir: langInfo(lang).rtl ? ("rtl" as const) : ("ltr" as const),
       lessons,
