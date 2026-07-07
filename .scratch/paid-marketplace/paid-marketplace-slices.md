@@ -60,6 +60,11 @@ green), *then* add the paid branch. Make the change easy, then make the easy cha
 
 ## Slice 2 — Sellers: Admin "Can Sell" grant + Stripe Express onboarding + per-Edition pricing
 
+> **Status: implemented (2026-07-07).** Backend `convex/sellers.ts` + `stripe.ts`,
+> seller-guarded pricing in `convex/market.ts`, UI in `Editions.tsx` /
+> `Dashboard.tsx` / `AdminPanel.tsx`. Tested in `convex/sellers.test.ts` (Stripe
+> mocked at the action boundary). Take-rate = **15%** (`PLATFORM_FEE_BPS`).
+
 ### What to build
 
 The seller side end-to-end, on Stripe **test mode**. The **Admin** grants a User the
@@ -88,6 +93,14 @@ a real Seller pricing action.
 ---
 
 ## Slice 3 — Purchase: Checkout → automatic per-Edition Entitlement + buyer account admission
+
+> **Status: implemented (2026-07-07).** `market.startCheckout` (direct charge +
+> 15% application fee), `market.fulfillPurchase` (idempotent mint / pending +
+> claim-on-sign-up), the signature-verified `POST /stripe/webhook` (`convex/http.ts`),
+> Allowlist widening in `convex/auth.ts`, and the live Paygate checkout button.
+> Tested in `convex/purchase.test.ts`. **Needs provisioning to run live** (see
+> the note at the end of this file): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+> `SITE_URL`, `PLATFORM_FEE_BPS`, Adaptive Pricing on, and the webhook endpoint.
 
 ### What to build
 
@@ -121,6 +134,13 @@ selling/authoring privilege. This replaces Slice 1's manual grant.
 
 ## Slice 4 — Refund revokes access
 
+> **Status: implemented (2026-07-07), defensively.** The owner's business decision
+> is **no refunds** — so there is no refund UI or self-serve refund flow. But the
+> webhook still handles `charge.refunded` / `charge.dispute.created` →
+> `market.revokePurchaseByPaymentIntent` (idempotent, keyed on the PaymentIntent),
+> so if Stripe ever reports a refund or chargeback, access is revoked and the
+> reader falls back to the paygate. Tested in `convex/purchase.test.ts`.
+
 ### What to build
 
 Close the lifecycle. The purchase webhook handles the **refund** event by revoking the
@@ -137,3 +157,41 @@ falls back to the paygate and sees only that Edition's **Preview** again.
 ### Blocked by
 
 - Slice 3.
+
+---
+
+## Provisioning to run the money path live (owner / operator)
+
+The code for slices 2–4 is built and tested (Stripe mocked at the action
+boundary — **no test touches Stripe or a deployment**). To exercise it end-to-end
+you must provision Stripe **test mode** and set these Convex env vars (do NOT
+commit secrets):
+
+- `STRIPE_SECRET_KEY` — the platform's test secret key (`sk_test_…`).
+- `STRIPE_WEBHOOK_SECRET` — the signing secret (`whsec_…`) of the webhook endpoint.
+- `SITE_URL` — the app origin, e.g. `https://<app>.vercel.app` (onboarding /
+  checkout return URLs resolve against it).
+- `PLATFORM_FEE_BPS` — the take-rate in basis points; **1500** (15%). Defaults to
+  1500 if unset.
+
+Then, in the Stripe Dashboard (test mode):
+
+1. Enable **Connect** (Express accounts) and **Adaptive Pricing** (for
+   local-currency presentment).
+2. Add a webhook endpoint pointing at `https://<deployment>.convex.site/stripe/webhook`,
+   subscribed to `checkout.session.completed`, `charge.refunded`,
+   `charge.dispute.created`. For **direct charges**, enable *Connect* events (they
+   originate on the connected account). Copy its signing secret into
+   `STRIPE_WEBHOOK_SECRET`.
+
+Live-drive (`/verify`) once provisioned — a scratch/separate Convex deployment
+avoids pushing the new schema to the shared dev one:
+1. Grant a User can-sell (admin portal) → they complete Express onboarding →
+   `sellerStatus` becomes `ready`.
+2. As that Seller-owner, price an Edition of a completed course → owner card shows
+   the gold "Paid $X" pill.
+3. A non-owner visits → Preview + locked + paygate → **Continue to checkout** →
+   Stripe test card `4242…` → return → the webhook mints the Entitlement → full
+   read + a "Purchased" dashboard card.
+4. (Optional, defensive) issue a refund in Stripe → the reader falls back to the
+   paygate.
