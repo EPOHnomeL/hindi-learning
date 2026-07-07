@@ -16,6 +16,7 @@
   --color-accent2: #3f6f5e;
   --color-gold: #b88a2e;
   --color-hi: #fbeecb;
+  --color-danger: #b4442f;
 }
 
 /* App-wide dark mode (ADR 0011). Overriding the color tokens under the dark
@@ -32,6 +33,7 @@ html[data-theme="dark"] {
   --color-accent2: #79b39b;
   --color-gold: #d8ab57;
   --color-hi: #4a3c1f;
+  --color-danger: #e0785f;
 }
 
 body {
@@ -42,6 +44,27 @@ body {
 
 .font-deva {
   font-family: var(--font-deva);
+}
+
+/* Popover menu entrance (UI redesign): a small fade + rise so the card's ⋯
+   overflow doesn't snap in. Suppressed under prefers-reduced-motion. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pop-in {
+  animation: pop-in 0.12s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pop-in {
+    animation: none;
+  }
 }
 
 /* Completion celebration reveal (ADR 0015): the certificate card scales+fades in
