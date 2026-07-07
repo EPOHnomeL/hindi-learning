@@ -89,6 +89,12 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
     }
   }, []);
 
+  // Paid marketplace (ADR 0016): a `preview` caller holds no access to a paid
+  // Edition, so every Lesson past the free Preview (and every Reference) is locked
+  // in the nav. The Preview itself — `paywall.previewKey` — is flagged Free.
+  const preview = header?.role === "preview";
+  const previewKey = header?.paywall?.previewKey ?? null;
+
   const completed = completedKeys(progress ?? []);
   const unseenAnswers = unseenReplyKeys(questions ?? [], seen);
   const frontier = frontierKey(lessons ?? []);
@@ -188,6 +194,8 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
                 active={!isRef && activeKey === l.key}
                 done={completed.has(l.key)}
                 notify={unseenAnswers.has(l.key)}
+                locked={preview && l.key !== previewKey}
+                free={preview && l.key === previewKey}
               >
                 {l.seq}. {l.title.split("—")[0]!.trim()}
               </NavItem>
@@ -195,7 +203,12 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
 
             <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">References</p>
             {references?.map((r) => (
-              <NavItem key={r.key} href={withLang(`/courses/${slug}/references/${r.key}`, lang)} active={isRef && activeKey === r.key}>
+              <NavItem
+                key={r.key}
+                href={withLang(`/courses/${slug}/references/${r.key}`, lang)}
+                active={isRef && activeKey === r.key}
+                locked={preview}
+              >
                 {r.title}
               </NavItem>
             ))}
@@ -319,23 +332,39 @@ function NavItem({
   active,
   done = false,
   notify = false,
+  locked = false,
+  free = false,
   children,
 }: {
   href: string;
   active: boolean;
   done?: boolean;
   notify?: boolean;
+  // Paid marketplace: `locked` marks content past the free Preview (a lock icon,
+  // muted label); `free` flags the Preview lesson itself. Both stay navigable —
+  // opening a locked item shows the paygate, not a dead end.
+  locked?: boolean;
+  free?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <Link
       href={href}
       className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors md:py-1.5 ${
-        active ? "bg-accent text-white" : "text-ink hover:bg-hi"
+        active ? "bg-accent text-white" : locked ? "text-soft hover:bg-hi" : "text-ink hover:bg-hi"
       }`}
     >
       <span className="min-w-0">{children}</span>
       <span className="flex shrink-0 items-center gap-1.5">
+        {free && (
+          <span
+            className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+              active ? "bg-white/20 text-white" : "bg-accent2/15 text-accent2"
+            }`}
+          >
+            Free
+          </span>
+        )}
         {notify && (
           <span
             aria-label="New reply from your teacher"
@@ -347,6 +376,9 @@ function NavItem({
           <span aria-label="completed" title="Completed" className={`text-xs ${active ? "text-white" : "text-accent2"}`}>
             ✓
           </span>
+        )}
+        {locked && (
+          <Icon name="lock" className={`h-3.5 w-3.5 ${active ? "text-white" : "text-soft"}`} />
         )}
       </span>
     </Link>
