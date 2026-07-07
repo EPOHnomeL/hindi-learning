@@ -193,5 +193,26 @@ avoids pushing the new schema to the shared dev one:
 3. A non-owner visits → Preview + locked + paygate → **Continue to checkout** →
    Stripe test card `4242…` → return → the webhook mints the Entitlement → full
    read + a "Purchased" dashboard card.
-4. (Optional, defensive) issue a refund in Stripe → the reader falls back to the
-   paygate.
+4. (Optional, defensive) issue a **full** refund in Stripe → the reader falls back
+   to the paygate.
+
+### Known follow-ups (money-path review, 2026-07-07)
+
+The money path was adversarially reviewed and is sound; the open-redirect, async-
+payment, and partial-refund findings are **fixed**. Two low-severity items are
+deliberately deferred (not blocking):
+
+- **`startCheckout` has no rate limit.** It's a public action (Guests must be able
+  to buy), so a bot could spam Stripe Checkout-session creation — a cost/noise
+  (availability) concern, never an access breach (email/amount/metadata are all
+  server- or Stripe-controlled). If it becomes a problem, add `@convex-dev/rate-limiter`
+  keyed by topic/IP.
+- **Double-buy + refund-of-the-first edge.** Buying the same Edition twice records
+  the second event but stores no new PaymentIntent (the entitlement is deduped), so
+  refunding the *earlier* PaymentIntent would revoke access despite a valid second
+  payment. Vanishingly unlikely (who buys the same edition twice); a proper fix
+  needs a per-purchase ledger. Left as-is.
+
+Confirmed **by design** (ADR 0016): payment admits an unverified email past the
+Allowlist — the intended "payment gates existence" rule, mirroring the existing
+email-keyed pending-Share claim.
