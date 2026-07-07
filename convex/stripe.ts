@@ -20,13 +20,23 @@ export function stripeClient(): Stripe {
   return new Stripe(key, { httpClient: Stripe.createFetchHttpClient() });
 }
 
-// The app origin the Stripe hosted flows return to. Resolved server-side (never a
-// client arg) so a caller can't turn onboarding return into an open redirect; the
-// client supplies only a relative path, resolved against this trusted base.
+// The app origin the Stripe hosted flows return to. `path` may be client-supplied
+// (a return path), so this ENFORCES same-origin: a value that resolves off the
+// trusted SITE_URL origin — an absolute `https://evil.com`, a protocol-relative
+// `//evil.com`, a `\\evil.com` — is discarded for the origin root, closing the
+// open-redirect that would otherwise flow into Stripe's return/success URLs.
 export function appUrl(path = "/"): string {
   const base = process.env.SITE_URL;
   if (!base) throw new Error("SITE_URL is not set — provision it as a Convex env var");
-  return new URL(path, base).toString();
+  const baseUrl = new URL(base);
+  let resolved: URL;
+  try {
+    resolved = new URL(path, baseUrl);
+  } catch {
+    return new URL("/", baseUrl).toString();
+  }
+  if (resolved.origin !== baseUrl.origin) return new URL("/", baseUrl).toString();
+  return resolved.toString();
 }
 
 // The platform's take-rate in basis points (the application fee on each sale).

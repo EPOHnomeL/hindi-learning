@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import { appUrl } from "./stripe";
 import type { Id } from "./_generated/dataModel";
 
 // Paid marketplace — Slice 3 (Purchase) + Slice 4 (refund revoke), ADR 0016.
@@ -32,9 +33,31 @@ beforeAll(async () => {
   const b64 = btoa(bin);
   process.env.JWT_PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----\n${(b64.match(/.{1,64}/g) ?? []).join("\n")}\n-----END PRIVATE KEY-----`;
   process.env.CONVEX_SITE_URL = "https://example.convex.site";
+  process.env.SITE_URL = "https://app.example.com";
   process.env.STRIPE_SECRET_KEY = "sk_test_dummy";
   process.env.STRIPE_WEBHOOK_SECRET = "whsec_dummy";
 });
+
+// Sign a payload with the Stripe scheme (t=<ts>,v1=<hmac_sha256(ts.payload)>) and
+// POST it to the webhook — a genuinely verified event, so we exercise the real
+// dispatch (event routing, payment_status / full-refund gating, metadata read).
+async function signedWebhook(t: ReturnType<typeof convexTest>, payload: string) {
+  const ts = Math.floor(Date.now() / 1000);
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode("whsec_dummy"),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${ts}.${payload}`));
+  const hex = Array.from(new Uint8Array(mac), (b) => b.toString(16).padStart(2, "0")).join("");
+  return await t.fetch("/stripe/webhook", {
+    method: "POST",
+    headers: { "stripe-signature": `t=${ts},v1=${hex}` },
+    body: payload,
+  });
+}
 
 function asUser(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
   return t.withIdentity({ subject: `${userId}|session` });
@@ -250,4 +273,91 @@ test("the webhook rejects a missing or bad Stripe signature", async () => {
     ctx.db.query("stripeEvents").withIndex("by_event", (q) => q.eq("eventId", "evt_forged")).collect(),
   );
   expect(seen).toEqual([]);
+});
+
+test("a signed checkout webhook mints access end-to-end (completed AND async success)", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await paidTopic(t);
+  const buyer = await seedUser(t, "buyer@example.com");
+  const asyncBuyer = await seedUser(t, "later@example.com");
+
+  // A genuinely-signed completed+paid session mints the Entitlement.
+  const completed = JSON.stringify({
+    id: "evt_c",
+    type: "checkout.session.completed",
+    data: {
+      object: {
+        payment_status: "paid",
+        payment_intent: "pi_c",
+        customer_details: { email: "buyer@example.com" },
+        metadata: { topicId, lang: "en" },
+      },
+    },
+  });
+  expect((await signedWebhook(t, completed)).status).toBe(200);
+  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+    locked: false,
+  });
+
+  // A delayed method's `async_payment_succeeded` (its `completed` arrived unpaid)
+  // also grants — otherwise the buyer is charged with no access.
+  const asyncPaid = JSON.stringify({
+    id: "evt_a",
+    type: "checkout.session.async_payment_succeeded",
+    data: {
+      object: {
+        payment_status: "paid",
+        payment_intent: "pi_a",
+        customer_details: { email: "later@example.com" },
+        metadata: { topicId, lang: "en" },
+      },
+    },
+  });
+  expect((await signedWebhook(t, asyncPaid)).status).toBe(200);
+  expect(await asUser(t, asyncBuyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+    locked: false,
+  });
+});
+
+test("a partial refund leaves access intact; a full refund revokes it", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await paidTopic(t);
+  const buyer = await seedUser(t, "buyer@example.com");
+  await t.mutation(internal.market.fulfillPurchase, {
+    eventId: "b1",
+    topicId,
+    lang: "en",
+    email: "buyer@example.com",
+    paymentIntentId: "pi_ref",
+  });
+
+  // Partial refund (a $1 goodwill refund on a $12 charge) → access untouched.
+  const partial = JSON.stringify({
+    id: "evt_partial",
+    type: "charge.refunded",
+    data: { object: { payment_intent: "pi_ref", amount: 1200, amount_refunded: 100 } },
+  });
+  expect((await signedWebhook(t, partial)).status).toBe(200);
+  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+    locked: false,
+  });
+
+  // Full refund → access revoked, back to the paygate.
+  const full = JSON.stringify({
+    id: "evt_full",
+    type: "charge.refunded",
+    data: { object: { payment_intent: "pi_ref", amount: 1200, amount_refunded: 1200 } },
+  });
+  expect((await signedWebhook(t, full)).status).toBe(200);
+  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+    locked: true,
+  });
+});
+
+test("appUrl enforces same-origin — no open redirect off SITE_URL", () => {
+  // A same-origin relative path (incl. query) is preserved.
+  expect(appUrl("/courses/hindi?lang=es")).toBe("https://app.example.com/courses/hindi?lang=es");
+  // Off-origin values (absolute, protocol-relative) are discarded for the root.
+  expect(appUrl("//evil.com")).toBe("https://app.example.com/");
+  expect(appUrl("https://evil.com/phish")).toBe("https://app.example.com/");
 });

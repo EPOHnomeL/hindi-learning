@@ -36,9 +36,11 @@ const stripeWebhook = httpAction(async (ctx, request) => {
   }
 
   try {
-    if (event.type === "checkout.session.completed") {
+    // Grant on a paid Checkout session. `async_payment_succeeded` covers
+    // delayed-notification methods (bank debits / some BNPL), whose `completed`
+    // event arrives `unpaid` and would otherwise charge the buyer with no access.
+    if (event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") {
       const session = event.data.object as Stripe.Checkout.Session;
-      // Only grant on a genuinely paid session.
       if (session.payment_status === "paid") {
         const topicId = session.metadata?.topicId as Id<"topics"> | undefined;
         const lang = session.metadata?.lang;
@@ -56,12 +58,17 @@ const stripeWebhook = httpAction(async (ctx, request) => {
         }
       }
     } else if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
-      // DEFENSIVE (the product offers no refunds): if Stripe ever reports a refund
-      // or chargeback, revoke the matching purchase by its PaymentIntent id.
+      // DEFENSIVE (the product offers no refunds): if Stripe ever reports a FULL
+      // refund or a chargeback, revoke the matching purchase by its PaymentIntent.
+      // A partial refund (amount_refunded < amount) leaves access intact — a $1
+      // goodwill refund shouldn't strip a paid course.
       const obj = event.data.object as Stripe.Charge | Stripe.Dispute;
+      const isFullRefund =
+        event.type === "charge.dispute.created" ||
+        ("amount_refunded" in obj && obj.amount_refunded >= obj.amount);
       const pi = "payment_intent" in obj ? obj.payment_intent : undefined;
       const paymentIntentId = typeof pi === "string" ? pi : (pi?.id ?? undefined);
-      if (paymentIntentId) {
+      if (isFullRefund && paymentIntentId) {
         await ctx.runMutation(internal.market.revokePurchaseByPaymentIntent, {
           eventId: event.id,
           paymentIntentId,
