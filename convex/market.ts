@@ -1,6 +1,9 @@
 import { v } from "convex/values";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
-import { editionPrice, normaliseEmail, topicBySlug } from "./lib";
+import type { Id } from "./_generated/dataModel";
+import { editionPrice, normaliseEmail, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import { langInfo } from "./languages";
 import { isCallerAdmin } from "./whitelist";
 
 // Paid marketplace (ADR 0016) — Slice 1 backend spine.
@@ -73,6 +76,77 @@ export const editionPricing = query({
     return rows
       .map((r) => ({ lang: r.lang, amount: r.amount, currency: r.currency }))
       .sort((a, b) => a.lang.localeCompare(b.lang));
+  },
+});
+
+// The caller's purchased courses, as dashboard cards — the paid twin of
+// `shares.listSharedTopics` (ADR 0016). An entitled buyer reads a course exactly
+// like a Viewer, so this mirrors that query's shape: one card per Topic, grouping
+// the Editions the buyer holds, with the buyer's OWN progress counts. The card
+// title shows in an Edition they hold (English if bought, else their first).
+export const myPurchases = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      slug: v.string(),
+      title: v.string(),
+      mission: v.union(v.string(), v.null()),
+      lessonCount: v.number(),
+      completedCount: v.number(),
+      langs: v.array(
+        v.object({ lang: v.string(), name: v.string(), native: v.string(), rtl: v.boolean() }),
+      ),
+    }),
+  ),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const ents = await ctx.db
+      .query("entitlements")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    // A buyer may hold several Editions of one Topic (one per language) — one card.
+    const byTopic = new Map<Id<"topics">, Set<string>>();
+    for (const e of ents) {
+      const set = byTopic.get(e.topicId) ?? new Set<string>();
+      set.add(e.lang);
+      byTopic.set(e.topicId, set);
+    }
+    const cards = await Promise.all(
+      [...byTopic.entries()].map(async ([topicId, langSet]) => {
+        const topic = await ctx.db.get(topicId);
+        if (!topic) return null;
+        const counts = await topicLessonCounts(ctx, topic._id, userId);
+        const langList = [...langSet].sort();
+        const preferred = langList.includes(SOURCE_LANG) ? SOURCE_LANG : langList[0]!;
+        let title = topic.title;
+        if (preferred !== SOURCE_LANG) {
+          const t = await ctx.db
+            .query("translations")
+            .withIndex("by_topic_lang_kind_key", (q) =>
+              q.eq("topicId", topic._id).eq("lang", preferred).eq("kind", "title").eq("key", ""),
+            )
+            .unique();
+          if (t?.text) title = t.text;
+        }
+        return {
+          slug: topic.slug,
+          title,
+          mission: topic.mission ?? null,
+          ...counts,
+          langs: langList.map((l) => {
+            const i = langInfo(l);
+            return {
+              lang: l,
+              name: l === SOURCE_LANG ? "English" : i.name,
+              native: l === SOURCE_LANG ? "English" : i.native,
+              rtl: l === SOURCE_LANG ? false : !!i.rtl,
+            };
+          }),
+        };
+      }),
+    );
+    return cards.filter((c): c is NonNullable<typeof c> => c !== null);
   },
 });
 

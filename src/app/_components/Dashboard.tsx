@@ -41,6 +41,17 @@ type SharedCourse = {
   langs: { lang: string; name: string; native: string; rtl: boolean }[];
 };
 
+// A purchased course (paid marketplace, ADR 0016) — the paid twin of a shared
+// one. Same shape minus the owner attribution: a buyer reads it like a Viewer.
+type PurchasedCourse = {
+  slug: string;
+  title: string;
+  mission: string | null;
+  lessonCount: number;
+  completedCount: number;
+  langs: { lang: string; name: string; native: string; rtl: boolean }[];
+};
+
 // The home dashboard (`/`): the course grid (create / edit / open) plus the
 // "Shared with me" section. Opening a course is a real navigation to
 // /courses/[slug] (ADR 0012), not a local view toggle.
@@ -88,6 +99,7 @@ export function Dashboard() {
       )}
 
       <SharedSection />
+      <PurchasedSection />
     </div>
   );
 }
@@ -326,6 +338,95 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
       <p className="mt-1 text-xs text-soft">
         Shared by <span className="text-ink">{course.ownerEmail ?? "another learner"}</span>
       </p>
+
+      <LangChips langs={course.langs} />
+
+      <div className="mt-3.5">
+        <div className="mb-1.5 flex items-center justify-between text-xs text-soft">
+          <span>
+            {course.lessonCount === 0 ? (
+              "No lessons yet"
+            ) : (
+              <>
+                <span className="tabular-nums font-medium text-ink">{course.completedCount}</span> / {course.lessonCount} lessons
+              </>
+            )}
+          </span>
+          {course.lessonCount > 0 && <span>{pct}%</span>}
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-line">
+          <div className="h-full rounded-full bg-accent2 transition-[width] duration-300" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+
+      <div className="min-h-[14px] flex-1" />
+
+      <div className="flex items-center gap-2">
+        <Link
+          href={withLang(`/courses/${course.slug}`, openLang)}
+          className="flex-1 rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
+        >
+          Open course
+        </Link>
+        {allDone && <CourseCertMenu topicSlug={course.slug} />}
+      </div>
+
+      {showMission && course.mission && (
+        <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />
+      )}
+    </article>
+  );
+}
+
+// Courses I've bought (paid marketplace, ADR 0016) — read-only, full access, my
+// own progress + certificate. Hidden when none. The paid twin of SharedSection.
+function PurchasedSection() {
+  const purchased = useQuery(api.market.myPurchases);
+  if (!purchased || purchased.length === 0) return null;
+  return (
+    <section className="mt-12">
+      <h2 className="mb-1 text-lg font-semibold tracking-tight text-accent">Purchased</h2>
+      <p className="mb-4 text-sm text-soft">Courses you’ve bought — yours to read for life.</p>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {purchased.map((c) => (
+          <PurchasedCourseCard key={c.slug} course={c} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// A purchased course: an entitled buyer is a first-class reader (own progress,
+// own certificate), so this mirrors SharedCourseCard — Open course is the only
+// action — but carries a gold "Purchased" badge and no owner attribution. They
+// read the Edition(s) they bought (chips are informational); buying another
+// language is a separate purchase.
+function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
+  const [showMission, setShowMission] = useState(false);
+  const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
+  const allDone = course.lessonCount > 0 && course.completedCount === course.lessonCount;
+  const openLang = course.langs.some((l) => l.lang === "en") ? "en" : course.langs[0]?.lang;
+
+  return (
+    <article className="flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <h2 className="min-w-0 text-lg font-semibold leading-snug text-ink">{course.title}</h2>
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
+          <Icon name="check" className="h-3 w-3" /> Purchased
+        </span>
+      </div>
+
+      {course.mission && (
+        <button
+          onClick={() => setShowMission(true)}
+          title="View full mission"
+          className="line-clamp-2 min-h-[38px] text-left text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
+        >
+          {missionPreview(course.mission)}
+        </button>
+      )}
+
+      <p className="mt-1 text-xs text-soft">Yours for life</p>
 
       <LangChips langs={course.langs} />
 

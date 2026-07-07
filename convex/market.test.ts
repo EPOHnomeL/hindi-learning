@@ -288,3 +288,24 @@ test("an entitled buyer gets Viewer semantics — own Progress, but no Responses
     }),
   ).rejects.toThrow();
 });
+
+test("myPurchases lists a buyer's entitled courses with their own progress; others see none", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await fixture(t);
+  const dave = await seedUser(t, "dave@example.com");
+  const carol = await seedUser(t, "carol@example.com");
+  await price(t, topicId, "en", 500, "usd");
+  await entitle(t, topicId, dave, "en");
+
+  // The buyer sees their purchase as a card, with their OWN (fresh) progress.
+  expect(await asUser(t, dave).query(api.market.myPurchases, {})).toMatchObject([
+    { slug: "hindi", lessonCount: 2, completedCount: 0, langs: [{ lang: "en", native: "English" }] },
+  ]);
+
+  // Their own completion moves only their card's count.
+  await asUser(t, dave).mutation(api.capture.setProgress, { topicSlug: "hindi", lessonKey: "0001", status: "completed" });
+  expect((await asUser(t, dave).query(api.market.myPurchases, {}))[0]).toMatchObject({ completedCount: 1 });
+
+  // A non-buyer has no purchases.
+  expect(await asUser(t, carol).query(api.market.myPurchases, {})).toEqual([]);
+});
