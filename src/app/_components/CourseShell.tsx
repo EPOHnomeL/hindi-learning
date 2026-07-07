@@ -1,12 +1,14 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useMutation, useQuery } from "convex/react";
+import { useQuery } from "convex/react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { CompletionCelebration, EmblemControl } from "./Certificate";
+import { CompletionCelebration } from "./Certificate";
+import { CourseSettingsDialog } from "./CourseSettings";
+import { Icon } from "./icons";
 import { LANG_KEY, useEditionLang, withLang } from "./editionUrl";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
@@ -201,23 +203,21 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             <ResourcesSection topicSlug={slug} canWrite={canWrite} />
           </nav>
 
-          {/* Owner-only course lifecycle (ADR 0015): conclude the course, or reopen
-              a completed one. Absent for Viewers (PRD story 9), and while still
-              `seeded` — a course that hasn't drafted a Lesson can't be completed.
-              The Emblem control (ADR 0017) sits alongside it: the owner curates the
-              subject's mark on the certificate, overriding the automatic default. */}
+          {/* Owner-only "Course settings" (UI redesign): rename + mission, the
+              certificate emblem (ADR 0017), and the completion lifecycle (ADR 0015)
+              — the two buttons that used to crowd the nav — consolidated into one
+              dialog. Absent for Viewers (PRD story 9), and while still `seeded` (a
+              course that hasn't drafted a Lesson can't be completed). */}
           {canWrite && header && header.status !== "seeded" && (
-            <>
-              <EmblemControl topicSlug={slug} />
-              <CompletionControls slug={slug} completed={courseCompleted} />
-            </>
+            <CourseSettingsButton slug={slug} status={header.status} />
           )}
 
           {/* Edition switcher + theme toggle, pinned together at the sidebar
-              bottom. The switcher only appears when there's more than one Edition
-              to choose between (English + at least one ready translation). */}
+              bottom. The switcher is owner-only (a Viewer reads the single edition
+              shared to them and can't change it — viewer-cannot-switch-edition) and
+              only appears with more than one Edition (English + a ready translation). */}
           <div className="mt-auto flex flex-col gap-2 pt-2">
-            {header && header.editions.length > 1 && (
+            {canWrite && header && header.editions.length > 1 && (
               <LanguageSwitcher editions={header.editions} current={header.lang} />
             )}
             <ThemeToggle />
@@ -247,7 +247,7 @@ function ThemeToggle() {
       className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
     >
       <span>{dark ? "Dark" : "Light"} mode</span>
-      <span aria-hidden className="text-base">{dark ? "☾" : "☀"}</span>
+      <Icon name={dark ? "moon" : "sun"} className="h-4 w-4" />
     </button>
   );
 }
@@ -294,105 +294,23 @@ function LanguageSwitcher({
   );
 }
 
-// Owner-only course lifecycle (ADR 0015). "Mark course complete" ends authoring —
-// behind a confirmation, since it stops the Routine (PRD story 6); "Reopen course"
-// returns a completed course to `active` so lessons generate again. Gated by
-// `canWrite` at the call site, so a Viewer never sees either.
-function CompletionControls({ slug, completed }: { slug: string; completed: boolean }) {
-  const endCourse = useMutation(api.content.endCourse);
-  const reopenCourse = useMutation(api.content.reopenCourse);
-  const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState(false);
-
-  if (completed) {
-    return (
-      <button
-        onClick={() => {
-          setBusy(true);
-          void reopenCourse({ topicSlug: slug }).finally(() => setBusy(false));
-        }}
-        disabled={busy}
-        className="mb-2 flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
-      >
-        ↻ Reopen course
-      </button>
-    );
-  }
-
+// Owner-only sidebar entry to the consolidated "Course settings" dialog (UI
+// redesign): rename + mission, the certificate emblem, and the completion
+// lifecycle (mark complete / reopen). Replaces the two full-width buttons that
+// used to stack under the lesson nav. Gated by `canWrite` at the call site, so a
+// Viewer never sees it.
+function CourseSettingsButton({ slug, status }: { slug: string; status: "seeded" | "active" | "completed" }) {
+  const [open, setOpen] = useState(false);
   return (
     <>
       <button
-        onClick={() => setConfirming(true)}
-        className="mb-2 flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
+        onClick={() => setOpen(true)}
+        className="mt-2 flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:border-transparent hover:bg-hi hover:text-accent"
       >
-        ✓ Mark course complete
+        <Icon name="settings" className="h-4 w-4" /> Course settings
       </button>
-      {confirming && (
-        <ConfirmDialog
-          title="Mark this course complete?"
-          body="This ends the course — no more lessons will be generated. You can reopen it later if your goals grow."
-          confirmLabel={busy ? "Ending…" : "Mark complete"}
-          confirmDisabled={busy}
-          onConfirm={() => {
-            setBusy(true);
-            void endCourse({ topicSlug: slug }).finally(() => {
-              setBusy(false);
-              setConfirming(false);
-            });
-          }}
-          onClose={() => setConfirming(false)}
-        />
-      )}
+      {open && <CourseSettingsDialog topicSlug={slug} status={status} onClose={() => setOpen(false)} />}
     </>
-  );
-}
-
-// A native <dialog> yes/no confirm — Esc, backdrop click, and focus-trap for
-// free (ponytail: same pattern as ArtifactView's QaDialog / Dashboard's
-// MissionDialog; extract to a shared module if a fourth use appears).
-function ConfirmDialog({
-  title,
-  body,
-  confirmLabel,
-  confirmDisabled = false,
-  onConfirm,
-  onClose,
-}: {
-  title: string;
-  body: string;
-  confirmLabel: string;
-  confirmDisabled?: boolean;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => ref.current?.showModal(), []);
-  return (
-    <dialog
-      ref={ref}
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close(); // backdrop click
-      }}
-      className="m-auto w-[92vw] max-w-md rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
-    >
-      <div className="px-6 py-5">
-        <h2 className="text-base font-semibold text-accent">{title}</h2>
-        <p className="mt-2 text-sm leading-relaxed text-soft">{body}</p>
-        <div className="mt-5 flex justify-end gap-2">
-          <button onClick={() => ref.current?.close()} className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi">
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={confirmDisabled}
-            className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-          >
-            {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </dialog>
   );
 }
 
