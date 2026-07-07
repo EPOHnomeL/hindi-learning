@@ -108,8 +108,8 @@ export const addEmail = mutation({
   },
 });
 
-// Remove an email from the Allowlist (Admin-only). Refuses to remove an Admin
-// row — the non-removable-Admin guard that stops the Admin locking themselves
+// Remove an email from the Allowlist (Admin-only). Refuses to remove any Admin
+// row — the non-removable-Admin guard that stops an Admin locking themselves
 // out. Removing closes off *new* sign-ups; it does not evict an existing
 // account (sign-up gate only — ADR 0011).
 export const removeEmail = mutation({
@@ -122,7 +122,7 @@ export const removeEmail = mutation({
       .withIndex("by_email", (q) => q.eq("email", normaliseEmail(email)))
       .unique();
     if (!row) return null;
-    if (row.isAdmin) throw new Error("The Admin can't be removed from the Allowlist.");
+    if (row.isAdmin) throw new Error("An Admin can't be removed from the Allowlist.");
     await ctx.db.delete(row._id);
     return null;
   },
@@ -140,14 +140,24 @@ export const seedEmail = internalMutation({
   },
 });
 
-// The single fixed Admin (PRD/ADR 0011). Flagged by the migration; the portal
-// shows but won't remove this row.
-const ADMIN_EMAIL = "jvorster63@gmail.com";
+// The fixed Admins (PRD/ADR 0011). Flagged by the migration; the portal shows
+// but won't remove these rows. Stored already-normalised (lower-case) so the
+// membership test below is a plain equality. `isCallerAdmin` grants Admin to any
+// row with `isAdmin`, so this list can hold more than one.
+const ADMIN_EMAILS = ["jvorster63@gmail.com", "josuavorster2003@gmail.com"];
+
+// The `isAdmin` test used by the migration: is this (arbitrary-cased) email one
+// of the fixed Admins? Normalises the input the same way the constants are.
+function isAdminEmail(email: string): boolean {
+  return ADMIN_EMAILS.includes(normaliseEmail(email));
+}
 
 // One-time migration off `AUTH_ALLOWED_EMAILS` (ADR 0011): admit each email the
-// env var listed, flag the Admin, and ensure the Admin is admitted even if the
-// env list omitted them. Idempotent — re-running admits nothing new. Run once in
-// prod via `npx convex run whitelist:migrateFromEnv`, then unset the env var.
+// env var listed, flag the Admins, and ensure every Admin is admitted even if
+// the env list omitted them. Idempotent — re-running admits nothing new, but
+// promotes any Admin added to the list since the last run (so re-running after
+// adding an Admin email is how that Admin gets flagged). Run in prod via
+// `npx convex run whitelist:migrateFromEnv`.
 export const migrateFromEnv = internalMutation({
   args: {},
   returns: v.object({ admitted: v.number() }),
@@ -157,9 +167,11 @@ export const migrateFromEnv = internalMutation({
       .map((e) => e.trim())
       .filter(Boolean);
     for (const email of emails) {
-      await admitEmail(ctx, email, normaliseEmail(email) === ADMIN_EMAIL);
+      await admitEmail(ctx, email, isAdminEmail(email));
     }
-    await admitEmail(ctx, ADMIN_EMAIL, true);
+    for (const admin of ADMIN_EMAILS) {
+      await admitEmail(ctx, admin, true);
+    }
     return { admitted: emails.length };
   },
 });

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 
-// The Admin portal (/admin, ADR 0011 + issue 02): the single Admin manages the
+// The Admin portal (/admin, ADR 0011 + issue 02): an Admin manages the
 // Allowlist — who may sign up — without the CLI. Client-guarded by `amIAdmin`
 // (UX only; the mutations are the real security boundary). The list is a live
 // Convex query, so adds/removes reflect immediately.

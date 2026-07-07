@@ -132,6 +132,28 @@ test("list: a non-Admin caller is rejected", async () => {
   await expect(asUser(t, intruder).query(api.whitelist.list, {})).rejects.toThrow();
 });
 
+test("migrateFromEnv: flags every fixed Admin, admitting them even if the env omits them", async () => {
+  const t = convexTest(schema, modules);
+  const prev = process.env.AUTH_ALLOWED_EMAILS;
+  // The env lists an ordinary learner only — neither Admin — so the migration
+  // must still admit and flag both fixed Admins.
+  process.env.AUTH_ALLOWED_EMAILS = "learner@example.com";
+  try {
+    await t.mutation(internal.whitelist.migrateFromEnv, {});
+  } finally {
+    if (prev === undefined) delete process.env.AUTH_ALLOWED_EMAILS;
+    else process.env.AUTH_ALLOWED_EMAILS = prev;
+  }
+
+  const rows = await t.run((ctx) => ctx.db.query("whitelist").collect());
+  const byEmail = Object.fromEntries(rows.map((r) => [r.email, r.isAdmin ?? false]));
+  expect(byEmail).toEqual({
+    "jvorster63@gmail.com": true,
+    "josuavorster2003@gmail.com": true,
+    "learner@example.com": false,
+  });
+});
+
 test("amIAdmin: true for the Admin, false for a non-Admin, false when unauthenticated", async () => {
   const t = convexTest(schema, modules);
   const admin = await seedAdmin(t, "jvorster63@gmail.com");

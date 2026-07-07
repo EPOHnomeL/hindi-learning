@@ -25,9 +25,12 @@ account's sign-in.
 
 - **Storage:** a `whitelist` table of `{ email, isAdmin }`, `by_email` index.
   Emails normalised lower-case + trimmed; adds are idempotent.
-- **Admin:** the table itself carries `isAdmin`. Exactly one Admin
-  (`jvorster63@gmail.com`). The Admin row is non-removable through the portal; the
-  portal only adds/removes ordinary admitted emails (no in-app promotion).
+- **Admin:** the table itself carries `isAdmin`. A small fixed set of Admins
+  (`jvorster63@gmail.com`, `josuavorster2003@gmail.com`) — `isCallerAdmin` grants
+  Admin to any row flagged `isAdmin`, so more than one is supported. Every Admin
+  row is non-removable through the portal; the portal only adds/removes ordinary
+  admitted emails (no in-app promotion — Admins are set in the migration's fixed
+  list, so re-running it after adding an email flags that Admin).
 - **Bootstrap:** a one-time migration reads the current `AUTH_ALLOWED_EMAILS`,
   writes a row per email, and flags the Admin. The env var is retired afterward.
   Dev/test seed a row via a `convex run`-able mutation (the env-reading migration

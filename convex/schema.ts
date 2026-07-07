@@ -12,7 +12,7 @@ export default defineSchema({
   // The Allowlist (ADR 0011): the set of emails permitted to sign up, managed at
   // runtime by the single Admin instead of the old `AUTH_ALLOWED_EMAILS` env var.
   // Emails are stored already-normalised (trimmed, lower-cased) so a lookup at
-  // sign-up never misses on casing/whitespace. `isAdmin` marks the one Admin row,
+  // sign-up never misses on casing/whitespace. `isAdmin` marks an Admin row,
   // which the portal shows but refuses to remove. An empty table admits nobody.
   whitelist: defineTable({
     email: v.string(),
