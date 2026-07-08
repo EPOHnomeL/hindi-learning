@@ -231,3 +231,36 @@ export function buildSrcDoc(
   const i = doc.lastIndexOf("</body>");
   return i === -1 ? doc + scripts : doc.slice(0, i) + scripts + doc.slice(i);
 }
+
+// The srcDoc for the owner's in-place editor (course-content-editing). Same
+// authored CSS/layout as the reader — but NONE of the reader's bridge scripts.
+// The editor iframe is `sandbox="allow-same-origin"` (no allow-scripts), so the
+// lesson's own scripts don't run and the DOM stays exactly as authored: reading
+// `contentDocument.body.innerHTML` back after editing yields a faithful body with
+// no injected cruft. The parent turns on `designMode` to make it editable (a DOM
+// property, so it needs no script and leaves no `contenteditable` attribute to
+// strip). Theme is baked for display only; the read-back takes body content, not
+// the <html> tag, so the baked `data-theme` never reaches the saved HTML.
+export function buildEditDoc(html: string, theme?: Theme): string {
+  let doc = ensureDocument(html);
+  if (theme) {
+    doc = stripLegacyThemePill(doc);
+    doc = setRootTheme(doc, theme);
+  }
+  return doc;
+}
+
+// Splice an edited body's inner HTML back into the authored document, preserving
+// the head, the `<body …>` attributes, and the doctype/`<html>` wrapper exactly —
+// only the body's contents change. A plain string splice (not DOMParser) so the
+// rest of the document round-trips byte-for-byte; mirrors buildSrcDoc's
+// lastIndexOf("</body>") guard against a stray literal "</body>" earlier in the
+// document.
+export function replaceBodyInner(html: string, inner: string): string {
+  const doc = ensureDocument(html);
+  const open = doc.match(/<body\b[^>]*>/i);
+  const close = doc.lastIndexOf("</body>");
+  if (!open || open.index === undefined || close === -1) return doc; // malformed → leave unchanged
+  const openEnd = open.index + open[0].length;
+  return doc.slice(0, openEnd) + inner + doc.slice(close);
+}

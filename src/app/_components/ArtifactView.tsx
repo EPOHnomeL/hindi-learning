@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { CertificateControl } from "./Certificate";
 import { useEditionLang, withLang } from "./editionUrl";
-import { buildSrcDoc, themeMessage, type Theme } from "./lessonSrcDoc";
+import { buildEditDoc, buildSrcDoc, replaceBodyInner, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
 import { internalNavTarget } from "./readerDerive";
 import { useTheme } from "./ThemeContext";
@@ -238,9 +239,17 @@ function LessonView({
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
   const setProgress = useMutation(api.capture.setProgress);
+  const [editing, setEditing] = useState(false);
 
   // The caller's own completion — an owner's, or a Viewer's own on a shared course.
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
+
+  // Owner-only in-place prose edit (course-content-editing 01), and only on the
+  // source (English) edition — editing a translated Edition is a later slice, and
+  // `editLesson` patches the SOURCE lesson blob, so it must not run on a
+  // translation. The server guard (`editLesson`) is the real control; this hides
+  // the affordance from Viewers/Guests, who never reach this owner reader anyway.
+  const canEdit = !readOnly && (lang == null || lang === "en");
 
   useEffect(() => {
     // Owner or Viewer: opening a lesson marks it opened in the caller's own Progress.
@@ -308,7 +317,32 @@ function LessonView({
             )}
           </div>
         </div>
-        <Frame html={html} withBridge theme={theme} dir={dir} lang={contentLang} />
+        {/* The pencil rides over the lesson on hover (owner + source edition). The
+            iframe is a descendant, so hovering the lesson body counts as hovering
+            the group and reveals it; focus reveals it for keyboard users. */}
+        <div className="group relative flex min-h-0 flex-1 flex-col">
+          <Frame html={html} withBridge theme={theme} dir={dir} lang={contentLang} />
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              aria-label="Edit this lesson"
+              title="Edit this lesson"
+              className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent opacity-0 shadow-sm backdrop-blur transition-opacity hover:bg-hi focus:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"
+            >
+              ✎ Edit
+            </button>
+          )}
+        </div>
+        {canEdit && editing && (
+          <LessonEditor
+            topicSlug={topicSlug}
+            lessonKey={lessonKey}
+            html={html}
+            theme={theme}
+            onClose={() => setEditing(false)}
+          />
+        )}
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
             scrolling, no slide-up trigger. Desktop uses the side column instead. */}
         <div className="p-3 md:hidden">
@@ -320,6 +354,106 @@ function LessonView({
         <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} readOnly={readOnly} />
       </aside>
     </div>
+  );
+}
+
+// The owner's in-place prose editor (course-content-editing 01). A modal holding
+// an edit iframe that renders the lesson with its authored CSS/layout — the same
+// visual surface the reader shows, minus the reader's bridge scripts. The iframe
+// is `sandbox="allow-same-origin"` (no allow-scripts), so the lesson's own scripts
+// stay inert and the DOM matches the authored source; the parent turns on
+// `designMode` to make it editable and reads `body.innerHTML` back on save. The
+// edited body is spliced into the authored document (`replaceBodyInner`), uploaded
+// as a new content blob, and swapped in by the owner-guarded `editLesson` action —
+// which refuses a save that changes the quiz structure, surfaced here inline.
+function LessonEditor({
+  topicSlug,
+  lessonKey,
+  html,
+  theme,
+  onClose,
+}: {
+  topicSlug: string;
+  lessonKey: string;
+  html: string;
+  theme: Theme;
+  onClose: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const generateUploadUrl = useMutation(api.content.generateEditUploadUrl);
+  const editLesson = useAction(api.content.editLesson);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Bake the theme for display only; the read-back takes body content, not the
+  // <html> tag, so the baked data-theme never reaches the saved HTML.
+  const srcDoc = useMemo(() => buildEditDoc(html, theme), [html, theme]);
+
+  useEffect(() => dialogRef.current?.showModal(), []);
+
+  async function save() {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const edited = replaceBodyInner(html, doc.body.innerHTML);
+      const url = await generateUploadUrl({ topicSlug });
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/html" }, body: edited });
+      if (!res.ok) throw new Error("Upload failed — please try again.");
+      const { storageId } = (await res.json()) as { storageId: string };
+      // The action rejects a structural change (quiz markers) — its message is shown.
+      await editLesson({ topicSlug, key: lessonKey, storageId: storageId as Id<"_storage"> });
+      onClose(); // live for every reader on the next reactive tick — no publish step.
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onClose={onClose}
+      className="m-auto flex h-[90vh] w-[96vw] max-w-4xl flex-col rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+        <h2 className="min-w-0 truncate text-base font-semibold text-ink">Edit lesson</h2>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition-colors hover:bg-hi disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => void save()}
+            disabled={saving}
+            className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+      {/* allow-same-origin (no allow-scripts): editable via designMode, lesson
+          scripts inert, contentDocument readable back by the same-origin parent. */}
+      <iframe
+        ref={iframeRef}
+        sandbox="allow-same-origin"
+        srcDoc={srcDoc}
+        onLoad={() => {
+          const doc = iframeRef.current?.contentDocument;
+          if (doc) doc.designMode = "on";
+        }}
+        className="min-h-0 flex-1 bg-card"
+      />
+      {error && (
+        <p className="border-t border-line px-5 py-3 text-sm text-red-600 dark:text-red-400">{error}</p>
+      )}
+    </dialog>
   );
 }
 

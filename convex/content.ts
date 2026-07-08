@@ -213,15 +213,17 @@ export const renameTopic = mutation({
 // Mint an upload URL for the owner reader's in-place edit: the client PUTs the
 // edited Lesson body straight to storage and passes the resulting storageId to
 // `editLesson`, so the HTML never rides through a Convex function (mirrors the
-// teach CLI's `generateContentUploadUrl`, but authed instead of secret-guarded —
-// any signed-in user may mint one; the blob does nothing until the owner-guarded
-// `editLesson` accepts it).
+// teach CLI's `generateContentUploadUrl`, but owner-guarded instead of
+// secret-guarded). Owner-scoped to the Topic being edited so only its owner can
+// mint an upload URL — the blob still does nothing until `editLesson` accepts it.
 export const generateEditUploadUrl = mutation({
-  args: {},
+  args: { topicSlug: v.string() },
   returns: v.string(),
-  handler: async (ctx) => {
+  handler: async (ctx, { topicSlug }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
     return await ctx.storage.generateUploadUrl();
   },
 });
