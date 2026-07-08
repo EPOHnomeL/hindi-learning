@@ -25,6 +25,7 @@ import type * as resources from "../resources.js";
 import type * as routine from "../routine.js";
 import type * as sellers from "../sellers.js";
 import type * as shares from "../shares.js";
+import type * as stripe from "../stripe.js";
 import type * as translate from "../translate.js";
 import type * as whitelist from "../whitelist.js";
 
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   routine: typeof routine;
   sellers: typeof sellers;
   shares: typeof shares;
+  stripe: typeof stripe;
   translate: typeof translate;
   whitelist: typeof whitelist;
 }>;
