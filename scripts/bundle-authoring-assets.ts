@@ -23,6 +23,7 @@ const TEACH_DOCS = [
 ] as const;
 const HEAD_PARTIAL = "lessons/_partials/head.html";
 const FOOT_PARTIAL = "lessons/_partials/foot.html";
+const REFERENCE_HEAD_PARTIAL = "lessons/_partials/reference-head.html";
 
 const OUTPUT = "convex/authoringAssets.generated.ts";
 
@@ -34,6 +35,7 @@ export function renderAssetsModule(
   docs: { rel: string; content: string }[],
   head: string,
   foot: string,
+  referenceHead: string,
 ): string {
   // The composed system prompt: each doc verbatim, under a `# === <path> ===`
   // header so the model sees the boundaries. Headers are derived from the fixed
@@ -51,6 +53,10 @@ export const TEACH_INSTRUCTIONS = ${JSON.stringify(instructions)};
 // verbatim — wrapped around the model's lean fragment at publish time.
 export const LESSON_HEAD = ${JSON.stringify(head.trim())};
 export const LESSON_FOOT = ${JSON.stringify(foot.trim())};
+
+// The shared reference design system (lessons/_partials/reference-head.html),
+// verbatim — wrapped around the model's lean reference fragment.
+export const REFERENCE_HEAD = ${JSON.stringify(referenceHead.trim())};
 `;
 }
 
@@ -59,7 +65,8 @@ if (process.argv[1] && process.argv[1].endsWith("bundle-authoring-assets.ts")) {
   const docs = TEACH_DOCS.map((rel) => ({ rel, content: readFileSync(rel, "utf8") }));
   const head = readFileSync(HEAD_PARTIAL, "utf8");
   const foot = readFileSync(FOOT_PARTIAL, "utf8");
-  const next = renderAssetsModule(docs, head, foot);
+  const referenceHead = readFileSync(REFERENCE_HEAD_PARTIAL, "utf8");
+  const next = renderAssetsModule(docs, head, foot, referenceHead);
 
   let current = "";
   try {
@@ -71,6 +78,6 @@ if (process.argv[1] && process.argv[1].endsWith("bundle-authoring-assets.ts")) {
     console.log(`${OUTPUT} already up to date.`);
   } else {
     writeFileSync(OUTPUT, next);
-    console.log(`Wrote ${OUTPUT} from ${docs.length} teach docs + 2 partials.`);
+    console.log(`Wrote ${OUTPUT} from ${docs.length} teach docs + 3 partials.`);
   }
 }

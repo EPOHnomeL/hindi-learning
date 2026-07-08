@@ -3,7 +3,7 @@
 // then uses these to wrap the lean fragment into a stored document, read its
 // title/supersession, name the lesson, and parse the model's structured output.
 // Kept pure + dependency-light so they unit-test without a live model or ctx.db.
-import { LESSON_FOOT, LESSON_HEAD, TEACH_INSTRUCTIONS } from "./authoringAssets.generated";
+import { LESSON_FOOT, LESSON_HEAD, REFERENCE_HEAD, TEACH_INSTRUCTIONS } from "./authoringAssets.generated";
 import type { ChatMessage } from "./openrouterClient";
 import { shuffleQuizOptions } from "./quizShuffle";
 
@@ -64,6 +64,33 @@ function parseFencedJson(raw: string, what: string): Record<string, unknown> {
   } catch {
     throw new Error(`${what}: response was not valid JSON`);
   }
+}
+
+// Wrap a lean reference fragment into a complete, self-contained document using
+// the bundled reference design system (REFERENCE_HEAD). References are stored as
+// complete documents (the reader renders them raw + injects only a dark override),
+// so — unlike lessons — the model can't be trusted to hand-author ~40 lines of
+// correct CSS every run; wrapping guarantees consistent styling (incl. tables).
+// An already-complete document is passed through untouched.
+export function assembleReference(fragment: string, title: string): string {
+  const f = fragment.trim();
+  if (/<!DOCTYPE|<html[\s>]/i.test(f)) return fragment; // already complete
+  const t = title.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reference · ${t}</title>
+${REFERENCE_HEAD}
+</head>
+<body>
+<div class="wrap">
+${f}
+</div>
+</body>
+</html>
+`;
 }
 
 // Dash-case a display title into a slug (AUTHORING.md §1 numbering).
@@ -171,7 +198,9 @@ and nothing else (no prose, no code fence), with these fields:
   per AUTHORING.md — content only, first line
   \`<title>Lesson N · <display title></title>\`. Do NOT include <!DOCTYPE>, <html>,
   <head>, <style>, <body>, <div class="wrap">, or any <script>; those are wrapped
-  on automatically. Keep the quiz markup exactly.
+  on automatically. Keep the quiz markup exactly. Use ONLY the shared design-system
+  classes (AUTHORING.md §4) — never inline styles. For tabular data use
+  \`<table class="paradigm">\` (a bare <table> is unstyled in a lesson).
 - "learningRecord": (required unless complete) the lesson's learning-record
   markdown per LEARNING-RECORD-FORMAT.md.
 - "estimatedLessons": your best whole-number estimate of the course's eventual
@@ -180,10 +209,16 @@ and nothing else (no prose, no code fence), with these fields:
   "reply": "<answer>" } for any open learner questions you can answer now. Use []
   if there are none.
 - "references": array of { "key": "<dash-case-key>", "title": "<title>",
-  "html": "<reference HTML, as-authored — NOT head/foot wrapped>" } for any
-  glossary/reference docs this lesson relies on or cross-links to
-  (/courses/<slug>/references/<key>), per AUTHORING.md §7. Include a reference for
-  every /references/<key> you link so no link dangles. Use [] if none.`;
+  "html": "<LEAN reference fragment>" } for any glossary/reference docs this lesson
+  relies on or cross-links to (/courses/<slug>/references/<key>). Include a
+  reference for every /references/<key> you link so no link dangles. Use [] if
+  none. The reference fragment is CONTENT ONLY — do NOT include <!DOCTYPE>, <html>,
+  <head>, <style>, or <body>; the reference design system is wrapped on
+  automatically. Open with
+  \`<header class="ref"><div class="kicker">Reference · …</div><h1>…</h1><p class="intro">…</p></header>\`,
+  then use \`.term\` blocks for glossary entries and a plain \`<table>\` (with
+  <thead>/<tbody>, <th>/<td>) for tabular cheat-sheets — both are styled. End with
+  a \`<footer>\` Sources line. Never inline <style> or colours.`;
 
 // Compact, readable serialisation of the course so far — the ZPD evidence the
 // generator judges the next step from (AUTHORING.md §8). Full HTML only for the

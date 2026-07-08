@@ -1,0 +1,65 @@
+<!-- Shared REFERENCE design system: fonts + the reference stylesheet. The
+     OpenRouter authoring action wraps this around a lean reference fragment
+     (convex/authoring.ts assembleReference), so authored references carry ONLY
+     their content — mirroring how lessons/_partials/head.html works for lessons.
+     Class names + CSS variables match the hand-authored references
+     (references/ref-*.html) so the reader's REFERENCE_DARK_CSS override
+     (src/app/_components/lessonSrcDoc.ts) re-skins them in dark mode. This is a
+     SUPERSET: header.ref/.kicker/.intro, .term (glossary entries), .word
+     (compact word list), a styled table for tabular cheat-sheets, plus prose. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#2b2622; --soft:#6b6258; --paper:#fbf7f0; --card:#fffdf9;
+    --accent:#9c5b34; --accent2:#3f6f5e; --gold:#b88a2e; --hi:#fbeecb;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0; background:var(--paper); color:var(--ink);
+    font-family:'Spectral',Georgia,'Times New Roman',serif; line-height:1.62; font-size:18px;}
+  .wrap{max-width:760px; margin:0 auto; padding:48px 26px 110px}
+  .deva{font-family:'Noto Serif Devanagari','Noto Sans Devanagari',serif;}
+
+  header.ref{border-bottom:1px solid #e7ddd4; padding-bottom:24px; margin-bottom:24px}
+  .kicker{font-size:13px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); font-weight:600}
+  h1{font-size:31px; line-height:1.18; margin:.3em 0 .15em; font-weight:600; letter-spacing:-.01em}
+  h2{font-size:21px; line-height:1.25; margin:1.6em 0 .5em; font-weight:600; letter-spacing:-.01em}
+  .intro{color:var(--soft); font-size:17px; margin:.4em 0 0}
+  p{margin:.7em 0}
+  ul,ol{margin:.6em 0; padding-left:1.4em}
+  li{margin:.3em 0}
+  a{color:var(--accent); text-decoration:underline; text-underline-offset:2px}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:.9em;
+    background:var(--hi); padding:.06em .3em; border-radius:4px}
+
+  /* Glossary entry (opinionated definition + aliases to avoid). */
+  .term{background:var(--card); border:1px solid #ece2d6; border-left:4px solid var(--gold);
+    border-radius:10px; padding:16px 20px; margin:14px 0; box-shadow:0 2px 14px #b88a2e10}
+  .term .name{font-weight:600; font-size:19px; color:#1f1b18}
+  .term .name .deva{color:var(--accent)}
+  .term .name .soft{color:var(--soft); font-weight:400; font-size:16px}
+  .term .def{margin:.5em 0 0}
+  .term .avoid{margin:.7em 0 0; font-size:14.5px; color:var(--soft); border-top:1px dotted #e2d6c5; padding-top:.6em}
+  .term .avoid b{color:#c0573f; font-weight:600; font-style:normal}
+
+  /* Compact word list. */
+  .word{display:grid; grid-template-columns:auto 1fr; gap:4px 16px; margin:0; padding:13px 0;
+    border-bottom:1px dotted #e2d6c5}
+  .word:last-child{border-bottom:none}
+  .word .w{font-size:24px; color:var(--accent); align-self:start}
+  .word .g b{color:var(--accent2); font-weight:600}
+  .word .g .tr{color:var(--soft); font-style:italic}
+
+  /* Tabular cheat-sheet — the reference twin of the lesson design system's
+     table.paradigm, so a plain <table> renders cleanly. */
+  table{border-collapse:collapse; width:100%; margin:18px 0; font-size:16px; background:var(--card)}
+  th,td{border:1px solid #ece2d6; padding:9px 13px; text-align:left; vertical-align:top}
+  th{background:#f3ebe0; font-weight:600; font-size:13px; letter-spacing:.04em;
+    text-transform:uppercase; color:var(--soft)}
+
+  .ref-cite,.cite{color:var(--soft); font-style:italic}
+  mark{background:var(--hi); padding:.04em .14em; border-radius:3px}
+  footer{margin-top:32px; padding-top:16px; border-top:1px solid #e7ddd4; color:var(--soft); font-size:14.5px}
+</style>

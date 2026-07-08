@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
 import { renderAssetsModule } from "./bundle-authoring-assets";
-import { LESSON_FOOT, LESSON_HEAD, TEACH_INSTRUCTIONS } from "../convex/authoringAssets.generated";
+import { LESSON_FOOT, LESSON_HEAD, REFERENCE_HEAD, TEACH_INSTRUCTIONS } from "../convex/authoringAssets.generated";
 
 test("renderAssetsModule is deterministic and embeds every source verbatim", () => {
   const docs = [
@@ -11,9 +11,10 @@ test("renderAssetsModule is deterministic and embeds every source verbatim", () 
   ];
   const head = "<style>.x{}</style>\n";
   const foot = "<script>1</script>\n";
+  const refHead = "<style>.term{}</style>\n";
 
-  const once = renderAssetsModule(docs, head, foot);
-  const twice = renderAssetsModule(docs, head, foot);
+  const once = renderAssetsModule(docs, head, foot, refHead);
+  const twice = renderAssetsModule(docs, head, foot, refHead);
   expect(once).toBe(twice); // deterministic — no timestamps, fixed order
 
   // Every source appears verbatim (backticks/${} survive via JSON.stringify).
@@ -21,6 +22,7 @@ test("renderAssetsModule is deterministic and embeds every source verbatim", () 
   expect(once).toContain("Beta ` ${danger} ` instructions");
   expect(once).toContain("<style>.x{}</style>");
   expect(once).toContain("<script>1</script>");
+  expect(once).toContain("<style>.term{}</style>");
 });
 
 test("the generated module mirrors the current teach skill + partials verbatim", () => {
@@ -35,4 +37,5 @@ test("the generated module mirrors the current teach skill + partials verbatim",
   expect(TEACH_INSTRUCTIONS).toContain("# === .agents/skills/teach/AUTHORING.md ===");
   expect(LESSON_HEAD).toBe(head);
   expect(LESSON_FOOT).toBe(foot);
+  expect(REFERENCE_HEAD).toBe(readFileSync("lessons/_partials/reference-head.html", "utf8").trim());
 });

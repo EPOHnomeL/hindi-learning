@@ -2,6 +2,7 @@
 import { expect, test } from "vitest";
 import {
   assembleLesson,
+  assembleReference,
   buildMissionMessages,
   buildOngoingMessages,
   nextLessonKey,
@@ -12,7 +13,7 @@ import {
   type MaterialisedContext,
 } from "./authoring";
 import { shuffleQuizOptions } from "./quizShuffle";
-import { LESSON_FOOT, LESSON_HEAD } from "./authoringAssets.generated";
+import { LESSON_FOOT, LESSON_HEAD, REFERENCE_HEAD } from "./authoringAssets.generated";
 
 const QUIZ_FRAGMENT = `<title>Lesson 2 · The Aorist</title>
 <header class="lesson">Aorist</header>
@@ -45,6 +46,24 @@ test("assembleLesson wraps a lean fragment with the bundled head/foot and shuffl
 test("assembleLesson passes through an already-complete document untouched", () => {
   const doc = "<!DOCTYPE html><html><head></head><body>done</body></html>";
   expect(assembleLesson(doc)).toBe(doc);
+});
+
+test("assembleReference wraps a lean fragment in the reference design system (styles tables)", () => {
+  const fragment = `<header class="ref"><div class="kicker">Reference · Card</div><h1>Decision card</h1></header>
+<table><thead><tr><th>Need</th><th>Pick</th></tr></thead><tbody><tr><td>Fast</td><td>Flash</td></tr></tbody></table>`;
+  const html = assembleReference(fragment, "Decision card & more");
+
+  expect(html).toMatch(/^<!DOCTYPE html>/);
+  expect(html).toContain(REFERENCE_HEAD); // bundled reference stylesheet (styles table/th/td)
+  expect(html).toContain("<title>Reference · Decision card &amp; more</title>"); // title escaped
+  expect(html).toContain('<div class="wrap">');
+  expect(html).toContain("<table>"); // content preserved
+  expect(REFERENCE_HEAD).toContain("th,td{border"); // the design system actually styles tables
+});
+
+test("assembleReference passes through an already-complete document untouched", () => {
+  const doc = "<!DOCTYPE html><html><head></head><body>ref</body></html>";
+  expect(assembleReference(doc, "x")).toBe(doc);
 });
 
 test("titleFrom / supersedesFrom read the fragment's meta", () => {

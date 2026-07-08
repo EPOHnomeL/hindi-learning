@@ -4,6 +4,7 @@ import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import {
   assembleLesson,
+  assembleReference,
   buildMissionMessages,
   buildOngoingMessages,
   nextLessonKey,
@@ -59,13 +60,16 @@ async function publishAuthoredLesson(
   // Upsert any references the lesson relies on / cross-links to, so a
   // /references/<key> link never dangles (AUTHORING.md §7). Stored as-authored.
   for (const ref of result.references) {
+    // Wrap the lean fragment in the bundled reference design system, so the stored
+    // reference is a complete, consistently-styled document (references render raw).
+    const refHtml = assembleReference(ref.html, ref.title);
     await ctx.runMutation(api.content.upsertReference, {
       secret,
       topicId,
       key: ref.key,
       title: ref.title,
-      html: ref.html,
-      contentHash: hashString(ref.html),
+      html: refHtml,
+      contentHash: hashString(refHtml),
     });
   }
 }

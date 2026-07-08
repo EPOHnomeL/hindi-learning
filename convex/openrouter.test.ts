@@ -96,9 +96,13 @@ test("ongoing single-pass authors the next lesson, wraps+shuffles it, publishes 
   // All three options survive the shuffle (order may differ; presence must not).
   for (const k of ["a", "b", "c"]) expect(lesson2!.html).toContain(`data-k="${k}"`);
 
-  // Any reference the lesson relies on was upserted (no dangling /references link).
+  // Any reference the lesson relies on was upserted (no dangling /references link),
+  // wrapped in the reference design system so it renders styled (not a bare fragment).
   const refs = await t.run((ctx) => ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect());
-  expect(refs.map((r) => r.key)).toContain("aorist-forms");
+  const ref = refs.find((r) => r.key === "aorist-forms");
+  expect(ref).toBeTruthy();
+  expect(ref!.html).toMatch(/^<!DOCTYPE html>/); // complete document, not a raw fragment
+  expect(ref!.html).toContain("th,td{border"); // reference stylesheet present → tables styled
 
   // A learning record was published for the lesson.
   const record = await t.run((ctx) =>
