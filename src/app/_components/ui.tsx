@@ -202,36 +202,39 @@ export function MenuItem({
   );
 }
 
-// Skeleton bars read as placeholders only if they contrast the paper — `bg-card`
-// is near-white and vanishes, so bars use `bg-line` (the muted divider tan, which
-// lifts off paper in both themes). Full-card placeholders keep `border border-line
-// bg-card` (an empty card outline), matching the dashboard/admin idiom.
+// Skeleton shapes read as placeholders only if they contrast the paper — `bg-card`
+// is near-white and vanishes. All placeholder fills use `bg-soft/20`, a muted grey
+// that lifts off paper in both themes; card placeholders add `border border-line`.
 
 // Loading placeholder for the lesson/reference reader body. Mirrors the content
-// region those readers render (title bar + body lines, plus a desktop-only
-// question aside for lessons) so content fills in place instead of the page
-// jumping from a bare "Loading…" line. Content only — the surrounding sidebar
-// belongs to CourseShell / PublicCourseShell, which are already mounted where
-// this renders. References have no question column, so pass `aside={false}`.
+// region those readers render (a centred reading column — title bar + body lines
+// — plus a desktop-only question aside for lessons) so content fills in place
+// instead of the page jumping from a bare "Loading…" line. Content only — the
+// surrounding sidebar belongs to CourseShell / PublicCourseShell, which are
+// already mounted where this renders. References have no question column, so
+// pass `aside={false}`.
 export function ReaderSkeleton({ aside = true }: { aside?: boolean }) {
   // Ragged widths so the body reads like paragraphs rather than a solid block.
   const lines = ["w-11/12", "w-full", "w-4/5", "w-full", "w-3/4", "w-11/12", "w-2/3"];
   return (
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
-      <div className="flex min-h-0 flex-1 flex-col gap-4">
-        {/* Title bar */}
-        <div className="h-7 w-1/2 animate-pulse rounded-lg bg-line" />
-        {/* Body lines */}
-        <div className="flex flex-col gap-3">
-          {lines.map((w, i) => (
-            <div key={i} className={`h-4 ${w} animate-pulse rounded bg-line`} />
-          ))}
+      {/* Centred reading column, mirroring the lesson body's centred measure. */}
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+          {/* Title bar */}
+          <div className="h-7 w-1/2 animate-pulse rounded-lg bg-soft/20" />
+          {/* Body lines */}
+          <div className="flex flex-col gap-3">
+            {lines.map((w, i) => (
+              <div key={i} className={`h-4 ${w} animate-pulse rounded bg-soft/20`} />
+            ))}
+          </div>
         </div>
       </div>
       {/* Desktop question aside — lessons only */}
       {aside && (
         <aside className="hidden shrink-0 md:block md:w-80">
-          <div className="h-64 animate-pulse rounded-xl border border-line bg-card" />
+          <div className="h-64 animate-pulse rounded-xl border border-line bg-soft/20" />
         </aside>
       )}
     </div>
@@ -243,10 +246,10 @@ export function ReaderSkeleton({ aside = true }: { aside?: boolean }) {
 function SidebarSkeleton() {
   return (
     <aside className="hidden w-64 shrink-0 flex-col gap-2 border-r border-line bg-paper p-4 md:flex">
-      <div className="h-6 w-28 animate-pulse rounded bg-line" />
+      <div className="h-6 w-28 animate-pulse rounded bg-soft/20" />
       <div className="mt-4 flex flex-col gap-2">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-8 animate-pulse rounded-lg bg-line" />
+          <div key={i} className="h-8 animate-pulse rounded-lg bg-soft/20" />
         ))}
       </div>
     </aside>
@@ -274,15 +277,15 @@ export function DashboardSkeleton() {
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
       <header className="mb-8 flex items-center gap-3">
-        <div className="h-10 w-10 shrink-0 animate-pulse rounded-lg bg-line" />
+        <div className="h-10 w-10 shrink-0 animate-pulse rounded-lg bg-soft/20" />
         <div className="flex flex-col gap-2">
-          <div className="h-7 w-40 animate-pulse rounded bg-line" />
-          <div className="h-4 w-32 animate-pulse rounded bg-line" />
+          <div className="h-7 w-40 animate-pulse rounded bg-soft/20" />
+          <div className="h-4 w-32 animate-pulse rounded bg-soft/20" />
         </div>
       </header>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy>
         {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-44 animate-pulse rounded-2xl border border-line bg-card" />
+          <div key={i} className="h-44 animate-pulse rounded-2xl border border-line bg-soft/20" />
         ))}
       </div>
     </div>
