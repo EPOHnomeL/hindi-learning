@@ -202,6 +202,37 @@ export function MenuItem({
   );
 }
 
+// Loading placeholder for the lesson/reference reader. Mirrors the shell those
+// readers render (title bar + body, plus a desktop-only question aside for
+// lessons) so content fills in place instead of the page jumping from a single
+// "Loading…" line to the full layout. Purely visual — varying line widths read
+// as prose. Reuses the animate-pulse / bg-card idiom from the dashboard and
+// admin placeholders. References have no question column, so pass `aside={false}`.
+export function ReaderSkeleton({ aside = true }: { aside?: boolean }) {
+  // Ragged widths so the body reads like paragraphs rather than a solid block.
+  const lines = ["w-11/12", "w-full", "w-4/5", "w-full", "w-3/4", "w-11/12", "w-2/3"];
+  return (
+    <div className="flex flex-col gap-4 md:h-full md:flex-row">
+      <div className="flex min-h-0 flex-1 flex-col gap-4">
+        {/* Title bar */}
+        <div className="h-7 w-1/2 animate-pulse rounded-lg bg-card" />
+        {/* Body lines */}
+        <div className="flex flex-col gap-3">
+          {lines.map((w, i) => (
+            <div key={i} className={`h-4 ${w} animate-pulse rounded bg-card`} />
+          ))}
+        </div>
+      </div>
+      {/* Desktop question aside — lessons only */}
+      {aside && (
+        <aside className="hidden shrink-0 md:block md:w-80">
+          <div className="h-64 animate-pulse rounded-xl border border-line bg-card" />
+        </aside>
+      )}
+    </div>
+  );
+}
+
 // A native-<dialog> yes/no confirm for destructive actions (e.g. "Mark course
 // complete"). Shared by CourseShell and the course settings dialog.
 export function ConfirmDialog({

@@ -11,6 +11,7 @@ import { useEditionLang, withLang } from "./editionUrl";
 import { buildEditDoc, buildSrcDoc, replaceBodyInner, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
 import { internalNavTarget } from "./readerDerive";
+import { ReaderSkeleton } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
 
@@ -269,7 +270,7 @@ function LessonView({
     return () => window.removeEventListener("message", onMessage);
   }, [topicSlug, lessonKey, recordResponse, readOnly]);
 
-  if (lesson === undefined || html === undefined) return <p className="text-soft">Loading…</p>;
+  if (lesson === undefined || html === undefined) return <ReaderSkeleton />;
   if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this lesson. Try refreshing.</p>;
 
@@ -556,7 +557,7 @@ function ReferenceView({
   const navHidden = useHideOnScroll();
   const ref = useQuery(api.content.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
   const html = useContentHtml(ref);
-  if (ref === undefined || html === undefined) return <p className="text-soft">Loading…</p>;
+  if (ref === undefined || html === undefined) return <ReaderSkeleton aside={false} />;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this reference. Try refreshing.</p>;
   return (
