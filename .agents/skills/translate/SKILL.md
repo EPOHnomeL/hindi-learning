@@ -62,10 +62,17 @@ structure is load-bearing.
   fill-in `data-answer` / `data-alt`;
 - every `<script>` and `<style>` block and all inline JS/CSS, and every `href` /
   `src`;
-- the **object of study** — anything the course *teaches* (target-language
-  vocabulary, example sentences, the script being taught), plus code and proper
-  nouns — even when it sits inside prose you are translating. When unsure whether a
-  token is taught rather than explained, leave it.
+- the **object of study** — the *target-language* material the course teaches:
+  its vocabulary, example sentences, and the script being taught — plus code and
+  proper nouns, even when they sit inside prose you are translating. This is the
+  language being taught, **not** every term the course names. A concept the course
+  *explains* in the **source language** — study-science jargon such as "storage
+  strength", "spacing", "interleaving", "retrieval", or any coined key term — is
+  learner-read prose: **translate it**, even when it is highlighted (`<mark>`),
+  bold, or sitting in a heading. A highlight marks a term as important; it never
+  means "leave untranslated." When unsure, decide by language: a source-language
+  token is prose → translate it; a target-language token is the object of study →
+  keep it.
 
 **Translate** — the learner-read prose only:
 
@@ -78,6 +85,15 @@ structure is load-bearing.
 > The server-side guard only compares the **counts** of
 > `data-correct`/`data-answer`/`data-k`; it does **not** catch a changed key value
 > or a reordered option. Getting those right is your job, not the guard's.
+
+**Scripture uses an existing translation, not yours.** When the prose quotes the
+Bible — a `.verse` block, a cited passage, an epigraph — do not render it by
+translating the English yourself. Quote the wording of a widely-used published
+Bible translation in the target language (e.g. the Afrikaanse Bybel for Afrikaans),
+and leave the reference/citation as-is. A learner should meet Scripture in the
+familiar published form, not a back-translation. If you cannot obtain a reliable
+published rendering for a passage, leave that quotation in the source language
+rather than invent one.
 
 For **plain-text files** (`title.txt`, `mission.txt`): translate the
 natural-language prose only; leave any HTML tags, markdown, code, proper nouns, and
