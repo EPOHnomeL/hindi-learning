@@ -88,23 +88,26 @@ export function useContentHtml(
   body: { html?: string; contentUrl?: string } | null | undefined,
 ): string | null | undefined {
   const url = body?.contentUrl;
-  const [fetched, setFetched] = useState<string | null | undefined>(undefined);
+  // Key the fetched value to the URL it belongs to. On navigation `url` changes
+  // and this render happens BEFORE the effect re-runs, so a bare `fetched` would
+  // briefly return the previous item's body. Gating on `fetched.url === url`
+  // makes a mismatch read as "loading" until the new fetch lands.
+  const [fetched, setFetched] = useState<{ url: string; html: string | null }>();
   useEffect(() => {
     if (!url) return;
     let live = true;
-    setFetched(undefined);
     fetch(url)
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
-      .then((t) => live && setFetched(t))
+      .then((html) => live && setFetched({ url, html }))
       .catch(() => {
-        if (live) setFetched(null);
+        if (live) setFetched({ url, html: null });
       });
     return () => {
       live = false;
     };
   }, [url]);
   if (body == null) return body; // undefined: query loading · null: not found
-  if (body.contentUrl) return fetched; // undefined while fetching · string ready · null on error
+  if (url) return fetched?.url === url ? fetched.html : undefined; // undefined: fetching/stale · string: ready · null: error
   return body.html ?? "";
 }
 
