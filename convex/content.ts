@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, buildPaywall, getOwnedTopic, heldLangs, lessonLocked, resolveReaderEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import { assertAdmin, buildPaywall, getOwnedTopic, heldLangs, lessonLocked, pickContentBody, resolveReaderEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
 import { isCallerAdmin } from "./whitelist";
@@ -342,7 +342,15 @@ export const getLesson = query({
     if (await lessonLocked(ctx, topic._id, level, key)) {
       return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
     }
-    return { key: lesson.key, seq: lesson.seq, title, html: t?.html ?? lesson.html, locked: false };
+    return {
+      key: lesson.key,
+      seq: lesson.seq,
+      title,
+      locked: false,
+      // The body is served as a content URL (content blob) or, on transition
+      // rows, inline html — from the translated row if it has one, else source.
+      ...pickContentBody(t, lesson),
+    };
   },
 });
 
@@ -387,11 +395,24 @@ export const getReference = query({
     const title = decodeEntities(t?.title ?? ref.title);
     // References sit entirely past the Preview — locked for a `preview` caller.
     if (level === "preview") return { key: ref.key, title, html: "", locked: true };
-    return { key: ref.key, title, html: t?.html ?? ref.html, locked: false };
+    return { key: ref.key, title, locked: false, ...pickContentBody(t, ref) };
   },
 });
 
 // ---- Publish (teach CLI, PUBLISH_SECRET-guarded) ---------------------------
+
+// Mint an upload URL for a content blob (a Lesson / Reference body). The teach
+// CLI `PUT`s the HTML straight to storage and passes the resulting storageId to
+// the publish mutations, so the HTML never rides through a Convex function (see
+// .scratch/html-blob-storage). Secret-guarded like the other teach seams.
+export const generateContentUploadUrl = mutation({
+  args: { secret: v.string() },
+  returns: v.string(),
+  handler: async (ctx, { secret }) => {
+    assertAdmin(secret);
+    return await ctx.storage.generateUploadUrl();
+  },
+});
 
 // Resolve the Topic's owner from email, then create the owned Topic or backfill
 // `ownerId` on the pre-existing unowned row (the legacy Hindi topic). Returns
@@ -494,19 +515,26 @@ export const publishLesson = mutation({
     key: v.string(),
     seq: v.number(),
     title: v.string(),
-    html: v.string(),
+    // The body is uploaded to storage by the CLI first (generateContentUploadUrl)
+    // and passed as a blob id — the HTML never rides through this function.
+    storageId: v.id("_storage"),
     supersedes: v.optional(v.string()),
   },
-  handler: async (ctx, { secret, topicId, key, seq, title, html, supersedes }) => {
+  handler: async (ctx, { secret, topicId, key, seq, title, storageId, supersedes }) => {
     assertAdmin(secret);
 
     const existing = await ctx.db
       .query("lessons")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
       .unique();
-    if (existing) return { status: "exists" as const };
+    // Lessons are immutable: the freshly-uploaded blob is redundant, so drop it
+    // (mirrors resources' dedupe-delete) rather than orphan it in storage.
+    if (existing) {
+      await ctx.storage.delete(storageId);
+      return { status: "exists" as const };
+    }
 
-    await ctx.db.insert("lessons", { topicId, key, seq, title, html });
+    await ctx.db.insert("lessons", { topicId, key, seq, title, htmlStorageId: storageId });
     if (supersedes) {
       const old = await ctx.db
         .query("lessons")
@@ -548,10 +576,10 @@ export const upsertReference = mutation({
     topicId: v.id("topics"),
     key: v.string(),
     title: v.string(),
-    html: v.string(),
+    storageId: v.id("_storage"),
     contentHash: v.string(),
   },
-  handler: async (ctx, { secret, topicId, key, title, html, contentHash }) => {
+  handler: async (ctx, { secret, topicId, key, title, storageId, contentHash }) => {
     assertAdmin(secret);
 
     const existing = await ctx.db
@@ -559,11 +587,19 @@ export const upsertReference = mutation({
       .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
       .unique();
     if (existing) {
-      if (existing.contentHash === contentHash) return { status: "unchanged" as const };
-      await ctx.db.patch(existing._id, { title, html, contentHash });
+      // Unchanged content → the new upload is redundant; drop it.
+      if (existing.contentHash === contentHash) {
+        await ctx.storage.delete(storageId);
+        return { status: "unchanged" as const };
+      }
+      // Changed → point at the new blob and delete the superseded one (a
+      // Reference is mutable, so its old body would otherwise orphan). Clear any
+      // legacy inline `html` so the row is blob-only going forward.
+      if (existing.htmlStorageId) await ctx.storage.delete(existing.htmlStorageId);
+      await ctx.db.patch(existing._id, { title, htmlStorageId: storageId, contentHash });
       return { status: "updated" as const };
     }
-    await ctx.db.insert("references", { topicId, key, title, html, contentHash });
+    await ctx.db.insert("references", { topicId, key, title, htmlStorageId: storageId, contentHash });
     return { status: "inserted" as const };
   },
 });

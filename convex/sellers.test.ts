@@ -37,7 +37,10 @@ async function seedTopic(
   return await t.run((ctx) => ctx.db.insert("topics", { ownerId, slug, title: slug, status }));
 }
 async function addLesson(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, key: string, seq: number) {
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key, seq, title: `Lesson ${key}`, html: `<p>en ${key}</p>` }));
+  await t.run(async (ctx) => {
+    const htmlStorageId = await ctx.storage.store(new Blob([`<p>en ${key}</p>`], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key, seq, title: `Lesson ${key}`, htmlStorageId });
+  });
 }
 // Make an existing account a fully-onboarded (payouts-enabled) Seller directly —
 // the state the Stripe onboarding flow leaves behind, without invoking Stripe.

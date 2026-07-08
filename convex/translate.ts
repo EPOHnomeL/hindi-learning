@@ -30,8 +30,11 @@ type Kind = "lesson" | "reference" | "mission" | "title" | "question";
 // The hash of a source item's content — stamped onto the translation so a later
 // re-translate can skip unchanged items. Must be computed identically wherever a
 // source item is read, so both `collectItems` and `readSource` route through here.
-function itemHash(kind: Kind, f: { title?: string; html?: string; text?: string; reply?: string }): string {
-  if (kind === "lesson" || kind === "reference") return hashString((f.title ?? "") + "|" + (f.html ?? ""));
+function itemHash(kind: Kind, f: { title?: string; html?: string; htmlStorageId?: Id<"_storage">; text?: string; reply?: string }): string {
+  // Bodies now live in content blobs; a blob-backed row has no inline `html`, so
+  // hash its stable `htmlStorageId` instead (immutable content → stable id → a
+  // valid staleness key). Falls back to inline `html` for not-yet-migrated rows.
+  if (kind === "lesson" || kind === "reference") return hashString((f.title ?? "") + "|" + (f.html ?? f.htmlStorageId ?? ""));
   if (kind === "question") return hashString((f.text ?? "") + "|" + (f.reply ?? ""));
   return hashString(f.text ?? ""); // title, mission
 }
@@ -82,7 +85,9 @@ async function readSource(
       .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
       .unique();
     if (!l || l.supersededBy) return null;
-    return { title: l.title, html: l.html, hash: itemHash("lesson", l) };
+    // The source body now lives in a content blob (no inline `html`), so the
+    // quiz-structure guard downstream is skipped for it (see publishTranslation).
+    return { title: l.title, hash: itemHash("lesson", l) };
   }
   if (kind === "reference") {
     const r = await ctx.db
@@ -90,7 +95,7 @@ async function readSource(
       .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
       .unique();
     if (!r) return null;
-    return { title: r.title, html: r.html, hash: itemHash("reference", r) };
+    return { title: r.title, hash: itemHash("reference", r) };
   }
   // question
   const q = await ctx.db.get(key as Id<"questions">);
@@ -308,8 +313,10 @@ export const publishTranslation = mutation({
 
     const html = a.html !== undefined ? stripFence(a.html) : undefined;
     // A structural drift in a Lesson's quiz markers would break positional scoring
-    // — skip it (English fallback) rather than ship a broken quiz.
-    if (a.kind === "lesson" && html !== undefined && !quizStructureMatches(src.html ?? "", html)) {
+    // — skip it (English fallback) rather than ship a broken quiz. The guard needs
+    // the source markup; once the source body is a content blob it isn't readable
+    // in a mutation, so the check is skipped (the run is trusted, secret-guarded).
+    if (a.kind === "lesson" && html !== undefined && src.html !== undefined && !quizStructureMatches(src.html, html)) {
       return { status: "skipped" };
     }
 

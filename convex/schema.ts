@@ -60,6 +60,11 @@ export default defineSchema({
         ownerSet: v.optional(v.boolean()),
       }),
     ),
+    // The LLM provider a Topic is authored with (e.g. "openrouter"). Owned by a
+    // parallel feature (course-content-editing); declared optional here only so
+    // this branch's schema stays compatible with the shared dev deployment, whose
+    // rows already carry it. Not read by this feature — reconcile at merge.
+    provider: v.optional(v.string()),
   })
     .index("by_slug", ["slug"])
     .index("by_owner", ["ownerId"])
@@ -74,7 +79,11 @@ export default defineSchema({
     key: v.string(),
     seq: v.number(),
     title: v.string(),
-    html: v.string(),
+    // The rendered Lesson body lives in a **content blob** (Convex File Storage),
+    // served over the `/content` HTTP route and keyed by `htmlStorageId`. The
+    // legacy inline `html` was dropped after every row was migrated (the narrow
+    // step, see .scratch/html-blob-storage).
+    htmlStorageId: v.optional(v.id("_storage")),
     supersededBy: v.optional(v.string()),
   })
     .index("by_topic_seq", ["topicId", "seq"])
@@ -119,7 +128,10 @@ export default defineSchema({
     topicId: v.id("topics"),
     key: v.string(),
     title: v.string(),
-    html: v.string(),
+    // The rendered Reference body — a **content blob** like the Lesson body.
+    // Mutable: a changed re-publish points at a new blob and deletes the old.
+    // `contentHash` still gates skip-unchanged publishing.
+    htmlStorageId: v.optional(v.id("_storage")),
     contentHash: v.string(),
   })
     .index("by_topic", ["topicId"])
@@ -281,7 +293,12 @@ export default defineSchema({
     ),
     key: v.string(),
     title: v.optional(v.string()),
+    // The translated lesson/reference body. Still stored inline (`html`) for new
+    // translations — migrating the translation write-path to blobs is a follow-up.
+    // Rows migrated by the one-shot backfill carry `htmlStorageId`; the reader
+    // serves whichever is present (see .scratch/html-blob-storage).
     html: v.optional(v.string()),
+    htmlStorageId: v.optional(v.id("_storage")),
     text: v.optional(v.string()),
     reply: v.optional(v.string()),
     sourceHash: v.string(),

@@ -32,7 +32,10 @@ async function seedTopic(t: ReturnType<typeof convexTest>, ownerId: Id<"users">,
   return await t.run((ctx) => ctx.db.insert("topics", { ownerId, slug, title, status: "completed" as const }));
 }
 async function addLesson(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, key: string, seq: number) {
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key, seq, title: `Lesson ${key}`, html: `<p>en ${key}</p>` }));
+  await t.run(async (ctx) => {
+    const htmlStorageId = await ctx.storage.store(new Blob([`<p>en ${key}</p>`], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key, seq, title: `Lesson ${key}`, htmlStorageId });
+  });
 }
 async function share(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, viewerId: Id<"users">, lang?: string) {
   await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId, lang }));
@@ -71,7 +74,7 @@ test("free Edition — owner & Viewer read everything; a stranger is not-found",
   expect(ownerHdr).toMatchObject({ role: "owner", lang: "en" });
   expect(ownerHdr!.paywall).toBeUndefined();
   expect(await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
-    html: "<p>en 0002</p>",
+    contentUrl: expect.any(String),
     locked: false,
   });
 
@@ -100,7 +103,7 @@ test("paid Edition — owner, Viewer, and entitled buyer read everything", async
 
   // owner is never paywalled on their own course.
   expect(await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
-    html: "<p>en 0002</p>",
+    contentUrl: expect.any(String),
     locked: false,
   });
   expect((await asUser(t, alice).query(api.content.courseHeader, { topicSlug: "hindi" }))!.paywall).toBeUndefined();
@@ -115,7 +118,7 @@ test("paid Edition — owner, Viewer, and entitled buyer read everything", async
     role: "entitled",
   });
   expect(await asUser(t, dave).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
-    html: "<p>en 0002</p>",
+    contentUrl: expect.any(String),
     locked: false,
   });
 });
@@ -137,7 +140,7 @@ test("paid Edition — an unentitled caller (signed-in or Guest) gets only the P
   ]);
   // The Preview Lesson's body is served; every other Lesson is locked (not null).
   expect(await asUser(t, carol).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" })).toMatchObject({
-    html: "<p>en 0001</p>",
+    contentUrl: expect.any(String),
     locked: false,
   });
   expect(await asUser(t, carol).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
@@ -151,7 +154,7 @@ test("paid Edition — an unentitled caller (signed-in or Guest) gets only the P
   expect(pub!.lessons.map((l) => l.key)).toEqual(["0001", "0002"]); // TOC intact
   expect(pub!.resources).toEqual([]); // paid material withheld
   expect(await t.query(api.public.publicLesson, { token: "tok-en", key: "0001" })).toMatchObject({
-    html: "<p>en 0001</p>",
+    contentUrl: expect.any(String),
     locked: false,
   });
   expect(await t.query(api.public.publicLesson, { token: "tok-en", key: "0002" })).toMatchObject({
@@ -168,7 +171,7 @@ test("a Guest on a FREE Public link still reads everything (unchanged)", async (
   const pub = await t.query(api.public.publicCourse, { token: "tok-free" });
   expect(pub!.paywall).toBeUndefined();
   expect(await t.query(api.public.publicLesson, { token: "tok-free", key: "0002" })).toMatchObject({
-    html: "<p>en 0002</p>",
+    contentUrl: expect.any(String),
     locked: false,
   });
 });
@@ -213,7 +216,7 @@ test("Admin grant flips a caller from Preview to full; revoke flips it back", as
   // Admin grants — carol now reads everything.
   await asUser(t, admin).mutation(api.market.grantEntitlement, { email: "carol@example.com", topicSlug: "hindi", lang: "en" });
   expect(await asUser(t, carol).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
-    html: "<p>en 0002</p>",
+    contentUrl: expect.any(String),
     locked: false,
   });
 

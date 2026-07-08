@@ -69,7 +69,10 @@ async function seedTopic(t: ReturnType<typeof convexTest>, ownerId: Id<"users">,
   return await t.run((ctx) => ctx.db.insert("topics", { ownerId, slug, title: slug, status: "completed" as const }));
 }
 async function addLesson(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, key: string, seq: number) {
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key, seq, title: `Lesson ${key}`, html: `<p>en ${key}</p>` }));
+  await t.run(async (ctx) => {
+    const htmlStorageId = await ctx.storage.store(new Blob([`<p>en ${key}</p>`], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key, seq, title: `Lesson ${key}`, htmlStorageId });
+  });
 }
 async function price(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, lang: string, amount: number, currency: string) {
   await t.run((ctx) => ctx.db.insert("listings", { topicId, lang, amount, currency }));
@@ -109,7 +112,7 @@ test("webhook mint (account exists) unlocks the Edition; idempotent on event id"
 
   // After: full read.
   expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
-    html: "<p>en 0002</p>",
+    contentUrl: expect.any(String),
     locked: false,
   });
 

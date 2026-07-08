@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { decodeEntities } from "./content";
-import { buildPaywall, editionAccessLevel, lessonLocked, SOURCE_LANG, type EditionAccess } from "./lib";
+import { buildPaywall, editionAccessLevel, lessonLocked, pickContentBody, SOURCE_LANG, type EditionAccess } from "./lib";
 import { langInfo } from "./languages";
 
 // The Guest read seam (issue 07 / ADR 0013). Every function here authorizes by
@@ -203,9 +203,19 @@ export const publicCourse = query({
 // or a superseded Lesson (mirrors the authed getLesson).
 export const publicLesson = query({
   args: { token: v.string(), key: v.string() },
+  // A locked marker (paid Edition, past the Preview) OR the body: `contentUrl`
+  // (content blob) or inline `html` during the migration — exactly one body form
+  // is present (see .scratch/html-blob-storage).
   returns: v.union(
     v.null(),
-    v.object({ key: v.string(), seq: v.number(), title: v.string(), html: v.string(), locked: v.boolean() }),
+    v.object({
+      key: v.string(),
+      seq: v.number(),
+      title: v.string(),
+      locked: v.boolean(),
+      contentUrl: v.optional(v.string()),
+      html: v.optional(v.string()),
+    }),
   ),
   handler: async (ctx, { token, key }) => {
     const resolved = await resolveGuestEdition(ctx, token);
@@ -231,7 +241,7 @@ export const publicLesson = query({
     if (await lessonLocked(ctx, topic._id, level, key)) {
       return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
     }
-    return { key: lesson.key, seq: lesson.seq, title, html: t?.html ?? lesson.html, locked: false };
+    return { key: lesson.key, seq: lesson.seq, title, locked: false, ...pickContentBody(t, lesson) };
   },
 });
 
@@ -240,7 +250,13 @@ export const publicReference = query({
   args: { token: v.string(), key: v.string() },
   returns: v.union(
     v.null(),
-    v.object({ key: v.string(), title: v.string(), html: v.string(), locked: v.boolean() }),
+    v.object({
+      key: v.string(),
+      title: v.string(),
+      locked: v.boolean(),
+      contentUrl: v.optional(v.string()),
+      html: v.optional(v.string()),
+    }),
   ),
   handler: async (ctx, { token, key }) => {
     const resolved = await resolveGuestEdition(ctx, token);
@@ -263,6 +279,6 @@ export const publicReference = query({
     const title = decodeEntities(t?.title ?? ref.title);
     // References sit entirely past the Preview — locked for a `preview` Guest.
     if (level === "preview") return { key: ref.key, title, html: "", locked: true };
-    return { key: ref.key, title, html: t?.html ?? ref.html, locked: false };
+    return { key: ref.key, title, locked: false, ...pickContentBody(t, ref) };
   },
 });

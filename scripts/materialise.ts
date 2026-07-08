@@ -30,8 +30,17 @@ mkdirSync(`${base}/learning-records`, { recursive: true });
 // The course title as plain text — the teach run ignores it; the translate run
 // reads it as the source for the title Edition (it isn't inside any lesson file).
 writeFileSync(`${base}/TITLE.txt`, ctx.topic.title);
-for (const l of ctx.lessons) writeFileSync(`${base}/lessons/${l.key}.html`, l.html);
-for (const r of ctx.references) writeFileSync(`${base}/references/${r.key}.html`, r.html);
+// Lesson/Reference bodies live in content blobs (.scratch/html-blob-storage):
+// materialiseTopic returns a signed `htmlUrl` we fetch. Empty only if a row has
+// no blob (unexpected in production).
+const bodyOf = async (x: { htmlUrl: string | null }): Promise<string> => {
+  if (!x.htmlUrl) return "";
+  const res = await fetch(x.htmlUrl);
+  if (!res.ok) throw new Error(`content fetch failed: ${res.status}`);
+  return await res.text();
+};
+for (const l of ctx.lessons) writeFileSync(`${base}/lessons/${l.key}.html`, await bodyOf(l));
+for (const r of ctx.references) writeFileSync(`${base}/references/${r.key}.html`, await bodyOf(r));
 for (const lr of ctx.learningRecords) writeFileSync(`${base}/learning-records/${lr.key}.md`, lr.markdown);
 writeFileSync(`${base}/CAPTURE.json`, JSON.stringify(ctx.capture, null, 2));
 
