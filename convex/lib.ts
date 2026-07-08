@@ -95,6 +95,17 @@ export function contentBody(row: { htmlStorageId?: Id<"_storage">; html?: string
   return { html: row.html ?? "" };
 }
 
+// Choose which body to serve for a translatable item: the translated row's when
+// it has one (blob or inline), else the source row's — the blob-aware twin of
+// the old `t?.html ?? source.html` fallback (course-translation).
+export function pickContentBody(
+  translated: { htmlStorageId?: Id<"_storage">; html?: string } | null | undefined,
+  source: { htmlStorageId?: Id<"_storage">; html?: string },
+): ContentBody {
+  if (translated && (translated.htmlStorageId || translated.html)) return contentBody(translated);
+  return contentBody(source);
+}
+
 // Guards the PUBLISH_SECRET-protected mutations the teach CLI / cloud agent call.
 export function assertAdmin(secret: string) {
   const expected = process.env.PUBLISH_SECRET;

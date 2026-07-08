@@ -99,6 +99,49 @@ test("getLesson / listReferences / getReference are owner+topic scoped", async (
   expect(await asAlice.query(api.content.getReference, { topicSlug: "nope", key: "grammar" })).toBeNull();
 });
 
+test("getLesson / getReference return a content URL for a blob-backed row, inline html otherwise", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const sid = await t.run((ctx) => ctx.storage.store(new Blob(["<p>blob body</p>"], { type: "text/html" })));
+  const refSid = await t.run((ctx) => ctx.storage.store(new Blob(["<p>ref blob</p>"], { type: "text/html" })));
+  await t.run(async (ctx) => {
+    await ctx.db.insert("lessons", { topicId, key: "blob", seq: 1, title: "Blob", htmlStorageId: sid });
+    await ctx.db.insert("lessons", { topicId, key: "inline", seq: 2, title: "Inline", html: "<p>inline</p>" });
+    await ctx.db.insert("references", { topicId, key: "g", title: "G", htmlStorageId: refSid, contentHash: "h" });
+  });
+  const as = asUser(t, alice);
+
+  // Blob-backed → a content URL keyed by the storageId, and NO inline html.
+  const blob = await as.query(api.content.getLesson, { topicSlug: "hindi", key: "blob" });
+  expect(blob).toMatchObject({ key: "blob", contentUrl: expect.stringContaining(`/content?id=${sid}`) });
+  expect(blob).not.toHaveProperty("html");
+
+  // Transition row (inline) → the html string, and NO content URL.
+  const inline = await as.query(api.content.getLesson, { topicSlug: "hindi", key: "inline" });
+  expect(inline).toMatchObject({ key: "inline", html: "<p>inline</p>" });
+  expect(inline).not.toHaveProperty("contentUrl");
+
+  const ref = await as.query(api.content.getReference, { topicSlug: "hindi", key: "g" });
+  expect(ref).toMatchObject({ key: "g", contentUrl: expect.stringContaining(`/content?id=${refSid}`) });
+  expect(ref).not.toHaveProperty("html");
+});
+
+test("publicLesson serves a blob-backed lesson as a content URL", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const sid = await t.run((ctx) => ctx.storage.store(new Blob(["<p>public blob</p>"], { type: "text/html" })));
+  await t.run(async (ctx) => {
+    await ctx.db.patch(topicId, { publicToken: "pubtok" });
+    await ctx.db.insert("lessons", { topicId, key: "l1", seq: 1, title: "L1", htmlStorageId: sid });
+  });
+
+  const lesson = await t.query(api.public.publicLesson, { token: "pubtok", key: "l1" });
+  expect(lesson).toMatchObject({ key: "l1", contentUrl: expect.stringContaining(`/content?id=${sid}`) });
+  expect(lesson).not.toHaveProperty("html");
+});
+
 test("ensureTopic creates an owned topic, backfills an unowned one, and is idempotent", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");

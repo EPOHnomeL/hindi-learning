@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { decodeEntities } from "./content";
-import { SOURCE_LANG } from "./lib";
+import { pickContentBody, SOURCE_LANG } from "./lib";
 import { langInfo } from "./languages";
 
 // The Guest read seam (issue 07 / ADR 0013). Every function here authorizes by
@@ -168,7 +168,19 @@ export const publicCourse = query({
 // or a superseded Lesson (mirrors the authed getLesson).
 export const publicLesson = query({
   args: { token: v.string(), key: v.string() },
-  returns: v.union(v.null(), v.object({ key: v.string(), seq: v.number(), title: v.string(), html: v.string() })),
+  // `contentUrl` (content blob) or inline `html` during the migration — exactly
+  // one is present (see .scratch/html-blob-storage). After the narrow step this
+  // becomes a required `contentUrl`.
+  returns: v.union(
+    v.null(),
+    v.object({
+      key: v.string(),
+      seq: v.number(),
+      title: v.string(),
+      contentUrl: v.optional(v.string()),
+      html: v.optional(v.string()),
+    }),
+  ),
   handler: async (ctx, { token, key }) => {
     const resolved = await resolveEdition(ctx, token);
     if (!resolved) return null;
@@ -191,7 +203,7 @@ export const publicLesson = query({
       key: lesson.key,
       seq: lesson.seq,
       title: decodeEntities(t?.title ?? lesson.title),
-      html: t?.html ?? lesson.html ?? "",
+      ...pickContentBody(t, lesson),
     };
   },
 });
@@ -199,7 +211,15 @@ export const publicLesson = query({
 // One Reference's HTML for a Guest. Null for an unknown/wrong token or key.
 export const publicReference = query({
   args: { token: v.string(), key: v.string() },
-  returns: v.union(v.null(), v.object({ key: v.string(), title: v.string(), html: v.string() })),
+  returns: v.union(
+    v.null(),
+    v.object({
+      key: v.string(),
+      title: v.string(),
+      contentUrl: v.optional(v.string()),
+      html: v.optional(v.string()),
+    }),
+  ),
   handler: async (ctx, { token, key }) => {
     const resolved = await resolveEdition(ctx, token);
     if (!resolved) return null;
@@ -218,6 +238,6 @@ export const publicReference = query({
               q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "reference").eq("key", key),
             )
             .unique();
-    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), html: t?.html ?? ref.html ?? "" };
+    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), ...pickContentBody(t, ref) };
   },
 });

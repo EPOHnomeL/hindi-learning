@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, getViewableTopic, heldLangs, readableLang, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import { assertAdmin, getOwnedTopic, getViewableTopic, heldLangs, pickContentBody, readableLang, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
 import { isCallerAdmin } from "./whitelist";
@@ -324,7 +324,9 @@ export const getLesson = query({
       key: lesson.key,
       seq: lesson.seq,
       title: decodeEntities(t?.title ?? lesson.title),
-      html: t?.html ?? lesson.html ?? "",
+      // The body is served as a content URL (content blob) or, on transition
+      // rows, inline html — from the translated row if it has one, else source.
+      ...pickContentBody(t, lesson),
     };
   },
 });
@@ -364,7 +366,7 @@ export const getReference = query({
       .unique();
     if (!ref) return null;
     const t = await trOne(ctx, topic._id, effLang, "reference", key);
-    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), html: t?.html ?? ref.html ?? "" };
+    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), ...pickContentBody(t, ref) };
   },
 });
 
