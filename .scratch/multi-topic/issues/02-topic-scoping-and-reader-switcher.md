@@ -1,6 +1,6 @@
 # 02 — Topic scoping + reader switcher (tracer bullet)
 
-Status: ready-for-agent
+Status: done — topic scoping + owner-scoped listTopics + per-slug reader shipped
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md). Spec: [`../PRD.md`](../PRD.md).
 

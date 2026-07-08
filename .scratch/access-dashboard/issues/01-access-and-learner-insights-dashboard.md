@@ -1,6 +1,6 @@
 # 01 — Access & learner-insights dashboard
 
-Status: needs-triage
+Status: open (deferred tracker) — no revoke mutation, owner-side 'who has access' query, or dashboard route
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Share**, **Viewer**, **Edition**, **Progress**, **Question**).
 Related specs: [`../../topic-sharing/PRD.md`](../../topic-sharing/PRD.md), [`../../course-translation/`](../../course-translation/), [`../../ui-redesign/`](../../ui-redesign/).

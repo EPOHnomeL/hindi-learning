@@ -1,6 +1,6 @@
 # 01 — AI-assisted course editing (author edits a course via AI)
 
-Status: needs-triage (deferred — post-demo upgrade; captured in the 2026-06-30 product-direction grilling)
+Status: open (deferred post-demo) — the review/approve gate + edit-intents are not built (lessons auto-publish)
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Topic, Lesson, Reference, Question, Routine, Frontier). Relates to [ADR 0001](../../../docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md) (no LLM in the web app), [ADR 0003](../../../docs/adr/0003-immutable-lessons-mutable-references.md) (immutable Lessons), and [ADR 0014](../../../docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md) (the programmatic runtime that makes a live authoring agent feasible).
 

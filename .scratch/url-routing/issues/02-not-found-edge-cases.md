@@ -1,6 +1,6 @@
 # 02 — Not-found & deep-link edge cases
 
-Status: ready-for-agent
+Status: partial — loading guard + inline 'not found' only; no not-found.tsx / uniform 404
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Topic**/course, **Lesson**, **Reference**, **Viewer**). Spec: [`../PRD.md`](../PRD.md). Decisions: [ADR 0012](../../../docs/adr/0012-app-router-url-addressable-navigation.md).
 

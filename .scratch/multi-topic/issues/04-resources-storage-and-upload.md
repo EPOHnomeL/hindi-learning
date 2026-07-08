@@ -1,6 +1,6 @@
 # 04 — Resources: schema, file storage, dashboard upload
 
-Status: ready-for-agent
+Status: done — Resource schema + file-storage upload + dashboard/sidebar UI shipped (13c7ee0)
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Resource). Spec: [`../PRD.md`](../PRD.md).
 Decision: [ADR 0009](../../../docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md).

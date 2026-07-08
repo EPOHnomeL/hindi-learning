@@ -1,6 +1,6 @@
 # 08 — Whitelist the 4 users + gate the on-demand button (usage control)
 
-Status: ready-for-human
+Status: done — Allowlist is now an admin-managed table (supersedes the env step, 78780d1); on-demand + new-course caps shipped (6ef3148, 1ad476c). Remaining human step: admin adds emails via the portal
 
 Spec: [`../PRD.md`](../PRD.md). Decision:
 [ADR 0010](../../../docs/adr/0010-teaching-compute-swappable-adapter.md).

@@ -1,6 +1,6 @@
 # Edition-removal race + translation cleanup nits
 
-Status: ready-for-agent
+Status: partial — removal race + error-clear shipped (a255df8); remaining: drop the dead by_topic_email_lang index and record the setTopicPublic decision
 
 > Deferred follow-up from the PR #4 review. One narrow correctness race plus a
 > few low-risk cleanups, grouped because they all concern the Edition/job

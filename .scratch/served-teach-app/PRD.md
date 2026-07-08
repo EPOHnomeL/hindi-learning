@@ -1,6 +1,6 @@
 # PRD: Served Teach App (v1)
 
-Status: ready-for-agent
+Status: done — shipped on Convex + Next.js (ADR 0009) and deployed on Vercel (rearchitected from the Neon/R2/Hono plan)
 
 > Vocabulary in this document follows [`CONTEXT.md`](../../CONTEXT.md). Decisions follow ADRs [0001](../../docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md), [0002](../../docs/adr/0002-local-workspace-source-of-truth-neon-mirror-via-mcp.md), [0003](../../docs/adr/0003-immutable-lessons-mutable-references.md), [0004](../../docs/adr/0004-cloudflare-access-for-v1-auth.md), [0005](../../docs/adr/0005-r2-for-artifact-blobs-served-privately.md).
 

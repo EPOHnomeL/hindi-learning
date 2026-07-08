@@ -1,6 +1,6 @@
 # PRD: Internal Course-Studio Demo (Phase 0)
 
-Status: ready-for-agent
+Status: partial — chrome/brand/mobile + sponsor path done; publish-gate, cost instrumentation, and shadcn remain open
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md). Decisions respect ADRs
 > [0001](../../docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md) (no LLM in the web app),

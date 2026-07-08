@@ -1,6 +1,6 @@
 # 01 — Streamline the routine's effort: course creation, lesson creation, Q&A
 
-Status: ready-for-agent
+Status: partial — AUTHORING contract + CAPTURE.json + deterministic setup shipped (df62360, a6c8c75); lean materialiseTopic digest, source-cache reuse, and curriculum outline remain
 Priority: **high** — sits **above** the remaining `topic-sharing` / backlog
 `ready-for-agent` items. Every run pays this tax; it compounds as Topics and
 lessons grow, and it directly bounds Claude spend (issue 08's concern).

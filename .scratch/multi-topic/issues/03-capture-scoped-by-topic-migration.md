@@ -1,6 +1,6 @@
 # 03 — Capture scoped by Topic (migration)
 
-Status: ready-for-agent
+Status: done — capture topic-scoped; migrated then narrowed (51d8a26)
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md). Spec: [`../PRD.md`](../PRD.md).
 Decision: [ADR 0009](../../../docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md).

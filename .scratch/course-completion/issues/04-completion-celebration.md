@@ -1,6 +1,6 @@
 # 04 — The completion celebration (confetti + reveal + claim)
 
-Status: ready-for-agent
+Status: done — shipped ff7ec91 (in-modal claim later superseded by auto-open, 7575a92)
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Certificate**, **Completion**). Spec: [`../PRD.md`](../PRD.md).
 

@@ -1,6 +1,6 @@
 # 02 — Certificates: relation, eligibility, claim, and the anonymous read seam
 
-Status: ready-for-agent
+Status: done — shipped 5b064e4
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Certificate**, **Certificate link**, **Completion**). Spec: [`../PRD.md`](../PRD.md). Decision: [ADR 0015](../../../docs/adr/0015-course-completion-and-certificates.md).
 

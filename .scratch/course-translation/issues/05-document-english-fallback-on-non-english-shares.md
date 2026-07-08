@@ -1,6 +1,6 @@
 # Document: a non-English share still exposes English source for untranslated items
 
-Status: ready-for-agent
+Status: done — documented in docs/translation.md §6 (2119c38)
 
 > Deferred follow-up from the PR #4 review. NOT a bug — the by-design per-item
 > fallback — but a confidentiality expectation worth writing down.

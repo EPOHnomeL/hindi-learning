@@ -1,6 +1,6 @@
 # PRD: Admin portal for the Allowlist
 
-Status: ready-for-agent
+Status: shipped — admission gate + admin portal delivered (78780d1, 455d2e3, 42fc3f3)
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — in particular the new
 > **Allowlist** and **Admin** terms added for this feature. Decision recorded in

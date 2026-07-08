@@ -1,6 +1,6 @@
 # The course mission is translated + billed on every Edition but never read
 
-Status: needs-triage
+Status: open — no product decision taken; the Mission is still translated but every surface still renders English
 
 > Deferred follow-up from the PR #4 review (product decision needed).
 

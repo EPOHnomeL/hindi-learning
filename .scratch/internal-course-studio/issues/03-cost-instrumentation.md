@@ -1,6 +1,6 @@
 # 03 — Cost instrumentation (tokens per Routine run)
 
-Status: ready-for-agent
+Status: open — no token/usage recording or per-Topic aggregate
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Routine, Topic, Generation). Spec: [`../PRD.md`](../PRD.md). Respects [ADR 0008](../../../docs/adr/0008-next-lesson-routine-gate-in-convex.md) / [ADR 0009](../../../docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md) (the gate + report path).
 

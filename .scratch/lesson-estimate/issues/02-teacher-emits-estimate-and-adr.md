@@ -1,6 +1,6 @@
 # 02 — Teacher emits the estimate + advisory ADR
 
-Status: ready-for-agent
+Status: open — routine-prompt + teach SKILL note + ADR 0018 not written
 
 ## Parent
 

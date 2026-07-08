@@ -1,6 +1,6 @@
 # PRD: Estimated lesson count ("~N lessons")
 
-Status: ready-for-agent
+Status: partial — issue 01 built + tested (uncommitted working tree at audit); issue 02 (docs/ADR) not started
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — **Topic**, **Lesson**,
 > **Routine**, **Frontier**, **Mission**, **owner** vs **Viewer**, **Completion**,

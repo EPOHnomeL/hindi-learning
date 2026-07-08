@@ -1,6 +1,6 @@
 # 09 — Migrate the existing Hindi Topic onto the new model
 
-Status: ready-for-agent
+Status: partial — migration tooling shipped (56682dc); remaining: remove Handbook.pdf from git after confirming the Convex Resource reads back, and confirm the prod run happened
 
 Spec: [`../PRD.md`](../PRD.md). Decision:
 [ADR 0009](../../../docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md).

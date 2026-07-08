@@ -1,6 +1,6 @@
 # 07 — Topic creation (Seed) + Mission flow + bootstrap gate
 
-Status: ready-for-agent
+Status: done — Seed form, Mission draft/edit round-trip, and bootstrap gate shipped
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Seed, Mission, Topic). Spec: [`../PRD.md`](../PRD.md).
 

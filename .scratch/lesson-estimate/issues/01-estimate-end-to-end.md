@@ -1,6 +1,6 @@
 # 01 — `~N lessons` estimate, end-to-end
 
-Status: ready-for-agent
+Status: done — implemented + tested; present in the working tree but not yet committed at audit time (2026-07-08)
 
 ## Parent
 

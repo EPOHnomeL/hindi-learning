@@ -1,6 +1,6 @@
 # Translate action: retries, timeout, and bounded fan-out
 
-Status: ready-for-agent
+Status: obsolete — in-app Claude fan-out removed in the cloud-Routine cut-over (674ebd6); reliability now owned by the cloud run
 
 > Deferred follow-up from the PR #4 (course-translation / Editions) review.
 > Flagged IMPORTANT by both the Convex and security reviews. Not a security hole

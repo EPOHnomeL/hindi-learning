@@ -1,6 +1,6 @@
 # 04 — shadcn/ui foundation (reconciled with the existing design system)
 
-Status: ready-for-agent
+Status: open — shadcn/ui not installed; UI is hand-rolled Tailwind v4 primitives (ui.tsx)
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md). Spec: [`../PRD.md`](../PRD.md). Respects [ADR 0011](../../../docs/adr/0011-app-driven-theme-into-sandboxed-lesson-iframe.md) (app → iframe theme bridge).
 

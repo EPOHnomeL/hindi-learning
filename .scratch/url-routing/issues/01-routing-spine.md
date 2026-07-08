@@ -1,6 +1,6 @@
 # 01 — Routing spine: URL-addressable dashboard → course → Lesson (tracer bullet)
 
-Status: ready-for-agent
+Status: done — App Router URL-addressable routes shipped (d86558c)
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Topic**/course, **Lesson**, **Reference**, **Frontier**, **Share**, **Viewer**). Spec: [`../PRD.md`](../PRD.md). Decisions: [ADR 0012](../../../docs/adr/0012-app-router-url-addressable-navigation.md).
 
