@@ -1,6 +1,6 @@
 # 01 — ArticleSkeleton for the lesson/reference readers
 
-Status: ready-for-agent
+Status: done — shipped de9a9d5 (reader skeleton), b336e62 (auth gate/interstitials); fix 9c4b1a8.
 
 Spec: ../PRD.md
 

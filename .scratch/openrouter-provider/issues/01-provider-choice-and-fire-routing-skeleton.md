@@ -1,6 +1,6 @@
 # Provider choice + fire-routing skeleton
 
-Status: ready-for-agent
+Status: done — shipped e9f6ca6, dcd640b, 0b61e1f (per-course provider, fire branch, create-course form).
 
 > First slice of the OpenRouter provider line. See
 > [`../PRD.md`](../PRD.md) and

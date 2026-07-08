@@ -1,6 +1,6 @@
 # Content-blob serving foundation (expand)
 
-Status: ready-for-agent
+Status: done — merged to main via PR #7 (html-blob-storage).
 
 ## What to build
 

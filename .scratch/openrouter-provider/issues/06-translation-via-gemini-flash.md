@@ -1,6 +1,6 @@
 # Translation via Gemini 3.5 Flash
 
-Status: ready-for-agent
+Status: done — shipped 8412566, 3620d0e (all translation routed through Gemini); reference styling d1ef376.
 
 > The translate side of the OpenRouter provider line. Follows the course's
 > provider. See [`../PRD.md`](../PRD.md) and

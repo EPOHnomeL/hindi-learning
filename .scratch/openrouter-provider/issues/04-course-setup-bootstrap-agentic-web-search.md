@@ -1,6 +1,6 @@
 # Course setup / bootstrap (agentic + web search)
 
-Status: ready-for-agent
+Status: done — shipped b96fc51 (web-grounded bootstrap); review fixes 5779bc5, dd72fc0.
 
 > The first-run experience for a new OpenRouter course. Builds on the single-pass
 > authoring core from issue 03. See [`../PRD.md`](../PRD.md).

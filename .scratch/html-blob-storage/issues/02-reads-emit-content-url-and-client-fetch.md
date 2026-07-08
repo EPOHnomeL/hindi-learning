@@ -1,6 +1,6 @@
 # Reads emit a content URL + client fetches it
 
-Status: ready-for-agent
+Status: done — merged to main via PR #7; fix 2176328 (key fetched body to its URL).
 
 ## What to build
 

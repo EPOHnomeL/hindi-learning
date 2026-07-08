@@ -1,6 +1,6 @@
 # OpenRouter client + bundled authoring assets
 
-Status: ready-for-agent
+Status: done — shipped 6272894, 99c4de6, ea699d8, 5bdf38d (env chat-completions client, bundled teach assets, wrap/parse helpers, provider seam).
 
 > Shared infrastructure for every OpenRouter action (authoring + translation).
 > See [`../PRD.md`](../PRD.md).

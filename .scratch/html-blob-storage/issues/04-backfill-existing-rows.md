@@ -1,6 +1,6 @@
 # Backfill existing rows (migrate)
 
-Status: ready-for-agent
+Status: done — shipped 715636e (backfill action), 63d46fc (verify), cc626a7 (strip inline html); merged via PRs #8/#9.
 
 ## What to build
 

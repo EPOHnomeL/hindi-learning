@@ -1,6 +1,6 @@
 # 01 — Source Lesson hover-edit, end-to-end
 
-Status: ready-for-agent
+Status: done — shipped a41aa9a (write path), bbaa7c8 (editor); fix aaea5f3 (never swap body on unverifiable edit).
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Topic, Lesson, owner, Viewer, Guest, Edition). Respects — and **amends** — [ADR 0003](../../../docs/adr/0003-immutable-lessons-mutable-references.md) (immutable Lessons). Rides the content-blob write path from [`html-blob-storage`](../../html-blob-storage/PRD.md) (merged to main).
 

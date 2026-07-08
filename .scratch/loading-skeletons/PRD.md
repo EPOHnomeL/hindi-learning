@@ -1,6 +1,6 @@
 # PRD: Loading skeletons for the article reader
 
-Status: ready-for-agent
+Status: done — shipped de9a9d5, b336e62; fix 9c4b1a8 (distinct dashboard vs course skeletons).
 
 ## Problem Statement
 

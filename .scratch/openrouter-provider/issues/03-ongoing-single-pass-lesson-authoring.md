@@ -1,6 +1,6 @@
 # Ongoing single-pass lesson authoring (GLM 4.2)
 
-Status: ready-for-agent
+Status: done — shipped 1bf91d6, 996cd2d (single-pass authoring + mission-draft/materialise seam).
 
 > The core authoring path for an OpenRouter course that already has a Frontier.
 > See [`../PRD.md`](../PRD.md).

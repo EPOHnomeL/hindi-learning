@@ -1,6 +1,6 @@
 # 02 — Reference hover-edit
 
-Status: ready-for-agent
+Status: done — shipped 2b80c95 (write path), 54ca447 (editor).
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Topic, Reference, owner). References are **mutable** per [ADR 0003](../../../docs/adr/0003-immutable-lessons-mutable-references.md) — no quiz guard.
 

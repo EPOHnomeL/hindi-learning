@@ -1,6 +1,6 @@
 # Auto-terminate + estimate + batched reply
 
-Status: ready-for-agent
+Status: done — shipped 0f2476e.
 
 > Completes the OpenRouter authoring path's parity with the teach skill's
 > per-run judgement. See [`../PRD.md`](../PRD.md).

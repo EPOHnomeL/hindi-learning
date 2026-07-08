@@ -1,6 +1,6 @@
 # 03 — Translated-Edition hover-edit
 
-Status: ready-for-agent
+Status: done — shipped f2ea363 (write path), 53eb418 (editor); debebca dropped unused query field.
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Topic, Lesson, Edition, owner). Same positional quiz guard as a Routine-published translation; respects [ADR 0003](../../../docs/adr/0003-immutable-lessons-mutable-references.md).
 

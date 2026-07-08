@@ -1,6 +1,6 @@
 # PRD: OpenRouter provider line (GLM 4.2 authoring + Gemini translation)
 
-Status: proposed — from the 2026-07-08 grilling session (grill-with-docs)
+Status: done — merged to main via PR #6 (9a40b69); all six vertical slices shipped. (Grilled 2026-07-08, grill-with-docs.)
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md). This feature builds the
 > first, spike-grade slice of
