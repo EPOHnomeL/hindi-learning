@@ -483,3 +483,68 @@ test("editLesson: rejects a non-owner and an unauthenticated caller; the lesson 
   const lesson = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
   expect(lesson).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldSid}`) });
 });
+
+// ---- editReference: owner edit of a source Reference (course-content-editing 02)
+
+async function seedReference(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, key: string, storageId: Id<"_storage">) {
+  await t.run((ctx) => ctx.db.insert("references", { topicId, key, title: "Grammar", htmlStorageId: storageId, contentHash: "h" }));
+}
+
+test("editReference: owner edits a Reference — new blob served, old deleted, no quiz guard", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, "<p>old cheat-sheet</p>");
+  await seedReference(t, topicId, "grammar", oldSid);
+
+  // References are mutable (ADR 0003) — even a body carrying quiz-like markers is
+  // accepted, since no structure guard applies.
+  const newSid = await storeHtml(t, QUIZ_BODY);
+  await asUser(t, alice).mutation(api.content.editReference, { topicSlug: "hindi", key: "grammar", storageId: newSid });
+
+  const ref = await asUser(t, alice).query(api.content.getReference, { topicSlug: "hindi", key: "grammar" });
+  expect(ref).toMatchObject({ key: "grammar", contentUrl: expect.stringContaining(`/content?id=${newSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).toBeNull(); // old blob cleaned up
+  expect(await t.run((ctx) => ctx.db.system.get(newSid))).not.toBeNull();
+});
+
+test("editReference: refuses an unreadable upload and preserves the current body", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, "<p>good body</p>");
+  await seedReference(t, topicId, "grammar", oldSid);
+
+  const deadSid = await t.run(async (ctx) => {
+    const id = await ctx.storage.store(new Blob(["tmp"], { type: "text/html" }));
+    await ctx.storage.delete(id);
+    return id;
+  });
+  await expect(
+    asUser(t, alice).mutation(api.content.editReference, { topicSlug: "hindi", key: "grammar", storageId: deadSid }),
+  ).rejects.toThrow();
+
+  const ref = await asUser(t, alice).query(api.content.getReference, { topicSlug: "hindi", key: "grammar" });
+  expect(ref).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).not.toBeNull();
+});
+
+test("editReference: rejects a non-owner and an unauthenticated caller; the reference is untouched", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const bob = await seedUser(t, "bob@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, "<p>original</p>");
+  await seedReference(t, topicId, "grammar", oldSid);
+
+  const bobSid = await storeHtml(t, "<p>hijacked</p>");
+  await expect(
+    asUser(t, bob).mutation(api.content.editReference, { topicSlug: "hindi", key: "grammar", storageId: bobSid }),
+  ).rejects.toThrow();
+  await expect(
+    t.mutation(api.content.editReference, { topicSlug: "hindi", key: "grammar", storageId: bobSid }),
+  ).rejects.toThrow();
+
+  const ref = await asUser(t, alice).query(api.content.getReference, { topicSlug: "hindi", key: "grammar" });
+  expect(ref).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldSid}`) });
+});

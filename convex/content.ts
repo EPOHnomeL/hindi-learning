@@ -325,6 +325,39 @@ export const editLesson = action({
   },
 });
 
+// Owner corrects a Reference's body in place (course-content-editing 02).
+// References are mutable by design (ADR 0003), so — unlike a Lesson — there is NO
+// quiz-structure guard: any prose edit is accepted. That means no blob bytes need
+// reading, so this is a plain owner-guarded mutation, not an action. `contentHash`
+// is left untouched: it hashes the *source* (the teach CLI's skip-unchanged key),
+// so keeping it means a later re-publish from an unchanged source won't clobber
+// this manual edit — only a genuine source change overwrites it (current-wins).
+// The prior blob is deleted (no orphan). The storageId is checked for existence
+// first (a mutation can't read bytes, but `db.system.get` confirms the blob is
+// real) so a bogus/consumed upload can't swap in a dead id and destroy the body.
+export const editReference = mutation({
+  args: { topicSlug: v.string(), key: v.string(), storageId: v.id("_storage") },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, key, storageId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const ref = await ctx.db
+      .query("references")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+      .unique();
+    if (!ref) throw new Error("reference not found");
+    if (!(await ctx.db.system.get(storageId))) {
+      throw new Error("The edited reference couldn't be read back. Please try saving again.");
+    }
+    const old = ref.htmlStorageId;
+    await ctx.db.patch(ref._id, { htmlStorageId: storageId });
+    if (old && old !== storageId) await ctx.storage.delete(old);
+    return null;
+  },
+});
+
 // Owner-driven Completion (ADR 0015): the owner concludes their own course — the
 // escape hatch for open-ended missions the teach skill won't auto-terminate.
 // Owner-only (a Viewer is refused by the owner gate, PRD story 9); once
