@@ -147,6 +147,25 @@ function injectDevanagariCss(html: string): string {
   return i === -1 ? DEVANAGARI_CSS + html : html.slice(0, i) + DEVANAGARI_CSS + html.slice(i);
 }
 
+// Some authored references arrive as a bare fragment (e.g. `<section
+// class="glossary">…</section>`) with all page styling scoped to that element,
+// not a full <html> document. The rest of this pipeline assumes a document:
+// setRootTheme, the dark-CSS injection (before </head>) and the bridge injection
+// (before </body>) all silently no-op on a fragment, so the theme never bakes and
+// — worse — nothing paints the document `body`, leaving the iframe's default white
+// canvas showing around the content (the fragment reads as a narrow card floating
+// on white instead of a full-bleed page like the well-formed references). Wrap any
+// fragment in a minimal document: a viewport meta (device-width on mobile) and a
+// body carrying the reference paper background (theme-aware, matching
+// REFERENCE_DARK_CSS) so it renders full-bleed and consistent with the others.
+const FRAGMENT_HEAD = `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<style>html,body{margin:0}body{background:#fbf7f0}:root[data-theme="dark"] body{background:#1b1815}</style>`;
+
+function ensureDocument(html: string): string {
+  if (/<html[\s>]/i.test(html)) return html;
+  return `<!DOCTYPE html><html lang="en"><head>${FRAGMENT_HEAD}</head><body>${html}</body></html>`;
+}
+
 // Bake the selected theme onto the root <html> so the lesson renders in the
 // right palette with no flash.
 function setRootTheme(html: string, theme: Theme): string {
@@ -195,7 +214,7 @@ export function buildSrcDoc(
   html: string,
   opts: { quiz: boolean; theme?: Theme; themeCss?: boolean; dir?: "ltr" | "rtl"; lang?: string },
 ): string {
-  let doc = html;
+  let doc = ensureDocument(html);
   if (opts.theme) {
     doc = stripLegacyThemePill(doc);
     doc = setRootTheme(doc, opts.theme);

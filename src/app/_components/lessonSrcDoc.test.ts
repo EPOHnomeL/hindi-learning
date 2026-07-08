@@ -78,6 +78,31 @@ describe("buildSrcDoc", () => {
     expect(out).not.toContain("Noto Serif Devanagari"); // no font override for Spanish
   });
 
+  it("wraps a fragment reference in a full document so theming + full-bleed background attach", () => {
+    // Some authored references are a bare fragment (e.g. `<section class="glossary">…`)
+    // with all styling scoped to that element rather than a full <html> document.
+    // Without a document, setRootTheme/dark-CSS/script injection all no-op and the
+    // iframe body keeps the browser-default white — the content floats as a narrow
+    // card on white instead of a full-bleed page like the well-formed references.
+    const fragment = `<section class="glossary"><h1>Terms</h1><p>hi</p></section>`;
+    const out = buildSrcDoc(fragment, { quiz: false, theme: "light", themeCss: true });
+    expect(out).toContain("<html"); // wrapped into a real document
+    expect(out).toContain('data-theme="light"'); // theme now bakes onto the synthesized <html>
+    expect(out).toContain("__lessonTheme"); // theme bridge attaches (needs </body>)
+    expect(out).toContain(':root[data-theme="dark"]'); // dark palette injected into synthesized <head>
+    expect(out).toContain('class="glossary"'); // original content preserved
+    // The synthesized body carries the paper background so the page is full-bleed,
+    // and a viewport meta so it renders at device width on mobile.
+    expect(out).toContain("initial-scale=1");
+    expect(out).toMatch(/body\s*\{[^}]*background/);
+  });
+
+  it("leaves a full-document reference un-wrapped (no double <html>)", () => {
+    const ref = `<!DOCTYPE html><html lang="en"><head><style>:root{--paper:#fbf7f0}</style></head><body><p>ref</p></body></html>`;
+    const out = buildSrcDoc(ref, { quiz: false, theme: "light", themeCss: true });
+    expect(out.match(/<html/gi)?.length).toBe(1); // still exactly one <html>
+  });
+
   it("themes a reference: bakes theme, injects the dark palette into <head>, adds the bridge", () => {
     const ref = `<!DOCTYPE html><html lang="en"><head><style>:root{--paper:#fbf7f0}</style></head><body><div class="term"><div class="name">x</div></div></body></html>`;
     const out = buildSrcDoc(ref, { quiz: false, theme: "dark", themeCss: true });
