@@ -40,6 +40,8 @@ async function publishAuthoredLesson(
   seq: number,
   result: AuthoringResult,
 ): Promise<void> {
+  // Only reached on the author path, where the contract requires a lesson.
+  if (!result.lessonHtml || !result.learningRecord) throw new Error("authoring: no lesson to publish");
   const html = assembleLesson(result.lessonHtml);
   const title = titleFrom(html);
   const key = nextLessonKey(seq, title);
@@ -52,7 +54,22 @@ async function publishAuthoredLesson(
     html,
     supersedes: supersedesFrom(html),
   });
-  await ctx.runMutation(api.content.publishLearningRecord, { secret, topicId, key, seq, markdown: result.learningRecord });
+  await ctx.runMutation(api.content.publishLearningRecord, { secret, topicId, key, seq, markdown: result.learningRecord! });
+}
+
+// Batched Q&A (issue 05): answer the open questions the model replied to, matching
+// on the ids we handed it so a stray/hallucinated id is ignored. Same delayed
+// cadence as the Claude path — replies land as part of the authoring run.
+async function applyReplies(ctx: ActionCtx, secret: string, context: ProviderContext, result: AuthoringResult): Promise<void> {
+  const known = new Set(context.capture.openQuestions.map((q) => q.id));
+  for (const r of result.replies) {
+    if (!known.has(r.questionId)) continue;
+    await ctx.runMutation(api.capture.replyToQuestion, {
+      secret,
+      questionId: r.questionId as Id<"questions">,
+      reply: r.reply,
+    });
+  }
 }
 
 // A whole authoring run for one topic. Two paths, chosen by the Frontier:
@@ -116,9 +133,28 @@ export const authorTopic = internalAction({
         return null;
       }
 
-      // Ongoing single-pass: one GLM 4.2 call for the next lesson (no web search).
+      // Ongoing single-pass: one GLM 4.2 call that judges completion, authors the
+      // next lesson (unless complete), and batches replies (no web search).
       const raw = await chatComplete({ model, messages: buildOngoingMessages(context) });
       const result = parseAuthoringResult(raw);
+
+      // Answer open questions regardless of the author-vs-complete branch.
+      await applyReplies(ctx, secret, context, result);
+
+      if (result.complete) {
+        // Terminate (ADR 0015): complete with NO emblem — a finished OpenRouter
+        // course falls back to the generic 🎓 (the owner may set one). Report
+        // `nothing` so the reader stops offering "Generate next lesson".
+        await ctx.runMutation(api.content.completeCourse, { secret, topicSlug });
+        await ctx.runMutation(api.routine.reportGeneration, {
+          secret,
+          topicSlug,
+          outcome: "nothing",
+          estimatedLessons: result.estimatedLessons,
+        });
+        return null;
+      }
+
       await publishAuthoredLesson(ctx, secret, context.topicId, context.frontier.seq + 1, result);
       await ctx.runMutation(api.routine.reportGeneration, {
         secret,

@@ -100,6 +100,51 @@ test("ongoing single-pass authors the next lesson, wraps+shuffles it, publishes 
   expect((await t.run((ctx) => ctx.db.get(topicId)))?.estimatedLessons).toBe(9);
 });
 
+test("a run that judges the mission met completes the course (no emblem), authors nothing, reports the estimate", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await seedOngoing(t);
+  stubModel(JSON.stringify({ complete: true, estimatedLessons: 6 }));
+
+  await t.action(internal.openrouter.authorTopic, { topicSlug: "glm" });
+
+  const topic = await t.run((ctx) => ctx.db.get(topicId));
+  expect(topic?.status).toBe("completed"); // reader stops offering "Generate next lesson"
+  expect(topic?.emblem).toBeUndefined(); // no emblem → generic 🎓 fallback
+  expect(topic?.estimatedLessons).toBe(6);
+  // No new lesson; the terminate run reports `nothing` (→ caughtUp, lock clean).
+  const lessons = await t.run((ctx) => ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect());
+  expect(lessons.some((l) => l.seq === 2)).toBe(false);
+  expect(await genStatus(t, topicId)).toBe("caughtUp");
+});
+
+test("open learner questions are answered during the authoring run", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await seedOngoing(t);
+  const qId = await t.run(async (ctx) => {
+    const alice = (await ctx.db.query("users").first())!._id;
+    return await ctx.db.insert("questions", {
+      userId: alice,
+      topicId,
+      lessonKey: "0001-intro",
+      text: "What is the aorist?",
+      status: "open",
+    });
+  });
+  stubModel(
+    JSON.stringify({
+      lessonHtml: LESSON_FRAGMENT,
+      learningRecord: "# Lesson 2\nr",
+      replies: [{ questionId: qId, reply: "A past-tense aspect." }],
+    }),
+  );
+
+  await t.action(internal.openrouter.authorTopic, { topicSlug: "glm" });
+
+  const q = await t.run((ctx) => ctx.db.get(qId));
+  expect(q?.status).toBe("answered");
+  expect(q?.reply).toBe("A past-tense aspect.");
+});
+
 test("a model/parse failure reports failed (retryable) and authors nothing", async () => {
   const t = convexTest(schema, modules);
   const { topicId } = await seedOngoing(t);

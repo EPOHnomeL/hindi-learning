@@ -61,13 +61,37 @@ test("nextLessonKey zero-pads the seq and dash-cases the title", () => {
 
 test("parseAuthoringResult reads the JSON contract, tolerating a code fence", () => {
   const raw = "```json\n" + JSON.stringify({ lessonHtml: "<title>x</title>", learningRecord: "# r", estimatedLessons: 8 }) + "\n```";
-  expect(parseAuthoringResult(raw)).toEqual({ lessonHtml: "<title>x</title>", learningRecord: "# r", estimatedLessons: 8 });
+  expect(parseAuthoringResult(raw)).toEqual({
+    complete: false,
+    lessonHtml: "<title>x</title>",
+    learningRecord: "# r",
+    estimatedLessons: 8,
+    replies: [],
+  });
 
   // Estimate is optional; absent → undefined.
   expect(parseAuthoringResult(JSON.stringify({ lessonHtml: "<h1>a</h1>", learningRecord: "r" })).estimatedLessons).toBeUndefined();
 });
 
-test("parseAuthoringResult throws on malformed or incomplete output", () => {
+test("parseAuthoringResult surfaces a terminate decision without a lesson", () => {
+  const done = parseAuthoringResult(JSON.stringify({ complete: true, estimatedLessons: 6 }));
+  expect(done.complete).toBe(true);
+  expect(done.lessonHtml).toBeUndefined();
+  expect(done.estimatedLessons).toBe(6);
+});
+
+test("parseAuthoringResult collects well-formed replies and drops malformed ones", () => {
+  const r = parseAuthoringResult(
+    JSON.stringify({
+      lessonHtml: "<h1>a</h1>",
+      learningRecord: "r",
+      replies: [{ questionId: "q1", reply: "yes" }, { questionId: 5, reply: "bad" }, { reply: "no id" }],
+    }),
+  );
+  expect(r.replies).toEqual([{ questionId: "q1", reply: "yes" }]);
+});
+
+test("parseAuthoringResult throws on malformed output or a non-complete run missing its lesson", () => {
   expect(() => parseAuthoringResult("not json at all")).toThrow();
   expect(() => parseAuthoringResult(JSON.stringify({ learningRecord: "r" }))).toThrow(/lessonHtml/);
 });
@@ -96,5 +120,5 @@ test("buildMissionMessages injects the seed and asks for the mission contract", 
 
 test("buildOngoingMessages targets seq 1 when there is no Frontier (first lesson)", () => {
   const [, user] = buildOngoingMessages(SEEDED_CTX);
-  expect(user.content).toContain("Author lesson number 1");
+  expect(user.content).toContain("lesson number 1");
 });

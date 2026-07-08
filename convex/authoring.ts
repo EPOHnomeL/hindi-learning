@@ -65,16 +65,24 @@ export function nextLessonKey(seq: number, title: string): string {
   return `${String(seq).padStart(4, "0")}-${slugify(title) || "lesson"}`;
 }
 
+export type AuthoringReply = { questionId: string; reply: string };
 export type AuthoringResult = {
-  lessonHtml: string;
-  learningRecord: string;
+  // The run's terminate judgement (issue 05): the mission is substantially met /
+  // ZPD exhausted, so complete the course instead of authoring.
+  complete: boolean;
+  // Present unless `complete` — the next lesson + its record.
+  lessonHtml?: string;
+  learningRecord?: string;
   estimatedLessons?: number;
+  // Batched answers to the open questions passed in context.
+  replies: AuthoringReply[];
 };
 
-// The single-pass output contract: the model returns one JSON object with the
-// lean lesson fragment, its learning record markdown, and an optional ~N estimate.
-// Tolerates a surrounding ```json code fence (models love to add one). Throws on
-// anything that isn't a usable lesson, so the action reports `failed`.
+// The single-pass output contract: the model returns one JSON object carrying the
+// terminate judgement, the next lesson (+ record) unless complete, an optional ~N
+// estimate, and batched replies. Tolerates a surrounding ```json code fence.
+// Throws on anything that isn't a usable authoring result, so the action reports
+// `failed`.
 export function parseAuthoringResult(raw: string): AuthoringResult {
   const unfenced = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
   let obj: unknown;
@@ -84,17 +92,32 @@ export function parseAuthoringResult(raw: string): AuthoringResult {
     throw new Error("authoring: response was not valid JSON");
   }
   const o = obj as Record<string, unknown>;
-  if (typeof o.lessonHtml !== "string" || o.lessonHtml.trim() === "") {
-    throw new Error("authoring: missing lessonHtml");
-  }
-  if (typeof o.learningRecord !== "string") {
-    throw new Error("authoring: missing learningRecord");
+  const complete = o.complete === true;
+  if (!complete) {
+    if (typeof o.lessonHtml !== "string" || o.lessonHtml.trim() === "") {
+      throw new Error("authoring: missing lessonHtml");
+    }
+    if (typeof o.learningRecord !== "string") {
+      throw new Error("authoring: missing learningRecord");
+    }
   }
   const estimate =
     typeof o.estimatedLessons === "number" && Number.isFinite(o.estimatedLessons)
       ? Math.max(1, Math.round(o.estimatedLessons))
       : undefined;
-  return { lessonHtml: o.lessonHtml, learningRecord: o.learningRecord, estimatedLessons: estimate };
+  const replies: AuthoringReply[] = Array.isArray(o.replies)
+    ? (o.replies as unknown[])
+        .map((r) => r as Record<string, unknown>)
+        .filter((r) => typeof r.questionId === "string" && typeof r.reply === "string")
+        .map((r) => ({ questionId: r.questionId as string, reply: r.reply as string }))
+    : [];
+  return {
+    complete,
+    lessonHtml: typeof o.lessonHtml === "string" ? o.lessonHtml : undefined,
+    learningRecord: typeof o.learningRecord === "string" ? o.learningRecord : undefined,
+    estimatedLessons: estimate,
+    replies,
+  };
 }
 
 // ---- Prompt building --------------------------------------------------------
@@ -124,13 +147,22 @@ You are running in a single pass with NO filesystem — you cannot write files o
 run tools. Instead of writing lesson/record files, return EXACTLY ONE JSON object
 and nothing else (no prose, no code fence), with these fields:
 
-- "lessonHtml": the next lesson as a LEAN HTML FRAGMENT per AUTHORING.md — content
-  only, first line \`<title>Lesson N · <display title></title>\`. Do NOT include
-  <!DOCTYPE>, <html>, <head>, <style>, <body>, <div class="wrap">, or any
-  <script>; those are wrapped on automatically. Keep the quiz markup exactly.
-- "learningRecord": the lesson's learning-record markdown per LEARNING-RECORD-FORMAT.md.
+- "complete": boolean. First judge the course against the Mission's "Success looks
+  like" outcomes. Set true ONLY when they are substantially met or the ZPD is
+  genuinely exhausted — then OMIT "lessonHtml"/"learningRecord" (the course is
+  finished). NEVER set true for a lifelong / open-ended mission. Otherwise false.
+- "lessonHtml": (required unless complete) the next lesson as a LEAN HTML FRAGMENT
+  per AUTHORING.md — content only, first line
+  \`<title>Lesson N · <display title></title>\`. Do NOT include <!DOCTYPE>, <html>,
+  <head>, <style>, <body>, <div class="wrap">, or any <script>; those are wrapped
+  on automatically. Keep the quiz markup exactly.
+- "learningRecord": (required unless complete) the lesson's learning-record
+  markdown per LEARNING-RECORD-FORMAT.md.
 - "estimatedLessons": your best whole-number estimate of the course's eventual
-  total lesson count (a number).`;
+  total lesson count (a number).
+- "replies": array of { "questionId": "<id from the Open questions above>",
+  "reply": "<answer>" } for any open learner questions you can answer now. Use []
+  if there are none.`;
 
 // Compact, readable serialisation of the course so far — the ZPD evidence the
 // generator judges the next step from (AUTHORING.md §8). Full HTML only for the
@@ -214,8 +246,10 @@ export function buildOngoingMessages(c: MaterialisedContext): ChatMessage[] {
 
 # Task
 
-Author lesson number ${nextSeq} — the next step on this learner's ZPD, grounded in
-the context above. Return the single JSON object per the output contract.`,
+First judge whether the mission is met (set "complete" accordingly — never for an
+open-ended mission). If not complete, author lesson number ${nextSeq} — the next
+step on this learner's ZPD, grounded in the context above. Answer any open
+questions in "replies". Return the single JSON object per the output contract.`,
     },
   ];
 }
