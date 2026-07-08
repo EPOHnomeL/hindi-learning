@@ -84,7 +84,12 @@ export function PublicCourseShell({ token, children }: { token: string; children
     [token],
   );
 
-  if (course === undefined) return <Centered>Loading…</Centered>;
+  if (course === undefined)
+    return (
+      <div className="p-4 md:h-screen">
+        <ReaderSkeleton />
+      </div>
+    );
   if (course === null) return <Centered>This link isn’t available — the owner may have turned it off.</Centered>;
 
   const isRef = pathname.includes("/references/");
@@ -240,10 +245,11 @@ export function PublicCourseIndex({ token }: { token: string }) {
     if (first) router.replace(`/share/${token}/lessons/${first}`);
   }, [first, token, router]);
 
-  if (course === undefined) return <Centered>Loading…</Centered>;
+  if (course === undefined) return <ReaderSkeleton />;
   if (course === null) return <Centered>This link isn’t available — the owner may have turned it off.</Centered>;
   if (course.lessons.length === 0) return <Centered>No lessons published yet.</Centered>;
-  return <Centered>Opening…</Centered>;
+  // Redirecting straight into a Lesson — mimic the reader, not a bare line.
+  return <ReaderSkeleton />;
 }
 
 export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKey: string }) {

@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { api } from "../../../convex/_generated/api";
 import { ArtifactView } from "./ArtifactView";
 import { useCourse } from "./CourseShell";
+import { ReaderSkeleton } from "./ui";
 import { LANG_KEY, useEditionLang, withLang } from "./editionUrl";
 import { firstLessonKey, frontierKey } from "./readerDerive";
 
@@ -59,13 +60,9 @@ export function CourseIndex({ slug }: { slug: string }) {
 // the first one lands). A Viewer of a shared course with no lessons gets a calm
 // "nothing yet" instead.
 function CourseStatus({ variant }: { variant: "loading" | "opening" | "preparing" | "empty-viewer" }) {
-  if (variant === "loading" || variant === "opening") {
-    return (
-      <div className="flex h-full min-h-[60vh] items-center justify-center p-8">
-        <p className="text-sm text-soft">{variant === "loading" ? "Loading…" : "Opening…"}</p>
-      </div>
-    );
-  }
+  // Both resolve straight into a Lesson, so mimic the lesson reader (with its
+  // question aside) rather than flashing a bare line of centred text.
+  if (variant === "loading" || variant === "opening") return <ReaderSkeleton />;
 
   if (variant === "empty-viewer") {
     return (

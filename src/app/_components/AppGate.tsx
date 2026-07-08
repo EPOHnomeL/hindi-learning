@@ -2,6 +2,7 @@
 
 import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
 import { SignIn } from "./SignIn";
+import { ReaderSkeleton } from "./ui";
 
 // The auth gate for every route in the (app) group (ADR 0012). Lifted out of the
 // old single page so a deep link like /courses/x/lessons/y renders <SignIn> *at
@@ -11,7 +12,9 @@ export function AppGate({ children }: { children: React.ReactNode }) {
   return (
     <main className="min-h-screen bg-paper text-ink">
       <AuthLoading>
-        <div className="grid min-h-screen place-items-center text-soft">Checking session…</div>
+        <div className="p-4 md:h-screen md:p-4">
+          <ReaderSkeleton />
+        </div>
       </AuthLoading>
       <Unauthenticated>
         <SignIn />
