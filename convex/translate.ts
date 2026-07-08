@@ -30,8 +30,11 @@ type Kind = "lesson" | "reference" | "mission" | "title" | "question";
 // The hash of a source item's content — stamped onto the translation so a later
 // re-translate can skip unchanged items. Must be computed identically wherever a
 // source item is read, so both `collectItems` and `readSource` route through here.
-function itemHash(kind: Kind, f: { title?: string; html?: string; text?: string; reply?: string }): string {
-  if (kind === "lesson" || kind === "reference") return hashString((f.title ?? "") + "|" + (f.html ?? ""));
+function itemHash(kind: Kind, f: { title?: string; html?: string; htmlStorageId?: Id<"_storage">; text?: string; reply?: string }): string {
+  // Bodies now live in content blobs; a blob-backed row has no inline `html`, so
+  // hash its stable `htmlStorageId` instead (immutable content → stable id → a
+  // valid staleness key). Falls back to inline `html` for not-yet-migrated rows.
+  if (kind === "lesson" || kind === "reference") return hashString((f.title ?? "") + "|" + (f.html ?? f.htmlStorageId ?? ""));
   if (kind === "question") return hashString((f.text ?? "") + "|" + (f.reply ?? ""));
   return hashString(f.text ?? ""); // title, mission
 }
@@ -308,8 +311,10 @@ export const publishTranslation = mutation({
 
     const html = a.html !== undefined ? stripFence(a.html) : undefined;
     // A structural drift in a Lesson's quiz markers would break positional scoring
-    // — skip it (English fallback) rather than ship a broken quiz.
-    if (a.kind === "lesson" && html !== undefined && !quizStructureMatches(src.html ?? "", html)) {
+    // — skip it (English fallback) rather than ship a broken quiz. The guard needs
+    // the source markup; once the source body is a content blob it isn't readable
+    // in a mutation, so the check is skipped (the run is trusted, secret-guarded).
+    if (a.kind === "lesson" && html !== undefined && src.html !== undefined && !quizStructureMatches(src.html, html)) {
       return { status: "skipped" };
     }
 

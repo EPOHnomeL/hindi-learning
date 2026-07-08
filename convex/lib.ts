@@ -70,6 +70,42 @@ export function hashString(s: string): string {
   return (h >>> 0).toString(16);
 }
 
+// ---- Content blobs (see .scratch/html-blob-storage) -------------------------
+
+// The read shape for a rendered body (Lesson / Reference / translated item):
+// a `contentUrl` the client fetches when the body lives in a content blob, or
+// the inline `html` string during the widen→migrate→narrow transition. Exactly
+// one is present. After the narrow step only `contentUrl` remains.
+export type ContentBody = { contentUrl: string; html?: undefined } | { contentUrl?: undefined; html: string };
+
+// The absolute URL of the `/content` HTTP route for a stored blob. Built from
+// CONVEX_SITE_URL (the deployment's `.convex.site` origin), which Convex injects
+// into every function's env. The storageId is an unguessable bearer capability;
+// callers only reach this after the query has authorized them.
+export function contentUrl(storageId: Id<"_storage">): string {
+  const base = process.env.CONVEX_SITE_URL ?? "";
+  return `${base}/content?id=${storageId}`;
+}
+
+// Resolve a row's body to its read shape: prefer the blob, fall back to inline
+// `html`. Returns an empty inline body when a row somehow has neither (never
+// expected once backfilled).
+export function contentBody(row: { htmlStorageId?: Id<"_storage">; html?: string }): ContentBody {
+  if (row.htmlStorageId) return { contentUrl: contentUrl(row.htmlStorageId) };
+  return { html: row.html ?? "" };
+}
+
+// Choose which body to serve for a translatable item: the translated row's when
+// it has one (blob or inline), else the source row's — the blob-aware twin of
+// the old `t?.html ?? source.html` fallback (course-translation).
+export function pickContentBody(
+  translated: { htmlStorageId?: Id<"_storage">; html?: string } | null | undefined,
+  source: { htmlStorageId?: Id<"_storage">; html?: string },
+): ContentBody {
+  if (translated && (translated.htmlStorageId || translated.html)) return contentBody(translated);
+  return contentBody(source);
+}
+
 // Guards the PUBLISH_SECRET-protected mutations the teach CLI / cloud agent call.
 export function assertAdmin(secret: string) {
   const expected = process.env.PUBLISH_SECRET;
