@@ -1,6 +1,6 @@
 # Global app-language picker (full chrome i18n)
 
-Status: ready-for-agent
+Status: open — chrome i18n not started; the existing pickers switch course/Edition content, not the UI locale
 
 > Blocked-by: the **course-translation** feature (Editions + content translation).
 > This issue localises the app *chrome*; that feature localises the course

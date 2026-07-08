@@ -1,6 +1,6 @@
 # 01 — Reader-visibility gate (draft → publish)
 
-Status: ready-for-agent
+Status: open — no reader-visibility/draft state or publish/unpublish; lessons go live as authored
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Topic, Lesson, Reference, Owner, Viewer, Guest, Public link, Share). Spec: [`../PRD.md`](../PRD.md). Respects [ADR 0003](../../../docs/adr/0003-immutable-lessons-mutable-references.md) (immutable Lessons) and [ADR 0013](../../../docs/adr/0013-public-link-shares.md) (Public link).
 

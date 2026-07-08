@@ -1,6 +1,6 @@
 # 01 — Completion state, the authoring stop-gate, and termination (tracer bullet)
 
-Status: ready-for-agent
+Status: done — shipped 88a2f83 (fix 488681b)
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Completion**, **Frontier**, **Routine**). Spec: [`../PRD.md`](../PRD.md). Decision: [ADR 0015](../../../docs/adr/0015-course-completion-and-certificates.md).
 

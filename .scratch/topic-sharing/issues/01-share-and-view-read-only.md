@@ -1,6 +1,6 @@
 # 01 — Share a Topic and open it read-only (tracer bullet)
 
-Status: ready-for-agent
+Status: done — shipped 0898055 (shares relation, owner-or-Viewer getViewableTopic, Shared-with-me section)
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Share**, **Viewer**). Spec: [`../PRD.md`](../PRD.md).
 

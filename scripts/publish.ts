@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
+import { shuffleQuizOptions } from "../convex/quizShuffle";
 import { convexUrl, ownerEmail, publishSecret, topicArg } from "./_env";
 
 const PROD = process.argv.includes("--prod");
@@ -51,10 +52,16 @@ const assembleLesson = (raw: string): string => {
   if (/<!DOCTYPE|<html[\s>]/i.test(fragment)) return raw; // already complete
   const title = fragment.match(/<title>[\s\S]*?<\/title>/i)?.[0] ?? "";
   const supersedes = fragment.match(/<meta\s+name=["']supersedes["'][^>]*>/i)?.[0] ?? "";
-  const content = fragment
-    .replace(/<title>[\s\S]*?<\/title>/i, "")
-    .replace(/<meta\s+name=["']supersedes["'][^>]*>/i, "")
-    .trim();
+  // Balance the correct-answer position: the authoring model clusters it at the
+  // first option, so shuffle each quiz's options deterministically here before
+  // storing (same helper the backfill uses). Author intent (data-correct) is
+  // preserved; only display order changes. See .scratch/quiz-shuffle/PRD.md.
+  const content = shuffleQuizOptions(
+    fragment
+      .replace(/<title>[\s\S]*?<\/title>/i, "")
+      .replace(/<meta\s+name=["']supersedes["'][^>]*>/i, "")
+      .trim(),
+  );
   return `<!DOCTYPE html>
 <html lang="en">
 <head>

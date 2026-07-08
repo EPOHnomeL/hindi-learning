@@ -1,6 +1,6 @@
 # 06 — Resource ingestion: lazy render + cache back
 
-Status: ready-for-agent
+Status: done — lazy render/extract cache-back seam shipped (2038398)
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Resource). Spec: [`../PRD.md`](../PRD.md).
 Decision: [ADR 0009](../../../docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md).

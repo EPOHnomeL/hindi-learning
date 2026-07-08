@@ -1,6 +1,6 @@
 # 05 — Chrome restyle + brand + mobile polish
 
-Status: ready-for-agent
+Status: done — chrome/brand/mobile restyled (26a69f8, 4664ad0, 8c1e813), on hand-rolled primitives rather than shadcn
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md). Spec: [`../PRD.md`](../PRD.md). Respects [ADR 0011](../../../docs/adr/0011-app-driven-theme-into-sandboxed-lesson-iframe.md) (theme bridge).
 

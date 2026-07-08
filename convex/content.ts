@@ -106,6 +106,15 @@ export const dashboard = query({
     const cards = await Promise.all(
       topics.map(async (t) => {
         const counts = await topicLessonCounts(ctx, t._id, userId);
+        // The soft `~N lessons` estimate (PRD: Estimated lesson count). Owner-only
+        // by construction — this query only returns the caller's OWN topics, so it
+        // never reaches a Viewer's shared card (listSharedTopics). Shown only while
+        // the course is being built (hidden while `seeded` / `completed`) and
+        // clamped up to the published count so it never reads below the real total.
+        const estimatedLessons =
+          t.estimatedLessons !== undefined && t.status !== "seeded" && t.status !== "completed"
+            ? Math.max(t.estimatedLessons, counts.lessonCount)
+            : null;
         // Ready translation Editions, for the card's language chips (grouping the
         // course's languages together in one place, per the design).
         const jobs = await ctx.db
@@ -125,6 +134,7 @@ export const dashboard = query({
           // "Public" badge and the SharePanel's link controls. Owner-only query,
           // so this is never exposed to anyone but the owner.
           publicToken: t.publicToken ?? null,
+          estimatedLessons,
           editions,
           seq: t.seq,
           creationTime: t._creationTime,

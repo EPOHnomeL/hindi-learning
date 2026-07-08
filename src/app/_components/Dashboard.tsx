@@ -27,6 +27,9 @@ type Course = {
   publicToken: string | null;
   lessonCount: number;
   completedCount: number;
+  // The soft "~N lessons" estimate of the course's eventual size (owner-only;
+  // null while seeded/completed or before the teacher has forecast one).
+  estimatedLessons: number | null;
   // Ready translation Editions (language codes), shown as chips (course-translation).
   editions: string[];
 };
@@ -256,6 +259,12 @@ function CourseCard({ course }: { course: Course }) {
               <>
                 <span className="tabular-nums font-medium text-ink">{course.completedCount}</span> / {course.lessonCount} lessons
               </>
+            )}
+            {/* Soft estimate of the eventual total (owner-only; server-gated). */}
+            {course.estimatedLessons != null && (
+              <span title="Your teacher's estimate of the course's eventual size — a rough guide, not a promise.">
+                {" · ~"}{course.estimatedLessons} total
+              </span>
             )}
           </span>
           {course.lessonCount > 0 && <span className={complete ? "font-semibold text-gold" : ""}>{pct}%</span>}

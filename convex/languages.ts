@@ -85,8 +85,38 @@ export const LANGUAGES: LanguageInfo[] = [
   { code: "ml", name: "Malayalam", native: "മലയാളം" },
   { code: "ne", name: "Nepali", native: "नेपाली" },
   { code: "si", name: "Sinhala", native: "සිංහල" },
+  // African languages. South Africa's official languages come first (English is
+  // the source Edition; South African Sign Language has no written form to
+  // translate prose into, so both are omitted here), then other widely-spoken
+  // African languages. English names carry the alternate/anglicised form so the
+  // picker's search finds them ("venda", "zulu", "sotho", …).
+  { code: "af", name: "Afrikaans", native: "Afrikaans" },
+  { code: "zu", name: "Zulu (isiZulu)", native: "isiZulu" },
+  { code: "xh", name: "Xhosa (isiXhosa)", native: "isiXhosa" },
+  { code: "nso", name: "Northern Sotho (Sepedi)", native: "Sepedi" },
+  { code: "st", name: "Southern Sotho (Sesotho)", native: "Sesotho" },
+  { code: "tn", name: "Tswana (Setswana)", native: "Setswana" },
+  { code: "ts", name: "Tsonga (Xitsonga)", native: "Xitsonga" },
+  { code: "ss", name: "Swati (siSwati)", native: "siSwati" },
+  { code: "ve", name: "Venda (Tshivenda)", native: "Tshivenḓa" },
+  { code: "nr", name: "Southern Ndebele (isiNdebele)", native: "isiNdebele" },
   { code: "sw", name: "Swahili", native: "Kiswahili" },
   { code: "am", name: "Amharic", native: "አማርኛ" },
+  { code: "ha", name: "Hausa", native: "Hausa" },
+  { code: "yo", name: "Yoruba", native: "Yorùbá" },
+  { code: "ig", name: "Igbo", native: "Igbo" },
+  { code: "so", name: "Somali", native: "Soomaali" },
+  { code: "om", name: "Oromo", native: "Afaan Oromoo" },
+  { code: "ti", name: "Tigrinya", native: "ትግርኛ" },
+  { code: "rw", name: "Kinyarwanda", native: "Ikinyarwanda" },
+  { code: "sn", name: "Shona", native: "chiShona" },
+  { code: "ny", name: "Chichewa (Nyanja)", native: "Chichewa" },
+  { code: "lg", name: "Luganda", native: "Luganda" },
+  { code: "ln", name: "Lingala", native: "Lingála" },
+  { code: "mg", name: "Malagasy", native: "Malagasy" },
+  { code: "wo", name: "Wolof", native: "Wolof" },
+  { code: "bm", name: "Bambara", native: "Bamanankan" },
+  { code: "ak", name: "Akan (Twi)", native: "Akan" },
   { code: "tl", name: "Filipino", native: "Filipino" },
 ];
 

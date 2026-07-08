@@ -1,6 +1,6 @@
 # Progress — Served Teach App
 
-Status: in-progress (pure core + transport complete; runs locally as a single origin; cloud deploy is the remaining HITL slice)
+Status: done (superseded) — the Neon/Cloudflare build was replaced by the deployed Convex rewrite
 
 Snapshot of an AFK build session. Vocabulary per [`CONTEXT.md`](../../CONTEXT.md); decisions per [`docs/adr/`](../../docs/adr/).
 

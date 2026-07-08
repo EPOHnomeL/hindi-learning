@@ -98,10 +98,17 @@ Do these steps IN ORDER:
 
 8. REPORT the outcome — ALWAYS, as the very last step, even on failure (treat it
    like a finally block):
-       pnpm run report:prod <published|nothing|failed> "$SLUG" ["error message"]
-   - published — you authored and published a lesson.
+       pnpm run report:prod <published|nothing|failed> "$SLUG" ["error message"] [--estimate <n>]
+   - published — you authored and published a lesson. Include `--estimate <n>`:
+                 your best-guess TOTAL eventual lesson count for the whole course
+                 (a whole number — lessons already authored plus those you expect
+                 still to come). It is a SOFT forecast shown to the owner on their
+                 dashboard as "~N lessons", NOT a quota — revise it freely and NEVER
+                 author lessons just to reach it (termination stays the step-6
+                 mission judgement; see SKILL.md "The Lesson-Count Estimate").
    - nothing   — there was nothing to add (or no topic was claimed; if "$SLUG"
-                 is empty because step 1 printed "none", just end the run).
+                 is empty because step 1 printed "none", just end the run). You may
+                 still pass `--estimate <n>` to refresh the forecast.
    - failed "<what went wrong>" — anything errored; this releases the lock so the
      reader can offer a retry.
 

@@ -1,6 +1,6 @@
 # PRD: Certificate Emblem & glow-up
 
-Status: ready-for-agent
+Status: shipped — certificate-emblem delivered (slices 1–4; commits 6fdbe98…4d85db0)
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — in particular the new
 > **Emblem** term (a Topic's representative mark, snapshotted onto the

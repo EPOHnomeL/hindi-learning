@@ -1,6 +1,6 @@
 # 03 — Reader & dashboard affordances for completion
 
-Status: ready-for-agent
+Status: done — shipped 88a2f83/5b064e4 (card redesign b966347/26a69f8)
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Completion**, **Certificate**). Spec: [`../PRD.md`](../PRD.md).
 

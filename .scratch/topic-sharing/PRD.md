@@ -1,6 +1,6 @@
 # PRD: Topic sharing — read-only Viewers
 
-Status: ready-for-agent
+Status: shipped — Shares + Public links delivered (issues 01–07 done); 08 deferred
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — in particular the new
 > **Share** and **Viewer** terms added for this feature. No ADR: the one

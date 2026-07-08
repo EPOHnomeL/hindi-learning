@@ -1,6 +1,6 @@
 # RTL reader chrome + a re-translate affordance for partially-ready Editions
 
-Status: ready-for-agent
+Status: open — reader-chrome RTL flip not built; retry not surfaced for ready-with-failures editions (re-entrancy guard is done)
 
 > Deferred follow-up from the PR #4 review. Two reader/dashboard UX gaps around
 > Editions. The RTL-chrome half overlaps the deferred **app-language-i18n** work

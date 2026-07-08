@@ -9,6 +9,7 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as backfill from "../backfill.js";
 import type * as capture from "../capture.js";
 import type * as certificates from "../certificates.js";
 import type * as content from "../content.js";
@@ -19,6 +20,7 @@ import type * as languages from "../languages.js";
 import type * as lib from "../lib.js";
 import type * as market from "../market.js";
 import type * as public_ from "../public.js";
+import type * as quizShuffle from "../quizShuffle.js";
 import type * as resources from "../resources.js";
 import type * as routine from "../routine.js";
 import type * as sellers from "../sellers.js";
@@ -34,6 +36,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  backfill: typeof backfill;
   capture: typeof capture;
   certificates: typeof certificates;
   content: typeof content;
@@ -44,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   lib: typeof lib;
   market: typeof market;
   public: typeof public_;
+  quizShuffle: typeof quizShuffle;
   resources: typeof resources;
   routine: typeof routine;
   sellers: typeof sellers;

@@ -1,6 +1,6 @@
 # 01 — Knowledge grilling: a diagnostic mode that maps what a learner doesn't know
 
-Status: needs-triage
+Status: open (deferred tracker) — the grill-my-knowledge skill exists (df330ef); the in-app diagnostic mode (schema/route + ADR decision) is not built
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Topic**, **Mission**, **Lesson**, **Response**, **Question**, **Progress**, **Frontier**, **Routine**, **Reference**).
 Related specs: [`../../served-teach-app/PRD.md`](../../served-teach-app/PRD.md), [`../../course-authoring/`](../../course-authoring/), [`../../product-direction/ROADMAP.md`](../../product-direction/ROADMAP.md).

@@ -36,6 +36,13 @@ export default defineSchema({
     // `completed` (ADR 0015) is terminal: the Routine's gate refuses it, so a
     // finished course stops authoring. Reopen returns it to `active`.
     status: v.optional(v.union(v.literal("seeded"), v.literal("active"), v.literal("completed"))),
+    // The soft `~N lessons` estimate (PRD: Estimated lesson count): the Routine's
+    // best guess at the course's eventual total Lesson count, refreshed each run
+    // via `reportGeneration`. A property of the course (survives across runs), so
+    // it lives here, not on the generation lock. Optional — a Topic never
+    // estimated simply has no value. Advisory only (ADR 0015 / 0018): it never
+    // gates authoring. `generationStatus` clamps + gates it on read.
+    estimatedLessons: v.optional(v.number()),
     // Public link (issue 07 / ADR 0013): an unguessable token granting anonymous
     // read-only access. Present while the Topic is public; cleared (truly revoked)
     // when made private. `by_public_token` is the Guest read seam's lookup.

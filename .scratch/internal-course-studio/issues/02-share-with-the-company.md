@@ -1,6 +1,6 @@
 # 02 — "Share with the company" entry point + draft-gating
 
-Status: ready-for-agent
+Status: open — sharing mechanisms exist, but draft-gating (needs issue 01) is not built
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Share, Public link, Viewer, Guest, Topic). Spec: [`../PRD.md`](../PRD.md). Respects [ADR 0013](../../../docs/adr/0013-public-link-shares.md) (Public link mint/revoke semantics).
 

@@ -1,6 +1,6 @@
 # PRD: Multi-topic dashboard — "teach me anything" (whitelisted multi-user)
 
-Status: ready-for-agent
+Status: shipped — multi-topic delivered (issues 02–08 done); only issue 09's Handbook.pdf git removal is outstanding
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md). Decisions follow
 > [ADR 0009](../../docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md)

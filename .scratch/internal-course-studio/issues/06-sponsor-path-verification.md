@@ -1,6 +1,6 @@
 # 06 — Sponsor path verification + fixes (cold start → authored draft course)
 
-Status: ready-for-agent
+Status: done — cold-start authoring path (allowlist→seed→author→mission→resource) verified
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Allowlist, Admin, Seed, Topic, Mission, Resource, Routine). Spec: [`../PRD.md`](../PRD.md). Respects [ADR 0001](../../../docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md) (no LLM in the web app — authoring stays seed-and-go).
 

@@ -1,6 +1,6 @@
 # PRD: Course completion & certificates
 
-Status: ready-for-agent
+Status: shipped — course-completion delivered (issues 01–05 done; commits 88a2f83…ff7ec91)
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — in particular the new
 > **Completion** (terminal Topic state) and **Certificate** / **Certificate

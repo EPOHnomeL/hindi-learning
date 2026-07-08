@@ -1,6 +1,6 @@
 # 05 — The public Certificate page (anonymous view + PDF download)
 
-Status: ready-for-agent
+Status: done — shipped 90429df (page redesign b48632b/3acb183)
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Certificate**, **Certificate link**, **Guest**). Spec: [`../PRD.md`](../PRD.md). Decision: [ADR 0015](../../../docs/adr/0015-course-completion-and-certificates.md).
 

@@ -185,3 +185,37 @@ test("the Admin bypasses the on-demand cooldown", async () => {
   // where a non-Admin owner would be rate-limited (see the test above).
   expect(await asUser(t, admin).mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: true });
 });
+
+// ---- The `~N lessons` estimate (PRD: Estimated lesson count) ---------------
+
+test("reportGeneration folds an estimate onto the topic; a later report without one never wipes it", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi");
+  // A run is in flight — the report also releases its lock, as in production.
+  await t.run((ctx) => ctx.db.insert("generation", { topicId, status: "generating", startedAt: 1 }));
+  const secret = "test-secret";
+
+  // A published report carrying an estimate stores it on the Topic.
+  await t.mutation(api.routine.reportGeneration, { secret, topicSlug: "hindi", outcome: "published", estimatedLessons: 8 });
+  expect((await t.run((ctx) => ctx.db.get(topicId)))?.estimatedLessons).toBe(8);
+
+  // A later `nothing`/`failed` report WITHOUT an estimate leaves it untouched —
+  // the estimate lives on the Topic across runs, not on the generation lock.
+  await t.mutation(api.routine.reportGeneration, { secret, topicSlug: "hindi", outcome: "nothing" });
+  expect((await t.run((ctx) => ctx.db.get(topicId)))?.estimatedLessons).toBe(8);
+
+  // A subsequent estimate overwrites it — the teacher revises freely each run.
+  await t.mutation(api.routine.reportGeneration, { secret, topicSlug: "hindi", outcome: "published", estimatedLessons: 11 });
+  expect((await t.run((ctx) => ctx.db.get(topicId)))?.estimatedLessons).toBe(11);
+});
+
+test("reportGeneration with an estimate still refuses a bad secret", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  await expect(
+    t.mutation(api.routine.reportGeneration, { secret: "wrong", topicSlug: "hindi", outcome: "published", estimatedLessons: 8 }),
+  ).rejects.toThrow();
+});
+

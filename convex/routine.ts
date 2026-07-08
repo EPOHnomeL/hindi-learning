@@ -212,11 +212,19 @@ export const reportGeneration = mutation({
     topicSlug: v.string(),
     outcome: v.union(v.literal("published"), v.literal("nothing"), v.literal("failed")),
     error: v.optional(v.string()),
+    // The run's best-guess total Lesson count for the course (PRD: `~N lessons`).
+    // Folded into the Topic here so there's no extra call — the estimate is part
+    // of "here's how this run ended". Advisory only; it never gates authoring.
+    estimatedLessons: v.optional(v.number()),
   },
-  handler: async (ctx, { secret, topicSlug, outcome, error }) => {
+  handler: async (ctx, { secret, topicSlug, outcome, error, estimatedLessons }) => {
     assertAdmin(secret);
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) throw new Error("topic not found");
+    // Patch the estimate when supplied; leave it untouched otherwise, so a later
+    // `nothing`/`failed` run never wipes a prior estimate. Topic-level, so it's
+    // independent of whether a generation lock row exists.
+    if (estimatedLessons !== undefined) await ctx.db.patch(topic._id, { estimatedLessons });
     const gen = await generationRow(ctx, topic._id);
     if (!gen) return;
     const clear = { startedAt: undefined, claimedAt: undefined, runId: undefined };

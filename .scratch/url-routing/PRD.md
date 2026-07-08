@@ -1,6 +1,6 @@
 # PRD: URL-addressable navigation (App Router routing)
 
-Status: ready-for-agent
+Status: partial — routing spine shipped (d86558c); the uniform not-found half is unbuilt
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — **Topic** (a "course" in
 > user-facing language), **Lesson**, **Reference**, **Frontier**, **Share**,

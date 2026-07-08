@@ -1,6 +1,6 @@
 # 06 — Share management & edge cases
 
-Status: ready-for-agent
+Status: partial — pending-shares + idempotent multi-Viewer shareTopic shipped; listShares, unshareTopic, revoke/recipient-list UI, self-share refusal, and topic-delete cascade are NOT built
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Share**, **Viewer**). Spec: [`../PRD.md`](../PRD.md).
 

@@ -81,6 +81,11 @@ you as ZPD evidence) — do not rename or drop them.
 - Answer matching is whitespace-normalised and case/space-exact otherwise.
 - **Every MCQ option must be the same word count** (and character count where
   possible) — no formatting or length tells that leak the answer (SKILL.md).
+- **Don't worry about which position the correct option sits in.** Publishing
+  shuffles each quiz's options deterministically (`convex/quizShuffle.ts`), so
+  the answer's on-screen slot is randomised regardless of the order you author.
+  `data-correct` is a key letter, not a position — set it to the right option and
+  author for correctness; the shuffle handles balance.
 
 ## 4. Components — build from the shared design system, don't inline styles
 
