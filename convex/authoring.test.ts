@@ -133,6 +133,14 @@ test("parseMissionResult reads the mission markdown (fence-tolerant) and rejects
   expect(() => parseMissionResult("nope")).toThrow();
 });
 
+test("parseFencedJson recovers the object from surrounding narration (chatty models)", () => {
+  // Real shape from Claude/Opus via OpenRouter with web search: a preamble
+  // sentence before the object, then trailing prose after it.
+  const raw = 'I\'ll look up information first.{"mission":"# Mission\\ntext"}\nLet me know if that works!';
+  expect(parseMissionResult(raw)).toEqual({ mission: "# Mission\ntext" });
+  expect(parseAuthoringResult('Sure — here it is:\n' + JSON.stringify({ lessonHtml: "<h1>a</h1>", learningRecord: "r" })).lessonHtml).toBe("<h1>a</h1>");
+});
+
 const SEEDED_CTX: MaterialisedContext = {
   topic: { slug: "greek", title: "Koine Greek", status: "seeded", mission: null, seed: "read the New Testament" },
   lessons: [],
