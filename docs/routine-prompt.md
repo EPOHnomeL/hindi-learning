@@ -102,8 +102,8 @@ Do these steps IN ORDER:
    - published — you authored and published a lesson. Include `--estimate <n>`:
                  your best-guess TOTAL eventual lesson count for the whole course
                  (a whole number — lessons already authored plus those you expect
-                 still to come). It is a SOFT forecast shown to the owner as
-                 "~N lessons", NOT a quota — revise it freely each run and NEVER
+                 still to come). It is a SOFT forecast shown to the owner on their
+                 dashboard as "~N lessons", NOT a quota — revise it freely and NEVER
                  author lessons just to reach it (termination stays the step-6
                  mission judgement; see SKILL.md "The Lesson-Count Estimate").
    - nothing   — there was nothing to add (or no topic was claimed; if "$SLUG"

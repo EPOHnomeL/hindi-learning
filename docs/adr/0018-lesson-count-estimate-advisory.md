@@ -6,9 +6,9 @@ status: proposed
 
 The teaching Routine now reports a **soft estimate** of a course's eventual total
 lesson count, stored on the Topic (`topics.estimatedLessons`) and shown to the
-owner in the reader as `~N lessons` while the course is being built. This ADR
-records the load-bearing constraint on that number: it is **display-only** and
-must **never** become an input to authoring or termination.
+owner on their dashboard — on the course card — as `~N lessons` while the course
+is being built. This ADR records the load-bearing constraint on that number: it
+is **display-only** and must **never** become an input to authoring or termination.
 
 ## Context
 
@@ -32,7 +32,8 @@ would quietly convert the forecast into the fixed syllabus ADR 0015 rejects.
 ## Decision
 
 - **The estimate is advisory and display-only.** It is a forecast the teacher
-  revises freely each run. Its only consumer is the reader's `~N lessons` line.
+  revises freely each run. Its only consumer is the dashboard card's `~N lessons`
+  label.
 - **It never gates authoring or termination.** Termination stays a judgement
   against the mission (ADR 0015 / the teach skill's "Terminating a Course"),
   independent of the estimate. The Routine must never author a lesson to reach the

@@ -112,7 +112,7 @@ Both `--image` and `--glyph` are optional (a lifelong mission or a subject you c
 
 ## The Lesson-Count Estimate
 
-Each run, alongside the outcome, report a **soft estimate** of the course's eventual size — your best guess at the **total** number of lessons the whole course will contain when it's done (not how many *remain*). The owner sees it in the reader as `~N lessons`: a rough gauge of scope while the course is still being built. It appears only mid-build — nothing shows on a freshly seeded course, and it disappears once the course is completed and the real count stands.
+Each run, alongside the outcome, report a **soft estimate** of the course's eventual size — your best guess at the **total** number of lessons the whole course will contain when it's done (not how many *remain*). The owner sees it on their dashboard, on the course card, as `~N lessons`: a rough gauge of scope while the course is still being built. It appears only mid-build — nothing shows on a freshly seeded course, and it disappears once the course is completed and the real count stands.
 
 It is a **forecast, never a quota**:
 

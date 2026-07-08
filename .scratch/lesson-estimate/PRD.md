@@ -1,6 +1,15 @@
 # PRD: Estimated lesson count ("~N lessons")
 
-Status: partial — issue 01 built + tested (uncommitted working tree at audit); issue 02 (docs/ADR) not started
+Status: shipped — issues 01 + 02 built, tested, committed; surface moved to the dashboard card (see Revision)
+
+> **Revision (2026-07-08, post-ship):** the surface moved. v1 shipped the number
+> in the reader's lesson-actions area (beside "Generate next lesson"); it now
+> lives on the **dashboard course card** (owner-only), on the lesson-count line as
+> `2 / 3 lessons · ~6 total`. The read path is `content.dashboard` (owner-scoped
+> by construction), not `generationStatus`. Clamp + gating semantics are
+> unchanged. Surface-specific wording below (Solution, story 2, the Read-path /
+> Display decisions, Out of Scope's "dashboard" bullet) reflects the original
+> plan; the two decision bullets are corrected in place.
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — **Topic**, **Lesson**,
 > **Routine**, **Frontier**, **Mission**, **owner** vs **Viewer**, **Completion**,
@@ -81,19 +90,19 @@ not show it. It appears once an estimate exists (so nothing shows on a freshly
   present and leaves it untouched when absent. The `report` script gains an
   optional `--estimate <n>` flag. This keeps the estimate conceptually part of
   "here's how this run ended," with the slug already in hand.
-- **Read path clamps server-side.** Extend the existing `generationStatus` query
-  (already owner-resolvable and already the data source for the generation-status
-  UI) to return the estimate, **clamped** to `max(estimatedLessons,
-  publishedCount)` using the existing `topicLessonCounts` helper for the
-  published (non-superseded) count. The query returns no estimate when the Topic
-  is `seeded` or `completed`, so the client renders nothing in those states
-  without its own lifecycle logic. Returning an already-clamped, already-gated
-  number keeps the component a pure render.
-- **Display: one line in the reader's lesson-actions area.** In the region that
-  hosts `NextLessonButton` (owner-only, on the Frontier of an active course),
-  render `~{n} lessons` alongside the generation-status states ("Generating next
-  lesson…", "✨ All caught up", "Generate next lesson"). Absent when the query
-  returns no estimate. No new surface, expander, or list.
+- **Read path clamps server-side.** _(Corrected — see Revision.)_ Extend the
+  existing `content.dashboard` query (owner-scoped by construction — it returns
+  only the caller's own Topics, so the estimate can never reach a Viewer's shared
+  card) to return the estimate, **clamped** to `max(estimatedLessons,
+  publishedCount)` using the `topicLessonCounts` count it already computes. It
+  returns no estimate when the Topic is `seeded` or `completed`, so the card
+  renders nothing in those states without its own lifecycle logic. An
+  already-clamped, already-gated number keeps the card a pure render.
+- **Display: on the dashboard course card.** _(Corrected — see Revision.)_ On the
+  owner's own course card, append `~{n} total` to the existing lesson-count line
+  (`2 / 3 lessons · ~6 total`). Absent when the query returns no estimate. No new
+  surface, expander, or list; shared/purchased cards (a different query) never
+  show it.
 - **Agent contract: two short doc edits.** Add one line to the canonical Routine
   instructions (`docs/routine-prompt.md`) and a short note to the teach skill
   (`SKILL.md`): each run, emit a best-guess **total** Lesson count for the course
@@ -132,9 +141,10 @@ not show it. It appears once an estimate exists (so nothing shows on a freshly
 - **A titled outline / list of upcoming Lessons.** v1 shows a single number only.
 - **Per-question attribution** ("+2 from your question", tags, or a callout). The
   estimate rises implicitly; no question→Lesson linkage is stored or shown.
-- **Showing the estimate to Viewers, on the dashboard, on the public/Certificate
-  pages, or in the setup ("Preparing your first lesson") pane.** Owner-only, one
-  surface.
+- **Showing the estimate to Viewers, on the public/Certificate pages, or in the
+  setup ("Preparing your first lesson") pane.** Owner-only, one surface. _(The
+  owner's own dashboard card is now that surface — see Revision; Viewers'
+  shared/purchased cards still never show it.)_
 - **Instant / real-time update at ask-time.** The estimate refreshes only on
   Routine runs; no in-app LLM call (respects ADR 0001).
 - **Any binding on termination or a lesson quota.** ADR 0015 stands; the estimate
