@@ -74,7 +74,13 @@ export default defineSchema({
     key: v.string(),
     seq: v.number(),
     title: v.string(),
-    html: v.string(),
+    // The rendered Lesson body. Historically an inline HTML string; being moved
+    // to a **content blob** (Convex File Storage) served over the `/content`
+    // HTTP route, keyed by `htmlStorageId`. During the widen→migrate→narrow
+    // migration a row carries one or the other; `html` is dropped once every row
+    // has a blob (see .scratch/html-blob-storage).
+    html: v.optional(v.string()),
+    htmlStorageId: v.optional(v.id("_storage")),
     supersededBy: v.optional(v.string()),
   })
     .index("by_topic_seq", ["topicId", "seq"])
@@ -119,7 +125,11 @@ export default defineSchema({
     topicId: v.id("topics"),
     key: v.string(),
     title: v.string(),
-    html: v.string(),
+    // The rendered Reference body — a **content blob** like `lessons.html` (see
+    // that field). Mutable: a changed re-publish points at a new blob and deletes
+    // the old. `contentHash` still gates skip-unchanged publishing.
+    html: v.optional(v.string()),
+    htmlStorageId: v.optional(v.id("_storage")),
     contentHash: v.string(),
   })
     .index("by_topic", ["topicId"])
@@ -281,7 +291,11 @@ export default defineSchema({
     ),
     key: v.string(),
     title: v.optional(v.string()),
+    // `html` carries the translated lesson/reference body. Being moved to a
+    // content blob (`htmlStorageId`) like the source rows, over the same
+    // `/content` route (see .scratch/html-blob-storage).
     html: v.optional(v.string()),
+    htmlStorageId: v.optional(v.id("_storage")),
     text: v.optional(v.string()),
     reply: v.optional(v.string()),
     sourceHash: v.string(),

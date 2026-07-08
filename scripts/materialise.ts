@@ -30,8 +30,12 @@ mkdirSync(`${base}/learning-records`, { recursive: true });
 // The course title as plain text — the teach run ignores it; the translate run
 // reads it as the source for the title Edition (it isn't inside any lesson file).
 writeFileSync(`${base}/TITLE.txt`, ctx.topic.title);
-for (const l of ctx.lessons) writeFileSync(`${base}/lessons/${l.key}.html`, l.html);
-for (const r of ctx.references) writeFileSync(`${base}/references/${r.key}.html`, r.html);
+// ponytail: html is being moved to content blobs (.scratch/html-blob-storage).
+// Until the read path returns a content URL these rows still carry inline html;
+// once they don't, materialise must FETCH the blob body here (issue 03) or it
+// would write empty files. The `?? ""` keeps the CLI green during the transition.
+for (const l of ctx.lessons) writeFileSync(`${base}/lessons/${l.key}.html`, l.html ?? "");
+for (const r of ctx.references) writeFileSync(`${base}/references/${r.key}.html`, r.html ?? "");
 for (const lr of ctx.learningRecords) writeFileSync(`${base}/learning-records/${lr.key}.md`, lr.markdown);
 writeFileSync(`${base}/CAPTURE.json`, JSON.stringify(ctx.capture, null, 2));
 

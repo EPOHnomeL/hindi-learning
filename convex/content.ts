@@ -324,7 +324,7 @@ export const getLesson = query({
       key: lesson.key,
       seq: lesson.seq,
       title: decodeEntities(t?.title ?? lesson.title),
-      html: t?.html ?? lesson.html,
+      html: t?.html ?? lesson.html ?? "",
     };
   },
 });
@@ -364,7 +364,7 @@ export const getReference = query({
       .unique();
     if (!ref) return null;
     const t = await trOne(ctx, topic._id, effLang, "reference", key);
-    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), html: t?.html ?? ref.html };
+    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), html: t?.html ?? ref.html ?? "" };
   },
 });
 

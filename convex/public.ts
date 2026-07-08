@@ -191,7 +191,7 @@ export const publicLesson = query({
       key: lesson.key,
       seq: lesson.seq,
       title: decodeEntities(t?.title ?? lesson.title),
-      html: t?.html ?? lesson.html,
+      html: t?.html ?? lesson.html ?? "",
     };
   },
 });
@@ -218,6 +218,6 @@ export const publicReference = query({
               q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "reference").eq("key", key),
             )
             .unique();
-    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), html: t?.html ?? ref.html };
+    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), html: t?.html ?? ref.html ?? "" };
   },
 });
