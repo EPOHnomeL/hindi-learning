@@ -117,7 +117,7 @@ export const generationStatus = query({
 // ---- The gate + lock (atomic) ----------------------------------------------
 
 type AcquireResult =
-  | { acquired: true; topicSlug: string; frontierKey: string }
+  | { acquired: true; topicSlug: string; frontierKey: string; provider: "claude" | "openrouter" }
   | { acquired: false; reason: string };
 
 // Check the gate and grab the lock in one transaction. Returns whether the
@@ -185,7 +185,9 @@ export const tryAcquireGeneration = internalMutation({
     if (gen) await ctx.db.patch(gen._id, patch);
     else await ctx.db.insert("generation", { topicId: topic._id, ...patch });
 
-    return { acquired: true, topicSlug, frontierKey };
+    // The fire step branches on this: `claude` POSTs the routine, `openrouter`
+    // schedules the authoring action. Absent on the row ⇒ `claude` (ADR 0014).
+    return { acquired: true, topicSlug, frontierKey, provider: topic.provider ?? "claude" };
   },
 });
 
@@ -277,6 +279,21 @@ type FireResult = { fired: boolean; reason?: string; error?: string };
 async function fireForTopic(ctx: ActionCtx, topicSlug: string, manual: boolean): Promise<FireResult> {
   const acquired: AcquireResult = await ctx.runMutation(internal.routine.tryAcquireGeneration, { topicSlug, manual });
   if (!acquired.acquired) return { fired: false, reason: acquired.reason };
+
+  // OpenRouter path (ADR 0014): author in a Convex action rather than the
+  // claude.ai Routine. No `claim` protocol — hand the action its topic directly.
+  // The gate/lock above is reused unchanged; the action reports via the same
+  // `reportGeneration`. A failed schedule releases the lock, as the POST path does.
+  if (acquired.provider === "openrouter") {
+    try {
+      await ctx.scheduler.runAfter(0, internal.openrouter.authorTopic, { topicSlug });
+      return { fired: true };
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      await ctx.runMutation(internal.routine.failGeneration, { topicSlug, error });
+      return { fired: false, reason: "fire-error", error };
+    }
+  }
 
   try {
     const url = process.env.ROUTINE_FIRE_URL;
@@ -377,18 +394,11 @@ export const dailyFire = internalAction({
 // `topics/<slug>/` and the teach skill runs there (ADR 0009: the Routine pulls
 // from Convex, never the repo). ponytail: returns all Lesson HTML in one query —
 // fine for a curriculum's worth; paginate if a Topic ever grows huge.
-export const materialiseTopic = query({
-  args: { secret: v.string(), ownerEmail: v.string(), topicSlug: v.string() },
-  handler: async (ctx, { secret, ownerEmail, topicSlug }) => {
-    assertAdmin(secret);
-    const owner = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", ownerEmail))
-      .unique();
-    if (!owner) return null;
-    const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
-    if (!topic) return null;
-
+// The whole materialised context for one Topic + owner, in one round-trip. Shared
+// by the secret-guarded `materialiseTopic` (the Claude CLI seam) and the internal
+// `materialiseForProvider` (the OpenRouter action seam), so both see identical
+// context regardless of which path pulls it.
+async function collectTopicContext(ctx: QueryCtx, topic: Doc<"topics">, owner: Doc<"users">) {
     // Bodies live in content blobs (.scratch/html-blob-storage); a query can't
     // read blob bytes, so expose a signed `htmlUrl` the materialise CLI fetches.
     const lessons = await Promise.all(
@@ -460,6 +470,46 @@ export const materialiseTopic = query({
         responses: responses.map((r) => ({ lessonKey: r.lessonKey, quizId: r.quizId, answer: r.answer, correct: r.correct })),
         progress: progress.map((p) => ({ lessonKey: p.lessonKey, status: p.status })),
       },
+    };
+}
+
+export const materialiseTopic = query({
+  args: { secret: v.string(), ownerEmail: v.string(), topicSlug: v.string() },
+  handler: async (ctx, { secret, ownerEmail, topicSlug }) => {
+    assertAdmin(secret);
+    const owner = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", ownerEmail))
+      .unique();
+    if (!owner) return null;
+    const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
+    if (!topic) return null;
+    return await collectTopicContext(ctx, topic, owner);
+  },
+});
+
+// The OpenRouter action's context seam. Internal (in-deployment, no secret), keyed
+// by slug: it resolves the Topic's own owner, so the action never needs an owner
+// email out of band. Adds the topicId (publish mutations key by it) and the
+// current Frontier (highest-seq non-superseded Lesson, or null) so the action can
+// pick the ongoing-vs-bootstrap path and compute the next seq. Null if the Topic
+// or its owner is missing.
+export const materialiseForProvider = internalQuery({
+  args: { topicSlug: v.string() },
+  handler: async (ctx, { topicSlug }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic || !topic.ownerId) return null;
+    const owner = await ctx.db.get(topic.ownerId);
+    if (!owner) return null;
+    const frontier = await frontierLesson(ctx, topic._id);
+    return {
+      topicId: topic._id,
+      // The owner's email — the publish mutations (publishMission, etc.) key by it,
+      // and it's intrinsic to the Topic, so the action never supplies it out of band.
+      ownerEmail: owner.email ?? null,
+      provider: topic.provider ?? "claude",
+      frontier: frontier ? { key: frontier.key, seq: frontier.seq } : null,
+      ...(await collectTopicContext(ctx, topic, owner)),
     };
   },
 });

@@ -415,6 +415,9 @@ function NewCourseCard() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [why, setWhy] = useState("");
+  // The course's Provider (ADR 0014). Defaults to Claude — the quality-guaranteed
+  // line; OpenRouter is the experimental spike.
+  const [provider, setProvider] = useState<"claude" | "openrouter">("claude");
   const [links, setLinks] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [linkDraft, setLinkDraft] = useState("");
@@ -453,7 +456,7 @@ function NewCourseCard() {
         const chosenLinks = links;
         const chosenFiles = files;
         try {
-          const { slug } = await seedTopic({ title: t, why: why.trim() });
+          const { slug } = await seedTopic({ title: t, why: why.trim(), provider });
           // Land on the new course immediately so the learner sees its "setting up"
           // page right away — instead of watching this form sit in "Creating…"
           // (next to the card the reactive dashboard has already rendered) for the
@@ -480,6 +483,7 @@ function NewCourseCard() {
           })();
           setTitle("");
           setWhy("");
+          setProvider("claude");
           setLinks([]);
           setFiles([]);
           setOpen(false);
@@ -508,6 +512,19 @@ function NewCourseCard() {
         placeholder="Why are you learning this?"
         className="resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
       />
+
+      <label className="mt-1 text-xs font-semibold uppercase tracking-wide text-accent2">Teacher</label>
+      <select
+        value={provider}
+        onChange={(e) => setProvider(e.target.value as "claude" | "openrouter")}
+        className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+      >
+        <option value="claude">Claude (recommended)</option>
+        <option value="openrouter">OpenRouter</option>
+      </select>
+      {provider === "openrouter" && (
+        <p className="text-xs text-soft">Experimental: quality isn&apos;t guaranteed on this teacher.</p>
+      )}
 
       <label className="mt-1 text-xs font-semibold uppercase tracking-wide text-accent2">Resources (optional)</label>
       {(links.length > 0 || files.length > 0) && (

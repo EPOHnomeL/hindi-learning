@@ -36,6 +36,12 @@ export default defineSchema({
     // `completed` (ADR 0015) is terminal: the Routine's gate refuses it, so a
     // finished course stops authoring. Reopen returns it to `active`.
     status: v.optional(v.union(v.literal("seeded"), v.literal("active"), v.literal("completed"))),
+    // The course's Provider (ADR 0014): which teaching runtime authors + translates
+    // it. `claude` is the existing claude.ai Routine; `openrouter` runs GLM 4.2
+    // authoring / Gemini translation in Convex actions. Optional and chosen at
+    // creation; ABSENT reads as `claude`, so every pre-existing course (incl. the
+    // legacy Hindi row) stays on the Claude path untouched.
+    provider: v.optional(v.union(v.literal("claude"), v.literal("openrouter"))),
     // The soft `~N lessons` estimate (PRD: Estimated lesson count): the Routine's
     // best guess at the course's eventual total Lesson count, refreshed each run
     // via `reportGeneration`. A property of the course (survives across runs), so
@@ -60,11 +66,6 @@ export default defineSchema({
         ownerSet: v.optional(v.boolean()),
       }),
     ),
-    // The LLM provider a Topic is authored with (e.g. "openrouter"). Owned by a
-    // parallel feature (course-content-editing); declared optional here only so
-    // this branch's schema stays compatible with the shared dev deployment, whose
-    // rows already carry it. Not read by this feature — reconcile at merge.
-    provider: v.optional(v.string()),
   })
     .index("by_slug", ["slug"])
     .index("by_owner", ["ownerId"])

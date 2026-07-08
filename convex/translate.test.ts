@@ -131,10 +131,12 @@ test("courseHeader exposes only the Editions the caller holds", async () => {
   expect(bobEn!.lang).toBe("ur");
 });
 
-// ---- tryAcquireTranslation: the gate + lock that fires the routine ----------
-// (startTranslation is a thin action: acquire, then POST the translate-routine
-// fire URL. The gate holds all the db logic and is tested directly, mirroring
-// routine.tryAcquireGeneration; the fetch itself isn't unit-tested.)
+// ---- tryAcquireTranslation: the gate + lock that fires the run --------------
+// (startTranslation is a thin action: acquire, then schedule the Gemini translate
+// action — ALL translation runs on Gemini now, never the claude.ai routine. The
+// gate holds all the db logic and is tested directly, mirroring
+// routine.tryAcquireGeneration; the fire branch is covered in
+// translate-openrouter.test.ts.)
 
 test("tryAcquireTranslation gates on owner + completed + known language, and seeds the job", async () => {
   const t = convexTest(schema, modules);

@@ -1,10 +1,11 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { internal } from "./_generated/api";
-import { action, internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
+import { api, internal } from "./_generated/api";
+import { action, internalAction, internalMutation, internalQuery, mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { assertAdmin, getOwnedTopic, hashString, SOURCE_LANG, shareLang, topicBySlug } from "./lib";
 import { isKnownLang, langInfo } from "./languages";
+import { chatComplete, translateModel, type ChatMessage } from "./openrouterClient";
 
 // Course translation (Editions), driven by the cloud **translate Routine** — the
 // sibling of the next-lesson Routine (routine.ts), reusing its lock → claim →
@@ -73,7 +74,7 @@ async function readSource(
   topicId: Id<"topics">,
   kind: Kind,
   key: string,
-): Promise<{ title?: string; html?: string; text?: string; reply?: string; hash: string } | null> {
+): Promise<{ title?: string; html?: string; htmlStorageId?: Id<"_storage">; text?: string; reply?: string; hash: string } | null> {
   const topic = await ctx.db.get(topicId);
   if (!topic) return null;
   if (kind === "title") return { text: topic.title, hash: itemHash("title", { text: topic.title }) };
@@ -88,8 +89,9 @@ async function readSource(
       .unique();
     if (!l || l.supersededBy) return null;
     // The source body now lives in a content blob (no inline `html`), so the
-    // quiz-structure guard downstream is skipped for it (see publishTranslation).
-    return { title: l.title, hash: itemHash("lesson", l) };
+    // quiz-structure guard downstream is skipped for it (see publishTranslation);
+    // the blob id lets an action read the bytes to translate the body.
+    return { title: l.title, htmlStorageId: l.htmlStorageId, hash: itemHash("lesson", l) };
   }
   if (kind === "reference") {
     const r = await ctx.db
@@ -97,7 +99,7 @@ async function readSource(
       .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
       .unique();
     if (!r) return null;
-    return { title: r.title, hash: itemHash("reference", r) };
+    return { title: r.title, htmlStorageId: r.htmlStorageId, hash: itemHash("reference", r) };
   }
   // question
   const q = await ctx.db.get(key as Id<"questions">);
@@ -173,10 +175,14 @@ export const failTranslation = internalMutation({
 
 type FireResult = { fired: boolean; reason?: string; error?: string };
 
-// Owner: translate a completed course into `lang` by firing the translate
-// Routine (mirrors `routine.requestNextLesson`). Acquire the lock, then POST the
-// routine's Fire URL; on a failed fire, release the lock. Idempotent re-translate
-// is a re-fire once the prior run is no longer `translating`.
+// Owner: translate a completed course into `lang`. ALL translation now runs on
+// Gemini via the OpenRouter translate action, regardless of the course's authoring
+// Provider — the claude.ai translate Routine is never fired (this branch
+// supersedes the PRD's "translation follows provider": a Claude-authored course
+// still translates through Gemini). Acquire the lock, then schedule the action; on
+// a failed schedule, release the lock. Idempotent re-translate is a re-fire once
+// the prior run is no longer `translating`. Requires OPENROUTER_API_KEY on the
+// deployment (the action reads it).
 export const startTranslation = action({
   args: { topicSlug: v.string(), lang: v.string() },
   handler: async (ctx, { topicSlug, lang }): Promise<FireResult> => {
@@ -190,18 +196,12 @@ export const startTranslation = action({
       if (acq.reason === "already-translating") throw new Error("a translation is already in progress for this language");
       return { fired: false, reason: acq.reason };
     }
+
+    // Always schedule the Gemini translate action — no `claimTranslation`, no POST
+    // to the claude.ai translate Routine. The gate/lock + reportTranslation are
+    // reused unchanged; a failed schedule releases the lock.
     try {
-      const url = process.env.TRANSLATE_FIRE_URL;
-      const token = process.env.TRANSLATE_FIRE_TOKEN;
-      if (!url || !token) throw new Error("TRANSLATE_FIRE_URL / TRANSLATE_FIRE_TOKEN not set");
-      // Closed body (ADR 0008): the run learns its (Topic, language) from
-      // `claimTranslation`, not the fire body.
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json", "anthropic-version": "2023-06-01", authorization: `Bearer ${token}` },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) throw new Error(`fire ${res.status}: ${await res.text()}`);
+      await ctx.scheduler.runAfter(0, internal.translate.translateTopic, { topicSlug, lang });
       return { fired: true };
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
@@ -374,6 +374,109 @@ export const reportTranslation = mutation({
       await ctx.db.patch(job._id, { status: "failed", error: error ?? "translation run failed", ...clear });
     }
     return null;
+  },
+});
+
+// ---- OpenRouter translate path (Gemini) ------------------------------------
+
+// The source content for every translatable item + the owner email the publish
+// seam keys by, in one round-trip. The OpenRouter action's context seam (internal,
+// keyed by slug + lang), mirroring routine.materialiseForProvider on the authoring
+// side. Null if the Topic or owner is missing.
+export const collectForTranslation = internalQuery({
+  args: { topicSlug: v.string(), lang: v.string() },
+  handler: async (ctx, { topicSlug }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic || !topic.ownerId) return null;
+    const owner = await ctx.db.get(topic.ownerId);
+    if (!owner) return null;
+    const items = await Promise.all(
+      (await collectItems(ctx, topic)).map(async (it) => {
+        const src = await readSource(ctx, topic._id, it.kind, it.key);
+        // Lesson/reference bodies live in content blobs; hand the action the blob
+        // id so it can read the bytes (a query can't) and translate the body.
+        return { kind: it.kind, key: it.key, title: src?.title, htmlStorageId: src?.htmlStorageId, text: src?.text, reply: src?.reply };
+      }),
+    );
+    return { ownerEmail: owner.email ?? null, items };
+  },
+});
+
+// The translation prompt for one item. `html` mode preserves every tag/attribute
+// (quiz markers must survive — publishTranslation rejects structural drift); `text`
+// mode is for the plain title/mission. Returns only the translation.
+export function buildTranslateMessages(content: string, langName: string, mode: "html" | "text"): ChatMessage[] {
+  const system =
+    mode === "html"
+      ? `You are a professional translator. Translate the human-readable text of the following HTML into ${langName}. Preserve EVERY HTML tag, attribute, and value EXACTLY — especially quiz markers (class names, data-correct, data-answer, data-k, data-alt). Do not add, remove, or reorder elements. Return ONLY the translated HTML, with no code fence and no commentary.`
+      : `You are a professional translator. Translate the following text into ${langName}. Return ONLY the translation, with no quotes or commentary.`;
+  return [
+    { role: "system", content: system },
+    { role: "user", content },
+  ];
+}
+
+// Translate one item's field, single-pass on Gemini. Empty content is returned
+// as-is (nothing to translate) to avoid a wasted call.
+async function translateField(model: string, content: string, langName: string, mode: "html" | "text"): Promise<string> {
+  if (content.trim() === "") return content;
+  return await chatComplete({ model, messages: buildTranslateMessages(content, langName, mode) });
+}
+
+// Translate a completed OpenRouter course into `lang` on Gemini 3.5 Flash. Reads
+// each source item, translates it single-pass, and publishes through the existing
+// publishTranslation (which stamps the source hash + rejects quiz drift), ticking
+// the job. Reports ready/failed via the existing reportTranslation, so the lock
+// never sticks and unpublished items fall back to English in the reader.
+export const translateTopic = internalAction({
+  args: { topicSlug: v.string(), lang: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, lang }): Promise<null> => {
+    const secret = process.env.PUBLISH_SECRET;
+    if (!secret) throw new Error("PUBLISH_SECRET not set");
+    try {
+      const info = await ctx.runQuery(internal.translate.collectForTranslation, { topicSlug, lang });
+      if (!info || !info.ownerEmail) throw new Error("no translation context (missing topic or owner)");
+      const ownerEmail = info.ownerEmail;
+      const langName = langInfo(lang).name;
+      const model = translateModel();
+
+      for (const item of info.items) {
+        if (item.kind === "lesson" || item.kind === "reference") {
+          // The body is a content blob; an action can read its bytes directly
+          // (no HTTP round-trip) and translate the markup.
+          const blob = item.htmlStorageId ? await ctx.storage.get(item.htmlStorageId) : null;
+          const body = blob ? await blob.text() : "";
+          await ctx.runMutation(api.translate.publishTranslation, {
+            secret,
+            ownerEmail,
+            topicSlug,
+            lang,
+            kind: item.kind,
+            key: item.key,
+            title: await translateField(model, item.title ?? "", langName, "text"),
+            html: await translateField(model, body, langName, "html"),
+          });
+        } else {
+          // title / mission — a single text field.
+          await ctx.runMutation(api.translate.publishTranslation, {
+            secret,
+            ownerEmail,
+            topicSlug,
+            lang,
+            kind: item.kind,
+            key: item.key,
+            text: await translateField(model, item.text ?? "", langName, "text"),
+          });
+        }
+      }
+      await ctx.runMutation(api.translate.reportTranslation, { secret, topicSlug, lang, outcome: "ready" });
+      return null;
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      await ctx.runMutation(api.translate.reportTranslation, { secret, topicSlug, lang, outcome: "failed", error });
+      return null;
+    }
   },
 });
 

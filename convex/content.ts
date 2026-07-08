@@ -153,8 +153,14 @@ export const dashboard = query({
 // runs here (ADR 0001). Slugs are globally unique (the routine path resolves by
 // slug), so identical titles get -2/-3 suffixes.
 export const seedTopic = mutation({
-  args: { title: v.string(), why: v.string() },
-  handler: async (ctx, { title, why }): Promise<{ slug: string }> => {
+  // `provider` (ADR 0014) is chosen at creation; omit for the Claude default so
+  // an absent value on the row reads as `claude` (schema + fire branch agree).
+  args: {
+    title: v.string(),
+    why: v.string(),
+    provider: v.optional(v.union(v.literal("claude"), v.literal("openrouter"))),
+  },
+  handler: async (ctx, { title, why, provider }): Promise<{ slug: string }> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
     // One new course per user per day (issue 08 — bounds Claude usage). The Admin
@@ -174,7 +180,16 @@ export const seedTopic = mutation({
     const base = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "topic";
     let slug = base;
     for (let n = 2; await topicBySlug(ctx, slug); n++) slug = `${base}-${n}`;
-    await ctx.db.insert("topics", { slug, title, ownerId: userId, seed: why, status: "seeded" });
+    // Store `provider` only when explicitly OpenRouter — the Claude default stays
+    // absent, so existing courses and a defaulted create are indistinguishable.
+    await ctx.db.insert("topics", {
+      slug,
+      title,
+      ownerId: userId,
+      seed: why,
+      status: "seeded",
+      ...(provider === "openrouter" ? { provider } : {}),
+    });
     return { slug };
   },
 });
