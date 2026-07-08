@@ -23,6 +23,8 @@
     "migrate-hindi:prod": "tsx scripts/migrate-hindi.ts --prod",
     "backfill-quiz-shuffle": "tsx scripts/backfill-quiz-shuffle.ts",
     "backfill-quiz-shuffle:prod": "tsx scripts/backfill-quiz-shuffle.ts --prod",
+    "backfill-html-blobs": "tsx scripts/backfill-html-blobs.ts",
+    "backfill-html-blobs:prod": "tsx scripts/backfill-html-blobs.ts --prod",
     "review": "tsx scripts/review.ts",
     "review:prod": "tsx scripts/review.ts --prod",
     "reply": "tsx scripts/reply.ts",

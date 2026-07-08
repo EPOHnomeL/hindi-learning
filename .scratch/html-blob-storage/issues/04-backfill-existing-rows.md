@@ -28,6 +28,24 @@ driver), paginated, secret-gated, idempotent.
 - [ ] A `tsx` driver runs it a page at a time against dev/prod, threading the cursor.
 - [ ] A short runbook documents the prod run + how to verify before narrowing.
 
+## Runbook (operator)
+
+The agent builds + tests this; **the operator runs it against prod.**
+
+1. **Dev first:** `pnpm run backfill-html-blobs` — migrates the dev deployment.
+   Spot-check: open a course in dev; lessons/references still render (now served
+   from `/content`). The console prints `<table> N migrated (M scanned)` per table.
+2. **Snapshot prod** (Convex dashboard) before touching live data.
+3. **Prod:** `pnpm run backfill-html-blobs:prod`. Idempotent — safe to re-run if
+   interrupted (already-migrated rows are skipped).
+4. **Verify prod before narrowing:** every published lesson/reference renders in
+   the live app; the Convex dashboard shows Database I/O reads dropping on
+   subsequent days. Only then start issue 05 (drop inline `html`).
+
+Note: the backfill itself reads all inline HTML once — expect a transient
+Database I/O bump the day it runs. It is the *last* time that HTML moves through
+the database.
+
 ## Blocked by
 
 - Publish writes blobs (mutations + teach CLI + translate)
