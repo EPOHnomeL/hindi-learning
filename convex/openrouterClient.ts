@@ -27,18 +27,16 @@ export type ChatOptions = {
   messages: ChatMessage[];
   // Enable OpenRouter's `web` plugin for this call (web-grounded generation).
   webSearch?: boolean;
-  temperature?: number;
 };
 
 // One round-trip: send the messages, return the assistant's text content.
 // Throws on a missing key or a non-OK response so the caller can report `failed`.
-export async function chatComplete({ model, messages, webSearch, temperature }: ChatOptions): Promise<string> {
+export async function chatComplete({ model, messages, webSearch }: ChatOptions): Promise<string> {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("OPENROUTER_API_KEY not set");
 
   const body: Record<string, unknown> = { model, messages };
   if (webSearch) body.plugins = [{ id: "web" }];
-  if (temperature !== undefined) body.temperature = temperature;
 
   const res = await fetch(ENDPOINT, {
     method: "POST",

@@ -74,7 +74,14 @@ async function genStatus(t: ReturnType<typeof convexTest>, topicId: Id<"topics">
 test("ongoing single-pass authors the next lesson, wraps+shuffles it, publishes a record, reports published", async () => {
   const t = convexTest(schema, modules);
   const { topicId } = await seedOngoing(t);
-  stubModel(JSON.stringify({ lessonHtml: LESSON_FRAGMENT, learningRecord: "# Lesson 2\nlearned the aorist", estimatedLessons: 9 }));
+  stubModel(
+    JSON.stringify({
+      lessonHtml: LESSON_FRAGMENT,
+      learningRecord: "# Lesson 2\nlearned the aorist",
+      estimatedLessons: 9,
+      references: [{ key: "aorist-forms", title: "Aorist Forms", html: "<p>forms</p>" }],
+    }),
+  );
 
   await t.action(internal.openrouter.authorTopic, { topicSlug: "glm" });
 
@@ -88,6 +95,10 @@ test("ongoing single-pass authors the next lesson, wraps+shuffles it, publishes 
   expect(lesson2!.html).toContain('<div class="wrap">');
   // All three options survive the shuffle (order may differ; presence must not).
   for (const k of ["a", "b", "c"]) expect(lesson2!.html).toContain(`data-k="${k}"`);
+
+  // Any reference the lesson relies on was upserted (no dangling /references link).
+  const refs = await t.run((ctx) => ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect());
+  expect(refs.map((r) => r.key)).toContain("aorist-forms");
 
   // A learning record was published for the lesson.
   const record = await t.run((ctx) =>

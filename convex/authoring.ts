@@ -55,6 +55,17 @@ ${LESSON_FOOT}
 `;
 }
 
+// Strip a surrounding ```json code fence (models love to add one) and parse. One
+// place so every structured-output parser agrees. Throws on invalid JSON.
+function parseFencedJson(raw: string, what: string): Record<string, unknown> {
+  const unfenced = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  try {
+    return JSON.parse(unfenced) as Record<string, unknown>;
+  } catch {
+    throw new Error(`${what}: response was not valid JSON`);
+  }
+}
+
 // Dash-case a display title into a slug (AUTHORING.md §1 numbering).
 function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -66,6 +77,7 @@ export function nextLessonKey(seq: number, title: string): string {
 }
 
 export type AuthoringReply = { questionId: string; reply: string };
+export type AuthoringReference = { key: string; title: string; html: string };
 export type AuthoringResult = {
   // The run's terminate judgement (issue 05): the mission is substantially met /
   // ZPD exhausted, so complete the course instead of authoring.
@@ -76,6 +88,9 @@ export type AuthoringResult = {
   estimatedLessons?: number;
   // Batched answers to the open questions passed in context.
   replies: AuthoringReply[];
+  // Glossary/reference docs to upsert (AUTHORING.md §7), so lessons that cross-link
+  // to /references/<key> don't dangle. Stored as-authored (not head/foot wrapped).
+  references: AuthoringReference[];
 };
 
 // The single-pass output contract: the model returns one JSON object carrying the
@@ -84,14 +99,7 @@ export type AuthoringResult = {
 // Throws on anything that isn't a usable authoring result, so the action reports
 // `failed`.
 export function parseAuthoringResult(raw: string): AuthoringResult {
-  const unfenced = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-  let obj: unknown;
-  try {
-    obj = JSON.parse(unfenced);
-  } catch {
-    throw new Error("authoring: response was not valid JSON");
-  }
-  const o = obj as Record<string, unknown>;
+  const o = parseFencedJson(raw, "authoring");
   const complete = o.complete === true;
   if (!complete) {
     if (typeof o.lessonHtml !== "string" || o.lessonHtml.trim() === "") {
@@ -111,12 +119,19 @@ export function parseAuthoringResult(raw: string): AuthoringResult {
         .filter((r) => typeof r.questionId === "string" && typeof r.reply === "string")
         .map((r) => ({ questionId: r.questionId as string, reply: r.reply as string }))
     : [];
+  const references: AuthoringReference[] = Array.isArray(o.references)
+    ? (o.references as unknown[])
+        .map((r) => r as Record<string, unknown>)
+        .filter((r) => typeof r.key === "string" && typeof r.title === "string" && typeof r.html === "string")
+        .map((r) => ({ key: r.key as string, title: r.title as string, html: r.html as string }))
+    : [];
   return {
     complete,
     lessonHtml: typeof o.lessonHtml === "string" ? o.lessonHtml : undefined,
     learningRecord: typeof o.learningRecord === "string" ? o.learningRecord : undefined,
     estimatedLessons: estimate,
     replies,
+    references,
   };
 }
 
@@ -128,6 +143,7 @@ export type MaterialisedContext = {
   lessons: { key: string; seq: number; title: string; html: string }[];
   learningRecords: { key: string; seq: number; markdown: string }[];
   references: { key: string; title: string; html: string }[];
+  resources: { filename: string; kind: string; url: string | null; processed: unknown }[];
   capture: {
     openQuestions: { id: string; lessonKey: string; text: string }[];
     responses: { lessonKey: string; quizId: string; answer: string; correct: boolean }[];
@@ -162,7 +178,12 @@ and nothing else (no prose, no code fence), with these fields:
   total lesson count (a number).
 - "replies": array of { "questionId": "<id from the Open questions above>",
   "reply": "<answer>" } for any open learner questions you can answer now. Use []
-  if there are none.`;
+  if there are none.
+- "references": array of { "key": "<dash-case-key>", "title": "<title>",
+  "html": "<reference HTML, as-authored — NOT head/foot wrapped>" } for any
+  glossary/reference docs this lesson relies on or cross-links to
+  (/courses/<slug>/references/<key>), per AUTHORING.md §7. Include a reference for
+  every /references/<key> you link so no link dangles. Use [] if none.`;
 
 // Compact, readable serialisation of the course so far — the ZPD evidence the
 // generator judges the next step from (AUTHORING.md §8). Full HTML only for the
@@ -181,6 +202,15 @@ function serializeContext(c: MaterialisedContext): string {
     c.learningRecords.length ? c.learningRecords.map((r) => `#### ${r.key}\n${r.markdown}`).join("\n\n") : "(none yet)",
     `\n### References`,
     c.references.length ? c.references.map((r) => `#### ${r.title} (${r.key})\n${r.html}`).join("\n\n") : "(none yet)",
+    // The learner's own uploaded/linked primary sources — ground claims in these
+    // (AUTHORING.md §6). A single-pass model can't fetch URLs, so it works from any
+    // extracted `processed` text; the filename/URL still tells it what exists.
+    `\n### Resources (learner's primary sources)`,
+    c.resources.length
+      ? c.resources
+          .map((r) => `- ${r.filename} [${r.kind}]${r.url ? ` ${r.url}` : ""}${r.processed ? `\n${JSON.stringify(r.processed)}` : ""}`)
+          .join("\n")
+      : "(none)",
     `\n### Learner capture`,
     `Progress: ${JSON.stringify(c.capture.progress)}`,
     `Quiz responses: ${JSON.stringify(c.capture.responses)}`,
@@ -203,14 +233,8 @@ markdown per MISSION-FORMAT.md>" }.`;
 // Read the drafted mission back from step 1's response. Fence-tolerant; throws on
 // anything that isn't a non-empty mission so the setup run reports `failed`.
 export function parseMissionResult(raw: string): { mission: string } {
-  const unfenced = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
-  let obj: unknown;
-  try {
-    obj = JSON.parse(unfenced);
-  } catch {
-    throw new Error("mission: response was not valid JSON");
-  }
-  const mission = (obj as Record<string, unknown>).mission;
+  const obj = parseFencedJson(raw, "mission");
+  const mission = obj.mission;
   if (typeof mission !== "string" || mission.trim() === "") throw new Error("mission: missing mission text");
   return { mission };
 }

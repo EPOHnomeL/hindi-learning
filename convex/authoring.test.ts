@@ -67,6 +67,7 @@ test("parseAuthoringResult reads the JSON contract, tolerating a code fence", ()
     learningRecord: "# r",
     estimatedLessons: 8,
     replies: [],
+    references: [],
   });
 
   // Estimate is optional; absent → undefined.
@@ -78,6 +79,17 @@ test("parseAuthoringResult surfaces a terminate decision without a lesson", () =
   expect(done.complete).toBe(true);
   expect(done.lessonHtml).toBeUndefined();
   expect(done.estimatedLessons).toBe(6);
+});
+
+test("parseAuthoringResult collects well-formed references and drops malformed ones", () => {
+  const r = parseAuthoringResult(
+    JSON.stringify({
+      lessonHtml: "<h1>a</h1>",
+      learningRecord: "r",
+      references: [{ key: "glossary", title: "Glossary", html: "<p>x</p>" }, { key: "bad" }],
+    }),
+  );
+  expect(r.references).toEqual([{ key: "glossary", title: "Glossary", html: "<p>x</p>" }]);
 });
 
 test("parseAuthoringResult collects well-formed replies and drops malformed ones", () => {
@@ -107,6 +119,7 @@ const SEEDED_CTX: MaterialisedContext = {
   lessons: [],
   learningRecords: [],
   references: [],
+  resources: [],
   capture: { openQuestions: [], responses: [], progress: [] },
   frontier: null,
 };

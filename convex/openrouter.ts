@@ -15,6 +15,7 @@ import {
   type MaterialisedContext,
 } from "./authoring";
 import { authorModel, chatComplete } from "./openrouterClient";
+import { hashString } from "./lib";
 
 // The OpenRouter teaching runtime (ADR 0014). A course with `provider:
 // "openrouter"` routes its authoring here instead of firing the claude.ai
@@ -55,6 +56,18 @@ async function publishAuthoredLesson(
     supersedes: supersedesFrom(html),
   });
   await ctx.runMutation(api.content.publishLearningRecord, { secret, topicId, key, seq, markdown: result.learningRecord! });
+  // Upsert any references the lesson relies on / cross-links to, so a
+  // /references/<key> link never dangles (AUTHORING.md §7). Stored as-authored.
+  for (const ref of result.references) {
+    await ctx.runMutation(api.content.upsertReference, {
+      secret,
+      topicId,
+      key: ref.key,
+      title: ref.title,
+      html: ref.html,
+      contentHash: hashString(ref.html),
+    });
+  }
 }
 
 // Batched Q&A (issue 05): answer the open questions the model replied to, matching
