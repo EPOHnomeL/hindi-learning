@@ -30,7 +30,9 @@ type Kind = "lesson" | "reference" | "mission" | "title" | "question";
 // The hash of a source item's content — stamped onto the translation so a later
 // re-translate can skip unchanged items. Must be computed identically wherever a
 // source item is read, so both `collectItems` and `readSource` route through here.
-function itemHash(kind: Kind, f: { title?: string; html?: string; htmlStorageId?: Id<"_storage">; text?: string; reply?: string }): string {
+// Also stamped by the owner's manual translated-Lesson edit (content.ts) so a
+// later re-translate of an unchanged source skips the item and keeps that edit.
+export function itemHash(kind: Kind, f: { title?: string; html?: string; htmlStorageId?: Id<"_storage">; text?: string; reply?: string }): string {
   // Bodies now live in content blobs; a blob-backed row has no inline `html`, so
   // hash its stable `htmlStorageId` instead (immutable content → stable id → a
   // valid staleness key). Falls back to inline `html` for not-yet-migrated rows.
