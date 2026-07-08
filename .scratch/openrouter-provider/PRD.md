@@ -52,10 +52,12 @@ Two authoring modes:
 - **Ongoing lessons** (a completed Frontier): a **single-pass** generation —
   full materialised context in → lean-fragment HTML out → wrap → publish.
 
-Translation on an OpenRouter course uses **Gemini 3.5 Flash**, single-pass per
-item, via the same action pattern. Translation **follows the course's
-Provider**: a Claude course keeps translating through the existing claude.ai
-translate Routine.
+Translation uses **Gemini 3.5 Flash**, single-pass per item, via the OpenRouter
+action pattern. **Update (this branch): ALL translation runs on Gemini,
+regardless of the course's authoring Provider** — the claude.ai translate Routine
+is never fired. (This supersedes the original "translation follows the course's
+Provider": a Claude-authored course now also translates through Gemini.) Requires
+`OPENROUTER_API_KEY` on the deployment. Authoring still follows Provider.
 
 Quality on GLM 4.2 / Gemini is **not guaranteed** — this is ADR 0014's
 "reachable, not guaranteed" line, and a spike to see the output.

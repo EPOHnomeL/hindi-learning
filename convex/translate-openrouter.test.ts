@@ -51,31 +51,22 @@ async function seedCompleted(t: ReturnType<typeof convexTest>, provider?: "openr
   return { alice, topicId };
 }
 
-test("startTranslation on an OpenRouter course schedules the translate action, no POST", async () => {
-  const t = convexTest(schema, modules);
-  const { alice, topicId } = await seedCompleted(t, "openrouter");
-  const { calls } = stubEcho(); // must NOT be called during the fire
+test("startTranslation always schedules the Gemini translate action (never POSTs), for BOTH providers", async () => {
+  for (const provider of ["openrouter", undefined] as const) {
+    const t = convexTest(schema, modules);
+    const { alice, topicId } = await seedCompleted(t, provider);
+    const { calls } = stubEcho(); // must NOT be called during the fire (no synchronous POST)
 
-  // TRANSLATE_FIRE_URL is unset — the Claude POST path would fail; the OpenRouter
-  // path must schedule instead.
-  const res = await asUser(t, alice).action(api.translate.startTranslation, { topicSlug: "greek", lang: "es" });
-  expect(res).toMatchObject({ fired: true });
-  expect(calls).toBe(0);
+    // TRANSLATE_FIRE_URL is unset — the old Claude POST path would fire-error. Both
+    // a Claude-authored (no provider) and an OpenRouter course must instead schedule
+    // the Gemini action and succeed.
+    const res = await asUser(t, alice).action(api.translate.startTranslation, { topicSlug: "greek", lang: "es" });
+    expect(res).toMatchObject({ fired: true });
+    expect(calls).toBe(0);
 
-  const job = await t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
-  expect(job?.status).toBe("translating"); // lock held until the scheduled run reports
-});
-
-test("startTranslation on a Claude course still takes the POST path (unchanged)", async () => {
-  const t = convexTest(schema, modules);
-  const { alice, topicId } = await seedCompleted(t); // no provider → claude
-
-  // No provider → Claude path attempts the routine POST; TRANSLATE_FIRE_URL unset
-  // → fire-error, proving it never scheduled the OpenRouter action.
-  const res = await asUser(t, alice).action(api.translate.startTranslation, { topicSlug: "greek", lang: "es" });
-  expect(res).toMatchObject({ fired: false, reason: "fire-error" });
-  const job = await t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
-  expect(job?.status).toBe("failed");
+    const job = await t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
+    expect(job?.status).toBe("translating"); // lock held until the scheduled run reports
+  }
 });
 
 test("translateTopic translates every item via Gemini and publishes a ready Edition", async () => {

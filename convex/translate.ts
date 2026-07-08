@@ -102,7 +102,7 @@ async function readSource(
 // ---- Owner: fire a translate run -------------------------------------------
 
 type AcquireResult =
-  | { acquired: true; topicSlug: string; lang: string; total: number; provider: "claude" | "openrouter" }
+  | { acquired: true; topicSlug: string; lang: string; total: number }
   | { acquired: false; reason: string };
 
 // Check the gate + grab the lock in one transaction (mirrors
@@ -144,10 +144,7 @@ export const tryAcquireTranslation = internalMutation({
     };
     if (job) await ctx.db.patch(job._id, patch);
     else await ctx.db.insert("translationJobs", { topicId: topic._id, lang, ...patch });
-    // Translation follows the course's Provider (ADR 0014): the fire step branches
-    // on this — `claude` POSTs the translate routine, `openrouter` schedules the
-    // Gemini translate action. Absent ⇒ `claude`.
-    return { acquired: true, topicSlug, lang, total, provider: topic.provider ?? "claude" };
+    return { acquired: true, topicSlug, lang, total };
   },
 });
 
@@ -170,10 +167,14 @@ export const failTranslation = internalMutation({
 
 type FireResult = { fired: boolean; reason?: string; error?: string };
 
-// Owner: translate a completed course into `lang` by firing the translate
-// Routine (mirrors `routine.requestNextLesson`). Acquire the lock, then POST the
-// routine's Fire URL; on a failed fire, release the lock. Idempotent re-translate
-// is a re-fire once the prior run is no longer `translating`.
+// Owner: translate a completed course into `lang`. ALL translation now runs on
+// Gemini via the OpenRouter translate action, regardless of the course's authoring
+// Provider — the claude.ai translate Routine is never fired (this branch
+// supersedes the PRD's "translation follows provider": a Claude-authored course
+// still translates through Gemini). Acquire the lock, then schedule the action; on
+// a failed schedule, release the lock. Idempotent re-translate is a re-fire once
+// the prior run is no longer `translating`. Requires OPENROUTER_API_KEY on the
+// deployment (the action reads it).
 export const startTranslation = action({
   args: { topicSlug: v.string(), lang: v.string() },
   handler: async (ctx, { topicSlug, lang }): Promise<FireResult> => {
@@ -188,33 +189,11 @@ export const startTranslation = action({
       return { fired: false, reason: acq.reason };
     }
 
-    // OpenRouter path (ADR 0014): translate in a Convex action on Gemini rather
-    // than the claude.ai translate Routine. No `claimTranslation` — the action is
-    // handed its (Topic, language) directly. The gate/lock + reportTranslation are
-    // reused unchanged; a failed schedule releases the lock, as the POST path does.
-    if (acq.provider === "openrouter") {
-      try {
-        await ctx.scheduler.runAfter(0, internal.translate.translateTopic, { topicSlug, lang });
-        return { fired: true };
-      } catch (e) {
-        const error = e instanceof Error ? e.message : String(e);
-        await ctx.runMutation(internal.translate.failTranslation, { topicSlug, lang, error });
-        return { fired: false, reason: "fire-error", error };
-      }
-    }
-
+    // Always schedule the Gemini translate action — no `claimTranslation`, no POST
+    // to the claude.ai translate Routine. The gate/lock + reportTranslation are
+    // reused unchanged; a failed schedule releases the lock.
     try {
-      const url = process.env.TRANSLATE_FIRE_URL;
-      const token = process.env.TRANSLATE_FIRE_TOKEN;
-      if (!url || !token) throw new Error("TRANSLATE_FIRE_URL / TRANSLATE_FIRE_TOKEN not set");
-      // Closed body (ADR 0008): the run learns its (Topic, language) from
-      // `claimTranslation`, not the fire body.
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json", "anthropic-version": "2023-06-01", authorization: `Bearer ${token}` },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) throw new Error(`fire ${res.status}: ${await res.text()}`);
+      await ctx.scheduler.runAfter(0, internal.translate.translateTopic, { topicSlug, lang });
       return { fired: true };
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
