@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, editionPrice, getOwnedTopic, heldLangs, previewLessonKey, resolveReaderEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import { assertAdmin, buildPaywall, getOwnedTopic, heldLangs, lessonLocked, resolveReaderEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
 import { isCallerAdmin } from "./whitelist";
@@ -277,24 +277,13 @@ export const courseHeader = query({
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
     const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    // `level` is now narrowed to the four access roles (the returns validator's
+    // union) — the "none" case is not-found above, so `role` is just `level`.
     if (level === "none") return null;
-    const role =
-      level === "owner"
-        ? ("owner" as const)
-        : level === "entitled"
-          ? ("entitled" as const)
-          : level === "preview"
-            ? ("preview" as const)
-            : ("viewer" as const);
+    const role = level;
     const t = await trOne(ctx, topic._id, effLang, "title", "");
     const editions = await switcherEditions(ctx, topic, userId);
-    let paywall: { amount: number; currency: string; previewKey: string | null } | undefined;
-    if (level === "preview") {
-      const price = await editionPrice(ctx, topic._id, effLang);
-      if (price) {
-        paywall = { amount: price.amount, currency: price.currency, previewKey: await previewLessonKey(ctx, topic._id) };
-      }
-    }
+    const paywall = level === "preview" ? await buildPaywall(ctx, topic._id, effLang) : undefined;
     return {
       title: decodeEntities(t?.text ?? topic.title),
       role,
@@ -350,7 +339,7 @@ export const getLesson = query({
     // Paygate: on a paid Edition the caller doesn't hold (`preview`), only the
     // Preview — the lowest-ordered non-superseded Lesson — is served; every other
     // Lesson returns an explicit `locked` marker, distinct from a not-found null.
-    if (level === "preview" && key !== (await previewLessonKey(ctx, topic._id))) {
+    if (await lessonLocked(ctx, topic._id, level, key)) {
       return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
     }
     return { key: lesson.key, seq: lesson.seq, title, html: t?.html ?? lesson.html, locked: false };

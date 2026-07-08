@@ -1,7 +1,7 @@
 "use client";
 
 import { useAction } from "convex/react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import { Icon } from "./icons";
 import { Dialog } from "./ui";
@@ -25,6 +25,20 @@ export function formatPrice(amount: number, currency: string): string {
   } catch {
     return `${major.toFixed(2)} ${currency.toUpperCase()}`;
   }
+}
+
+// The locked-content pane both readers render for a Lesson/Reference past the
+// free Preview: the item's title, then the paygate. The `<Paygate/>` is passed as
+// children because its props differ slightly between the authed reader
+// (ArtifactView) and the Guest reader (PublicReader) — the surrounding shell is
+// what's shared, so it lives here in one place.
+export function LockedPane({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="flex min-h-full flex-col gap-1">
+      <h2 className="truncate px-3 py-2 text-lg font-semibold md:px-0">{title}</h2>
+      {children}
+    </div>
+  );
 }
 
 export function Paygate({

@@ -9,6 +9,7 @@ import { api } from "../../../convex/_generated/api";
 import { CompletionCelebration } from "./Certificate";
 import { CourseSettingsDialog } from "./CourseSettings";
 import { Icon } from "./icons";
+import { NavItem } from "./NavItem";
 import { LANG_KEY, useEditionLang, withLang } from "./editionUrl";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
@@ -327,64 +328,6 @@ function CourseSettingsButton({ slug, status }: { slug: string; status: "seeded"
       </button>
       {open && <CourseSettingsDialog topicSlug={slug} status={status} onClose={() => setOpen(false)} />}
     </>
-  );
-}
-
-function NavItem({
-  href,
-  active,
-  done = false,
-  notify = false,
-  locked = false,
-  free = false,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  done?: boolean;
-  notify?: boolean;
-  // Paid marketplace: `locked` marks content past the free Preview (a lock icon,
-  // muted label); `free` flags the Preview lesson itself. Both stay navigable —
-  // opening a locked item shows the paygate, not a dead end.
-  locked?: boolean;
-  free?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors md:py-1.5 ${
-        active ? "bg-accent text-white" : locked ? "text-soft hover:bg-hi" : "text-ink hover:bg-hi"
-      }`}
-    >
-      <span className="min-w-0">{children}</span>
-      <span className="flex shrink-0 items-center gap-1.5">
-        {free && (
-          <span
-            className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
-              active ? "bg-white/20 text-white" : "bg-accent2/15 text-accent2"
-            }`}
-          >
-            Free
-          </span>
-        )}
-        {notify && (
-          <span
-            aria-label="New reply from your teacher"
-            title="Your teacher answered a question here"
-            className={`h-2 w-2 rounded-full ${active ? "bg-white" : "bg-gold"}`}
-          />
-        )}
-        {done && (
-          <span aria-label="completed" title="Completed" className={`text-xs ${active ? "text-white" : "text-accent2"}`}>
-            ✓
-          </span>
-        )}
-        {locked && (
-          <Icon name="lock" className={`h-3.5 w-3.5 ${active ? "text-white" : "text-soft"}`} />
-        )}
-      </span>
-    </Link>
   );
 }
 

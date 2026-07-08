@@ -15,6 +15,7 @@ import {
   SOURCE_LANG,
   topicBySlug,
   topicLessonCounts,
+  translatedTitle,
 } from "./lib";
 import { langInfo } from "./languages";
 import { applicationFee, appUrl, stripeClient } from "./stripe";
@@ -145,16 +146,7 @@ export const myPurchases = query({
         const counts = await topicLessonCounts(ctx, topic._id, userId);
         const langList = [...langSet].sort();
         const preferred = langList.includes(SOURCE_LANG) ? SOURCE_LANG : langList[0]!;
-        let title = topic.title;
-        if (preferred !== SOURCE_LANG) {
-          const t = await ctx.db
-            .query("translations")
-            .withIndex("by_topic_lang_kind_key", (q) =>
-              q.eq("topicId", topic._id).eq("lang", preferred).eq("kind", "title").eq("key", ""),
-            )
-            .unique();
-          if (t?.text) title = t.text;
-        }
+        const title = await translatedTitle(ctx, topic._id, preferred, topic.title);
         return {
           slug: topic.slug,
           title,
@@ -340,16 +332,7 @@ export const checkoutInfo = internalQuery({
     if (!listing) return null; // not for sale
     const seller = topic.ownerId ? await getSeller(ctx, topic.ownerId) : null;
     // The display title in the requested language (translated title, else source).
-    let title = topic.title;
-    if (lang !== SOURCE_LANG) {
-      const t = await ctx.db
-        .query("translations")
-        .withIndex("by_topic_lang_kind_key", (q) =>
-          q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "title").eq("key", ""),
-        )
-        .unique();
-      if (t?.text) title = t.text;
-    }
+    const title = await translatedTitle(ctx, topic._id, lang, topic.title);
     return {
       topicId: topic._id,
       lang,

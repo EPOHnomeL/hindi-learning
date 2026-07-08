@@ -4,6 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import type { SellerStatus } from "../../../convex/lib";
 
 // The Admin portal (/admin, ADR 0011 + issue 02): the single Admin manages the
 // Allowlist — who may sign up — without the CLI. Client-guarded by `amIAdmin`
@@ -162,7 +163,7 @@ function SellerRow({
   status,
 }: {
   email: string;
-  status: "not-granted" | "granted-not-onboarded" | "onboarding-incomplete" | "ready";
+  status: SellerStatus;
 }) {
   const revoke = useMutation(api.sellers.revokeCanSell);
   const [busy, setBusy] = useState(false);

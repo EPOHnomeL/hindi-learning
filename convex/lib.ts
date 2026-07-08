@@ -1,3 +1,4 @@
+import { v, type Infer } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 
@@ -228,11 +229,16 @@ export async function readableLang(
 //   onboarding-incomplete — Stripe account exists but payouts not yet enabled
 //   ready                 — payouts enabled: the Seller may price and be paid
 // A Seller (CONTEXT) is only `ready` when both gates are satisfied.
-export type SellerStatus =
-  | "not-granted"
-  | "granted-not-onboarded"
-  | "onboarding-incomplete"
-  | "ready";
+// Single source of truth for the status: the validator (used by every Convex
+// function that returns a status) and the `SellerStatus` type both derive from
+// this one declaration, so the four stages are never restated out of sync.
+export const sellerStatusValidator = v.union(
+  v.literal("not-granted"),
+  v.literal("granted-not-onboarded"),
+  v.literal("onboarding-incomplete"),
+  v.literal("ready"),
+);
+export type SellerStatus = Infer<typeof sellerStatusValidator>;
 
 // The caller's Seller row, or null when can-sell was never granted.
 export async function getSeller(ctx: QueryCtx, userId: Id<"users">): Promise<Doc<"sellers"> | null> {
@@ -312,11 +318,56 @@ export async function editionAccessLevel(
 // rendering is handled by the reader's normal translation fallback. Null when the
 // course has no readable Lesson yet.
 export async function previewLessonKey(ctx: QueryCtx, topicId: Id<"topics">): Promise<string | null> {
-  const lessons = (
-    await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect()
-  ).filter((l) => !l.supersededBy);
-  if (lessons.length === 0) return null;
-  return lessons.sort((a, b) => a.seq - b.seq)[0]!.key;
+  // Walk the `by_topic_seq` index in ascending order and return the first
+  // non-superseded Lesson — the lowest-ordered live one — short-circuiting rather
+  // than collecting + sorting the whole course on every reader request.
+  for await (const l of ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId))) {
+    if (!l.supersededBy) return l.key;
+  }
+  return null;
+}
+
+// The paygate payload for an Edition: its price and which Lesson is the free
+// Preview, or undefined when the Edition is free. Built in one place so both
+// readers' course-header queries (content.courseHeader / public.publicCourse)
+// render the paywall identically.
+export type Paywall = { amount: number; currency: string; previewKey: string | null };
+export async function buildPaywall(ctx: QueryCtx, topicId: Id<"topics">, lang: string): Promise<Paywall | undefined> {
+  const price = await editionPrice(ctx, topicId, lang);
+  if (!price) return undefined;
+  return { amount: price.amount, currency: price.currency, previewKey: await previewLessonKey(ctx, topicId) };
+}
+
+// Whether a Lesson body is withheld from this caller: only on a PAID Edition they
+// don't hold (`preview`), and only for a Lesson past the free Preview. Shared by
+// both readers' per-Lesson queries (content.getLesson / public.publicLesson) so
+// the lock decision lives in one place.
+export async function lessonLocked(
+  ctx: QueryCtx,
+  topicId: Id<"topics">,
+  level: EditionAccess,
+  key: string,
+): Promise<boolean> {
+  return level === "preview" && key !== (await previewLessonKey(ctx, topicId));
+}
+
+// The translated title text for an Edition, or the source title when the Edition
+// is English or untranslated. Centralises the `kind: "title"` translation lookup
+// the marketplace read paths (market.myPurchases / market.checkoutInfo) need.
+export async function translatedTitle(
+  ctx: QueryCtx,
+  topicId: Id<"topics">,
+  lang: string,
+  sourceTitle: string,
+): Promise<string> {
+  if (lang === SOURCE_LANG) return sourceTitle;
+  const t = await ctx.db
+    .query("translations")
+    .withIndex("by_topic_lang_kind_key", (q) =>
+      q.eq("topicId", topicId).eq("lang", lang).eq("kind", "title").eq("key", ""),
+    )
+    .unique();
+  return t?.text ?? sourceTitle;
 }
 
 // The authed reader's per-request resolution: which Edition to serve AND the

@@ -34,6 +34,10 @@ type Course = {
   editions: string[];
 };
 
+// One Edition chip: the language + how to display it (shared by the shared- and
+// purchased-course cards, whose `langs` arrays are identical in shape).
+type EditionChip = { lang: string; name: string; native: string; rtl: boolean };
+
 type SharedCourse = {
   slug: string;
   title: string;
@@ -42,19 +46,12 @@ type SharedCourse = {
   lessonCount: number;
   completedCount: number;
   // The Edition languages this Viewer holds — chips + which one to open in.
-  langs: { lang: string; name: string; native: string; rtl: boolean }[];
+  langs: EditionChip[];
 };
 
 // A purchased course (paid marketplace, ADR 0016) — the paid twin of a shared
-// one. Same shape minus the owner attribution: a buyer reads it like a Viewer.
-type PurchasedCourse = {
-  slug: string;
-  title: string;
-  mission: string | null;
-  lessonCount: number;
-  completedCount: number;
-  langs: { lang: string; name: string; native: string; rtl: boolean }[];
-};
+// one: the same shape minus the owner attribution (a buyer reads it like a Viewer).
+type PurchasedCourse = Omit<SharedCourse, "ownerEmail">;
 
 // The home dashboard (`/`): the course grid (create / edit / open) plus the
 // "Shared with me" section. Opening a course is a real navigation to

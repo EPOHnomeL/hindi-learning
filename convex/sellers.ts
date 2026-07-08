@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { api, internal } from "./_generated/api";
-import { getSeller, normaliseEmail, sellerStatusOf, type SellerStatus } from "./lib";
+import { getSeller, normaliseEmail, sellerStatusOf, sellerStatusValidator, type SellerStatus } from "./lib";
 import { appUrl, stripeClient } from "./stripe";
 import { isCallerAdmin } from "./whitelist";
 
@@ -15,13 +15,6 @@ import { isCallerAdmin } from "./whitelist";
 // and the internal mutations the Stripe onboarding action / `account.updated`
 // webhook call to persist the connected-account id and its capability flags. The
 // Stripe SDK is touched only in the actions at the bottom (PRD: never in a query).
-
-const sellerStatusValidator = v.union(
-  v.literal("not-granted"),
-  v.literal("granted-not-onboarded"),
-  v.literal("onboarding-incomplete"),
-  v.literal("ready"),
-);
 
 // ---- Admin: the can-sell grant (the first gate) -----------------------------
 
@@ -196,12 +189,7 @@ export const startOnboarding = action({
 // the caller's fresh Seller status so the UI can react without a second round-trip.
 export const refreshOnboarding = action({
   args: {},
-  returns: v.union(
-    v.literal("not-granted"),
-    v.literal("granted-not-onboarded"),
-    v.literal("onboarding-incomplete"),
-    v.literal("ready"),
-  ),
+  returns: sellerStatusValidator,
   handler: async (ctx): Promise<SellerStatus> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return "not-granted";

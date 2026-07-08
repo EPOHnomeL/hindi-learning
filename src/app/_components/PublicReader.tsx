@@ -8,9 +8,9 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
 import { Frame } from "./ArtifactView";
-import { Icon } from "./icons";
+import { NavItem } from "./NavItem";
 import { Markdown } from "./MarkdownView";
-import { Paygate } from "./Paygate";
+import { LockedPane, Paygate } from "./Paygate";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
@@ -198,52 +198,6 @@ export function PublicCourseShell({ token, children }: { token: string; children
   );
 }
 
-function NavItem({
-  href,
-  active,
-  done = false,
-  locked = false,
-  free = false,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  done?: boolean;
-  // Paid marketplace: `locked` marks content past the free Preview (lock icon,
-  // muted label); `free` flags the Preview lesson. Both stay navigable.
-  locked?: boolean;
-  free?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors md:py-1.5 ${
-        active ? "bg-accent text-white" : locked ? "text-soft hover:bg-hi" : "text-ink hover:bg-hi"
-      }`}
-    >
-      <span className="min-w-0">{children}</span>
-      <span className="flex shrink-0 items-center gap-1.5">
-        {free && (
-          <span
-            className={`rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
-              active ? "bg-white/20 text-white" : "bg-accent2/15 text-accent2"
-            }`}
-          >
-            Free
-          </span>
-        )}
-        {done && (
-          <span aria-label="completed" title="Completed" className={`text-xs ${active ? "text-white" : "text-accent2"}`}>
-            ✓
-          </span>
-        )}
-        {locked && <Icon name="lock" className={`h-3.5 w-3.5 ${active ? "text-white" : "text-soft"}`} />}
-      </span>
-    </Link>
-  );
-}
-
 function ThemeToggle() {
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
@@ -290,8 +244,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
   const editionName = course.lang !== "en" ? langInfo(course.lang).native : undefined;
   if (lesson.locked) {
     return (
-      <div className="flex min-h-full flex-col gap-1">
-        <h2 className="truncate px-3 py-2 text-lg font-semibold md:px-0">{lesson.title}</h2>
+      <LockedPane title={lesson.title}>
         <Paygate
           kind="lesson"
           paywall={course.paywall ?? null}
@@ -300,7 +253,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
           topicSlug={course.slug}
           lang={course.lang}
         />
-      </div>
+      </LockedPane>
     );
   }
   const preview = !!course.paywall;
@@ -378,8 +331,7 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
   // Guest on a paid Edition.
   if (ref.locked) {
     return (
-      <div className="flex min-h-full flex-col gap-1">
-        <h2 className="truncate px-3 py-2 text-lg font-semibold md:px-0">{ref.title}</h2>
+      <LockedPane title={ref.title}>
         <Paygate
           kind="reference"
           paywall={course.paywall ?? null}
@@ -388,7 +340,7 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
           topicSlug={course.slug}
           lang={course.lang}
         />
-      </div>
+      </LockedPane>
     );
   }
   return (

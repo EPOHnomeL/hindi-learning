@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { decodeEntities } from "./content";
-import { editionAccessLevel, editionPrice, previewLessonKey, SOURCE_LANG, type EditionAccess } from "./lib";
+import { buildPaywall, editionAccessLevel, lessonLocked, SOURCE_LANG, type EditionAccess } from "./lib";
 import { langInfo } from "./languages";
 
 // The Guest read seam (issue 07 / ADR 0013). Every function here authorizes by
@@ -182,13 +182,7 @@ export const publicCourse = query({
       : [];
 
     const title = decodeEntities(tmap.get("title:")?.text ?? topic.title);
-    let paywall: { amount: number; currency: string; previewKey: string | null } | undefined;
-    if (preview) {
-      const price = await editionPrice(ctx, topic._id, lang);
-      if (price) {
-        paywall = { amount: price.amount, currency: price.currency, previewKey: await previewLessonKey(ctx, topic._id) };
-      }
-    }
+    const paywall = preview ? await buildPaywall(ctx, topic._id, lang) : undefined;
     return {
       title,
       slug: topic.slug,
@@ -234,7 +228,7 @@ export const publicLesson = query({
     const title = decodeEntities(t?.title ?? lesson.title);
     // Paygate: on a paid Edition (`preview`) only the Preview Lesson's body is
     // served; every other Lesson is a locked marker (never a bare null 404).
-    if (level === "preview" && key !== (await previewLessonKey(ctx, topic._id))) {
+    if (await lessonLocked(ctx, topic._id, level, key)) {
       return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
     }
     return { key: lesson.key, seq: lesson.seq, title, html: t?.html ?? lesson.html, locked: false };

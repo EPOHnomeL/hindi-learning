@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { CertificateControl } from "./Certificate";
-import { Paygate } from "./Paygate";
+import { LockedPane, Paygate } from "./Paygate";
 import { useEditionLang, withLang } from "./editionUrl";
 import { buildSrcDoc, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
@@ -242,10 +242,9 @@ function LessonView({
   // pane. The title still renders so the reader knows what they'd unlock.
   if (lesson.locked) {
     return (
-      <div className="flex min-h-full flex-col gap-1">
-        <h2 className="truncate px-3 py-2 text-lg font-semibold md:px-0">{lesson.title}</h2>
+      <LockedPane title={lesson.title}>
         <Paygate kind="lesson" paywall={header?.paywall ?? null} courseTitle={header?.title} topicSlug={topicSlug} lang={lang ?? "en"} />
-      </div>
+      </LockedPane>
     );
   }
 
@@ -421,10 +420,9 @@ function ReferenceView({
   // caller gets the paygate here (the reader returns `locked` on a paid Edition).
   if (ref.locked) {
     return (
-      <div className="flex min-h-full flex-col gap-1">
-        <h2 className="truncate px-3 py-2 text-lg font-semibold md:px-0">{ref.title}</h2>
+      <LockedPane title={ref.title}>
         <Paygate kind="reference" paywall={header?.paywall ?? null} courseTitle={header?.title} topicSlug={topicSlug} lang={lang ?? "en"} />
-      </div>
+      </LockedPane>
     );
   }
   return (
