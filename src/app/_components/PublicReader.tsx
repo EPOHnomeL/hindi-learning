@@ -11,7 +11,7 @@ import { Frame, useContentHtml } from "./ArtifactView";
 import { Markdown } from "./MarkdownView";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
-import { ReaderSkeleton } from "./ui";
+import { CourseSkeleton, ReaderSkeleton } from "./ui";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { firstLessonKey, nextLessonKey } from "./readerDerive";
 
@@ -84,12 +84,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
     [token],
   );
 
-  if (course === undefined)
-    return (
-      <div className="p-4 md:h-screen">
-        <ReaderSkeleton />
-      </div>
-    );
+  if (course === undefined) return <CourseSkeleton />;
   if (course === null) return <Centered>This link isn’t available — the owner may have turned it off.</Centered>;
 
   const isRef = pathname.includes("/references/");
