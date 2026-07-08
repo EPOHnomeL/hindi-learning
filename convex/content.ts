@@ -1,9 +1,11 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query, type QueryCtx } from "./_generated/server";
+import { action, internalMutation, internalQuery, mutation, query, type ActionCtx, type QueryCtx } from "./_generated/server";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { assertAdmin, getOwnedTopic, getViewableTopic, heldLangs, pickContentBody, readableLang, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
+import { quizStructureMatches } from "./translate";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
 import { isCallerAdmin } from "./whitelist";
 
@@ -203,6 +205,103 @@ export const renameTopic = mutation({
     const trimmed = title.trim();
     if (!trimmed) throw new Error("title required");
     await ctx.db.patch(topic._id, { title: trimmed });
+  },
+});
+
+// ---- Owner prose edit (course-content-editing 01) --------------------------
+
+// Mint an upload URL for the owner reader's in-place edit: the client PUTs the
+// edited Lesson body straight to storage and passes the resulting storageId to
+// `editLesson`, so the HTML never rides through a Convex function (mirrors the
+// teach CLI's `generateContentUploadUrl`, but authed instead of secret-guarded —
+// any signed-in user may mint one; the blob does nothing until the owner-guarded
+// `editLesson` accepts it).
+export const generateEditUploadUrl = mutation({
+  args: {},
+  returns: v.string(),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    return await ctx.storage.generateUploadUrl();
+  },
+});
+
+// The current content blob of an owned, non-superseded source Lesson — for the
+// quiz-structure guard, which needs the OLD body's markup. Owner-guarded; throws
+// (rather than returning null) so `editLesson` surfaces the reason. Blob bytes
+// aren't readable in a query, so only the storageId is returned; the action reads
+// the bytes itself.
+export const lessonEditTarget = internalQuery({
+  args: { topicSlug: v.string(), key: v.string() },
+  returns: v.object({ storageId: v.union(v.id("_storage"), v.null()) }),
+  handler: async (ctx, { topicSlug, key }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+      .unique();
+    if (!lesson || lesson.supersededBy) throw new Error("lesson not found");
+    return { storageId: lesson.htmlStorageId ?? null };
+  },
+});
+
+// Swap an owned source Lesson's body blob and delete the superseded one (no
+// orphan — PRD story 18). Owner-guarded again here: `editLesson` is the only
+// caller, but the guard doesn't depend on it. The quiz-structure check has
+// already run in the action (it needs the blob bytes); this just applies the swap.
+export const applyLessonEdit = internalMutation({
+  args: { topicSlug: v.string(), key: v.string(), storageId: v.id("_storage") },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, key, storageId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+      .unique();
+    if (!lesson || lesson.supersededBy) throw new Error("lesson not found");
+    const old = lesson.htmlStorageId;
+    await ctx.db.patch(lesson._id, { htmlStorageId: storageId });
+    if (old && old !== storageId) await ctx.storage.delete(old);
+    return null;
+  },
+});
+
+async function blobText(ctx: ActionCtx, id: Id<"_storage">): Promise<string | null> {
+  const blob = await ctx.storage.get(id);
+  return blob ? await blob.text() : null;
+}
+
+// Owner corrects a source Lesson's body in place (amends ADR 0003): the client
+// uploads the edited HTML (generateEditUploadUrl) and passes its storageId here.
+// A Lesson stays structurally immutable — a save that changes the quiz's marker
+// counts (data-correct/data-answer/data-k) is refused (`quizStructureMatches`),
+// since scoring is positional. The guard needs both bodies' bytes, and
+// `ctx.storage.get` is action-only, so the comparison lives here; the DB swap is
+// delegated to `applyLessonEdit`. Owner-only: `lessonEditTarget` rejects anyone
+// who isn't the Topic owner before any blob is touched. A refused edit's uploaded
+// blob is deleted so a rejected save leaves no orphan.
+export const editLesson = action({
+  args: { topicSlug: v.string(), key: v.string(), storageId: v.id("_storage") },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, key, storageId }): Promise<null> => {
+    const target = await ctx.runQuery(internal.content.lessonEditTarget, { topicSlug, key });
+    if (target.storageId) {
+      const [oldHtml, newHtml] = await Promise.all([blobText(ctx, target.storageId), blobText(ctx, storageId)]);
+      if (oldHtml !== null && newHtml !== null && !quizStructureMatches(oldHtml, newHtml)) {
+        await ctx.storage.delete(storageId);
+        throw new Error(
+          "This edit changes the lesson's quiz structure, so it can't be saved. Reword the text without adding, removing, or reordering quiz options or answers.",
+        );
+      }
+    }
+    await ctx.runMutation(internal.content.applyLessonEdit, { topicSlug, key, storageId });
+    return null;
   },
 });
 

@@ -347,3 +347,95 @@ test("renameTopic changes the title, keeps the slug, and is owner-scoped", async
   expect((await asUser(t, alice).query(api.content.dashboard, {}))[0]).toMatchObject({ slug: "hindi", title: "Biblical Hindi" });
   await expect(asUser(t, bob).mutation(api.content.renameTopic, { topicSlug: "hindi", title: "x" })).rejects.toThrow();
 });
+
+// ---- editLesson: owner prose-edit of a source Lesson (course-content-editing 01)
+
+// A quiz body whose marker counts define the lesson's positional scoring:
+// data-correct=1, data-k=2, data-answer=0. The guard compares these counts.
+const QUIZ_BODY =
+  '<p>What is the word?</p><div class="quiz" data-correct="a"><span class="opt" data-k="a">x</span><span class="opt" data-k="b">y</span></div>';
+
+async function storeHtml(t: ReturnType<typeof convexTest>, html: string) {
+  return await t.run((ctx) => ctx.storage.store(new Blob([html], { type: "text/html" })));
+}
+
+async function seedLesson(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, key: string, storageId: Id<"_storage">) {
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key, seq: 1, title: "A", htmlStorageId: storageId }));
+}
+
+test("editLesson: owner edits a source Lesson — the new blob is served and the old one is deleted", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, "<p>Helo world</p>");
+  await seedLesson(t, topicId, "0001", oldSid);
+
+  // The client uploads the corrected body to a new blob and passes its storageId.
+  const newSid = await storeHtml(t, "<p>Hello world</p>");
+  await asUser(t, alice).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: newSid });
+
+  const lesson = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(lesson).toMatchObject({ key: "0001", contentUrl: expect.stringContaining(`/content?id=${newSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).toBeNull(); // old blob cleaned up
+  expect(await t.run((ctx) => ctx.db.system.get(newSid))).not.toBeNull();
+});
+
+test("editLesson: rejects a structural change, cleans up the rejected blob, and leaves the old body", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", oldSid);
+
+  // A third option adds a data-k marker → positional scoring would break → refused.
+  const badSid = await storeHtml(
+    t,
+    QUIZ_BODY.replace("</div>", '<span class="opt" data-k="c">z</span></div>'),
+  );
+  await expect(
+    asUser(t, alice).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: badSid }),
+  ).rejects.toThrow(/quiz/i);
+
+  // Old body untouched; the refused upload is deleted (no orphan).
+  const lesson = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(lesson).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).not.toBeNull();
+  expect(await t.run((ctx) => ctx.db.system.get(badSid))).toBeNull();
+});
+
+test("editLesson: accepts a prose-only edit that preserves the quiz markers", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", oldSid);
+
+  // Reworded prose, same three markers → allowed.
+  const goodSid = await storeHtml(t, QUIZ_BODY.replace("What is the word?", "Which word fits?"));
+  await asUser(t, alice).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: goodSid });
+
+  const lesson = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(lesson).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${goodSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).toBeNull();
+});
+
+test("editLesson: rejects a non-owner and an unauthenticated caller; the lesson is untouched", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const bob = await seedUser(t, "bob@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, "<p>original</p>");
+  await seedLesson(t, topicId, "0001", oldSid);
+
+  const bobSid = await storeHtml(t, "<p>hijacked</p>");
+  await expect(
+    asUser(t, bob).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: bobSid }),
+  ).rejects.toThrow();
+  await expect(
+    t.action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: bobSid }),
+  ).rejects.toThrow();
+
+  // The owner's lesson still points at its original body.
+  const lesson = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(lesson).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldSid}`) });
+});
