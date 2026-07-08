@@ -117,7 +117,7 @@ export const generationStatus = query({
 // ---- The gate + lock (atomic) ----------------------------------------------
 
 type AcquireResult =
-  | { acquired: true; topicSlug: string; frontierKey: string }
+  | { acquired: true; topicSlug: string; frontierKey: string; provider: "claude" | "openrouter" }
   | { acquired: false; reason: string };
 
 // Check the gate and grab the lock in one transaction. Returns whether the
@@ -185,7 +185,9 @@ export const tryAcquireGeneration = internalMutation({
     if (gen) await ctx.db.patch(gen._id, patch);
     else await ctx.db.insert("generation", { topicId: topic._id, ...patch });
 
-    return { acquired: true, topicSlug, frontierKey };
+    // The fire step branches on this: `claude` POSTs the routine, `openrouter`
+    // schedules the authoring action. Absent on the row ⇒ `claude` (ADR 0014).
+    return { acquired: true, topicSlug, frontierKey, provider: topic.provider ?? "claude" };
   },
 });
 
@@ -277,6 +279,21 @@ type FireResult = { fired: boolean; reason?: string; error?: string };
 async function fireForTopic(ctx: ActionCtx, topicSlug: string, manual: boolean): Promise<FireResult> {
   const acquired: AcquireResult = await ctx.runMutation(internal.routine.tryAcquireGeneration, { topicSlug, manual });
   if (!acquired.acquired) return { fired: false, reason: acquired.reason };
+
+  // OpenRouter path (ADR 0014): author in a Convex action rather than the
+  // claude.ai Routine. No `claim` protocol — hand the action its topic directly.
+  // The gate/lock above is reused unchanged; the action reports via the same
+  // `reportGeneration`. A failed schedule releases the lock, as the POST path does.
+  if (acquired.provider === "openrouter") {
+    try {
+      await ctx.scheduler.runAfter(0, internal.openrouter.authorTopic, { topicSlug });
+      return { fired: true };
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      await ctx.runMutation(internal.routine.failGeneration, { topicSlug, error });
+      return { fired: false, reason: "fire-error", error };
+    }
+  }
 
   try {
     const url = process.env.ROUTINE_FIRE_URL;

@@ -18,6 +18,7 @@ import type * as emblem from "../emblem.js";
 import type * as http from "../http.js";
 import type * as languages from "../languages.js";
 import type * as lib from "../lib.js";
+import type * as openrouter from "../openrouter.js";
 import type * as public_ from "../public.js";
 import type * as quizShuffle from "../quizShuffle.js";
 import type * as resources from "../resources.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   languages: typeof languages;
   lib: typeof lib;
+  openrouter: typeof openrouter;
   public: typeof public_;
   quizShuffle: typeof quizShuffle;
   resources: typeof resources;

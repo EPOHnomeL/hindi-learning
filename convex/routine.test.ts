@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { beforeAll, expect, test } from "vitest";
+import { beforeAll, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
@@ -143,6 +143,18 @@ test("the bootstrap gate fires a seeded topic with no lessons; a plain empty top
   expect(plain).toMatchObject({ acquired: false, reason: "no-frontier" });
 });
 
+test("tryAcquireGeneration reports the topic's provider so the fire step can branch; absent reads as claude", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  // A seeded OpenRouter course (bootstrap gate passes) and a seeded default course
+  // (no provider → claude).
+  await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "glm", title: "GLM", status: "seeded", provider: "openrouter" }));
+  await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "std", title: "Std", status: "seeded" }));
+
+  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "glm" })).toMatchObject({ acquired: true, provider: "openrouter" });
+  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "std" })).toMatchObject({ acquired: true, provider: "claude" });
+});
+
 test("the on-demand button is capped to one manual fire per user per day, across topics; the daily cron is not", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
@@ -163,6 +175,49 @@ test("the on-demand button is capped to one manual fire per user per day, across
   expect(await asAlice.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "spanish", manual: true })).toMatchObject({ acquired: false, reason: "rate-limited" });
   // ...but the daily cron (manual=false) still fires that course.
   expect(await asAlice.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "spanish", manual: false })).toMatchObject({ acquired: true });
+});
+
+async function genStatus(t: ReturnType<typeof convexTest>, topicId: Id<"topics">) {
+  return await t.run(async (ctx) =>
+    (await ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique())?.status,
+  );
+}
+
+test("firing an OpenRouter course schedules the authoring action (no POST) and the skeleton leaves the lock clean", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const glm = await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "glm", title: "GLM", status: "seeded", provider: "openrouter" }));
+
+  // Fake timers must be active BEFORE the fire so the `runAfter(0)` schedule is
+  // set against the fake clock that `finishAllScheduledFunctions` then advances.
+  vi.useFakeTimers();
+  try {
+    // ROUTINE_FIRE_URL is intentionally unset — the Claude POST path would fail;
+    // the OpenRouter path must never reach it, so this fire succeeds by scheduling.
+    const res = await asUser(t, alice).action(api.routine.requestSetup, { topicSlug: "glm" });
+    expect(res).toMatchObject({ fired: true });
+    expect(await genStatus(t, glm)).toBe("generating"); // lock held until the scheduled run reports
+
+    // Run the scheduled skeleton action: it does no LLM work, just reports
+    // `nothing` (→ caughtUp), proving the schedule → run → report round-trip.
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+  } finally {
+    vi.useRealTimers();
+  }
+  expect(await genStatus(t, glm)).toBe("caughtUp");
+});
+
+test("firing a Claude course still takes the POST path (unchanged), never the scheduler", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const std = await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "std", title: "Std", status: "seeded" }));
+
+  // No provider → Claude path: it attempts the routine POST. With ROUTINE_FIRE_URL
+  // unset the fire can't land, surfacing as fire-error / a failed lock — proving it
+  // took the POST branch, not the scheduler.
+  const res = await asUser(t, alice).action(api.routine.requestSetup, { topicSlug: "std" });
+  expect(res).toMatchObject({ fired: false, reason: "fire-error" });
+  expect(await genStatus(t, std)).toBe("failed");
 });
 
 test("the Admin bypasses the on-demand cooldown", async () => {
