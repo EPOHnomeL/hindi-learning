@@ -419,6 +419,50 @@ test("editLesson: accepts a prose-only edit that preserves the quiz markers", as
   expect(await t.run((ctx) => ctx.db.system.get(oldSid))).toBeNull();
 });
 
+test("editLesson: refuses an unreadable upload and preserves the current body (no data loss)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", oldSid);
+
+  // A well-formed storageId whose bytes don't exist (a bogus or already-consumed
+  // upload). The swap must NOT proceed — else it would point the lesson at a dead
+  // blob and delete the good one.
+  const deadSid = await t.run(async (ctx) => {
+    const id = await ctx.storage.store(new Blob(["tmp"], { type: "text/html" }));
+    await ctx.storage.delete(id);
+    return id;
+  });
+  await expect(
+    asUser(t, alice).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: deadSid }),
+  ).rejects.toThrow();
+
+  const lesson = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(lesson).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).not.toBeNull(); // good body survives
+});
+
+test("editLesson: refuses when the current body can't be read back, cleaning up the upload", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  // The lesson points at a storageId whose blob has since been removed — the guard
+  // has no old body to check against, so a structural change can't be verified.
+  const goneSid = await t.run(async (ctx) => {
+    const id = await ctx.storage.store(new Blob(["x"], { type: "text/html" }));
+    await ctx.storage.delete(id);
+    return id;
+  });
+  await seedLesson(t, topicId, "0001", goneSid);
+
+  const newSid = await storeHtml(t, "<p>new</p>");
+  await expect(
+    asUser(t, alice).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: newSid }),
+  ).rejects.toThrow();
+  expect(await t.run((ctx) => ctx.db.system.get(newSid))).toBeNull(); // unverifiable edit cleaned up
+});
+
 test("editLesson: rejects a non-owner and an unauthenticated caller; the lesson is untouched", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");

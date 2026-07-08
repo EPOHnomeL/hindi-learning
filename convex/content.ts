@@ -293,16 +293,34 @@ export const editLesson = action({
   returns: v.null(),
   handler: async (ctx, { topicSlug, key, storageId }): Promise<null> => {
     const target = await ctx.runQuery(internal.content.lessonEditTarget, { topicSlug, key });
+    // Read the edited body up front. The swap must NEVER proceed on an unreadable
+    // upload (a bogus/consumed storageId): that would patch the lesson to a dead
+    // blob and then delete the good previous body — silent, unrecoverable loss.
+    const newHtml = await blobText(ctx, storageId);
+    if (newHtml === null) throw new Error("The edited lesson couldn't be read back. Please try saving again.");
+    // A lesson with a current body must keep its quiz-marker counts unchanged
+    // (scoring is positional). If the current body can't be read, the edit can't
+    // be verified against it — refuse rather than accept a possibly-structural
+    // change. (A lesson with no stored body yet has nothing to preserve.)
     if (target.storageId) {
-      const [oldHtml, newHtml] = await Promise.all([blobText(ctx, target.storageId), blobText(ctx, storageId)]);
-      if (oldHtml !== null && newHtml !== null && !quizStructureMatches(oldHtml, newHtml)) {
+      const oldHtml = await blobText(ctx, target.storageId);
+      if (oldHtml === null || !quizStructureMatches(oldHtml, newHtml)) {
         await ctx.storage.delete(storageId);
         throw new Error(
-          "This edit changes the lesson's quiz structure, so it can't be saved. Reword the text without adding, removing, or reordering quiz options or answers.",
+          oldHtml === null
+            ? "Couldn't check this edit against the current lesson. Please refresh and try again."
+            : "This edit changes the lesson's quiz structure, so it can't be saved. Reword the text without adding or removing quiz options or answers.",
         );
       }
     }
-    await ctx.runMutation(internal.content.applyLessonEdit, { topicSlug, key, storageId });
+    // Guard passed. If the swap itself fails (e.g. the lesson was superseded in the
+    // window since lessonEditTarget resolved), delete the upload so it doesn't orphan.
+    try {
+      await ctx.runMutation(internal.content.applyLessonEdit, { topicSlug, key, storageId });
+    } catch (e) {
+      await ctx.storage.delete(storageId);
+      throw e;
+    }
     return null;
   },
 });
