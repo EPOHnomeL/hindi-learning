@@ -271,6 +271,16 @@ test("an entitled buyer gets Viewer semantics — own Progress, but no Responses
       correct: true,
     }),
   ).rejects.toThrow();
+
+  // Questions stay owner-only too (PRD: a buyer "cannot record Responses or ask
+  // Questions") — asking is refused by the owner gate.
+  await expect(
+    asUser(t, dave).mutation(api.capture.askQuestion, {
+      topicSlug: "hindi",
+      lessonKey: "0001",
+      text: "why?",
+    }),
+  ).rejects.toThrow();
 });
 
 test("myPurchases lists a buyer's entitled courses with their own progress; others see none", async () => {
