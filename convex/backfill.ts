@@ -125,3 +125,51 @@ export const backfillHtmlBlobs = action({
     return { patched, scanned: page.rows.length, isDone: page.isDone, cursor: page.cursor };
   },
 });
+
+// Integrity check before dropping inline `html` (issue 05). Read-only: for each
+// body row it confirms a blob exists AND its bytes equal the inline `html`, so
+// we can prove `html` is redundant before removing it. `stranded` (inline html
+// but no blob) and `mismatched` (blob != html) must both be 0 to narrow safely.
+export const verifyHtmlBlobs = action({
+  args: { secret: v.string(), table: blobTableV, cursor: v.union(v.string(), v.null()) },
+  returns: v.object({
+    bodies: v.number(),
+    matched: v.number(),
+    mismatched: v.number(),
+    stranded: v.number(),
+    blobOnly: v.number(),
+    isDone: v.boolean(),
+    cursor: v.union(v.string(), v.null()),
+  }),
+  handler: async (
+    ctx,
+    { secret, table, cursor },
+  ): Promise<{ bodies: number; matched: number; mismatched: number; stranded: number; blobOnly: number; isDone: boolean; cursor: string | null }> => {
+    assertAdmin(secret);
+    const page: { isDone: boolean; cursor: string | null; rows: Array<{ id: string; html?: string; htmlStorageId?: Id<"_storage">; kind?: string }> } =
+      await ctx.runQuery(internal.backfill.pageToBackfill, { table, cursor });
+    let bodies = 0,
+      matched = 0,
+      mismatched = 0,
+      stranded = 0,
+      blobOnly = 0;
+    for (const r of page.rows) {
+      if (table === "translations" && r.kind !== "lesson" && r.kind !== "reference") continue;
+      if (r.html == null && !r.htmlStorageId) continue; // no body at all
+      bodies++;
+      if (!r.htmlStorageId) {
+        stranded++; // inline html but no blob — dropping html WOULD lose this
+        continue;
+      }
+      if (r.html == null) {
+        blobOnly++; // already narrowed (blob, no inline) — fine
+        continue;
+      }
+      const blob = await ctx.storage.get(r.htmlStorageId);
+      const text = blob ? await blob.text() : null;
+      if (text === r.html) matched++;
+      else mismatched++; // blob missing or bytes differ from inline html
+    }
+    return { bodies, matched, mismatched, stranded, blobOnly, isDone: page.isDone, cursor: page.cursor };
+  },
+});

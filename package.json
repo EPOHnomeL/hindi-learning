@@ -25,6 +25,8 @@
     "backfill-quiz-shuffle:prod": "tsx scripts/backfill-quiz-shuffle.ts --prod",
     "backfill-html-blobs": "tsx scripts/backfill-html-blobs.ts",
     "backfill-html-blobs:prod": "tsx scripts/backfill-html-blobs.ts --prod",
+    "verify-html-blobs": "tsx scripts/verify-html-blobs.ts",
+    "verify-html-blobs:prod": "tsx scripts/verify-html-blobs.ts --prod",
     "review": "tsx scripts/review.ts",
     "review:prod": "tsx scripts/review.ts --prod",
     "reply": "tsx scripts/reply.ts",
