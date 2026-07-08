@@ -149,6 +149,26 @@ test("seedTopic creates a seeded topic; identical titles get distinct slugs", as
   expect(topics.find((x) => x.slug === "koine-greek")).toMatchObject({ title: "Koine Greek!", status: "seeded", mission: null });
 });
 
+test("seedTopic persists the chosen provider; absent defaults to claude", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const bob = await seedUser(t, "bob@example.com");
+
+  // Explicit OpenRouter (the experimental line).
+  const { slug: or } = await asUser(t, alice).mutation(api.content.seedTopic, {
+    title: "GLM Course",
+    why: "try it",
+    provider: "openrouter",
+  });
+  // No provider supplied → the quality-guaranteed Claude default.
+  const { slug: def } = await asUser(t, bob).mutation(api.content.seedTopic, { title: "Default Course", why: "x" });
+
+  const rows = await t.run((ctx) => ctx.db.query("topics").collect());
+  expect(rows.find((x) => x.slug === or)?.provider).toBe("openrouter");
+  // The default topic stores no provider; readers treat absent as claude.
+  expect(rows.find((x) => x.slug === def)?.provider).toBeUndefined();
+});
+
 test("seedTopic caps a non-Admin to one new course per day; the Admin is exempt", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
