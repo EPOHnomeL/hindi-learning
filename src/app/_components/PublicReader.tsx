@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
-import { Frame } from "./ArtifactView";
+import { Frame, useContentHtml } from "./ArtifactView";
 import { Markdown } from "./MarkdownView";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
@@ -250,11 +250,13 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
   const navHidden = useHideOnScroll();
   const { course, markComplete } = useGuestCourse();
   const lesson = useQuery(api.public.publicLesson, { token, key: lessonKey });
+  const html = useContentHtml(lesson);
   const qa = course.questions.filter((q) => q.lessonKey === lessonKey);
   const next = nextLessonKey(course.lessons, lessonKey);
 
-  if (lesson === undefined) return <p className="text-soft">Loading…</p>;
+  if (lesson === undefined || html === undefined) return <p className="text-soft">Loading…</p>;
   if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
+  if (html === null) return <p className="text-soft">Couldn’t load this lesson. Try refreshing.</p>;
 
   return (
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
@@ -276,7 +278,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
           )}
         </div>
         {/* Quizzes stay interactive (self-check); nothing is recorded for a Guest. */}
-        <Frame html={lesson.html} withBridge theme={theme} dir={course.dir} lang={course.lang} />
+        <Frame html={html} withBridge theme={theme} dir={course.dir} lang={course.lang} />
         <div className="p-3 md:hidden">
           <GuestQuestions qa={qa} />
         </div>
@@ -318,8 +320,10 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
   const { course } = useGuestCourse();
   const navHidden = useHideOnScroll();
   const ref = useQuery(api.public.publicReference, { token, key: refKey });
-  if (ref === undefined) return <p className="text-soft">Loading…</p>;
+  const html = useContentHtml(ref);
+  if (ref === undefined || html === undefined) return <p className="text-soft">Loading…</p>;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
+  if (html === null) return <p className="text-soft">Couldn’t load this reference. Try refreshing.</p>;
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3">
       <h2
@@ -329,7 +333,7 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
       >
         {ref.title}
       </h2>
-      <Frame html={ref.html} withBridge={false} theme={theme} themeCss dir={course.dir} lang={course.lang} />
+      <Frame html={html} withBridge={false} theme={theme} themeCss dir={course.dir} lang={course.lang} />
     </div>
   );
 }

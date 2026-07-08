@@ -25,7 +25,7 @@ test("an owner makes a Topic public; a Guest reads it by token, a wrong token ge
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
   const topicId = await seedTopic(t, owner, "hindi", "Hindi");
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>a</p>" }));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
 
   const token = await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true });
   expect(typeof token).toBe("string");
@@ -41,11 +41,11 @@ test("publicCourse is the full mirror: lessons, references, resources, the owner
   const owner = await seedUser(t, "owner@example.com");
   const topicId = await seedTopic(t, owner, "hindi", "Hindi");
   await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>a</p>" });
-    await ctx.db.insert("lessons", { topicId, key: "0002-b", seq: 2, title: "B", html: "<p>b</p>" });
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" });
+    await ctx.db.insert("lessons", { topicId, key: "0002-b", seq: 2, title: "B" });
     // A superseded lesson must not appear in the sidebar.
-    await ctx.db.insert("lessons", { topicId, key: "0000-old", seq: 0, title: "Old", html: "<p>o</p>", supersededBy: "0001-a" });
-    await ctx.db.insert("references", { topicId, key: "grammar", title: "Grammar", html: "<p>g</p>", contentHash: "h" });
+    await ctx.db.insert("lessons", { topicId, key: "0000-old", seq: 0, title: "Old", supersededBy: "0001-a" });
+    await ctx.db.insert("references", { topicId, key: "grammar", title: "Grammar", contentHash: "h" });
     await ctx.db.insert("resources", { topicId, ownerId: owner, filename: "Doc", url: "https://x", contentHash: "https://x", status: "ready", kind: "url" });
     await ctx.db.insert("progress", { userId: owner, topicId, lessonKey: "0001-a", status: "completed" });
     await ctx.db.insert("questions", { userId: owner, topicId, lessonKey: "0001-a", text: "why?", status: "answered", reply: "because" });
@@ -66,15 +66,18 @@ test("publicLesson and publicReference serve HTML by token; superseded/wrong key
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
   const topicId = await seedTopic(t, owner, "hindi", "Hindi");
-  await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>lesson</p>" });
-    await ctx.db.insert("lessons", { topicId, key: "0000-old", seq: 0, title: "Old", html: "<p>old</p>", supersededBy: "0001-a" });
-    await ctx.db.insert("references", { topicId, key: "grammar", title: "Grammar", html: "<p>ref</p>", contentHash: "h" });
+  const { lessonSid, refSid } = await t.run(async (ctx) => {
+    const lessonSid = await ctx.storage.store(new Blob(["<p>lesson</p>"], { type: "text/html" }));
+    const refSid = await ctx.storage.store(new Blob(["<p>ref</p>"], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", htmlStorageId: lessonSid });
+    await ctx.db.insert("lessons", { topicId, key: "0000-old", seq: 0, title: "Old", supersededBy: "0001-a" });
+    await ctx.db.insert("references", { topicId, key: "grammar", title: "Grammar", htmlStorageId: refSid, contentHash: "h" });
+    return { lessonSid, refSid };
   });
   const token = await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true });
 
-  expect(await t.query(api.public.publicLesson, { token: token!, key: "0001-a" })).toMatchObject({ key: "0001-a", html: "<p>lesson</p>" });
-  expect(await t.query(api.public.publicReference, { token: token!, key: "grammar" })).toMatchObject({ key: "grammar", html: "<p>ref</p>" });
+  expect(await t.query(api.public.publicLesson, { token: token!, key: "0001-a" })).toMatchObject({ key: "0001-a", contentUrl: expect.stringContaining(`/content?id=${lessonSid}`) });
+  expect(await t.query(api.public.publicReference, { token: token!, key: "grammar" })).toMatchObject({ key: "grammar", contentUrl: expect.stringContaining(`/content?id=${refSid}`) });
 
   expect(await t.query(api.public.publicLesson, { token: token!, key: "0000-old" })).toBeNull(); // superseded
   expect(await t.query(api.public.publicLesson, { token: "nope", key: "0001-a" })).toBeNull(); // wrong token
@@ -86,7 +89,7 @@ test("setTopicPublic: regenerate invalidates the old token, make-private revokes
   const owner = await seedUser(t, "owner@example.com");
   const stranger = await seedUser(t, "stranger@example.com");
   const topicId = await seedTopic(t, owner, "hindi", "Hindi");
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>a</p>" }));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
 
   const t1 = await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true });
   const t2 = await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true }); // regenerate
@@ -109,7 +112,7 @@ test("the read seam is identity-agnostic: any signed-in user (and the owner) rea
   const owner = await seedUser(t, "owner@example.com");
   const someoneElse = await seedUser(t, "else@example.com");
   const topicId = await seedTopic(t, owner, "hindi", "Hindi");
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>a</p>" }));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
   const token = await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true });
 
   // No Share needed — the token alone grants the read, regardless of who's asking.

@@ -77,6 +77,40 @@ export function ArtifactView({
 // initial theme is baked into srcDoc and later changes are pushed live via
 // postMessage so a toggle re-skins without reloading (ADR 0011). `themeCss`
 // injects the dark palette too — set for references, which don't ship their own.
+// Resolve a read seam's content body to the HTML string to render. An inline
+// `html` body (transition rows) is returned as-is; a `contentUrl` (content blob,
+// .scratch/html-blob-storage) is fetched — `fetch` honours the HTTP cache, so a
+// re-open/refresh of an already-read body is served from disk with no network.
+// Returns `undefined` while the query is loading OR a blob fetch is in flight
+// (caller shows a loading state), `null` when the query found nothing or the
+// fetch failed, and the HTML string once ready.
+export function useContentHtml(
+  body: { html?: string; contentUrl?: string } | null | undefined,
+): string | null | undefined {
+  const url = body?.contentUrl;
+  // Key the fetched value to the URL it belongs to. On navigation `url` changes
+  // and this render happens BEFORE the effect re-runs, so a bare `fetched` would
+  // briefly return the previous item's body. Gating on `fetched.url === url`
+  // makes a mismatch read as "loading" until the new fetch lands.
+  const [fetched, setFetched] = useState<{ url: string; html: string | null }>();
+  useEffect(() => {
+    if (!url) return;
+    let live = true;
+    fetch(url)
+      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+      .then((html) => live && setFetched({ url, html }))
+      .catch(() => {
+        if (live) setFetched({ url, html: null });
+      });
+    return () => {
+      live = false;
+    };
+  }, [url]);
+  if (body == null) return body; // undefined: query loading · null: not found
+  if (url) return fetched?.url === url ? fetched.html : undefined; // undefined: fetching/stale · string: ready · null: error
+  return body.html ?? ""; // translation still stored inline
+}
+
 export function Frame({
   html,
   withBridge,
@@ -200,6 +234,7 @@ function LessonView({
   const lang = useEditionLang();
   const navHidden = useHideOnScroll();
   const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey, lang: lang ?? undefined });
+  const html = useContentHtml(lesson);
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
   const setProgress = useMutation(api.capture.setProgress);
@@ -225,8 +260,9 @@ function LessonView({
     return () => window.removeEventListener("message", onMessage);
   }, [topicSlug, lessonKey, recordResponse, readOnly]);
 
-  if (lesson === undefined) return <p className="text-soft">Loading…</p>;
+  if (lesson === undefined || html === undefined) return <p className="text-soft">Loading…</p>;
   if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
+  if (html === null) return <p className="text-soft">Couldn’t load this lesson. Try refreshing.</p>;
 
   return (
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
@@ -272,7 +308,7 @@ function LessonView({
             )}
           </div>
         </div>
-        <Frame html={lesson.html} withBridge theme={theme} dir={dir} lang={contentLang} />
+        <Frame html={html} withBridge theme={theme} dir={dir} lang={contentLang} />
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
             scrolling, no slide-up trigger. Desktop uses the side column instead. */}
         <div className="p-3 md:hidden">
@@ -385,8 +421,10 @@ function ReferenceView({
   const lang = useEditionLang();
   const navHidden = useHideOnScroll();
   const ref = useQuery(api.content.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
-  if (ref === undefined) return <p className="text-soft">Loading…</p>;
+  const html = useContentHtml(ref);
+  if (ref === undefined || html === undefined) return <p className="text-soft">Loading…</p>;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
+  if (html === null) return <p className="text-soft">Couldn’t load this reference. Try refreshing.</p>;
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3">
       <h2
@@ -398,7 +436,7 @@ function ReferenceView({
       </h2>
       {/* References carry no dark CSS of their own, so themeCss injects the dark
           palette (ADR 0011) — the theme then flips them with the rest of the app. */}
-      <Frame html={ref.html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} />
+      <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} />
     </div>
   );
 }

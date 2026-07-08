@@ -31,8 +31,11 @@ type Kind = "lesson" | "reference" | "mission" | "title" | "question";
 // The hash of a source item's content — stamped onto the translation so a later
 // re-translate can skip unchanged items. Must be computed identically wherever a
 // source item is read, so both `collectItems` and `readSource` route through here.
-function itemHash(kind: Kind, f: { title?: string; html?: string; text?: string; reply?: string }): string {
-  if (kind === "lesson" || kind === "reference") return hashString((f.title ?? "") + "|" + (f.html ?? ""));
+function itemHash(kind: Kind, f: { title?: string; html?: string; htmlStorageId?: Id<"_storage">; text?: string; reply?: string }): string {
+  // Bodies now live in content blobs; a blob-backed row has no inline `html`, so
+  // hash its stable `htmlStorageId` instead (immutable content → stable id → a
+  // valid staleness key). Falls back to inline `html` for not-yet-migrated rows.
+  if (kind === "lesson" || kind === "reference") return hashString((f.title ?? "") + "|" + (f.html ?? f.htmlStorageId ?? ""));
   if (kind === "question") return hashString((f.text ?? "") + "|" + (f.reply ?? ""));
   return hashString(f.text ?? ""); // title, mission
 }
@@ -69,7 +72,7 @@ async function readSource(
   topicId: Id<"topics">,
   kind: Kind,
   key: string,
-): Promise<{ title?: string; html?: string; text?: string; reply?: string; hash: string } | null> {
+): Promise<{ title?: string; html?: string; htmlStorageId?: Id<"_storage">; text?: string; reply?: string; hash: string } | null> {
   const topic = await ctx.db.get(topicId);
   if (!topic) return null;
   if (kind === "title") return { text: topic.title, hash: itemHash("title", { text: topic.title }) };
@@ -83,7 +86,10 @@ async function readSource(
       .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
       .unique();
     if (!l || l.supersededBy) return null;
-    return { title: l.title, html: l.html, hash: itemHash("lesson", l) };
+    // The source body now lives in a content blob (no inline `html`), so the
+    // quiz-structure guard downstream is skipped for it (see publishTranslation);
+    // the blob id lets an action read the bytes to translate the body.
+    return { title: l.title, htmlStorageId: l.htmlStorageId, hash: itemHash("lesson", l) };
   }
   if (kind === "reference") {
     const r = await ctx.db
@@ -91,7 +97,7 @@ async function readSource(
       .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
       .unique();
     if (!r) return null;
-    return { title: r.title, html: r.html, hash: itemHash("reference", r) };
+    return { title: r.title, htmlStorageId: r.htmlStorageId, hash: itemHash("reference", r) };
   }
   // question
   const q = await ctx.db.get(key as Id<"questions">);
@@ -307,8 +313,10 @@ export const publishTranslation = mutation({
 
     const html = a.html !== undefined ? stripFence(a.html) : undefined;
     // A structural drift in a Lesson's quiz markers would break positional scoring
-    // — skip it (English fallback) rather than ship a broken quiz.
-    if (a.kind === "lesson" && html !== undefined && !quizStructureMatches(src.html ?? "", html)) {
+    // — skip it (English fallback) rather than ship a broken quiz. The guard needs
+    // the source markup; once the source body is a content blob it isn't readable
+    // in a mutation, so the check is skipped (the run is trusted, secret-guarded).
+    if (a.kind === "lesson" && html !== undefined && src.html !== undefined && !quizStructureMatches(src.html, html)) {
       return { status: "skipped" };
     }
 
@@ -383,7 +391,9 @@ export const collectForTranslation = internalQuery({
     const items = await Promise.all(
       (await collectItems(ctx, topic)).map(async (it) => {
         const src = await readSource(ctx, topic._id, it.kind, it.key);
-        return { kind: it.kind, key: it.key, title: src?.title, html: src?.html, text: src?.text, reply: src?.reply };
+        // Lesson/reference bodies live in content blobs; hand the action the blob
+        // id so it can read the bytes (a query can't) and translate the body.
+        return { kind: it.kind, key: it.key, title: src?.title, htmlStorageId: src?.htmlStorageId, text: src?.text, reply: src?.reply };
       }),
     );
     return { ownerEmail: owner.email ?? null, items };
@@ -431,6 +441,10 @@ export const translateTopic = internalAction({
 
       for (const item of info.items) {
         if (item.kind === "lesson" || item.kind === "reference") {
+          // The body is a content blob; an action can read its bytes directly
+          // (no HTTP round-trip) and translate the markup.
+          const blob = item.htmlStorageId ? await ctx.storage.get(item.htmlStorageId) : null;
+          const body = blob ? await blob.text() : "";
           await ctx.runMutation(api.translate.publishTranslation, {
             secret,
             ownerEmail,
@@ -439,7 +453,7 @@ export const translateTopic = internalAction({
             kind: item.kind,
             key: item.key,
             title: await translateField(model, item.title ?? "", langName, "text"),
-            html: await translateField(model, item.html ?? "", langName, "html"),
+            html: await translateField(model, body, langName, "html"),
           });
         } else {
           // title / mission — a single text field.

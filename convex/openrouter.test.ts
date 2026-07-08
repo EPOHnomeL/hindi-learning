@@ -7,6 +7,15 @@ import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
 
+// Lesson/reference bodies live in content blobs (File Storage); read the bytes back.
+async function blobText(t: ReturnType<typeof convexTest>, storageId: Id<"_storage"> | null | undefined): Promise<string> {
+  if (!storageId) return "";
+  return await t.run(async (ctx) => {
+    const blob = await ctx.storage.get(storageId);
+    return blob ? await blob.text() : "";
+  });
+}
+
 beforeAll(() => {
   process.env.PUBLISH_SECRET = "test-secret";
 });
@@ -46,7 +55,8 @@ async function seedOngoing(t: ReturnType<typeof convexTest>) {
   );
   await t.run(async (ctx) => {
     // A completed Frontier (seq 1) + the acquired lock, as after fireForTopic.
-    await ctx.db.insert("lessons", { topicId, key: "0001-intro", seq: 1, title: "Intro", html: "<p>one</p>" });
+    const sid = await ctx.storage.store(new Blob(["<p>one</p>"], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key: "0001-intro", seq: 1, title: "Intro", htmlStorageId: sid });
     await ctx.db.insert("progress", { userId: alice, topicId, lessonKey: "0001-intro", status: "completed" });
     await ctx.db.insert("generation", { topicId, status: "generating", startedAt: 1 });
   });
@@ -91,18 +101,20 @@ test("ongoing single-pass authors the next lesson, wraps+shuffles it, publishes 
   expect(lesson2).toBeTruthy();
   expect(lesson2!.key).toBe("0002-the-aorist");
   expect(lesson2!.title).toBe("The Aorist");
-  expect(lesson2!.html).toMatch(/^<!DOCTYPE html>/);
-  expect(lesson2!.html).toContain('<div class="wrap">');
+  const lesson2Html = await blobText(t, lesson2!.htmlStorageId);
+  expect(lesson2Html).toMatch(/^<!DOCTYPE html>/);
+  expect(lesson2Html).toContain('<div class="wrap">');
   // All three options survive the shuffle (order may differ; presence must not).
-  for (const k of ["a", "b", "c"]) expect(lesson2!.html).toContain(`data-k="${k}"`);
+  for (const k of ["a", "b", "c"]) expect(lesson2Html).toContain(`data-k="${k}"`);
 
   // Any reference the lesson relies on was upserted (no dangling /references link),
   // wrapped in the reference design system so it renders styled (not a bare fragment).
   const refs = await t.run((ctx) => ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect());
   const ref = refs.find((r) => r.key === "aorist-forms");
   expect(ref).toBeTruthy();
-  expect(ref!.html).toMatch(/^<!DOCTYPE html>/); // complete document, not a raw fragment
-  expect(ref!.html).toContain("th,td{border"); // reference stylesheet present → tables styled
+  const refHtml = await blobText(t, ref!.htmlStorageId);
+  expect(refHtml).toMatch(/^<!DOCTYPE html>/); // complete document, not a raw fragment
+  expect(refHtml).toContain("th,td{border"); // reference stylesheet present → tables styled
 
   // A learning record was published for the lesson.
   const record = await t.run((ctx) =>
@@ -195,7 +207,7 @@ test("bootstrap drafts the mission (course → active) then authors lesson 1, bo
   // Step 2 authored Lesson 1 (seq 1) + a learning record.
   const lessons = await t.run((ctx) => ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect());
   expect(lessons.map((l) => l.seq)).toEqual([1]);
-  expect(lessons[0]!.html).toMatch(/^<!DOCTYPE html>/);
+  expect(await blobText(t, lessons[0]!.htmlStorageId)).toMatch(/^<!DOCTYPE html>/);
   const record = await t.run((ctx) => ctx.db.query("learningRecords").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect());
   expect(record).toHaveLength(1);
 

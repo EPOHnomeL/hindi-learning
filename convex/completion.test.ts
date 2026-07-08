@@ -100,7 +100,7 @@ test("the gate refuses a completed Topic and resumes after reopen", async () => 
   const topicId = await seedTopic(t, alice, "hindi");
   // A completed Frontier — the gate would otherwise acquire.
   await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1", html: "<p>x</p>" });
+    await ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1" });
     await ctx.db.insert("progress", { userId: alice, topicId, lessonKey: "0001", status: "completed" });
   });
 

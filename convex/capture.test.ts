@@ -83,8 +83,8 @@ test("the gate counts completion per topic — completing one topic doesn't open
   const spanish = await seedTopic(t, alice, "spanish");
   // Both topics' frontier lesson is keyed "0001".
   await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId: hindi, key: "0001", seq: 1, title: "H1", html: "<p>h</p>" });
-    await ctx.db.insert("lessons", { topicId: spanish, key: "0001", seq: 1, title: "S1", html: "<p>s</p>" });
+    await ctx.db.insert("lessons", { topicId: hindi, key: "0001", seq: 1, title: "H1" });
+    await ctx.db.insert("lessons", { topicId: spanish, key: "0001", seq: 1, title: "S1" });
   });
   // Complete hindi's 0001 only.
   await asUser(t, alice).mutation(api.capture.setProgress, { topicSlug: "hindi", lessonKey: "0001", status: "completed" });

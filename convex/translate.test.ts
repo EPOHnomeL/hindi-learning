@@ -35,8 +35,12 @@ async function seedTopic(
 ) {
   return await t.run((ctx) => ctx.db.insert("topics", { ownerId, slug, title, status }));
 }
-async function addLesson(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, key: string, seq: number) {
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key, seq, title: `Lesson ${key}`, html: `<p>en ${key}</p>` }));
+// Source Lessons are blob-backed (no inline `html`); return the storageId so a
+// caller can assert the English body is served as a `/content` URL.
+async function addLesson(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, key: string, seq: number): Promise<Id<"_storage">> {
+  const sid = await t.run((ctx) => ctx.storage.store(new Blob([`<p>en ${key}</p>`], { type: "text/html" })));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key, seq, title: `Lesson ${key}`, htmlStorageId: sid }));
+  return sid;
 }
 // Stand in for a completed translation of one item.
 async function addTranslation(
@@ -64,13 +68,14 @@ test("owner reads a translated Edition; unheld languages fall back to English", 
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
   const topicId = await seedTopic(t, alice, "hindi", "Hindi");
-  await addLesson(t, topicId, "0001", 1);
+  const sid = await addLesson(t, topicId, "0001", 1);
   await addReadyJob(t, topicId, "es");
   await addTranslation(t, topicId, "es", "title", "", { text: "Hindi (es)" });
   await addTranslation(t, topicId, "es", "lesson", "0001", { title: "Lección 0001", html: "<p>es 0001</p>" });
 
   const a = asUser(t, alice);
-  // Spanish edition (the owner holds it — a ready job exists).
+  // Spanish edition (the owner holds it — a ready job exists). The translated body
+  // is still inline `html` (the translation write-path isn't blob-backed yet).
   expect(await a.query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "es" })).toMatchObject({
     title: "Lección 0001",
     html: "<p>es 0001</p>",
@@ -78,13 +83,13 @@ test("owner reads a translated Edition; unheld languages fall back to English", 
   expect(await a.query(api.content.listLessons, { topicSlug: "hindi", lang: "es" })).toEqual([
     { key: "0001", seq: 1, title: "Lección 0001" },
   ]);
-  // English (source) is always available and returns the base rows.
+  // English (source) is always available; its blob body is served as a content URL.
   expect(await a.query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "en" })).toMatchObject({
-    html: "<p>en 0001</p>",
+    contentUrl: expect.stringContaining(`/content?id=${sid}`),
   });
   // A language with no Edition (fr) isn't held → falls back to English, never 403s.
   expect(await a.query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "fr" })).toMatchObject({
-    html: "<p>en 0001</p>",
+    contentUrl: expect.stringContaining(`/content?id=${sid}`),
   });
 });
 
@@ -93,12 +98,12 @@ test("a per-item missing translation falls back to the English source", async ()
   const alice = await seedUser(t, "alice@example.com");
   const topicId = await seedTopic(t, alice, "hindi", "Hindi");
   await addLesson(t, topicId, "0001", 1);
-  await addLesson(t, topicId, "0002", 2);
+  const sid2 = await addLesson(t, topicId, "0002", 2);
   await addReadyJob(t, topicId, "es");
   await addTranslation(t, topicId, "es", "lesson", "0001", { title: "Lección 0001", html: "<p>es 0001</p>" });
-  // 0002 has no Spanish row → English fallback.
+  // 0002 has no Spanish row → English fallback (the source blob's content URL).
   expect(await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0002", lang: "es" })).toMatchObject({
-    html: "<p>en 0002</p>",
+    contentUrl: expect.stringContaining(`/content?id=${sid2}`),
   });
 });
 
@@ -235,14 +240,18 @@ test("claim → publish → report round-trips one Edition, and the reader serve
   });
 });
 
-test("publishTranslation skips a lesson whose quiz structure changed (no row, English fallback)", async () => {
+test("publishTranslation no longer quiz-guards a blob-backed source (body unreadable in a mutation) — it saves the row", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
   const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1", html: '<div data-correct="a"></div>' }));
+  // The source body lives in a content blob, so the quiz-structure guard can't
+  // read the source markup in a mutation (see translate.ts) — the check is skipped
+  // for the trusted, secret-guarded run and the translated row is written as-is.
+  const sid = await t.run((ctx) => ctx.storage.store(new Blob(['<div data-correct="a"></div>'], { type: "text/html" })));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1", htmlStorageId: sid }));
   await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" });
 
-  // The translated HTML dropped the quiz marker → rejected; no row written.
+  // Even a translation that dropped the quiz marker is saved — the guard is bypassed.
   expect(
     await t.mutation(api.translate.publishTranslation, {
       secret: "test-secret",
@@ -254,14 +263,14 @@ test("publishTranslation skips a lesson whose quiz structure changed (no row, En
       title: "L1",
       html: "<div></div>",
     }),
-  ).toEqual({ status: "skipped" });
+  ).toEqual({ status: "saved" });
   const row = await t.run((ctx) =>
     ctx.db
       .query("translations")
       .withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "es").eq("kind", "lesson").eq("key", "0001"))
       .unique(),
   );
-  expect(row).toBeNull();
+  expect(row).toMatchObject({ kind: "lesson", key: "0001", html: "<div></div>" });
 });
 
 test("the translate Routine seams reject a bad secret", async () => {
@@ -339,7 +348,7 @@ test("a per-Edition public link serves that language; a legacy token serves Engl
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
   const topicId = await seedTopic(t, alice, "hindi", "Hindi");
-  await addLesson(t, topicId, "0001", 1);
+  const sid = await addLesson(t, topicId, "0001", 1);
   await addReadyJob(t, topicId, "es");
   await addTranslation(t, topicId, "es", "title", "", { text: "Hindi (es)" });
   await addTranslation(t, topicId, "es", "lesson", "0001", { title: "Lección", html: "<p>es</p>" });
@@ -359,7 +368,7 @@ test("a per-Edition public link serves that language; a legacy token serves Engl
   const enToken = await asUser(t, alice).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true });
   const enCourse = await t.query(api.public.publicCourse, { token: enToken! });
   expect(enCourse).toMatchObject({ title: "Hindi", lang: "en" });
-  expect(await t.query(api.public.publicLesson, { token: enToken!, key: "0001" })).toMatchObject({ html: "<p>en 0001</p>" });
+  expect(await t.query(api.public.publicLesson, { token: enToken!, key: "0001" })).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${sid}`) });
 });
 
 test("removeEdition drops the Edition's translations, job, shares, and public link", async () => {

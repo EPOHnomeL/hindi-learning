@@ -47,7 +47,10 @@ async function seedCompleted(t: ReturnType<typeof convexTest>, provider?: "openr
       ...(provider ? { provider } : {}),
     }),
   );
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-alpha", seq: 1, title: "Alpha", html: '<div class="quiz" data-correct="a"><div class="opts"><button class="opt" data-k="a">x</button></div></div>' }));
+  await t.run(async (ctx) => {
+    const sid = await ctx.storage.store(new Blob(['<div class="quiz" data-correct="a"><div class="opts"><button class="opt" data-k="a">x</button></div></div>'], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key: "0001-alpha", seq: 1, title: "Alpha", htmlStorageId: sid });
+  });
   return { alice, topicId };
 }
 
@@ -72,7 +75,10 @@ test("startTranslation always schedules the Gemini translate action (never POSTs
 test("translateTopic translates every item via Gemini and publishes a ready Edition", async () => {
   const t = convexTest(schema, modules);
   const { topicId } = await seedCompleted(t, "openrouter");
-  await t.run((ctx) => ctx.db.insert("references", { topicId, key: "glossary", title: "Glossary", html: "<p>terms</p>", contentHash: "h" }));
+  await t.run(async (ctx) => {
+    const sid = await ctx.storage.store(new Blob(["<p>terms</p>"], { type: "text/html" }));
+    await ctx.db.insert("references", { topicId, key: "glossary", title: "Glossary", htmlStorageId: sid, contentHash: "h" });
+  });
   // The lock the fire seeds before scheduling (title + mission + lesson + reference).
   await t.run((ctx) => ctx.db.insert("translationJobs", { topicId, lang: "es", status: "translating", total: 4, done: 0, failed: 0 }));
   stubEcho();

@@ -47,13 +47,18 @@ async function publishAuthoredLesson(
   const html = assembleLesson(result.lessonHtml);
   const title = titleFrom(html);
   const key = nextLessonKey(seq, title);
+  // Bodies live in content blobs now (.scratch/html-blob-storage): the HTML never
+  // rides through the mutation. In-deployment we can store the blob directly,
+  // skipping the CLI's generateContentUploadUrl → PUT dance. publishLesson takes
+  // ownership of the blob (drops it if the Lesson already exists).
+  const storageId = await ctx.storage.store(new Blob([html], { type: "text/html" }));
   await ctx.runMutation(api.content.publishLesson, {
     secret,
     topicId,
     key,
     seq,
     title,
-    html,
+    storageId,
     supersedes: supersedesFrom(html),
   });
   await ctx.runMutation(api.content.publishLearningRecord, { secret, topicId, key, seq, markdown: result.learningRecord! });
@@ -65,12 +70,13 @@ async function publishAuthoredLesson(
     // document (references render raw — see assembleReference; this overrides
     // AUTHORING.md §7's "stored as-authored").
     const refHtml = assembleReference(ref.html, ref.title);
+    const refStorageId = await ctx.storage.store(new Blob([refHtml], { type: "text/html" }));
     await ctx.runMutation(api.content.upsertReference, {
       secret,
       topicId,
       key: ref.key,
       title: ref.title,
-      html: refHtml,
+      storageId: refStorageId,
       contentHash: hashString(refHtml),
     });
   }

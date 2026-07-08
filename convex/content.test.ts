@@ -60,9 +60,9 @@ test("listLessons is seq-ordered and excludes superseded lessons", async () => {
   const alice = await seedUser(t, "alice@example.com");
   const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
   await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId, key: "0002-b", seq: 2, title: "B", html: "<p>b</p>" });
-    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>a</p>" });
-    await ctx.db.insert("lessons", { topicId, key: "0000-old", seq: 0, title: "Old", html: "<p>old</p>", supersededBy: "0001-a" });
+    await ctx.db.insert("lessons", { topicId, key: "0002-b", seq: 2, title: "B" });
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" });
+    await ctx.db.insert("lessons", { topicId, key: "0000-old", seq: 0, title: "Old", supersededBy: "0001-a" });
   });
 
   const lessons = await asUser(t, alice).query(api.content.listLessons, { topicSlug: "hindi" });
@@ -74,7 +74,7 @@ test("cross-owner isolation: a user asking for another's topicSlug gets nothing"
   const alice = await seedUser(t, "alice@example.com");
   const bob = await seedUser(t, "bob@example.com");
   const bobTopic = await seedTopic(t, bob, "hindi", "Hindi", 1);
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId: bobTopic, key: "0001-a", seq: 1, title: "A", html: "<p>x</p>" }));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId: bobTopic, key: "0001-a", seq: 1, title: "A" }));
 
   const asAlice = asUser(t, alice);
   expect(await asAlice.query(api.content.listLessons, { topicSlug: "hindi" })).toEqual([]);
@@ -86,17 +86,111 @@ test("getLesson / listReferences / getReference are owner+topic scoped", async (
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
   const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
-  await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>lesson</p>" });
-    await ctx.db.insert("references", { topicId, key: "grammar", title: "Grammar", html: "<p>ref</p>", contentHash: "h" });
+  const { lessonSid, refSid } = await t.run(async (ctx) => {
+    const lessonSid = await ctx.storage.store(new Blob(["<p>lesson</p>"], { type: "text/html" }));
+    const refSid = await ctx.storage.store(new Blob(["<p>ref</p>"], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", htmlStorageId: lessonSid });
+    await ctx.db.insert("references", { topicId, key: "grammar", title: "Grammar", htmlStorageId: refSid, contentHash: "h" });
+    return { lessonSid, refSid };
   });
   const asAlice = asUser(t, alice);
 
-  expect(await asAlice.query(api.content.getLesson, { topicSlug: "hindi", key: "0001-a" })).toMatchObject({ key: "0001-a", html: "<p>lesson</p>" });
+  expect(await asAlice.query(api.content.getLesson, { topicSlug: "hindi", key: "0001-a" })).toMatchObject({ key: "0001-a", contentUrl: expect.stringContaining(`/content?id=${lessonSid}`) });
   expect(await asAlice.query(api.content.listReferences, { topicSlug: "hindi" })).toMatchObject([{ key: "grammar", title: "Grammar" }]);
-  expect(await asAlice.query(api.content.getReference, { topicSlug: "hindi", key: "grammar" })).toMatchObject({ key: "grammar", html: "<p>ref</p>" });
+  expect(await asAlice.query(api.content.getReference, { topicSlug: "hindi", key: "grammar" })).toMatchObject({ key: "grammar", contentUrl: expect.stringContaining(`/content?id=${refSid}`) });
   // wrong slug → nothing
   expect(await asAlice.query(api.content.getReference, { topicSlug: "nope", key: "grammar" })).toBeNull();
+});
+
+test("getLesson / getReference serve a blob-backed row as a content URL (no inline html)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const sid = await t.run((ctx) => ctx.storage.store(new Blob(["<p>blob body</p>"], { type: "text/html" })));
+  const refSid = await t.run((ctx) => ctx.storage.store(new Blob(["<p>ref blob</p>"], { type: "text/html" })));
+  await t.run(async (ctx) => {
+    // Lessons and References are always blob-backed after the narrow step — they
+    // can no longer hold inline `html`, so the body is served as a `/content` URL.
+    await ctx.db.insert("lessons", { topicId, key: "blob", seq: 1, title: "Blob", htmlStorageId: sid });
+    await ctx.db.insert("references", { topicId, key: "g", title: "G", htmlStorageId: refSid, contentHash: "h" });
+  });
+  const as = asUser(t, alice);
+
+  // Blob-backed → a content URL keyed by the storageId, and NO inline html.
+  const blob = await as.query(api.content.getLesson, { topicSlug: "hindi", key: "blob" });
+  expect(blob).toMatchObject({ key: "blob", contentUrl: expect.stringContaining(`/content?id=${sid}`) });
+  expect(blob).not.toHaveProperty("html");
+
+  const ref = await as.query(api.content.getReference, { topicSlug: "hindi", key: "g" });
+  expect(ref).toMatchObject({ key: "g", contentUrl: expect.stringContaining(`/content?id=${refSid}`) });
+  expect(ref).not.toHaveProperty("html");
+});
+
+test("publicLesson serves a blob-backed lesson as a content URL", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const sid = await t.run((ctx) => ctx.storage.store(new Blob(["<p>public blob</p>"], { type: "text/html" })));
+  await t.run(async (ctx) => {
+    await ctx.db.patch(topicId, { publicToken: "pubtok" });
+    await ctx.db.insert("lessons", { topicId, key: "l1", seq: 1, title: "L1", htmlStorageId: sid });
+  });
+
+  const lesson = await t.query(api.public.publicLesson, { token: "pubtok", key: "l1" });
+  expect(lesson).toMatchObject({ key: "l1", contentUrl: expect.stringContaining(`/content?id=${sid}`) });
+  expect(lesson).not.toHaveProperty("html");
+});
+
+test("publishLesson stores the body as a blob (htmlStorageId, no inline html) and stays immutable", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const secret = "test-secret";
+
+  const sid = await t.run((ctx) => ctx.storage.store(new Blob(["<p>body</p>"], { type: "text/html" })));
+  const r1 = await t.mutation(api.content.publishLesson, { secret, topicId, key: "0001", seq: 1, title: "One", storageId: sid });
+  expect(r1.status).toBe("inserted");
+  const row = await t.run((ctx) =>
+    ctx.db.query("lessons").withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", "0001")).unique(),
+  );
+  expect(row?.htmlStorageId).toBe(sid);
+  expect(row?.html).toBeUndefined();
+
+  // Immutable: a second publish drops the redundant upload and no-ops, leaving
+  // the original blob untouched.
+  const sid2 = await t.run((ctx) => ctx.storage.store(new Blob(["<p>again</p>"], { type: "text/html" })));
+  expect((await t.mutation(api.content.publishLesson, { secret, topicId, key: "0001", seq: 1, title: "One", storageId: sid2 })).status).toBe("exists");
+  expect(await t.run((ctx) => ctx.db.system.get(sid2))).toBeNull();
+  expect(await t.run((ctx) => ctx.db.system.get(sid))).not.toBeNull();
+
+  await expect(
+    t.mutation(api.content.publishLesson, { secret: "wrong", topicId, key: "x", seq: 1, title: "x", storageId: sid }),
+  ).rejects.toThrow();
+});
+
+test("upsertReference inserts, drops a redundant unchanged blob, and deletes the old blob on change", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const secret = "test-secret";
+
+  const sid1 = await t.run((ctx) => ctx.storage.store(new Blob(["<p>v1</p>"], { type: "text/html" })));
+  expect((await t.mutation(api.content.upsertReference, { secret, topicId, key: "g", title: "G", storageId: sid1, contentHash: "h1" })).status).toBe("inserted");
+
+  // Unchanged (same hash) → the new upload is redundant and dropped; row untouched.
+  const dup = await t.run((ctx) => ctx.storage.store(new Blob(["<p>v1</p>"], { type: "text/html" })));
+  expect((await t.mutation(api.content.upsertReference, { secret, topicId, key: "g", title: "G", storageId: dup, contentHash: "h1" })).status).toBe("unchanged");
+  expect(await t.run((ctx) => ctx.db.system.get(dup))).toBeNull();
+  expect(await t.run((ctx) => ctx.db.system.get(sid1))).not.toBeNull();
+
+  // Changed → point at the new blob and delete the superseded one.
+  const sid2 = await t.run((ctx) => ctx.storage.store(new Blob(["<p>v2</p>"], { type: "text/html" })));
+  expect((await t.mutation(api.content.upsertReference, { secret, topicId, key: "g", title: "G2", storageId: sid2, contentHash: "h2" })).status).toBe("updated");
+  const row = await t.run((ctx) =>
+    ctx.db.query("references").withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", "g")).unique(),
+  );
+  expect(row?.htmlStorageId).toBe(sid2);
+  expect(await t.run((ctx) => ctx.db.system.get(sid1))).toBeNull();
 });
 
 test("ensureTopic creates an owned topic, backfills an unowned one, and is idempotent", async () => {
@@ -217,9 +311,9 @@ test("dashboard returns the user's topics with live lesson + completed counts", 
   const hindi = await seedTopic(t, alice, "hindi", "Hindi", 1);
   await seedTopic(t, bob, "spanish", "Spanish", 1);
   await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId: hindi, key: "0001", seq: 1, title: "A", html: "<p>a</p>" });
-    await ctx.db.insert("lessons", { topicId: hindi, key: "0002", seq: 2, title: "B", html: "<p>b</p>" });
-    await ctx.db.insert("lessons", { topicId: hindi, key: "0000", seq: 0, title: "Old", html: "<p>o</p>", supersededBy: "0001" });
+    await ctx.db.insert("lessons", { topicId: hindi, key: "0001", seq: 1, title: "A" });
+    await ctx.db.insert("lessons", { topicId: hindi, key: "0002", seq: 2, title: "B" });
+    await ctx.db.insert("lessons", { topicId: hindi, key: "0000", seq: 0, title: "Old", supersededBy: "0001" });
     await ctx.db.insert("progress", { userId: alice, topicId: hindi, lessonKey: "0001", status: "completed" });
   });
 
@@ -253,10 +347,10 @@ test("dashboard clamps the estimate up to the published lesson count", async () 
   );
   await t.run(async (ctx) => {
     for (let seq = 1; seq <= 5; seq++) {
-      await ctx.db.insert("lessons", { topicId: hindi, key: `L${seq}`, seq, title: `L${seq}`, html: "<p>x</p>" });
+      await ctx.db.insert("lessons", { topicId: hindi, key: `L${seq}`, seq, title: `L${seq}` });
     }
     // A superseded lesson must not inflate the published count.
-    await ctx.db.insert("lessons", { topicId: hindi, key: "old", seq: 0, title: "Old", html: "<p>x</p>", supersededBy: "L1" });
+    await ctx.db.insert("lessons", { topicId: hindi, key: "old", seq: 0, title: "Old", supersededBy: "L1" });
   });
 
   // max(estimate 3, published 5) = 5, so it never reads below the real count.

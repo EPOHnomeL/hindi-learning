@@ -12,6 +12,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
+import type { Id } from "../convex/_generated/dataModel";
 import { shuffleQuizOptions } from "../convex/quizShuffle";
 import { convexUrl, ownerEmail, publishSecret, topicArg } from "./_env";
 
@@ -36,6 +37,17 @@ const titleFrom = (html: string): string => {
 const supersedesFrom = (html: string): string | undefined =>
   html.match(/<meta\s+name=["']supersedes["']\s+content=["']([^"']+)["']/i)?.[1];
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+// Upload a body to Convex File Storage and return its blob id — the HTML never
+// rides through a function (.scratch/html-blob-storage). A redundant upload (an
+// immutable lesson that already exists, or an unchanged reference) is dropped
+// server-side by the publish mutation, so uploading unconditionally is safe.
+const uploadHtml = async (html: string): Promise<Id<"_storage">> => {
+  const url = await client.mutation(api.content.generateContentUploadUrl, { secret });
+  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/html" }, body: html });
+  if (!res.ok) throw new Error(`content upload failed: ${res.status}`);
+  const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+  return storageId;
+};
 // Skip partials/templates (anything underscore-prefixed); only real artifacts.
 const filesIn = (dir: string, ext: string) =>
   existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith(ext) && !f.startsWith("_")).sort() : [];
@@ -101,13 +113,14 @@ for (const f of filesIn(`${base}/lessons`, ".html")) {
   const html = assembleLesson(readFileSync(`${base}/lessons/${f}`, "utf8"));
   const key = f.replace(/\.html$/, "");
   const seq = Number(key.match(/^(\d+)/)?.[1] ?? 0);
+  const storageId = await uploadHtml(html);
   const result = await client.mutation(api.content.publishLesson, {
     secret,
     topicId,
     key,
     seq,
     title: titleFrom(html),
-    html,
+    storageId,
     supersedes: supersedesFrom(html),
   });
   console.log(`lesson     ${key} — ${result.status}`);
@@ -129,12 +142,13 @@ for (const f of filesIn(`${base}/learning-records`, ".md")) {
 for (const f of filesIn(`${base}/references`, ".html")) {
   const html = readFileSync(`${base}/references/${f}`, "utf8");
   const key = f.replace(/\.html$/, "");
+  const storageId = await uploadHtml(html);
   const result = await client.mutation(api.content.upsertReference, {
     secret,
     topicId,
     key,
     title: titleFrom(html),
-    html,
+    storageId,
     contentHash: sha256(html),
   });
   console.log(`reference  ${key} — ${result.status}`);
