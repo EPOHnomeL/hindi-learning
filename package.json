@@ -27,6 +27,8 @@
     "backfill-html-blobs:prod": "tsx scripts/backfill-html-blobs.ts --prod",
     "verify-html-blobs": "tsx scripts/verify-html-blobs.ts",
     "verify-html-blobs:prod": "tsx scripts/verify-html-blobs.ts --prod",
+    "strip-inline-html": "tsx scripts/strip-inline-html.ts",
+    "strip-inline-html:prod": "tsx scripts/strip-inline-html.ts --prod",
     "review": "tsx scripts/review.ts",
     "review:prod": "tsx scripts/review.ts --prod",
     "reply": "tsx scripts/reply.ts",
