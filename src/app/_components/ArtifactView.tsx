@@ -3,7 +3,7 @@
 import { useAction, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import { CertificateControl } from "./Certificate";
 import { useEditionLang, withLang } from "./editionUrl";
@@ -333,40 +333,56 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
     }
   }
 
+  let control: ReactNode;
   if (generating && !stale) {
-    return <span className="animate-pulse text-sm text-soft">Generating next lesson…</span>;
-  }
-  if (caughtUp) {
-    return (
+    control = <span className="animate-pulse text-sm text-soft">Generating next lesson…</span>;
+  } else if (caughtUp) {
+    control = (
       <span className="text-sm text-accent2" title="Your teacher has nothing new queued yet.">
         ✨ All caught up
       </span>
     );
-  }
-  if ((rateLimited || capped) && status !== "failed") {
-    return (
+  } else if ((rateLimited || capped) && status !== "failed") {
+    control = (
       <span className="text-sm text-soft" title="The daily schedule will continue authoring — this caps on-demand runs to one per day.">
         ✓ Generated today
       </span>
     );
+  } else {
+    const label = status === "failed" ? "Retry" : stale ? "Still working — retry" : "Generate next lesson →";
+    control = (
+      <div className="flex items-center gap-2">
+        {status === "failed" && gen?.error && (
+          <span title={gen.error} className="text-xs text-soft">
+            generation failed
+          </span>
+        )}
+        <button
+          onClick={() => void fire()}
+          disabled={pending}
+          className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+        >
+          {pending ? "Starting…" : label}
+        </button>
+      </div>
+    );
   }
 
-  const label = status === "failed" ? "Retry" : stale ? "Still working — retry" : "Generate next lesson →";
+  // The soft `~N lessons` estimate beside the control: scope and progress in one
+  // place (PRD story 2). The server already clamps + gates it (owner-only, hidden
+  // while seeded/completed), so a non-null value is simply rendered as-is.
   return (
-    <div className="flex items-center gap-2">
-      {status === "failed" && gen?.error && (
-        <span title={gen.error} className="text-xs text-soft">
-          generation failed
+    <>
+      {gen?.estimatedLessons != null && (
+        <span
+          className="text-sm text-soft"
+          title="Your teacher's estimate of the course's eventual size — a rough guide, not a promise."
+        >
+          ~{gen.estimatedLessons} lessons
         </span>
       )}
-      <button
-        onClick={() => void fire()}
-        disabled={pending}
-        className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-      >
-        {pending ? "Starting…" : label}
-      </button>
-    </div>
+      {control}
+    </>
   );
 }
 

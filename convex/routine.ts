@@ -13,7 +13,7 @@ import {
   type ActionCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, topicBySlug } from "./lib";
+import { assertAdmin, getOwnedTopic, topicBySlug, topicLessonCounts } from "./lib";
 import { isCallerAdmin } from "./whitelist";
 
 // The next-lesson Routine (ADR 0008). One cloud Claude Code routine, fired two
@@ -98,10 +98,28 @@ async function userFiredManuallyWithinDay(
 export const generationStatus = query({
   args: { topicSlug: v.string() },
   handler: async (ctx, { topicSlug }) => {
-    if (!(await getAuthUserId(ctx))) return null;
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
     const gen = await generationRow(ctx, topic._id);
+    // The soft `~N lessons` estimate (PRD: Estimated lesson count). Owner-only —
+    // resolved server-side so it can never leak to a Viewer or Guest regardless
+    // of the UI (PRD stories 13 & 14). Shown only while the course is being
+    // built: hidden on a `seeded` Topic (no first run yet) and once `completed`
+    // (the real count stands). Clamped up to the published (non-superseded)
+    // Lesson count so it never reads as fewer lessons than the course already
+    // has. Already-gated + already-clamped here, so the reader is a pure render.
+    let estimatedLessons: number | null = null;
+    if (
+      topic.ownerId === userId &&
+      topic.estimatedLessons !== undefined &&
+      topic.status !== "seeded" &&
+      topic.status !== "completed"
+    ) {
+      const { lessonCount } = await topicLessonCounts(ctx, topic._id, userId);
+      estimatedLessons = Math.max(topic.estimatedLessons, lessonCount);
+    }
     return {
       status: gen?.status ?? "idle",
       frontierKey: gen?.frontierKey ?? null,
@@ -110,6 +128,7 @@ export const generationStatus = query({
       // Raw timestamp; the client compares against the cooldown (queries can't
       // call Date.now()). Lets the button disable when fired within the window.
       lastManualFireAt: gen?.lastManualFireAt ?? null,
+      estimatedLessons,
     };
   },
 });
@@ -212,11 +231,19 @@ export const reportGeneration = mutation({
     topicSlug: v.string(),
     outcome: v.union(v.literal("published"), v.literal("nothing"), v.literal("failed")),
     error: v.optional(v.string()),
+    // The run's best-guess total Lesson count for the course (PRD: `~N lessons`).
+    // Folded into the Topic here so there's no extra call — the estimate is part
+    // of "here's how this run ended". Advisory only; it never gates authoring.
+    estimatedLessons: v.optional(v.number()),
   },
-  handler: async (ctx, { secret, topicSlug, outcome, error }) => {
+  handler: async (ctx, { secret, topicSlug, outcome, error, estimatedLessons }) => {
     assertAdmin(secret);
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) throw new Error("topic not found");
+    // Patch the estimate when supplied; leave it untouched otherwise, so a later
+    // `nothing`/`failed` run never wipes a prior estimate. Topic-level, so it's
+    // independent of whether a generation lock row exists.
+    if (estimatedLessons !== undefined) await ctx.db.patch(topic._id, { estimatedLessons });
     const gen = await generationRow(ctx, topic._id);
     if (!gen) return;
     const clear = { startedAt: undefined, claimedAt: undefined, runId: undefined };
