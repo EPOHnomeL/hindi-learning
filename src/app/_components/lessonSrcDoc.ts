@@ -241,11 +241,15 @@ export function buildSrcDoc(
 // property, so it needs no script and leaves no `contenteditable` attribute to
 // strip). Theme is baked for display only; the read-back takes body content, not
 // the <html> tag, so the baked `data-theme` never reaches the saved HTML.
-export function buildEditDoc(html: string, theme?: Theme): string {
+export function buildEditDoc(html: string, opts: { theme?: Theme; themeCss?: boolean } = {}): string {
   let doc = ensureDocument(html);
-  if (theme) {
+  if (opts.theme) {
     doc = stripLegacyThemePill(doc);
-    doc = setRootTheme(doc, theme);
+    doc = setRootTheme(doc, opts.theme);
+    // References carry no dark palette of their own, so inject it for the editor
+    // just like the reader's Frame does (ADR 0011). Head-only, so the body
+    // read-back on save is unaffected.
+    if (opts.themeCss) doc = injectReferenceDarkCss(doc);
   }
   return doc;
 }

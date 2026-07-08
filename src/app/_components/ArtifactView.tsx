@@ -59,7 +59,7 @@ export function ArtifactView({
   contentLang?: string;
 }) {
   if (kind === "reference")
-    return <ReferenceView refKey={artifactKey} topicSlug={topicSlug} dir={dir} contentLang={contentLang} />;
+    return <ReferenceView refKey={artifactKey} topicSlug={topicSlug} readOnly={readOnly} dir={dir} contentLang={contentLang} />;
   return (
     <LessonView
       lessonKey={artifactKey}
@@ -240,6 +240,7 @@ function LessonView({
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
   const setProgress = useMutation(api.capture.setProgress);
+  const editLesson = useAction(api.content.editLesson);
   const [editing, setEditing] = useState(false);
 
   // The caller's own completion — an owner's, or a Viewer's own on a shared course.
@@ -336,12 +337,13 @@ function LessonView({
           )}
         </div>
         {canEdit && editing && (
-          <LessonEditor
+          <ContentEditor
             topicSlug={topicSlug}
-            lessonKey={lessonKey}
             html={html}
             theme={theme}
+            label="lesson"
             onClose={() => setEditing(false)}
+            commit={(storageId) => editLesson({ topicSlug, key: lessonKey, storageId })}
           />
         )}
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
@@ -358,38 +360,45 @@ function LessonView({
   );
 }
 
-// The owner's in-place prose editor (course-content-editing 01). A modal holding
-// an edit iframe that renders the lesson with its authored CSS/layout — the same
+// The owner's in-place prose editor (course-content-editing). A modal holding an
+// edit iframe that renders the item with its authored CSS/layout — the same
 // visual surface the reader shows, minus the reader's bridge scripts. The iframe
-// is `sandbox="allow-same-origin"` (no allow-scripts), so the lesson's own scripts
+// is `sandbox="allow-same-origin"` (no allow-scripts), so the item's own scripts
 // stay inert and the DOM matches the authored source; the parent turns on
 // `designMode` to make it editable and reads `body.innerHTML` back on save. The
 // edited body is spliced into the authored document (`replaceBodyInner`), uploaded
-// as a new content blob, and swapped in by the owner-guarded `editLesson` action —
-// which refuses a save that changes the quiz structure, surfaced here inline.
-function LessonEditor({
+// as a new content blob, and handed to `commit` — the owner-guarded write path for
+// the item's kind (a Lesson's rejects a quiz-structure change; a Reference's has
+// no guard). Any rejection message is surfaced inline. Shared by Lessons and
+// References; the caller supplies the kind-specific `commit`.
+function ContentEditor({
   topicSlug,
-  lessonKey,
   html,
   theme,
+  themeCss,
+  label,
   onClose,
+  commit,
 }: {
   topicSlug: string;
-  lessonKey: string;
   html: string;
   theme: Theme;
+  // Inject the dark palette for items that don't ship their own (References) —
+  // display-only, mirrors the reader Frame's `themeCss`.
+  themeCss?: boolean;
+  label: string;
   onClose: () => void;
+  commit: (storageId: Id<"_storage">) => Promise<unknown>;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const generateUploadUrl = useMutation(api.content.generateEditUploadUrl);
-  const editLesson = useAction(api.content.editLesson);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Bake the theme for display only; the read-back takes body content, not the
   // <html> tag, so the baked data-theme never reaches the saved HTML.
-  const srcDoc = useMemo(() => buildEditDoc(html, theme), [html, theme]);
+  const srcDoc = useMemo(() => buildEditDoc(html, { theme, themeCss }), [html, theme, themeCss]);
 
   useEffect(() => dialogRef.current?.showModal(), []);
 
@@ -404,8 +413,8 @@ function LessonEditor({
       const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/html" }, body: edited });
       if (!res.ok) throw new Error("Upload failed — please try again.");
       const { storageId } = (await res.json()) as { storageId: string };
-      // The action rejects a structural change (quiz markers) — its message is shown.
-      await editLesson({ topicSlug, key: lessonKey, storageId: storageId as Id<"_storage"> });
+      // The write path may reject (e.g. a Lesson's quiz-structure guard) — show it.
+      await commit(storageId as Id<"_storage">);
       onClose(); // live for every reader on the next reactive tick — no publish step.
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -421,7 +430,7 @@ function LessonEditor({
       className="m-auto flex h-[90vh] w-[96vw] max-w-4xl flex-col rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
     >
       <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
-        <h2 className="min-w-0 truncate text-base font-semibold text-ink">Edit lesson</h2>
+        <h2 className="min-w-0 truncate text-base font-semibold text-ink">Edit {label}</h2>
         <div className="flex shrink-0 items-center gap-2">
           <button
             onClick={onClose}
@@ -544,11 +553,13 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
 function ReferenceView({
   refKey,
   topicSlug,
+  readOnly,
   dir,
   contentLang,
 }: {
   refKey: string;
   topicSlug: string;
+  readOnly: boolean;
   dir?: "ltr" | "rtl";
   contentLang?: string;
 }) {
@@ -557,6 +568,12 @@ function ReferenceView({
   const navHidden = useHideOnScroll();
   const ref = useQuery(api.content.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
   const html = useContentHtml(ref);
+  const editReference = useMutation(api.content.editReference);
+  const [editing, setEditing] = useState(false);
+  // Owner-only, and only on the source (English) edition — `editReference` patches
+  // the source Reference; editing a translated Edition is a later slice. References
+  // are mutable (ADR 0003), so the save takes the write path with no quiz guard.
+  const canEdit = !readOnly && (lang == null || lang === "en");
   if (ref === undefined || html === undefined) return <ReaderSkeleton aside={false} />;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this reference. Try refreshing.</p>;
@@ -570,8 +587,33 @@ function ReferenceView({
         {ref.title}
       </h2>
       {/* References carry no dark CSS of their own, so themeCss injects the dark
-          palette (ADR 0011) — the theme then flips them with the rest of the app. */}
-      <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} />
+          palette (ADR 0011) — the theme then flips them with the rest of the app.
+          The pencil rides over the body on hover for the owner (source edition). */}
+      <div className="group relative flex min-h-0 flex-1 flex-col">
+        <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} />
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            aria-label="Edit this reference"
+            title="Edit this reference"
+            className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent opacity-0 shadow-sm backdrop-blur transition-opacity hover:bg-hi focus:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"
+          >
+            ✎ Edit
+          </button>
+        )}
+      </div>
+      {canEdit && editing && (
+        <ContentEditor
+          topicSlug={topicSlug}
+          html={html}
+          theme={theme}
+          themeCss
+          label="reference"
+          onClose={() => setEditing(false)}
+          commit={(storageId) => editReference({ topicSlug, key: refKey, storageId })}
+        />
+      )}
     </div>
   );
 }
