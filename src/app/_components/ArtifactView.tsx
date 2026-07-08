@@ -108,7 +108,7 @@ export function useContentHtml(
   }, [url]);
   if (body == null) return body; // undefined: query loading · null: not found
   if (url) return fetched?.url === url ? fetched.html : undefined; // undefined: fetching/stale · string: ready · null: error
-  return body.html ?? "";
+  return body.html ?? ""; // translation still stored inline
 }
 
 export function Frame({

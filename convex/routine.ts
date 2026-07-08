@@ -391,7 +391,6 @@ export const materialiseTopic = query({
 
     // Bodies live in content blobs (.scratch/html-blob-storage); a query can't
     // read blob bytes, so expose a signed `htmlUrl` the materialise CLI fetches.
-    // `html` stays for not-yet-migrated (inline) rows during the transition.
     const lessons = await Promise.all(
       (await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect())
         .filter((l) => !l.supersededBy)
@@ -399,7 +398,6 @@ export const materialiseTopic = query({
           key: l.key,
           seq: l.seq,
           title: l.title,
-          html: l.html ?? null,
           htmlUrl: l.htmlStorageId ? await ctx.storage.getUrl(l.htmlStorageId) : null,
         })),
     );
@@ -411,7 +409,6 @@ export const materialiseTopic = query({
         async (r) => ({
           key: r.key,
           title: r.title,
-          html: r.html ?? null,
           htmlUrl: r.htmlStorageId ? await ctx.storage.getUrl(r.htmlStorageId) : null,
         }),
       ),

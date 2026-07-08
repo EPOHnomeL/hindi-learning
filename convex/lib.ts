@@ -72,10 +72,11 @@ export function hashString(s: string): string {
 
 // ---- Content blobs (see .scratch/html-blob-storage) -------------------------
 
-// The read shape for a rendered body (Lesson / Reference / translated item):
-// a `contentUrl` the client fetches when the body lives in a content blob, or
-// the inline `html` string during the widen→migrate→narrow transition. Exactly
-// one is present. After the narrow step only `contentUrl` remains.
+// The read shape for a rendered body (Lesson / Reference / translated item): a
+// `contentUrl` the client fetches when the body lives in a content blob (all
+// source Lessons/References after the narrow step), or an inline `html` string
+// for a translated row still stored inline (the translation write-path migration
+// is a follow-up). Exactly one is present.
 export type ContentBody = { contentUrl: string; html?: undefined } | { contentUrl?: undefined; html: string };
 
 // The absolute URL of the `/content` HTTP route for a stored blob. Built from
@@ -87,20 +88,18 @@ export function contentUrl(storageId: Id<"_storage">): string {
   return `${base}/content?id=${storageId}`;
 }
 
-// Resolve a row's body to its read shape: prefer the blob, fall back to inline
-// `html`. Returns an empty inline body when a row somehow has neither (never
-// expected once backfilled).
+// Resolve a row's body: the `/content` URL for its blob, else an inline `html`
+// string (translations still stored inline). Empty inline body when neither.
 export function contentBody(row: { htmlStorageId?: Id<"_storage">; html?: string }): ContentBody {
   if (row.htmlStorageId) return { contentUrl: contentUrl(row.htmlStorageId) };
   return { html: row.html ?? "" };
 }
 
 // Choose which body to serve for a translatable item: the translated row's when
-// it has one (blob or inline), else the source row's — the blob-aware twin of
-// the old `t?.html ?? source.html` fallback (course-translation).
+// it has one (blob or inline html), else the source row's blob (course-translation).
 export function pickContentBody(
   translated: { htmlStorageId?: Id<"_storage">; html?: string } | null | undefined,
-  source: { htmlStorageId?: Id<"_storage">; html?: string },
+  source: { htmlStorageId?: Id<"_storage"> },
 ): ContentBody {
   if (translated && (translated.htmlStorageId || translated.html)) return contentBody(translated);
   return contentBody(source);

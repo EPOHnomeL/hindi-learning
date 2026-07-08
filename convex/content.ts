@@ -567,7 +567,7 @@ export const upsertReference = mutation({
       // Reference is mutable, so its old body would otherwise orphan). Clear any
       // legacy inline `html` so the row is blob-only going forward.
       if (existing.htmlStorageId) await ctx.storage.delete(existing.htmlStorageId);
-      await ctx.db.patch(existing._id, { title, htmlStorageId: storageId, html: undefined, contentHash });
+      await ctx.db.patch(existing._id, { title, htmlStorageId: storageId, contentHash });
       return { status: "updated" as const };
     }
     await ctx.db.insert("references", { topicId, key, title, htmlStorageId: storageId, contentHash });

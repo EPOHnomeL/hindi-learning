@@ -25,7 +25,7 @@ test("a Viewer reads the Lessons of a Topic shared with them", async () => {
   const owner = await seedUser(t, "owner@example.com");
   const viewer = await seedUser(t, "viewer@example.com");
   const topicId = await seedTopic(t, owner, "hindi", "Hindi");
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>a</p>" }));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
 
   // Before the Share, the Viewer sees nothing.
   expect(await asUser(t, viewer).query(api.content.listLessons, { topicSlug: "hindi" })).toEqual([]);
@@ -43,16 +43,19 @@ test("a Viewer reads a single Lesson and the References of a shared Topic", asyn
   const owner = await seedUser(t, "owner@example.com");
   const viewer = await seedUser(t, "viewer@example.com");
   const topicId = await seedTopic(t, owner, "hindi", "Hindi");
-  await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>lesson</p>" });
-    await ctx.db.insert("references", { topicId, key: "grammar", title: "Grammar", html: "<p>ref</p>", contentHash: "h" });
+  const { lessonSid, refSid } = await t.run(async (ctx) => {
+    const lessonSid = await ctx.storage.store(new Blob(["<p>lesson</p>"], { type: "text/html" }));
+    const refSid = await ctx.storage.store(new Blob(["<p>ref</p>"], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", htmlStorageId: lessonSid });
+    await ctx.db.insert("references", { topicId, key: "grammar", title: "Grammar", htmlStorageId: refSid, contentHash: "h" });
+    return { lessonSid, refSid };
   });
   await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "viewer@example.com" });
 
   const as = asUser(t, viewer);
-  expect(await as.query(api.content.getLesson, { topicSlug: "hindi", key: "0001-a" })).toMatchObject({ key: "0001-a", html: "<p>lesson</p>" });
+  expect(await as.query(api.content.getLesson, { topicSlug: "hindi", key: "0001-a" })).toMatchObject({ key: "0001-a", contentUrl: expect.stringContaining(`/content?id=${lessonSid}`) });
   expect(await as.query(api.content.listReferences, { topicSlug: "hindi" })).toMatchObject([{ key: "grammar", title: "Grammar" }]);
-  expect(await as.query(api.content.getReference, { topicSlug: "hindi", key: "grammar" })).toMatchObject({ key: "grammar", html: "<p>ref</p>" });
+  expect(await as.query(api.content.getReference, { topicSlug: "hindi", key: "grammar" })).toMatchObject({ key: "grammar", contentUrl: expect.stringContaining(`/content?id=${refSid}`) });
 });
 
 test("a non-Viewer (no Share) still sees nothing of the Topic", async () => {
@@ -61,7 +64,7 @@ test("a non-Viewer (no Share) still sees nothing of the Topic", async () => {
   const viewer = await seedUser(t, "viewer@example.com");
   const stranger = await seedUser(t, "stranger@example.com");
   const topicId = await seedTopic(t, owner, "hindi", "Hindi");
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>a</p>" }));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
   // Share with the Viewer only.
   await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "viewer@example.com" });
 
@@ -75,7 +78,7 @@ test("the owner still reads their own Topic after sharing it", async () => {
   const owner = await seedUser(t, "owner@example.com");
   const viewer = await seedUser(t, "viewer@example.com");
   const topicId = await seedTopic(t, owner, "hindi", "Hindi");
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>a</p>" }));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
   await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "viewer@example.com" });
 
   const lessons = await asUser(t, owner).query(api.content.listLessons, { topicSlug: "hindi" });
@@ -89,8 +92,8 @@ test("listSharedTopics returns Topics shared with the caller, attributed to the 
   const stranger = await seedUser(t, "stranger@example.com");
   const topicId = await seedTopic(t, owner, "hindi", "Hindi");
   await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>a</p>" });
-    await ctx.db.insert("lessons", { topicId, key: "0002-b", seq: 2, title: "B", html: "<p>b</p>" });
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" });
+    await ctx.db.insert("lessons", { topicId, key: "0002-b", seq: 2, title: "B" });
     // The owner completed both, but counts on the shared card are the Viewer's own.
     await ctx.db.insert("progress", { userId: owner, topicId, lessonKey: "0001-a", status: "completed" });
     await ctx.db.insert("progress", { userId: owner, topicId, lessonKey: "0002-b", status: "completed" });

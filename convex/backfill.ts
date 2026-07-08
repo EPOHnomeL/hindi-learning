@@ -29,6 +29,9 @@ export const backfillQuizShuffle = mutation({
     const page = await ctx.db.query(table).paginate({ cursor, numItems: 100 });
     let patched = 0;
     for (const row of page.page) {
+      // Lesson bodies now live in content blobs (no inline `html`), so only the
+      // still-inline `translations` rows are shufflable in-row here.
+      if (!("html" in row)) continue;
       // translations covers every artifact kind; only lesson bodies carry quizzes.
       if ("kind" in row && row.kind !== "lesson") continue;
       const html = row.html;
