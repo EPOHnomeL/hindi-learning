@@ -360,14 +360,13 @@ export const editReference = mutation({
 
 // ---- Owner prose edit of a translated Edition (course-content-editing 03) ----
 
-// The source Lesson's blob (for the quiz guard) and the current translated row's
-// blob (to delete on swap) for an owned Topic's translated Lesson. Owner-guarded;
-// throws on a non-owner, an unknown Lesson, or the source language (not an
-// Edition). The translated row may not exist yet (an untranslated item shows the
-// English fallback) — then `oldStorageId` is null and the edit creates the row.
+// The source Lesson's blob for the quiz guard on an owned Topic's translated
+// Lesson. Owner-guarded; throws on a non-owner, an unknown Lesson, or the source
+// language (not an Edition). The apply mutation re-reads the translated row itself
+// (to delete its old blob), so only the source is needed here.
 export const translatedLessonEditTarget = internalQuery({
   args: { topicSlug: v.string(), key: v.string(), lang: v.string() },
-  returns: v.object({ sourceStorageId: v.union(v.id("_storage"), v.null()), oldStorageId: v.union(v.id("_storage"), v.null()) }),
+  returns: v.object({ sourceStorageId: v.union(v.id("_storage"), v.null()) }),
   handler: async (ctx, { topicSlug, key, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
@@ -379,11 +378,7 @@ export const translatedLessonEditTarget = internalQuery({
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     if (!lesson || lesson.supersededBy) throw new Error("lesson not found");
-    const row = await ctx.db
-      .query("translations")
-      .withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "lesson").eq("key", key))
-      .unique();
-    return { sourceStorageId: lesson.htmlStorageId ?? null, oldStorageId: row?.htmlStorageId ?? null };
+    return { sourceStorageId: lesson.htmlStorageId ?? null };
   },
 });
 
@@ -418,7 +413,8 @@ export const applyTranslatedLessonEdit = internalMutation({
       await ctx.db.patch(row._id, { htmlStorageId: storageId, html: undefined, sourceHash });
       if (old && old !== storageId) await ctx.storage.delete(old);
     } else {
-      // No translated title yet — the reader falls back to the source title.
+      // First edit of this item in this Edition (it was showing the English
+      // fallback). No translated title — the reader falls back to the source title.
       await ctx.db.insert("translations", { topicId: topic._id, lang, kind: "lesson", key, htmlStorageId: storageId, sourceHash });
     }
     return null;
