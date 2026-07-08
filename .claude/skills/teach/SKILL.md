@@ -110,6 +110,22 @@ Both `--image` and `--glyph` are optional (a lifelong mission or a subject you c
 
 **Lifelong or open-ended missions** (e.g. "keep improving my Hindi forever", "stay fit for life") may legitimately *never* auto-complete — there is no discrete outcome to satisfy. Do **not** force these to a finish. Leave them to the learner's own "Mark course complete" action, and keep teaching while there is a worthwhile next step in the ZPD.
 
+## The Lesson-Count Estimate
+
+Each run, alongside the outcome, report a **soft estimate** of the course's eventual size — your best guess at the **total** number of lessons the whole course will contain when it's done (not how many *remain*). The owner sees it in the reader as `~N lessons`: a rough gauge of scope while the course is still being built. It appears only mid-build — nothing shows on a freshly seeded course, and it disappears once the course is completed and the real count stands.
+
+It is a **forecast, never a quota**:
+
+- It is a **total**, a whole number — lessons already authored plus those you expect still to come.
+- **Revise it freely** each run; drift is expected and fine (±1 is nothing to worry about). A learner's question that opens new ground legitimately raises it — the number simply ticks up on the next run.
+- **Never author a lesson just to reach it.** Termination stays a judgement against the mission (see [Terminating a Course](#terminating-a-course)) — the estimate never sets a syllabus length or a lesson quota, and you must never pad the course to hit the number. If the mission is met at *fewer* lessons than you last forecast, terminate anyway; the forecast was only ever a guess. See [ADR 0018](../../../docs/adr/0018-lesson-count-estimate-advisory.md).
+
+In the cloud Routine, pass it on the final report (see [routine-prompt.md](../../../docs/routine-prompt.md) step 8):
+
+```sh
+pnpm run report:prod published "$SLUG" --estimate 8
+```
+
 ## Zone Of Proximal Development
 
 Each lesson, the user should always feel as if they are being challenged 'just enough'.
