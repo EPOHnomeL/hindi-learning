@@ -208,6 +208,41 @@ test("dashboard returns the user's topics with live lesson + completed counts", 
   expect(cards[0]).toMatchObject({ lessonCount: 2, completedCount: 1 }); // superseded excluded
 });
 
+test("dashboard surfaces the estimate only for active courses that have one", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await t.run(async (ctx) => {
+    // Active with an estimate → shown. Seeded/completed → hidden even though a
+    // value is stored. Active with no estimate → null.
+    await ctx.db.insert("topics", { ownerId: alice, slug: "hindi", title: "Hindi", seq: 1, status: "active", estimatedLessons: 6 });
+    await ctx.db.insert("topics", { ownerId: alice, slug: "greek", title: "Greek", seq: 2, status: "seeded", estimatedLessons: 5 });
+    await ctx.db.insert("topics", { ownerId: alice, slug: "latin", title: "Latin", seq: 3, status: "completed", estimatedLessons: 9 });
+    await ctx.db.insert("topics", { ownerId: alice, slug: "farsi", title: "Farsi", seq: 4, status: "active" });
+  });
+
+  const cards = await asUser(t, alice).query(api.content.dashboard, {});
+  const bySlug = Object.fromEntries(cards.map((c) => [c.slug, c.estimatedLessons]));
+  expect(bySlug).toEqual({ hindi: 6, greek: null, latin: null, farsi: null });
+});
+
+test("dashboard clamps the estimate up to the published lesson count", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const hindi = await t.run((ctx) =>
+    ctx.db.insert("topics", { ownerId: alice, slug: "hindi", title: "Hindi", seq: 1, status: "active", estimatedLessons: 3 }),
+  );
+  await t.run(async (ctx) => {
+    for (let seq = 1; seq <= 5; seq++) {
+      await ctx.db.insert("lessons", { topicId: hindi, key: `L${seq}`, seq, title: `L${seq}`, html: "<p>x</p>" });
+    }
+    // A superseded lesson must not inflate the published count.
+    await ctx.db.insert("lessons", { topicId: hindi, key: "old", seq: 0, title: "Old", html: "<p>x</p>", supersededBy: "L1" });
+  });
+
+  // max(estimate 3, published 5) = 5, so it never reads below the real count.
+  expect((await asUser(t, alice).query(api.content.dashboard, {}))[0]!.estimatedLessons).toBe(5);
+});
+
 test("renameTopic changes the title, keeps the slug, and is owner-scoped", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
