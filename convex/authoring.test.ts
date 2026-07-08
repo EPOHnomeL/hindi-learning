@@ -2,10 +2,14 @@
 import { expect, test } from "vitest";
 import {
   assembleLesson,
+  buildMissionMessages,
+  buildOngoingMessages,
   nextLessonKey,
   parseAuthoringResult,
+  parseMissionResult,
   supersedesFrom,
   titleFrom,
+  type MaterialisedContext,
 } from "./authoring";
 import { shuffleQuizOptions } from "./quizShuffle";
 import { LESSON_FOOT, LESSON_HEAD } from "./authoringAssets.generated";
@@ -66,4 +70,31 @@ test("parseAuthoringResult reads the JSON contract, tolerating a code fence", ()
 test("parseAuthoringResult throws on malformed or incomplete output", () => {
   expect(() => parseAuthoringResult("not json at all")).toThrow();
   expect(() => parseAuthoringResult(JSON.stringify({ learningRecord: "r" }))).toThrow(/lessonHtml/);
+});
+
+test("parseMissionResult reads the mission markdown (fence-tolerant) and rejects empties", () => {
+  expect(parseMissionResult('```json\n{"mission":"# Mission\\nread the NT"}\n```')).toEqual({ mission: "# Mission\nread the NT" });
+  expect(() => parseMissionResult(JSON.stringify({ mission: "  " }))).toThrow(/mission/);
+  expect(() => parseMissionResult("nope")).toThrow();
+});
+
+const SEEDED_CTX: MaterialisedContext = {
+  topic: { slug: "greek", title: "Koine Greek", status: "seeded", mission: null, seed: "read the New Testament" },
+  lessons: [],
+  learningRecords: [],
+  references: [],
+  capture: { openQuestions: [], responses: [], progress: [] },
+  frontier: null,
+};
+
+test("buildMissionMessages injects the seed and asks for the mission contract", () => {
+  const [system, user] = buildMissionMessages(SEEDED_CTX);
+  expect(system.role).toBe("system");
+  expect(system.content).toContain('"mission"'); // the mission output contract
+  expect(user.content).toContain("read the New Testament"); // the seed
+});
+
+test("buildOngoingMessages targets seq 1 when there is no Frontier (first lesson)", () => {
+  const [, user] = buildOngoingMessages(SEEDED_CTX);
+  expect(user.content).toContain("Author lesson number 1");
 });

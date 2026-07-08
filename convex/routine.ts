@@ -491,6 +491,9 @@ export const materialiseForProvider = internalQuery({
     const frontier = await frontierLesson(ctx, topic._id);
     return {
       topicId: topic._id,
+      // The owner's email — the publish mutations (publishMission, etc.) key by it,
+      // and it's intrinsic to the Topic, so the action never supplies it out of band.
+      ownerEmail: owner.email ?? null,
       provider: topic.provider ?? "claude",
       frontier: frontier ? { key: frontier.key, seq: frontier.seq } : null,
       ...(await collectTopicContext(ctx, topic, owner)),

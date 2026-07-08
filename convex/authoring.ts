@@ -157,6 +157,50 @@ function serializeContext(c: MaterialisedContext): string {
   return lines.filter(Boolean).join("\n");
 }
 
+// The bootstrap mission-drafting contract, appended to the teach instructions for
+// step 1 of setup. The model returns ONE JSON object `{ "mission": "<markdown>" }`
+// per MISSION-FORMAT.md — no filesystem to write MISSION.md to.
+const MISSION_CONTRACT = `
+
+# === OUTPUT CONTRACT (mission draft, single-pass) ===
+
+Draft the course's Mission from the learner's seed ("why") and any resources.
+Return EXACTLY ONE JSON object and nothing else: { "mission": "<the Mission as
+markdown per MISSION-FORMAT.md>" }.`;
+
+// Read the drafted mission back from step 1's response. Fence-tolerant; throws on
+// anything that isn't a non-empty mission so the setup run reports `failed`.
+export function parseMissionResult(raw: string): { mission: string } {
+  const unfenced = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+  let obj: unknown;
+  try {
+    obj = JSON.parse(unfenced);
+  } catch {
+    throw new Error("mission: response was not valid JSON");
+  }
+  const mission = (obj as Record<string, unknown>).mission;
+  if (typeof mission !== "string" || mission.trim() === "") throw new Error("mission: missing mission text");
+  return { mission };
+}
+
+// Build the chat messages for bootstrap step 1: draft the Mission from the seed +
+// resources (web search enabled by the caller). System = teach instructions +
+// mission contract; user = the serialised context + the task.
+export function buildMissionMessages(c: MaterialisedContext): ChatMessage[] {
+  return [
+    { role: "system", content: TEACH_INSTRUCTIONS + MISSION_CONTRACT },
+    {
+      role: "user",
+      content: `${serializeContext(c)}
+
+# Task
+
+Draft this course's Mission from the learner's seed ("why") and any resources
+above. Return the single JSON object per the output contract.`,
+    },
+  ];
+}
+
 // Build the chat messages for the ongoing single-pass authoring of the NEXT
 // lesson (the course already has a Frontier). System = ported teach instructions
 // + output contract; user = the serialised context + the task.
