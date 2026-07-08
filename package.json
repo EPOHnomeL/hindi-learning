@@ -21,6 +21,8 @@
     "materialise:prod": "tsx scripts/materialise.ts --prod",
     "migrate-hindi": "tsx scripts/migrate-hindi.ts",
     "migrate-hindi:prod": "tsx scripts/migrate-hindi.ts --prod",
+    "backfill-quiz-shuffle": "tsx scripts/backfill-quiz-shuffle.ts",
+    "backfill-quiz-shuffle:prod": "tsx scripts/backfill-quiz-shuffle.ts --prod",
     "review": "tsx scripts/review.ts",
     "review:prod": "tsx scripts/review.ts --prod",
     "reply": "tsx scripts/reply.ts",
