@@ -15,6 +15,7 @@ import { Icon } from "./icons";
 import { Logo } from "./Logo";
 import { Markdown } from "./MarkdownView";
 import { missionPreview } from "./markdown";
+import { useTheme } from "./ThemeContext";
 import { Dialog, IconButton } from "./ui";
 import { useResourceUpload } from "./useResourceUpload";
 
@@ -64,6 +65,7 @@ export function Dashboard() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <ThemeToggle />
           {amAdmin && (
             <Link href="/admin" className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
               Admin
@@ -92,6 +94,25 @@ export function Dashboard() {
 
       <SharedSection />
     </div>
+  );
+}
+
+// Icon-only light/dark toggle for the dashboard header (ADR 0011). A compact
+// sibling of the sidebar's labelled ThemeToggle — same tokens, sized to sit
+// among the header's text buttons. Sun in dark mode (tap for light), moon in
+// light mode (tap for dark).
+function ThemeToggle() {
+  const { theme, toggle } = useTheme();
+  const dark = theme === "dark";
+  return (
+    <button
+      onClick={toggle}
+      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      title={dark ? "Light mode" : "Dark mode"}
+      className="rounded-lg p-1.5 text-soft transition-colors hover:bg-hi hover:text-accent"
+    >
+      <Icon name={dark ? "sun" : "moon"} className="h-4 w-4" />
+    </button>
   );
 }
 
