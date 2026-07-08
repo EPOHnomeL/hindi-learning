@@ -213,11 +213,14 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
           )}
 
           {/* Edition switcher + theme toggle, pinned together at the sidebar
-              bottom. The switcher is owner-only (a Viewer reads the single edition
-              shared to them and can't change it — viewer-cannot-switch-edition) and
-              only appears with more than one Edition (English + a ready translation). */}
+              bottom. Shown to anyone holding more than one Edition — an owner
+              (English + each ready translation) or a Viewer shared several
+              languages, who may now switch among the editions they hold (a Viewer
+              with a single shared edition still sees no switcher). `header.editions`
+              is already scoped to the caller's held languages server-side, so the
+              switcher only ever offers editions they may read. */}
           <div className="mt-auto flex flex-col gap-2 pt-2">
-            {canWrite && header && header.editions.length > 1 && (
+            {header && header.editions.length > 1 && (
               <LanguageSwitcher editions={header.editions} current={header.lang} />
             )}
             <ThemeToggle />
