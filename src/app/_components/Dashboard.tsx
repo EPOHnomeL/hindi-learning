@@ -499,7 +499,7 @@ function NewCourseCard() {
         className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
       >
         <option value="claude">Claude (recommended)</option>
-        <option value="openrouter">OpenRouter — GLM (experimental)</option>
+        <option value="openrouter">OpenRouter</option>
       </select>
       {provider === "openrouter" && (
         <p className="text-xs text-soft">Experimental: quality isn&apos;t guaranteed on this teacher.</p>
