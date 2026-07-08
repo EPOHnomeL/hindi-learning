@@ -488,8 +488,9 @@ function stripFence(s: string): string {
 
 // True when the quiz-scoring markers survived translation unchanged. The reader
 // derives quiz identity positionally and reads data-correct/data-answer/data-k
-// (lessonSrcDoc), so a changed count means a broken quiz.
-function quizStructureMatches(source: string, out: string): boolean {
+// (lessonSrcDoc), so a changed count means a broken quiz. Reused by the owner
+// prose-edit path (content.editLesson) to reject a structural change to a Lesson.
+export function quizStructureMatches(source: string, out: string): boolean {
   for (const re of [/data-correct=/g, /data-answer=/g, /data-k=/g]) {
     if ((source.match(re) ?? []).length !== (out.match(re) ?? []).length) return false;
   }
