@@ -354,6 +354,43 @@ test("a partial refund leaves access intact; a full refund revokes it", async ()
   });
 });
 
+test("a dispute revokes access only when it is closed as lost, not when merely opened or won", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await paidTopic(t);
+  const buyer = await seedUser(t, "buyer@example.com");
+  await t.mutation(internal.market.fulfillPurchase, {
+    eventId: "d1",
+    topicId,
+    lang: "en",
+    email: "buyer@example.com",
+    paymentIntentId: "pi_dis",
+  });
+
+  // A dispute the Seller WON (closed, status "won") → access untouched: a chargeback
+  // that resolved in the Seller's favour never withdrew the money.
+  const won = JSON.stringify({
+    id: "evt_won",
+    type: "charge.dispute.closed",
+    data: { object: { payment_intent: "pi_dis", status: "won" } },
+  });
+  expect((await signedWebhook(t, won)).status).toBe(200);
+  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+    locked: false,
+  });
+
+  // A dispute the Seller LOST (closed, status "lost") → access revoked: the funds
+  // were pulled back, so the buyer no longer holds the Edition.
+  const lost = JSON.stringify({
+    id: "evt_lost",
+    type: "charge.dispute.closed",
+    data: { object: { payment_intent: "pi_dis", status: "lost" } },
+  });
+  expect((await signedWebhook(t, lost)).status).toBe(200);
+  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+    locked: true,
+  });
+});
+
 test("appUrl enforces same-origin — no open redirect off SITE_URL", () => {
   // A same-origin relative path (incl. query) is preserved.
   expect(appUrl("/courses/hindi?lang=es")).toBe("https://app.example.com/courses/hindi?lang=es");

@@ -57,18 +57,21 @@ const stripeWebhook = httpAction(async (ctx, request) => {
           });
         }
       }
-    } else if (event.type === "charge.refunded" || event.type === "charge.dispute.created") {
-      // DEFENSIVE (the product offers no refunds): if Stripe ever reports a FULL
-      // refund or a chargeback, revoke the matching purchase by its PaymentIntent.
-      // A partial refund (amount_refunded < amount) leaves access intact — a $1
-      // goodwill refund shouldn't strip a paid course.
+    } else if (event.type === "charge.refunded" || event.type === "charge.dispute.closed") {
+      // DEFENSIVE (the product offers no refunds): revoke access only when money
+      // has actually left — a FULL refund, or a chargeback the Seller LOST. A
+      // dispute merely being *opened* (`charge.dispute.created`) can still be won,
+      // so we wait for `charge.dispute.closed` with `status: "lost"` before
+      // revoking. A partial refund (amount_refunded < amount) leaves access intact
+      // — a $1 goodwill refund shouldn't strip a paid course.
       const obj = event.data.object as Stripe.Charge | Stripe.Dispute;
-      const isFullRefund =
-        event.type === "charge.dispute.created" ||
-        ("amount_refunded" in obj && obj.amount_refunded >= obj.amount);
+      const shouldRevoke =
+        event.type === "charge.dispute.closed"
+          ? (obj as Stripe.Dispute).status === "lost"
+          : "amount_refunded" in obj && obj.amount_refunded >= obj.amount;
       const pi = "payment_intent" in obj ? obj.payment_intent : undefined;
       const paymentIntentId = typeof pi === "string" ? pi : (pi?.id ?? undefined);
-      if (isFullRefund && paymentIntentId) {
+      if (shouldRevoke && paymentIntentId) {
         await ctx.runMutation(internal.market.revokePurchaseByPaymentIntent, {
           eventId: event.id,
           paymentIntentId,

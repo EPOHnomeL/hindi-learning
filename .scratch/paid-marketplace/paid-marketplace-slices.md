@@ -136,10 +136,12 @@ selling/authoring privilege. This replaces Slice 1's manual grant.
 
 > **Status: implemented (2026-07-07), defensively.** The owner's business decision
 > is **no refunds** — so there is no refund UI or self-serve refund flow. But the
-> webhook still handles `charge.refunded` / `charge.dispute.created` →
-> `market.revokePurchaseByPaymentIntent` (idempotent, keyed on the PaymentIntent),
-> so if Stripe ever reports a refund or chargeback, access is revoked and the
-> reader falls back to the paygate. Tested in `convex/purchase.test.ts`.
+> webhook still handles `charge.refunded` (full only) / `charge.dispute.closed`
+> **with `status: "lost"`** → `market.revokePurchaseByPaymentIntent` (idempotent,
+> keyed on the PaymentIntent), so access is revoked only when money has actually
+> left — a dispute merely *opened* may still be won, so a full refund or a *lost*
+> chargeback is the trigger, and the reader falls back to the paygate. Tested in
+> `convex/purchase.test.ts`.
 
 ### What to build
 
@@ -179,10 +181,10 @@ Then, in the Stripe Dashboard (test mode):
 1. Enable **Connect** (Express accounts) and **Adaptive Pricing** (for
    local-currency presentment).
 2. Add a webhook endpoint pointing at `https://<deployment>.convex.site/stripe/webhook`,
-   subscribed to `checkout.session.completed`, `charge.refunded`,
-   `charge.dispute.created`. For **direct charges**, enable *Connect* events (they
-   originate on the connected account). Copy its signing secret into
-   `STRIPE_WEBHOOK_SECRET`.
+   subscribed to `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+   `charge.refunded`, `charge.dispute.closed`. For **direct charges**, enable
+   *Connect* events (they originate on the connected account). Copy its signing
+   secret into `STRIPE_WEBHOOK_SECRET`.
 
 Live-drive (`/verify`) once provisioned — a scratch/separate Convex deployment
 avoids pushing the new schema to the shared dev one:
