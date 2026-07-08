@@ -60,6 +60,11 @@ export default defineSchema({
         ownerSet: v.optional(v.boolean()),
       }),
     ),
+    // The LLM provider a Topic is authored with (e.g. "openrouter"). Owned by a
+    // parallel feature (course-content-editing); declared optional here only so
+    // this branch's schema stays compatible with the shared dev deployment, whose
+    // rows already carry it. Not read by this feature — reconcile at merge.
+    provider: v.optional(v.string()),
   })
     .index("by_slug", ["slug"])
     .index("by_owner", ["ownerId"])
