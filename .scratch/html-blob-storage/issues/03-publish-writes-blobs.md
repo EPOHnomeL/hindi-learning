@@ -31,6 +31,19 @@ pattern (as `resources` does) so the HTML never transits a Convex function.
 - [ ] A bad `PUBLISH_SECRET` is refused (existing pattern).
 - [ ] The teach CLI + translate driver upload via `generateUploadUrl` and pass `storageId`; the HTML is never sent as a mutation argument.
 
+## Scope note (during implementation)
+
+Migrating **`translations.html`** storage to blobs was deferred to a follow-up.
+It has extra coupling: `publishTranslation` reads the *source* Lesson HTML in a
+mutation (for the quiz-structure guard + staleness hash), which a mutation can't
+do once the source is a blob. This turn instead made that source-read
+**blob-tolerant** (`convex/translate.ts`): `itemHash` hashes `htmlStorageId` when
+inline `html` is absent, and the quiz-structure guard is skipped when the source
+body isn't inline (the run is trusted / secret-guarded). Translations keep inline
+`html`; the reader already serves them correctly via `pickContentBody`. A future
+ticket can move translation bodies to blobs (likely by making `publishTranslation`
+an action, or validating quiz structure in the driver).
+
 ## Blocked by
 
 - Reads emit a content URL + client fetches it

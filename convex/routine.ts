@@ -389,17 +389,33 @@ export const materialiseTopic = query({
     const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
     if (!topic) return null;
 
-    const lessons = (
-      await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
-    )
-      .filter((l) => !l.supersededBy)
-      .map((l) => ({ key: l.key, seq: l.seq, title: l.title, html: l.html }));
+    // Bodies live in content blobs (.scratch/html-blob-storage); a query can't
+    // read blob bytes, so expose a signed `htmlUrl` the materialise CLI fetches.
+    // `html` stays for not-yet-migrated (inline) rows during the transition.
+    const lessons = await Promise.all(
+      (await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect())
+        .filter((l) => !l.supersededBy)
+        .map(async (l) => ({
+          key: l.key,
+          seq: l.seq,
+          title: l.title,
+          html: l.html ?? null,
+          htmlUrl: l.htmlStorageId ? await ctx.storage.getUrl(l.htmlStorageId) : null,
+        })),
+    );
     const learningRecords = (
       await ctx.db.query("learningRecords").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
     ).map((r) => ({ key: r.key, seq: r.seq, markdown: r.markdown }));
-    const references = (
-      await ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()
-    ).map((r) => ({ key: r.key, title: r.title, html: r.html }));
+    const references = await Promise.all(
+      (await ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()).map(
+        async (r) => ({
+          key: r.key,
+          title: r.title,
+          html: r.html ?? null,
+          htmlUrl: r.htmlStorageId ? await ctx.storage.getUrl(r.htmlStorageId) : null,
+        }),
+      ),
+    );
     const resources = await Promise.all(
       (await ctx.db.query("resources").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()).map(
         async (r) => ({
