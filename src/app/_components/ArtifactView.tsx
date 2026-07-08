@@ -241,17 +241,20 @@ function LessonView({
   const recordResponse = useMutation(api.capture.recordResponse);
   const setProgress = useMutation(api.capture.setProgress);
   const editLesson = useAction(api.content.editLesson);
+  const editTranslatedLesson = useAction(api.content.editTranslatedLesson);
   const [editing, setEditing] = useState(false);
 
   // The caller's own completion — an owner's, or a Viewer's own on a shared course.
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
 
-  // Owner-only in-place prose edit (course-content-editing 01), and only on the
-  // source (English) edition — editing a translated Edition is a later slice, and
-  // `editLesson` patches the SOURCE lesson blob, so it must not run on a
-  // translation. The server guard (`editLesson`) is the real control; this hides
-  // the affordance from Viewers/Guests, who never reach this owner reader anyway.
-  const canEdit = !readOnly && (lang == null || lang === "en");
+  // Owner-only in-place prose edit (course-content-editing). Editing the source
+  // (English) edition patches the Lesson blob (`editLesson`); editing a translated
+  // Edition patches that Edition's `translations` row (`editTranslatedLesson`),
+  // leaving the source untouched. Both guard the quiz structure server-side — the
+  // real control; this only hides the affordance from Viewers/Guests, who never
+  // reach this owner reader anyway.
+  const isSource = lang == null || lang === "en";
+  const canEdit = !readOnly;
 
   useEffect(() => {
     // Owner or Viewer: opening a lesson marks it opened in the caller's own Progress.
@@ -341,9 +344,15 @@ function LessonView({
             topicSlug={topicSlug}
             html={html}
             theme={theme}
+            dir={dir}
+            lang={contentLang}
             label="lesson"
             onClose={() => setEditing(false)}
-            commit={(storageId) => editLesson({ topicSlug, key: lessonKey, storageId })}
+            commit={(storageId) =>
+              isSource
+                ? editLesson({ topicSlug, key: lessonKey, storageId })
+                : editTranslatedLesson({ topicSlug, key: lessonKey, lang: lang!, storageId })
+            }
           />
         )}
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
@@ -376,6 +385,8 @@ function ContentEditor({
   html,
   theme,
   themeCss,
+  dir,
+  lang,
   label,
   onClose,
   commit,
@@ -386,6 +397,10 @@ function ContentEditor({
   // Inject the dark palette for items that don't ship their own (References) —
   // display-only, mirrors the reader Frame's `themeCss`.
   themeCss?: boolean;
+  // The served Edition's direction/language, for editing a translated Lesson with
+  // the right RTL/localised presentation (display-only, mirrors the reader Frame).
+  dir?: "ltr" | "rtl";
+  lang?: string;
   label: string;
   onClose: () => void;
   commit: (storageId: Id<"_storage">) => Promise<unknown>;
@@ -396,9 +411,9 @@ function ContentEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Bake the theme for display only; the read-back takes body content, not the
-  // <html> tag, so the baked data-theme never reaches the saved HTML.
-  const srcDoc = useMemo(() => buildEditDoc(html, { theme, themeCss }), [html, theme, themeCss]);
+  // Bake theme/dir/lang for display only; the read-back takes body content, not
+  // the <html> tag, so none of it reaches the saved HTML.
+  const srcDoc = useMemo(() => buildEditDoc(html, { theme, themeCss, dir, lang }), [html, theme, themeCss, dir, lang]);
 
   useEffect(() => dialogRef.current?.showModal(), []);
 
