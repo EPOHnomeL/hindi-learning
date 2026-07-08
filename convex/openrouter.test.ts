@@ -23,6 +23,22 @@ function stubModel(content: string) {
   );
 }
 
+// Stub a multi-step run: return each `contents` entry in order, capturing the
+// request bodies so tests can assert on ordering + web-search plugin usage.
+function stubModelSequence(contents: string[]): { bodies: any[] } {
+  const bodies: any[] = [];
+  let i = 0;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init: RequestInit) => {
+      bodies.push(JSON.parse(init.body as string));
+      const content = contents[Math.min(i++, contents.length - 1)]!;
+      return new Response(JSON.stringify({ choices: [{ message: { content } }] }), { status: 200 });
+    }),
+  );
+  return { bodies };
+}
+
 async function seedOngoing(t: ReturnType<typeof convexTest>) {
   const alice = await t.run((ctx) => ctx.db.insert("users", { email: "alice@example.com" }));
   const topicId = await t.run((ctx) =>
@@ -96,15 +112,56 @@ test("a model/parse failure reports failed (retryable) and authors nothing", asy
   expect(lessons.some((l) => l.seq === 2)).toBe(false); // no lesson published
 });
 
-test("a seeded course with no Frontier stays a skeleton for now (reports nothing)", async () => {
+test("bootstrap drafts the mission (course → active) then authors lesson 1, both web-grounded", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await t.run((ctx) => ctx.db.insert("users", { email: "alice@example.com" }));
+  const topicId = await t.run((ctx) =>
+    ctx.db.insert("topics", { ownerId: alice, slug: "greek", title: "Koine Greek", status: "seeded", provider: "openrouter", seed: "read the NT" }),
+  );
+  await t.run((ctx) => ctx.db.insert("generation", { topicId, status: "generating", startedAt: 1 }));
+
+  const { bodies } = stubModelSequence([
+    JSON.stringify({ mission: "# Mission\nRead the Greek New Testament." }),
+    JSON.stringify({ lessonHtml: LESSON_FRAGMENT, learningRecord: "# Lesson 1\nalphabet", estimatedLessons: 12 }),
+  ]);
+
+  await t.action(internal.openrouter.authorTopic, { topicSlug: "greek" });
+
+  // Step 1 published the mission and flipped the course active.
+  const topic = await t.run((ctx) => ctx.db.get(topicId));
+  expect(topic?.status).toBe("active");
+  expect(topic?.mission).toContain("Read the Greek New Testament");
+
+  // Step 2 authored Lesson 1 (seq 1) + a learning record.
+  const lessons = await t.run((ctx) => ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect());
+  expect(lessons.map((l) => l.seq)).toEqual([1]);
+  expect(lessons[0]!.html).toMatch(/^<!DOCTYPE html>/);
+  const record = await t.run((ctx) => ctx.db.query("learningRecords").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect());
+  expect(record).toHaveLength(1);
+
+  // Both setup calls enabled OpenRouter web search, mission before lesson.
+  expect(bodies).toHaveLength(2);
+  expect(bodies[0].plugins).toEqual([{ id: "web" }]);
+  expect(bodies[1].plugins).toEqual([{ id: "web" }]);
+
+  // Reported published with the estimate; lock cleared.
+  expect(await genStatus(t, topicId)).toBe("idle");
+  expect(topic?.estimatedLessons).toBe(12);
+});
+
+test("a mission-draft failure during bootstrap reports failed and authors nothing", async () => {
   const t = convexTest(schema, modules);
   const alice = await t.run((ctx) => ctx.db.insert("users", { email: "a@e.com" }));
   const topicId = await t.run((ctx) =>
     ctx.db.insert("topics", { ownerId: alice, slug: "seed", title: "Seed", status: "seeded", provider: "openrouter", seed: "why" }),
   );
   await t.run((ctx) => ctx.db.insert("generation", { topicId, status: "generating", startedAt: 1 }));
-  stubModel(JSON.stringify({ lessonHtml: "x", learningRecord: "y" })); // must NOT be called
+  stubModel("not the mission json contract"); // step 1 parse throws
 
   await t.action(internal.openrouter.authorTopic, { topicSlug: "seed" });
-  expect(await genStatus(t, topicId)).toBe("caughtUp"); // reported nothing
+
+  expect(await genStatus(t, topicId)).toBe("failed");
+  expect((await t.run((ctx) => ctx.db.get(topicId)))?.status).toBe("seeded"); // never flipped active
+  const lessons = await t.run((ctx) => ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect());
+  expect(lessons).toHaveLength(0);
 });

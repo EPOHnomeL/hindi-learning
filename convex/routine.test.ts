@@ -183,7 +183,7 @@ async function genStatus(t: ReturnType<typeof convexTest>, topicId: Id<"topics">
   );
 }
 
-test("firing an OpenRouter course schedules the authoring action (no POST) and the skeleton leaves the lock clean", async () => {
+test("firing an OpenRouter course schedules the authoring action (no POST) and the scheduled run resolves the lock", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
   const glm = await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "glm", title: "GLM", status: "seeded", provider: "openrouter" }));
@@ -198,13 +198,16 @@ test("firing an OpenRouter course schedules the authoring action (no POST) and t
     expect(res).toMatchObject({ fired: true });
     expect(await genStatus(t, glm)).toBe("generating"); // lock held until the scheduled run reports
 
-    // Run the scheduled skeleton action: it does no LLM work, just reports
-    // `nothing` (→ caughtUp), proving the schedule → run → report round-trip.
+    // Run the scheduled authoring action end to end. This env has no
+    // OPENROUTER_API_KEY (authoring is tested with a mocked client in
+    // openrouter.test.ts), so the bootstrap reports `failed` — which still proves
+    // the schedule → run → reportGeneration round-trip leaves the lock resolved,
+    // never stuck `generating`.
     await t.finishAllScheduledFunctions(vi.runAllTimers);
   } finally {
     vi.useRealTimers();
   }
-  expect(await genStatus(t, glm)).toBe("caughtUp");
+  expect(await genStatus(t, glm)).toBe("failed");
 });
 
 test("firing a Claude course still takes the POST path (unchanged), never the scheduler", async () => {
