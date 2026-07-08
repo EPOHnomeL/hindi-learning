@@ -60,8 +60,10 @@ async function publishAuthoredLesson(
   // Upsert any references the lesson relies on / cross-links to, so a
   // /references/<key> link never dangles (AUTHORING.md §7). Stored as-authored.
   for (const ref of result.references) {
-    // Wrap the lean fragment in the bundled reference design system, so the stored
-    // reference is a complete, consistently-styled document (references render raw).
+    // The model emits a lean reference fragment; wrap it in the bundled reference
+    // design system so the STORED reference is a complete, consistently-styled
+    // document (references render raw — see assembleReference; this overrides
+    // AUTHORING.md §7's "stored as-authored").
     const refHtml = assembleReference(ref.html, ref.title);
     await ctx.runMutation(api.content.upsertReference, {
       secret,
@@ -125,22 +127,32 @@ export const authorTopic = internalAction({
         }
         if (!context.ownerEmail) throw new Error("seeded topic has no owner email");
 
-        // Bootstrap step 1 — draft + publish the Mission (web-grounded). This flips
-        // the course seeded → active via the existing publishMission mutation.
+        // Bootstrap is made atomic w.r.t. the (failure-prone) model calls by doing
+        // ALL generation BEFORE any publish, and publishing the Mission LAST —
+        // publishMission is what flips seeded → active, so if mission-drafting or
+        // Lesson-1 authoring fails/times out, the course stays `seeded` and the
+        // gate re-fires bootstrap cleanly (issue 03/04: a failed run is retryable).
+        // Publishing mission first (the old order) bricked the course: active with
+        // no Frontier, which the gate refuses on both the bootstrap and ongoing paths.
+
+        // Step 1 — draft the Mission (web-grounded), in memory (not yet published).
         const startedAt = Date.now();
         const missionRaw = await chatComplete({ model, messages: buildMissionMessages(context), webSearch: true });
         const { mission } = parseMissionResult(missionRaw);
-        await ctx.runMutation(api.content.publishMission, { secret, ownerEmail: context.ownerEmail, topicSlug, mission });
 
         if (Date.now() - startedAt > SETUP_BUDGET_MS) throw new Error("setup exceeded time budget before lesson 1");
 
-        // Bootstrap step 2 — author Lesson 1 (web-grounded). Refetch so the prompt
-        // carries the just-drafted mission + active status; no Frontier → seq 1.
-        const active = (await ctx.runQuery(internal.routine.materialiseForProvider, { topicSlug })) as ProviderContext | null;
-        if (!active) throw new Error("context vanished after mission publish");
-        const raw = await chatComplete({ model, messages: buildOngoingMessages(active), webSearch: true });
+        // Step 2 — author Lesson 1 (web-grounded), injecting the drafted mission into
+        // the prompt context (no Frontier → seq 1) without publishing it yet.
+        const withMission: ProviderContext = { ...context, topic: { ...context.topic, mission, status: "active" } };
+        const raw = await chatComplete({ model, messages: buildOngoingMessages(withMission), webSearch: true });
         const result = parseAuthoringResult(raw);
-        await publishAuthoredLesson(ctx, secret, active.topicId, 1, result);
+
+        // All model work succeeded — now publish. Lesson (+ record + refs) first,
+        // then the Mission LAST (flips seeded → active), so the course only leaves
+        // `seeded` once it has a Frontier.
+        await publishAuthoredLesson(ctx, secret, context.topicId, 1, result);
+        await ctx.runMutation(api.content.publishMission, { secret, ownerEmail: context.ownerEmail, topicSlug, mission });
         await ctx.runMutation(api.routine.reportGeneration, {
           secret,
           topicSlug,

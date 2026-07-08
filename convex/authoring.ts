@@ -57,11 +57,27 @@ ${LESSON_FOOT}
 
 // Strip a surrounding ```json code fence (models love to add one) and parse. One
 // place so every structured-output parser agrees. Throws on invalid JSON.
+//
+// Chatty models (e.g. Claude/Opus, especially with web search on) prepend a
+// sentence of narration — "I'll look up information first.{...}" — or trail one
+// after the object, so the whole string isn't valid JSON even after unfencing.
+// If the direct parse fails, fall back to the first-`{`..last-`}` slice, which
+// recovers the object from surrounding prose. Genuinely brace-free junk still
+// throws (no slice to try).
 function parseFencedJson(raw: string, what: string): Record<string, unknown> {
   const unfenced = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
   try {
     return JSON.parse(unfenced) as Record<string, unknown>;
   } catch {
+    const start = unfenced.indexOf("{");
+    const end = unfenced.lastIndexOf("}");
+    if (start !== -1 && end > start) {
+      try {
+        return JSON.parse(unfenced.slice(start, end + 1)) as Record<string, unknown>;
+      } catch {
+        // fall through to the shared error
+      }
+    }
     throw new Error(`${what}: response was not valid JSON`);
   }
 }
@@ -115,8 +131,10 @@ export type AuthoringResult = {
   estimatedLessons?: number;
   // Batched answers to the open questions passed in context.
   replies: AuthoringReply[];
-  // Glossary/reference docs to upsert (AUTHORING.md §7), so lessons that cross-link
-  // to /references/<key> don't dangle. Stored as-authored (not head/foot wrapped).
+  // Glossary/reference docs to upsert, so lessons that cross-link to
+  // /references/<key> don't dangle. Emitted as LEAN fragments and wrapped in the
+  // reference design system by assembleReference (this runtime overrides
+  // AUTHORING.md §7's "stored as-authored, not wrapped").
   references: AuthoringReference[];
 };
 
@@ -212,9 +230,10 @@ and nothing else (no prose, no code fence), with these fields:
   "html": "<LEAN reference fragment>" } for any glossary/reference docs this lesson
   relies on or cross-links to (/courses/<slug>/references/<key>). Include a
   reference for every /references/<key> you link so no link dangles. Use [] if
-  none. The reference fragment is CONTENT ONLY — do NOT include <!DOCTYPE>, <html>,
-  <head>, <style>, or <body>; the reference design system is wrapped on
-  automatically. Open with
+  none. NOTE — this OVERRIDES AUTHORING.md §7 ("references are stored as authored,
+  NOT head/foot-wrapped"): in THIS runtime references ARE wrapped automatically, so
+  emit a LEAN fragment exactly like a lesson. The reference fragment is CONTENT
+  ONLY — do NOT include <!DOCTYPE>, <html>, <head>, <style>, or <body>. Open with
   \`<header class="ref"><div class="kicker">Reference · …</div><h1>…</h1><p class="intro">…</p></header>\`,
   then use \`.term\` blocks for glossary entries and a plain \`<table>\` (with
   <thead>/<tbody>, <th>/<td>) for tabular cheat-sheets — both are styled. End with

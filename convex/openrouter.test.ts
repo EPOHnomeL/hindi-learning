@@ -225,3 +225,41 @@ test("a mission-draft failure during bootstrap reports failed and authors nothin
   const lessons = await t.run((ctx) => ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect());
   expect(lessons).toHaveLength(0);
 });
+
+test("a Lesson-1 failure after the mission draft leaves the course SEEDED (re-fireable), not bricked", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await t.run((ctx) => ctx.db.insert("users", { email: "a@e.com" }));
+  const topicId = await t.run((ctx) =>
+    ctx.db.insert("topics", { ownerId: alice, slug: "seed", title: "Seed", status: "seeded", provider: "openrouter", seed: "why" }),
+  );
+  await t.run((ctx) => ctx.db.insert("generation", { topicId, status: "generating", startedAt: 1 }));
+  // Step 1 (mission) parses; step 2 (lesson) does not → authorTopic throws before
+  // any publish, so the Mission is never published (never flips seeded → active).
+  stubModelSequence([JSON.stringify({ mission: "# Mission\nx" }), "not the lesson json contract"]);
+
+  await t.action(internal.openrouter.authorTopic, { topicSlug: "seed" });
+
+  const topic = await t.run((ctx) => ctx.db.get(topicId));
+  expect(topic?.status).toBe("seeded"); // NOT active → the gate will re-bootstrap
+  expect(topic?.mission ?? null).toBeNull(); // mission never published
+  const lessons = await t.run((ctx) => ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect());
+  expect(lessons).toHaveLength(0);
+  expect(await genStatus(t, topicId)).toBe("failed"); // retryable
+
+  // Prove it re-bootstraps: a subsequent successful fire produces mission + Lesson 1.
+  await t.run(async (ctx) => {
+    const gen = await ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique();
+    await ctx.db.patch(gen!._id, { status: "generating", startedAt: 2, error: undefined });
+  });
+  stubModelSequence([
+    JSON.stringify({ mission: "# Mission\nread it" }),
+    JSON.stringify({ lessonHtml: LESSON_FRAGMENT, learningRecord: "# L1", estimatedLessons: 5 }),
+  ]);
+  await t.action(internal.openrouter.authorTopic, { topicSlug: "seed" });
+
+  const after = await t.run((ctx) => ctx.db.get(topicId));
+  expect(after?.status).toBe("active");
+  expect(after?.mission).toContain("read it");
+  const lessons2 = await t.run((ctx) => ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect());
+  expect(lessons2).toHaveLength(1);
+});
