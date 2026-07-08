@@ -394,18 +394,11 @@ export const dailyFire = internalAction({
 // `topics/<slug>/` and the teach skill runs there (ADR 0009: the Routine pulls
 // from Convex, never the repo). ponytail: returns all Lesson HTML in one query —
 // fine for a curriculum's worth; paginate if a Topic ever grows huge.
-export const materialiseTopic = query({
-  args: { secret: v.string(), ownerEmail: v.string(), topicSlug: v.string() },
-  handler: async (ctx, { secret, ownerEmail, topicSlug }) => {
-    assertAdmin(secret);
-    const owner = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", ownerEmail))
-      .unique();
-    if (!owner) return null;
-    const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
-    if (!topic) return null;
-
+// The whole materialised context for one Topic + owner, in one round-trip. Shared
+// by the secret-guarded `materialiseTopic` (the Claude CLI seam) and the internal
+// `materialiseForProvider` (the OpenRouter action seam), so both see identical
+// context regardless of which path pulls it.
+async function collectTopicContext(ctx: QueryCtx, topic: Doc<"topics">, owner: Doc<"users">) {
     const lessons = (
       await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
     )
@@ -464,6 +457,43 @@ export const materialiseTopic = query({
         responses: responses.map((r) => ({ lessonKey: r.lessonKey, quizId: r.quizId, answer: r.answer, correct: r.correct })),
         progress: progress.map((p) => ({ lessonKey: p.lessonKey, status: p.status })),
       },
+    };
+}
+
+export const materialiseTopic = query({
+  args: { secret: v.string(), ownerEmail: v.string(), topicSlug: v.string() },
+  handler: async (ctx, { secret, ownerEmail, topicSlug }) => {
+    assertAdmin(secret);
+    const owner = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", ownerEmail))
+      .unique();
+    if (!owner) return null;
+    const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
+    if (!topic) return null;
+    return await collectTopicContext(ctx, topic, owner);
+  },
+});
+
+// The OpenRouter action's context seam. Internal (in-deployment, no secret), keyed
+// by slug: it resolves the Topic's own owner, so the action never needs an owner
+// email out of band. Adds the topicId (publish mutations key by it) and the
+// current Frontier (highest-seq non-superseded Lesson, or null) so the action can
+// pick the ongoing-vs-bootstrap path and compute the next seq. Null if the Topic
+// or its owner is missing.
+export const materialiseForProvider = internalQuery({
+  args: { topicSlug: v.string() },
+  handler: async (ctx, { topicSlug }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic || !topic.ownerId) return null;
+    const owner = await ctx.db.get(topic.ownerId);
+    if (!owner) return null;
+    const frontier = await frontierLesson(ctx, topic._id);
+    return {
+      topicId: topic._id,
+      provider: topic.provider ?? "claude",
+      frontier: frontier ? { key: frontier.key, seq: frontier.seq } : null,
+      ...(await collectTopicContext(ctx, topic, owner)),
     };
   },
 });
