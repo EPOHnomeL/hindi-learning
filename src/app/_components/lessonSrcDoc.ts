@@ -241,7 +241,10 @@ export function buildSrcDoc(
 // property, so it needs no script and leaves no `contenteditable` attribute to
 // strip). Theme is baked for display only; the read-back takes body content, not
 // the <html> tag, so the baked `data-theme` never reaches the saved HTML.
-export function buildEditDoc(html: string, opts: { theme?: Theme; themeCss?: boolean } = {}): string {
+export function buildEditDoc(
+  html: string,
+  opts: { theme?: Theme; themeCss?: boolean; dir?: "ltr" | "rtl"; lang?: string } = {},
+): string {
   let doc = ensureDocument(html);
   if (opts.theme) {
     doc = stripLegacyThemePill(doc);
@@ -251,6 +254,11 @@ export function buildEditDoc(html: string, opts: { theme?: Theme; themeCss?: boo
     // read-back on save is unaffected.
     if (opts.themeCss) doc = injectReferenceDarkCss(doc);
   }
+  // Stamp the served Edition's direction/language so a translated Lesson edits
+  // RTL/localised (course-translation), matching the reader's Frame. Applied to
+  // the <html> tag + head, so the body read-back is unaffected.
+  doc = setRootDirLang(doc, opts.dir, opts.lang);
+  if (opts.lang && isDevanagari(opts.lang)) doc = injectDevanagariCss(doc);
   return doc;
 }
 

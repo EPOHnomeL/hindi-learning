@@ -5,7 +5,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { assertAdmin, getOwnedTopic, getViewableTopic, heldLangs, pickContentBody, readableLang, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
-import { quizStructureMatches } from "./translate";
+import { itemHash, quizStructureMatches } from "./translate";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
 import { isCallerAdmin } from "./whitelist";
 
@@ -369,6 +369,104 @@ export const editReference = mutation({
     const old = ref.htmlStorageId;
     await ctx.db.patch(ref._id, { htmlStorageId: storageId });
     if (old && old !== storageId) await ctx.storage.delete(old);
+    return null;
+  },
+});
+
+// ---- Owner prose edit of a translated Edition (course-content-editing 03) ----
+
+// The source Lesson's blob for the quiz guard on an owned Topic's translated
+// Lesson. Owner-guarded; throws on a non-owner, an unknown Lesson, or the source
+// language (not an Edition). The apply mutation re-reads the translated row itself
+// (to delete its old blob), so only the source is needed here.
+export const translatedLessonEditTarget = internalQuery({
+  args: { topicSlug: v.string(), key: v.string(), lang: v.string() },
+  returns: v.object({ sourceStorageId: v.union(v.id("_storage"), v.null()) }),
+  handler: async (ctx, { topicSlug, key, lang }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    if (lang === SOURCE_LANG) throw new Error("not a translated edition");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+      .unique();
+    if (!lesson || lesson.supersededBy) throw new Error("lesson not found");
+    return { sourceStorageId: lesson.htmlStorageId ?? null };
+  },
+});
+
+// Patch (or create) the translated Lesson row's body blob and delete the prior
+// one. The source Lesson and every other Edition are untouched. `sourceHash` is
+// stamped from the current source (the same key `publishTranslation` uses), so a
+// later re-translate of an unchanged source skips this item and keeps the manual
+// edit. When no row exists yet, insert one (correcting an untranslated term).
+export const applyTranslatedLessonEdit = internalMutation({
+  args: { topicSlug: v.string(), key: v.string(), lang: v.string(), storageId: v.id("_storage") },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, key, lang, storageId }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    if (lang === SOURCE_LANG) throw new Error("not a translated edition");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+      .unique();
+    if (!lesson || lesson.supersededBy) throw new Error("lesson not found");
+    const sourceHash = itemHash("lesson", lesson);
+    const row = await ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "lesson").eq("key", key))
+      .unique();
+    if (row) {
+      const old = row.htmlStorageId;
+      // Clear any inline `html` (older translations stored the body inline) so the
+      // row is blob-only going forward.
+      await ctx.db.patch(row._id, { htmlStorageId: storageId, html: undefined, sourceHash });
+      if (old && old !== storageId) await ctx.storage.delete(old);
+    } else {
+      // First edit of this item in this Edition (it was showing the English
+      // fallback). No translated title — the reader falls back to the source title.
+      await ctx.db.insert("translations", { topicId: topic._id, lang, kind: "lesson", key, htmlStorageId: storageId, sourceHash });
+    }
+    return null;
+  },
+});
+
+// Owner corrects a translated Edition's Lesson body in place. Like `editLesson`
+// but the guard compares the edit against the SOURCE Lesson's markers (positional
+// scoring is shared across Editions, so a translation must keep the source's
+// data-correct/data-answer/data-k counts — the same rule `publishTranslation`
+// enforces). Owner-only (a Viewer of the Edition is rejected by `getOwnedTopic`),
+// source untouched, live on the next tick. A rejected/failed save's upload is
+// deleted so it can't orphan.
+export const editTranslatedLesson = action({
+  args: { topicSlug: v.string(), key: v.string(), lang: v.string(), storageId: v.id("_storage") },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, key, lang, storageId }): Promise<null> => {
+    const target = await ctx.runQuery(internal.content.translatedLessonEditTarget, { topicSlug, key, lang });
+    const newHtml = await blobText(ctx, storageId);
+    if (newHtml === null) throw new Error("The edited lesson couldn't be read back. Please try saving again.");
+    if (target.sourceStorageId) {
+      const srcHtml = await blobText(ctx, target.sourceStorageId);
+      if (srcHtml === null || !quizStructureMatches(srcHtml, newHtml)) {
+        await ctx.storage.delete(storageId);
+        throw new Error(
+          srcHtml === null
+            ? "Couldn't check this edit against the source lesson. Please refresh and try again."
+            : "This edit changes the lesson's quiz structure, so it can't be saved. Reword the text without adding or removing quiz options or answers.",
+        );
+      }
+    }
+    try {
+      await ctx.runMutation(internal.content.applyTranslatedLessonEdit, { topicSlug, key, lang, storageId });
+    } catch (e) {
+      await ctx.storage.delete(storageId);
+      throw e;
+    }
     return null;
   },
 });

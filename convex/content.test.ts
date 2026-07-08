@@ -568,3 +568,120 @@ test("editReference: rejects a non-owner and an unauthenticated caller; the refe
   const ref = await asUser(t, alice).query(api.content.getReference, { topicSlug: "hindi", key: "grammar" });
   expect(ref).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldSid}`) });
 });
+
+// ---- editTranslatedLesson: owner edit of a translated Edition (content-editing 03)
+
+// Seed a Lesson translated into `lang` (a blob-backed translations row) and mark
+// the Edition ready so the owner holds it (getLesson serves it).
+async function seedTranslatedLesson(
+  t: ReturnType<typeof convexTest>,
+  topicId: Id<"topics">,
+  lang: string,
+  key: string,
+  storageId: Id<"_storage"> | null,
+) {
+  await t.run(async (ctx) => {
+    await ctx.db.insert("translationJobs", { topicId, lang, status: "ready", total: 1, done: 1, failed: 0 });
+    if (storageId) {
+      await ctx.db.insert("translations", {
+        topicId,
+        lang,
+        kind: "lesson",
+        key,
+        htmlStorageId: storageId,
+        sourceHash: "seed",
+      });
+    }
+  });
+}
+
+test("editTranslatedLesson: owner edits a translated Lesson — round-trips, old blob deleted, source unchanged", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", srcSid);
+  const oldTrSid = await storeHtml(t, QUIZ_BODY.replace("What is the word?", "Wat is die woord?"));
+  await seedTranslatedLesson(t, topicId, "af", "0001", oldTrSid);
+
+  // Prose-only fix in the Afrikaans Edition — same markers as the English source.
+  const newTrSid = await storeHtml(t, QUIZ_BODY.replace("What is the word?", "Watter woord pas?"));
+  await asUser(t, alice).action(api.content.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: newTrSid });
+
+  // The af Edition serves the new body; English source is unchanged.
+  const af = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "af" });
+  expect(af).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${newTrSid}`) });
+  const en = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(en).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${srcSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldTrSid))).toBeNull(); // old translated blob gone
+  expect(await t.run((ctx) => ctx.db.system.get(srcSid))).not.toBeNull(); // source blob untouched
+});
+
+test("editTranslatedLesson: rejects a structural change against the source markers, keeps the old body", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, QUIZ_BODY); // data-k = 2
+  await seedLesson(t, topicId, "0001", srcSid);
+  const oldTrSid = await storeHtml(t, QUIZ_BODY);
+  await seedTranslatedLesson(t, topicId, "af", "0001", oldTrSid);
+
+  // A third option changes the marker counts vs the source → refused.
+  const badSid = await storeHtml(t, QUIZ_BODY.replace("</div>", '<span class="opt" data-k="c">z</span></div>'));
+  await expect(
+    asUser(t, alice).action(api.content.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: badSid }),
+  ).rejects.toThrow(/quiz/i);
+
+  const af = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "af" });
+  expect(af).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldTrSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldTrSid))).not.toBeNull();
+  expect(await t.run((ctx) => ctx.db.system.get(badSid))).toBeNull();
+});
+
+test("editTranslatedLesson: creates a translation row when the Edition had none (untranslated term)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", srcSid);
+  await seedTranslatedLesson(t, topicId, "af", "0001", null); // ready Edition, no row → English fallback
+
+  const newSid = await storeHtml(t, QUIZ_BODY.replace("What is the word?", "Watter woord pas?"));
+  await asUser(t, alice).action(api.content.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: newSid });
+
+  const af = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "af" });
+  expect(af).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${newSid}`) });
+  // English source still served on the source Edition.
+  const en = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(en).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${srcSid}`) });
+});
+
+test("editTranslatedLesson: rejects a non-owner, a Viewer of the Edition, and an unauthenticated caller", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const bob = await seedUser(t, "bob@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", srcSid);
+  const oldTrSid = await storeHtml(t, QUIZ_BODY);
+  await seedTranslatedLesson(t, topicId, "af", "0001", oldTrSid);
+  // bob is a Viewer of the af Edition — still can't edit it.
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: bob, lang: "af" }));
+
+  const bobSid = await storeHtml(t, QUIZ_BODY);
+  await expect(
+    asUser(t, bob).action(api.content.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: bobSid }),
+  ).rejects.toThrow();
+  await expect(
+    t.action(api.content.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: bobSid }),
+  ).rejects.toThrow();
+
+  // The translated row still points at its original body.
+  const row = await t.run((ctx) =>
+    ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "af").eq("kind", "lesson").eq("key", "0001"))
+      .unique(),
+  );
+  expect(row?.htmlStorageId).toBe(oldTrSid);
+});
