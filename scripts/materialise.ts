@@ -31,16 +31,13 @@ mkdirSync(`${base}/learning-records`, { recursive: true });
 // reads it as the source for the title Edition (it isn't inside any lesson file).
 writeFileSync(`${base}/TITLE.txt`, ctx.topic.title);
 // Lesson/Reference bodies live in content blobs (.scratch/html-blob-storage):
-// materialiseTopic returns a signed `htmlUrl` we fetch, falling back to inline
-// `html` for not-yet-migrated rows. Empty only if a row has neither (unexpected).
-const bodyOf = async (x: { html: string | null; htmlUrl: string | null }): Promise<string> => {
-  if (x.html != null) return x.html;
-  if (x.htmlUrl) {
-    const res = await fetch(x.htmlUrl);
-    if (!res.ok) throw new Error(`content fetch failed: ${res.status}`);
-    return await res.text();
-  }
-  return "";
+// materialiseTopic returns a signed `htmlUrl` we fetch. Empty only if a row has
+// no blob (unexpected in production).
+const bodyOf = async (x: { htmlUrl: string | null }): Promise<string> => {
+  if (!x.htmlUrl) return "";
+  const res = await fetch(x.htmlUrl);
+  if (!res.ok) throw new Error(`content fetch failed: ${res.status}`);
+  return await res.text();
 };
 for (const l of ctx.lessons) writeFileSync(`${base}/lessons/${l.key}.html`, await bodyOf(l));
 for (const r of ctx.references) writeFileSync(`${base}/references/${r.key}.html`, await bodyOf(r));

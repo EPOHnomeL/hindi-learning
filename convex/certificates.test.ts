@@ -42,7 +42,7 @@ async function addLesson(
   seq: number,
   supersededBy?: string,
 ) {
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key, seq, title: key, html: "<p>x</p>", supersededBy }));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key, seq, title: key, supersededBy }));
 }
 async function complete(
   t: ReturnType<typeof convexTest>,

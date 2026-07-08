@@ -1,6 +1,23 @@
 # Drop inline `html` (contract)
 
-Status: ready-for-agent
+Status: implemented (lessons + references) — translations deferred
+
+## Scope note (during implementation)
+
+Narrowed **lessons + references only** — the dominant, hottest tables (132 + 23
+prod rows, largest bodies). `translations.html` is **kept**: `publishTranslation`
+still writes translated bodies inline, and migrating that write-path to blobs is
+a follow-up. So the read path keeps its dual shape (`contentUrl` | inline `html`)
+for translations; `pickContentBody` and the client `useContentHtml` still handle
+both.
+
+**Behaviour change to note:** with source Lesson bodies in blobs, the source
+markup isn't readable inside a mutation, so `publishTranslation`'s
+**quiz-structure guard no longer runs** for a blob-backed source (it's bypassed
+for the trusted, secret-guarded run). Restoring it (validate in the driver, or
+make `publishTranslation` an action that fetches the source blob) belongs with
+the deferred translation-write migration.
+
 
 ## What to build
 

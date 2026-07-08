@@ -85,7 +85,9 @@ async function readSource(
       .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
       .unique();
     if (!l || l.supersededBy) return null;
-    return { title: l.title, html: l.html, hash: itemHash("lesson", l) };
+    // The source body now lives in a content blob (no inline `html`), so the
+    // quiz-structure guard downstream is skipped for it (see publishTranslation).
+    return { title: l.title, hash: itemHash("lesson", l) };
   }
   if (kind === "reference") {
     const r = await ctx.db
@@ -93,7 +95,7 @@ async function readSource(
       .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
       .unique();
     if (!r) return null;
-    return { title: r.title, html: r.html, hash: itemHash("reference", r) };
+    return { title: r.title, hash: itemHash("reference", r) };
   }
   // question
   const q = await ctx.db.get(key as Id<"questions">);

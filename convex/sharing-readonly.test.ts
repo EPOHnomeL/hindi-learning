@@ -36,7 +36,7 @@ async function sharedFixture(t: ReturnType<typeof convexTest>, mission?: string)
   const viewer = await seedUser(t, "viewer@example.com");
   const stranger = await seedUser(t, "stranger@example.com");
   const topicId = await seedTopic(t, owner, "hindi", "Hindi", mission);
-  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", html: "<p>a</p>" }));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
   await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "viewer@example.com" });
   return { owner, viewer, stranger, topicId };
 }

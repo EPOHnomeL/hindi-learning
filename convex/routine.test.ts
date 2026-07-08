@@ -76,16 +76,18 @@ test("materialiseTopic returns one owner's topic context and is owner-scoped", a
   const topicId = await seedTopic(t, alice, "hindi");
   const storageId = await t.run((ctx) => ctx.storage.store(new Blob(["%PDF"], { type: "application/pdf" })));
   await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1", html: "<p>one</p>" });
-    await ctx.db.insert("lessons", { topicId, key: "0000", seq: 0, title: "Old", html: "<p>x</p>", supersededBy: "0001" });
-    await ctx.db.insert("references", { topicId, key: "grammar", title: "Grammar", html: "<p>ref</p>", contentHash: "h" });
+    const refSid = await ctx.storage.store(new Blob(["<p>ref</p>"], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1" });
+    await ctx.db.insert("lessons", { topicId, key: "0000", seq: 0, title: "Old", supersededBy: "0001" });
+    await ctx.db.insert("references", { topicId, key: "grammar", title: "Grammar", htmlStorageId: refSid, contentHash: "h" });
     await ctx.db.insert("resources", { topicId, ownerId: alice, filename: "h.pdf", rawStorageId: storageId, contentHash: "c", status: "raw", kind: "file" });
   });
   const secret = "test-secret";
 
   const ctx = await t.query(api.routine.materialiseTopic, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi" });
   expect(ctx?.lessons.map((l) => l.key)).toEqual(["0001"]); // superseded excluded
-  expect(ctx?.references).toMatchObject([{ key: "grammar", html: "<p>ref</p>" }]);
+  // The blob-backed Reference body is exposed as a signed `htmlUrl` for the CLI.
+  expect(ctx?.references).toMatchObject([{ key: "grammar", htmlUrl: expect.any(String) }]);
   expect(ctx?.resources[0]).toMatchObject({ filename: "h.pdf", status: "raw" });
   expect(ctx?.resources[0]?.rawUrl).toBeTruthy();
 
@@ -151,7 +153,7 @@ test("the on-demand button is capped to one manual fire per user per day, across
   // only thing that can block a fire on it is the per-user daily cap.
   await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "spanish", title: "Spanish", status: "seeded" }));
   await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId: hindi, key: "0001", seq: 1, title: "L1", html: "<p>x</p>" });
+    await ctx.db.insert("lessons", { topicId: hindi, key: "0001", seq: 1, title: "L1" });
     await ctx.db.insert("progress", { userId: alice, topicId: hindi, lessonKey: "0001", status: "completed" });
   });
   const asAlice = asUser(t, alice);
@@ -170,7 +172,7 @@ test("the Admin bypasses the on-demand cooldown", async () => {
   const admin = await seedAdmin(t, "jvorster63@gmail.com");
   const topicId = await seedTopic(t, admin, "hindi");
   await t.run(async (ctx) => {
-    await ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1", html: "<p>x</p>" });
+    await ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1" });
     await ctx.db.insert("progress", { userId: admin, topicId, lessonKey: "0001", status: "completed" });
   });
 

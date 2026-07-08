@@ -25,15 +25,18 @@ async function runBackfill(t: ReturnType<typeof convexTest>, table: "lessons" | 
   return patched;
 }
 
+// Lessons/References no longer carry inline `html` (narrowed), so the only table
+// still holding inline bodies to migrate is `translations` — exercise the
+// backfill there.
 test("backfillHtmlBlobs moves inline html into a blob and is idempotent", async () => {
   const t = convexTest(schema, modules);
   const topicId = await t.run((ctx) => ctx.db.insert("topics", { slug: "hindi", title: "Hindi" }));
-  const lessonId = await t.run((ctx) =>
-    ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "One", html: "<p>body</p>" }),
+  const rowId = await t.run((ctx) =>
+    ctx.db.insert("translations", { topicId, lang: "es", kind: "lesson", key: "0001", html: "<p>body</p>", sourceHash: "h" }),
   );
 
-  expect(await runBackfill(t, "lessons")).toBe(1);
-  const row = await t.run((ctx) => ctx.db.get(lessonId));
+  expect(await runBackfill(t, "translations")).toBe(1);
+  const row = await t.run((ctx) => ctx.db.get(rowId));
   expect(row?.htmlStorageId).toBeDefined();
   // The blob holds the original body (read text inside t.run — a Blob can't
   // cross the t.run boundary).
@@ -44,7 +47,7 @@ test("backfillHtmlBlobs moves inline html into a blob and is idempotent", async 
   expect(text).toBe("<p>body</p>");
 
   // Idempotent: a second pass migrates nothing (row already has htmlStorageId).
-  expect(await runBackfill(t, "lessons")).toBe(0);
+  expect(await runBackfill(t, "translations")).toBe(0);
 });
 
 test("backfillHtmlBlobs migrates only lesson/reference translation rows, skips others", async () => {

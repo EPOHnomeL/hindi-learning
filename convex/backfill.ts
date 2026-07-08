@@ -29,6 +29,9 @@ export const backfillQuizShuffle = mutation({
     const page = await ctx.db.query(table).paginate({ cursor, numItems: 100 });
     let patched = 0;
     for (const row of page.page) {
+      // Lesson bodies now live in content blobs (no inline `html`), so only the
+      // still-inline `translations` rows are shufflable in-row here.
+      if (!("html" in row)) continue;
       // translations covers every artifact kind; only lesson bodies carry quizzes.
       if ("kind" in row && row.kind !== "lesson") continue;
       const html = row.html;
@@ -174,34 +177,6 @@ export const verifyHtmlBlobs = action({
   },
 });
 
-// Strip the now-redundant inline `html` field from Lesson / Reference rows — the
-// DATA step that must run BEFORE the schema narrow (issue 05), since a Convex
-// schema push validates existing rows and would reject any that still carry
-// `html`. Safety: only strips a row whose body is already in a blob
-// (`htmlStorageId` present), so it can never lose content. Idempotent (a row
-// with no inline `html` is skipped). Paginated + secret-gated; driven by
-// `pnpm run strip-inline-html[:prod]`. Run AFTER verifyHtmlBlobs is clean.
-export const stripInlineHtml = mutation({
-  args: {
-    secret: v.string(),
-    table: v.union(v.literal("lessons"), v.literal("references")),
-    cursor: v.union(v.string(), v.null()),
-  },
-  returns: v.object({ stripped: v.number(), skipped: v.number(), isDone: v.boolean(), cursor: v.union(v.string(), v.null()) }),
-  handler: async (ctx, { secret, table, cursor }) => {
-    assertAdmin(secret);
-    const page = await ctx.db.query(table).paginate({ cursor, numItems: 100 });
-    let stripped = 0;
-    let skipped = 0;
-    for (const row of page.page) {
-      if (row.html === undefined) continue; // already stripped / no inline body
-      if (!row.htmlStorageId) {
-        skipped++; // SAFETY: body not in a blob — never strip, would lose content
-        continue;
-      }
-      await ctx.db.patch(row._id, { html: undefined }); // `undefined` removes the field
-      stripped++;
-    }
-    return { stripped, skipped, isDone: page.isDone, cursor: page.continueCursor };
-  },
-});
+// `stripInlineHtml` (the pre-narrow data-strip, PR #9) is intentionally gone from
+// here: once `lessons`/`references` no longer carry inline `html`, it can't
+// compile and its job (strip prod rows before this narrow deploys) is complete.
