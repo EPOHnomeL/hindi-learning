@@ -317,28 +317,42 @@ function AdminCourseMenu({ slug, title }: { slug: string; title: string }) {
   const amAdmin = useQuery(api.whitelist.amIAdmin);
   const status = useQuery(api.routine.generationStatus, { topicSlug: slug });
   const finish = useAction(api.routine.finishGenerating);
+  const cancel = useAction(api.routine.cancelFinishGenerating);
   const [busy, setBusy] = useState(false);
   if (!amAdmin) return null;
 
   const generating = busy || status?.status === "generating";
+  const cancelling = status?.cancelRequested === true;
   const failed = status?.status === "failed";
-  const label = generating ? "Generating…" : failed ? "Finish generating — retry" : "Finish generating course";
 
   return (
     <Menu triggerLabel={`Admin actions for ${title}`} dot={failed}>
-      {(close) => (
-        <MenuItem
-          icon="refresh"
-          onClick={() => {
-            close();
-            if (generating) return;
-            setBusy(true);
-            void finish({ topicSlug: slug }).finally(() => setBusy(false));
-          }}
-        >
-          {label}
-        </MenuItem>
-      )}
+      {(close) =>
+        generating ? (
+          // A run is in flight — offer to stop it (fire-and-pray can loop).
+          <MenuItem
+            icon="x"
+            onClick={() => {
+              close();
+              if (cancelling) return;
+              void cancel({ topicSlug: slug });
+            }}
+          >
+            {cancelling ? "Cancelling…" : "Cancel generation"}
+          </MenuItem>
+        ) : (
+          <MenuItem
+            icon="refresh"
+            onClick={() => {
+              close();
+              setBusy(true);
+              void finish({ topicSlug: slug }).finally(() => setBusy(false));
+            }}
+          >
+            {failed ? "Finish generating — retry" : "Finish generating course"}
+          </MenuItem>
+        )
+      }
     </Menu>
   );
 }
