@@ -364,6 +364,103 @@ export const requestSetup = action({
   },
 });
 
+// ---- Admin: finish generating (fire & pray) --------------------------------
+
+// The Admin "fire and pray" driver: author the whole remaining curriculum back
+// to back, WITHOUT waiting for the learner to complete each Frontier lesson (the
+// gate the daily cron / reader button obey). An Admin kicks it off from the
+// dashboard ⋯ menu and the loop churns lessons in the background until the model
+// judges the course complete (ADR 0015) — or the safety cap trips. Runs entirely
+// in-deployment via `openrouter.authorTopic`, so it drives ANY course to a finish
+// regardless of its Provider (the loop always authors with the OpenRouter model).
+
+// Backstop against a never-completing (e.g. open-ended) mission: the model is told
+// never to complete a lifelong mission, so an unbounded self-rescheduling author
+// loop would generate forever. Cap the lessons one fire adds.
+const MAX_FINISH_LESSONS = 30;
+
+// Actions have no `ctx.db`; the finish action checks admin-ness through this query
+// (run with the action's forwarded identity), mirroring `callerOwnsTopic`.
+export const callerIsAdmin = internalQuery({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx) => isCallerAdmin(ctx),
+});
+
+// Force the lock to `generating`, bypassing the Frontier-completed gate (the whole
+// point of fire-and-pray). Refuses a completed course and an in-flight run so two
+// admins can't drive the same course at once. `gate: false` (the per-step refresh)
+// skips the in-flight guard, since the loop re-marks between its own steps.
+export const markFinishGenerating = internalMutation({
+  args: { topicSlug: v.string(), gate: v.boolean() },
+  returns: v.object({ started: v.boolean(), reason: v.optional(v.string()) }),
+  handler: async (ctx, { topicSlug, gate }): Promise<{ started: boolean; reason?: string }> => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return { started: false, reason: "no-topic" };
+    if (topic.status === "completed") return { started: false, reason: "completed" };
+    const gen = await generationRow(ctx, topic._id);
+    const now = Date.now();
+    if (gate && gen) {
+      const stale = gen.startedAt !== undefined && now - gen.startedAt > STALE_MS;
+      if (gen.status === "generating" && !stale) return { started: false, reason: "already-generating" };
+    }
+    const patch = { status: "generating" as const, startedAt: now, error: undefined, claimedAt: undefined, runId: undefined };
+    if (gen) await ctx.db.patch(gen._id, patch);
+    else await ctx.db.insert("generation", { topicId: topic._id, ...patch });
+    return { started: true };
+  },
+});
+
+// Read the course + lock status so the loop can decide whether to keep going.
+export const finishState = internalQuery({
+  args: { topicSlug: v.string() },
+  returns: v.object({ topicStatus: v.string(), genStatus: v.string() }),
+  handler: async (ctx, { topicSlug }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return { topicStatus: "missing", genStatus: "idle" };
+    const gen = await generationRow(ctx, topic._id);
+    return { topicStatus: topic.status ?? "active", genStatus: gen?.status ?? "idle" };
+  },
+});
+
+// One step of the fire-and-pray loop: author a single lesson (or complete the
+// course) via the existing in-deployment authoring, then decide whether to go
+// again. `authorTopic` reports its own outcome into the lock, so we read it back:
+// completed / failed / caughtUp stops the loop; a published lesson (lock → idle)
+// re-marks generating and schedules the next step. Each step is its own action
+// invocation, so the ~10-min action cap never bites — the run just chains.
+export const finishStep = internalAction({
+  args: { topicSlug: v.string(), remaining: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, remaining }) => {
+    if (remaining <= 0) return null; // safety cap hit — leave the lock idle and stop
+    await ctx.runAction(internal.openrouter.authorTopic, { topicSlug });
+    const { topicStatus, genStatus } = await ctx.runQuery(internal.routine.finishState, { topicSlug });
+    // Course finished, a step failed, or nothing left to author → stop; the lock
+    // already carries the terminal status the reader/dashboard shows.
+    if (topicStatus === "completed" || genStatus === "failed" || genStatus === "caughtUp") return null;
+    // A lesson was published (lock → idle). Keep the lock lit and go again.
+    await ctx.runMutation(internal.routine.markFinishGenerating, { topicSlug, gate: false });
+    await ctx.scheduler.runAfter(0, internal.routine.finishStep, { topicSlug, remaining: remaining - 1 });
+    return null;
+  },
+});
+
+// The dashboard ⋯ entry point (Admin-only). Grabs the lock past the completion
+// gate and kicks off the loop; the gate inside `markFinishGenerating` refuses a
+// completed or already-running course.
+export const finishGenerating = action({
+  args: { topicSlug: v.string() },
+  returns: v.object({ started: v.boolean(), reason: v.optional(v.string()) }),
+  handler: async (ctx, { topicSlug }): Promise<{ started: boolean; reason?: string }> => {
+    if (!(await ctx.runQuery(internal.routine.callerIsAdmin, {}))) throw new Error("forbidden");
+    const res = await ctx.runMutation(internal.routine.markFinishGenerating, { topicSlug, gate: true });
+    if (!res.started) return res;
+    await ctx.scheduler.runAfter(0, internal.routine.finishStep, { topicSlug, remaining: MAX_FINISH_LESSONS });
+    return { started: true };
+  },
+});
+
 // ---- Daily cron ------------------------------------------------------------
 
 export const listTopicSlugs = internalQuery({

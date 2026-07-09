@@ -70,6 +70,48 @@ test("claimWork rejects a bad secret", async () => {
   await expect(t.mutation(api.routine.claimWork, { secret: "wrong", runId: "r1" })).rejects.toThrow();
 });
 
+test("finishGenerating is Admin-only and refuses a non-admin", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  // A signed-in owner who isn't the Admin can't fire the fire-and-pray loop.
+  await expect(asUser(t, alice).action(api.routine.finishGenerating, { topicSlug: "hindi" })).rejects.toThrow();
+  // The lock stays untouched — no run was started.
+  const gen = await t.run((ctx) => ctx.db.query("generation").first());
+  expect(gen).toBeNull();
+});
+
+test("finishGenerating: Admin starts a run and locks the topic generating", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  await seedTopic(t, admin, "hindi");
+
+  const res = await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "hindi" });
+  expect(res).toEqual({ started: true });
+  const gen = await t.run((ctx) => ctx.db.query("generation").first());
+  expect(gen?.status).toBe("generating");
+});
+
+test("finishGenerating refuses a completed course and an in-flight run", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  // Completed courses never author again (ADR 0015) — fire-and-pray obeys that.
+  const done = await t.run((ctx) => ctx.db.insert("topics", { ownerId: admin, slug: "done", title: "Done", status: "completed" }));
+  expect(await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "done" })).toEqual({
+    started: false,
+    reason: "completed",
+  });
+  expect(await t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", done)).first())).toBeNull();
+
+  // A second fire while one is already in flight is refused (single-flight).
+  await seedTopic(t, admin, "hindi");
+  expect(await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "hindi" })).toEqual({ started: true });
+  expect(await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "hindi" })).toEqual({
+    started: false,
+    reason: "already-generating",
+  });
+});
+
 test("materialiseTopic returns one owner's topic context and is owner-scoped", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
