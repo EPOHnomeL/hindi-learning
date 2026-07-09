@@ -112,6 +112,55 @@ test("finishGenerating refuses a completed course and an in-flight run", async (
   });
 });
 
+test("fire-and-pray re-fires the course's own provider until the budget runs out", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  // A Claude course (no provider field) — its finish loop must NOT touch OpenRouter.
+  const topicId = await seedTopic(t, admin, "hindi");
+  const secret = "test-secret";
+
+  await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "hindi" });
+  const armed = await t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique());
+  expect(armed?.status).toBe("generating");
+  expect(armed?.finishRemaining).toBe(30);
+
+  // A reported lesson decrements the budget and re-arms for the next one.
+  await t.mutation(api.routine.reportGeneration, { secret, topicSlug: "hindi", outcome: "published" });
+  const after = await t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique());
+  expect(after?.status).toBe("generating");
+  expect(after?.finishRemaining).toBe(29);
+
+  // The course completing (reported as "nothing") ends the run — budget cleared.
+  await t.mutation(api.routine.reportGeneration, { secret, topicSlug: "hindi", outcome: "nothing" });
+  const done = await t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique());
+  expect(done?.status).toBe("caughtUp");
+  expect(done?.finishRemaining).toBeUndefined();
+});
+
+test("cancelling a fire-and-pray run stops the next re-fire", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const topicId = await seedTopic(t, admin, "hindi");
+  const secret = "test-secret";
+
+  await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "hindi" });
+  // Non-admin can't cancel.
+  const intruder = await seedUser(t, "eve@example.com");
+  await expect(asUser(t, intruder).action(api.routine.cancelFinishGenerating, { topicSlug: "hindi" })).rejects.toThrow();
+
+  expect(await asUser(t, admin).action(api.routine.cancelFinishGenerating, { topicSlug: "hindi" })).toEqual({ cancelled: true });
+  const cancelled = await t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique());
+  expect(cancelled?.cancelRequested).toBe(true);
+  expect(cancelled?.finishRemaining).toBeUndefined();
+
+  // The in-flight lesson still reports back, but with the budget cleared it does
+  // NOT re-arm — the loop is over and the cancel flag is reset for the UI.
+  await t.mutation(api.routine.reportGeneration, { secret, topicSlug: "hindi", outcome: "published" });
+  const settled = await t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique());
+  expect(settled?.status).toBe("idle");
+  expect(settled?.cancelRequested).toBeUndefined();
+});
+
 test("materialiseTopic returns one owner's topic context and is owner-scoped", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");

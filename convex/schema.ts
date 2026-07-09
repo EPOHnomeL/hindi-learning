@@ -187,6 +187,13 @@ export default defineSchema({
     // Last on-demand (button) fire, for the per-Topic manual cooldown (issue 08)
     // — the daily cron stays the primary authoring path. Survives reports.
     lastManualFireAt: v.optional(v.number()),
+    // Fire-and-pray (Admin) bookkeeping. `finishRemaining` is how many more lessons
+    // the back-to-back run may still author — set when the Admin starts it and
+    // decremented each time a lesson is reported, so `reportGeneration` re-fires the
+    // course's OWN provider (Claude routine or OpenRouter action) until it hits 0,
+    // the course completes, or `cancelRequested` is set. Both absent for normal runs.
+    finishRemaining: v.optional(v.number()),
+    cancelRequested: v.optional(v.boolean()),
   }).index("by_topic", ["topicId"]),
 
   // A Share: grants one Viewer read-only access to one **Edition** — a
