@@ -16,7 +16,7 @@ import { Logo } from "./Logo";
 import { Markdown } from "./MarkdownView";
 import { missionPreview } from "./markdown";
 import { useTheme } from "./ThemeContext";
-import { Dialog, IconButton } from "./ui";
+import { Dialog, IconButton, Menu, MenuItem } from "./ui";
 import { useResourceUpload } from "./useResourceUpload";
 
 type Course = {
@@ -262,7 +262,7 @@ function CourseCard({ course }: { course: Course }) {
           <button
             onClick={() => void startSetup()}
             disabled={setup === "starting" || setup === "started"}
-            className="w-full rounded-lg bg-gold/20 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-gold/30 disabled:opacity-70"
+            className="flex-1 rounded-lg bg-gold/20 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-gold/30 disabled:opacity-70"
           >
             {setup === "starting"
               ? "Starting setup…"
@@ -290,6 +290,10 @@ function CourseCard({ course }: { course: Course }) {
             {complete && <CourseCertMenu topicSlug={course.slug} />}
           </>
         )}
+        {/* Admin "fire and pray": generate the whole remaining curriculum in one
+            go, without waiting for the learner to finish each lesson. Hidden for
+            everyone but the Admin (self-gated), and never on a completed course. */}
+        {!complete && <AdminCourseMenu slug={course.slug} title={course.title} />}
       </div>
 
       {showMission && course.mission && (
@@ -302,6 +306,40 @@ function CourseCard({ course }: { course: Course }) {
         <EditionsDialog topicSlug={course.slug} title={course.title} onClose={() => setEditionsOpen(false)} />
       )}
     </article>
+  );
+}
+
+// The Admin-only ⋯ on a course card (fire and pray). Self-hides for non-admins,
+// so a plain learner never sees a ⋯ on their own cards. "Finish generating" kicks
+// off the back-to-back authoring loop; while it runs, the live generation status
+// relabels the item ("Generating…") and flags a failed run with a dot on the ⋯.
+function AdminCourseMenu({ slug, title }: { slug: string; title: string }) {
+  const amAdmin = useQuery(api.whitelist.amIAdmin);
+  const status = useQuery(api.routine.generationStatus, { topicSlug: slug });
+  const finish = useAction(api.routine.finishGenerating);
+  const [busy, setBusy] = useState(false);
+  if (!amAdmin) return null;
+
+  const generating = busy || status?.status === "generating";
+  const failed = status?.status === "failed";
+  const label = generating ? "Generating…" : failed ? "Finish generating — retry" : "Finish generating course";
+
+  return (
+    <Menu triggerLabel={`Admin actions for ${title}`} dot={failed}>
+      {(close) => (
+        <MenuItem
+          icon="refresh"
+          onClick={() => {
+            close();
+            if (generating) return;
+            setBusy(true);
+            void finish({ topicSlug: slug }).finally(() => setBusy(false));
+          }}
+        >
+          {label}
+        </MenuItem>
+      )}
+    </Menu>
   );
 }
 
