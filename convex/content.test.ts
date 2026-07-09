@@ -38,6 +38,49 @@ test("listTopics returns only the signed-in user's topics", async () => {
   expect(aliceTopics.map((x) => x.slug)).toEqual(["hindi"]);
 });
 
+test("deleteLesson removes the lesson and cascades its blob, record, and capture", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const bob = await seedUser(t, "bob@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+
+  const blobId = await t.run((ctx) => ctx.storage.store(new Blob(["<p>lesson 2</p>"], { type: "text/html" })));
+  await t.run(async (ctx) => {
+    // Lesson 1 was retired by lesson 2 (supersededBy points at the key we delete).
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "One", supersededBy: "0002-b" });
+    await ctx.db.insert("lessons", { topicId, key: "0002-b", seq: 2, title: "Two", htmlStorageId: blobId });
+    await ctx.db.insert("learningRecords", { topicId, key: "0002-b", seq: 2, markdown: "# two" });
+    await ctx.db.insert("progress", { topicId, userId: alice, lessonKey: "0002-b", status: "completed" });
+    await ctx.db.insert("responses", { topicId, userId: alice, lessonKey: "0002-b", quizId: "q1", answer: "a", correct: true });
+    await ctx.db.insert("questions", { topicId, userId: alice, lessonKey: "0002-b", text: "why?", status: "open" });
+    // Untouched neighbours (lesson 1's own record + a different lesson's response).
+    await ctx.db.insert("learningRecords", { topicId, key: "0001-a", seq: 1, markdown: "# one" });
+    await ctx.db.insert("responses", { topicId, userId: alice, lessonKey: "0001-a", quizId: "q1", answer: "b", correct: false });
+  });
+
+  // Only the owner may delete.
+  await expect(asUser(t, bob).mutation(api.content.deleteLesson, { topicSlug: "hindi", key: "0002-b" })).rejects.toThrow();
+
+  await asUser(t, alice).mutation(api.content.deleteLesson, { topicSlug: "hindi", key: "0002-b" });
+
+  await t.run(async (ctx) => {
+    const lessons = await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect();
+    // Lesson 2 gone; lesson 1 restored (supersededBy cleared).
+    expect(lessons.map((l) => l.key)).toEqual(["0001-a"]);
+    expect(lessons[0]!.supersededBy).toBeUndefined();
+    // Its blob was deleted.
+    expect(await ctx.storage.getUrl(blobId)).toBeNull();
+    // Record for the deleted key gone; lesson 1's record kept.
+    const records = await ctx.db.query("learningRecords").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect();
+    expect(records.map((r) => r.key)).toEqual(["0001-a"]);
+    // Capture for the deleted key gone; the other lesson's response kept.
+    expect((await ctx.db.query("progress").withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topicId)).collect()).length).toBe(0);
+    const responses = await ctx.db.query("responses").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect();
+    expect(responses.map((r) => r.lessonKey)).toEqual(["0001-a"]);
+    expect((await ctx.db.query("questions").withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", alice)).collect()).length).toBe(0);
+  });
+});
+
 test("decodeEntities turns entity-encoded titles back into plain text", () => {
   expect(decodeEntities("Course Map &amp; Reading List")).toBe("Course Map & Reading List");
   expect(decodeEntities("&lt;a&gt; &quot;x&quot; &#39;y&#39;")).toBe('<a> "x" \'y\'');

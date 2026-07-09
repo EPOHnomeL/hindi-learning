@@ -340,6 +340,77 @@ export const editLesson = action({
   },
 });
 
+// Owner deletes one of their Lessons outright (e.g. a bad lesson a runaway
+// fire-and-pray loop produced). Unlike `editLesson`'s in-place swap, this removes
+// the row and cascades everything keyed to it so nothing dangles or skews:
+//   - the content blob (no orphaned storage);
+//   - its learning record (else the next authoring run's ZPD context references a
+//     lesson that no longer exists);
+//   - any predecessor this lesson retired (`supersededBy === key`) is un-hidden,
+//     so deleting a replacement restores the original rather than losing both;
+//   - the learner's progress / quiz responses / questions / translations for the
+//     key (keeps completion counts honest and drops now-orphaned rows + blobs).
+// Owner-guarded like the other content edits. Deleting the highest-seq (Frontier)
+// lesson simply moves the Frontier back, so the course can regenerate from there.
+export const deleteLesson = mutation({
+  args: { topicSlug: v.string(), key: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, key }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+      .unique();
+    if (!lesson) throw new Error("lesson not found");
+
+    // Un-hide any lesson this one superseded, so its predecessor isn't stranded.
+    const predecessor = (
+      await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
+    ).find((l) => l.supersededBy === key);
+    if (predecessor) await ctx.db.patch(predecessor._id, { supersededBy: undefined });
+
+    // The lesson row + its body blob.
+    if (lesson.htmlStorageId) await ctx.storage.delete(lesson.htmlStorageId);
+    await ctx.db.delete(lesson._id);
+
+    // Its learning record (append-only history keyed by the same key).
+    const record = await ctx.db
+      .query("learningRecords")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+      .unique();
+    if (record) await ctx.db.delete(record._id);
+
+    // Learner capture keyed to this lesson (across every user of the Topic).
+    const progress = (
+      await ctx.db.query("progress").withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id)).collect()
+    ).filter((p) => p.lessonKey === key);
+    for (const p of progress) await ctx.db.delete(p._id);
+
+    const responses = (
+      await ctx.db.query("responses").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()
+    ).filter((r) => r.lessonKey === key);
+    for (const r of responses) await ctx.db.delete(r._id);
+
+    const questions = (
+      await ctx.db.query("questions").withIndex("by_topic_user", (q) => q.eq("topicId", topic._id)).collect()
+    ).filter((qn) => qn.lessonKey === key);
+    for (const qn of questions) await ctx.db.delete(qn._id);
+
+    // Translated Editions of this lesson (any language), plus their body blobs.
+    const translations = (
+      await ctx.db.query("translations").withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id)).collect()
+    ).filter((t) => t.kind === "lesson" && t.key === key);
+    for (const t of translations) {
+      if (t.htmlStorageId) await ctx.storage.delete(t.htmlStorageId);
+      await ctx.db.delete(t._id);
+    }
+    return null;
+  },
+});
+
 // Owner corrects a Reference's body in place (course-content-editing 02).
 // References are mutable by design (ADR 0003), so — unlike a Lesson — there is NO
 // quiz-structure guard: any prose edit is accepted. That means no blob bytes need
