@@ -14,7 +14,7 @@ import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { useResourceUpload } from "./useResourceUpload";
-import { completedKeys, frontierKey, nextLessonKey, seenAfterOpening, unseenReplyKeys } from "./readerDerive";
+import { completedKeys, frontierKey, nextLessonKey, seenAfterOpening } from "./readerDerive";
 
 // localStorage key for answered-question ids the learner has already seen.
 const SEEN_KEY = "hindi:answers-seen";
@@ -90,7 +90,6 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   }, []);
 
   const completed = completedKeys(progress ?? []);
-  const unseenAnswers = unseenReplyKeys(questions ?? [], seen);
   const frontier = frontierKey(lessons ?? []);
   const nextKey = useCallback((lessonKey: string) => nextLessonKey(lessons ?? [], lessonKey), [lessons]);
 
@@ -187,7 +186,6 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
                 href={withLang(`/courses/${slug}/lessons/${l.key}`, lang)}
                 active={!isRef && activeKey === l.key}
                 done={completed.has(l.key)}
-                notify={unseenAnswers.has(l.key)}
               >
                 {l.seq}. {l.title.split("—")[0]!.trim()}
               </NavItem>
@@ -321,13 +319,11 @@ function NavItem({
   href,
   active,
   done = false,
-  notify = false,
   children,
 }: {
   href: string;
   active: boolean;
   done?: boolean;
-  notify?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -339,13 +335,6 @@ function NavItem({
     >
       <span className="min-w-0">{children}</span>
       <span className="flex shrink-0 items-center gap-1.5">
-        {notify && (
-          <span
-            aria-label="New reply from your teacher"
-            title="Your teacher answered a question here"
-            className={`h-2 w-2 rounded-full ${active ? "bg-white" : "bg-gold"}`}
-          />
-        )}
         {done && (
           <span aria-label="completed" title="Completed" className={`text-xs ${active ? "text-white" : "text-accent2"}`}>
             ✓
