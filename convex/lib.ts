@@ -70,8 +70,8 @@ export async function claimPendingEntitlements(ctx: MutationCtx, userId: Id<"use
         topicId: purchase.topicId,
         userId,
         lang: purchase.lang,
-        // Carry the PaymentIntent forward so a later refund still revokes cleanly.
-        stripePaymentIntentId: purchase.stripePaymentIntentId,
+        // Carry the PayFast payment id forward — provenance back to the sale.
+        pfPaymentId: purchase.pfPaymentId,
       });
     }
     await ctx.db.delete(purchase._id);
@@ -258,19 +258,17 @@ export async function readableLang(
 
 // ---- Paid marketplace: Sellers (ADR 0016) -----------------------------------
 
-// A Seller's onboarding stage, derived from their `sellers` row (see schema):
-//   not-granted          — no row: the Admin has not granted can-sell
-//   granted-not-onboarded — granted, but Stripe onboarding not started (no account)
-//   onboarding-incomplete — Stripe account exists but payouts not yet enabled
-//   ready                 — payouts enabled: the Seller may price and be paid
-// A Seller (CONTEXT) is only `ready` when both gates are satisfied.
-// Single source of truth for the status: the validator (used by every Convex
-// function that returns a status) and the `SellerStatus` type both derive from
-// this one declaration, so the four stages are never restated out of sync.
+// A Seller's readiness stage, derived from their `sellers` row (see schema):
+//   not-granted               — no row: the Admin has not granted can-sell
+//   granted-no-payout-details — granted, but no payout bank details on file yet
+//   ready                     — grant + bank details: may price and be paid
+// A Seller (CONTEXT) is only `ready` when both gates are satisfied — a course is
+// never sold with nowhere to send the author's cut. Single source of truth: the
+// validator (used by every Convex function that returns a status) and the
+// `SellerStatus` type both derive from this one declaration.
 export const sellerStatusValidator = v.union(
   v.literal("not-granted"),
-  v.literal("granted-not-onboarded"),
-  v.literal("onboarding-incomplete"),
+  v.literal("granted-no-payout-details"),
   v.literal("ready"),
 );
 export type SellerStatus = Infer<typeof sellerStatusValidator>;
@@ -283,16 +281,15 @@ export async function getSeller(ctx: QueryCtx, userId: Id<"users">): Promise<Doc
     .unique();
 }
 
-// Map a Seller row (or its absence) to the onboarding stage the self-status query
-// and the pricing guard both read. `payoutsEnabled` is the single gate on `ready`.
+// Map a Seller row (or its absence) to the readiness stage the self-status query
+// and the pricing guard both read. Payout bank details are the single gate on `ready`.
 export function sellerStatusOf(seller: Doc<"sellers"> | null): SellerStatus {
   if (!seller) return "not-granted";
-  if (!seller.stripeAccountId) return "granted-not-onboarded";
-  return seller.payoutsEnabled ? "ready" : "onboarding-incomplete";
+  return seller.payout ? "ready" : "granted-no-payout-details";
 }
 
-// Whether the caller may price/sell right now — granted AND payouts-enabled. The
-// guard the real (Slice 2) pricing action enforces, replacing Slice 1's Admin gate.
+// Whether the caller may price/sell right now — granted AND bank details on file.
+// The guard the pricing action enforces.
 export async function isReadySeller(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
   return sellerStatusOf(await getSeller(ctx, userId)) === "ready";
 }

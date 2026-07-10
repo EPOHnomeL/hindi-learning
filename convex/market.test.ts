@@ -97,7 +97,7 @@ test("paid Edition — owner, Viewer, and entitled buyer read everything", async
   const { alice, topicId } = await fixture(t);
   const bob = await seedUser(t, "bob@example.com");
   const dave = await seedUser(t, "dave@example.com");
-  await price(t, topicId, "en", 500, "usd");
+  await price(t, topicId, "en", 500, "zar");
   await share(t, topicId, bob, "en");
   await entitle(t, topicId, dave, "en");
 
@@ -127,12 +127,12 @@ test("paid Edition — an unentitled caller (signed-in or Guest) gets only the P
   const t = convexTest(schema, modules);
   const { topicId } = await fixture(t);
   const carol = await seedUser(t, "carol@example.com");
-  await price(t, topicId, "en", 500, "usd");
+  await price(t, topicId, "en", 500, "zar");
   await publicLink(t, topicId, "en", "tok-en");
 
   // Signed-in non-holder: role preview + the paygate (price + which Lesson is free).
   const hdr = await asUser(t, carol).query(api.content.courseHeader, { topicSlug: "hindi" });
-  expect(hdr).toMatchObject({ role: "preview", lang: "en", paywall: { amount: 500, currency: "usd", previewKey: "0001" } });
+  expect(hdr).toMatchObject({ role: "preview", lang: "en", paywall: { amount: 500, currency: "zar", previewKey: "0001" } });
   // The whole table of contents still renders (the paygate has structure).
   expect((await asUser(t, carol).query(api.content.listLessons, { topicSlug: "hindi" })).map((l) => l.key)).toEqual([
     "0001",
@@ -150,7 +150,7 @@ test("paid Edition — an unentitled caller (signed-in or Guest) gets only the P
 
   // Guest via a Public link to the paid Edition: the same paygate.
   const pub = await t.query(api.public.publicCourse, { token: "tok-en" });
-  expect(pub).toMatchObject({ paywall: { amount: 500, currency: "usd", previewKey: "0001" } });
+  expect(pub).toMatchObject({ paywall: { amount: 500, currency: "zar", previewKey: "0001" } });
   expect(pub!.lessons.map((l) => l.key)).toEqual(["0001", "0002"]); // TOC intact
   expect(pub!.resources).toEqual([]); // paid material withheld
   expect(await t.query(api.public.publicLesson, { token: "tok-en", key: "0001" })).toMatchObject({
@@ -180,8 +180,8 @@ test("an Entitlement is Edition-scoped — `es` does not unlock `ur`", async () 
   const t = convexTest(schema, modules);
   const { topicId } = await fixture(t);
   const dave = await seedUser(t, "dave@example.com");
-  await price(t, topicId, "es", 500, "usd");
-  await price(t, topicId, "ur", 700, "usd");
+  await price(t, topicId, "es", 500, "zar");
+  await price(t, topicId, "ur", 700, "zar");
   await entitle(t, topicId, dave, "es"); // dave bought Spanish only
 
   // Spanish: entitled → full (English fallback content, no `es` rows seeded).
@@ -206,7 +206,7 @@ test("Admin grant flips a caller from Preview to full; revoke flips it back", as
   const { topicId } = await fixture(t);
   const admin = await seedAdmin(t, "admin@example.com");
   const carol = await seedUser(t, "carol@example.com");
-  await price(t, topicId, "en", 500, "usd");
+  await price(t, topicId, "en", 500, "zar");
 
   // Before: Preview only.
   expect(await asUser(t, carol).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
@@ -255,7 +255,7 @@ test("an entitled buyer gets Viewer semantics — own Progress, but no Responses
   const t = convexTest(schema, modules);
   const { topicId } = await fixture(t);
   const dave = await seedUser(t, "dave@example.com");
-  await price(t, topicId, "en", 500, "usd");
+  await price(t, topicId, "en", 500, "zar");
   await entitle(t, topicId, dave, "en");
 
   // Own Progress: an entitled buyer tracks their own, like any Viewer.
@@ -291,7 +291,7 @@ test("myPurchases lists a buyer's entitled courses with their own progress; othe
   const { topicId } = await fixture(t);
   const dave = await seedUser(t, "dave@example.com");
   const carol = await seedUser(t, "carol@example.com");
-  await price(t, topicId, "en", 500, "usd");
+  await price(t, topicId, "en", 500, "zar");
   await entitle(t, topicId, dave, "en");
 
   // The buyer sees their purchase as a card, with their OWN (fresh) progress.

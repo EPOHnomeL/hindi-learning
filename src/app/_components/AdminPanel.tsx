@@ -73,9 +73,9 @@ function AllowlistManager() {
   );
 }
 
-// Who may sell (paid marketplace, ADR 0016). The Admin grants a User the
-// **can-sell** capability here; the Seller then completes Stripe payout
-// onboarding on their own (the status column reflects how far they've got).
+// Who may sell (paid marketplace, ADR 0016 / PayFast rail). The Admin grants a
+// User the **can-sell** capability here; the Seller then saves their payout bank
+// details on their own (the status column reflects how far they've got).
 // Revoking stops new pricing but leaves already-sold access intact.
 function SellersManager() {
   const sellers = useQuery(api.sellers.listSellers);
@@ -156,7 +156,7 @@ function GrantSellerForm() {
   );
 }
 
-// One Seller row: email + onboarding status + revoke. Revoke stops new pricing
+// One Seller row: email + readiness status + revoke. Revoke stops new pricing
 // (server-enforced) but does not touch courses they've already sold.
 function SellerRow({
   email,
@@ -169,12 +169,7 @@ function SellerRow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
 
-  const label =
-    status === "ready"
-      ? "Ready"
-      : status === "onboarding-incomplete"
-        ? "Onboarding incomplete"
-        : "Not onboarded";
+  const label = status === "ready" ? "Ready" : "No payout details";
 
   return (
     <li className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-4 py-3">

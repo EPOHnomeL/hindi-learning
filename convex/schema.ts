@@ -348,11 +348,11 @@ export default defineSchema({
   // The price of one **Edition** — a (Topic, language) pair. The PRESENCE of a
   // listing row is what makes an Edition **paid**; its absence means the Edition
   // is free and behaves exactly as course-translation serves it today. `amount`
-  // is in the currency's minor units (e.g. cents) and `currency` is a lower-case
-  // ISO-4217 code (Stripe's convention). One row per Edition — `by_topic_lang`
+  // is in the currency's minor units (cents) and `currency` is a lower-case
+  // ISO-4217 code — **ZAR-only** on the PayFast rail (the platform's settlement
+  // currency; .scratch/payfast-payments). One row per Edition — `by_topic_lang`
   // is the price lookup the access resolver consults; `by_topic` lists a Topic's
-  // priced Editions (and cascades on Topic delete). In Slice 1 the price is set
-  // by a temporary Admin/dev mutation; Slice 2 replaces that with a Seller action.
+  // priced Editions (and cascades on Topic delete).
   listings: defineTable({
     topicId: v.id("topics"),
     lang: v.string(),
@@ -371,26 +371,22 @@ export default defineSchema({
   // does not unlock `ur`). Never expires. `by_topic_user` is the resolver's hold
   // check (a buyer may hold several, one per language — matched in-memory like
   // Shares); `by_topic` cascades on Topic delete; `by_user` backs "my purchases".
-  // In Slice 1 rows are minted by a temporary Admin/dev grant; Slice 3 mints them
-  // from a verified Stripe webhook.
+  // Rows are minted by the verified PayFast ITN (or the manual Admin grant).
   entitlements: defineTable({
     userId: v.id("users"),
     topicId: v.id("topics"),
     lang: v.string(),
-    // The Stripe PaymentIntent that paid for this Edition (paid marketplace) — the
-    // key a refund / chargeback (Slice 4) revokes by. Optional: rows from the temp
-    // Admin grant (Slice 1) and legacy grants carry none, so a refund never
-    // matches them. `by_payment_intent` is the refund revoke lookup.
-    stripePaymentIntentId: v.optional(v.string()),
+    // The PayFast payment that bought this Edition — provenance back to the sale
+    // (and its Ledger row). Optional: Admin-granted / legacy rows carry none.
+    pfPaymentId: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_topic", ["topicId"])
-    .index("by_topic_user", ["topicId", "userId"])
-    .index("by_payment_intent", ["stripePaymentIntentId"]),
+    .index("by_topic_user", ["topicId", "userId"]),
 
   // A **pending Entitlement** (ADR 0016): a paid purchase for an email that has
   // *no account yet* — the paid twin of a `pendingShares` invite. Minted by the
-  // purchase webhook when the buyer's email has no `users` row, and turned into a
+  // verified ITN when the buyer's email has no `users` row, and turned into a
   // real (language-scoped) Entitlement by `claimPendingEntitlements` the moment
   // that email signs up. Carries the `lang` so the claimed access is scoped to the
   // Edition bought. `by_email` is the claim-on-sign-up lookup and the Allowlist
@@ -400,47 +396,62 @@ export default defineSchema({
     email: v.string(),
     topicId: v.id("topics"),
     lang: v.string(),
-    // The Stripe PaymentIntent that paid for this purchase, so a later refund /
-    // chargeback (Slice 4) revokes deterministically — a Charge does NOT inherit
-    // its PaymentIntent's metadata, so this id is the reliable link back. Optional
-    // for rows minted by the temp Admin grant (no payment). Copied onto the real
-    // Entitlement when the buyer claims it. `by_payment_intent` is the refund seam.
-    stripePaymentIntentId: v.optional(v.string()),
+    // The PayFast payment that bought it — copied onto the real Entitlement when
+    // the buyer claims it. Optional for rows minted by the manual Admin grant.
+    pfPaymentId: v.optional(v.string()),
   })
     .index("by_email", ["email"])
     .index("by_topic", ["topicId"])
-    .index("by_topic_email_lang", ["topicId", "email", "lang"])
-    .index("by_payment_intent", ["stripePaymentIntentId"]),
+    .index("by_topic_email_lang", ["topicId", "email", "lang"]),
 
-  // The webhook idempotency ledger (ADR 0016): one row per Stripe event id we have
-  // already processed. The purchase/refund webhook records the event id inside the
-  // same mutation that mints/revokes access, so a replayed event (Stripe retries)
-  // is a no-op — it never double-grants or double-revokes. `by_event` is the seen?
-  // lookup.
-  stripeEvents: defineTable({
-    eventId: v.string(),
-  }).index("by_event", ["eventId"]),
+  // The ITN idempotency ledger (.scratch/payfast-payments): one row per PayFast
+  // payment id already processed. fulfillPurchase records it inside the same
+  // transaction that mints access + writes the Ledger, so a re-delivered ITN
+  // (PayFast retries) is a no-op — never a double grant or double Ledger row.
+  payfastEvents: defineTable({
+    pfPaymentId: v.string(),
+  }).index("by_pf_payment_id", ["pfPaymentId"]),
 
-  // A **Seller**'s capability record (ADR 0016). Selling is a two-gate capability:
-  // the PRESENCE of a row is the Admin's **can-sell** grant, and Stripe Express
-  // onboarding then fills the connected-account id and its capability flags. A
-  // Seller (CONTEXT) requires BOTH — granted AND `payoutsEnabled` — and only then
-  // may price an Edition. Revoking can-sell deletes this row (which stops *new*
-  // pricing) but never touches already-sold Entitlements. One row per user.
-  // `by_user` is the grant/status lookup; `by_stripe_account` lets the Stripe
-  // `account.updated` webhook find the Seller from the event's connected-account id.
+  // The money **Ledger** (.scratch/payfast-payments): one row per sale, written by
+  // the verified ITN in the same transaction as the Entitlement. All sales settle
+  // into the operator's single PayFast account, so this is the record of what the
+  // operator owes each author: the ITN's gross/fee/net (cents) split 50/50 on net
+  // into authorShare (owed to the author) and platformShare. The operator pays out
+  // by EFT out of band and flips `owed` → `paid` with a reference — `by_status`
+  // is the owed-per-author rollup's scan.
+  ledger: defineTable({
+    topicId: v.id("topics"),
+    lang: v.string(),
+    sellerId: v.id("users"),
+    buyerEmail: v.string(),
+    gross: v.number(),
+    fee: v.number(),
+    net: v.number(),
+    authorShare: v.number(),
+    platformShare: v.number(),
+    pfPaymentId: v.string(),
+    status: v.union(v.literal("owed"), v.literal("paid")),
+    payoutRef: v.optional(v.string()),
+  }).index("by_status", ["status"]),
+
+  // A **Seller**'s capability record (ADR 0016 / .scratch/payfast-payments).
+  // Selling is a two-gate capability: the PRESENCE of a row is the Admin's
+  // **can-sell** grant, and the author then saves the SA payout bank details the
+  // operator EFTs their Ledger share to — no external onboarding, authors never
+  // register a payment account. A Seller (CONTEXT) requires BOTH before pricing.
+  // Revoking can-sell deletes this row (which stops *new* pricing) but never
+  // touches already-sold Entitlements. One row per user; `by_user` is the
+  // grant/status lookup. Bank details are Admin-readable only (never returned by
+  // a non-admin query, never logged).
   sellers: defineTable({
     userId: v.id("users"),
-    // Absent until the granted user starts Stripe Express onboarding; set once and
-    // reused across onboarding retries (a re-start returns a fresh account link for
-    // the SAME account, never a second connected account).
-    stripeAccountId: v.optional(v.string()),
-    // Mirrored from the Stripe account's capabilities on onboarding return and via
-    // the account.updated webhook. `payoutsEnabled` is the gate on pricing/selling;
-    // both default false until Stripe reports the account fully enabled.
-    chargesEnabled: v.boolean(),
-    payoutsEnabled: v.boolean(),
-  })
-    .index("by_user", ["userId"])
-    .index("by_stripe_account", ["stripeAccountId"]),
+    payout: v.optional(
+      v.object({
+        accountHolder: v.string(),
+        bank: v.string(),
+        accountNumber: v.string(),
+        branchCode: v.string(),
+      }),
+    ),
+  }).index("by_user", ["userId"]),
 });

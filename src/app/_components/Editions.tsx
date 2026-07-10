@@ -344,8 +344,8 @@ const SELL_CURRENCIES = ["USD", "EUR", "GBP", "INR", "CAD", "AUD"];
 // "Sell this edition" (paid marketplace, ADR 0016, Slice 2). Prices ONE Edition
 // of a completed course. Setting a price makes the Edition paid (its first Lesson
 // stays a free Preview; the rest needs a purchase); clearing it makes it free
-// again. Guarded to a payouts-enabled Seller: a not-yet-Seller sees a "Set up
-// selling" gate (Admin grant → Stripe payout onboarding) instead of the control.
+// again. Guarded to a ready Seller: a not-yet-Seller sees a "Set up selling"
+// gate (Admin grant → payout bank details) instead of the control.
 // gold = paid/price throughout (the design system's monetisation colour).
 function SellEdition({
   topicSlug,
@@ -364,7 +364,6 @@ function SellEdition({
   const pricing = useQuery(api.market.editionPricing, { topicSlug });
   const setPrice = useMutation(api.market.setEditionPrice);
   const clearPrice = useMutation(api.market.clearEditionPrice);
-  const startOnboarding = useAction(api.sellers.startOnboarding);
 
   const current = pricing?.find((p) => p.lang === lang) ?? null;
   const [open, setOpen] = useState(false);
@@ -384,20 +383,10 @@ function SellEdition({
     );
   }
 
-  // Seller gate: not a payouts-enabled Seller yet → the two-step "set up selling"
-  // path (Admin grant, then Stripe onboarding), never the price control.
+  // Seller gate: not a ready Seller yet → the two-step "set up selling" path
+  // (Admin grant, then payout bank details — .scratch/payfast-payments), never
+  // the price control. The bank-details form lands with ticket 02.
   if (status !== "ready") {
-    const beginOnboarding = async () => {
-      setBusy(true);
-      setError(null);
-      try {
-        const { url } = await startOnboarding({ returnPath: "/?onboarding=return" });
-        window.location.href = url;
-      } catch {
-        setError("Couldn’t open Stripe onboarding — please try again.");
-        setBusy(false);
-      }
-    };
     return (
       <div className="flex items-start gap-3 rounded-xl border border-dashed border-line px-3.5 py-3 text-[13px] leading-relaxed text-soft">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-hi text-accent">
@@ -412,25 +401,10 @@ function SellEdition({
               ask them to turn it on for your account.
             </span>
           ) : (
-            <>
-              <span>
-                <b className="font-semibold text-ink">
-                  {status === "granted-not-onboarded" ? "Set up payouts to sell." : "Finish your payout setup."}
-                </b>{" "}
-                Connect a Stripe account to receive payments; then you can price this edition.
-              </span>
-              <div className="mt-2.5">
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void beginOnboarding()}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-                >
-                  {busy ? "Opening…" : status === "granted-not-onboarded" ? "Set up selling" : "Continue setup"}
-                </button>
-              </div>
-              {error && <p className="mt-2 text-xs text-danger">{error}</p>}
-            </>
+            <span>
+              <b className="font-semibold text-ink">Add your payout details to sell.</b> Save the bank account your
+              earnings are paid to; then you can price this edition.
+            </span>
           )}
         </div>
       </div>

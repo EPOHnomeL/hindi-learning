@@ -4,7 +4,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { useAction, useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
 import { CourseCertMenu } from "./Certificate";
@@ -59,22 +59,8 @@ type PurchasedCourse = Omit<SharedCourse, "ownerEmail">;
 export function Dashboard() {
   const courses = useQuery(api.content.dashboard);
   const amAdmin = useQuery(api.whitelist.amIAdmin);
-  const refreshOnboarding = useAction(api.sellers.refreshOnboarding);
   const { signOut } = useAuthActions();
   const router = useRouter();
-
-  // Returning from Stripe Express onboarding (paid marketplace, ADR 0016): the
-  // hosted flow sends the seller back to `/?onboarding=…`. Pull their fresh
-  // account flags once, so sellerStatus (and the pricing controls) update, then
-  // strip the param so a refresh doesn't re-trigger it.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (!params.get("onboarding")) return;
-    void refreshOnboarding().catch(() => {});
-    params.delete("onboarding");
-    const qs = params.toString();
-    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
-  }, [refreshOnboarding]);
 
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
