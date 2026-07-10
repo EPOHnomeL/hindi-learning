@@ -252,15 +252,20 @@ export const reportGeneration = mutation({
     const remaining = gen.finishRemaining ?? 0;
     if (remaining > 0) {
       if (outcome === "published" && !gen.cancelRequested) {
+        const reArmedAt = Date.now();
         await ctx.db.patch(gen._id, {
           status: "generating",
-          startedAt: Date.now(),
+          startedAt: reArmedAt,
           error: undefined,
           finishRemaining: remaining - 1,
           claimedAt: undefined,
           runId: undefined,
         });
         await ctx.scheduler.runAfter(0, internal.routine.refireFinish, { topicSlug });
+        await ctx.scheduler.runAfter(FINISH_CLAIM_TIMEOUT_MS, internal.routine.expireUnclaimedFinish, {
+          topicSlug,
+          startedAt: reArmedAt,
+        });
       } else {
         await ctx.db.patch(gen._id, { finishRemaining: undefined, cancelRequested: undefined });
       }
@@ -416,6 +421,12 @@ export const requestSetup = action({
 // forever. Cap the lessons one fire-and-pray run adds.
 const MAX_FINISH_LESSONS = 30;
 
+// A fired finish run must claim its topic within this window. A fire is a blind
+// POST — if the run it should start never claims (fire lost, crash in setup,
+// plan limits), the armed lock would sit "Generating…" forever: nothing re-fires
+// a finish loop. Past the window, `expireUnclaimedFinish` fails the row visibly.
+const FINISH_CLAIM_TIMEOUT_MS = 15 * 60 * 1000;
+
 // Actions have no `ctx.db`; the finish action checks admin-ness through this query
 // (run with the action's forwarded identity), mirroring `callerOwnsTopic`.
 export const callerIsAdmin = internalQuery({
@@ -464,7 +475,42 @@ export const startFinishGenerating = internalMutation({
     };
     if (gen) await ctx.db.patch(gen._id, patch);
     else await ctx.db.insert("generation", { topicId: topic._id, ...patch });
+    await ctx.scheduler.runAfter(FINISH_CLAIM_TIMEOUT_MS, internal.routine.expireUnclaimedFinish, {
+      topicSlug,
+      startedAt: now,
+    });
     return { started: true };
+  },
+});
+
+// The finish-loop watchdog, scheduled at every finish fire. A no-op unless the
+// SAME fire cycle (matched by `startedAt`) is still armed, generating, and
+// unclaimed — i.e. no run ever picked it up. (The OpenRouter action never claims,
+// but its ~10-min action cap means it has always reported by the time this runs.)
+export const expireUnclaimedFinish = internalMutation({
+  args: { topicSlug: v.string(), startedAt: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, startedAt }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return null;
+    const gen = await generationRow(ctx, topic._id);
+    if (
+      !gen ||
+      gen.status !== "generating" ||
+      gen.claimedAt !== undefined ||
+      gen.startedAt !== startedAt ||
+      gen.finishRemaining === undefined
+    ) {
+      return null;
+    }
+    await ctx.db.patch(gen._id, {
+      status: "failed",
+      error: "finish run never claimed the topic (fire lost or run crashed before starting)",
+      startedAt: undefined,
+      finishRemaining: undefined,
+      cancelRequested: undefined,
+    });
+    return null;
   },
 });
 
@@ -621,6 +667,18 @@ async function collectTopicContext(ctx: QueryCtx, topic: Doc<"topics">, owner: D
       .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id).eq("userId", owner._id))
       .collect();
 
+    // Fire-and-pray (finishRemaining armed): the loop authors past the learner's
+    // pace by design, but each fired run is a fresh teacher that reads an unread
+    // Frontier as "caught up for today" and reports `nothing` — which ends the
+    // loop one lesson in. So while a finish run is armed, present a caught-up
+    // learner: every current lesson reads as completed. The stored Progress rows
+    // are untouched; only this materialised view is masked.
+    const gen = await generationRow(ctx, topic._id);
+    const progressView =
+      gen?.finishRemaining !== undefined
+        ? lessons.map((l) => ({ lessonKey: l.key, status: "completed" }))
+        : progress.map((p) => ({ lessonKey: p.lessonKey, status: p.status as string }));
+
     return {
       topic: {
         slug: topic.slug,
@@ -639,7 +697,7 @@ async function collectTopicContext(ctx: QueryCtx, topic: Doc<"topics">, owner: D
       capture: {
         openQuestions: open.map((q) => ({ id: q._id, lessonKey: q.lessonKey, text: q.text })),
         responses: responses.map((r) => ({ lessonKey: r.lessonKey, quizId: r.quizId, answer: r.answer, correct: r.correct })),
-        progress: progress.map((p) => ({ lessonKey: p.lessonKey, status: p.status })),
+        progress: progressView,
       },
     };
 }

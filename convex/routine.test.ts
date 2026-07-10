@@ -161,6 +161,63 @@ test("cancelling a fire-and-pray run stops the next re-fire", async () => {
   expect(settled?.cancelRequested).toBeUndefined();
 });
 
+test("fire-and-pray materialises a caught-up learner so runs author past an unread frontier", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const topicId = await seedTopic(t, admin, "biz");
+  await t.run(async (ctx) => {
+    await ctx.db.insert("lessons", { topicId, key: "0001-intro", seq: 1, title: "Intro" });
+    await ctx.db.insert("lessons", { topicId, key: "0002-next", seq: 2, title: "Next" });
+    // The owner has completed lesson 1 only; the frontier (0002) is unseen.
+    await ctx.db.insert("progress", { topicId, userId: admin, lessonKey: "0001-intro", status: "completed" });
+  });
+
+  // Outside a finish run, materialise shows the real (unread-frontier) progress.
+  const normal = await t.query(internal.routine.materialiseForProvider, { topicSlug: "biz" });
+  expect(normal?.capture.progress).toEqual([{ lessonKey: "0001-intro", status: "completed" }]);
+
+  // A finish run bypasses the learner's pace by design, but each re-fired run is
+  // a fresh teacher that would see the unread frontier and report "nothing" —
+  // ending the loop after one lesson. So while the budget is armed, materialise
+  // must present every current lesson as completed.
+  await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "biz" });
+  const finishing = await t.query(internal.routine.materialiseForProvider, { topicSlug: "biz" });
+  expect(finishing?.capture.progress).toEqual([
+    { lessonKey: "0001-intro", status: "completed" },
+    { lessonKey: "0002-next", status: "completed" },
+  ]);
+  // The stored Progress is untouched — only the materialised view is masked.
+  const rows = await t.run((ctx) => ctx.db.query("progress").collect());
+  expect(rows).toHaveLength(1);
+});
+
+test("a finish fire nobody claims fails visibly instead of generating forever", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const topicId = await seedTopic(t, admin, "biz");
+  const gen = () => t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique());
+
+  await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "biz" });
+  const armed = await gen();
+
+  // The claim window closes with no run having claimed: fail the row (dot +
+  // error in the UI) and end the loop, rather than "Generating…" forever.
+  await t.mutation(internal.routine.expireUnclaimedFinish, { topicSlug: "biz", startedAt: armed!.startedAt! });
+  const expired = await gen();
+  expect(expired?.status).toBe("failed");
+  expect(expired?.finishRemaining).toBeUndefined();
+
+  // Re-arm. A stale watchdog from an older cycle (mismatched startedAt) no-ops,
+  // and once a run HAS claimed the fire, the watchdog leaves it alone.
+  await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "biz" });
+  const rearmed = await gen();
+  await t.mutation(internal.routine.expireUnclaimedFinish, { topicSlug: "biz", startedAt: (rearmed!.startedAt ?? 0) - 1 });
+  expect((await gen())?.status).toBe("generating");
+  await t.mutation(api.routine.claimWork, { secret: "test-secret", runId: "r1" });
+  await t.mutation(internal.routine.expireUnclaimedFinish, { topicSlug: "biz", startedAt: rearmed!.startedAt! });
+  expect((await gen())?.status).toBe("generating");
+});
+
 test("materialiseTopic returns one owner's topic context and is owner-scoped", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
