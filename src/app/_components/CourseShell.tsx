@@ -30,6 +30,12 @@ type CourseCtx = {
   // hides every write control. Defaults false while access is still loading, so
   // a Viewer never sees a control flash before it's hidden.
   canWrite: boolean;
+  // Whether the caller may make the in-place prose edits on the SERVED Edition
+  // (ADR 0020): the owner, or an Editor of this language. Distinct from
+  // `canWrite` — an Editor is a Viewer for everything else (quiz, questions,
+  // authoring stay owner-only) but sees the hover-pencil. Server-computed;
+  // defaults false while the header loads so the pencil never flashes.
+  canEdit: boolean;
   // True once the Topic is `completed` (ADR 0015): the reader stops offering
   // "Generate next lesson". Defaults false while the header is still loading.
   completed: boolean;
@@ -64,6 +70,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const lang = useEditionLang();
   const header = useQuery(api.content.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
   const canWrite = header?.role === "owner";
+  const canEdit = header?.canEdit ?? false;
   const courseCompleted = header?.status === "completed";
   const { signOut } = useAuthActions();
   const router = useRouter();
@@ -127,6 +134,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
         frontierKey: frontier,
         markSeen,
         canWrite,
+        canEdit,
         completed: courseCompleted,
         nextKey,
         dir: header?.dir ?? "ltr",

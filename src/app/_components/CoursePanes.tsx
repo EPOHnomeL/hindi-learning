@@ -103,7 +103,7 @@ function CourseStatus({ variant }: { variant: "loading" | "opening" | "preparing
 // A single Lesson. Reads `frontierKey` from the course context for the
 // "generate next lesson" affordance, and marks its replies seen on open.
 export function LessonPane({ slug, lessonKey }: { slug: string; lessonKey: string }) {
-  const { markSeen, frontierKey, canWrite, completed, nextKey, dir, contentLang } = useCourse();
+  const { markSeen, frontierKey, canWrite, canEdit, completed, nextKey, dir, contentLang } = useCourse();
   useEffect(() => {
     markSeen(lessonKey);
   }, [lessonKey, markSeen]);
@@ -114,6 +114,7 @@ export function LessonPane({ slug, lessonKey }: { slug: string; lessonKey: strin
       topicSlug={slug}
       isFrontier={frontierKey === lessonKey}
       readOnly={!canWrite}
+      canEdit={canEdit}
       courseCompleted={completed}
       nextLessonKey={nextKey(lessonKey)}
       dir={dir}
@@ -124,7 +125,7 @@ export function LessonPane({ slug, lessonKey }: { slug: string; lessonKey: strin
 
 // A single Reference. Never the Frontier, nothing to mark seen.
 export function ReferencePane({ slug, refKey }: { slug: string; refKey: string }) {
-  const { canWrite, dir, contentLang } = useCourse();
+  const { canWrite, canEdit, dir, contentLang } = useCourse();
   return (
     <ArtifactView
       kind="reference"
@@ -132,6 +133,7 @@ export function ReferencePane({ slug, refKey }: { slug: string; refKey: string }
       topicSlug={slug}
       isFrontier={false}
       readOnly={!canWrite}
+      canEdit={canEdit}
       dir={dir}
       contentLang={contentLang}
     />

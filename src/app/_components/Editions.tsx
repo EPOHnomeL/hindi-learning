@@ -159,15 +159,7 @@ function EditionPanel({ topicSlug, title, edition }: { topicSlug: string; title:
       <InviteByEmail topicSlug={topicSlug} lang={edition.lang} />
       <PublicLinkToggle topicSlug={topicSlug} lang={edition.lang} publicToken={edition.publicToken} />
       <div className="flex flex-col items-start gap-2 border-t border-line pt-4">
-        {/* The people/access list is deferred to a dedicated dashboard (issue
-            filed) — this stays a quiet, non-interactive pointer for now. */}
-        <div className="flex w-full items-center gap-2.5 rounded-lg border border-dashed border-line px-3 py-2.5 text-[12.5px] text-soft">
-          <Icon name="users" className="h-4 w-4 shrink-0" />
-          <span>See who has access &amp; their progress</span>
-          <span className="ml-auto rounded-full bg-gold/15 px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-gold">
-            Soon
-          </span>
-        </div>
+        <AccessRoster topicSlug={topicSlug} lang={edition.lang} />
         {!edition.source && (
           <RemoveEdition topicSlug={topicSlug} lang={edition.lang} label="Remove this edition" />
         )}
@@ -230,6 +222,93 @@ function InviteByEmail({ topicSlug, lang }: { topicSlug: string; lang: string })
       {done?.status === "shared" && <p className="text-xs text-accent2">Shared with {done.email}.</p>}
       {done?.status === "pending" && <p className="text-xs text-accent2">Invited {done.email} — they’ll get access when they sign up.</p>}
     </form>
+  );
+}
+
+// The access roster for one Edition (ADR 0020): everyone the owner has granted
+// access to — accepted people and pending invites — each with a Can view / Can
+// edit toggle and a revoke control. Owner-only (the whole dialog is), reactive
+// (a live query), so promoting/revoking/inviting reflects immediately. "Can
+// edit" grants exactly the owner's in-place prose editing on this one Edition.
+function AccessRoster({ topicSlug, lang }: { topicSlug: string; lang: string }) {
+  const roster = useQuery(api.shares.listEditionAccess, { topicSlug, lang });
+  if (roster === undefined) return <p className="text-xs text-soft">Loading access…</p>;
+  if (roster.length === 0) return <p className="text-xs text-soft">No one has access to this edition yet.</p>;
+  return (
+    <div className="flex w-full flex-col gap-1.5">
+      <p className="text-xs font-semibold uppercase tracking-wide text-soft">Who has access</p>
+      <ul className="flex flex-col gap-1.5">
+        {roster.map((entry) => (
+          <AccessRow key={`${entry.status}:${entry.email}`} topicSlug={topicSlug} lang={lang} entry={entry} />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// One roster row: the person's email (with a "pending" marker when they have no
+// account yet), a Can view / Can edit segmented toggle (setShareRole), and a
+// revoke control (revokeShare). Controls are identical for accepted and pending
+// entries — the role rides through claim-on-signup.
+function AccessRow({
+  topicSlug,
+  lang,
+  entry,
+}: {
+  topicSlug: string;
+  lang: string;
+  entry: { email: string; role: "viewer" | "editor"; status: "accepted" | "pending" };
+}) {
+  const setShareRole = useMutation(api.shares.setShareRole);
+  const revokeShare = useMutation(api.shares.revokeShare);
+  const [busy, setBusy] = useState(false);
+
+  const setRole = (role: "viewer" | "editor") => {
+    if (role === entry.role) return;
+    setBusy(true);
+    void setShareRole({ topicSlug, email: entry.email, lang, role }).finally(() => setBusy(false));
+  };
+
+  return (
+    <li className="flex items-center gap-2 rounded-lg border border-line px-3 py-2">
+      <div className="min-w-0 flex-1">
+        <span className="block truncate text-[13px] text-ink" title={entry.email}>
+          {entry.email}
+        </span>
+        {entry.status === "pending" && (
+          <span className="text-[11px] text-soft">Pending — joins when they sign up</span>
+        )}
+      </div>
+      <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-line text-[12px]">
+        {(["viewer", "editor"] as const).map((role) => (
+          <button
+            key={role}
+            type="button"
+            disabled={busy}
+            aria-pressed={entry.role === role}
+            onClick={() => setRole(role)}
+            className={`px-2.5 py-1 font-medium transition-colors disabled:opacity-60 ${
+              entry.role === role ? "bg-accent text-white" : "bg-card text-soft hover:bg-hi"
+            }`}
+          >
+            {role === "viewer" ? "Can view" : "Can edit"}
+          </button>
+        ))}
+      </div>
+      <button
+        type="button"
+        disabled={busy}
+        aria-label={`Revoke access for ${entry.email}`}
+        title="Revoke access"
+        onClick={() => {
+          setBusy(true);
+          void revokeShare({ topicSlug, email: entry.email, lang }).finally(() => setBusy(false));
+        }}
+        className="shrink-0 rounded-lg p-1.5 text-soft transition-colors hover:bg-hi hover:text-danger disabled:opacity-60"
+      >
+        <Icon name="trash" className="h-3.75 w-3.75" />
+      </button>
+    </li>
   );
 }
 

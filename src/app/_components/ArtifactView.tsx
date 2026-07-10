@@ -34,6 +34,7 @@ export function ArtifactView({
   topicSlug,
   isFrontier,
   readOnly,
+  canEdit,
   courseCompleted = false,
   nextLessonKey,
   dir,
@@ -47,6 +48,10 @@ export function ArtifactView({
   // recording, asking Questions, next-lesson authoring). Progress is NOT gated by
   // this — a Viewer tracks their own (see setProgress). Reads stay live.
   readOnly: boolean;
+  // Server-computed per-Edition edit capability (ADR 0020): owner, or an Editor
+  // of the served language. Gates ONLY the hover-pencil — an Editor is otherwise
+  // a Viewer (readOnly stays true for them), so no other control is affected.
+  canEdit: boolean;
   // True once the Topic is `completed` (ADR 0015): authoring has stopped, so the
   // reader never offers "Generate next lesson" even on the completed Frontier.
   courseCompleted?: boolean;
@@ -59,13 +64,14 @@ export function ArtifactView({
   contentLang?: string;
 }) {
   if (kind === "reference")
-    return <ReferenceView refKey={artifactKey} topicSlug={topicSlug} readOnly={readOnly} dir={dir} contentLang={contentLang} />;
+    return <ReferenceView refKey={artifactKey} topicSlug={topicSlug} canEdit={canEdit} dir={dir} contentLang={contentLang} />;
   return (
     <LessonView
       lessonKey={artifactKey}
       topicSlug={topicSlug}
       isFrontier={isFrontier}
       readOnly={readOnly}
+      canEdit={canEdit}
       courseCompleted={courseCompleted}
       nextLessonKey={nextLessonKey ?? null}
       dir={dir}
@@ -218,6 +224,7 @@ function LessonView({
   topicSlug,
   isFrontier,
   readOnly,
+  canEdit,
   courseCompleted,
   nextLessonKey,
   dir,
@@ -227,6 +234,7 @@ function LessonView({
   topicSlug: string;
   isFrontier: boolean;
   readOnly: boolean;
+  canEdit: boolean;
   courseCompleted: boolean;
   nextLessonKey: string | null;
   dir?: "ltr" | "rtl";
@@ -247,14 +255,13 @@ function LessonView({
   // The caller's own completion — an owner's, or a Viewer's own on a shared course.
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
 
-  // Owner-only in-place prose edit (course-content-editing). Editing the source
+  // In-place prose edit (course-content-editing / ADR 0020). Editing the source
   // (English) edition patches the Lesson blob (`editLesson`); editing a translated
   // Edition patches that Edition's `translations` row (`editTranslatedLesson`),
   // leaving the source untouched. Both guard the quiz structure server-side — the
-  // real control; this only hides the affordance from Viewers/Guests, who never
-  // reach this owner reader anyway.
+  // real control; `canEdit` (server, per-Edition) only hides the affordance from
+  // those who can't edit this Edition (Viewers, Guests, an Editor of another lang).
   const isSource = lang == null || lang === "en";
-  const canEdit = !readOnly;
 
   useEffect(() => {
     // Owner or Viewer: opening a lesson marks it opened in the caller's own Progress.
@@ -568,13 +575,15 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
 function ReferenceView({
   refKey,
   topicSlug,
-  readOnly,
+  canEdit,
   dir,
   contentLang,
 }: {
   refKey: string;
   topicSlug: string;
-  readOnly: boolean;
+  // Server per-Edition edit capability (ADR 0020). References are English-source
+  // only, so the pencil is further gated to the source Edition below.
+  canEdit: boolean;
   dir?: "ltr" | "rtl";
   contentLang?: string;
 }) {
@@ -585,10 +594,11 @@ function ReferenceView({
   const html = useContentHtml(ref);
   const editReference = useMutation(api.content.editReference);
   const [editing, setEditing] = useState(false);
-  // Owner-only, and only on the source (English) edition — `editReference` patches
-  // the source Reference; editing a translated Edition is a later slice. References
-  // are mutable (ADR 0003), so the save takes the write path with no quiz guard.
-  const canEdit = !readOnly && (lang == null || lang === "en");
+  // Editable by the owner or an English-edition Editor (server `canEdit`), and
+  // only on the source (English) edition — `editReference` patches the source
+  // Reference (translated-Reference editing is out of scope). References are
+  // mutable (ADR 0003), so the save takes the write path with no quiz guard.
+  const canEditRef = canEdit && (lang == null || lang === "en");
   if (ref === undefined || html === undefined) return <ReaderSkeleton aside={false} />;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this reference. Try refreshing.</p>;
@@ -606,7 +616,7 @@ function ReferenceView({
           The pencil rides over the body on hover for the owner (source edition). */}
       <div className="group relative flex min-h-0 flex-1 flex-col">
         <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} />
-        {canEdit && (
+        {canEditRef && (
           <button
             type="button"
             onClick={() => setEditing(true)}
@@ -618,7 +628,7 @@ function ReferenceView({
           </button>
         )}
       </div>
-      {canEdit && editing && (
+      {canEditRef && editing && (
         <ContentEditor
           topicSlug={topicSlug}
           html={html}
