@@ -404,6 +404,18 @@ export default defineSchema({
     .index("by_topic", ["topicId"])
     .index("by_topic_email_lang", ["topicId", "email", "lang"]),
 
+  // A checkout-intent (.scratch/payfast-payments): one row per Buy click,
+  // linking our `m_payment_id` reference to the buyer's email and the Edition
+  // being bought. The return page resolves it by `m_payment_id` (an unguessable
+  // token — a bearer capability) to prefill+lock the sign-up email without
+  // racing the ITN. Never granted from — access comes only from the verified ITN.
+  checkoutIntents: defineTable({
+    mPaymentId: v.string(),
+    email: v.string(),
+    topicId: v.id("topics"),
+    lang: v.string(),
+  }).index("by_m_payment_id", ["mPaymentId"]),
+
   // The ITN idempotency ledger (.scratch/payfast-payments): one row per PayFast
   // payment id already processed. fulfillPurchase records it inside the same
   // transaction that mints access + writes the Ledger, so a re-delivered ITN

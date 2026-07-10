@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { action, internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -8,6 +8,7 @@ import {
   getOwnedTopic,
   heldLangs,
   isReadySeller,
+  mintToken,
   normaliseEmail,
   SOURCE_LANG,
   topicBySlug,
@@ -15,6 +16,7 @@ import {
   translatedTitle,
 } from "./lib";
 import { langInfo } from "./languages";
+import { appUrl, buildCheckoutFields, processUrl } from "./payfast";
 import { isCallerAdmin } from "./whitelist";
 
 // Paid marketplace (ADR 0016, PayFast rail — .scratch/payfast-payments) — the
@@ -281,14 +283,60 @@ export const fulfillPurchase = internalMutation({
   },
 });
 
-// Start a purchase — NEUTRALISED during the PayFast pivot (ticket 01): the
-// Stripe checkout is gone and the PayFast signed-form checkout lands with
-// ticket 03. Kept as a stub so the Paygate's buy dialog keeps compiling; it
-// surfaces as the dialog's "try again in a moment" error.
-export const startCheckout = action({
-  args: { topicSlug: v.string(), lang: v.string(), returnPath: v.optional(v.string()) },
-  returns: v.object({ url: v.string() }),
-  handler: async (): Promise<{ url: string }> => {
-    throw new Error("purchases are temporarily unavailable");
+// Start a purchase — available to Guests (a buyer needs no account to pay; the
+// paid email is what the ITN grants to). Confirms the Edition is priced and its
+// Seller is ready, persists a **checkout-intent** (m_payment_id → email, topic,
+// lang — what the return page prefills+locks the sign-up email from), and
+// returns the signed PayFast field set for the client to form-POST to the
+// hosted process URL. Access is NOT granted here — only the verified ITN
+// (/payfast/notify) grants. A mutation, not an action: PayFast's checkout needs
+// no network call from us, so the intent write and the field build are one
+// transaction (a rejected checkout writes nothing).
+export const startCheckout = mutation({
+  args: { topicSlug: v.string(), lang: v.string(), email: v.string() },
+  returns: v.object({ action: v.string(), fields: v.record(v.string(), v.string()) }),
+  handler: async (ctx, { topicSlug, lang, email: rawEmail }) => {
+    const email = normaliseEmail(rawEmail);
+    // A sanity shape check only (PayFast re-validates) — catches a pasted blank
+    // or a name, not RFC-precise addresses.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("enter a valid email address");
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) throw new Error("this edition isn't for sale");
+    const listing = await editionPrice(ctx, topic._id, lang);
+    if (!listing) throw new Error("this edition isn't for sale");
+    // The Seller must still be ready (grant + payout bank details): a sale with
+    // nowhere to send the author's cut must never start.
+    if (!topic.ownerId || !(await isReadySeller(ctx, topic.ownerId))) {
+      throw new Error("this course isn't available for purchase right now");
+    }
+
+    const merchantId = process.env.PAYFAST_MERCHANT_ID;
+    const merchantKey = process.env.PAYFAST_MERCHANT_KEY;
+    const passphrase = process.env.PAYFAST_PASSPHRASE;
+    if (!merchantId || !merchantKey || !passphrase) {
+      throw new Error("PAYFAST_MERCHANT_ID / PAYFAST_MERCHANT_KEY / PAYFAST_PASSPHRASE are not set — provision them as Convex env vars");
+    }
+
+    const mPaymentId = mintToken();
+    await ctx.db.insert("checkoutIntents", { mPaymentId, email, topicId: topic._id, lang });
+
+    const title = await translatedTitle(ctx, topic._id, lang, topic.title);
+    const editionName = lang === SOURCE_LANG ? "English" : langInfo(lang).name;
+    const back = `/courses/${topicSlug}${lang === SOURCE_LANG ? "" : `?lang=${lang}`}`;
+    const fields = buildCheckoutFields({
+      merchantId,
+      merchantKey,
+      returnUrl: appUrl(`${back}${back.includes("?") ? "&" : "?"}purchase=return&mp=${mPaymentId}`),
+      cancelUrl: appUrl(back),
+      notifyUrl: `${process.env.CONVEX_SITE_URL}/payfast/notify`,
+      mPaymentId,
+      amountCents: listing.amount,
+      itemName: `${title} — ${editionName} edition`,
+      email,
+      topicId: topic._id,
+      lang,
+      passphrase,
+    });
+    return { action: processUrl(), fields };
   },
 });

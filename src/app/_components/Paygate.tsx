@@ -1,23 +1,24 @@
 "use client";
 
-import { useAction } from "convex/react";
+import { useMutation } from "convex/react";
 import { useState, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import { Icon } from "./icons";
 import { Dialog } from "./ui";
 
-// The paygate (paid marketplace, ADR 0016). A caller reading a PAID Edition they
-// don't hold gets the free Preview (the first Lesson); every other Lesson and
-// Reference renders this in place of the content — an explicit locked state, never
-// a blank pane. The buy dialog opens Stripe Checkout (Slice 3): its final step
-// calls `market.startCheckout` and redirects to Stripe. Access is granted only by
-// the verified webhook on return, never by the redirect itself.
+// The paygate (paid marketplace, ADR 0016 / PayFast rail). A caller reading a
+// PAID Edition they don't hold gets the free Preview (the first Lesson); every
+// other Lesson and Reference renders this in place of the content — an explicit
+// locked state, never a blank pane. The buy dialog captures the buyer's email,
+// calls `market.startCheckout` for the signed PayFast field set, and form-POSTs
+// it to PayFast's hosted checkout. Access is granted only by the verified ITN
+// on PayFast's side, never by the return redirect itself.
 
 export type Paywall = { amount: number; currency: string; previewKey: string | null };
 
-// Minor units → a localised currency string (e.g. 1200 "usd" → "$12.00"). Assumes
-// a 2-decimal currency (every currency this ships with); `Intl` renders the symbol
-// and grouping for the viewer's locale.
+// Minor units → a localised currency string (e.g. 120000 "zar" → "R 1 200,00").
+// Assumes a 2-decimal currency (ZAR is); `Intl` renders the symbol and grouping
+// for the viewer's locale.
 export function formatPrice(amount: number, currency: string): string {
   const major = amount / 100;
   try {
@@ -85,7 +86,7 @@ export function Paygate({
         </div>
         <p className="mt-3 flex items-center gap-1.5 text-xs text-soft">
           <Icon name="globe" className="h-3.5 w-3.5 text-accent2" />
-          Shown in your local currency · pay once, keep forever
+          Card or Instant EFT via PayFast · pay once, keep forever
         </p>
       </div>
       {buying && (
@@ -102,11 +103,12 @@ export function Paygate({
   );
 }
 
-// The purchase summary → Stripe Checkout (Slice 3). "Continue to checkout" calls
-// `market.startCheckout` (a direct charge on the Seller's connected account with
-// the platform fee) and redirects to Stripe's hosted page; on return, the
-// signature-verified webhook grants access — never this redirect. Falls back to
-// an "unavailable" note if the caller couldn't supply the Edition to buy.
+// The purchase summary → PayFast's hosted checkout. Captures the buyer's email
+// (Guests need no account — the paid email is what access attaches to), calls
+// `market.startCheckout` for the signed field set, and auto-submits it as a
+// form POST to the hosted process URL. On PayFast's side the verified ITN
+// grants access — never the return redirect. Falls back to an "unavailable"
+// note if the caller couldn't supply the Edition to buy.
 function BuyDialog({
   price,
   courseTitle,
@@ -122,7 +124,8 @@ function BuyDialog({
   lang?: string;
   onClose: () => void;
 }) {
-  const startCheckout = useAction(api.market.startCheckout);
+  const startCheckout = useMutation(api.market.startCheckout);
+  const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canBuy = !!topicSlug && !!lang;
@@ -132,12 +135,23 @@ function BuyDialog({
     setBusy(true);
     setError(null);
     try {
-      const returnPath =
-        typeof window !== "undefined" ? window.location.pathname + window.location.search : undefined;
-      const { url } = await startCheckout({ topicSlug: topicSlug!, lang: lang!, returnPath });
-      window.location.href = url;
+      const { action, fields } = await startCheckout({ topicSlug: topicSlug!, lang: lang!, email });
+      // POST the signed fields to PayFast's hosted checkout — a real form
+      // submission (top-level navigation), built off-DOM and fired once.
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = action;
+      for (const [name, value] of Object.entries(fields)) {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = name;
+        input.value = value;
+        form.appendChild(input);
+      }
+      document.body.appendChild(form);
+      form.submit();
     } catch {
-      setError("Couldn’t start checkout — please try again in a moment.");
+      setError("Couldn’t start checkout — check your email address and try again.");
       setBusy(false);
     }
   };
@@ -162,18 +176,41 @@ function BuyDialog({
         </span>
       </div>
 
-      <button
-        disabled={!canBuy || busy}
-        onClick={() => void checkout()}
-        className="mt-4 w-full rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void checkout();
+        }}
       >
-        {busy ? "Redirecting to checkout…" : `Continue to checkout${price ? ` · ${price}` : ""}`}
-      </button>
+        <label className="mt-4 flex flex-col gap-1">
+          <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">Your email</span>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setError(null);
+            }}
+            placeholder="you@example.com"
+            className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+          />
+          <span className="text-[11px] text-soft">Your purchase attaches to this address — you’ll sign in with it.</span>
+        </label>
+
+        <button
+          type="submit"
+          disabled={!canBuy || busy || !email.trim()}
+          className="mt-4 w-full rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {busy ? "Redirecting to PayFast…" : `Continue to PayFast${price ? ` · ${price}` : ""}`}
+        </button>
+      </form>
       {error ? (
         <p className="mt-2.5 text-center text-xs text-danger">{error}</p>
       ) : (
         <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-xs text-soft">
-          <Icon name="globe" className="h-3.5 w-3.5 text-accent2" /> Shown in your local currency · pay once, keep forever
+          <Icon name="globe" className="h-3.5 w-3.5 text-accent2" /> Card or Instant EFT · pay once, keep forever
         </p>
       )}
       <p className="mt-1 text-center text-xs text-soft">No account? Buying will create one for you.</p>

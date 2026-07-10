@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import { verifySignature } from "./payfast";
 import type { Id } from "./_generated/dataModel";
 
 // Paid marketplace — the purchase-fulfilment seam (.scratch/payfast-payments).
@@ -31,6 +32,11 @@ beforeAll(async () => {
   process.env.JWT_PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----\n${(b64.match(/.{1,64}/g) ?? []).join("\n")}\n-----END PRIVATE KEY-----`;
   process.env.CONVEX_SITE_URL = "https://example.convex.site";
   process.env.SITE_URL = "https://app.example.com";
+  // PayFast sandbox test-merchant credentials (public, from PayFast's docs).
+  process.env.PAYFAST_MERCHANT_ID = "10000100";
+  process.env.PAYFAST_MERCHANT_KEY = "46f0cd694581a";
+  process.env.PAYFAST_PASSPHRASE = "jt7NOE43FZPn";
+  delete process.env.PAYFAST_MODE; // → sandbox
 });
 
 function asUser(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
@@ -181,4 +187,91 @@ test("payment is the ONLY new admission path — a stranger with no purchase is 
   const t = convexTest(schema, modules);
   await t.mutation(internal.whitelist.seedEmail, { email: "someone@example.com" }); // table non-empty, closed to others
   await expect(signUp(t, "stranger@example.com", "hunter2-strong")).rejects.toThrow();
+});
+
+// ---- checkout initiation (ticket 03): the signed PayFast form ----------------
+
+// A ready Seller (grant + payout bank details) selling a completed course.
+async function sellableTopic(t: ReturnType<typeof convexTest>) {
+  const { alice, topicId } = await paidTopic(t);
+  await t.run((ctx) =>
+    ctx.db.insert("sellers", {
+      userId: alice,
+      payout: { accountHolder: "A. Author", bank: "FNB", accountNumber: "62000000001", branchCode: "250655" },
+    }),
+  );
+  return { alice, topicId };
+}
+
+test("startCheckout returns the full signed field set for a priced Edition of a ready Seller", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await sellableTopic(t);
+
+  // Available to Guests: no identity on the call. Email is normalised.
+  const { action, fields } = await t.mutation(api.market.startCheckout, {
+    topicSlug: "hindi",
+    lang: "en",
+    email: "  Buyer@Example.COM ",
+  });
+
+  // The hosted process URL, sandbox by default.
+  expect(action).toBe("https://sandbox.payfast.co.za/eng/process");
+  // The amount is the stored listing rendered as 2-decimal Rand (paidTopic
+  // prices at 120000 cents), addressed to the platform's merchant account.
+  expect(fields).toMatchObject({
+    merchant_id: "10000100",
+    merchant_key: "46f0cd694581a",
+    amount: "1200.00",
+    email_address: "buyer@example.com",
+    custom_str1: topicId,
+    custom_str2: "en",
+  });
+  expect(fields.item_name).toContain("hindi"); // the course title
+  expect(fields.m_payment_id).toBeTruthy();
+  // Same-origin return/cancel (via appUrl); the notify URL points at the ITN route.
+  expect(fields.return_url).toMatch(/^https:\/\/app\.example\.com\//);
+  expect(fields.cancel_url).toMatch(/^https:\/\/app\.example\.com\//);
+  expect(fields.notify_url).toBe("https://example.convex.site/payfast/notify");
+  // The signature is verifiable by the pure module — PayFast will accept it.
+  expect(verifySignature(fields, "jt7NOE43FZPn")).toBe(true);
+
+  // A checkout-intent row links m_payment_id → (email, topic, lang) for the
+  // return page to prefill+lock the sign-up email without racing the ITN.
+  const intent = await t.run((ctx) =>
+    ctx.db
+      .query("checkoutIntents")
+      .withIndex("by_m_payment_id", (q) => q.eq("mPaymentId", fields.m_payment_id!))
+      .unique(),
+  );
+  expect(intent).toMatchObject({ email: "buyer@example.com", topicId, lang: "en" });
+});
+
+test("startCheckout rejects an unpriced Edition, a not-ready Seller, and a bad email", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await sellableTopic(t);
+
+  // Priced (en) but the ur Edition is not → refused.
+  await expect(
+    t.mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "ur", email: "b@example.com" }),
+  ).rejects.toThrow();
+
+  // A garbage email → refused before anything is written.
+  await expect(
+    t.mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "en", email: "not-an-email" }),
+  ).rejects.toThrow();
+
+  // The Seller loses readiness (bank details gone) → the priced Edition stops selling.
+  await t.run(async (ctx) => {
+    const alice = await ctx.db.query("users").withIndex("email", (q) => q.eq("email", "alice@example.com")).unique();
+    const row = await ctx.db.query("sellers").withIndex("by_user", (q) => q.eq("userId", alice!._id)).unique();
+    await ctx.db.patch(row!._id, { payout: undefined });
+  });
+  await expect(
+    t.mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "en", email: "b@example.com" }),
+  ).rejects.toThrow();
+
+  // Nothing was persisted by the rejected attempts.
+  const intents = await t.run((ctx) => ctx.db.query("checkoutIntents").collect());
+  expect(intents).toEqual([]);
+  void topicId;
 });
