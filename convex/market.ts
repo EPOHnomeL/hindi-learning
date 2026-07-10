@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import {
@@ -16,7 +16,7 @@ import {
   translatedTitle,
 } from "./lib";
 import { langInfo } from "./languages";
-import { appUrl, buildCheckoutFields, processUrl } from "./payfast";
+import { appUrl, buildCheckoutFields, platformFeeBps, processUrl, splitNet } from "./payfast";
 import { isCallerAdmin } from "./whitelist";
 
 // Paid marketplace (ADR 0016, PayFast rail — .scratch/payfast-payments) — the
@@ -241,21 +241,31 @@ async function alreadyProcessed(ctx: MutationCtx, pfPaymentId: string): Promise<
   return false;
 }
 
-// Grant access on a verified COMPLETE payment. If an account exists for the paid
-// email, mint the Entitlement for that Edition; otherwise mint an email-keyed
-// **pending** Entitlement that becomes real when that email signs up
-// (`claimPendingEntitlements`). Idempotent per pf_payment_id and per
-// (buyer, Topic, language) — a replay, or a buyer who already holds it, is a no-op.
-// (Ticket 04 adds the Ledger write in this same transaction.)
+// Grant access on a verified COMPLETE payment AND record what the operator now
+// owes the author — one seam, one transaction ("money in + what we owe"). If an
+// account exists for the paid email, mint the Entitlement for that Edition;
+// otherwise mint an email-keyed **pending** Entitlement that becomes real when
+// that email signs up (`claimPendingEntitlements`). The Ledger row records the
+// ITN's gross/fee/net (cents) with the net split 50/50 (splitNet), status
+// `owed`. Idempotent per pf_payment_id and per (buyer, Topic, language) — a
+// replay, or a buyer who already holds it, is a no-op.
 export const fulfillPurchase = internalMutation({
   args: {
     pfPaymentId: v.string(),
     topicId: v.id("topics"),
     lang: v.string(),
     email: v.string(),
+    gross: v.number(),
+    fee: v.number(),
+    net: v.number(),
   },
   returns: v.null(),
-  handler: async (ctx, { pfPaymentId, topicId, lang, email: rawEmail }) => {
+  handler: async (ctx, { pfPaymentId, topicId, lang, email: rawEmail, gross, fee, net }) => {
+    // Internal (only the verified ITN calls this), but money is money: the
+    // amounts must be sane non-negative integer cents.
+    for (const n of [gross, fee, net]) {
+      if (!Number.isInteger(n) || n < 0) throw new Error("ledger amounts must be non-negative integer cents");
+    }
     if (await alreadyProcessed(ctx, pfPaymentId)) return null;
     const email = normaliseEmail(rawEmail);
     const user = await ctx.db
@@ -279,7 +289,39 @@ export const fulfillPurchase = internalMutation({
         await ctx.db.insert("pendingEntitlements", { email, topicId, lang, pfPaymentId });
       }
     }
+    // The Ledger row — what this sale means in money. A throw here rolls back
+    // the grant AND the payfastEvents row, so PayFast's retry re-runs it whole.
+    const topic = await ctx.db.get(topicId);
+    if (!topic?.ownerId) throw new Error("sold course has no owner to owe");
+    const { authorShare, platformShare } = splitNet(net, platformFeeBps());
+    await ctx.db.insert("ledger", {
+      topicId,
+      lang,
+      sellerId: topic.ownerId,
+      buyerEmail: email,
+      gross,
+      fee,
+      net,
+      authorShare,
+      platformShare,
+      pfPaymentId,
+      status: "owed",
+    });
     return null;
+  },
+});
+
+// The stored price (cents) of an Edition, for the ITN's amount-match check —
+// takes the topic id as a plain string because it arrives from PayFast's
+// custom_str1 (normalised defensively, never trusted). Null when unknown/unpriced.
+export const listingAmount = internalQuery({
+  args: { topicId: v.string(), lang: v.string() },
+  returns: v.union(v.number(), v.null()),
+  handler: async (ctx, { topicId, lang }) => {
+    const id = ctx.db.normalizeId("topics", topicId);
+    if (!id) return null;
+    const listing = await editionPrice(ctx, id, lang);
+    return listing?.amount ?? null;
   },
 });
 
@@ -294,7 +336,10 @@ export const fulfillPurchase = internalMutation({
 // transaction (a rejected checkout writes nothing).
 export const startCheckout = mutation({
   args: { topicSlug: v.string(), lang: v.string(), email: v.string() },
-  returns: v.object({ action: v.string(), fields: v.record(v.string(), v.string()) }),
+  // `fields` is an ORDERED list of pairs, not a record: Convex sorts object
+  // keys, and PayFast's signature is computed over the field order — the client
+  // must POST them in exactly this order.
+  returns: v.object({ action: v.string(), fields: v.array(v.object({ name: v.string(), value: v.string() })) }),
   handler: async (ctx, { topicSlug, lang, email: rawEmail }) => {
     const email = normaliseEmail(rawEmail);
     // A sanity shape check only (PayFast re-validates) — catches a pasted blank
@@ -337,6 +382,6 @@ export const startCheckout = mutation({
       lang,
       passphrase,
     });
-    return { action: processUrl(), fields };
+    return { action: processUrl(), fields: Object.entries(fields).map(([name, value]) => ({ name, value })) };
   },
 });

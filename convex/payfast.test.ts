@@ -2,7 +2,9 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import {
   appUrl,
   buildCheckoutFields,
+  centsFromRand,
   md5,
+  pfParamString,
   platformFeeBps,
   processUrl,
   randFromCents,
@@ -50,7 +52,7 @@ function md5Independent(): string {
   return "d1d22127c0c2345260478ca35dc527cb";
 }
 
-// ---- signature scheme (alphabetical non-empty fields + passphrase) -----------
+// ---- signature scheme (fields in given order + passphrase — PayFast's scheme) --
 
 const FIELDS = {
   merchant_id: "10000100",
@@ -58,14 +60,22 @@ const FIELDS = {
   amount: "123.45",
   item_name: "Hindi — Spanish edition",
   email_address: "buyer@example.com",
-  m_payment_id: "", // empty → excluded from the signature
+  m_payment_id: "", // empty values stay in the canonical string (PayFast's ITN sample keeps them)
 };
 const PASSPHRASE = "jt7NOE43FZPn";
 
-test("signFields signs the alphabetically-ordered non-empty fields + passphrase (known vector)", () => {
-  // Independently computed (node:crypto) over the canonical string:
-  // amount=…&email_address=buyer%40example.com&item_name=Hindi+%E2%80%94+Spanish+edition&…&passphrase=…
-  expect(signFields(FIELDS, PASSPHRASE)).toBe("08ab14bb4300bc5f7417a10a299a0140");
+test("pfParamString canonicalises in FIELD ORDER (never sorted), PHP-urlencoded, minus signature", () => {
+  expect(pfParamString({ ...FIELDS, signature: "deadbeef" })).toBe(
+    "merchant_id=10000100&merchant_key=46f0cd694581a&amount=123.45" +
+      "&item_name=Hindi+%E2%80%94+Spanish+edition&email_address=buyer%40example.com&m_payment_id=",
+  );
+});
+
+test("signFields signs the in-order fields + passphrase (known vector)", () => {
+  // Independently computed (node:crypto) over the canonical string above +
+  // &passphrase=jt7NOE43FZPn. PayFast signs over the field ORDER (form: its
+  // documented attribute order; ITN: the order received) — never alphabetical.
+  expect(signFields(FIELDS, PASSPHRASE)).toBe("40c5b77b19841e02c9421e33de29f309");
 });
 
 test("verifySignature round-trips a built signature and rejects a forged one", () => {
@@ -74,6 +84,9 @@ test("verifySignature round-trips a built signature and rejects a forged one", (
   expect(verifySignature({ ...FIELDS, signature: "0".repeat(32) }, PASSPHRASE)).toBe(false);
   // A tampered amount no longer matches the signature.
   expect(verifySignature({ ...FIELDS, amount: "1.00", signature }, PASSPHRASE)).toBe(false);
+  // Re-ordered fields don't verify either — the order is part of the signature.
+  const { merchant_id, ...rest } = FIELDS;
+  expect(verifySignature({ ...rest, merchant_id, signature }, PASSPHRASE)).toBe(false);
   // No signature at all → rejected.
   expect(verifySignature(FIELDS, PASSPHRASE)).toBe(false);
 });
@@ -154,6 +167,18 @@ test("randFromCents renders cents as 2-decimal Rand", () => {
   expect(randFromCents(150000)).toBe("1500.00");
   expect(randFromCents(999)).toBe("9.99");
   expect(randFromCents(5)).toBe("0.05");
+});
+
+test("centsFromRand parses PayFast amount strings to integer cents (fees arrive negative)", () => {
+  expect(centsFromRand("1500.00")).toBe(150000);
+  expect(centsFromRand("9.9")).toBe(990);
+  expect(centsFromRand("1200")).toBe(120000);
+  expect(centsFromRand("-4.60")).toBe(-460); // ITN amount_fee
+  expect(centsFromRand(" 12.34 ")).toBe(1234);
+  expect(centsFromRand("")).toBeNull();
+  expect(centsFromRand("12,34")).toBeNull();
+  expect(centsFromRand("1.2.3")).toBeNull();
+  expect(centsFromRand("abc")).toBeNull();
 });
 
 // ---- gateway URLs by PAYFAST_MODE ----------------------------------------------

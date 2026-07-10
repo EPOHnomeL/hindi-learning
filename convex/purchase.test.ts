@@ -1,9 +1,9 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { beforeAll, expect, test } from "vitest";
+import { afterEach, beforeAll, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { verifySignature } from "./payfast";
+import { signFields, verifySignature } from "./payfast";
 import type { Id } from "./_generated/dataModel";
 
 // Paid marketplace — the purchase-fulfilment seam (.scratch/payfast-payments).
@@ -72,9 +72,17 @@ async function paidTopic(t: ReturnType<typeof convexTest>) {
 
 // ---- mint (a verified COMPLETE payment) --------------------------------------
 
-test("fulfillPurchase (account exists) unlocks the Edition; idempotent on pf_payment_id", async () => {
+// The money amounts a genuine ITN carries, in cents: PayFast's fee comes off the
+// gross; the 50/50 split applies to the net (PLATFORM_FEE_BPS unset → 5000).
+const MONEY = { gross: 120000, fee: 2760, net: 117240 };
+
+async function ledgerRows(t: ReturnType<typeof convexTest>) {
+  return await t.run((ctx) => ctx.db.query("ledger").take(100));
+}
+
+test("fulfillPurchase (account exists) unlocks the Edition + writes the Ledger; idempotent on pf_payment_id", async () => {
   const t = convexTest(schema, modules);
-  const { topicId } = await paidTopic(t);
+  const { alice, topicId } = await paidTopic(t);
   const buyer = await seedUser(t, "buyer@example.com");
 
   // Before: unentitled → the paygate (locked past the free Preview).
@@ -87,6 +95,7 @@ test("fulfillPurchase (account exists) unlocks the Edition; idempotent on pf_pay
     topicId,
     lang: "en",
     email: "buyer@example.com",
+    ...MONEY,
   });
 
   // After: full read.
@@ -94,21 +103,40 @@ test("fulfillPurchase (account exists) unlocks the Edition; idempotent on pf_pay
     contentUrl: expect.any(String),
     locked: false,
   });
+  // The same transaction wrote the Ledger: what the operator owes the author —
+  // the ITN's gross/fee/net with net split 50/50, status owed.
+  expect(await ledgerRows(t)).toMatchObject([
+    {
+      topicId,
+      lang: "en",
+      sellerId: alice,
+      buyerEmail: "buyer@example.com",
+      gross: 120000,
+      fee: 2760,
+      net: 117240,
+      authorShare: 58620,
+      platformShare: 58620,
+      pfPaymentId: "pf_1",
+      status: "owed",
+    },
+  ]);
 
-  // Replay the SAME payment → no second grant (PayFast re-delivers ITNs). A
-  // DIFFERENT payment for the same (buyer, Topic, language) also doesn't
-  // duplicate (dedup on the tuple).
+  // Replay the SAME payment → no second grant and no second Ledger row (PayFast
+  // re-delivers ITNs). A DIFFERENT payment for the same (buyer, Topic, language)
+  // doesn't duplicate the Entitlement (dedup on the tuple).
   await t.mutation(internal.market.fulfillPurchase, {
     pfPaymentId: "pf_1",
     topicId,
     lang: "en",
     email: "buyer@example.com",
+    ...MONEY,
   });
   await t.mutation(internal.market.fulfillPurchase, {
     pfPaymentId: "pf_2",
     topicId,
     lang: "en",
     email: "buyer@example.com",
+    ...MONEY,
   });
   const ents = await t.run((ctx) =>
     ctx.db.query("entitlements").withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", buyer)).collect(),
@@ -132,6 +160,7 @@ test("a minted Entitlement is language-scoped — buying es doesn't unlock ur", 
     topicId,
     lang: "es",
     email: "buyer@example.com",
+    ...MONEY,
   });
 
   expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002", lang: "es" })).toMatchObject({
@@ -152,11 +181,14 @@ test("a purchase with no account mints a pending Entitlement, claimed (and admit
     topicId,
     lang: "en",
     email: "newbuyer@example.com",
+    ...MONEY,
   });
   const pendingBefore = await t.run((ctx) =>
     ctx.db.query("pendingEntitlements").withIndex("by_email", (q) => q.eq("email", "newbuyer@example.com")).collect(),
   );
   expect(pendingBefore).toHaveLength(1);
+  // A guest sale still writes the Ledger — the operator owes the author either way.
+  expect(await ledgerRows(t)).toMatchObject([{ buyerEmail: "newbuyer@example.com", status: "owed" }]);
 
   // Sign up — the paid purchase admits them though sign-up is otherwise closed.
   await signUp(t, "newbuyer@example.com", "hunter2-strong");
@@ -208,7 +240,7 @@ test("startCheckout returns the full signed field set for a priced Edition of a 
   const { topicId } = await sellableTopic(t);
 
   // Available to Guests: no identity on the call. Email is normalised.
-  const { action, fields } = await t.mutation(api.market.startCheckout, {
+  const { action, fields: pairs } = await t.mutation(api.market.startCheckout, {
     topicSlug: "hindi",
     lang: "en",
     email: "  Buyer@Example.COM ",
@@ -216,6 +248,15 @@ test("startCheckout returns the full signed field set for a priced Edition of a 
 
   // The hosted process URL, sandbox by default.
   expect(action).toBe("https://sandbox.payfast.co.za/eng/process");
+  // Fields come back as ORDERED pairs — Convex sorts object keys, and PayFast
+  // signs over the field order, so a record would corrupt the signature. The
+  // client posts them in exactly this order.
+  expect(pairs.map((p) => p.name)).toEqual([
+    "merchant_id", "merchant_key", "return_url", "cancel_url", "notify_url",
+    "email_address", "m_payment_id", "amount", "item_name", "custom_str1", "custom_str2",
+    "signature",
+  ]);
+  const fields = Object.fromEntries(pairs.map((p) => [p.name, p.value]));
   // The amount is the stored listing rendered as 2-decimal Rand (paidTopic
   // prices at 120000 cents), addressed to the platform's merchant account.
   expect(fields).toMatchObject({
@@ -274,4 +315,141 @@ test("startCheckout rejects an unpriced Edition, a not-ready Seller, and a bad e
   const intents = await t.run((ctx) => ctx.db.query("checkoutIntents").collect());
   expect(intents).toEqual([]);
   void topicId;
+});
+
+// ---- the ITN HTTP boundary (ticket 04): the sole grantor of paid access ------
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+// Stub the ONE network call on the rail — the server postback to PayFast's
+// /eng/query/validate — at the action boundary, capturing what was sent.
+function mockValidate(reply: string, capture?: { url?: string; body?: string }) {
+  const fn = vi.fn(async (url: RequestInfo | URL, init?: RequestInit) => {
+    if (capture) {
+      capture.url = String(url);
+      capture.body = String(init?.body ?? "");
+    }
+    return new Response(reply, { status: 200 });
+  });
+  vi.stubGlobal("fetch", fn);
+  return fn;
+}
+
+// A genuine ITN field set for `topicId` (custom_str1/2 carry what to grant),
+// signed with the sandbox passphrase — in PayFast's ITN field order.
+function itnFields(topicId: string, over: Record<string, string> = {}): Record<string, string> {
+  const base: Record<string, string> = {
+    m_payment_id: "mp_1",
+    pf_payment_id: "pf_100",
+    payment_status: "COMPLETE",
+    item_name: "hindi — English edition",
+    amount_gross: "1200.00",
+    amount_fee: "-27.60",
+    amount_net: "1172.40",
+    custom_str1: topicId,
+    custom_str2: "en",
+    email_address: "buyer@example.com",
+    merchant_id: "10000100",
+    ...over,
+  };
+  return { ...base, signature: signFields(base, "jt7NOE43FZPn") };
+}
+
+async function postItn(t: ReturnType<typeof convexTest>, fields: Record<string, string>) {
+  return await t.fetch("/payfast/notify", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(fields).toString(),
+  });
+}
+
+// Every table the ITN may write, for the "nothing written" assertions.
+async function itnWrites(t: ReturnType<typeof convexTest>) {
+  return await t.run(async (ctx) => ({
+    events: await ctx.db.query("payfastEvents").take(10),
+    ledger: await ctx.db.query("ledger").take(10),
+    ents: await ctx.db.query("entitlements").take(10),
+    pending: await ctx.db.query("pendingEntitlements").take(10),
+  }));
+}
+
+test("ITN: a missing or forged signature → 400, nothing written, no postback attempted", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await paidTopic(t);
+  const fetchMock = mockValidate("VALID");
+
+  // No signature at all.
+  const { signature: _sig, ...unsigned } = itnFields(topicId);
+  expect((await postItn(t, unsigned)).status).toBe(400);
+
+  // A forged signature (tampered amount, stale signature).
+  const forged = itnFields(topicId);
+  forged.amount_gross = "0.01";
+  expect((await postItn(t, forged)).status).toBe(400);
+
+  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [], pending: [] });
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
+test("ITN: a postback that does not return VALID → rejected, nothing written", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await paidTopic(t);
+  mockValidate("INVALID");
+
+  expect((await postItn(t, itnFields(topicId))).status).toBe(400);
+  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [], pending: [] });
+});
+
+test("ITN: an amount that doesn't match the stored listing → rejected", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await paidTopic(t); // listed at 1200.00
+  const fetchMock = mockValidate("VALID");
+
+  // Signed correctly — the buyer paid a genuine 500.00, but that's not the price.
+  expect((await postItn(t, itnFields(topicId, { amount_gross: "500.00" }))).status).toBe(400);
+  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [], pending: [] });
+  expect(fetchMock).not.toHaveBeenCalled(); // cheaper checks run before the network hop
+});
+
+test("ITN: a genuine COMPLETE notification grants once + writes the Ledger; replay is a no-op", async () => {
+  const t = convexTest(schema, modules);
+  const { alice, topicId } = await paidTopic(t);
+  const buyer = await seedUser(t, "buyer@example.com");
+  const capture: { url?: string; body?: string } = {};
+  mockValidate("VALID", capture);
+
+  expect((await postItn(t, itnFields(topicId))).status).toBe(200);
+
+  // The postback went to the sandbox validate URL, re-sending the received
+  // fields minus the signature.
+  expect(capture.url).toBe("https://sandbox.payfast.co.za/eng/query/validate");
+  expect(capture.body).toContain("pf_payment_id=pf_100");
+  expect(capture.body).not.toContain("signature=");
+
+  // Access granted at the reader seam + the Ledger row in the same transaction.
+  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+    locked: false,
+  });
+  expect(await ledgerRows(t)).toMatchObject([
+    { sellerId: alice, gross: 120000, fee: 2760, net: 117240, authorShare: 58620, platformShare: 58620, status: "owed" },
+  ]);
+
+  // PayFast re-delivers → same 200, no double grant, no second Ledger row.
+  expect((await postItn(t, itnFields(topicId))).status).toBe(200);
+  expect(await ledgerRows(t)).toHaveLength(1);
+  const ents = await t.run((ctx) =>
+    ctx.db.query("entitlements").withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", buyer)).collect(),
+  );
+  expect(ents).toHaveLength(1);
+});
+
+test("ITN: a non-COMPLETE payment_status is acknowledged but grants nothing", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await paidTopic(t);
+  mockValidate("VALID");
+
+  expect((await postItn(t, itnFields(topicId, { payment_status: "CANCELLED" }))).status).toBe(200);
+  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [], pending: [] });
 });

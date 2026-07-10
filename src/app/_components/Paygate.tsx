@@ -137,11 +137,12 @@ function BuyDialog({
     try {
       const { action, fields } = await startCheckout({ topicSlug: topicSlug!, lang: lang!, email });
       // POST the signed fields to PayFast's hosted checkout — a real form
-      // submission (top-level navigation), built off-DOM and fired once.
+      // submission (top-level navigation), built off-DOM and fired once. The
+      // pairs are ordered: PayFast verifies the signature over the field order.
       const form = document.createElement("form");
       form.method = "POST";
       form.action = action;
-      for (const [name, value] of Object.entries(fields)) {
+      for (const { name, value } of fields) {
         const input = document.createElement("input");
         input.type = "hidden";
         input.name = name;

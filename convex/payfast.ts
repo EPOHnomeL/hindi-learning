@@ -66,22 +66,42 @@ function pfEncode(value: string): string {
     .replace(/%20/g, "+");
 }
 
-// Sign a PayFast field set: the NON-EMPTY fields in alphabetical order as
-// key=urlencode(value) joined with &, the passphrase appended, MD5'd (lowercase
-// hex). Any `signature` field is excluded — this is what it's computed over.
-export function signFields(fields: Record<string, string>, passphrase: string): string {
-  const canonical = Object.keys(fields)
-    .filter((k) => k !== "signature" && fields[k] !== "")
-    .sort()
+// PayFast's canonical parameter string: key=urlencode(value) pairs joined with
+// &, in the ORDER THE FIELDS APPEAR (never sorted — for an outgoing form that's
+// PayFast's documented attribute order, for an ITN the order received), with
+// any `signature` field excluded. Empty values are kept as `key=` (PayFast's
+// own ITN sample includes them); outgoing builders simply never emit empties.
+// NOTE: the PRD said "alphabetically-ordered", but PayFast computes and checks
+// MD5 over the field order — sorting would make it reject every signature.
+// This is also the exact body the ITN postback re-sends to /eng/query/validate.
+export function pfParamString(fields: Record<string, string>): string {
+  return Object.keys(fields)
+    .filter((k) => k !== "signature")
     .map((k) => `${k}=${pfEncode(fields[k]!)}`)
     .join("&");
-  return md5(`${canonical}&passphrase=${pfEncode(passphrase)}`);
+}
+
+// Sign a PayFast field set: the canonical string above, the passphrase
+// appended, MD5'd (lowercase hex).
+export function signFields(fields: Record<string, string>, passphrase: string): string {
+  return md5(`${pfParamString(fields)}&passphrase=${pfEncode(passphrase)}`);
 }
 
 // Whether a field set's `signature` is genuine — the ITN's first verification
-// step (http.ts). Absent or mismatched ⇒ forged ⇒ rejected.
+// step (http.ts). The fields must be in RECEIVED order (URLSearchParams
+// iteration preserves it). Absent or mismatched ⇒ forged ⇒ rejected.
 export function verifySignature(fields: Record<string, string>, passphrase: string): boolean {
   return !!fields.signature && fields.signature.toLowerCase() === signFields(fields, passphrase);
+}
+
+// Parse a PayFast Rand amount string ("1200.00", "9.9", "-4.60" — the ITN's
+// amount_fee arrives negative) into signed integer cents, or null on garbage.
+// Integer math; never trusts parseFloat at the money boundary.
+export function centsFromRand(amount: string): number | null {
+  const m = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(amount.trim());
+  if (!m) return null;
+  const cents = Number(m[2]) * 100 + (m[3] ? Number(m[3].padEnd(2, "0")) : 0);
+  return m[1] === "-" ? -cents : cents;
 }
 
 // ---- the checkout field builder --------------------------------------------------
@@ -89,7 +109,8 @@ export function verifySignature(fields: Record<string, string>, passphrase: stri
 // The signed field set startCheckout returns for the client to form-POST to the
 // hosted process URL. `custom_str1/2` carry what the ITN grants (topicId/lang);
 // `m_payment_id` is our checkout-intent reference. item_name is capped at
-// PayFast's 100-char field limit.
+// PayFast's 100-char field limit. Field order below IS the signature order
+// (PayFast's documented attribute order: merchant → buyer → transaction).
 export function buildCheckoutFields(opts: {
   merchantId: string;
   merchantKey: string;
@@ -110,10 +131,10 @@ export function buildCheckoutFields(opts: {
     return_url: opts.returnUrl,
     cancel_url: opts.cancelUrl,
     notify_url: opts.notifyUrl,
+    email_address: opts.email,
     m_payment_id: opts.mPaymentId,
     amount: randFromCents(opts.amountCents),
     item_name: opts.itemName.slice(0, 100),
-    email_address: opts.email,
     custom_str1: opts.topicId,
     custom_str2: opts.lang,
   };
