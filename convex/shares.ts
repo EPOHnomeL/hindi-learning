@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { getOwnedTopic, mintToken, normaliseEmail, shareLang, SOURCE_LANG, topicLessonCounts } from "./lib";
+import { getOwnedTopic, mintToken, normaliseEmail, shareLang, shareRole, SOURCE_LANG, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 
 // Sharing: an owner grants another existing User read-only access to a Topic
@@ -117,6 +117,117 @@ export const setEditionPublic = mutation({
     if (existing) await ctx.db.patch(existing._id, { token });
     else await ctx.db.insert("publicLinks", { topicId: topic._id, lang, token });
     return token;
+  },
+});
+
+// ---- Owner access management (edition-editor-rights issue 03) --------------
+
+// The access roster for one Edition (ADR 0020): everyone the owner has granted
+// access to on `(topic, lang)` — accepted Shares (joined to the person's email)
+// and pending invites (an email with no account yet) — each with its role. The
+// first owner-facing "who has access" surface. Owner-only via getOwnedTopic, so
+// a non-owner is rejected before any row is read. Lang is matched in-memory over
+// `by_topic` (legacy rows carry no `lang`), matching shareTopic.
+export const listEditionAccess = query({
+  args: { topicSlug: v.string(), lang: v.string() },
+  returns: v.array(
+    v.object({
+      email: v.string(),
+      role: v.union(v.literal("viewer"), v.literal("editor")),
+      status: v.union(v.literal("accepted"), v.literal("pending")),
+    }),
+  ),
+  handler: async (ctx, { topicSlug, lang }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+
+    const shares = (
+      await ctx.db.query("shares").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()
+    ).filter((s) => shareLang(s) === lang);
+    const accepted = await Promise.all(
+      shares.map(async (s) => {
+        const user = await ctx.db.get(s.viewerId);
+        return { email: user?.email ?? "", role: shareRole(s), status: "accepted" as const };
+      }),
+    );
+
+    const pending = (
+      await ctx.db.query("pendingShares").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()
+    )
+      .filter((p) => (p.lang ?? SOURCE_LANG) === lang)
+      .map((p) => ({ email: p.email, role: shareRole(p), status: "pending" as const }));
+
+    return [...accepted, ...pending];
+  },
+});
+
+// Set a person's role on one Edition (ADR 0020) — the owner promoting a Viewer to
+// Editor or demoting back. Owner-only. Patches the matching accepted Share for
+// `(topic, person, lang)` if one exists, else the matching pending invite;
+// throws if neither does (nothing to set). Idempotent. Lang matched in-memory.
+export const setShareRole = mutation({
+  args: {
+    topicSlug: v.string(),
+    email: v.string(),
+    lang: v.string(),
+    role: v.union(v.literal("viewer"), v.literal("editor")),
+  },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, email, lang, role }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const addr = normaliseEmail(email);
+
+    const person = await ctx.db.query("users").withIndex("email", (q) => q.eq("email", addr)).unique();
+    if (person) {
+      const share = (
+        await ctx.db.query("shares").withIndex("by_topic_viewer", (q) => q.eq("topicId", topic._id).eq("viewerId", person._id)).collect()
+      ).find((s) => shareLang(s) === lang);
+      if (share) {
+        await ctx.db.patch(share._id, { role });
+        return null;
+      }
+    }
+    const invite = (
+      await ctx.db.query("pendingShares").withIndex("by_topic_email", (q) => q.eq("topicId", topic._id).eq("email", addr)).collect()
+    ).find((p) => (p.lang ?? SOURCE_LANG) === lang);
+    if (invite) {
+      await ctx.db.patch(invite._id, { role });
+      return null;
+    }
+    throw new Error("no such access to update");
+  },
+});
+
+// Revoke a person's access to one Edition (ADR 0020) — deletes the matching
+// accepted Share or pending invite for `(topic, person, lang)`. Owner-only.
+// Idempotent: a no-op if the access is already gone. Lang matched in-memory.
+export const revokeShare = mutation({
+  args: { topicSlug: v.string(), email: v.string(), lang: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, email, lang }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const addr = normaliseEmail(email);
+
+    const person = await ctx.db.query("users").withIndex("email", (q) => q.eq("email", addr)).unique();
+    if (person) {
+      const share = (
+        await ctx.db.query("shares").withIndex("by_topic_viewer", (q) => q.eq("topicId", topic._id).eq("viewerId", person._id)).collect()
+      ).find((s) => shareLang(s) === lang);
+      if (share) await ctx.db.delete(share._id);
+    }
+    const invite = (
+      await ctx.db.query("pendingShares").withIndex("by_topic_email", (q) => q.eq("topicId", topic._id).eq("email", addr)).collect()
+    ).find((p) => (p.lang ?? SOURCE_LANG) === lang);
+    if (invite) await ctx.db.delete(invite._id);
+    return null;
   },
 });
 
