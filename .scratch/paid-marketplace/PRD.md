@@ -1,6 +1,6 @@
 # PRD: Paid Course Marketplace (Stripe Connect)
 
-Status: ready-for-agent
+Status: done (payment rail superseded — see ../payfast-payments/PRD.md)
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — **Seller**, **Entitlement**,
 > **Preview**, **Edition**, plus Topic, Guest, Viewer, Public link, Allowlist, Admin,
