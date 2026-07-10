@@ -14,8 +14,9 @@ import type { Id } from "./_generated/dataModel";
 //      course can price one of its held Editions; a non-owner, a not-ready
 //      Seller, and an unfinished course are all refused. Pricing an Edition
 //      makes it paid (the flag the access resolver reads).
-// (The bank-details save/read mutations land with ticket 02 — until then the
-// tests seed payout details directly, the state that mutation leaves behind.)
+// Bank details are saved in-app by the granted author (savePayoutDetails) —
+// Admin-readable via listSellers (needed to pay out) but never returned by any
+// non-admin query.
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -137,11 +138,70 @@ test("sellerStatus walks not-granted → granted-no-payout-details → ready", a
   await asUser(t, admin).mutation(api.sellers.grantCanSell, { email: "seller@example.com" });
   expect(await asUser(t, seller).query(api.sellers.sellerStatus, {})).toBe("granted-no-payout-details");
 
-  // Bank details land (ticket 02's mutation; seeded directly here) → ready.
-  await t.run(async (ctx) => {
-    const row = await ctx.db.query("sellers").withIndex("by_user", (q) => q.eq("userId", seller)).unique();
-    await ctx.db.patch(row!._id, { payout: PAYOUT });
-  });
+  // Bank details land → ready.
+  await asUser(t, seller).mutation(api.sellers.savePayoutDetails, PAYOUT);
+  expect(await asUser(t, seller).query(api.sellers.sellerStatus, {})).toBe("ready");
+});
+
+// ---- Seam — payout bank details ------------------------------------------------
+
+test("a granted author can save and update bank details; a non-granted user cannot", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const stranger = await seedUser(t, "stranger@example.com");
+
+  // Not granted (and not signed in) → refused.
+  await expect(asUser(t, stranger).mutation(api.sellers.savePayoutDetails, PAYOUT)).rejects.toThrow();
+  await expect(t.mutation(api.sellers.savePayoutDetails, PAYOUT)).rejects.toThrow();
+
+  await asUser(t, admin).mutation(api.sellers.grantCanSell, { email: "seller@example.com" });
+  await asUser(t, seller).mutation(api.sellers.savePayoutDetails, PAYOUT);
+  let [row] = await sellerRows(t, seller);
+  expect(row!.payout).toEqual(PAYOUT);
+
+  // Update in place (a correction) — still one row, new details.
+  const updated = { ...PAYOUT, accountNumber: "62999999999" };
+  await asUser(t, seller).mutation(api.sellers.savePayoutDetails, updated);
+  [row] = await sellerRows(t, seller);
+  expect(row!.payout).toEqual(updated);
+  expect(await sellerRows(t, seller)).toHaveLength(1);
+});
+
+test("savePayoutDetails rejects blank or non-numeric account/branch fields", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  await asUser(t, admin).mutation(api.sellers.grantCanSell, { email: "seller@example.com" });
+
+  await expect(
+    asUser(t, seller).mutation(api.sellers.savePayoutDetails, { ...PAYOUT, accountHolder: "   " }),
+  ).rejects.toThrow();
+  await expect(
+    asUser(t, seller).mutation(api.sellers.savePayoutDetails, { ...PAYOUT, accountNumber: "not-digits" }),
+  ).rejects.toThrow();
+  await expect(
+    asUser(t, seller).mutation(api.sellers.savePayoutDetails, { ...PAYOUT, branchCode: "12" }),
+  ).rejects.toThrow();
+  expect(await asUser(t, seller).query(api.sellers.sellerStatus, {})).toBe("granted-no-payout-details");
+});
+
+test("bank details are Admin-readable via listSellers, and in no non-admin payload", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  await asUser(t, admin).mutation(api.sellers.grantCanSell, { email: "seller@example.com" });
+  await asUser(t, seller).mutation(api.sellers.savePayoutDetails, PAYOUT);
+
+  // The Admin sees the details (they have to EFT the author's share somewhere).
+  expect(await asUser(t, admin).query(api.sellers.listSellers, {})).toEqual([
+    { email: "seller@example.com", status: "ready", payout: PAYOUT },
+  ]);
+  // Never logged is a code-review property; never *returned* is structural — the
+  // sellers table is read only by listSellers (admin-gated) and sellerStatus.
+  // A non-admin (the Seller themself included) cannot read them back.
+  await expect(asUser(t, seller).query(api.sellers.listSellers, {})).rejects.toThrow();
+  // The only self-facing read is the bare status string — no details in it.
   expect(await asUser(t, seller).query(api.sellers.sellerStatus, {})).toBe("ready");
 });
 
@@ -153,7 +213,7 @@ test("listSellers is Admin-only and reports each Seller's status", async () => {
 
   await expect(asUser(t, seller).query(api.sellers.listSellers, {})).rejects.toThrow();
   expect(await asUser(t, admin).query(api.sellers.listSellers, {})).toEqual([
-    { email: "seller@example.com", status: "granted-no-payout-details" },
+    { email: "seller@example.com", status: "granted-no-payout-details", payout: null },
   ]);
 });
 
@@ -231,4 +291,25 @@ test("pricing is refused on an unfinished course and on an Edition the owner doe
   await expect(
     asUser(t, stranger).mutation(api.market.clearEditionPrice, { topicSlug: "hindi", lang: "en" }),
   ).rejects.toThrow();
+});
+
+test("pricing is ZAR-only — any other currency is rejected", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  await makeReadySeller(t, owner);
+  const topicId = await seedTopic(t, owner, "hindi", "completed");
+  await addLesson(t, topicId, "0001", 1);
+
+  for (const currency of ["usd", "USD", "eur", "gbp"]) {
+    await expect(
+      asUser(t, owner).mutation(api.market.setEditionPrice, { topicSlug: "hindi", lang: "en", amount: 50000, currency }),
+    ).rejects.toThrow();
+  }
+  expect(await t.query(api.market.editionPricing, { topicSlug: "hindi" })).toEqual([]);
+
+  // ZAR (any casing) is accepted and normalised.
+  await asUser(t, owner).mutation(api.market.setEditionPrice, { topicSlug: "hindi", lang: "en", amount: 50000, currency: "ZAR" });
+  expect(await t.query(api.market.editionPricing, { topicSlug: "hindi" })).toEqual([
+    { lang: "en", amount: 50000, currency: "zar" },
+  ]);
 });

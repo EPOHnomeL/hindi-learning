@@ -337,9 +337,65 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
   );
 }
 
-// Two-decimal currencies this ships with (matches Paygate.formatPrice's 2-decimal
-// assumption — no zero-decimal currency like JPY, whose minor unit differs).
-const SELL_CURRENCIES = ["USD", "EUR", "GBP", "INR", "CAD", "AUD"];
+// The payout bank-details form (paid marketplace, PayFast rail): a granted
+// author saves the SA bank account their earnings are EFT'd to — the step that
+// makes them a ready Seller. Write-only by design: details are never read back
+// into any non-admin UI, so the form always starts blank (re-submitting
+// overwrites). Rendered inside the SellEdition gate.
+function PayoutDetailsForm() {
+  const save = useMutation(api.sellers.savePayoutDetails);
+  const [form, setForm] = useState({ accountHolder: "", bank: "", accountNumber: "", branchCode: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const field = (key: keyof typeof form, label: string, placeholder: string, inputMode?: "numeric") => (
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{label}</span>
+      <input
+        value={form[key]}
+        inputMode={inputMode}
+        onChange={(e) => {
+          setForm((f) => ({ ...f, [key]: e.target.value }));
+          setError(null);
+        }}
+        placeholder={placeholder}
+        className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+      />
+    </label>
+  );
+
+  return (
+    <form
+      className="mt-2.5 flex flex-col gap-2.5"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError(null);
+        try {
+          await save(form);
+        } catch {
+          setError("Couldn’t save — check every field (account number and branch code are digits).");
+          setBusy(false);
+        }
+      }}
+    >
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        {field("accountHolder", "Account holder", "Full name on the account")}
+        {field("bank", "Bank", "e.g. FNB")}
+        {field("accountNumber", "Account number", "62…", "numeric")}
+        {field("branchCode", "Branch code", "6 digits", "numeric")}
+      </div>
+      <button
+        type="submit"
+        disabled={busy}
+        className="self-start rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+      >
+        {busy ? "Saving…" : "Save payout details"}
+      </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </form>
+  );
+}
 
 // "Sell this edition" (paid marketplace, ADR 0016, Slice 2). Prices ONE Edition
 // of a completed course. Setting a price makes the Edition paid (its first Lesson
@@ -368,7 +424,6 @@ function SellEdition({
   const current = pricing?.find((p) => p.lang === lang) ?? null;
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("USD");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -401,10 +456,13 @@ function SellEdition({
               ask them to turn it on for your account.
             </span>
           ) : (
-            <span>
-              <b className="font-semibold text-ink">Add your payout details to sell.</b> Save the bank account your
-              earnings are paid to; then you can price this edition.
-            </span>
+            <>
+              <span>
+                <b className="font-semibold text-ink">Add your payout details to sell.</b> Save the bank account your
+                earnings are paid to; then you can price this edition.
+              </span>
+              <PayoutDetailsForm />
+            </>
           )}
         </div>
       </div>
@@ -415,7 +473,6 @@ function SellEdition({
   // the editor; the editor sets/updates the price or stops selling.
   const openEditor = () => {
     setAmount(current ? (current.amount / 100).toFixed(2) : "");
-    setCurrency(current?.currency.toUpperCase() ?? "USD");
     setError(null);
     setOpen((o) => !o);
   };
@@ -428,7 +485,8 @@ function SellEdition({
     setBusy(true);
     setError(null);
     try {
-      await setPrice({ topicSlug, lang, amount: minor, currency });
+      // ZAR-only (PayFast settles in Rand) — the server enforces the same.
+      await setPrice({ topicSlug, lang, amount: minor, currency: "ZAR" });
       setOpen(false);
     } catch {
       setError("Couldn’t save the price — please try again.");
@@ -494,7 +552,7 @@ function SellEdition({
         <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
           <div className="flex flex-wrap items-end gap-2.5">
             <label className="flex flex-col gap-1">
-              <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">Price</span>
+              <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">Price (ZAR)</span>
               <input
                 value={amount}
                 inputMode="decimal"
@@ -505,20 +563,6 @@ function SellEdition({
                 placeholder="0.00"
                 className="w-32 rounded-lg border border-line bg-card px-3 py-2 text-sm tabular-nums focus:border-gold focus:outline-none"
               />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">Currency</span>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-28 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
-              >
-                {SELL_CURRENCIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
             </label>
             <button
               type="button"

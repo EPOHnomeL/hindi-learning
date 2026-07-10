@@ -28,7 +28,6 @@ import { isCallerAdmin } from "./whitelist";
 // listing the access resolver reads. `grant/revokeEntitlement` are the manual
 // Admin tools (revoke is the ONLY refund path — nothing automated).
 
-const CURRENCY = /^[a-z]{3}$/;
 
 // Set (or update) the price of an Edition (Topic, language), making it paid —
 // the Seller pricing action. The caller must OWN the course, be a ready Seller,
@@ -58,8 +57,10 @@ export const setEditionPrice = mutation({
     if (!Number.isInteger(amount) || amount <= 0 || amount > 100_000_000) {
       throw new Error("amount must be a positive integer in the currency's minor units");
     }
+    // ZAR-only (.scratch/payfast-payments): PayFast settles in Rand, so a price
+    // in any other currency would be a lie the checkout can't honour.
     const cur = currency.trim().toLowerCase();
-    if (!CURRENCY.test(cur)) throw new Error("currency must be a 3-letter ISO-4217 code");
+    if (cur !== "zar") throw new Error("prices are in South African Rand (ZAR) only");
     const existing = await editionPrice(ctx, topic._id, lang);
     if (existing) await ctx.db.patch(existing._id, { amount, currency: cur });
     else await ctx.db.insert("listings", { topicId: topic._id, lang, amount, currency: cur });

@@ -58,10 +58,22 @@ export const revokeCanSell = mutation({
   },
 });
 
-// The granted Sellers and their readiness status, for the admin portal (Admin-only).
+// An author's SA payout bank details — where the operator EFTs their Ledger share.
+const payoutValidator = v.object({
+  accountHolder: v.string(),
+  bank: v.string(),
+  accountNumber: v.string(),
+  branchCode: v.string(),
+});
+
+// The granted Sellers, their readiness status, and their payout bank details,
+// for the admin portal (Admin-only — the ONLY read that ever returns bank
+// details; the operator needs them to pay out. Never logged.)
 export const listSellers = query({
   args: {},
-  returns: v.array(v.object({ email: v.string(), status: sellerStatusValidator })),
+  returns: v.array(
+    v.object({ email: v.string(), status: sellerStatusValidator, payout: v.union(payoutValidator, v.null()) }),
+  ),
   handler: async (ctx) => {
     if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
     // Bounded scan: Sellers are hand-vetted (Admin-granted), so the table stays
@@ -70,10 +82,40 @@ export const listSellers = query({
     const out = await Promise.all(
       rows.map(async (r) => {
         const user = await ctx.db.get(r.userId);
-        return { email: user?.email ?? "(unknown)", status: sellerStatusOf(r) };
+        return { email: user?.email ?? "(unknown)", status: sellerStatusOf(r), payout: r.payout ?? null };
       }),
     );
     return out.sort((a, b) => a.email.localeCompare(b.email));
+  },
+});
+
+// ---- Self: payout bank details (the second gate) ----------------------------
+
+// Save (or correct) the caller's payout bank details — the step that makes a
+// granted author `ready`. Granted-only: without the can-sell grant there is
+// nothing these details unlock. Light validation only (the operator eyeballs
+// them before EFTing): every field non-blank, account number and branch code
+// numeric (spaces tolerated and stripped). There is deliberately NO read-back —
+// bank details leave the DB only via the Admin's listSellers.
+export const savePayoutDetails = mutation({
+  args: payoutValidator.fields,
+  returns: v.null(),
+  handler: async (ctx, { accountHolder, bank, accountNumber, branchCode }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("forbidden");
+    const seller = await getSeller(ctx, userId);
+    if (!seller) throw new Error("selling hasn't been enabled for your account");
+    const payout = {
+      accountHolder: accountHolder.trim(),
+      bank: bank.trim(),
+      accountNumber: accountNumber.replace(/\s+/g, ""),
+      branchCode: branchCode.replace(/\s+/g, ""),
+    };
+    if (!payout.accountHolder || !payout.bank) throw new Error("every field is required");
+    if (!/^\d{4,20}$/.test(payout.accountNumber)) throw new Error("account number must be 4–20 digits");
+    if (!/^\d{6}$/.test(payout.branchCode)) throw new Error("branch code must be 6 digits");
+    await ctx.db.patch(seller._id, { payout });
+    return null;
   },
 });
 
