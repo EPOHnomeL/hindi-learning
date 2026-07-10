@@ -33,3 +33,7 @@ panel from **01**.
 ## Notes
 
 - Covers PRD stories 3, 4, 5, 6, 7, 8, 9. Independent of **02–05**.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#34](https://github.com/EPOHnomeL/hindi-learning/issues/34); GitHub is now the tracking home for this ticket.

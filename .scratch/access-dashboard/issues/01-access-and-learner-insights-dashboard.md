@@ -76,3 +76,5 @@ Plus a public-link overview: for each Edition, whether the public link is on
   via `topic-sharing`; this issue is only the owner-facing complement.
 
 ## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#12](https://github.com/EPOHnomeL/hindi-learning/issues/12); GitHub is now the tracking home for this ticket.

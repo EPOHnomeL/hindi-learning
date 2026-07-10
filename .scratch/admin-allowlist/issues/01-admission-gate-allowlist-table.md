@@ -68,3 +68,7 @@ None - can start immediately.
   `AUTH_ALLOWED_EMAILS` once verified.
 - Local dev/tests start empty (the migration reads an unset env var locally), so
   `seedEmail` is the expected first step there.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#13](https://github.com/EPOHnomeL/hindi-learning/issues/13); GitHub is now the tracking home for this ticket.

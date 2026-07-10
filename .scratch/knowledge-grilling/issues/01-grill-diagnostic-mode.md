@@ -67,3 +67,5 @@ Two natural entry points to settle at triage:
 - **Scope guard.** This is diagnosis feeding the existing teach loop, not a second teaching engine. The gap map's only job is to steer the Routine.
 
 ## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#27](https://github.com/EPOHnomeL/hindi-learning/issues/27); GitHub is now the tracking home for this ticket.

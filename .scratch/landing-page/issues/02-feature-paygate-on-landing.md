@@ -27,3 +27,7 @@ Keep the **paygate** as one of the landing page's headline features ([issue 01](
 
 - This ticket is **only** the landing-page marketing surface + the merge reminder — it does **not** re-build the paygate (that's the branch's PRD + issues 01–05).
 - To-scope only; not built.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#29](https://github.com/EPOHnomeL/hindi-learning/issues/29); GitHub is now the tracking home for this ticket.

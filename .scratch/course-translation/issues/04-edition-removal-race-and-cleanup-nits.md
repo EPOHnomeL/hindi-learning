@@ -42,3 +42,7 @@ Status: partial — removal race + error-clear shipped (a255df8); remaining: dro
 ## Blocked by
 
 - None — can start immediately.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#21](https://github.com/EPOHnomeL/hindi-learning/issues/21); GitHub is now the tracking home for this ticket.

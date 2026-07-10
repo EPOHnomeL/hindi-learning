@@ -73,3 +73,7 @@ learner reading a Spanish edition still sees an English frame around it. To
 - Consider a fallback banner or subtle marker when chrome is localised but the
   content Edition the reader holds is a different language, so the mixed-language
   state is not read as a bug.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#14](https://github.com/EPOHnomeL/hindi-learning/issues/14); GitHub is now the tracking home for this ticket.

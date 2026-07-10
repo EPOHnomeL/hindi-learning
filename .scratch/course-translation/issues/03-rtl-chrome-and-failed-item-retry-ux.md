@@ -42,3 +42,7 @@ Two related polish items for the Editions reader experience:
 - None to start. RTL-chrome scope should be reconciled with app-language-i18n
   (`.scratch/app-language-i18n/issues/01-global-app-language-picker.md`) so the
   direction handling isn't implemented twice.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#20](https://github.com/EPOHnomeL/hindi-learning/issues/20); GitHub is now the tracking home for this ticket.

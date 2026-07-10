@@ -132,3 +132,5 @@ later run is cheap and consistent:
   word and I'll promote it to a PRD with sub-issues.
 
 ## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#15](https://github.com/EPOHnomeL/hindi-learning/issues/15); GitHub is now the tracking home for this ticket.

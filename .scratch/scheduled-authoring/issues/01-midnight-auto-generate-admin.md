@@ -30,3 +30,7 @@ The Routine authors a **buffer of one**: both the daily `dailyFire` cron (04:23 
 
 - This intentionally **inverts** the buffer-of-one throttle, which is exactly why it's admin-gated and cost-bounded.
 - To-scope only; not built.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#32](https://github.com/EPOHnomeL/hindi-learning/issues/32); GitHub is now the tracking home for this ticket.

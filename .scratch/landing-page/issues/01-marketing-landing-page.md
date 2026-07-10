@@ -34,3 +34,7 @@ An **awesome public landing page** — the front door a logged-out visitor sees,
 - Roadmap deferred this to **Phase 1** (external productisation) — internal-first, so it was never built for the Phase 0 demo.
 - Copy must respect `CONTEXT.md` vocabulary: user-facing "course" maps to a **Topic**; the URL is `/courses/[slug]` (ADR 0012). Prefer Lesson / Reference / Edition / Certificate / Seller / Entitlement.
 - To-scope only — nothing in this ticket is built yet.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#28](https://github.com/EPOHnomeL/hindi-learning/issues/28); GitHub is now the tracking home for this ticket.

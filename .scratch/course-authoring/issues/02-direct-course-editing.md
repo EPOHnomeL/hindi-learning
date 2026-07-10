@@ -39,3 +39,7 @@ Both are edits to a **translated Edition item** (a `translations` row keyed `(to
 
 - Distinct from [issue 01](01-ai-assisted-course-editing.md) (AI-assisted "direct and build"). This ticket is the manual editor: buttons and forms, no agent.
 - To-scope only; not built.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#17](https://github.com/EPOHnomeL/hindi-learning/issues/17); GitHub is now the tracking home for this ticket.

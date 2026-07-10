@@ -36,3 +36,7 @@ No code and no tests — this is the agent contract plus one decision record.
 ## Blocked by
 
 - [01 — `~N lessons` estimate, end-to-end](./01-estimate-end-to-end.md)
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#30](https://github.com/EPOHnomeL/hindi-learning/issues/30); GitHub is now the tracking home for this ticket.

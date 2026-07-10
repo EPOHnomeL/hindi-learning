@@ -38,3 +38,7 @@ Pick the shape at triage.
 
 - v1 / the company demo deliberately stays **seed-and-go**; this issue is the post-demo authoring upgrade.
 - The review gate is independently valuable the moment a course is shared company-wide, even before AI editing lands.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#16](https://github.com/EPOHnomeL/hindi-learning/issues/16); GitHub is now the tracking home for this ticket.

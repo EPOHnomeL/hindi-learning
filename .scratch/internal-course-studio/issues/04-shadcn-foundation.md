@@ -19,3 +19,7 @@ Adopt **shadcn/ui** on the existing Tailwind v4 setup and **reconcile** it with 
 ## Blocked by
 
 None - can start immediately.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#26](https://github.com/EPOHnomeL/hindi-learning/issues/26); GitHub is now the tracking home for this ticket.

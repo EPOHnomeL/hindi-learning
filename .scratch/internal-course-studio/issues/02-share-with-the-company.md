@@ -19,3 +19,7 @@ A prominent **"share with the company"** entry point on a published course, surf
 ## Blocked by
 
 - Issue **01** (reader-visibility state) — distribution gating keys off the published state.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#24](https://github.com/EPOHnomeL/hindi-learning/issues/24); GitHub is now the tracking home for this ticket.

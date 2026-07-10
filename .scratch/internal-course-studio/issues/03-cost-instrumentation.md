@@ -23,3 +23,7 @@ None - can start immediately.
 ## Notes
 
 - The current teaching compute is the shared **claude.ai Routine** (Claude Code on the operator's subscription), which may not surface exact token counts to the report path. Record whatever the run can report; if exact counts are unavailable, capture the gap explicitly. Full-fidelity per-run accounting arrives with the programmatic, provider-agnostic runtime ([ADR 0014](../../../docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md)) — do **not** pull that work forward here. Build the seam so it fills in cleanly when the runtime lands.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#25](https://github.com/EPOHnomeL/hindi-learning/issues/25); GitHub is now the tracking home for this ticket.

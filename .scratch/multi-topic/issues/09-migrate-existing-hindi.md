@@ -30,3 +30,7 @@ multi-tenant model without resetting anything.
 - Do this **last**, behind the schema work; it's the cut-over. Keep a Convex prod
   snapshot before the `git` blob removal (the lesson-5 drift incident is the
   cautionary tale — see [docs/routine.md](../../../docs/routine.md) §6).
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#31](https://github.com/EPOHnomeL/hindi-learning/issues/31); GitHub is now the tracking home for this ticket.

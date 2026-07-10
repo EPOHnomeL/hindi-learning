@@ -43,3 +43,7 @@ the inline HTML entirely so rows are thin and the DB I/O reads collapse.
 ## Blocked by
 
 - Backfill existing rows (migrate) — **and** the prod backfill verified by the operator.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#22](https://github.com/EPOHnomeL/hindi-learning/issues/22); GitHub is now the tracking home for this ticket.

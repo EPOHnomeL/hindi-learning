@@ -24,3 +24,7 @@ Prefactor first: route all Viewer/Guest content reads through a **single** query
 ## Blocked by
 
 None - can start immediately.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#23](https://github.com/EPOHnomeL/hindi-learning/issues/23); GitHub is now the tracking home for this ticket.

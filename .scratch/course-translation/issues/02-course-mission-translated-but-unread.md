@@ -34,3 +34,7 @@ Pick one direction (this is a product call):
 ## Blocked by
 
 - None — can start immediately.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#19](https://github.com/EPOHnomeL/hindi-learning/issues/19); GitHub is now the tracking home for this ticket.

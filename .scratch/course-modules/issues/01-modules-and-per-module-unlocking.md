@@ -30,3 +30,7 @@ Group a Topic's Lessons into **Modules** — named, ordered sections — and sup
 ## Notes
 
 - To-scope only; not built.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#18](https://github.com/EPOHnomeL/hindi-learning/issues/18); GitHub is now the tracking home for this ticket.

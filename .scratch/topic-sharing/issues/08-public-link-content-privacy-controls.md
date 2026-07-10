@@ -30,3 +30,7 @@ see everything).
 ## Depends on
 
 - **07** (the Public link, the Guest, and the token-authorized read seam).
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#35](https://github.com/EPOHnomeL/hindi-learning/issues/35); GitHub is now the tracking home for this ticket.

@@ -40,3 +40,7 @@ bookmarked, or shared. Build on the routing spine (**01**).
 - If a pure not-found predicate or default-Lesson resolver falls out, give it a
   small co-located unit test in the style of `lessonSrcDoc.test.ts` — but don't
   manufacture a seam for router glue.
+
+## Comments
+
+- 2026-07-10 — Migrated to GitHub issue [#36](https://github.com/EPOHnomeL/hindi-learning/issues/36); GitHub is now the tracking home for this ticket.
