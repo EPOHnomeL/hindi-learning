@@ -14,13 +14,17 @@ auth.addHttpRoutes(http);
 // be spoofed). Three verification steps before anything is trusted
 // (.scratch/payfast-payments):
 //   1. the inline-MD5 signature over the fields in RECEIVED order + passphrase;
-//   2. the amount against the stored listing (a tampered/cheap payment never
-//      unlocks a dearer Edition);
+//   2. the amount against the CHECKOUT-INTENT's price — what was listed when
+//      the buyer clicked Buy (a tampered/cheap payment never unlocks a dearer
+//      Edition, and a re-price/un-list after Buy never strands a genuine
+//      payment: once they've paid what was asked, they own it);
 //   3. a server postback to PayFast's /eng/query/validate that must say VALID —
 //      which also subsumes the source-IP allowlist check we deliberately skip
 //      (serverless egress IPs are unreliable to pin).
-// The DB effects live in the idempotent fulfillPurchase (keyed on
-// pf_payment_id), so a PayFast re-delivery is a safe no-op.
+// What to grant (topic/lang) and to whom (the email the buyer typed, which the
+// locked sign-up claims) comes from the intent, our own record — not from the
+// notification's echoed fields. The DB effects live in the idempotent
+// fulfillPurchase (keyed on pf_payment_id), so a PayFast re-delivery is a safe no-op.
 const payfastNotify = httpAction(async (ctx, request) => {
   const raw = await request.text();
   // URLSearchParams preserves the received order — the signature depends on it.
@@ -38,20 +42,20 @@ const payfastNotify = httpAction(async (ctx, request) => {
   if (fields.payment_status !== "COMPLETE") return new Response(null, { status: 200 });
 
   const pfPaymentId = fields.pf_payment_id;
-  const topicId = fields.custom_str1; // what checkout stamped on the payment
-  const lang = fields.custom_str2;
-  const email = fields.email_address;
+  const mPaymentId = fields.m_payment_id; // our checkout-intent reference
   const gross = centsFromRand(fields.amount_gross ?? "");
   const fee = centsFromRand(fields.amount_fee ?? ""); // PayFast sends its fee negative
   const net = centsFromRand(fields.amount_net ?? "");
-  if (!pfPaymentId || !topicId || !lang || !email || gross === null || fee === null || net === null) {
+  if (!pfPaymentId || !mPaymentId || gross === null || fee === null || net === null) {
     return new Response("malformed notification", { status: 400 });
   }
 
-  // Amount match: the buyer must have paid the listed price — checked before
-  // the network hop (cheap rejections first).
-  const expected = await ctx.runQuery(internal.market.listingAmount, { topicId, lang });
-  if (expected === null || expected !== gross) return new Response("amount mismatch", { status: 400 });
+  // Resolve the Buy click this payment answers, and match the paid amount to
+  // the price frozen on it — both checked before the network hop (cheap
+  // rejections first). No intent ⇒ this payment never came from our checkout.
+  const intent = await ctx.runQuery(internal.market.checkoutIntentByRef, { mPaymentId });
+  if (!intent) return new Response("unknown payment reference", { status: 400 });
+  if (intent.amount !== gross) return new Response("amount mismatch", { status: 400 });
 
   // Server postback: PayFast must confirm it really sent this notification.
   // The body is the received fields minus the signature, order preserved.
@@ -70,12 +74,10 @@ const payfastNotify = httpAction(async (ctx, request) => {
 
   try {
     await ctx.runMutation(internal.market.fulfillPurchase, {
-      // Safe cast: listingAmount returned non-null above, which required this
-      // exact string to normalise to a real `topics` id.
       pfPaymentId,
-      topicId: topicId as Id<"topics">,
-      lang,
-      email,
+      topicId: intent.topicId,
+      lang: intent.lang,
+      email: intent.email,
       gross,
       fee: Math.abs(fee),
       net,

@@ -337,11 +337,12 @@ function mockValidate(reply: string, capture?: { url?: string; body?: string }) 
   return fn;
 }
 
-// A genuine ITN field set for `topicId` (custom_str1/2 carry what to grant),
-// signed with the sandbox passphrase — in PayFast's ITN field order.
+// A genuine ITN field set, signed with the sandbox passphrase — in PayFast's
+// ITN field order. `m_payment_id` is the checkout-intent reference the grant
+// resolves through, so tests obtain one from a real startCheckout first.
 function itnFields(topicId: string, over: Record<string, string> = {}): Record<string, string> {
   const base: Record<string, string> = {
-    m_payment_id: "mp_1",
+    m_payment_id: "mp_unknown",
     pf_payment_id: "pf_100",
     payment_status: "COMPLETE",
     item_name: "hindi — English edition",
@@ -355,6 +356,13 @@ function itnFields(topicId: string, over: Record<string, string> = {}): Record<s
     ...over,
   };
   return { ...base, signature: signFields(base, "jt7NOE43FZPn") };
+}
+
+// Click Buy as `email` — returns the checkout-intent reference a genuine ITN
+// would carry back as m_payment_id.
+async function startBuy(t: ReturnType<typeof convexTest>, email = "buyer@example.com") {
+  const { fields } = await t.mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "en", email });
+  return fields.find((f) => f.name === "m_payment_id")!.value;
 }
 
 async function postItn(t: ReturnType<typeof convexTest>, fields: Record<string, string>) {
@@ -393,34 +401,49 @@ test("ITN: a missing or forged signature → 400, nothing written, no postback a
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
+test("ITN: an unknown m_payment_id (no checkout-intent) → rejected, nothing written", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await sellableTopic(t);
+  const fetchMock = mockValidate("VALID");
+
+  // Correctly signed, but no Buy click ever minted this reference.
+  expect((await postItn(t, itnFields(topicId, { m_payment_id: "mp_forged" }))).status).toBe(400);
+  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [], pending: [] });
+  expect(fetchMock).not.toHaveBeenCalled();
+});
+
 test("ITN: a postback that does not return VALID → rejected, nothing written", async () => {
   const t = convexTest(schema, modules);
-  const { topicId } = await paidTopic(t);
+  const { topicId } = await sellableTopic(t);
+  const mp = await startBuy(t);
   mockValidate("INVALID");
 
-  expect((await postItn(t, itnFields(topicId))).status).toBe(400);
+  expect((await postItn(t, itnFields(topicId, { m_payment_id: mp }))).status).toBe(400);
   expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [], pending: [] });
 });
 
-test("ITN: an amount that doesn't match the stored listing → rejected", async () => {
+test("ITN: an amount that doesn't match the checkout-intent's price → rejected", async () => {
   const t = convexTest(schema, modules);
-  const { topicId } = await paidTopic(t); // listed at 1200.00
+  const { topicId } = await sellableTopic(t); // listed at 1200.00 when Buy was clicked
+  const mp = await startBuy(t);
   const fetchMock = mockValidate("VALID");
 
-  // Signed correctly — the buyer paid a genuine 500.00, but that's not the price.
-  expect((await postItn(t, itnFields(topicId, { amount_gross: "500.00" }))).status).toBe(400);
+  // Signed correctly — the buyer paid a genuine 500.00, but that's not what
+  // this checkout was for.
+  expect((await postItn(t, itnFields(topicId, { m_payment_id: mp, amount_gross: "500.00" }))).status).toBe(400);
   expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [], pending: [] });
   expect(fetchMock).not.toHaveBeenCalled(); // cheaper checks run before the network hop
 });
 
 test("ITN: a genuine COMPLETE notification grants once + writes the Ledger; replay is a no-op", async () => {
   const t = convexTest(schema, modules);
-  const { alice, topicId } = await paidTopic(t);
+  const { alice, topicId } = await sellableTopic(t);
   const buyer = await seedUser(t, "buyer@example.com");
+  const mp = await startBuy(t);
   const capture: { url?: string; body?: string } = {};
   mockValidate("VALID", capture);
 
-  expect((await postItn(t, itnFields(topicId))).status).toBe(200);
+  expect((await postItn(t, itnFields(topicId, { m_payment_id: mp }))).status).toBe(200);
 
   // The postback went to the sandbox validate URL, re-sending the received
   // fields minus the signature.
@@ -437,12 +460,41 @@ test("ITN: a genuine COMPLETE notification grants once + writes the Ledger; repl
   ]);
 
   // PayFast re-delivers → same 200, no double grant, no second Ledger row.
-  expect((await postItn(t, itnFields(topicId))).status).toBe(200);
+  expect((await postItn(t, itnFields(topicId, { m_payment_id: mp }))).status).toBe(200);
   expect(await ledgerRows(t)).toHaveLength(1);
   const ents = await t.run((ctx) =>
     ctx.db.query("entitlements").withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", buyer)).collect(),
   );
   expect(ents).toHaveLength(1);
+});
+
+test("ITN: re-pricing or clearing the listing after Buy never strands a genuine payment", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await sellableTopic(t); // listed at 1200.00
+  const buyer = await seedUser(t, "buyer@example.com");
+  const mp = await startBuy(t);
+  mockValidate("VALID");
+
+  // Between Buy and the ITN, the Seller re-prices… and then un-lists entirely.
+  await t.run(async (ctx) => {
+    const listing = await ctx.db
+      .query("listings")
+      .withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "en"))
+      .unique();
+    await ctx.db.delete(listing!._id);
+  });
+
+  // The buyer paid exactly what was listed when they clicked Buy (the
+  // checkout-intent's price) — they own it. The ITN's own email_address may be
+  // the buyer's PayFast account address; the grant keys on the email they
+  // TYPED (the intent's), which the locked sign-up will claim.
+  expect(
+    (await postItn(t, itnFields(topicId, { m_payment_id: mp, email_address: "payfast-account@example.com" }))).status,
+  ).toBe(200);
+  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+    locked: false,
+  });
+  expect(await ledgerRows(t)).toMatchObject([{ buyerEmail: "buyer@example.com", gross: 120000, status: "owed" }]);
 });
 
 // ---- the return page (ticket 05): checkout status + prefilled/locked sign-up --

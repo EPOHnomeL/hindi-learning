@@ -119,11 +119,17 @@ authors out manually against an in-app **Ledger**:
   (`m_payment_id` → email/topicId/lang) is persisted so the return page can prefill+lock
   the sign-up email without racing the ITN.
 - **Access is granted only by the verified ITN.** `POST /payfast/notify` (HTTP action)
-  verifies in three steps — **inline-MD5 signature**, **amount match** against the stored
-  listing, and a **server postback** to PayFast's `/eng/query/validate` requiring `VALID`
-  — then calls the idempotent `fulfillPurchase`. The source-IP allowlist check is
-  deliberately skipped (serverless IP unreliability; the postback subsumes it). Idempotency
-  is keyed on `pf_payment_id` in the `payfastEvents` ledger.
+  verifies in three steps — **inline-MD5 signature**, **amount match**, and a **server
+  postback** to PayFast's `/eng/query/validate` requiring `VALID` — then calls the
+  idempotent `fulfillPurchase`. The source-IP allowlist check is deliberately skipped
+  (serverless IP unreliability; the postback subsumes it). Idempotency is keyed on
+  `pf_payment_id` in the `payfastEvents` ledger. *(Implementation correction: the amount
+  is matched against the **checkout-intent's frozen price** — what was listed when the
+  buyer clicked Buy — not the live listing, which the PRD originally named. Matching the
+  live listing meant a re-price/un-list between Buy and payment rejected a genuine
+  COMPLETE ITN forever: money taken, no grant. Once a buyer has paid what was asked, they
+  own it. The intent — resolved from the ITN's `m_payment_id` — is likewise what names
+  the Edition and the buyer email to grant to, not the notification's echoed fields.)*
 - **Fulfilment writes the Ledger in the same transaction.** `fulfillPurchase` mints the
   Entitlement (or pending Entitlement, keyed on the paid email, carrying `pf_payment_id`)
   **and** writes the Ledger row from the ITN's `amount_net`, so "money in + what we owe"

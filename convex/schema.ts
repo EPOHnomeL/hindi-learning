@@ -416,15 +416,19 @@ export default defineSchema({
     .index("by_topic_email_lang", ["topicId", "email", "lang"]),
 
   // A checkout-intent (.scratch/payfast-payments): one row per Buy click,
-  // linking our `m_payment_id` reference to the buyer's email and the Edition
-  // being bought. The return page resolves it by `m_payment_id` (an unguessable
-  // token — a bearer capability) to prefill+lock the sign-up email without
-  // racing the ITN. Never granted from — access comes only from the verified ITN.
+  // linking our `m_payment_id` reference to the buyer's email, the Edition
+  // being bought, and the PRICE SHOWN at that moment (`amount`, cents). The
+  // return page resolves it by `m_payment_id` (an unguessable token — a bearer
+  // capability) to prefill+lock the sign-up email without racing the ITN, and
+  // the ITN matches the paid amount against `amount` — the intent, not the live
+  // listing, so a re-price/un-list between Buy and payment never strands a
+  // genuine payment. The intent itself grants nothing; only the verified ITN does.
   checkoutIntents: defineTable({
     mPaymentId: v.string(),
     email: v.string(),
     topicId: v.id("topics"),
     lang: v.string(),
+    amount: v.number(),
   }).index("by_m_payment_id", ["mPaymentId"]),
 
   // The ITN idempotency ledger (.scratch/payfast-payments): one row per PayFast

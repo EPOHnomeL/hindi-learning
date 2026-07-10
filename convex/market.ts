@@ -361,17 +361,25 @@ export const checkoutStatus = query({
   },
 });
 
-// The stored price (cents) of an Edition, for the ITN's amount-match check —
-// takes the topic id as a plain string because it arrives from PayFast's
-// custom_str1 (normalised defensively, never trusted). Null when unknown/unpriced.
-export const listingAmount = internalQuery({
-  args: { topicId: v.string(), lang: v.string() },
-  returns: v.union(v.number(), v.null()),
-  handler: async (ctx, { topicId, lang }) => {
-    const id = ctx.db.normalizeId("topics", topicId);
-    if (!id) return null;
-    const listing = await editionPrice(ctx, id, lang);
-    return listing?.amount ?? null;
+// The checkout-intent behind an ITN's `m_payment_id` — the ITN's source of
+// truth for WHAT was bought (topic/lang), for WHOM (the email the buyer typed,
+// which the locked sign-up will claim — the ITN's own email_address may be the
+// buyer's PayFast account address instead), and at WHAT PRICE (the listing as
+// shown at Buy time, so a re-price/un-list after Buy never strands a genuine
+// payment). Null when no Buy click ever minted the reference.
+export const checkoutIntentByRef = internalQuery({
+  args: { mPaymentId: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({ topicId: v.id("topics"), lang: v.string(), email: v.string(), amount: v.number() }),
+  ),
+  handler: async (ctx, { mPaymentId }) => {
+    const intent = await ctx.db
+      .query("checkoutIntents")
+      .withIndex("by_m_payment_id", (q) => q.eq("mPaymentId", mPaymentId))
+      .unique();
+    if (!intent) return null;
+    return { topicId: intent.topicId, lang: intent.lang, email: intent.email, amount: intent.amount };
   },
 });
 
@@ -413,7 +421,9 @@ export const startCheckout = mutation({
     }
 
     const mPaymentId = mintToken();
-    await ctx.db.insert("checkoutIntents", { mPaymentId, email, topicId: topic._id, lang });
+    // The intent freezes the price SHOWN at this Buy click — what the ITN's
+    // amount match verifies against, so a later re-price never strands the payment.
+    await ctx.db.insert("checkoutIntents", { mPaymentId, email, topicId: topic._id, lang, amount: listing.amount });
 
     const title = await translatedTitle(ctx, topic._id, lang, topic.title);
     const editionName = lang === SOURCE_LANG ? "English" : langInfo(lang).name;

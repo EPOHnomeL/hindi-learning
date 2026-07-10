@@ -52,3 +52,10 @@ order) → COMPLETE gate → amount match → postback VALID, then idempotent `f
 between Buy and ITN makes a genuine COMPLETE ITN 400 forever (money in, no grant, no
 record) — spec-induced; consider logging rejected-but-signed ITNs or matching against the
 checkout-intent's amount instead. NOT yet driven against the live sandbox.
+
+**2026-07-10 (agent, follow-up fixed)** — Operator confirmed "if a user owns they own":
+the amount match (and the grant's topic/lang/email) is now anchored to the
+**checkout-intent** — the price frozen at the Buy click — instead of the live listing,
+so a re-price/un-list between Buy and payment never strands a genuine payment. An ITN
+whose `m_payment_id` resolves to no intent is rejected outright. PRD annotated; tests
+pin the re-price/un-list path and the unknown-reference rejection.
