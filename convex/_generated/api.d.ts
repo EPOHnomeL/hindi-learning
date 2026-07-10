@@ -17,6 +17,7 @@ import type * as crons from "../crons.js";
 import type * as emblem from "../emblem.js";
 import type * as http from "../http.js";
 import type * as languages from "../languages.js";
+import type * as ledger from "../ledger.js";
 import type * as lib from "../lib.js";
 import type * as market from "../market.js";
 import type * as payfast from "../payfast.js";
@@ -45,6 +46,7 @@ declare const fullApi: ApiFromModules<{
   emblem: typeof emblem;
   http: typeof http;
   languages: typeof languages;
+  ledger: typeof ledger;
   lib: typeof lib;
   market: typeof market;
   payfast: typeof payfast;

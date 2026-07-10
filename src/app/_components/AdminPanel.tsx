@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import Link from "next/link";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
@@ -69,7 +70,104 @@ function AllowlistManager() {
       )}
 
       <SellersManager />
+      <PayoutsManager />
     </div>
+  );
+}
+
+// What the operator owes each author (.scratch/payfast-payments, ticket 06):
+// the `owed` Ledger rows summed per Seller, with the bank details to EFT to.
+// "Mark paid" flips the listed sales to `paid` with the typed EFT reference —
+// server-enforced Admin-only, never double-counted.
+function PayoutsManager() {
+  const owed = useQuery(api.ledger.owedPayouts);
+  return (
+    <section className="mt-12">
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold tracking-tight text-accent">Payouts</h2>
+        <p className="mt-0.5 text-sm text-soft">What you owe each author, from the sales ledger</p>
+      </div>
+      {owed === undefined ? (
+        <ul className="flex flex-col gap-2" aria-busy>
+          {[0, 1].map((i) => (
+            <li key={i} className="h-16 animate-pulse rounded-xl border border-line bg-card" />
+          ))}
+        </ul>
+      ) : owed.length === 0 ? (
+        <p className="text-sm text-soft">Nothing owed — all sales are paid out.</p>
+      ) : (
+        <ul className="flex flex-col gap-3">
+          {owed.map((o) => (
+            <PayoutRow key={o.email} owed={o} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// Rand formatting for ledger amounts (cents → "R 1 234.56").
+function rand(cents: number): string {
+  return `R ${(cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function PayoutRow({ owed }: { owed: FunctionReturnType<typeof api.ledger.owedPayouts>[number] }) {
+  const markPaid = useMutation(api.ledger.markPaid);
+  const [reference, setReference] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+
+  return (
+    <li className="rounded-xl border border-gold/40 bg-card px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <b className="block truncate text-sm font-semibold text-ink">{owed.email}</b>
+          <span className="text-xs text-soft">
+            {owed.payout
+              ? `${owed.payout.accountHolder} · ${owed.payout.bank} · ${owed.payout.accountNumber} · branch ${owed.payout.branchCode}`
+              : "No bank details on file — ask the author before paying out"}
+          </span>
+        </div>
+        <span className="shrink-0 rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
+          {rand(owed.totalOwed)}
+        </span>
+      </div>
+      <p className="mt-1.5 text-xs text-soft">
+        {owed.sales.length} sale{owed.sales.length === 1 ? "" : "s"} ·{" "}
+        {owed.sales.map((s) => `${s.lang} ${rand(s.authorShare)}`).join(", ")}
+      </p>
+      <form
+        className="mt-2.5 flex flex-wrap items-center gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          setError(false);
+          try {
+            await markPaid({ ids: owed.sales.map((s) => s.id), reference });
+            setReference("");
+          } catch {
+            setError(true);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <input
+          value={reference}
+          onChange={(e) => setReference(e.target.value)}
+          placeholder="EFT reference"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-1.5 text-sm focus:border-gold focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={busy || !reference.trim()}
+          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+        >
+          {busy ? "Recording…" : "Mark paid"}
+        </button>
+        {error && <span className="text-xs text-red-600">Failed — retry</span>}
+      </form>
+    </li>
   );
 }
 
