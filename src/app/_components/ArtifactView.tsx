@@ -333,7 +333,7 @@ function LessonView({
               onClick={() => setEditing(true)}
               aria-label="Edit this lesson"
               title="Edit this lesson"
-              className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent opacity-0 shadow-sm backdrop-blur transition-opacity hover:bg-hi focus:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"
+              className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent opacity-100 shadow-sm backdrop-blur transition-opacity hover:bg-hi focus:opacity-100 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
             >
               ✎ Edit
             </button>
@@ -612,7 +612,7 @@ function ReferenceView({
             onClick={() => setEditing(true)}
             aria-label="Edit this reference"
             title="Edit this reference"
-            className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent opacity-0 shadow-sm backdrop-blur transition-opacity hover:bg-hi focus:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"
+            className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent opacity-100 shadow-sm backdrop-blur transition-opacity hover:bg-hi focus:opacity-100 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
           >
             ✎ Edit
           </button>
