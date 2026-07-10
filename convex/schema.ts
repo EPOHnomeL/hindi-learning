@@ -196,17 +196,21 @@ export default defineSchema({
     cancelRequested: v.optional(v.boolean()),
   }).index("by_topic", ["topicId"]),
 
-  // A Share: grants one Viewer read-only access to one **Edition** — a
-  // (Topic, language) pair (course-translation). `lang` is the granted edition's
-  // BCP-47 code; a Viewer may hold several Shares on one Topic (one per language).
-  // `lang` is optional so pre-translation rows read as the English edition ("en").
-  // `by_viewer` powers "Shared with me"; `by_topic` lists a Topic's Viewers (and
-  // cascades on delete); `by_topic_viewer` lists a Viewer's Editions on a Topic
-  // (dedup is done in-memory over these, since legacy rows carry no `lang`).
+  // A Share: grants one person access to one **Edition** — a (Topic, language)
+  // pair (course-translation). `lang` is the granted edition's BCP-47 code; a
+  // person may hold several Shares on one Topic (one per language). `lang` is
+  // optional so pre-translation rows read as the English edition ("en"). `role`
+  // (ADR 0020) is the access level: absent/`viewer` = read-only, `editor` = may
+  // make the owner's in-place prose edits on that one Edition; absent so every
+  // existing Share stays a Viewer (no migration). `by_viewer` powers "Shared with
+  // me"; `by_topic` lists a Topic's Viewers (and cascades on delete);
+  // `by_topic_viewer` lists a person's Editions on a Topic (dedup is done
+  // in-memory over these, since legacy rows carry no `lang`).
   shares: defineTable({
     topicId: v.id("topics"),
     viewerId: v.id("users"),
     lang: v.optional(v.string()),
+    role: v.optional(v.union(v.literal("viewer"), v.literal("editor"))),
   })
     .index("by_viewer", ["viewerId"])
     .index("by_topic", ["topicId"])
@@ -220,10 +224,13 @@ export default defineSchema({
   // (at most one per (Topic, email)); `by_topic` lists a Topic's open invites and
   // would cascade on Topic delete. `lang` names the invited Edition (optional →
   // English), so an invite claimed at sign-up becomes a language-scoped Share.
+  // `role` (ADR 0020) rides through the claim, so an email can be pre-set as an
+  // Editor before it has an account (absent → viewer).
   pendingShares: defineTable({
     topicId: v.id("topics"),
     email: v.string(),
     lang: v.optional(v.string()),
+    role: v.optional(v.union(v.literal("viewer"), v.literal("editor"))),
   })
     .index("by_email", ["email"])
     .index("by_topic", ["topicId"])
