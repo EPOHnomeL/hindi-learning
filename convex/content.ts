@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { action, internalMutation, internalQuery, mutation, query, type ActionCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, getViewableTopic, heldLangs, pickContentBody, readableLang, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import { assertAdmin, getEditableTopic, getOwnedTopic, getViewableTopic, heldLangs, pickContentBody, readableLang, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import { itemHash, quizStructureMatches } from "./translate";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
@@ -254,7 +254,8 @@ export const lessonEditTarget = internalQuery({
   handler: async (ctx, { topicSlug, key }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    // Owner OR an Editor of the English (source) edition (ADR 0020).
+    const topic = await getEditableTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
     const lesson = await ctx.db
       .query("lessons")
@@ -275,7 +276,8 @@ export const applyLessonEdit = internalMutation({
   handler: async (ctx, { topicSlug, key, storageId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    // Owner OR an Editor of the English (source) edition (ADR 0020).
+    const topic = await getEditableTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
     const lesson = await ctx.db
       .query("lessons")
@@ -427,7 +429,9 @@ export const editReference = mutation({
   handler: async (ctx, { topicSlug, key, storageId }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    // Owner OR an Editor of the English (source) edition — References are
+    // English-source-only, so a translated-edition Editor never reaches here.
+    const topic = await getEditableTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
     const ref = await ctx.db
       .query("references")
@@ -457,7 +461,9 @@ export const translatedLessonEditTarget = internalQuery({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
     if (lang === SOURCE_LANG) throw new Error("not a translated edition");
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    // Owner OR an Editor of THIS translated edition (ADR 0020) — an editor-Share
+    // for lang X never authorises an edit to lang Y.
+    const topic = await getEditableTopic(ctx, userId, topicSlug, lang);
     if (!topic) throw new Error("topic not found");
     const lesson = await ctx.db
       .query("lessons")
@@ -480,7 +486,8 @@ export const applyTranslatedLessonEdit = internalMutation({
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
     if (lang === SOURCE_LANG) throw new Error("not a translated edition");
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    // Owner OR an Editor of THIS translated edition (ADR 0020).
+    const topic = await getEditableTopic(ctx, userId, topicSlug, lang);
     if (!topic) throw new Error("topic not found");
     const lesson = await ctx.db
       .query("lessons")
@@ -587,6 +594,11 @@ export const courseHeader = query({
     v.object({
       title: v.string(),
       role: v.union(v.literal("owner"), v.literal("viewer")),
+      // Whether the caller may make the in-place prose edits on the SERVED
+      // Edition (ADR 0020): the owner, or an Editor of this `lang`. The reader
+      // gates its hover-pencil on this, NOT on `role` — a Viewer of one Edition
+      // may be an Editor of another, so edit rights are per-Edition, not per-role.
+      canEdit: v.boolean(),
       // The reader reads `status` to switch affordances: `completed` (ADR 0015)
       // hides "Generate next lesson" and shows the owner's Reopen control.
       status: v.union(v.literal("seeded"), v.literal("active"), v.literal("completed")),
@@ -607,11 +619,15 @@ export const courseHeader = query({
     const effLang = await readableLang(ctx, topic, userId, lang ?? null);
     if (!effLang) return null;
     const role = topic.ownerId === userId ? ("owner" as const) : ("viewer" as const);
+    // Per-Edition edit capability (ADR 0020), same logic as the edit mutations'
+    // guard: owner, or an Editor of the served lang.
+    const canEdit = (await getEditableTopic(ctx, userId, topicSlug, effLang)) !== null;
     const t = await trOne(ctx, topic._id, effLang, "title", "");
     const editions = await switcherEditions(ctx, topic, userId);
     return {
       title: decodeEntities(t?.text ?? topic.title),
       role,
+      canEdit,
       status: topic.status ?? "active",
       lang: effLang,
       dir: langInfo(effLang).rtl ? ("rtl" as const) : ("ltr" as const),

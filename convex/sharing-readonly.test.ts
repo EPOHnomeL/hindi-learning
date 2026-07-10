@@ -53,12 +53,14 @@ test("courseHeader reports the role: owner, viewer, or null for a stranger", asy
   expect(await asUser(t, owner).query(api.content.courseHeader, { topicSlug: "hindi" })).toEqual({
     title: "Hindi",
     role: "owner",
+    canEdit: true,
     status: "active",
     ...enEdition,
   });
   expect(await asUser(t, viewer).query(api.content.courseHeader, { topicSlug: "hindi" })).toEqual({
     title: "Hindi",
     role: "viewer",
+    canEdit: false,
     status: "active",
     ...enEdition,
   });
