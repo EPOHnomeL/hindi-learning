@@ -311,6 +311,56 @@ export const fulfillPurchase = internalMutation({
   },
 });
 
+// The state of a purchase as seen from the return page, resolved from the
+// checkout-intent by its unguessable `m_payment_id` (a bearer capability, like
+// a Public link — that's what authorises this read). Drives the post-payment
+// sign-up: the paid email to prefill+lock, and how far the money has got:
+//   awaiting-payment    — intent exists, the ITN hasn't landed yet (the page
+//                         shows a pending state; this query is reactive, so it
+//                         resolves the moment the ITN writes)
+//   paid-awaiting-signup — a pending Entitlement waits for this email to sign up
+//   granted             — the email's account holds the Entitlement (signed up,
+//                         or the buyer already had an account when they paid)
+// Read-only and grants nothing: access still comes only from the verified ITN.
+export const checkoutStatus = query({
+  args: { mPaymentId: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      email: v.string(),
+      lang: v.string(),
+      state: v.union(v.literal("awaiting-payment"), v.literal("paid-awaiting-signup"), v.literal("granted")),
+    }),
+  ),
+  handler: async (ctx, { mPaymentId }) => {
+    const intent = await ctx.db
+      .query("checkoutIntents")
+      .withIndex("by_m_payment_id", (q) => q.eq("mPaymentId", mPaymentId))
+      .unique();
+    if (!intent) return null;
+    const base = { email: intent.email, lang: intent.lang };
+    const user = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", intent.email))
+      .unique();
+    if (user) {
+      const ents = await ctx.db
+        .query("entitlements")
+        .withIndex("by_topic_user", (q) => q.eq("topicId", intent.topicId).eq("userId", user._id))
+        .collect();
+      if (ents.some((e) => e.lang === intent.lang)) return { ...base, state: "granted" as const };
+    }
+    const pending = await ctx.db
+      .query("pendingEntitlements")
+      .withIndex("by_topic_email_lang", (q) =>
+        q.eq("topicId", intent.topicId).eq("email", intent.email).eq("lang", intent.lang),
+      )
+      .unique();
+    if (pending) return { ...base, state: "paid-awaiting-signup" as const };
+    return { ...base, state: "awaiting-payment" as const };
+  },
+});
+
 // The stored price (cents) of an Edition, for the ITN's amount-match check —
 // takes the topic id as a plain string because it arrives from PayFast's
 // custom_str1 (normalised defensively, never trusted). Null when unknown/unpriced.

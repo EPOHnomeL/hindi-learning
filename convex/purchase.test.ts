@@ -445,6 +445,82 @@ test("ITN: a genuine COMPLETE notification grants once + writes the Ledger; repl
   expect(ents).toHaveLength(1);
 });
 
+// ---- the return page (ticket 05): checkout status + prefilled/locked sign-up --
+
+test("checkoutStatus walks awaiting-payment → paid-awaiting-signup → granted, keyed on the intent token", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await sellableTopic(t);
+  mockValidate("VALID");
+
+  // An unknown token resolves to null (a guessed/expired link shows nothing).
+  expect(await t.query(api.market.checkoutStatus, { mPaymentId: "nope" })).toBeNull();
+
+  // Buy → intent exists, ITN not yet landed: the page shows a pending state.
+  const { fields } = await t.mutation(api.market.startCheckout, {
+    topicSlug: "hindi",
+    lang: "en",
+    email: "newbuyer@example.com",
+  });
+  const mp = fields.find((f) => f.name === "m_payment_id")!.value;
+  expect(await t.query(api.market.checkoutStatus, { mPaymentId: mp })).toEqual({
+    email: "newbuyer@example.com",
+    lang: "en",
+    state: "awaiting-payment",
+  });
+
+  // The ITN lands (guest → pending Entitlement) → ready to sign up.
+  expect(
+    (await postItn(t, itnFields(topicId, { m_payment_id: mp, email_address: "newbuyer@example.com" }))).status,
+  ).toBe(200);
+  expect(await t.query(api.market.checkoutStatus, { mPaymentId: mp })).toEqual({
+    email: "newbuyer@example.com",
+    lang: "en",
+    state: "paid-awaiting-signup",
+  });
+
+  // Sign-up claims it → granted (the page can now say "sign in / you're in").
+  await signUp(t, "newbuyer@example.com", "hunter2-strong");
+  expect(await t.query(api.market.checkoutStatus, { mPaymentId: mp })).toEqual({
+    email: "newbuyer@example.com",
+    lang: "en",
+    state: "granted",
+  });
+});
+
+test("claim is language-scoped and grants no selling/authoring capability", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi");
+  await addLesson(t, topicId, "0001", 1);
+  await addLesson(t, topicId, "0002", 2);
+  await price(t, topicId, "es", 120000);
+  await price(t, topicId, "ur", 150000);
+
+  // A guest pays for the Spanish Edition only, then signs up.
+  await t.mutation(internal.market.fulfillPurchase, {
+    pfPaymentId: "pf_es",
+    topicId,
+    lang: "es",
+    email: "newbuyer@example.com",
+    ...MONEY,
+  });
+  await signUp(t, "newbuyer@example.com", "hunter2-strong");
+  const buyer = (await t.run((ctx) =>
+    ctx.db.query("users").withIndex("email", (q) => q.eq("email", "newbuyer@example.com")).unique(),
+  ))!._id;
+
+  // Spanish unlocked; Urdu still the paygate.
+  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002", lang: "es" })).toMatchObject({
+    locked: false,
+  });
+  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002", lang: "ur" })).toMatchObject({
+    locked: true,
+  });
+
+  // Buying never escalates: the fresh account holds no selling capability.
+  expect(await asUser(t, buyer).query(api.sellers.sellerStatus, {})).toBe("not-granted");
+});
+
 test("ITN: a non-COMPLETE payment_status is acknowledged but grants nothing", async () => {
   const t = convexTest(schema, modules);
   const { topicId } = await paidTopic(t);
