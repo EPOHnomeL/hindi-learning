@@ -75,7 +75,7 @@ function AllowlistManager() {
   );
 }
 
-// What the operator owes each author (.scratch/payfast-payments, ticket 06):
+// What the operator owes each Seller (.scratch/payfast-payments, ticket 06):
 // the `owed` Ledger rows summed per Seller, with the bank details to EFT to.
 // "Mark paid" flips the listed sales to `paid` with the typed EFT reference —
 // server-enforced Admin-only, never double-counted.
@@ -85,7 +85,7 @@ function PayoutsManager() {
     <section className="mt-12">
       <div className="mb-4">
         <h2 className="text-xl font-semibold tracking-tight text-accent">Payouts</h2>
-        <p className="mt-0.5 text-sm text-soft">What you owe each author, from the sales ledger</p>
+        <p className="mt-0.5 text-sm text-soft">What you owe each seller, from the sales ledger</p>
       </div>
       {owed === undefined ? (
         <ul className="flex flex-col gap-2" aria-busy>
@@ -107,7 +107,7 @@ function PayoutsManager() {
 }
 
 // Rand formatting for ledger amounts (cents → "R 1 234.56").
-function rand(cents: number): string {
+function formatRand(cents: number): string {
   return `R ${(cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
@@ -125,16 +125,16 @@ function PayoutRow({ owed }: { owed: FunctionReturnType<typeof api.ledger.owedPa
           <span className="text-xs text-soft">
             {owed.payout
               ? `${owed.payout.accountHolder} · ${owed.payout.bank} · ${owed.payout.accountNumber} · branch ${owed.payout.branchCode}`
-              : "No bank details on file — ask the author before paying out"}
+              : "No bank details on file — ask the seller before paying out"}
           </span>
         </div>
         <span className="shrink-0 rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
-          {rand(owed.totalOwed)}
+          {formatRand(owed.totalOwed)}
         </span>
       </div>
       <p className="mt-1.5 text-xs text-soft">
         {owed.sales.length} sale{owed.sales.length === 1 ? "" : "s"} ·{" "}
-        {owed.sales.map((s) => `${s.lang} ${rand(s.authorShare)}`).join(", ")}
+        {owed.sales.map((s) => `${s.lang} ${formatRand(s.sellerShare)}`).join(", ")}
       </p>
       <form
         className="mt-2.5 flex flex-wrap items-center gap-2"

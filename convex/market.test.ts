@@ -286,6 +286,27 @@ test("an entitled buyer gets Viewer semantics — own Progress, but no Responses
   ).rejects.toThrow();
 });
 
+test("an entitled buyer who finishes the Edition can claim a Certificate, like any Viewer", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await fixture(t); // status: completed
+  const dave = await seedUser(t, "dave@example.com");
+  await price(t, topicId, "en", 50000, "zar");
+  await entitle(t, topicId, dave, "en");
+
+  // Not yet finished → not eligible.
+  await expect(
+    asUser(t, dave).mutation(api.certificates.claimCertificate, { topicSlug: "hindi", name: "Dave" }),
+  ).rejects.toThrow();
+
+  // The buyer completes every Lesson in their OWN Progress…
+  for (const key of ["0001", "0002"]) {
+    await asUser(t, dave).mutation(api.capture.setProgress, { topicSlug: "hindi", lessonKey: key, status: "completed" });
+  }
+  // …and earns the Certificate (the entitled-≡-Viewer invariant's last leg).
+  const cert = await asUser(t, dave).mutation(api.certificates.claimCertificate, { topicSlug: "hindi", name: "Dave" });
+  expect(cert).toMatchObject({ learnerName: "Dave", lessonCount: 2 });
+});
+
 test("myPurchases lists a buyer's entitled courses with their own progress; others see none", async () => {
   const t = convexTest(schema, modules);
   const { topicId } = await fixture(t);

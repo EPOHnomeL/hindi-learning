@@ -153,13 +153,16 @@ export function platformFeeBps(): number {
   return Math.round(raw);
 }
 
-// Split a sale's net (cents, from the ITN's amount_net) into the author's and the
-// platform's shares (PRD: author = round(net × bps / 10000), remainder platform).
+// Split a sale's net (cents, from the ITN's amount_net) into the Seller's and
+// the platform's shares. The bps is the PLATFORM's cut — its name, and the
+// prior rail's convention (1500 meant a 15% platform take-rate); the PRD's
+// literal formula handed the bps to the seller, which at the decided 5000 is
+// identical but at any other value inverts the economics, so the name wins.
 // The shares always sum back to net and never go negative — rounding neither
 // loses nor mints a cent, even on a fixed-fee-heavy cheap sale.
-export function splitNet(netCents: number, bps: number): { authorShare: number; platformShare: number } {
-  const authorShare = Math.round((netCents * bps) / 10_000);
-  return { authorShare, platformShare: netCents - authorShare };
+export function splitNet(netCents: number, bps: number): { sellerShare: number; platformShare: number } {
+  const platformShare = Math.round((netCents * bps) / 10_000);
+  return { sellerShare: netCents - platformShare, platformShare };
 }
 
 // ---- ZAR formatting -----------------------------------------------------------------

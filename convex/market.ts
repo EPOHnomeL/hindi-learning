@@ -242,7 +242,7 @@ async function alreadyProcessed(ctx: MutationCtx, pfPaymentId: string): Promise<
 }
 
 // Grant access on a verified COMPLETE payment AND record what the operator now
-// owes the author — one seam, one transaction ("money in + what we owe"). If an
+// owes the Seller — one seam, one transaction ("money in + what we owe"). If an
 // account exists for the paid email, mint the Entitlement for that Edition;
 // otherwise mint an email-keyed **pending** Entitlement that becomes real when
 // that email signs up (`claimPendingEntitlements`). The Ledger row records the
@@ -293,7 +293,7 @@ export const fulfillPurchase = internalMutation({
     // the grant AND the payfastEvents row, so PayFast's retry re-runs it whole.
     const topic = await ctx.db.get(topicId);
     if (!topic?.ownerId) throw new Error("sold course has no owner to owe");
-    const { authorShare, platformShare } = splitNet(net, platformFeeBps());
+    const { sellerShare, platformShare } = splitNet(net, platformFeeBps());
     await ctx.db.insert("ledger", {
       topicId,
       lang,
@@ -302,7 +302,7 @@ export const fulfillPurchase = internalMutation({
       gross,
       fee,
       net,
-      authorShare,
+      sellerShare,
       platformShare,
       pfPaymentId,
       status: "owed",
@@ -400,7 +400,7 @@ export const startCheckout = mutation({
     const listing = await editionPrice(ctx, topic._id, lang);
     if (!listing) throw new Error("this edition isn't for sale");
     // The Seller must still be ready (grant + payout bank details): a sale with
-    // nowhere to send the author's cut must never start.
+    // nowhere to send the Seller's cut must never start.
     if (!topic.ownerId || !(await isReadySeller(ctx, topic.ownerId))) {
       throw new Error("this course isn't available for purchase right now");
     }

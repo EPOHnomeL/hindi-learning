@@ -2,15 +2,16 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { getSeller, normaliseEmail, sellerStatusOf, sellerStatusValidator, type SellerStatus } from "./lib";
+import { payoutDetailsValidator } from "./schema";
 import { isCallerAdmin } from "./whitelist";
 
 // Paid marketplace (ADR 0016, PayFast rail — .scratch/payfast-payments): the
 // **Seller** side.
 //
 // Selling is a two-gate capability. The **Admin** grants a User `can-sell` (the
-// presence of a `sellers` row), and the granted author then saves the SA payout
+// presence of a `sellers` row), and the granted Seller then saves the SA payout
 // bank details the operator EFTs their Ledger share to — no external onboarding,
-// authors never register a payment account of their own. Only a Seller with both
+// Sellers never register a payment account of their own. Only a Seller with both
 // (status `ready`) may price an Edition. This module owns the grant/revoke
 // (Admin-only) and the self status query; the bank-details save/read lands with
 // ticket 02.
@@ -18,7 +19,7 @@ import { isCallerAdmin } from "./whitelist";
 // ---- Admin: the can-sell grant (the first gate) -----------------------------
 
 // Grant a User the can-sell capability (Admin-only). Idempotent: a repeat is a
-// no-op that never clobbers an author's saved bank details. The account must
+// no-op that never clobbers a Seller's saved bank details. The account must
 // exist — you grant the capability to a User, not a bare email.
 export const grantCanSell = mutation({
   args: { email: v.string() },
@@ -58,21 +59,13 @@ export const revokeCanSell = mutation({
   },
 });
 
-// An author's SA payout bank details — where the operator EFTs their Ledger share.
-const payoutValidator = v.object({
-  accountHolder: v.string(),
-  bank: v.string(),
-  accountNumber: v.string(),
-  branchCode: v.string(),
-});
-
 // The granted Sellers, their readiness status, and their payout bank details,
 // for the admin portal (Admin-only — the ONLY read that ever returns bank
 // details; the operator needs them to pay out. Never logged.)
 export const listSellers = query({
   args: {},
   returns: v.array(
-    v.object({ email: v.string(), status: sellerStatusValidator, payout: v.union(payoutValidator, v.null()) }),
+    v.object({ email: v.string(), status: sellerStatusValidator, payout: v.union(payoutDetailsValidator, v.null()) }),
   ),
   handler: async (ctx) => {
     if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
@@ -92,13 +85,13 @@ export const listSellers = query({
 // ---- Self: payout bank details (the second gate) ----------------------------
 
 // Save (or correct) the caller's payout bank details — the step that makes a
-// granted author `ready`. Granted-only: without the can-sell grant there is
+// granted Seller `ready`. Granted-only: without the can-sell grant there is
 // nothing these details unlock. Light validation only (the operator eyeballs
 // them before EFTing): every field non-blank, account number and branch code
 // numeric (spaces tolerated and stripped). There is deliberately NO read-back —
 // bank details leave the DB only via the Admin's listSellers.
 export const savePayoutDetails = mutation({
-  args: payoutValidator.fields,
+  args: payoutDetailsValidator.fields,
   returns: v.null(),
   handler: async (ctx, { accountHolder, bank, accountNumber, branchCode }) => {
     const userId = await getAuthUserId(ctx);

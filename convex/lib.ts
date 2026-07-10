@@ -263,7 +263,7 @@ export async function readableLang(
 //   granted-no-payout-details — granted, but no payout bank details on file yet
 //   ready                     — grant + bank details: may price and be paid
 // A Seller (CONTEXT) is only `ready` when both gates are satisfied — a course is
-// never sold with nowhere to send the author's cut. Single source of truth: the
+// never sold with nowhere to send the Seller's cut. Single source of truth: the
 // validator (used by every Convex function that returns a status) and the
 // `SellerStatus` type both derive from this one declaration.
 export const sellerStatusValidator = v.union(

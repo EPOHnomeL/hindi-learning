@@ -2,6 +2,17 @@ import { defineSchema, defineTable } from "convex/server";
 import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
+// A Seller's SA payout bank details — where the operator EFTs their Ledger
+// share. Single source of truth for the shape: the `sellers.payout` field, the
+// save mutation's args (sellers.ts), and the admin payout reads (sellers.ts /
+// ledger.ts) all derive from this one declaration.
+export const payoutDetailsValidator = v.object({
+  accountHolder: v.string(),
+  bank: v.string(),
+  accountNumber: v.string(),
+  branchCode: v.string(),
+});
+
 // The Hub, as Convex tables (see PRD §4). Local workspace files (lessons/,
 // references/) remain the source of truth; `pnpm run publish` mirrors them
 // here. Capture tables (responses/progress/questions) are written by the
@@ -427,10 +438,10 @@ export default defineSchema({
   // The money **Ledger** (.scratch/payfast-payments): one row per sale, written by
   // the verified ITN in the same transaction as the Entitlement. All sales settle
   // into the operator's single PayFast account, so this is the record of what the
-  // operator owes each author: the ITN's gross/fee/net (cents) split 50/50 on net
-  // into authorShare (owed to the author) and platformShare. The operator pays out
+  // operator owes each Seller: the ITN's gross/fee/net (cents) split 50/50 on net
+  // into sellerShare (owed to the Seller) and platformShare. The operator pays out
   // by EFT out of band and flips `owed` → `paid` with a reference — `by_status`
-  // is the owed-per-author rollup's scan.
+  // is the owed-per-Seller rollup's scan.
   ledger: defineTable({
     topicId: v.id("topics"),
     lang: v.string(),
@@ -439,7 +450,7 @@ export default defineSchema({
     gross: v.number(),
     fee: v.number(),
     net: v.number(),
-    authorShare: v.number(),
+    sellerShare: v.number(),
     platformShare: v.number(),
     pfPaymentId: v.string(),
     status: v.union(v.literal("owed"), v.literal("paid")),
@@ -448,8 +459,8 @@ export default defineSchema({
 
   // A **Seller**'s capability record (ADR 0016 / .scratch/payfast-payments).
   // Selling is a two-gate capability: the PRESENCE of a row is the Admin's
-  // **can-sell** grant, and the author then saves the SA payout bank details the
-  // operator EFTs their Ledger share to — no external onboarding, authors never
+  // **can-sell** grant, and the Seller then saves the SA payout bank details the
+  // operator EFTs their Ledger share to — no external onboarding, Sellers never
   // register a payment account. A Seller (CONTEXT) requires BOTH before pricing.
   // Revoking can-sell deletes this row (which stops *new* pricing) but never
   // touches already-sold Entitlements. One row per user; `by_user` is the
@@ -457,13 +468,6 @@ export default defineSchema({
   // a non-admin query, never logged).
   sellers: defineTable({
     userId: v.id("users"),
-    payout: v.optional(
-      v.object({
-        accountHolder: v.string(),
-        bank: v.string(),
-        accountNumber: v.string(),
-        branchCode: v.string(),
-      }),
-    ),
+    payout: v.optional(payoutDetailsValidator),
   }).index("by_user", ["userId"]),
 });

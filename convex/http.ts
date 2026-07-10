@@ -70,8 +70,10 @@ const payfastNotify = httpAction(async (ctx, request) => {
 
   try {
     await ctx.runMutation(internal.market.fulfillPurchase, {
+      // Safe cast: listingAmount returned non-null above, which required this
+      // exact string to normalise to a real `topics` id.
       pfPaymentId,
-      topicId: topicId as Id<"topics">, // normalised by listingAmount above
+      topicId: topicId as Id<"topics">,
       lang,
       email,
       gross,

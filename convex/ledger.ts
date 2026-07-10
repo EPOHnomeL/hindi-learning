@@ -5,13 +5,13 @@ import { isCallerAdmin } from "./whitelist";
 
 // The Ledger admin seam (.scratch/payfast-payments): every sale lands in the
 // operator's single PayFast account, and the `ledger` table (written by the
-// verified ITN) records the author's 50% of net as `owed`. The operator pays
-// authors out by EFT out of band; these two functions are the in-app half —
+// verified ITN) records the Seller's 50% of net as `owed`. The operator pays
+// Sellers out by EFT out of band; these two functions are the in-app half —
 // see what's owed to whom (with the bank details to send it to), and record
 // the payout so a row is never double-counted. Both Admin-only.
 
-// What the operator owes each author right now: the `owed` Ledger rows grouped
-// per Seller, each author's payout bank details (from their sellers row), the
+// What the operator owes each Seller right now: the `owed` Ledger rows grouped
+// per Seller, each Seller's payout bank details (from their sellers row), the
 // total, and the contributing sales (ids feed markPaid). Authors with nothing
 // owed don't appear. Bounded scan: `owed` rows only live until the next manual
 // payout run, so the working set stays small — capped defensively regardless.
@@ -35,7 +35,7 @@ export const owedPayouts = query({
           id: v.id("ledger"),
           lang: v.string(),
           buyerEmail: v.string(),
-          authorShare: v.number(),
+          sellerShare: v.number(),
           at: v.number(),
         }),
       ),
@@ -63,14 +63,14 @@ export const owedPayouts = query({
         return {
           email: user?.email ?? "(unknown)",
           // The bank details to EFT to — null if the grant was since revoked or
-          // the details cleared; the debt still shows (ask the author).
+          // the details cleared; the debt still shows (ask the Seller).
           payout: seller?.payout ?? null,
-          totalOwed: sales.reduce((sum, s) => sum + s.authorShare, 0),
+          totalOwed: sales.reduce((sum, s) => sum + s.sellerShare, 0),
           sales: sales.map((s) => ({
             id: s._id,
             lang: s.lang,
             buyerEmail: s.buyerEmail,
-            authorShare: s.authorShare,
+            sellerShare: s.sellerShare,
             at: s._creationTime,
           })),
         };

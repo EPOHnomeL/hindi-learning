@@ -34,7 +34,7 @@ async function seedSales(t: ReturnType<typeof convexTest>) {
   const topicId = await t.run((ctx) =>
     ctx.db.insert("topics", { ownerId: author, slug: "hindi", title: "Hindi", status: "completed" as const }),
   );
-  const row = (buyer: string, pf: string, authorShare: number) => ({
+  const row = (buyer: string, pf: string, sellerShare: number) => ({
     topicId,
     lang: "en",
     sellerId: author,
@@ -42,8 +42,8 @@ async function seedSales(t: ReturnType<typeof convexTest>) {
     gross: 120000,
     fee: 2760,
     net: 117240,
-    authorShare,
-    platformShare: 117240 - authorShare,
+    sellerShare,
+    platformShare: 117240 - sellerShare,
     pfPaymentId: pf,
     status: "owed" as const,
   });
@@ -68,7 +68,7 @@ test("owedPayouts is Admin-only and sums only owed rows per author, with bank de
     totalOwed: 117240, // 58620 + 58620 — only `owed` rows
   });
   expect(owed[0]!.sales.map((s) => s.id).sort()).toEqual([sale1, sale2].sort());
-  expect(owed[0]!.sales[0]).toMatchObject({ lang: "en", authorShare: 58620, buyerEmail: expect.any(String) });
+  expect(owed[0]!.sales[0]).toMatchObject({ lang: "en", sellerShare: 58620, buyerEmail: expect.any(String) });
 });
 
 test("markPaid is Admin-only, flips owed→paid with a reference, and never double-counts", async () => {

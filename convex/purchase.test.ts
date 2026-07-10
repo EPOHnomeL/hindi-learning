@@ -114,7 +114,7 @@ test("fulfillPurchase (account exists) unlocks the Edition + writes the Ledger; 
       gross: 120000,
       fee: 2760,
       net: 117240,
-      authorShare: 58620,
+      sellerShare: 58620,
       platformShare: 58620,
       pfPaymentId: "pf_1",
       status: "owed",
@@ -433,7 +433,7 @@ test("ITN: a genuine COMPLETE notification grants once + writes the Ledger; repl
     locked: false,
   });
   expect(await ledgerRows(t)).toMatchObject([
-    { sellerId: alice, gross: 120000, fee: 2760, net: 117240, authorShare: 58620, platformShare: 58620, status: "owed" },
+    { sellerId: alice, gross: 120000, fee: 2760, net: 117240, sellerShare: 58620, platformShare: 58620, status: "owed" },
   ]);
 
   // PayFast re-delivers → same 200, no double grant, no second Ledger row.

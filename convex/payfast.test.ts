@@ -128,24 +128,33 @@ test("buildCheckoutFields returns the signed PayFast field set", () => {
 // ---- the net split (50/50 on amount_net) --------------------------------------
 
 test("splitNet halves a normal sale's net and always sums back to it", () => {
-  expect(splitNet(8846, 5000)).toEqual({ authorShare: 4423, platformShare: 4423 });
+  expect(splitNet(8846, 5000)).toEqual({ sellerShare: 4423, platformShare: 4423 });
   // Odd cent: rounding never loses or mints money.
   const odd = splitNet(8847, 5000);
-  expect(odd.authorShare + odd.platformShare).toBe(8847);
-  expect(odd.authorShare).toBeGreaterThanOrEqual(0);
+  expect(odd.sellerShare + odd.platformShare).toBe(8847);
+  expect(odd.sellerShare).toBeGreaterThanOrEqual(0);
   expect(odd.platformShare).toBeGreaterThanOrEqual(0);
+});
+
+test("the bps is the PLATFORM's share — its name, and the platform's take-rate convention", () => {
+  // PLATFORM_FEE_BPS names the platform's cut (the old rail's 1500 meant a 15%
+  // platform take). At 5000 the direction is invisible; at any other value it
+  // must follow the name — the PRD's literal formula had it backwards.
+  expect(splitNet(10000, 2500)).toEqual({ sellerShare: 7500, platformShare: 2500 });
+  expect(splitNet(10000, 0)).toEqual({ sellerShare: 10000, platformShare: 0 });
+  expect(splitNet(10000, 10000)).toEqual({ sellerShare: 0, platformShare: 10000 });
 });
 
 test("splitNet on a fixed-fee-heavy cheap sale still yields non-negative shares summing to net", () => {
   // A R5 course: PayFast's ~R2+2% fee leaves ~257c net. Nothing goes negative.
   const tiny = splitNet(257, 5000);
-  expect(tiny.authorShare + tiny.platformShare).toBe(257);
-  expect(tiny.authorShare).toBeGreaterThanOrEqual(0);
+  expect(tiny.sellerShare + tiny.platformShare).toBe(257);
+  expect(tiny.sellerShare).toBeGreaterThanOrEqual(0);
   expect(tiny.platformShare).toBeGreaterThanOrEqual(0);
   // Degenerate: a 1-cent net still splits without going negative.
   const one = splitNet(1, 5000);
-  expect(one.authorShare + one.platformShare).toBe(1);
-  expect(one.authorShare).toBeGreaterThanOrEqual(0);
+  expect(one.sellerShare + one.platformShare).toBe(1);
+  expect(one.sellerShare).toBeGreaterThanOrEqual(0);
 });
 
 test("platformFeeBps defaults to 5000 and rejects out-of-bounds values", () => {

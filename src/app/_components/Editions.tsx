@@ -338,7 +338,7 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
 }
 
 // The payout bank-details form (paid marketplace, PayFast rail): a granted
-// author saves the SA bank account their earnings are EFT'd to — the step that
+// Seller saves the SA bank account their earnings are EFT'd to — the step that
 // makes them a ready Seller. Write-only by design: details are never read back
 // into any non-admin UI, so the form always starts blank (re-submitting
 // overwrites). Rendered inside the SellEdition gate.
