@@ -5,6 +5,7 @@ import { CertificateCard, type CertificateData } from "./Certificate";
 import { Icon, type IconName } from "./icons";
 import { Logo } from "./Logo";
 import { SignIn } from "./SignIn";
+import { useTheme } from "./ThemeContext";
 
 // The public front door (landing-page/01): what a logged-out visitor sees at `/`.
 // Markets the real product in glossary terms — user-facing "course" is a Topic —
@@ -65,11 +66,11 @@ const FEATURES: { icon: IconName; title: string; body: string }[] = [
 // is a specimen, not a live document.
 const DEMO_CERT: CertificateData = {
   learnerName: "Asha Patel",
-  courseTitle: "Everyday Hindi, from Your Handbook",
+  courseTitle: "The Night Sky, from Your Field Guide",
   lessonCount: 24,
   issuedAt: Date.UTC(2026, 5, 21),
   lang: "en",
-  emblem: { kind: "glyph", glyph: "🪷" },
+  emblem: { kind: "glyph", glyph: "🔭" },
 };
 
 // The demo certificate renders dates via toLocaleDateString, which can disagree
@@ -82,6 +83,23 @@ function DemoCertificate() {
   return <CertificateCard {...DEMO_CERT} />;
 }
 
+// Icon-only light/dark toggle for the landing nav (ADR 0011) — the same compact
+// per-surface copy the Dashboard, CourseShell and PublicReader headers carry.
+function ThemeToggle() {
+  const { theme, toggle } = useTheme();
+  const dark = theme === "dark";
+  return (
+    <button
+      onClick={toggle}
+      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      title={dark ? "Light mode" : "Dark mode"}
+      className="rounded-lg p-1.5 text-soft transition-colors hover:bg-hi hover:text-accent"
+    >
+      <Icon name={dark ? "sun" : "moon"} className="h-4 w-4" />
+    </button>
+  );
+}
+
 export function Landing() {
   return (
     <div className="min-h-screen">
@@ -92,44 +110,37 @@ export function Landing() {
             <Logo className="h-8 w-8 text-accent" />
             <span className="text-lg font-semibold tracking-tight text-accent">My Course</span>
           </span>
-          <a
-            href="#get-started"
-            className="rounded-lg border border-line bg-card/60 px-4 py-1.5 text-sm font-medium text-ink transition-colors hover:border-gold hover:text-accent"
-          >
-            Sign in
-          </a>
+          <span className="flex items-center gap-2">
+            <ThemeToggle />
+            <a
+              href="#get-started"
+              className="rounded-lg border border-line bg-card/60 px-4 py-1.5 text-sm font-medium text-ink transition-colors hover:border-gold hover:text-accent"
+            >
+              Sign in
+            </a>
+          </span>
         </nav>
 
         <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center px-6 pb-24 pt-16 text-center sm:pb-32 sm:pt-24">
-          {/* Devanagari heritage nod — the app's origin, not its limit. Decorative. */}
-          <span
-            aria-hidden
-            className="land-rise font-deva pointer-events-none select-none text-7xl leading-none text-gold/40 sm:text-8xl"
-          >
-            अ
-          </span>
-          <p
-            className="land-rise mt-6 text-xs font-semibold uppercase tracking-[0.35em] text-accent2"
-            style={{ "--d": "80ms" } as CSSProperties}
-          >
+          <p className="land-rise text-xs font-semibold uppercase tracking-[0.35em] text-accent2">
             An AI course studio
           </p>
           <h1
             className="land-rise mt-4 text-4xl font-semibold leading-tight tracking-tight text-ink sm:text-6xl"
-            style={{ "--d": "160ms" } as CSSProperties}
+            style={{ "--d": "80ms" } as CSSProperties}
           >
             Learn anything, grounded in <em className="text-accent">your</em> reading.
           </h1>
           <p
             className="land-rise mt-6 max-w-xl text-base text-soft sm:text-lg"
-            style={{ "--d": "240ms" } as CSSProperties}
+            style={{ "--d": "160ms" } as CSSProperties}
           >
             Seed a topic with the sources you trust, and an AI author writes you an interactive course — lesson by
             lesson, as you learn — all the way to a certificate.
           </p>
           <div
             className="land-rise mt-10 flex flex-wrap items-center justify-center gap-3"
-            style={{ "--d": "320ms" } as CSSProperties}
+            style={{ "--d": "240ms" } as CSSProperties}
           >
             <a
               href="#get-started"
