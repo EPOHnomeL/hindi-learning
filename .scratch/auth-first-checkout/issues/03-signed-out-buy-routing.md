@@ -1,6 +1,6 @@
 # 03 — Signed-out Buy routing: share link → sign-in → dialog open
 
-Status: open
+Status: done
 
 ## Parent
 
@@ -32,3 +32,11 @@ Buy on a Public link routes into the authed app, deep-linked to the same content
 ## Blocked by
 
 - [02 — Auth-first checkout: the account is the buyer](02-auth-first-checkout.md)
+
+## Comments
+
+**2026-07-12 (agent)** — Done in `f23f6f9`. Paygate grew `buyHref` (share reader:
+CTA renders as a Link, no dialog machinery mounts) and `autoOpenBuy` (authed reader:
+`buy=1` opens the dialog on mount). Shared `useBuyMarker()` in editionUrl.ts backs
+SignIn's Create-account default + purchase copy. UI-only — no unit seam per PRD;
+pinned by the live sandbox journey. tsc, 223 tests, build green.

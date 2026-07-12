@@ -1,6 +1,6 @@
 # 01 — Open sign-up; Allowlist becomes the course-creation gate
 
-Status: open
+Status: done
 
 ## Parent
 
@@ -36,3 +36,12 @@ Allowlist now gates.
 ## Blocked by
 
 — (first slice)
+
+## Comments
+
+**2026-07-12 (agent)** — Done in `9e95345`. `createOrUpdateUser` keeps only
+normalise + insert + pending-Share/Entitlement claims (Entitlement claim goes in 05).
+`seedTopic` gates on `isEmailAdmitted`; new `whitelist.amIAllowlisted` hides the
+New-course card for non-members. Deleted the stranger-rejected tests (auth + the
+"payment is the ONLY admission path" case in purchase.test.ts) — behaviour died with
+the gate. 222 tests, tsc, build green.

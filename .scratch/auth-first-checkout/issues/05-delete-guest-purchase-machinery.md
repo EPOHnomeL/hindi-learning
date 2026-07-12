@@ -1,6 +1,6 @@
 # 05 — Delete the guest-purchase machinery
 
-Status: open
+Status: done
 
 ## Parent
 
@@ -34,3 +34,13 @@ With auth-first live, the account-less buy path is unreachable — delete it.
 - [02 — Auth-first checkout: the account is the buyer](02-auth-first-checkout.md)
 - [04 — Return UX: confirming banner, reactive unlock](04-return-confirming-banner.md)
   (SignIn's locked-email consumer of `checkoutStatus.email` must be gone first)
+
+## Comments
+
+**2026-07-12 (agent)** — Done in `45cb273` (net −113 lines). Table, claim/has
+helpers, auth claim call, and the fulfilPurchase pending branch all gone;
+`pendingShares` untouched. The throw test asserts events/ledger/entitlements are ALL
+empty after a no-account fulfil (the retry-ability invariant); the checkoutStatus
+walk test is strict-equality so an email field can't creep back. 226 tests, tsc,
+build green. NOTE for merge: the schema drop means prod deploy removes
+`pendingEntitlements` — verify prod marketplace tables are empty first (handoff §2).

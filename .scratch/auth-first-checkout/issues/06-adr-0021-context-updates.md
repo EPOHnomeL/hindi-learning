@@ -1,6 +1,6 @@
 # 06 — ADR 0021 + CONTEXT.md: record the new Allowlist semantics
 
-Status: open
+Status: done
 
 ## Parent
 
@@ -36,3 +36,12 @@ The decision record for what this feature changed about the domain.
 
 - [05 — Delete the guest-purchase machinery](05-delete-guest-purchase-machinery.md)
   (write the record once the behaviour it records is true)
+
+## Comments
+
+**2026-07-12 (agent)** — Done in `407e064`. ADR 0021 written + linked from a
+superseded-in-part banner on ADR 0011; CONTEXT.md Allowlist/Admin/Seller/Share
+entries and the Monetisation reshaping bullets updated; the knowledge-bank ADR
+registry (docs/architecture/index.html) lists 0021. Sweep grep for private-
+workspace/guest-buying/locked-sign-up language over convex/, src/, CONTEXT.md is
+clean. Number 0021 assumes main's ADR 0020 — re-check at merge.

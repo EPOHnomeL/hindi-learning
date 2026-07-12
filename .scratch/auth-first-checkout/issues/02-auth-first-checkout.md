@@ -1,6 +1,6 @@
 # 02 — Auth-first checkout: the account is the buyer
 
-Status: open
+Status: done
 
 ## Parent
 
@@ -31,3 +31,11 @@ Status: open
 
 - [01 — Open sign-up; Allowlist becomes the course-creation gate](01-open-signup-allowlist-creation-gate.md)
   (a routed Guest must be able to sign up before this flow makes sense end-to-end)
+
+## Comments
+
+**2026-07-12 (agent)** — Done in `fd54164`. `startCheckout` args are now
+`{topicSlug, lang}` only; anonymous callers throw before any write, the intent email
+is the account's (re-normalised defensively). BuyDialog is summary + price + one
+button. Test count 222 → 223 (new anonymous-caller case; the bad-email case died
+with the argument). tsc, tests, build green.

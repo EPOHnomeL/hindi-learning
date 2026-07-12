@@ -1,6 +1,6 @@
 # 04 — Return UX: confirming banner, reactive unlock
 
-Status: open
+Status: done
 
 ## Parent
 
@@ -34,3 +34,11 @@ confirming state that resolves itself.
 ## Blocked by
 
 - [02 — Auth-first checkout: the account is the buyer](02-auth-first-checkout.md)
+
+## Comments
+
+**2026-07-12 (agent)** — Done in `3b4ee9b`. The redirect param-carry is an extracted
+pure `courseIndexRedirect()` in readerDerive.ts with unit tests (the "pinned where
+cheap" option — readerDerive.test.ts already existed). Banner lives in CourseShell
+(mounted once per course, over the content pane); SignIn is back to a plain
+email+password form. 226 tests, tsc, build green.
