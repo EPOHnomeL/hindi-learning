@@ -322,13 +322,13 @@ export default defineSchema({
     .index("by_topic_lang_kind_key", ["topicId", "lang", "kind", "key"]),
 
   // One translation job per (Topic, language) — the Editions panel's live status
-  // AND the single-flight lock for the translate Routine (mirrors `generation`).
+  // AND the single-flight lock for the translate run (mirrors `generation`).
   // Seeded "translating" by `startTranslation` on a completed course, which then
-  // fires the routine; the fired run claims it (`claimTranslation` stamps
-  // `claimedAt`/`runId`), `publishTranslation` ticks `done` per item, and
-  // `reportTranslation` flips it "ready" (unpublished items → `failed`, English
-  // fallback) or "failed". `total` counts translatable items. Reused (patched) on
-  // re-translate.
+  // schedules the Gemini translate action; `publishTranslation` ticks `done` per
+  // item, and `reportTranslation` flips it "ready" (unpublished items → `failed`,
+  // English fallback) or "failed". `total` counts translatable items. Reused
+  // (patched) on re-translate — a re-fire RESUMES: `done` is re-seeded with the
+  // items whose translation is already fresh, and the run skips them.
   translationJobs: defineTable({
     topicId: v.id("topics"),
     lang: v.string(),
@@ -337,7 +337,10 @@ export default defineSchema({
     done: v.number(),
     failed: v.number(),
     error: v.optional(v.string()),
-    // Set when a fired run claims this job; keeps a second run from grabbing it.
+    // The run's heartbeat: stamped at acquire, re-stamped by every published
+    // item. A "translating" job whose heartbeat goes silent (the action was
+    // killed infra-side, so nothing ever reported) is presumed dead and its
+    // lock may be retaken (see translate.ts STALE_MS).
     claimedAt: v.optional(v.number()),
     runId: v.optional(v.string()),
   })

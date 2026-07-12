@@ -213,7 +213,13 @@ test("claim → publish → report round-trips one Edition, and the reader serve
   await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" });
 
   const secret = "test-secret";
-  // The run claims the pending Edition — it learns the (Topic, language, owner).
+  // The acquire's heartbeat marks the job live (the Gemini action owns it); the
+  // legacy claim seam may only steal DEAD work, so age the heartbeat first.
+  await t.run(async (ctx) => {
+    const job = await ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique();
+    await ctx.db.patch(job!._id, { claimedAt: Date.now() - 11 * 60 * 1000 });
+  });
+  // The run claims the dead Edition — it learns the (Topic, language, owner).
   const claim = await t.mutation(api.translate.claimTranslation, { secret, runId: "r1" });
   expect(claim).toMatchObject({ topicSlug: "hindi", lang: "es", ownerEmail: "alice@example.com" });
   // A second claim finds nothing — the job is now claimed (single-flight).
