@@ -242,13 +242,15 @@ async function alreadyProcessed(ctx: MutationCtx, pfPaymentId: string): Promise<
 }
 
 // Grant access on a verified COMPLETE payment AND record what the operator now
-// owes the Seller — one seam, one transaction ("money in + what we owe"). If an
-// account exists for the paid email, mint the Entitlement for that Edition;
-// otherwise mint an email-keyed **pending** Entitlement that becomes real when
-// that email signs up (`claimPendingEntitlements`). The Ledger row records the
-// ITN's gross/fee/net (cents) with the net split 50/50 (splitNet), status
-// `owed`. Idempotent per pf_payment_id and per (buyer, Topic, language) — a
-// replay, or a buyer who already holds it, is a no-op.
+// owes the Seller — one seam, one transaction ("money in + what we owe"). The
+// intent email is an ACCOUNT's (auth-first checkout froze it at Buy), so the
+// Entitlement mints directly onto that user; no account means something is
+// deeply wrong and the mutation throws — the rollback un-records the
+// payfastEvents row too, so PayFast's ITN retry re-runs it whole and money is
+// never silently dropped. The Ledger row records the ITN's gross/fee/net
+// (cents) with the net split 50/50 (splitNet), status `owed`. Idempotent per
+// pf_payment_id and per (buyer, Topic, language) — a replay, or a buyer who
+// already holds it, is a no-op.
 export const fulfillPurchase = internalMutation({
   args: {
     pfPaymentId: v.string(),
@@ -272,22 +274,13 @@ export const fulfillPurchase = internalMutation({
       .query("users")
       .withIndex("email", (q) => q.eq("email", email))
       .unique();
-    if (user) {
-      const existing = await ctx.db
-        .query("entitlements")
-        .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", user._id))
-        .collect();
-      if (!existing.some((e) => e.lang === lang)) {
-        await ctx.db.insert("entitlements", { userId: user._id, topicId, lang, pfPaymentId });
-      }
-    } else {
-      const existing = await ctx.db
-        .query("pendingEntitlements")
-        .withIndex("by_topic_email_lang", (q) => q.eq("topicId", topicId).eq("email", email).eq("lang", lang))
-        .unique();
-      if (!existing) {
-        await ctx.db.insert("pendingEntitlements", { email, topicId, lang, pfPaymentId });
-      }
+    if (!user) throw new Error(`no account for intent email — cannot fulfil ${pfPaymentId}`);
+    const existing = await ctx.db
+      .query("entitlements")
+      .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", user._id))
+      .collect();
+    if (!existing.some((e) => e.lang === lang)) {
+      await ctx.db.insert("entitlements", { userId: user._id, topicId, lang, pfPaymentId });
     }
     // The Ledger row — what this sale means in money. A throw here rolls back
     // the grant AND the payfastEvents row, so PayFast's retry re-runs it whole.
@@ -313,23 +306,21 @@ export const fulfillPurchase = internalMutation({
 
 // The state of a purchase as seen from the return page, resolved from the
 // checkout-intent by its unguessable `m_payment_id` (a bearer capability, like
-// a Public link — that's what authorises this read). Drives the post-payment
-// sign-up: the paid email to prefill+lock, and how far the money has got:
-//   awaiting-payment    — intent exists, the ITN hasn't landed yet (the page
-//                         shows a pending state; this query is reactive, so it
-//                         resolves the moment the ITN writes)
-//   paid-awaiting-signup — a pending Entitlement waits for this email to sign up
-//   granted             — the email's account holds the Entitlement (signed up,
-//                         or the buyer already had an account when they paid)
-// Read-only and grants nothing: access still comes only from the verified ITN.
+// a Public link — that's what authorises this read). Drives the confirming
+// banner:
+//   awaiting-payment — intent exists, the ITN hasn't landed yet (the banner
+//                      shows; this query is reactive, so it resolves the
+//                      moment the ITN writes)
+//   granted          — the intent's account holds the Entitlement
+// Carries NO email — a bearer-token query must not leak PII. Read-only and
+// grants nothing: access still comes only from the verified ITN.
 export const checkoutStatus = query({
   args: { mPaymentId: v.string() },
   returns: v.union(
     v.null(),
     v.object({
-      email: v.string(),
       lang: v.string(),
-      state: v.union(v.literal("awaiting-payment"), v.literal("paid-awaiting-signup"), v.literal("granted")),
+      state: v.union(v.literal("awaiting-payment"), v.literal("granted")),
     }),
   ),
   handler: async (ctx, { mPaymentId }) => {
@@ -338,7 +329,6 @@ export const checkoutStatus = query({
       .withIndex("by_m_payment_id", (q) => q.eq("mPaymentId", mPaymentId))
       .unique();
     if (!intent) return null;
-    const base = { email: intent.email, lang: intent.lang };
     const user = await ctx.db
       .query("users")
       .withIndex("email", (q) => q.eq("email", intent.email))
@@ -348,16 +338,9 @@ export const checkoutStatus = query({
         .query("entitlements")
         .withIndex("by_topic_user", (q) => q.eq("topicId", intent.topicId).eq("userId", user._id))
         .collect();
-      if (ents.some((e) => e.lang === intent.lang)) return { ...base, state: "granted" as const };
+      if (ents.some((e) => e.lang === intent.lang)) return { lang: intent.lang, state: "granted" as const };
     }
-    const pending = await ctx.db
-      .query("pendingEntitlements")
-      .withIndex("by_topic_email_lang", (q) =>
-        q.eq("topicId", intent.topicId).eq("email", intent.email).eq("lang", intent.lang),
-      )
-      .unique();
-    if (pending) return { ...base, state: "paid-awaiting-signup" as const };
-    return { ...base, state: "awaiting-payment" as const };
+    return { lang: intent.lang, state: "awaiting-payment" as const };
   },
 });
 

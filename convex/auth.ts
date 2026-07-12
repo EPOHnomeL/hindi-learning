@@ -1,6 +1,6 @@
 import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
-import { claimPendingEntitlements, claimPendingShares } from "./lib";
+import { claimPendingShares } from "./lib";
 
 // Convex Auth (PRD §6 — auth must "just work"). Email + password to start;
 // add OAuth providers here later if wanted. No JWT/cookie plumbing of our own.
@@ -26,12 +26,9 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       // Existing account → sign-in/link, not a new sign-up.
       if (existingUserId !== null) return existingUserId;
       const email = String(profile.email ?? "").trim().toLowerCase();
-      // New account → claim anything waiting on this email before it existed:
-      // pending Shares become real Shares, and pending Entitlements (paid
-      // purchases) become real Entitlements.
+      // New account → claim any Shares invited to this email before it existed.
       const userId = await ctx.db.insert("users", { email });
       await claimPendingShares(ctx, userId, email);
-      await claimPendingEntitlements(ctx, userId, email);
       return userId;
     },
   },

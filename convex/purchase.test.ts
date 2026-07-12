@@ -6,13 +6,13 @@ import schema from "./schema";
 import { signFields, verifySignature } from "./payfast";
 import type { Id } from "./_generated/dataModel";
 
-// Paid marketplace — the purchase-fulfilment seam (.scratch/payfast-payments).
-// Access is granted ONLY by the verified PayFast ITN, which calls the idempotent
-// `fulfillPurchase` — tested here directly, no network (the ITN HTTP boundary
-// itself is ticket 04's seam). We assert external behaviour at the reader seam
-// (what the buyer can read), the idempotency ledger (a replayed pf_payment_id
-// never double-grants), the account-exists vs pending-then-claim split,
-// lang-scoping, and the Allowlist admission of a paid email.
+// Paid marketplace — the purchase-fulfilment seam (.scratch/payfast-payments,
+// auth-first per .scratch/auth-first-checkout). Access is granted ONLY by the
+// verified PayFast ITN, which calls the idempotent `fulfillPurchase` — tested
+// here directly, no network (the ITN HTTP boundary itself is ticket 04's seam).
+// We assert external behaviour at the reader seam (what the buyer can read),
+// the idempotency ledger (a replayed pf_payment_id never double-grants),
+// lang-scoping, and that a no-account intent email fails loudly (retryable).
 
 const modules = import.meta.glob("./**/*.ts");
 
@@ -171,48 +171,24 @@ test("a minted Entitlement is language-scoped — buying es doesn't unlock ur", 
   });
 });
 
-test("a purchase with no account mints a pending Entitlement, claimed (and admitted) on sign-up", async () => {
+test("fulfillPurchase with an intent email matching no account throws and persists nothing", async () => {
   const t = convexTest(schema, modules);
   const { topicId } = await paidTopic(t);
 
-  // Buyer has no account and is NOT on the Allowlist — payment is what admits them.
-  await t.mutation(internal.market.fulfillPurchase, {
-    pfPaymentId: "pf_9",
-    topicId,
-    lang: "en",
-    email: "newbuyer@example.com",
-    ...MONEY,
-  });
-  const pendingBefore = await t.run((ctx) =>
-    ctx.db.query("pendingEntitlements").withIndex("by_email", (q) => q.eq("email", "newbuyer@example.com")).collect(),
-  );
-  expect(pendingBefore).toHaveLength(1);
-  // A guest sale still writes the Ledger — the operator owes the author either way.
-  expect(await ledgerRows(t)).toMatchObject([{ buyerEmail: "newbuyer@example.com", status: "owed" }]);
-
-  // Sign up — the paid purchase admits them though sign-up is otherwise closed.
-  await signUp(t, "newbuyer@example.com", "hunter2-strong");
-
-  const { buyerId, ents, pendingAfter } = await t.run(async (ctx) => {
-    const u = await ctx.db.query("users").withIndex("email", (q) => q.eq("email", "newbuyer@example.com")).unique();
-    const ents = await ctx.db
-      .query("entitlements")
-      .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", u!._id))
-      .collect();
-    const pendingAfter = await ctx.db
-      .query("pendingEntitlements")
-      .withIndex("by_email", (q) => q.eq("email", "newbuyer@example.com"))
-      .collect();
-    return { buyerId: u!._id, ents, pendingAfter };
-  });
-  // The pending purchase became a real Entitlement carrying the PayFast payment
-  // id (provenance back to the sale), and the pending row is cleared.
-  expect(ents).toHaveLength(1);
-  expect(ents[0]).toMatchObject({ lang: "en", pfPaymentId: "pf_9" });
-  expect(pendingAfter).toEqual([]);
-  expect(await asUser(t, buyerId).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
-    locked: false,
-  });
+  // Auth-first: checkout can't mint a guest intent any more, so no-account here
+  // means something is deeply wrong. Fail loudly — the throw rolls back the
+  // whole transaction INCLUDING the payfastEvents idempotency row, so PayFast's
+  // ITN retry re-runs it whole and money is never silently dropped.
+  await expect(
+    t.mutation(internal.market.fulfillPurchase, {
+      pfPaymentId: "pf_9",
+      topicId,
+      lang: "en",
+      email: "ghost@example.com",
+      ...MONEY,
+    }),
+  ).rejects.toThrow();
+  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [] });
 });
 
 // ---- checkout initiation (ticket 03): the signed PayFast form ----------------
@@ -386,7 +362,6 @@ async function itnWrites(t: ReturnType<typeof convexTest>) {
     events: await ctx.db.query("payfastEvents").take(10),
     ledger: await ctx.db.query("ledger").take(10),
     ents: await ctx.db.query("entitlements").take(10),
-    pending: await ctx.db.query("pendingEntitlements").take(10),
   }));
 }
 
@@ -404,7 +379,7 @@ test("ITN: a missing or forged signature → 400, nothing written, no postback a
   forged.amount_gross = "0.01";
   expect((await postItn(t, forged)).status).toBe(400);
 
-  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [], pending: [] });
+  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [] });
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
@@ -415,7 +390,7 @@ test("ITN: an unknown m_payment_id (no checkout-intent) → rejected, nothing wr
 
   // Correctly signed, but no Buy click ever minted this reference.
   expect((await postItn(t, itnFields(topicId, { m_payment_id: "mp_forged" }))).status).toBe(400);
-  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [], pending: [] });
+  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [] });
   expect(fetchMock).not.toHaveBeenCalled();
 });
 
@@ -426,7 +401,7 @@ test("ITN: a postback that does not return VALID → rejected, nothing written",
   mockValidate("INVALID");
 
   expect((await postItn(t, itnFields(topicId, { m_payment_id: mp }))).status).toBe(400);
-  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [], pending: [] });
+  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [] });
 });
 
 test("ITN: an amount that doesn't match the checkout-intent's price → rejected", async () => {
@@ -438,7 +413,7 @@ test("ITN: an amount that doesn't match the checkout-intent's price → rejected
   // Signed correctly — the buyer paid a genuine 500.00, but that's not what
   // this checkout was for.
   expect((await postItn(t, itnFields(topicId, { m_payment_id: mp, amount_gross: "500.00" }))).status).toBe(400);
-  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [], pending: [] });
+  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [] });
   expect(fetchMock).not.toHaveBeenCalled(); // cheaper checks run before the network hop
 });
 
@@ -515,10 +490,11 @@ test("checkoutStatus walks awaiting-payment → granted, keyed on the intent tok
   expect(await t.query(api.market.checkoutStatus, { mPaymentId: "nope" })).toBeNull();
 
   // Buy (auth-first: the account exists before checkout) → intent exists, ITN
-  // not yet landed: the return page shows the confirming state.
+  // not yet landed: the return page shows the confirming state. Strict equality:
+  // the shape carries NO email (a bearer-token query must not leak PII).
   await signUp(t, "newbuyer@example.com", "hunter2-strong");
   const mp = await startBuy(t, "newbuyer@example.com");
-  expect(await t.query(api.market.checkoutStatus, { mPaymentId: mp })).toMatchObject({
+  expect(await t.query(api.market.checkoutStatus, { mPaymentId: mp })).toEqual({
     lang: "en",
     state: "awaiting-payment",
   });
@@ -527,43 +503,33 @@ test("checkoutStatus walks awaiting-payment → granted, keyed on the intent tok
   expect(
     (await postItn(t, itnFields(topicId, { m_payment_id: mp, email_address: "newbuyer@example.com" }))).status,
   ).toBe(200);
-  expect(await t.query(api.market.checkoutStatus, { mPaymentId: mp })).toMatchObject({
+  expect(await t.query(api.market.checkoutStatus, { mPaymentId: mp })).toEqual({
     lang: "en",
     state: "granted",
   });
 });
 
-test("claim is language-scoped and grants no selling/authoring capability", async () => {
+test("a purchase grants no selling/authoring capability", async () => {
   const t = convexTest(schema, modules);
-  const alice = await seedUser(t, "alice@example.com");
-  const topicId = await seedTopic(t, alice, "hindi");
-  await addLesson(t, topicId, "0001", 1);
-  await addLesson(t, topicId, "0002", 2);
-  await price(t, topicId, "es", 120000);
-  await price(t, topicId, "ur", 150000);
+  const { topicId } = await paidTopic(t);
 
-  // A guest pays for the Spanish Edition only, then signs up.
+  // A fresh account buys (auth-first: the account exists before the ITN).
+  await signUp(t, "newbuyer@example.com", "hunter2-strong");
   await t.mutation(internal.market.fulfillPurchase, {
-    pfPaymentId: "pf_es",
+    pfPaymentId: "pf_en",
     topicId,
-    lang: "es",
+    lang: "en",
     email: "newbuyer@example.com",
     ...MONEY,
   });
-  await signUp(t, "newbuyer@example.com", "hunter2-strong");
   const buyer = (await t.run((ctx) =>
     ctx.db.query("users").withIndex("email", (q) => q.eq("email", "newbuyer@example.com")).unique(),
   ))!._id;
 
-  // Spanish unlocked; Urdu still the paygate.
-  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002", lang: "es" })).toMatchObject({
+  // They can read what they bought — and nothing more: no selling capability.
+  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     locked: false,
   });
-  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002", lang: "ur" })).toMatchObject({
-    locked: true,
-  });
-
-  // Buying never escalates: the fresh account holds no selling capability.
   expect(await asUser(t, buyer).query(api.sellers.sellerStatus, {})).toBe("not-granted");
 });
 
@@ -573,5 +539,5 @@ test("ITN: a non-COMPLETE payment_status is acknowledged but grants nothing", as
   mockValidate("VALID");
 
   expect((await postItn(t, itnFields(topicId, { payment_status: "CANCELLED" }))).status).toBe(200);
-  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [], pending: [] });
+  expect(await itnWrites(t)).toEqual({ events: [], ledger: [], ents: [] });
 });

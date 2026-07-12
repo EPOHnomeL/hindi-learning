@@ -395,34 +395,16 @@ export default defineSchema({
     .index("by_topic", ["topicId"])
     .index("by_topic_user", ["topicId", "userId"]),
 
-  // A **pending Entitlement** (ADR 0016): a paid purchase for an email that has
-  // *no account yet* — the paid twin of a `pendingShares` invite. Minted by the
-  // verified ITN when the buyer's email has no `users` row, and turned into a
-  // real (language-scoped) Entitlement by `claimPendingEntitlements` the moment
-  // that email signs up. Carries the `lang` so the claimed access is scoped to the
-  // Edition bought. `by_email` is the claim-on-sign-up lookup and the Allowlist
-  // admission check (a paid email may sign up though sign-up is otherwise closed);
-  // `by_topic_email_lang` dedups a purchase; `by_topic` cascades on Topic delete.
-  pendingEntitlements: defineTable({
-    email: v.string(),
-    topicId: v.id("topics"),
-    lang: v.string(),
-    // The PayFast payment that bought it — copied onto the real Entitlement when
-    // the buyer claims it. Optional for rows minted by the manual Admin grant.
-    pfPaymentId: v.optional(v.string()),
-  })
-    .index("by_email", ["email"])
-    .index("by_topic", ["topicId"])
-    .index("by_topic_email_lang", ["topicId", "email", "lang"]),
-
-  // A checkout-intent (.scratch/payfast-payments): one row per Buy click,
-  // linking our `m_payment_id` reference to the buyer's email, the Edition
-  // being bought, and the PRICE SHOWN at that moment (`amount`, cents). The
-  // return page resolves it by `m_payment_id` (an unguessable token — a bearer
-  // capability) to prefill+lock the sign-up email without racing the ITN, and
-  // the ITN matches the paid amount against `amount` — the intent, not the live
-  // listing, so a re-price/un-list between Buy and payment never strands a
-  // genuine payment. The intent itself grants nothing; only the verified ITN does.
+  // A checkout-intent (.scratch/payfast-payments, auth-first per
+  // .scratch/auth-first-checkout): one row per Buy click, linking our
+  // `m_payment_id` reference to the buyer's ACCOUNT email (frozen at Buy —
+  // never a typed argument), the Edition being bought, and the PRICE SHOWN at
+  // that moment (`amount`, cents). The return page resolves it by
+  // `m_payment_id` (an unguessable token — a bearer capability) to drive the
+  // confirming banner, and the ITN matches the paid amount against `amount` —
+  // the intent, not the live listing, so a re-price/un-list between Buy and
+  // payment never strands a genuine payment. The intent itself grants nothing;
+  // only the verified ITN does.
   checkoutIntents: defineTable({
     mPaymentId: v.string(),
     email: v.string(),
