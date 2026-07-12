@@ -9,10 +9,12 @@ import { Dialog } from "./ui";
 // The paygate (paid marketplace, ADR 0016 / PayFast rail). A caller reading a
 // PAID Edition they don't hold gets the free Preview (the first Lesson); every
 // other Lesson and Reference renders this in place of the content — an explicit
-// locked state, never a blank pane. The buy dialog captures the buyer's email,
-// calls `market.startCheckout` for the signed PayFast field set, and form-POSTs
-// it to PayFast's hosted checkout. Access is granted only by the verified ITN
-// on PayFast's side, never by the return redirect itself.
+// locked state, never a blank pane. Checkout is auth-first (ADR 0021): the buy
+// dialog shows the course + price and calls `market.startCheckout`, which
+// derives the buyer from the signed-in account (no email input) and returns the
+// signed PayFast field set to form-POST to PayFast's hosted checkout. Access is
+// granted only by the verified ITN on PayFast's side, never by the return
+// redirect itself.
 
 export type Paywall = { amount: number; currency: string; previewKey: string | null };
 
@@ -103,12 +105,13 @@ export function Paygate({
   );
 }
 
-// The purchase summary → PayFast's hosted checkout. Captures the buyer's email
-// (Guests need no account — the paid email is what access attaches to), calls
-// `market.startCheckout` for the signed field set, and auto-submits it as a
-// form POST to the hosted process URL. On PayFast's side the verified ITN
-// grants access — never the return redirect. Falls back to an "unavailable"
-// note if the caller couldn't supply the Edition to buy.
+// The purchase summary → PayFast's hosted checkout. The buyer is the signed-in
+// account (auth-first — checkout derives the email server-side), so this is
+// just the course, the price, and one button: `market.startCheckout` returns
+// the signed field set, auto-submitted as a form POST to the hosted process
+// URL. On PayFast's side the verified ITN grants access — never the return
+// redirect. Falls back to an "unavailable" note if the caller couldn't supply
+// the Edition to buy.
 function BuyDialog({
   price,
   courseTitle,
@@ -125,7 +128,6 @@ function BuyDialog({
   onClose: () => void;
 }) {
   const startCheckout = useMutation(api.market.startCheckout);
-  const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canBuy = !!topicSlug && !!lang;
@@ -135,7 +137,7 @@ function BuyDialog({
     setBusy(true);
     setError(null);
     try {
-      const { action, fields } = await startCheckout({ topicSlug: topicSlug!, lang: lang!, email });
+      const { action, fields } = await startCheckout({ topicSlug: topicSlug!, lang: lang! });
       // POST the signed fields to PayFast's hosted checkout — a real form
       // submission (top-level navigation), built off-DOM and fired once. The
       // pairs are ordered: PayFast verifies the signature over the field order.
@@ -152,7 +154,7 @@ function BuyDialog({
       document.body.appendChild(form);
       form.submit();
     } catch {
-      setError("Couldn’t start checkout — check your email address and try again.");
+      setError("Couldn’t start checkout — please try again.");
       setBusy(false);
     }
   };
@@ -183,25 +185,9 @@ function BuyDialog({
           void checkout();
         }}
       >
-        <label className="mt-4 flex flex-col gap-1">
-          <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">Your email</span>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setError(null);
-            }}
-            placeholder="you@example.com"
-            className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
-          />
-          <span className="text-[11px] text-soft">Your purchase attaches to this address — you’ll sign in with it.</span>
-        </label>
-
         <button
           type="submit"
-          disabled={!canBuy || busy || !email.trim()}
+          disabled={!canBuy || busy}
           className="mt-4 w-full rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
         >
           {busy ? "Redirecting to PayFast…" : `Continue to PayFast${price ? ` · ${price}` : ""}`}
@@ -214,7 +200,6 @@ function BuyDialog({
           <Icon name="globe" className="h-3.5 w-3.5 text-accent2" /> Card or Instant EFT · pay once, keep forever
         </p>
       )}
-      <p className="mt-1 text-center text-xs text-soft">No account? Buying will create one for you.</p>
     </Dialog>
   );
 }

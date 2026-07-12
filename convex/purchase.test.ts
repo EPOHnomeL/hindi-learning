@@ -233,11 +233,12 @@ test("startCheckout returns the full signed field set for a priced Edition of a 
   const t = convexTest(schema, modules);
   const { topicId } = await sellableTopic(t);
 
-  // Available to Guests: no identity on the call. Email is normalised.
-  const { action, fields: pairs } = await t.mutation(api.market.startCheckout, {
+  // Auth-first (ADR 0021): the caller's ACCOUNT is the buyer — no email argument
+  // exists, the intent email comes from users.email.
+  const buyer = await seedUser(t, "buyer@example.com");
+  const { action, fields: pairs } = await asUser(t, buyer).mutation(api.market.startCheckout, {
     topicSlug: "hindi",
     lang: "en",
-    email: "  Buyer@Example.COM ",
   });
 
   // The hosted process URL, sandbox by default.
@@ -270,8 +271,8 @@ test("startCheckout returns the full signed field set for a priced Edition of a 
   // The signature is verifiable by the pure module — PayFast will accept it.
   expect(verifySignature(fields, "jt7NOE43FZPn")).toBe(true);
 
-  // A checkout-intent row links m_payment_id → (email, topic, lang) for the
-  // return page to prefill+lock the sign-up email without racing the ITN.
+  // A checkout-intent row links m_payment_id → (email, topic, lang); the email
+  // is the ACCOUNT's, frozen at Buy time — what the ITN grants to.
   const intent = await t.run((ctx) =>
     ctx.db
       .query("checkoutIntents")
@@ -281,18 +282,25 @@ test("startCheckout returns the full signed field set for a priced Edition of a 
   expect(intent).toMatchObject({ email: "buyer@example.com", topicId, lang: "en" });
 });
 
-test("startCheckout rejects an unpriced Edition, a not-ready Seller, and a bad email", async () => {
+test("startCheckout refuses an anonymous caller — no payment can attach to a free-typed email", async () => {
+  const t = convexTest(schema, modules);
+  await sellableTopic(t);
+
+  await expect(t.mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "en" })).rejects.toThrow();
+
+  // No checkout-intent row was written.
+  const intents = await t.run((ctx) => ctx.db.query("checkoutIntents").collect());
+  expect(intents).toEqual([]);
+});
+
+test("startCheckout rejects an unpriced Edition and a not-ready Seller", async () => {
   const t = convexTest(schema, modules);
   const { topicId } = await sellableTopic(t);
+  const buyer = await seedUser(t, "buyer@example.com");
 
   // Priced (en) but the ur Edition is not → refused.
   await expect(
-    t.mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "ur", email: "b@example.com" }),
-  ).rejects.toThrow();
-
-  // A garbage email → refused before anything is written.
-  await expect(
-    t.mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "en", email: "not-an-email" }),
+    asUser(t, buyer).mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "ur" }),
   ).rejects.toThrow();
 
   // The Seller loses readiness (bank details gone) → the priced Edition stops selling.
@@ -302,7 +310,7 @@ test("startCheckout rejects an unpriced Edition, a not-ready Seller, and a bad e
     await ctx.db.patch(row!._id, { payout: undefined });
   });
   await expect(
-    t.mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "en", email: "b@example.com" }),
+    asUser(t, buyer).mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "en" }),
   ).rejects.toThrow();
 
   // Nothing was persisted by the rejected attempts.
@@ -353,9 +361,14 @@ function itnFields(topicId: string, over: Record<string, string> = {}): Record<s
 }
 
 // Click Buy as `email` — returns the checkout-intent reference a genuine ITN
-// would carry back as m_payment_id.
+// would carry back as m_payment_id. Auth-first: checkout requires a signed-in
+// caller, so this finds (or seeds) the account and calls as them.
 async function startBuy(t: ReturnType<typeof convexTest>, email = "buyer@example.com") {
-  const { fields } = await t.mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "en", email });
+  const existing = await t.run((ctx) =>
+    ctx.db.query("users").withIndex("email", (q) => q.eq("email", email)).unique(),
+  );
+  const buyerId = existing?._id ?? (await seedUser(t, email));
+  const { fields } = await asUser(t, buyerId).mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "en" });
   return fields.find((f) => f.name === "m_payment_id")!.value;
 }
 
@@ -493,7 +506,7 @@ test("ITN: re-pricing or clearing the listing after Buy never strands a genuine 
 
 // ---- the return page (ticket 05): checkout status + prefilled/locked sign-up --
 
-test("checkoutStatus walks awaiting-payment → paid-awaiting-signup → granted, keyed on the intent token", async () => {
+test("checkoutStatus walks awaiting-payment → granted, keyed on the intent token", async () => {
   const t = convexTest(schema, modules);
   const { topicId } = await sellableTopic(t);
   mockValidate("VALID");
@@ -501,33 +514,20 @@ test("checkoutStatus walks awaiting-payment → paid-awaiting-signup → granted
   // An unknown token resolves to null (a guessed/expired link shows nothing).
   expect(await t.query(api.market.checkoutStatus, { mPaymentId: "nope" })).toBeNull();
 
-  // Buy → intent exists, ITN not yet landed: the page shows a pending state.
-  const { fields } = await t.mutation(api.market.startCheckout, {
-    topicSlug: "hindi",
-    lang: "en",
-    email: "newbuyer@example.com",
-  });
-  const mp = fields.find((f) => f.name === "m_payment_id")!.value;
-  expect(await t.query(api.market.checkoutStatus, { mPaymentId: mp })).toEqual({
-    email: "newbuyer@example.com",
+  // Buy (auth-first: the account exists before checkout) → intent exists, ITN
+  // not yet landed: the return page shows the confirming state.
+  await signUp(t, "newbuyer@example.com", "hunter2-strong");
+  const mp = await startBuy(t, "newbuyer@example.com");
+  expect(await t.query(api.market.checkoutStatus, { mPaymentId: mp })).toMatchObject({
     lang: "en",
     state: "awaiting-payment",
   });
 
-  // The ITN lands (guest → pending Entitlement) → ready to sign up.
+  // The ITN lands → the account's Entitlement exists: granted, reactively.
   expect(
     (await postItn(t, itnFields(topicId, { m_payment_id: mp, email_address: "newbuyer@example.com" }))).status,
   ).toBe(200);
-  expect(await t.query(api.market.checkoutStatus, { mPaymentId: mp })).toEqual({
-    email: "newbuyer@example.com",
-    lang: "en",
-    state: "paid-awaiting-signup",
-  });
-
-  // Sign-up claims it → granted (the page can now say "sign in / you're in").
-  await signUp(t, "newbuyer@example.com", "hunter2-strong");
-  expect(await t.query(api.market.checkoutStatus, { mPaymentId: mp })).toEqual({
-    email: "newbuyer@example.com",
+  expect(await t.query(api.market.checkoutStatus, { mPaymentId: mp })).toMatchObject({
     lang: "en",
     state: "granted",
   });

@@ -383,26 +383,30 @@ export const checkoutIntentByRef = internalQuery({
   },
 });
 
-// Start a purchase — available to Guests (a buyer needs no account to pay; the
-// paid email is what the ITN grants to). Confirms the Edition is priced and its
-// Seller is ready, persists a **checkout-intent** (m_payment_id → email, topic,
-// lang — what the return page prefills+locks the sign-up email from), and
-// returns the signed PayFast field set for the client to form-POST to the
-// hosted process URL. Access is NOT granted here — only the verified ITN
-// (/payfast/notify) grants. A mutation, not an action: PayFast's checkout needs
-// no network call from us, so the intent write and the field build are one
-// transaction (a rejected checkout writes nothing).
+// Start a purchase — auth-first (ADR 0021): the caller must be signed in, and
+// the purchase email is their ACCOUNT's, never an argument — impersonation-via-
+// checkout and typo-stranding both die at this seam. Confirms the Edition is
+// priced and its Seller is ready, persists a **checkout-intent** (m_payment_id
+// → account email, topic, lang — what the ITN grants to), and returns the
+// signed PayFast field set for the client to form-POST to the hosted process
+// URL. Access is NOT granted here — only the verified ITN (/payfast/notify)
+// grants. A mutation, not an action: PayFast's checkout needs no network call
+// from us, so the intent write and the field build are one transaction (a
+// rejected checkout writes nothing).
 export const startCheckout = mutation({
-  args: { topicSlug: v.string(), lang: v.string(), email: v.string() },
+  args: { topicSlug: v.string(), lang: v.string() },
   // `fields` is an ORDERED list of pairs, not a record: Convex sorts object
   // keys, and PayFast's signature is computed over the field order — the client
   // must POST them in exactly this order.
   returns: v.object({ action: v.string(), fields: v.array(v.object({ name: v.string(), value: v.string() })) }),
-  handler: async (ctx, { topicSlug, lang, email: rawEmail }) => {
-    const email = normaliseEmail(rawEmail);
-    // A sanity shape check only (PayFast re-validates) — catches a pasted blank
-    // or a name, not RFC-precise addresses.
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("enter a valid email address");
+  handler: async (ctx, { topicSlug, lang }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("sign in to buy — a purchase attaches to your account");
+    const user = await ctx.db.get(userId);
+    if (!user?.email) throw new Error("your account has no email address");
+    // users.email is stored normalised at sign-up; normalise again anyway so the
+    // intent row can never disagree with the ITN's comparison.
+    const email = normaliseEmail(user.email);
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) throw new Error("this edition isn't for sale");
     const listing = await editionPrice(ctx, topic._id, lang);
