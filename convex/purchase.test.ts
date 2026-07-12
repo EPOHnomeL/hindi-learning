@@ -215,12 +215,6 @@ test("a purchase with no account mints a pending Entitlement, claimed (and admit
   });
 });
 
-test("payment is the ONLY new admission path — a stranger with no purchase is still rejected", async () => {
-  const t = convexTest(schema, modules);
-  await t.mutation(internal.whitelist.seedEmail, { email: "someone@example.com" }); // table non-empty, closed to others
-  await expect(signUp(t, "stranger@example.com", "hunter2-strong")).rejects.toThrow();
-});
-
 // ---- checkout initiation (ticket 03): the signed PayFast form ----------------
 
 // A ready Seller (grant + payout bank details) selling a completed course.

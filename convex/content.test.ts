@@ -23,6 +23,13 @@ async function seedUser(t: ReturnType<typeof convexTest>, email: string) {
   return await t.run((ctx) => ctx.db.insert("users", { email }));
 }
 
+// A user whose email is on the Allowlist — may create courses (ADR 0021).
+async function seedMember(t: ReturnType<typeof convexTest>, email: string) {
+  const userId = await seedUser(t, email);
+  await t.mutation(internal.whitelist.seedEmail, { email });
+  return userId;
+}
+
 async function seedTopic(t: ReturnType<typeof convexTest>, ownerId: Id<"users">, slug: string, title: string, seq?: number) {
   return await t.run((ctx) => ctx.db.insert("topics", { ownerId, slug, title, seq }));
 }
@@ -229,10 +236,10 @@ test("ensureTopic rejects a bad secret and an unknown owner", async () => {
 
 test("seedTopic creates a seeded topic; identical titles get distinct slugs", async () => {
   const t = convexTest(schema, modules);
-  const alice = await seedUser(t, "alice@example.com");
+  const alice = await seedMember(t, "alice@example.com");
   // Slugs are globally unique, so two learners naming a course the same still get
   // distinct slugs. Two users also keeps each within the one-course-per-day cap.
-  const bob = await seedUser(t, "bob@example.com");
+  const bob = await seedMember(t, "bob@example.com");
 
   const r1 = await asUser(t, alice).mutation(api.content.seedTopic, { title: "Koine Greek!", why: "read the NT" });
   const r2 = await asUser(t, bob).mutation(api.content.seedTopic, { title: "Koine Greek!", why: "again" });
@@ -243,9 +250,21 @@ test("seedTopic creates a seeded topic; identical titles get distinct slugs", as
   expect(topics.find((x) => x.slug === "koine-greek")).toMatchObject({ title: "Koine Greek!", status: "seeded", mission: null });
 });
 
+test("seedTopic is Allowlist-gated: a signed-in non-member is refused, a member seeds", async () => {
+  const t = convexTest(schema, modules);
+  // Sign-up is open (ADR 0021) — an account alone doesn't grant course creation.
+  const outsider = await seedUser(t, "outsider@example.com");
+  await expect(asUser(t, outsider).mutation(api.content.seedTopic, { title: "Greek", why: "NT" })).rejects.toThrow();
+  expect(await asUser(t, outsider).query(api.content.listTopics, {})).toEqual([]);
+
+  const member = await seedMember(t, "member@example.com");
+  const { slug } = await asUser(t, member).mutation(api.content.seedTopic, { title: "Greek", why: "NT" });
+  expect(slug).toBe("greek");
+});
+
 test("seedTopic caps a non-Admin to one new course per day; the Admin is exempt", async () => {
   const t = convexTest(schema, modules);
-  const alice = await seedUser(t, "alice@example.com");
+  const alice = await seedMember(t, "alice@example.com");
   const as = asUser(t, alice);
 
   // First course of the day is allowed; a second within the day is refused.
@@ -267,7 +286,7 @@ test("seedTopic caps a non-Admin to one new course per day; the Admin is exempt"
 
 test("editMission sets the learner's mission (owner-scoped); publishMission flips status to active", async () => {
   const t = convexTest(schema, modules);
-  const alice = await seedUser(t, "alice@example.com");
+  const alice = await seedMember(t, "alice@example.com");
   const bob = await seedUser(t, "bob@example.com");
   const as = asUser(t, alice);
   const secret = "test-secret";

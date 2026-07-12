@@ -59,6 +59,9 @@ type PurchasedCourse = Omit<SharedCourse, "ownerEmail">;
 export function Dashboard() {
   const courses = useQuery(api.content.dashboard);
   const amAdmin = useQuery(api.whitelist.amIAdmin);
+  // Course creation is Allowlist-gated (ADR 0021): non-members get a clean
+  // library with no "New course" card (UX only — seedTopic enforces server-side).
+  const amAllowlisted = useQuery(api.whitelist.amIAllowlisted);
   const { signOut } = useAuthActions();
   const router = useRouter();
 
@@ -95,7 +98,7 @@ export function Dashboard() {
           {courses.map((c) => (
             <CourseCard key={c.slug} course={c} />
           ))}
-          <NewCourseCard />
+          {amAllowlisted && <NewCourseCard />}
         </div>
       )}
 

@@ -5,7 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { assertAdmin, buildPaywall, getOwnedTopic, heldLangs, lessonLocked, pickContentBody, resolveReaderEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
-import { isCallerAdmin } from "./whitelist";
+import { isCallerAdmin, isEmailAdmitted } from "./whitelist";
 
 // A learner may seed at most one new course per this window — an anti-abuse / cost
 // cap that mirrors the routine's per-user on-demand cap. Rolling 24h window.
@@ -155,6 +155,13 @@ export const seedTopic = mutation({
   handler: async (ctx, { title, why }): Promise<{ slug: string }> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
+    // Course creation is Allowlist-gated (ADR 0021): sign-up is open, so the
+    // Allowlist is what stands between anyone-with-an-account and Claude
+    // generation spend. The Admin's own row admits them like any member.
+    const user = await ctx.db.get(userId);
+    if (!user?.email || !(await isEmailAdmitted(ctx, user.email))) {
+      throw new Error("Course creation is limited to Allowlisted emails.");
+    }
     // One new course per user per day (issue 08 — bounds Claude usage). The Admin
     // is exempt (they drive the app and aren't the runaway-usage risk this guards
     // against, mirroring the routine's on-demand bypass). Checked against the

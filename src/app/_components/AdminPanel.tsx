@@ -8,7 +8,7 @@ import { api } from "../../../convex/_generated/api";
 import type { SellerStatus } from "../../../convex/lib";
 
 // The Admin portal (/admin, ADR 0011 + issue 02): the single Admin manages the
-// Allowlist — who may sign up — without the CLI. Client-guarded by `amIAdmin`
+// Allowlist — who may create courses (ADR 0021) — without the CLI. Client-guarded by `amIAdmin`
 // (UX only; the mutations are the real security boundary). The list is a live
 // Convex query, so adds/removes reflect immediately.
 export function AdminPanel() {
@@ -43,7 +43,7 @@ function AllowlistManager() {
       <header className="mb-8 flex items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Allowlist</h1>
-          <p className="mt-0.5 text-sm text-soft">Who can sign up for this workspace</p>
+          <p className="mt-0.5 text-sm text-soft">Who can create courses</p>
         </div>
         <Link href="/" className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
           ← Courses
@@ -335,7 +335,7 @@ function AddEmailForm() {
       }}
     >
       <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Admit an email</label>
-      <p className="text-sm text-soft">They can then create an account. Share the sign-up link with them yourself.</p>
+      <p className="text-sm text-soft">They can then create courses with their account.</p>
       <div className="mt-1 flex gap-2">
         <input
           autoFocus

@@ -3,10 +3,11 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
-// The Allowlist backend (ADR 0011, PRD §"Implementation Decisions"). The Admin
-// edits who may sign up at runtime; the sign-up gate asks `isAdmitted`. Emails
-// are normalised on the way in and stored normalised, so every comparison is a
-// plain equality on the `by_email` index.
+// The Allowlist backend (ADR 0011, semantics revised by ADR 0021). Sign-up is
+// open; the Allowlist answers "who may create courses" — the Admin edits it at
+// runtime and `seedTopic` asks `isEmailAdmitted`. Emails are normalised on the
+// way in and stored normalised, so every comparison is a plain equality on the
+// `by_email` index.
 
 // Trim + lower-case — the one normalisation used on both store and lookup.
 function normaliseEmail(email: string): string {
@@ -93,6 +94,21 @@ export const amIAdmin = query({
   args: {},
   returns: v.boolean(),
   handler: async (ctx) => isCallerAdmin(ctx),
+});
+
+// Whether the caller's account email is on the Allowlist — backs the dashboard's
+// "new course" affordance (UX only; seedTopic's server gate is the boundary).
+// Identity is derived server-side, false when unauthenticated, like `amIAdmin`.
+export const amIAllowlisted = query({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return false;
+    const user = await ctx.db.get(userId);
+    if (!user?.email) return false;
+    return isEmailAdmitted(ctx, user.email);
+  },
 });
 
 // Admit an email (Admin-only). Normalises, validates a basic shape, inserts if
