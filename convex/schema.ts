@@ -20,11 +20,12 @@ export const payoutDetailsValidator = v.object({
 export default defineSchema({
   ...authTables,
 
-  // The Allowlist (ADR 0011): the set of emails permitted to sign up, managed at
-  // runtime by the single Admin instead of the old `AUTH_ALLOWED_EMAILS` env var.
-  // Emails are stored already-normalised (trimmed, lower-cased) so a lookup at
-  // sign-up never misses on casing/whitespace. `isAdmin` marks the one Admin row,
-  // which the portal shows but refuses to remove. An empty table admits nobody.
+  // The Allowlist (ADR 0011, semantics revised by ADR 0021): the set of emails
+  // permitted to CREATE COURSES (sign-up is open), managed at runtime by the
+  // single Admin. Emails are stored already-normalised (trimmed, lower-cased) so
+  // a lookup never misses on casing/whitespace. `isAdmin` marks the one Admin
+  // row, which the portal shows but refuses to remove. An empty table admits
+  // nobody to course creation.
   whitelist: defineTable({
     email: v.string(),
     isAdmin: v.optional(v.boolean()),
@@ -217,9 +218,8 @@ export default defineSchema({
 
   // A pending Share: an invite to an email that has *no account yet*. Recorded
   // when an owner shares to an unregistered address, and turned into a real Share
-  // by `claimPendingShares` the moment that email signs up. Sign-up itself stays
-  // gated by the Admin's Allowlist (ADR 0011) — an invite does not open that door.
-  // `by_email` is the claim-on-sign-up lookup; `by_topic_email` dedups an invite
+  // by `claimPendingShares` the moment that email signs up (sign-up is open —
+  // ADR 0021). `by_email` is the claim-on-sign-up lookup; `by_topic_email` dedups an invite
   // (at most one per (Topic, email)); `by_topic` lists a Topic's open invites and
   // would cascade on Topic delete. `lang` names the invited Edition (optional →
   // English), so an invite claimed at sign-up becomes a language-scoped Share.

@@ -12,8 +12,7 @@ import { langInfo } from "./languages";
 // Share a Topic with a person, named by email. Owner-only. If the recipient has
 // an account, they get a read-only Share now ("shared"); if not, the invite is
 // held as a pending Share ("pending") and claimed when they sign up (see
-// `claimPendingShares`). Both paths are idempotent. Sign-up stays Admin-gated by
-// the Allowlist (ADR 0011) — inviting an email does not itself open sign-up.
+// `claimPendingShares` — sign-up is open, ADR 0021). Both paths are idempotent.
 export const shareTopic = mutation({
   args: { topicSlug: v.string(), email: v.string(), lang: v.optional(v.string()) },
   returns: v.union(v.literal("shared"), v.literal("pending")),

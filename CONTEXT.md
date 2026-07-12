@@ -68,7 +68,7 @@ The highest-ordered, non-superseded Lesson in a Topic — the learner's leading 
 _Avoid_: Latest, head, tip, edge
 
 **Share**:
-A grant giving one User read-only access to a single Topic owned by another User. Created by the Topic's owner, who supplies the recipient's email. If an account with that email already exists the Share takes effect at once; if not, it is held as a **pending Share** and forms automatically the moment that email signs up — sign-up itself stays gated by the **Allowlist**, so an invite does not by itself let a stranger in. Revocable by the owner at any time; removed when its Topic is deleted. A Topic may have many Shares (shared with several Users); a Share never confers write access.
+A grant giving one User read-only access to a single Topic owned by another User. Created by the Topic's owner, who supplies the recipient's email. If an account with that email already exists the Share takes effect at once; if not, it is held as a **pending Share** and forms automatically the moment that email signs up (sign-up is open — [ADR 0021](docs/adr/0021-open-signup-allowlist-gates-course-creation.md)). Revocable by the owner at any time; removed when its Topic is deleted. A Topic may have many Shares (shared with several Users); a Share never confers write access.
 _Avoid_: link, permission, grant (as separate terms); "invite" as a *separate* concept — a pending Share is still a Share, just not yet in effect. Distinct from a **Public link** — a Share is always targeted to a specific person by email; a Public link is anonymous and account-less.
 
 **Viewer**:
@@ -92,11 +92,11 @@ The representative mark for a Topic's subject, shown on its **Certificate**. By 
 _Avoid_: Icon, badge, logo, avatar, favicon; "seal" / "medallion" (those name the *visual treatment* of an Emblem, not the concept)
 
 **Allowlist**:
-The set of emails permitted to create an account — the private-alpha admission gate. An email must be on the Allowlist to sign up; removing one closes off *new* sign-ups for it but does not evict an account that already exists (a sign-up gate, not a session gate). Site-wide, not per-Topic.
-_Avoid_: Whitelist, allowed emails, AUTH_ALLOWED_EMAILS (the retired env-var form)
+The set of emails permitted to **create courses** ([ADR 0021](docs/adr/0021-open-signup-allowlist-gates-course-creation.md) — sign-up itself is open to everyone). Creating a course spends Claude generation, so that is what the Admin curates; removing an email revokes *creating new courses*, never the account or its sessions (not a session gate). Site-wide, not per-Topic, and distinct from the **can-sell** grant (selling) and from buying (any account may buy).
+_Avoid_: Whitelist, allowed emails, AUTH_ALLOWED_EMAILS (the retired env-var form); "admission gate" / "sign-up gate" (the pre-ADR-0021 meaning)
 
 **Admin**:
-The single User who governs the Allowlist — adds and removes admitted emails. Site-wide and distinct from a Topic's **owner** (a User owns the Topics they create; the Admin owns admission to the app). Exactly one Admin exists; the Admin's own admission is fixed and cannot be removed through the portal.
+The single User who governs the Allowlist — adds and removes emails permitted to create courses. Site-wide and distinct from a Topic's **owner** (a User owns the Topics they create; the Admin owns who may create them). Exactly one Admin exists; the Admin's own row is fixed and cannot be removed through the portal.
 _Avoid_: Owner (that is the Topic owner), superuser, moderator
 
 ## Productisation (proposed — [ADR 0014](docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md))
@@ -120,7 +120,7 @@ An account's purchased, permanent right to read a paid **Edition** — a `(Topic
 _Avoid_: Purchase, licence, subscription (it is one-time, not recurring), access grant, enrollment (the deferred per-learner-progress concept — not this)
 
 **Seller**:
-A User the **Admin** has explicitly granted the **can-sell** capability (a per-user flag in the admin portal, *distinct from* the Allowlist that merely admits the account) **and** who has saved **payout bank details** in-app — the SA bank account the operator EFTs their **Ledger** share to. No external onboarding: a Seller never registers a payment account. A Seller chooses which **Editions** (specific languages) of a finished course to sell and sets a price on **each Edition independently**, in Rand. Being on the **Allowlist** lets you *exist*; the can-sell grant lets you *charge*.
+A User the **Admin** has explicitly granted the **can-sell** capability (a per-user flag in the admin portal, *distinct from* the Allowlist that gates course creation) **and** who has saved **payout bank details** in-app — the SA bank account the operator EFTs their **Ledger** share to. No external onboarding: a Seller never registers a payment account. A Seller chooses which **Editions** (specific languages) of a finished course to sell and sets a price on **each Edition independently**, in Rand. Being on the **Allowlist** lets you *create courses*; the can-sell grant lets you *charge* for them.
 _Avoid_: Author (collides with the Routine *authoring* Lessons), Vendor, Creator, Merchant, Sponsor (the internal-studio term)
 
 **Ledger**:
@@ -131,8 +131,7 @@ _Avoid_: Balance, wallet, statement, payouts table (a Ledger row is per-sale, no
 On a paid **Edition**, the free first Lesson *in that Edition's language* — readable without an Entitlement by anyone, including a Guest. The teaser that sits before the paygate; continuing past it requires a buyer account and an Entitlement for that Edition.
 _Avoid_: Free trial, sample, demo, taster
 
-**How monetisation reshapes existing terms** (proposed):
-- **Allowlist** keeps its meaning (who may create an account) but selling is now gated by the *separate* Admin-granted **can-sell** capability, not by the Allowlist. Buyers are admitted by **payment**, bypassing the Allowlist entirely — so account creation is no longer purely a private-alpha gate for them.
+**How monetisation reshapes existing terms**:
+- Buying is **auth-first** ([ADR 0021](docs/adr/0021-open-signup-allowlist-gates-course-creation.md)): checkout requires a signed-in account and derives the purchase email from it — never from a typed address. A Guest hitting Buy on a Public link is routed into the app to create an account (sign-up is open) before paying; selling remains gated by the *separate* Admin-granted **can-sell** capability.
 - **Guest** / **Public link** semantics **fork by Edition**: a **free** Edition keeps today's per-Edition anonymous read access; a **paid** Edition exposes only its **Preview** through a Public link / to a Guest, and the rest requires an Entitlement for that Edition (which a Guest structurally cannot hold).
-- A **pending Entitlement** (a purchase whose email has no account yet) carries a `lang` and is claimed on sign-up, exactly like the language-scoped **pending Share**.
 - The **buyer role** is intentionally left unnamed for now — it would collide with the generic "learner" used throughout this glossary. It is defined operationally as "a User holding an Entitlement" until the deferred roles/enrollment work names it.

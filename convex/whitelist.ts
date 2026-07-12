@@ -14,9 +14,10 @@ function normaliseEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-// The single admission decision, shared by the auth sign-up gate and the tests.
-// An empty Allowlist returns false (closed by design). Case- and whitespace-
-// insensitive: the input is normalised the same way the stored row was.
+// The single membership decision, shared by the course-creation gate
+// (content.seedTopic), `amIAllowlisted`, and the tests. An empty Allowlist
+// returns false (closed by design). Case- and whitespace-insensitive: the input
+// is normalised the same way the stored row was.
 export async function isEmailAdmitted(ctx: QueryCtx, email: string): Promise<boolean> {
   const row = await ctx.db
     .query("whitelist")
@@ -126,8 +127,8 @@ export const addEmail = mutation({
 
 // Remove an email from the Allowlist (Admin-only). Refuses to remove an Admin
 // row — the non-removable-Admin guard that stops the Admin locking themselves
-// out. Removing closes off *new* sign-ups; it does not evict an existing
-// account (sign-up gate only — ADR 0011).
+// out. Removing revokes creating *new* courses; it does not evict the account
+// or touch the courses they already own (ADR 0021).
 export const removeEmail = mutation({
   args: { email: v.string() },
   returns: v.null(),

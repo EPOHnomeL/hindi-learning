@@ -345,11 +345,11 @@ export const checkoutStatus = query({
 });
 
 // The checkout-intent behind an ITN's `m_payment_id` — the ITN's source of
-// truth for WHAT was bought (topic/lang), for WHOM (the email the buyer typed,
-// which the locked sign-up will claim — the ITN's own email_address may be the
-// buyer's PayFast account address instead), and at WHAT PRICE (the listing as
-// shown at Buy time, so a re-price/un-list after Buy never strands a genuine
-// payment). Null when no Buy click ever minted the reference.
+// truth for WHAT was bought (topic/lang), for WHOM (the buyer's ACCOUNT email,
+// frozen at Buy — the ITN's own email_address may be the buyer's PayFast
+// account address instead), and at WHAT PRICE (the listing as shown at Buy
+// time, so a re-price/un-list after Buy never strands a genuine payment). Null
+// when no Buy click ever minted the reference.
 export const checkoutIntentByRef = internalQuery({
   args: { mPaymentId: v.string() },
   returns: v.union(

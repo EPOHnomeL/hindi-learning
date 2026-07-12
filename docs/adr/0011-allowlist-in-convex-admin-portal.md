@@ -1,5 +1,11 @@
 # The Allowlist lives in Convex and is managed by an in-app Admin, gating sign-up only
 
+> **Superseded in part by
+> [ADR 0021](0021-open-signup-allowlist-gates-course-creation.md):** sign-up is
+> now open and the Allowlist gates **course creation** instead. The storage,
+> portal, Admin, and normalisation decisions below all stand — only the
+> *admission* semantics changed.
+
 The private-alpha **Allowlist** moves from the `AUTH_ALLOWED_EMAILS` env var into
 a Convex `whitelist` table, editable at runtime by a single **Admin** through a
 dedicated `/admin` route. The gate fires on **account creation only** (via the

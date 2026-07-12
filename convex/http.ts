@@ -21,10 +21,11 @@ auth.addHttpRoutes(http);
 //   3. a server postback to PayFast's /eng/query/validate that must say VALID —
 //      which also subsumes the source-IP allowlist check we deliberately skip
 //      (serverless egress IPs are unreliable to pin).
-// What to grant (topic/lang) and to whom (the email the buyer typed, which the
-// locked sign-up claims) comes from the intent, our own record — not from the
-// notification's echoed fields. The DB effects live in the idempotent
-// fulfillPurchase (keyed on pf_payment_id), so a PayFast re-delivery is a safe no-op.
+// What to grant (topic/lang) and to whom (the buyer's ACCOUNT email, frozen
+// into the intent at Buy — auth-first, ADR 0021) comes from the intent, our own
+// record — not from the notification's echoed fields. The DB effects live in the
+// idempotent fulfillPurchase (keyed on pf_payment_id), so a PayFast re-delivery
+// is a safe no-op.
 const payfastNotify = httpAction(async (ctx, request) => {
   const raw = await request.text();
   // URLSearchParams preserves the received order — the signature depends on it.

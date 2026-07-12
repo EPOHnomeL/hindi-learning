@@ -468,8 +468,8 @@ test("ITN: re-pricing or clearing the listing after Buy never strands a genuine 
 
   // The buyer paid exactly what was listed when they clicked Buy (the
   // checkout-intent's price) — they own it. The ITN's own email_address may be
-  // the buyer's PayFast account address; the grant keys on the email they
-  // TYPED (the intent's), which the locked sign-up will claim.
+  // the buyer's PayFast account address; the grant keys on the intent's email
+  // (their ACCOUNT's, frozen at Buy — auth-first).
   expect(
     (await postItn(t, itnFields(topicId, { m_payment_id: mp, email_address: "payfast-account@example.com" }))).status,
   ).toBe(200);
@@ -479,7 +479,7 @@ test("ITN: re-pricing or clearing the listing after Buy never strands a genuine 
   expect(await ledgerRows(t)).toMatchObject([{ buyerEmail: "buyer@example.com", gross: 120000, status: "owed" }]);
 });
 
-// ---- the return page (ticket 05): checkout status + prefilled/locked sign-up --
+// ---- the return page: checkout status behind the confirming banner ----------
 
 test("checkoutStatus walks awaiting-payment → granted, keyed on the intent token", async () => {
   const t = convexTest(schema, modules);
