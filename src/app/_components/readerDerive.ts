@@ -13,6 +13,18 @@ export function firstLessonKey(lessons: readonly LessonLite[]): string | null {
   return lessons[0]?.key ?? null;
 }
 
+// The course-index redirect URL: the resolved lesson path carrying the CURRENT
+// query string through — dropping `purchase`/`mp` here would silently kill the
+// payment-return banner (auth-first checkout). `lang` is replaced by the
+// resolved Edition (null/"en" is the default and carries no param).
+export function courseIndexRedirect(path: string, search: string, lang: string | null): string {
+  const params = new URLSearchParams(search);
+  params.delete("lang");
+  if (lang && lang !== "en") params.set("lang", lang);
+  const qs = params.toString();
+  return qs ? `${path}?${qs}` : path;
+}
+
 // The Frontier: the highest-seq (last) lesson — the learner's leading edge.
 // `isFrontier` styling and the "fire the next lesson" offer hang off this.
 export function frontierKey(lessons: readonly LessonLite[]): string | null {

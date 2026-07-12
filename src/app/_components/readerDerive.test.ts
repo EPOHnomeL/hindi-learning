@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   completedKeys,
+  courseIndexRedirect,
   firstLessonKey,
   frontierKey,
   internalNavTarget,
@@ -8,6 +9,30 @@ import {
   seenAfterOpening,
   unseenReplyKeys,
 } from "./readerDerive";
+
+describe("courseIndexRedirect", () => {
+  it("carries purchase/mp through to the lesson URL — the payment-return banner depends on it", () => {
+    expect(courseIndexRedirect("/courses/hindi/lessons/0001", "purchase=return&mp=tok1", null)).toBe(
+      "/courses/hindi/lessons/0001?purchase=return&mp=tok1",
+    );
+  });
+
+  it("sets lang from the resolved Edition, replacing any lang in the URL", () => {
+    // The Edition can come from localStorage (no lang in the URL) — set fresh.
+    expect(courseIndexRedirect("/courses/hindi/lessons/0001", "purchase=return&mp=t", "ur")).toBe(
+      "/courses/hindi/lessons/0001?purchase=return&mp=t&lang=ur",
+    );
+    // A lang already in the URL is replaced, never duplicated.
+    expect(courseIndexRedirect("/courses/hindi/lessons/0001", "lang=es&purchase=return&mp=t", "ur")).toBe(
+      "/courses/hindi/lessons/0001?purchase=return&mp=t&lang=ur",
+    );
+  });
+
+  it("English is the default Edition and carries no lang param", () => {
+    expect(courseIndexRedirect("/courses/hindi/lessons/0001", "", null)).toBe("/courses/hindi/lessons/0001");
+    expect(courseIndexRedirect("/courses/hindi/lessons/0001", "lang=en", "en")).toBe("/courses/hindi/lessons/0001");
+  });
+});
 
 describe("internalNavTarget", () => {
   it("passes an owner/viewer course link through unchanged", () => {
