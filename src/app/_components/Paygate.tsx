@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "convex/react";
+import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import { Icon } from "./icons";
@@ -51,6 +52,8 @@ export function Paygate({
   editionName,
   topicSlug,
   lang,
+  buyHref,
+  autoOpenBuy,
 }: {
   paywall: Paywall | null;
   kind: "lesson" | "reference";
@@ -60,11 +63,19 @@ export function Paygate({
   // the buy dialog can start checkout; absent, it degrades to an unavailable note.
   topicSlug?: string;
   lang?: string;
+  // Share reader (auth-first, ADR 0021): the CTA is a LINK into the authed app
+  // (the same content under /courses with a buy marker), never a dialog here —
+  // checkout needs the signed-in account.
+  buyHref?: string;
+  // Authed reader: arriving with the buy marker opens the dialog immediately.
+  autoOpenBuy?: boolean;
 }) {
-  const [buying, setBuying] = useState(false);
+  const [buying, setBuying] = useState(!!autoOpenBuy && !buyHref);
   const price = paywall ? formatPrice(paywall.amount, paywall.currency) : null;
   const heading =
     kind === "reference" ? "This reference is part of the full course" : "The rest of this course is locked";
+  const ctaClass =
+    "rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90";
 
   return (
     <div className="flex min-h-[60vh] flex-1 items-center justify-center p-4 md:p-8">
@@ -78,12 +89,15 @@ export function Paygate({
           {editionName ? ` the ${editionName} edition` : " this edition"}, in a single payment.
         </p>
         <div className="mt-5 flex flex-wrap items-center gap-4">
-          <button
-            onClick={() => setBuying(true)}
-            className="rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90"
-          >
-            Unlock the full course
-          </button>
+          {buyHref ? (
+            <Link href={buyHref} className={ctaClass}>
+              Unlock the full course
+            </Link>
+          ) : (
+            <button onClick={() => setBuying(true)} className={ctaClass}>
+              Unlock the full course
+            </button>
+          )}
           {price && <span className="text-2xl font-semibold tabular-nums text-ink">{price}</span>}
         </div>
         <p className="mt-3 flex items-center gap-1.5 text-xs text-soft">
@@ -91,7 +105,7 @@ export function Paygate({
           Card or Instant EFT via PayFast · pay once, keep forever
         </p>
       </div>
-      {buying && (
+      {buying && !buyHref && (
         <BuyDialog
           price={price}
           courseTitle={courseTitle}

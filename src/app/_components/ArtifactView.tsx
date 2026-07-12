@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { CertificateControl } from "./Certificate";
 import { LockedPane, Paygate } from "./Paygate";
-import { useEditionLang, withLang } from "./editionUrl";
+import { useBuyMarker, useEditionLang, withLang } from "./editionUrl";
 import { buildSrcDoc, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
 import { internalNavTarget } from "./readerDerive";
@@ -233,6 +233,7 @@ function LessonView({
 }) {
   const { theme } = useTheme();
   const lang = useEditionLang();
+  const buyMarker = useBuyMarker();
   const navHidden = useHideOnScroll();
   const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey, lang: lang ?? undefined });
   // Same subscription CourseShell holds (deduped by Convex), for the caller's
@@ -279,7 +280,14 @@ function LessonView({
   if (lesson.locked) {
     return (
       <LockedPane title={lesson.title}>
-        <Paygate kind="lesson" paywall={header?.paywall ?? null} courseTitle={header?.title} topicSlug={topicSlug} lang={lang ?? "en"} />
+        <Paygate
+          kind="lesson"
+          paywall={header?.paywall ?? null}
+          courseTitle={header?.title}
+          topicSlug={topicSlug}
+          lang={lang ?? "en"}
+          autoOpenBuy={buyMarker}
+        />
       </LockedPane>
     );
   }
@@ -447,6 +455,7 @@ function ReferenceView({
 }) {
   const { theme } = useTheme();
   const lang = useEditionLang();
+  const buyMarker = useBuyMarker();
   const navHidden = useHideOnScroll();
   const ref = useQuery(api.content.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
   const header = useQuery(api.content.courseHeader, { topicSlug, lang: lang ?? undefined });
@@ -460,7 +469,14 @@ function ReferenceView({
   if (ref.locked) {
     return (
       <LockedPane title={ref.title}>
-        <Paygate kind="reference" paywall={header?.paywall ?? null} courseTitle={header?.title} topicSlug={topicSlug} lang={lang ?? "en"} />
+        <Paygate
+          kind="reference"
+          paywall={header?.paywall ?? null}
+          courseTitle={header?.title}
+          topicSlug={topicSlug}
+          lang={lang ?? "en"}
+          autoOpenBuy={buyMarker}
+        />
       </LockedPane>
     );
   }

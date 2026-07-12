@@ -48,6 +48,16 @@ function Centered({ children }: { children: React.ReactNode }) {
   return <p className="p-8 text-center text-soft">{children}</p>;
 }
 
+// Buy on a Public link routes into the authed app (auth-first, ADR 0021): the
+// SAME Lesson/Reference under /courses, carrying the Edition and a `buy` marker.
+// Signed out, that URL renders SignIn (defaulting to "Create account"); signed
+// in, it lands on the locked page with the buy dialog open.
+function buyLink(slug: string, kind: "lessons" | "references", key: string, lang: string): string {
+  const params = new URLSearchParams({ buy: "1" });
+  if (lang !== "en") params.set("lang", lang);
+  return `/courses/${slug}/${kind}/${key}?${params.toString()}`;
+}
+
 // The persistent sidebar + pane shell, fixed by the URL token. Fetches the
 // course bundle once; an unknown/revoked token renders a friendly dead-end.
 export function PublicCourseShell({ token, children }: { token: string; children: React.ReactNode }) {
@@ -252,8 +262,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
           paywall={course.paywall ?? null}
           courseTitle={course.title}
           editionName={editionName}
-          topicSlug={course.slug}
-          lang={course.lang}
+          buyHref={buyLink(course.slug, "lessons", lessonKey, course.lang)}
         />
       </LockedPane>
     );
@@ -341,8 +350,7 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
           paywall={course.paywall ?? null}
           courseTitle={course.title}
           editionName={course.lang !== "en" ? langInfo(course.lang).native : undefined}
-          topicSlug={course.slug}
-          lang={course.lang}
+          buyHref={buyLink(course.slug, "references", refKey, course.lang)}
         />
       </LockedPane>
     );

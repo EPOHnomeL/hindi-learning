@@ -5,11 +5,17 @@ import { useQuery } from "convex/react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { useBuyMarker } from "./editionUrl";
 import { Logo } from "./Logo";
 
 export function SignIn() {
   const { signIn } = useAuthActions();
-  const [flow, setFlow] = useState<"signIn" | "signUp">("signIn");
+  // Arriving via a share reader's Buy CTA (`buy=1`, auth-first checkout): the
+  // common path is a NEW buyer, so the form opens on "Create account" with
+  // purchase-flavoured copy; the toggle still reaches sign-in. Without the
+  // marker the default stays "Sign in".
+  const buyIntent = useBuyMarker();
+  const [flow, setFlow] = useState<"signIn" | "signUp">(buyIntent ? "signUp" : "signIn");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -82,6 +88,11 @@ export function SignIn() {
           }}
         >
           <h2 className="text-xl font-semibold text-accent">{flow === "signIn" ? "Sign in" : "Create account"}</h2>
+          {buyIntent && flow === "signUp" && (
+            <p className="-mt-1.5 text-sm text-soft">
+              Create an account to complete your purchase — already have one? Sign in below.
+            </p>
+          )}
           <input
             // Remount when the paid email resolves — the input flips from a free
             // uncontrolled field to a locked controlled one.
