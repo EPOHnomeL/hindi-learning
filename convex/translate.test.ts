@@ -131,10 +131,30 @@ test("courseHeader exposes only the Editions the caller holds", async () => {
   expect(bobEn!.lang).toBe("ur");
 });
 
-// ---- tryAcquireTranslation: the gate + lock that fires the routine ----------
-// (startTranslation is a thin action: acquire, then POST the translate-routine
-// fire URL. The gate holds all the db logic and is tested directly, mirroring
-// routine.tryAcquireGeneration; the fetch itself isn't unit-tested.)
+test("courseHeader carries the served edition's mission — translated, falling back to the source", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi");
+  await t.run((ctx) => ctx.db.patch(topicId, { mission: "Read the Hindi Bible." }));
+  await addReadyJob(t, topicId, "es");
+  await addTranslation(t, topicId, "es", "mission", "", { text: "Lee la Biblia hindi." });
+
+  const a = asUser(t, alice);
+  expect((await a.query(api.content.courseHeader, { topicSlug: "hindi", lang: "es" }))?.mission).toBe("Lee la Biblia hindi.");
+  expect((await a.query(api.content.courseHeader, { topicSlug: "hindi" }))?.mission).toBe("Read the Hindi Bible.");
+
+  // A mission-less course carries null.
+  const bare = await seedTopic(t, alice, "bare", "Bare");
+  void bare;
+  expect((await a.query(api.content.courseHeader, { topicSlug: "bare" }))?.mission).toBeNull();
+});
+
+// ---- tryAcquireTranslation: the gate + lock that fires the run --------------
+// (startTranslation is a thin action: acquire, then schedule the Gemini translate
+// action — ALL translation runs on Gemini now, never the claude.ai routine. The
+// gate holds all the db logic and is tested directly, mirroring
+// routine.tryAcquireGeneration; the fire branch is covered in
+// translate-openrouter.test.ts.)
 
 test("tryAcquireTranslation gates on owner + completed + known language, and seeds the job", async () => {
   const t = convexTest(schema, modules);
@@ -211,7 +231,13 @@ test("claim → publish → report round-trips one Edition, and the reader serve
   await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" });
 
   const secret = "test-secret";
-  // The run claims the pending Edition — it learns the (Topic, language, owner).
+  // The acquire's heartbeat marks the job live (the Gemini action owns it); the
+  // legacy claim seam may only steal DEAD work, so age the heartbeat first.
+  await t.run(async (ctx) => {
+    const job = await ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique();
+    await ctx.db.patch(job!._id, { claimedAt: Date.now() - 11 * 60 * 1000 });
+  });
+  // The run claims the dead Edition — it learns the (Topic, language, owner).
   const claim = await t.mutation(api.translate.claimTranslation, { secret, runId: "r1" });
   expect(claim).toMatchObject({ topicSlug: "hindi", lang: "es", ownerEmail: "alice@example.com" });
   // A second claim finds nothing — the job is now claimed (single-flight).

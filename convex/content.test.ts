@@ -45,6 +45,49 @@ test("listTopics returns only the signed-in user's topics", async () => {
   expect(aliceTopics.map((x) => x.slug)).toEqual(["hindi"]);
 });
 
+test("deleteLesson removes the lesson and cascades its blob, record, and capture", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const bob = await seedUser(t, "bob@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+
+  const blobId = await t.run((ctx) => ctx.storage.store(new Blob(["<p>lesson 2</p>"], { type: "text/html" })));
+  await t.run(async (ctx) => {
+    // Lesson 1 was retired by lesson 2 (supersededBy points at the key we delete).
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "One", supersededBy: "0002-b" });
+    await ctx.db.insert("lessons", { topicId, key: "0002-b", seq: 2, title: "Two", htmlStorageId: blobId });
+    await ctx.db.insert("learningRecords", { topicId, key: "0002-b", seq: 2, markdown: "# two" });
+    await ctx.db.insert("progress", { topicId, userId: alice, lessonKey: "0002-b", status: "completed" });
+    await ctx.db.insert("responses", { topicId, userId: alice, lessonKey: "0002-b", quizId: "q1", answer: "a", correct: true });
+    await ctx.db.insert("questions", { topicId, userId: alice, lessonKey: "0002-b", text: "why?", status: "open" });
+    // Untouched neighbours (lesson 1's own record + a different lesson's response).
+    await ctx.db.insert("learningRecords", { topicId, key: "0001-a", seq: 1, markdown: "# one" });
+    await ctx.db.insert("responses", { topicId, userId: alice, lessonKey: "0001-a", quizId: "q1", answer: "b", correct: false });
+  });
+
+  // Only the owner may delete.
+  await expect(asUser(t, bob).mutation(api.content.deleteLesson, { topicSlug: "hindi", key: "0002-b" })).rejects.toThrow();
+
+  await asUser(t, alice).mutation(api.content.deleteLesson, { topicSlug: "hindi", key: "0002-b" });
+
+  await t.run(async (ctx) => {
+    const lessons = await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect();
+    // Lesson 2 gone; lesson 1 restored (supersededBy cleared).
+    expect(lessons.map((l) => l.key)).toEqual(["0001-a"]);
+    expect(lessons[0]!.supersededBy).toBeUndefined();
+    // Its blob was deleted.
+    expect(await ctx.storage.getUrl(blobId)).toBeNull();
+    // Record for the deleted key gone; lesson 1's record kept.
+    const records = await ctx.db.query("learningRecords").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect();
+    expect(records.map((r) => r.key)).toEqual(["0001-a"]);
+    // Capture for the deleted key gone; the other lesson's response kept.
+    expect((await ctx.db.query("progress").withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topicId)).collect()).length).toBe(0);
+    const responses = await ctx.db.query("responses").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect();
+    expect(responses.map((r) => r.lessonKey)).toEqual(["0001-a"]);
+    expect((await ctx.db.query("questions").withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", alice)).collect()).length).toBe(0);
+  });
+});
+
 test("decodeEntities turns entity-encoded titles back into plain text", () => {
   expect(decodeEntities("Course Map &amp; Reading List")).toBe("Course Map & Reading List");
   expect(decodeEntities("&lt;a&gt; &quot;x&quot; &#39;y&#39;")).toBe('<a> "x" \'y\'');
@@ -262,6 +305,27 @@ test("seedTopic is Allowlist-gated: a signed-in non-member is refused, a member 
   expect(slug).toBe("greek");
 });
 
+test("seedTopic persists the chosen provider; absent defaults to claude", async () => {
+  const t = convexTest(schema, modules);
+  // Course creation is Allowlist-gated (ADR 0021), so both authors must be members.
+  const alice = await seedMember(t, "alice@example.com");
+  const bob = await seedMember(t, "bob@example.com");
+
+  // Explicit OpenRouter (the experimental line).
+  const { slug: or } = await asUser(t, alice).mutation(api.content.seedTopic, {
+    title: "GLM Course",
+    why: "try it",
+    provider: "openrouter",
+  });
+  // No provider supplied → the quality-guaranteed Claude default.
+  const { slug: def } = await asUser(t, bob).mutation(api.content.seedTopic, { title: "Default Course", why: "x" });
+
+  const rows = await t.run((ctx) => ctx.db.query("topics").collect());
+  expect(rows.find((x) => x.slug === or)?.provider).toBe("openrouter");
+  // The default topic stores no provider; readers treat absent as claude.
+  expect(rows.find((x) => x.slug === def)?.provider).toBeUndefined();
+});
+
 test("seedTopic caps a non-Admin to one new course per day; the Admin is exempt", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedMember(t, "alice@example.com");
@@ -365,4 +429,447 @@ test("renameTopic changes the title, keeps the slug, and is owner-scoped", async
   await asUser(t, alice).mutation(api.content.renameTopic, { topicSlug: "hindi", title: "Biblical Hindi" });
   expect((await asUser(t, alice).query(api.content.dashboard, {}))[0]).toMatchObject({ slug: "hindi", title: "Biblical Hindi" });
   await expect(asUser(t, bob).mutation(api.content.renameTopic, { topicSlug: "hindi", title: "x" })).rejects.toThrow();
+});
+
+// ---- editLesson: owner prose-edit of a source Lesson (course-content-editing 01)
+
+// A quiz body whose marker counts define the lesson's positional scoring:
+// data-correct=1, data-k=2, data-answer=0. The guard compares these counts.
+const QUIZ_BODY =
+  '<p>What is the word?</p><div class="quiz" data-correct="a"><span class="opt" data-k="a">x</span><span class="opt" data-k="b">y</span></div>';
+
+async function storeHtml(t: ReturnType<typeof convexTest>, html: string) {
+  return await t.run((ctx) => ctx.storage.store(new Blob([html], { type: "text/html" })));
+}
+
+async function seedLesson(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, key: string, storageId: Id<"_storage">) {
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key, seq: 1, title: "A", htmlStorageId: storageId }));
+}
+
+test("editLesson: owner edits a source Lesson — the new blob is served and the old one is deleted", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, "<p>Helo world</p>");
+  await seedLesson(t, topicId, "0001", oldSid);
+
+  // The client uploads the corrected body to a new blob and passes its storageId.
+  const newSid = await storeHtml(t, "<p>Hello world</p>");
+  await asUser(t, alice).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: newSid });
+
+  const lesson = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(lesson).toMatchObject({ key: "0001", contentUrl: expect.stringContaining(`/content?id=${newSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).toBeNull(); // old blob cleaned up
+  expect(await t.run((ctx) => ctx.db.system.get(newSid))).not.toBeNull();
+});
+
+test("editLesson: rejects a structural change, cleans up the rejected blob, and leaves the old body", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", oldSid);
+
+  // A third option adds a data-k marker → positional scoring would break → refused.
+  const badSid = await storeHtml(
+    t,
+    QUIZ_BODY.replace("</div>", '<span class="opt" data-k="c">z</span></div>'),
+  );
+  await expect(
+    asUser(t, alice).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: badSid }),
+  ).rejects.toThrow(/quiz/i);
+
+  // Old body untouched; the refused upload is deleted (no orphan).
+  const lesson = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(lesson).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).not.toBeNull();
+  expect(await t.run((ctx) => ctx.db.system.get(badSid))).toBeNull();
+});
+
+test("editLesson: accepts a prose-only edit that preserves the quiz markers", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", oldSid);
+
+  // Reworded prose, same three markers → allowed.
+  const goodSid = await storeHtml(t, QUIZ_BODY.replace("What is the word?", "Which word fits?"));
+  await asUser(t, alice).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: goodSid });
+
+  const lesson = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(lesson).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${goodSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).toBeNull();
+});
+
+test("editLesson: refuses an unreadable upload and preserves the current body (no data loss)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", oldSid);
+
+  // A well-formed storageId whose bytes don't exist (a bogus or already-consumed
+  // upload). The swap must NOT proceed — else it would point the lesson at a dead
+  // blob and delete the good one.
+  const deadSid = await t.run(async (ctx) => {
+    const id = await ctx.storage.store(new Blob(["tmp"], { type: "text/html" }));
+    await ctx.storage.delete(id);
+    return id;
+  });
+  await expect(
+    asUser(t, alice).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: deadSid }),
+  ).rejects.toThrow();
+
+  const lesson = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(lesson).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).not.toBeNull(); // good body survives
+});
+
+test("editLesson: refuses when the current body can't be read back, cleaning up the upload", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  // The lesson points at a storageId whose blob has since been removed — the guard
+  // has no old body to check against, so a structural change can't be verified.
+  const goneSid = await t.run(async (ctx) => {
+    const id = await ctx.storage.store(new Blob(["x"], { type: "text/html" }));
+    await ctx.storage.delete(id);
+    return id;
+  });
+  await seedLesson(t, topicId, "0001", goneSid);
+
+  const newSid = await storeHtml(t, "<p>new</p>");
+  await expect(
+    asUser(t, alice).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: newSid }),
+  ).rejects.toThrow();
+  expect(await t.run((ctx) => ctx.db.system.get(newSid))).toBeNull(); // unverifiable edit cleaned up
+});
+
+test("editLesson: rejects a non-owner and an unauthenticated caller; the lesson is untouched", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const bob = await seedUser(t, "bob@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, "<p>original</p>");
+  await seedLesson(t, topicId, "0001", oldSid);
+
+  const bobSid = await storeHtml(t, "<p>hijacked</p>");
+  await expect(
+    asUser(t, bob).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: bobSid }),
+  ).rejects.toThrow();
+  await expect(
+    t.action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: bobSid }),
+  ).rejects.toThrow();
+
+  // The owner's lesson still points at its original body.
+  const lesson = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(lesson).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldSid}`) });
+});
+
+// ---- editReference: owner edit of a source Reference (course-content-editing 02)
+
+async function seedReference(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, key: string, storageId: Id<"_storage">) {
+  await t.run((ctx) => ctx.db.insert("references", { topicId, key, title: "Grammar", htmlStorageId: storageId, contentHash: "h" }));
+}
+
+test("editReference: owner edits a Reference — new blob served, old deleted, no quiz guard", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, "<p>old cheat-sheet</p>");
+  await seedReference(t, topicId, "grammar", oldSid);
+
+  // References are mutable (ADR 0003) — even a body carrying quiz-like markers is
+  // accepted, since no structure guard applies.
+  const newSid = await storeHtml(t, QUIZ_BODY);
+  await asUser(t, alice).mutation(api.content.editReference, { topicSlug: "hindi", key: "grammar", storageId: newSid });
+
+  const ref = await asUser(t, alice).query(api.content.getReference, { topicSlug: "hindi", key: "grammar" });
+  expect(ref).toMatchObject({ key: "grammar", contentUrl: expect.stringContaining(`/content?id=${newSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).toBeNull(); // old blob cleaned up
+  expect(await t.run((ctx) => ctx.db.system.get(newSid))).not.toBeNull();
+});
+
+test("editReference: refuses an unreadable upload and preserves the current body", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, "<p>good body</p>");
+  await seedReference(t, topicId, "grammar", oldSid);
+
+  const deadSid = await t.run(async (ctx) => {
+    const id = await ctx.storage.store(new Blob(["tmp"], { type: "text/html" }));
+    await ctx.storage.delete(id);
+    return id;
+  });
+  await expect(
+    asUser(t, alice).mutation(api.content.editReference, { topicSlug: "hindi", key: "grammar", storageId: deadSid }),
+  ).rejects.toThrow();
+
+  const ref = await asUser(t, alice).query(api.content.getReference, { topicSlug: "hindi", key: "grammar" });
+  expect(ref).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).not.toBeNull();
+});
+
+test("editReference: rejects a non-owner and an unauthenticated caller; the reference is untouched", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const bob = await seedUser(t, "bob@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, "<p>original</p>");
+  await seedReference(t, topicId, "grammar", oldSid);
+
+  const bobSid = await storeHtml(t, "<p>hijacked</p>");
+  await expect(
+    asUser(t, bob).mutation(api.content.editReference, { topicSlug: "hindi", key: "grammar", storageId: bobSid }),
+  ).rejects.toThrow();
+  await expect(
+    t.mutation(api.content.editReference, { topicSlug: "hindi", key: "grammar", storageId: bobSid }),
+  ).rejects.toThrow();
+
+  const ref = await asUser(t, alice).query(api.content.getReference, { topicSlug: "hindi", key: "grammar" });
+  expect(ref).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldSid}`) });
+});
+
+// ---- editTranslatedLesson: owner edit of a translated Edition (content-editing 03)
+
+// Seed a Lesson translated into `lang` (a blob-backed translations row) and mark
+// the Edition ready so the owner holds it (getLesson serves it).
+async function seedTranslatedLesson(
+  t: ReturnType<typeof convexTest>,
+  topicId: Id<"topics">,
+  lang: string,
+  key: string,
+  storageId: Id<"_storage"> | null,
+) {
+  await t.run(async (ctx) => {
+    await ctx.db.insert("translationJobs", { topicId, lang, status: "ready", total: 1, done: 1, failed: 0 });
+    if (storageId) {
+      await ctx.db.insert("translations", {
+        topicId,
+        lang,
+        kind: "lesson",
+        key,
+        htmlStorageId: storageId,
+        sourceHash: "seed",
+      });
+    }
+  });
+}
+
+test("editTranslatedLesson: owner edits a translated Lesson — round-trips, old blob deleted, source unchanged", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", srcSid);
+  const oldTrSid = await storeHtml(t, QUIZ_BODY.replace("What is the word?", "Wat is die woord?"));
+  await seedTranslatedLesson(t, topicId, "af", "0001", oldTrSid);
+
+  // Prose-only fix in the Afrikaans Edition — same markers as the English source.
+  const newTrSid = await storeHtml(t, QUIZ_BODY.replace("What is the word?", "Watter woord pas?"));
+  await asUser(t, alice).action(api.content.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: newTrSid });
+
+  // The af Edition serves the new body; English source is unchanged.
+  const af = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "af" });
+  expect(af).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${newTrSid}`) });
+  const en = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(en).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${srcSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldTrSid))).toBeNull(); // old translated blob gone
+  expect(await t.run((ctx) => ctx.db.system.get(srcSid))).not.toBeNull(); // source blob untouched
+});
+
+test("editTranslatedLesson: rejects a structural change against the source markers, keeps the old body", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, QUIZ_BODY); // data-k = 2
+  await seedLesson(t, topicId, "0001", srcSid);
+  const oldTrSid = await storeHtml(t, QUIZ_BODY);
+  await seedTranslatedLesson(t, topicId, "af", "0001", oldTrSid);
+
+  // A third option changes the marker counts vs the source → refused.
+  const badSid = await storeHtml(t, QUIZ_BODY.replace("</div>", '<span class="opt" data-k="c">z</span></div>'));
+  await expect(
+    asUser(t, alice).action(api.content.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: badSid }),
+  ).rejects.toThrow(/quiz/i);
+
+  const af = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "af" });
+  expect(af).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${oldTrSid}`) });
+  expect(await t.run((ctx) => ctx.db.system.get(oldTrSid))).not.toBeNull();
+  expect(await t.run((ctx) => ctx.db.system.get(badSid))).toBeNull();
+});
+
+test("editTranslatedLesson: creates a translation row when the Edition had none (untranslated term)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", srcSid);
+  await seedTranslatedLesson(t, topicId, "af", "0001", null); // ready Edition, no row → English fallback
+
+  const newSid = await storeHtml(t, QUIZ_BODY.replace("What is the word?", "Watter woord pas?"));
+  await asUser(t, alice).action(api.content.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: newSid });
+
+  const af = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "af" });
+  expect(af).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${newSid}`) });
+  // English source still served on the source Edition.
+  const en = await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" });
+  expect(en).toMatchObject({ contentUrl: expect.stringContaining(`/content?id=${srcSid}`) });
+});
+
+test("editTranslatedLesson: rejects a non-owner, a Viewer of the Edition, and an unauthenticated caller", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const bob = await seedUser(t, "bob@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", srcSid);
+  const oldTrSid = await storeHtml(t, QUIZ_BODY);
+  await seedTranslatedLesson(t, topicId, "af", "0001", oldTrSid);
+  // bob is a Viewer of the af Edition — still can't edit it.
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: bob, lang: "af" }));
+
+  const bobSid = await storeHtml(t, QUIZ_BODY);
+  await expect(
+    asUser(t, bob).action(api.content.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: bobSid }),
+  ).rejects.toThrow();
+  await expect(
+    t.action(api.content.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: bobSid }),
+  ).rejects.toThrow();
+
+  // The translated row still points at its original body.
+  const row = await t.run((ctx) =>
+    ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "af").eq("kind", "lesson").eq("key", "0001"))
+      .unique(),
+  );
+  expect(row?.htmlStorageId).toBe(oldTrSid);
+});
+
+// ---- Editor enforcement on edit mutations (edition-editor-rights issue 02) ---
+
+// Grant `editor` on one Edition (lang) of a Topic. Editors edit exactly the
+// owner's hover-pencil prose, scoped to that Edition (ADR 0020).
+async function seedEditorShare(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, editorId: Id<"users">, lang: string) {
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: editorId, lang, role: "editor" }));
+}
+
+test("editor enforcement: an English-edition Editor can editLesson and editReference; the read seam serves the new bodies", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const editor = await seedUser(t, "editor@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  const lessonSid = await storeHtml(t, "<p>Helo</p>");
+  await seedLesson(t, topicId, "0001", lessonSid);
+  const refSid = await storeHtml(t, "<p>old ref</p>");
+  await seedReference(t, topicId, "grammar", refSid);
+  await seedEditorShare(t, topicId, editor, "en");
+
+  // Editor edits the source Lesson.
+  const newLessonSid = await storeHtml(t, "<p>Hello</p>");
+  await asUser(t, editor).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: newLessonSid });
+  expect(await asUser(t, editor).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" })).toMatchObject({
+    contentUrl: expect.stringContaining(`/content?id=${newLessonSid}`),
+  });
+
+  // Editor edits the source Reference.
+  const newRefSid = await storeHtml(t, "<p>new ref</p>");
+  await asUser(t, editor).mutation(api.content.editReference, { topicSlug: "hindi", key: "grammar", storageId: newRefSid });
+  expect(await asUser(t, editor).query(api.content.getReference, { topicSlug: "hindi", key: "grammar" })).toMatchObject({
+    contentUrl: expect.stringContaining(`/content?id=${newRefSid}`),
+  });
+});
+
+test("editor enforcement: a translated-edition Editor can editTranslatedLesson; the English source is untouched", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const editor = await seedUser(t, "editor@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", srcSid);
+  const oldTrSid = await storeHtml(t, QUIZ_BODY.replace("What is the word?", "Wat is die woord?"));
+  await seedTranslatedLesson(t, topicId, "af", "0001", oldTrSid);
+  await seedEditorShare(t, topicId, editor, "af");
+
+  const newTrSid = await storeHtml(t, QUIZ_BODY.replace("What is the word?", "Watter woord pas?"));
+  await asUser(t, editor).action(api.content.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: newTrSid });
+
+  expect(await asUser(t, editor).query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "af" })).toMatchObject({
+    contentUrl: expect.stringContaining(`/content?id=${newTrSid}`),
+  });
+  // The English source row is unchanged (owner reads it on the source Edition).
+  expect(await asUser(t, owner).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" })).toMatchObject({
+    contentUrl: expect.stringContaining(`/content?id=${srcSid}`),
+  });
+});
+
+test("editor enforcement: a plain Viewer, a wrong-lang Editor, and a stranger are all rejected", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const viewer = await seedUser(t, "viewer@example.com");
+  const afEditor = await seedUser(t, "afeditor@example.com");
+  const stranger = await seedUser(t, "stranger@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", srcSid);
+  await seedReference(t, topicId, "grammar", await storeHtml(t, "<p>ref</p>"));
+  await seedTranslatedLesson(t, topicId, "af", "0001", await storeHtml(t, QUIZ_BODY));
+  // viewer holds a read-only English Share; afEditor is an Editor of af ONLY.
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: viewer, lang: "en" }));
+  await seedEditorShare(t, topicId, afEditor, "af");
+
+  const sid = await storeHtml(t, QUIZ_BODY);
+  // A plain Viewer cannot touch any of the three.
+  await expect(asUser(t, viewer).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: sid })).rejects.toThrow();
+  await expect(asUser(t, viewer).mutation(api.content.editReference, { topicSlug: "hindi", key: "grammar", storageId: sid })).rejects.toThrow();
+  await expect(asUser(t, viewer).action(api.content.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: sid })).rejects.toThrow();
+  // The af Editor cannot edit the English source Lesson or Reference (lang X ≠ lang Y).
+  await expect(asUser(t, afEditor).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: sid })).rejects.toThrow();
+  await expect(asUser(t, afEditor).mutation(api.content.editReference, { topicSlug: "hindi", key: "grammar", storageId: sid })).rejects.toThrow();
+  // A stranger (no Share at all) is rejected everywhere, as is an unauthenticated caller.
+  await expect(asUser(t, stranger).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: sid })).rejects.toThrow();
+  await expect(t.action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: sid })).rejects.toThrow();
+
+  // The source Lesson still points at its original body after all rejections.
+  expect(await asUser(t, owner).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" })).toMatchObject({
+    contentUrl: expect.stringContaining(`/content?id=${srcSid}`),
+  });
+});
+
+test("editor enforcement: the quiz-structure guard still rejects a structural change made by an Editor", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const editor = await seedUser(t, "editor@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  const oldSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", oldSid);
+  await seedEditorShare(t, topicId, editor, "en");
+
+  // A third option adds a data-k marker → positional scoring breaks → refused,
+  // exactly as it would be for the owner.
+  const badSid = await storeHtml(t, QUIZ_BODY.replace("</div>", '<span class="opt" data-k="c">z</span></div>'));
+  await expect(
+    asUser(t, editor).action(api.content.editLesson, { topicSlug: "hindi", key: "0001", storageId: badSid }),
+  ).rejects.toThrow(/quiz/i);
+  expect(await asUser(t, editor).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" })).toMatchObject({
+    contentUrl: expect.stringContaining(`/content?id=${oldSid}`),
+  });
+});
+
+test("courseHeader.canEdit: true for the owner and an Editor of the served lang, false for a Viewer", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const enEditor = await seedUser(t, "eneditor@example.com");
+  const viewer = await seedUser(t, "viewer@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  await seedLesson(t, topicId, "0001", await storeHtml(t, "<p>x</p>"));
+  await seedEditorShare(t, topicId, enEditor, "en");
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: viewer, lang: "en" }));
+
+  expect(await asUser(t, owner).query(api.content.courseHeader, { topicSlug: "hindi" })).toMatchObject({ role: "owner", canEdit: true });
+  expect(await asUser(t, enEditor).query(api.content.courseHeader, { topicSlug: "hindi" })).toMatchObject({ role: "viewer", canEdit: true });
+  expect(await asUser(t, viewer).query(api.content.courseHeader, { topicSlug: "hindi" })).toMatchObject({ role: "viewer", canEdit: false });
 });

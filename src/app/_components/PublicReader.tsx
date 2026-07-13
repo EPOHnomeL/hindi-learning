@@ -13,6 +13,7 @@ import { Markdown } from "./MarkdownView";
 import { LockedPane, Paygate } from "./Paygate";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
+import { CourseSkeleton, ReaderSkeleton } from "./ui";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { firstLessonKey, nextLessonKey } from "./readerDerive";
 
@@ -95,7 +96,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
     [token],
   );
 
-  if (course === undefined) return <Centered>Loading…</Centered>;
+  if (course === undefined) return <CourseSkeleton />;
   if (course === null) return <Centered>This link isn’t available — the owner may have turned it off.</Centered>;
 
   const isRef = pathname.includes("/references/");
@@ -232,10 +233,11 @@ export function PublicCourseIndex({ token }: { token: string }) {
     if (first) router.replace(`/share/${token}/lessons/${first}`);
   }, [first, token, router]);
 
-  if (course === undefined) return <Centered>Loading…</Centered>;
+  if (course === undefined) return <ReaderSkeleton />;
   if (course === null) return <Centered>This link isn’t available — the owner may have turned it off.</Centered>;
   if (course.lessons.length === 0) return <Centered>No lessons published yet.</Centered>;
-  return <Centered>Opening…</Centered>;
+  // Redirecting straight into a Lesson — mimic the reader, not a bare line.
+  return <ReaderSkeleton />;
 }
 
 export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKey: string }) {
@@ -247,7 +249,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
   const qa = course.questions.filter((q) => q.lessonKey === lessonKey);
   const next = nextLessonKey(course.lessons, lessonKey);
 
-  if (lesson === undefined || html === undefined) return <p className="text-soft">Loading…</p>;
+  if (lesson === undefined || html === undefined) return <ReaderSkeleton />;
   if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this lesson. Try refreshing.</p>;
 
@@ -337,7 +339,7 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
   const navHidden = useHideOnScroll();
   const ref = useQuery(api.public.publicReference, { token, key: refKey });
   const html = useContentHtml(ref);
-  if (ref === undefined || html === undefined) return <p className="text-soft">Loading…</p>;
+  if (ref === undefined || html === undefined) return <ReaderSkeleton aside={false} />;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this reference. Try refreshing.</p>;
   // Paid marketplace: References sit past the free Preview — the paygate for a

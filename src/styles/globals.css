@@ -490,6 +490,39 @@ html[data-theme="dark"] .cert-stage {
   }
 }
 
+/* Landing page motion (landing-page/01) — all CSS, no dependency. `.land-rise`
+   is the hero entrance, staggered per element via --d; `.land-reveal` is a
+   scroll-driven fade+rise for sections further down, defined only inside
+   @supports so browsers without animation-timeline just show the content.
+   Both are suppressed under prefers-reduced-motion. */
+@keyframes land-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.land-rise {
+  animation: land-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+@supports (animation-timeline: view()) {
+  .land-reveal {
+    animation: land-rise linear both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 60%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .land-rise,
+  .land-reveal {
+    animation: none;
+  }
+}
+
 /* Certificate print-to-PDF (ADR 0015 + 0017): the /certificate/[token] page prints
    as a single clean page. Hide the on-screen controls (`.no-print`), drop the
    page's own padding/centering, flatten the card (no tilt, no foil, no shadow) to a

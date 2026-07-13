@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { beforeAll, expect, test } from "vitest";
+import { beforeAll, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
@@ -68,6 +68,154 @@ test("claimWork returns ownerEmail null for an unowned topic", async () => {
 test("claimWork rejects a bad secret", async () => {
   const t = convexTest(schema, modules);
   await expect(t.mutation(api.routine.claimWork, { secret: "wrong", runId: "r1" })).rejects.toThrow();
+});
+
+test("finishGenerating is Admin-only and refuses a non-admin", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  // A signed-in owner who isn't the Admin can't fire the fire-and-pray loop.
+  await expect(asUser(t, alice).action(api.routine.finishGenerating, { topicSlug: "hindi" })).rejects.toThrow();
+  // The lock stays untouched — no run was started.
+  const gen = await t.run((ctx) => ctx.db.query("generation").first());
+  expect(gen).toBeNull();
+});
+
+test("finishGenerating: Admin starts a run and locks the topic generating", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  await seedTopic(t, admin, "hindi");
+
+  const res = await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "hindi" });
+  expect(res).toEqual({ started: true });
+  const gen = await t.run((ctx) => ctx.db.query("generation").first());
+  expect(gen?.status).toBe("generating");
+});
+
+test("finishGenerating refuses a completed course and an in-flight run", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  // Completed courses never author again (ADR 0015) — fire-and-pray obeys that.
+  const done = await t.run((ctx) => ctx.db.insert("topics", { ownerId: admin, slug: "done", title: "Done", status: "completed" }));
+  expect(await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "done" })).toEqual({
+    started: false,
+    reason: "completed",
+  });
+  expect(await t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", done)).first())).toBeNull();
+
+  // A second fire while one is already in flight is refused (single-flight).
+  await seedTopic(t, admin, "hindi");
+  expect(await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "hindi" })).toEqual({ started: true });
+  expect(await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "hindi" })).toEqual({
+    started: false,
+    reason: "already-generating",
+  });
+});
+
+test("fire-and-pray re-fires the course's own provider until the budget runs out", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  // A Claude course (no provider field) — its finish loop must NOT touch OpenRouter.
+  const topicId = await seedTopic(t, admin, "hindi");
+  const secret = "test-secret";
+
+  await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "hindi" });
+  const armed = await t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique());
+  expect(armed?.status).toBe("generating");
+  expect(armed?.finishRemaining).toBe(30);
+
+  // A reported lesson decrements the budget and re-arms for the next one.
+  await t.mutation(api.routine.reportGeneration, { secret, topicSlug: "hindi", outcome: "published" });
+  const after = await t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique());
+  expect(after?.status).toBe("generating");
+  expect(after?.finishRemaining).toBe(29);
+
+  // The course completing (reported as "nothing") ends the run — budget cleared.
+  await t.mutation(api.routine.reportGeneration, { secret, topicSlug: "hindi", outcome: "nothing" });
+  const done = await t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique());
+  expect(done?.status).toBe("caughtUp");
+  expect(done?.finishRemaining).toBeUndefined();
+});
+
+test("cancelling a fire-and-pray run stops the next re-fire", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const topicId = await seedTopic(t, admin, "hindi");
+  const secret = "test-secret";
+
+  await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "hindi" });
+  // Non-admin can't cancel.
+  const intruder = await seedUser(t, "eve@example.com");
+  await expect(asUser(t, intruder).action(api.routine.cancelFinishGenerating, { topicSlug: "hindi" })).rejects.toThrow();
+
+  expect(await asUser(t, admin).action(api.routine.cancelFinishGenerating, { topicSlug: "hindi" })).toEqual({ cancelled: true });
+  const cancelled = await t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique());
+  expect(cancelled?.cancelRequested).toBe(true);
+  expect(cancelled?.finishRemaining).toBeUndefined();
+
+  // The in-flight lesson still reports back, but with the budget cleared it does
+  // NOT re-arm — the loop is over and the cancel flag is reset for the UI.
+  await t.mutation(api.routine.reportGeneration, { secret, topicSlug: "hindi", outcome: "published" });
+  const settled = await t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique());
+  expect(settled?.status).toBe("idle");
+  expect(settled?.cancelRequested).toBeUndefined();
+});
+
+test("fire-and-pray materialises a caught-up learner so runs author past an unread frontier", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const topicId = await seedTopic(t, admin, "biz");
+  await t.run(async (ctx) => {
+    await ctx.db.insert("lessons", { topicId, key: "0001-intro", seq: 1, title: "Intro" });
+    await ctx.db.insert("lessons", { topicId, key: "0002-next", seq: 2, title: "Next" });
+    // The owner has completed lesson 1 only; the frontier (0002) is unseen.
+    await ctx.db.insert("progress", { topicId, userId: admin, lessonKey: "0001-intro", status: "completed" });
+  });
+
+  // Outside a finish run, materialise shows the real (unread-frontier) progress.
+  const normal = await t.query(internal.routine.materialiseForProvider, { topicSlug: "biz" });
+  expect(normal?.capture.progress).toEqual([{ lessonKey: "0001-intro", status: "completed" }]);
+
+  // A finish run bypasses the learner's pace by design, but each re-fired run is
+  // a fresh teacher that would see the unread frontier and report "nothing" —
+  // ending the loop after one lesson. So while the budget is armed, materialise
+  // must present every current lesson as completed.
+  await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "biz" });
+  const finishing = await t.query(internal.routine.materialiseForProvider, { topicSlug: "biz" });
+  expect(finishing?.capture.progress).toEqual([
+    { lessonKey: "0001-intro", status: "completed" },
+    { lessonKey: "0002-next", status: "completed" },
+  ]);
+  // The stored Progress is untouched — only the materialised view is masked.
+  const rows = await t.run((ctx) => ctx.db.query("progress").collect());
+  expect(rows).toHaveLength(1);
+});
+
+test("a finish fire nobody claims fails visibly instead of generating forever", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const topicId = await seedTopic(t, admin, "biz");
+  const gen = () => t.run((ctx) => ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique());
+
+  await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "biz" });
+  const armed = await gen();
+
+  // The claim window closes with no run having claimed: fail the row (dot +
+  // error in the UI) and end the loop, rather than "Generating…" forever.
+  await t.mutation(internal.routine.expireUnclaimedFinish, { topicSlug: "biz", startedAt: armed!.startedAt! });
+  const expired = await gen();
+  expect(expired?.status).toBe("failed");
+  expect(expired?.finishRemaining).toBeUndefined();
+
+  // Re-arm. A stale watchdog from an older cycle (mismatched startedAt) no-ops,
+  // and once a run HAS claimed the fire, the watchdog leaves it alone.
+  await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "biz" });
+  const rearmed = await gen();
+  await t.mutation(internal.routine.expireUnclaimedFinish, { topicSlug: "biz", startedAt: (rearmed!.startedAt ?? 0) - 1 });
+  expect((await gen())?.status).toBe("generating");
+  await t.mutation(api.routine.claimWork, { secret: "test-secret", runId: "r1" });
+  await t.mutation(internal.routine.expireUnclaimedFinish, { topicSlug: "biz", startedAt: rearmed!.startedAt! });
+  expect((await gen())?.status).toBe("generating");
 });
 
 test("materialiseTopic returns one owner's topic context and is owner-scoped", async () => {
@@ -145,6 +293,18 @@ test("the bootstrap gate fires a seeded topic with no lessons; a plain empty top
   expect(plain).toMatchObject({ acquired: false, reason: "no-frontier" });
 });
 
+test("tryAcquireGeneration reports the topic's provider so the fire step can branch; absent reads as claude", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  // A seeded OpenRouter course (bootstrap gate passes) and a seeded default course
+  // (no provider → claude).
+  await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "glm", title: "GLM", status: "seeded", provider: "openrouter" }));
+  await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "std", title: "Std", status: "seeded" }));
+
+  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "glm" })).toMatchObject({ acquired: true, provider: "openrouter" });
+  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "std" })).toMatchObject({ acquired: true, provider: "claude" });
+});
+
 test("the on-demand button is capped to one manual fire per user per day, across topics; the daily cron is not", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
@@ -165,6 +325,52 @@ test("the on-demand button is capped to one manual fire per user per day, across
   expect(await asAlice.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "spanish", manual: true })).toMatchObject({ acquired: false, reason: "rate-limited" });
   // ...but the daily cron (manual=false) still fires that course.
   expect(await asAlice.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "spanish", manual: false })).toMatchObject({ acquired: true });
+});
+
+async function genStatus(t: ReturnType<typeof convexTest>, topicId: Id<"topics">) {
+  return await t.run(async (ctx) =>
+    (await ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique())?.status,
+  );
+}
+
+test("firing an OpenRouter course schedules the authoring action (no POST) and the scheduled run resolves the lock", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const glm = await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "glm", title: "GLM", status: "seeded", provider: "openrouter" }));
+
+  // Fake timers must be active BEFORE the fire so the `runAfter(0)` schedule is
+  // set against the fake clock that `finishAllScheduledFunctions` then advances.
+  vi.useFakeTimers();
+  try {
+    // ROUTINE_FIRE_URL is intentionally unset — the Claude POST path would fail;
+    // the OpenRouter path must never reach it, so this fire succeeds by scheduling.
+    const res = await asUser(t, alice).action(api.routine.requestSetup, { topicSlug: "glm" });
+    expect(res).toMatchObject({ fired: true });
+    expect(await genStatus(t, glm)).toBe("generating"); // lock held until the scheduled run reports
+
+    // Run the scheduled authoring action end to end. This env has no
+    // OPENROUTER_API_KEY (authoring is tested with a mocked client in
+    // openrouter.test.ts), so the bootstrap reports `failed` — which still proves
+    // the schedule → run → reportGeneration round-trip leaves the lock resolved,
+    // never stuck `generating`.
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+  } finally {
+    vi.useRealTimers();
+  }
+  expect(await genStatus(t, glm)).toBe("failed");
+});
+
+test("firing a Claude course still takes the POST path (unchanged), never the scheduler", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const std = await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "std", title: "Std", status: "seeded" }));
+
+  // No provider → Claude path: it attempts the routine POST. With ROUTINE_FIRE_URL
+  // unset the fire can't land, surfacing as fire-error / a failed lock — proving it
+  // took the POST branch, not the scheduler.
+  const res = await asUser(t, alice).action(api.routine.requestSetup, { topicSlug: "std" });
+  expect(res).toMatchObject({ fired: false, reason: "fire-error" });
+  expect(await genStatus(t, std)).toBe("failed");
 });
 
 test("the Admin bypasses the on-demand cooldown", async () => {

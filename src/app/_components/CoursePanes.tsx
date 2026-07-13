@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { api } from "../../../convex/_generated/api";
 import { ArtifactView } from "./ArtifactView";
 import { useCourse } from "./CourseShell";
+import { ReaderSkeleton } from "./ui";
 import { LANG_KEY, useEditionLang } from "./editionUrl";
 import { courseIndexRedirect, firstLessonKey, frontierKey } from "./readerDerive";
 
@@ -61,13 +62,9 @@ export function CourseIndex({ slug }: { slug: string }) {
 // the first one lands). A Viewer of a shared course with no lessons gets a calm
 // "nothing yet" instead.
 function CourseStatus({ variant }: { variant: "loading" | "opening" | "preparing" | "empty-viewer" }) {
-  if (variant === "loading" || variant === "opening") {
-    return (
-      <div className="flex h-full min-h-[60vh] items-center justify-center p-8">
-        <p className="text-sm text-soft">{variant === "loading" ? "Loading…" : "Opening…"}</p>
-      </div>
-    );
-  }
+  // Both resolve straight into a Lesson, so mimic the lesson reader (with its
+  // question aside) rather than flashing a bare line of centred text.
+  if (variant === "loading" || variant === "opening") return <ReaderSkeleton />;
 
   if (variant === "empty-viewer") {
     return (
@@ -108,7 +105,7 @@ function CourseStatus({ variant }: { variant: "loading" | "opening" | "preparing
 // A single Lesson. Reads `frontierKey` from the course context for the
 // "generate next lesson" affordance, and marks its replies seen on open.
 export function LessonPane({ slug, lessonKey }: { slug: string; lessonKey: string }) {
-  const { markSeen, frontierKey, canWrite, completed, nextKey, dir, contentLang } = useCourse();
+  const { markSeen, frontierKey, canWrite, canEdit, completed, nextKey, dir, contentLang } = useCourse();
   useEffect(() => {
     markSeen(lessonKey);
   }, [lessonKey, markSeen]);
@@ -119,6 +116,7 @@ export function LessonPane({ slug, lessonKey }: { slug: string; lessonKey: strin
       topicSlug={slug}
       isFrontier={frontierKey === lessonKey}
       readOnly={!canWrite}
+      canEdit={canEdit}
       courseCompleted={completed}
       nextLessonKey={nextKey(lessonKey)}
       dir={dir}
@@ -129,7 +127,7 @@ export function LessonPane({ slug, lessonKey }: { slug: string; lessonKey: strin
 
 // A single Reference. Never the Frontier, nothing to mark seen.
 export function ReferencePane({ slug, refKey }: { slug: string; refKey: string }) {
-  const { canWrite, dir, contentLang } = useCourse();
+  const { canWrite, canEdit, dir, contentLang } = useCourse();
   return (
     <ArtifactView
       kind="reference"
@@ -137,6 +135,7 @@ export function ReferencePane({ slug, refKey }: { slug: string; refKey: string }
       topicSlug={slug}
       isFrontier={false}
       readOnly={!canWrite}
+      canEdit={canEdit}
       dir={dir}
       contentLang={contentLang}
     />

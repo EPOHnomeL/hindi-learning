@@ -52,13 +52,17 @@ test("courseHeader reports the role: owner, viewer, or null for a stranger", asy
   const enEdition = { lang: "en", dir: "ltr" as const, editions: [{ lang: "en", name: "English", native: "English", rtl: false }] };
   expect(await asUser(t, owner).query(api.content.courseHeader, { topicSlug: "hindi" })).toEqual({
     title: "Hindi",
+    mission: null,
     role: "owner",
+    canEdit: true,
     status: "active",
     ...enEdition,
   });
   expect(await asUser(t, viewer).query(api.content.courseHeader, { topicSlug: "hindi" })).toEqual({
     title: "Hindi",
+    mission: null,
     role: "viewer",
+    canEdit: false,
     status: "active",
     ...enEdition,
   });
@@ -229,6 +233,107 @@ test("Shared-with-me counts reflect the Viewer's own progress, not the owner's",
   await asUser(t, viewer).mutation(api.capture.setProgress, { topicSlug: "hindi", lessonKey: "0001-a", status: "completed" });
   expect(await asUser(t, viewer).query(api.shares.listSharedTopics, {})).toMatchObject([
     { slug: "hindi", lessonCount: 1, completedCount: 1 },
+  ]);
+});
+
+// ---- Owner access management (edition-editor-rights issue 03) --------------
+
+test("listEditionAccess returns accepted + pending entries for the requested lang only; non-owner rejected", async () => {
+  const t = convexTest(schema, modules);
+  const { owner, viewer, stranger, topicId } = await sharedFixture(t);
+  // A ready Afrikaans Edition so a second-lang Share/invite is possible.
+  await t.run(async (ctx) => {
+    await ctx.db.insert("translationJobs", { topicId, lang: "af", status: "ready", total: 1, done: 1, failed: 0 });
+    // A pending English invite (email with no account yet).
+    await ctx.db.insert("pendingShares", { topicId, email: "invitee@example.com", lang: "en" });
+    // The existing viewer also holds an af Share, as an Editor — must not appear
+    // under the English roster.
+    await ctx.db.insert("shares", { topicId, viewerId: viewer, lang: "af", role: "editor" });
+  });
+
+  const en = await asUser(t, owner).query(api.shares.listEditionAccess, { topicSlug: "hindi", lang: "en" });
+  expect(en).toEqual([
+    { email: "viewer@example.com", role: "viewer", status: "accepted" },
+    { email: "invitee@example.com", role: "viewer", status: "pending" },
+  ]);
+  // The af roster shows only the af Editor.
+  const af = await asUser(t, owner).query(api.shares.listEditionAccess, { topicSlug: "hindi", lang: "af" });
+  expect(af).toEqual([{ email: "viewer@example.com", role: "editor", status: "accepted" }]);
+
+  // A non-owner cannot read the roster.
+  await expect(asUser(t, stranger).query(api.shares.listEditionAccess, { topicSlug: "hindi", lang: "en" })).rejects.toThrow();
+});
+
+test("setShareRole promotes a Viewer→Editor and demotes back; a non-owner is rejected", async () => {
+  const t = convexTest(schema, modules);
+  const { owner, stranger } = await sharedFixture(t);
+
+  await asUser(t, owner).mutation(api.shares.setShareRole, { topicSlug: "hindi", email: "viewer@example.com", lang: "en", role: "editor" });
+  expect(await asUser(t, owner).query(api.shares.listEditionAccess, { topicSlug: "hindi", lang: "en" })).toEqual([
+    { email: "viewer@example.com", role: "editor", status: "accepted" },
+  ]);
+  // Demote back.
+  await asUser(t, owner).mutation(api.shares.setShareRole, { topicSlug: "hindi", email: "viewer@example.com", lang: "en", role: "viewer" });
+  expect(await asUser(t, owner).query(api.shares.listEditionAccess, { topicSlug: "hindi", lang: "en" })).toEqual([
+    { email: "viewer@example.com", role: "viewer", status: "accepted" },
+  ]);
+
+  // A non-owner cannot set roles; a role with no matching access throws.
+  await expect(
+    asUser(t, stranger).mutation(api.shares.setShareRole, { topicSlug: "hindi", email: "viewer@example.com", lang: "en", role: "editor" }),
+  ).rejects.toThrow();
+  await expect(
+    asUser(t, owner).mutation(api.shares.setShareRole, { topicSlug: "hindi", email: "nobody@example.com", lang: "en", role: "editor" }),
+  ).rejects.toThrow();
+});
+
+test("setShareRole works on a pending invite too", async () => {
+  const t = convexTest(schema, modules);
+  const { owner, topicId } = await sharedFixture(t);
+  await t.run((ctx) => ctx.db.insert("pendingShares", { topicId, email: "invitee@example.com", lang: "en" }));
+
+  await asUser(t, owner).mutation(api.shares.setShareRole, { topicSlug: "hindi", email: "invitee@example.com", lang: "en", role: "editor" });
+  const roster = await asUser(t, owner).query(api.shares.listEditionAccess, { topicSlug: "hindi", lang: "en" });
+  expect(roster).toContainEqual({ email: "invitee@example.com", role: "editor", status: "pending" });
+});
+
+test("revokeShare removes an accepted Share and a pending invite; the second call is a no-op; non-owner rejected", async () => {
+  const t = convexTest(schema, modules);
+  const { owner, stranger, topicId } = await sharedFixture(t);
+  await t.run((ctx) => ctx.db.insert("pendingShares", { topicId, email: "invitee@example.com", lang: "en" }));
+
+  // A non-owner cannot revoke.
+  await expect(
+    asUser(t, stranger).mutation(api.shares.revokeShare, { topicSlug: "hindi", email: "viewer@example.com", lang: "en" }),
+  ).rejects.toThrow();
+
+  // Revoke the accepted Share, then the pending invite.
+  await asUser(t, owner).mutation(api.shares.revokeShare, { topicSlug: "hindi", email: "viewer@example.com", lang: "en" });
+  await asUser(t, owner).mutation(api.shares.revokeShare, { topicSlug: "hindi", email: "invitee@example.com", lang: "en" });
+  expect(await asUser(t, owner).query(api.shares.listEditionAccess, { topicSlug: "hindi", lang: "en" })).toEqual([]);
+
+  // Idempotent: revoking again is a silent no-op.
+  await asUser(t, owner).mutation(api.shares.revokeShare, { topicSlug: "hindi", email: "viewer@example.com", lang: "en" });
+});
+
+test("setShareRole on lang A leaves the same person's Share on lang B unchanged", async () => {
+  const t = convexTest(schema, modules);
+  const { owner, viewer, topicId } = await sharedFixture(t);
+  // The viewer also holds an af Share (Viewer).
+  await t.run(async (ctx) => {
+    await ctx.db.insert("translationJobs", { topicId, lang: "af", status: "ready", total: 1, done: 1, failed: 0 });
+    await ctx.db.insert("shares", { topicId, viewerId: viewer, lang: "af" });
+  });
+
+  // Promote on English only.
+  await asUser(t, owner).mutation(api.shares.setShareRole, { topicSlug: "hindi", email: "viewer@example.com", lang: "en", role: "editor" });
+
+  expect(await asUser(t, owner).query(api.shares.listEditionAccess, { topicSlug: "hindi", lang: "en" })).toEqual([
+    { email: "viewer@example.com", role: "editor", status: "accepted" },
+  ]);
+  // The af Share is untouched — still a Viewer.
+  expect(await asUser(t, owner).query(api.shares.listEditionAccess, { topicSlug: "hindi", lang: "af" })).toEqual([
+    { email: "viewer@example.com", role: "viewer", status: "accepted" },
   ]);
 });
 

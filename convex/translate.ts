@@ -1,10 +1,11 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { internal } from "./_generated/api";
-import { action, internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
+import { api, internal } from "./_generated/api";
+import { action, internalAction, internalMutation, internalQuery, mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, hashString, SOURCE_LANG, shareLang, topicBySlug } from "./lib";
+import { assertAdmin, getEditableTopic, getOwnedTopic, hashString, SOURCE_LANG, shareLang, topicBySlug } from "./lib";
 import { isKnownLang, langInfo } from "./languages";
+import { chatComplete, translateModel, type ChatMessage } from "./openrouterClient";
 
 // Course translation (Editions), driven by the cloud **translate Routine** — the
 // sibling of the next-lesson Routine (routine.ts), reusing its lock → claim →
@@ -30,7 +31,9 @@ type Kind = "lesson" | "reference" | "mission" | "title" | "question";
 // The hash of a source item's content — stamped onto the translation so a later
 // re-translate can skip unchanged items. Must be computed identically wherever a
 // source item is read, so both `collectItems` and `readSource` route through here.
-function itemHash(kind: Kind, f: { title?: string; html?: string; htmlStorageId?: Id<"_storage">; text?: string; reply?: string }): string {
+// Also stamped by the owner's manual translated-Lesson edit (content.ts) so a
+// later re-translate of an unchanged source skips the item and keeps that edit.
+export function itemHash(kind: Kind, f: { title?: string; html?: string; htmlStorageId?: Id<"_storage">; text?: string; reply?: string }): string {
   // Bodies now live in content blobs; a blob-backed row has no inline `html`, so
   // hash its stable `htmlStorageId` instead (immutable content → stable id → a
   // valid staleness key). Falls back to inline `html` for not-yet-migrated rows.
@@ -40,6 +43,26 @@ function itemHash(kind: Kind, f: { title?: string; html?: string; htmlStorageId?
 }
 
 type Item = { kind: Kind; key: string; hash: string };
+
+// How long a `translating` job may sit without a heartbeat tick before it is
+// presumed dead and its lock retakeable. The heartbeat (`claimedAt`) is stamped
+// at acquire and re-stamped by every `publishTranslation` tick (~one a minute
+// while a run is alive), so 10 silent minutes means the action was killed
+// infra-side — nothing will ever report, and the lock would stick forever.
+const STALE_MS = 10 * 60 * 1000;
+
+// True when a fresh translation of this item already exists (its `sourceHash`
+// matches the current source), so a run can skip it — this is what makes a
+// re-fire a *resume* instead of a from-scratch restart.
+async function isFresh(ctx: QueryCtx, topicId: Id<"topics">, lang: string, it: Item): Promise<boolean> {
+  const existing = await ctx.db
+    .query("translations")
+    .withIndex("by_topic_lang_kind_key", (q) =>
+      q.eq("topicId", topicId).eq("lang", lang).eq("kind", it.kind).eq("key", it.key),
+    )
+    .unique();
+  return existing !== null && existing.sourceHash === it.hash;
+}
 
 // Every translatable item of a Topic — its title, mission (if any), and each
 // non-superseded Lesson + Reference. Used only to seed the job's `total`; the run
@@ -71,7 +94,7 @@ async function readSource(
   topicId: Id<"topics">,
   kind: Kind,
   key: string,
-): Promise<{ title?: string; html?: string; text?: string; reply?: string; hash: string } | null> {
+): Promise<{ title?: string; html?: string; htmlStorageId?: Id<"_storage">; text?: string; reply?: string; hash: string } | null> {
   const topic = await ctx.db.get(topicId);
   if (!topic) return null;
   if (kind === "title") return { text: topic.title, hash: itemHash("title", { text: topic.title }) };
@@ -86,8 +109,9 @@ async function readSource(
       .unique();
     if (!l || l.supersededBy) return null;
     // The source body now lives in a content blob (no inline `html`), so the
-    // quiz-structure guard downstream is skipped for it (see publishTranslation).
-    return { title: l.title, hash: itemHash("lesson", l) };
+    // quiz-structure guard downstream is skipped for it (see publishTranslation);
+    // the blob id lets an action read the bytes to translate the body.
+    return { title: l.title, htmlStorageId: l.htmlStorageId, hash: itemHash("lesson", l) };
   }
   if (kind === "reference") {
     const r = await ctx.db
@@ -95,7 +119,7 @@ async function readSource(
       .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
       .unique();
     if (!r) return null;
-    return { title: r.title, hash: itemHash("reference", r) };
+    return { title: r.title, htmlStorageId: r.htmlStorageId, hash: itemHash("reference", r) };
   }
   // question
   const q = await ctx.db.get(key as Id<"questions">);
@@ -116,6 +140,10 @@ type AcquireResult =
 // with the item `total`. The ONLY place that decides to translate.
 export const tryAcquireTranslation = internalMutation({
   args: { topicSlug: v.string(), lang: v.string() },
+  returns: v.union(
+    v.object({ acquired: v.literal(true), topicSlug: v.string(), lang: v.string(), total: v.number() }),
+    v.object({ acquired: v.literal(false), reason: v.string() }),
+  ),
   handler: async (ctx, { topicSlug, lang }): Promise<AcquireResult> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return { acquired: false, reason: "unauthenticated" };
@@ -133,22 +161,34 @@ export const tryAcquireTranslation = internalMutation({
       .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", lang))
       .unique();
     // Single-flight: a language already mid-translation must finish (or be removed)
-    // before another fire — else the run is triggered twice for one Edition.
-    if (job && job.status === "translating") return { acquired: false, reason: "already-translating" };
+    // before another fire — else the run is triggered twice for one Edition. But a
+    // run killed infra-side never reports, so a job whose heartbeat went silent
+    // (or that never had one) is dead: retaking its lock is the only way out.
+    if (
+      job &&
+      job.status === "translating" &&
+      job.claimedAt !== undefined &&
+      Date.now() - job.claimedAt < STALE_MS
+    )
+      return { acquired: false, reason: "already-translating" };
 
-    const total = (await collectItems(ctx, topic)).length;
+    const items = await collectItems(ctx, topic);
+    let done = 0;
+    for (const it of items) if (await isFresh(ctx, topic._id, lang, it)) done++;
     const patch = {
       status: "translating" as const,
-      total,
-      done: 0,
+      total: items.length,
+      // Fresh rows from a prior (dead) run are kept, so the count resumes, not
+      // restarts — the run itself skips them via `collectForTranslation`.
+      done,
       failed: 0,
       error: undefined,
-      claimedAt: undefined, // fresh lock — unclaimed until a fired run grabs it
+      claimedAt: Date.now(), // the heartbeat — publishTranslation re-stamps it per item
       runId: undefined,
     };
     if (job) await ctx.db.patch(job._id, patch);
     else await ctx.db.insert("translationJobs", { topicId: topic._id, lang, ...patch });
-    return { acquired: true, topicSlug, lang, total };
+    return { acquired: true, topicSlug, lang, total: items.length };
   },
 });
 
@@ -171,12 +211,17 @@ export const failTranslation = internalMutation({
 
 type FireResult = { fired: boolean; reason?: string; error?: string };
 
-// Owner: translate a completed course into `lang` by firing the translate
-// Routine (mirrors `routine.requestNextLesson`). Acquire the lock, then POST the
-// routine's Fire URL; on a failed fire, release the lock. Idempotent re-translate
-// is a re-fire once the prior run is no longer `translating`.
+// Owner: translate a completed course into `lang`. ALL translation now runs on
+// Gemini via the OpenRouter translate action, regardless of the course's authoring
+// Provider — the claude.ai translate Routine is never fired (this branch
+// supersedes the PRD's "translation follows provider": a Claude-authored course
+// still translates through Gemini). Acquire the lock, then schedule the action; on
+// a failed schedule, release the lock. Idempotent re-translate is a re-fire once
+// the prior run is no longer `translating`. Requires OPENROUTER_API_KEY on the
+// deployment (the action reads it).
 export const startTranslation = action({
   args: { topicSlug: v.string(), lang: v.string() },
+  returns: v.object({ fired: v.boolean(), reason: v.optional(v.string()), error: v.optional(v.string()) }),
   handler: async (ctx, { topicSlug, lang }): Promise<FireResult> => {
     const acq: AcquireResult = await ctx.runMutation(internal.translate.tryAcquireTranslation, { topicSlug, lang });
     if (!acq.acquired) {
@@ -188,18 +233,12 @@ export const startTranslation = action({
       if (acq.reason === "already-translating") throw new Error("a translation is already in progress for this language");
       return { fired: false, reason: acq.reason };
     }
+
+    // Always schedule the Gemini translate action — no `claimTranslation`, no POST
+    // to the claude.ai translate Routine. The gate/lock + reportTranslation are
+    // reused unchanged; a failed schedule releases the lock.
     try {
-      const url = process.env.TRANSLATE_FIRE_URL;
-      const token = process.env.TRANSLATE_FIRE_TOKEN;
-      if (!url || !token) throw new Error("TRANSLATE_FIRE_URL / TRANSLATE_FIRE_TOKEN not set");
-      // Closed body (ADR 0008): the run learns its (Topic, language) from
-      // `claimTranslation`, not the fire body.
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "content-type": "application/json", "anthropic-version": "2023-06-01", authorization: `Bearer ${token}` },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) throw new Error(`fire ${res.status}: ${await res.text()}`);
+      await ctx.scheduler.runAfter(0, internal.translate.translateTopic, { topicSlug, lang });
       return { fired: true };
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
@@ -245,15 +284,65 @@ export const removeEdition = mutation({
   },
 });
 
+// ---- Owner/Editor: edition title & mission edit (edition-title-edit 01) -----
+
+// Fix an Edition's translated title or mission in place — the topic-level
+// counterpart of the translated-Lesson edit, same trust boundary (owner or that
+// Edition's Editor, ADR 0020). Stamps the CURRENT source hash so a re-translate
+// sees the item fresh and keeps the edit; it goes stale (re-translated) only if
+// the English source text itself changes later. Blank text reverts to auto:
+// the row is dropped, the reader falls back to the English source, and the next
+// re-translate regenerates it.
+export const editEditionText = mutation({
+  args: {
+    topicSlug: v.string(),
+    lang: v.string(),
+    kind: v.union(v.literal("title"), v.literal("mission")),
+    text: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, lang, kind, text }): Promise<null> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    // The source keeps its owner-only paths (renameTopic / editMission).
+    if (lang === SOURCE_LANG) throw new Error("not a translated edition");
+    const topic = await getEditableTopic(ctx, userId, topicSlug, lang);
+    if (!topic) throw new Error("topic not found");
+    const source = kind === "title" ? topic.title : topic.mission;
+    if (source === undefined) throw new Error("this course has no mission");
+
+    const existing = await ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) =>
+        q.eq("topicId", topic._id).eq("lang", lang).eq("kind", kind).eq("key", ""),
+      )
+      .unique();
+    const trimmed = text.trim();
+    if (trimmed === "") {
+      if (existing) await ctx.db.delete(existing._id);
+      return null;
+    }
+    const row = { topicId: topic._id, lang, kind, key: "", text: trimmed, sourceHash: itemHash(kind, { text: source }) };
+    if (existing) await ctx.db.replace(existing._id, row);
+    else await ctx.db.insert("translations", row);
+    return null;
+  },
+});
+
 // ---- The run's seams (PUBLISH_SECRET-guarded) ------------------------------
 
-// A fired run can't be told its (Topic, language) — the Fire body is closed (ADR
-// 0008) — so it calls this to atomically grab one locked-but-unclaimed
-// translation job and stamp its runId. Returns the claimed Topic slug, target
-// language, and owner email (for the owner-scoped materialise/publish), or null
-// if none waiting. Mirrors `routine.claimWork`.
+// Legacy/manual seam (the fired-Routine flow — `startTranslation` no longer
+// fires it): atomically grab one translation job whose run is DEAD — heartbeat
+// absent or silent past STALE_MS — and stamp a fresh heartbeat + runId. A live
+// job (the Gemini action ticking `claimedAt` via publishes) is never stealable.
+// Returns the claimed Topic slug, target language, and owner email (for the
+// owner-scoped materialise/publish), or null if none waiting.
 export const claimTranslation = mutation({
   args: { secret: v.string(), runId: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({ topicSlug: v.string(), lang: v.string(), ownerEmail: v.union(v.string(), v.null()) }),
+  ),
   handler: async (
     ctx,
     { secret, runId },
@@ -264,7 +353,11 @@ export const claimTranslation = mutation({
     // edition count ever grows large enough to matter.
     const jobs = await ctx.db.query("translationJobs").collect();
     const candidate = jobs
-      .filter((j) => j.status === "translating" && j.claimedAt === undefined)
+      .filter(
+        (j) =>
+          j.status === "translating" &&
+          (j.claimedAt === undefined || Date.now() - j.claimedAt >= STALE_MS),
+      )
       .sort((a, b) => a._creationTime - b._creationTime)[0];
     if (!candidate) return null;
     await ctx.db.patch(candidate._id, { claimedAt: Date.now(), runId });
@@ -339,7 +432,9 @@ export const publishTranslation = mutation({
       .unique();
     if (existing) await ctx.db.replace(existing._id, row);
     else await ctx.db.insert("translations", row);
-    await ctx.db.patch(job._id, { done: job.done + 1 });
+    // The tick doubles as the run's heartbeat: while items keep landing, the
+    // lock stays held; silence past STALE_MS marks the run dead (re-fireable).
+    await ctx.db.patch(job._id, { done: job.done + 1, claimedAt: Date.now() });
     return { status: "saved" };
   },
 });
@@ -375,6 +470,194 @@ export const reportTranslation = mutation({
   },
 });
 
+// ---- OpenRouter translate path (Gemini) ------------------------------------
+
+// The source content for every translatable item + the owner email the publish
+// seam keys by, in one round-trip. The OpenRouter action's context seam (internal,
+// keyed by slug + lang), mirroring routine.materialiseForProvider on the authoring
+// side. Null if the Topic or owner is missing.
+export const collectForTranslation = internalQuery({
+  args: { topicSlug: v.string(), lang: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      ownerEmail: v.union(v.string(), v.null()),
+      items: v.array(
+        v.object({
+          kind: kindV,
+          key: v.string(),
+          title: v.optional(v.string()),
+          htmlStorageId: v.optional(v.id("_storage")),
+          text: v.optional(v.string()),
+          reply: v.optional(v.string()),
+        }),
+      ),
+    }),
+  ),
+  handler: async (ctx, { topicSlug, lang }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic || !topic.ownerId) return null;
+    const owner = await ctx.db.get(topic.ownerId);
+    if (!owner) return null;
+    const items = [];
+    for (const it of await collectItems(ctx, topic)) {
+      // Already translated from this exact source → skip, so a re-fire after a
+      // killed run resumes where it stopped instead of re-paying the whole course.
+      if (await isFresh(ctx, topic._id, lang, it)) continue;
+      const src = await readSource(ctx, topic._id, it.kind, it.key);
+      // Lesson/reference bodies live in content blobs; hand the action the blob
+      // id so it can read the bytes (a query can't) and translate the body.
+      items.push({ kind: it.kind, key: it.key, title: src?.title, htmlStorageId: src?.htmlStorageId, text: src?.text, reply: src?.reply });
+    }
+    return { ownerEmail: owner.email ?? null, items };
+  },
+});
+
+// The translation prompt for one item. `html` mode preserves every tag/attribute
+// (quiz markers must survive — publishTranslation rejects structural drift); `text`
+// mode is for the plain title/mission. Returns only the translation.
+export function buildTranslateMessages(content: string, langName: string, mode: "html" | "text"): ChatMessage[] {
+  const system =
+    mode === "html"
+      ? `You are a professional translator. Translate the human-readable text of the following HTML into ${langName}. Preserve EVERY HTML tag, attribute, and value EXACTLY — especially quiz markers (class names, data-correct, data-answer, data-k, data-alt). Do not add, remove, or reorder elements. Return ONLY the translated HTML, with no code fence and no commentary.`
+      : `You are a professional translator. Translate the following text into ${langName}. Return ONLY the translation, with no quotes or commentary.`;
+  return [
+    { role: "system", content: system },
+    { role: "user", content },
+  ];
+}
+
+// Translate one item's field, single-pass on Gemini. Empty content is returned
+// as-is (nothing to translate) to avoid a wasted call.
+async function translateField(model: string, content: string, langName: string, mode: "html" | "text"): Promise<string> {
+  if (content.trim() === "") return content;
+  // Reasoning off: thinking tokens are billed as output and buy nothing for
+  // constrained translation (translation-cost 02).
+  return await chatComplete({ model, messages: buildTranslateMessages(content, langName, mode), reasoning: "none" });
+}
+
+// Items translated per action invocation. A big course can't finish inside one
+// action's execution ceiling (the 56-lesson prod course was killed at 28/59
+// after ~20 minutes), so each invocation does a bounded chunk and reschedules
+// itself for the rest. ~45s/item observed → a chunk stays a few minutes.
+const CHUNK = 5;
+
+// Translate a completed course into `lang` on Gemini 3.5 Flash, in chunks of
+// CHUNK items per invocation. Reads each source item, translates it single-pass,
+// and publishes through the existing publishTranslation (which stamps the source
+// hash + rejects quiz drift), ticking the job. `remaining` (absent on the first
+// invocation) pins the continuation's work-list, so an item that publish refuses
+// (skipped) can never be retried forever. Reports ready/failed via the existing
+// reportTranslation, so the lock never sticks and unpublished items fall back to
+// English in the reader.
+export const translateTopic = internalAction({
+  args: { topicSlug: v.string(), lang: v.string(), remaining: v.optional(v.array(v.string())) },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, lang, remaining }): Promise<null> => {
+    const secret = process.env.PUBLISH_SECRET;
+    if (!secret) throw new Error("PUBLISH_SECRET not set");
+    try {
+      const info = await ctx.runQuery(internal.translate.collectForTranslation, { topicSlug, lang });
+      if (!info || !info.ownerEmail) throw new Error("no translation context (missing topic or owner)");
+      const ownerEmail = info.ownerEmail;
+      const langName = langInfo(lang).name;
+      const model = translateModel();
+
+      // Fresh items are already gone (collectForTranslation skips them); a
+      // continuation additionally narrows to its handed-down work-list.
+      let items = info.items;
+      if (remaining) {
+        const keep = new Set(remaining);
+        items = items.filter((it) => keep.has(it.kind + ":" + it.key));
+      }
+      const rest = items.slice(CHUNK);
+      for (const item of items.slice(0, CHUNK)) {
+        if (item.kind === "lesson" || item.kind === "reference") {
+          // The body is a content blob; an action can read its bytes directly
+          // (no HTTP round-trip) and translate the markup. Styles/scripts are
+          // swapped out first — the model translates only the real content.
+          const blob = item.htmlStorageId ? await ctx.storage.get(item.htmlStorageId) : null;
+          const body = blob ? await blob.text() : "";
+          const { stripped, blocks } = swapOutStatic(body);
+          const translated = stripFence(await translateField(model, stripped, langName, "html"));
+          const html = swapBackStatic(translated, blocks);
+          // A mangled placeholder or a dropped quiz marker means a corrupt body:
+          // skip the item (English fallback; counted `failed` at report). The
+          // mutation-side quiz guard can't read blobs, so this is THE check.
+          if (html === null || !quizStructureMatches(body, html)) continue;
+          await ctx.runMutation(api.translate.publishTranslation, {
+            secret,
+            ownerEmail,
+            topicSlug,
+            lang,
+            kind: item.kind,
+            key: item.key,
+            title: await translateField(model, item.title ?? "", langName, "text"),
+            html,
+          });
+        } else {
+          // title / mission — a single text field.
+          await ctx.runMutation(api.translate.publishTranslation, {
+            secret,
+            ownerEmail,
+            topicSlug,
+            lang,
+            kind: item.kind,
+            key: item.key,
+            text: await translateField(model, item.text ?? "", langName, "text"),
+          });
+        }
+      }
+      if (rest.length > 0) {
+        // Continue in a fresh invocation so the run never outlives the ceiling.
+        await ctx.scheduler.runAfter(0, internal.translate.translateTopic, {
+          topicSlug,
+          lang,
+          remaining: rest.map((it) => it.kind + ":" + it.key),
+        });
+        return null;
+      }
+      await ctx.runMutation(api.translate.reportTranslation, { secret, topicSlug, lang, outcome: "ready" });
+      return null;
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      await ctx.runMutation(api.translate.reportTranslation, { secret, topicSlug, lang, outcome: "failed", error });
+      return null;
+    }
+  },
+});
+
+// ---- Static-block placeholder swap (translation-cost 01) --------------------
+
+// ~70% of a Lesson document is fixed <style>/<script> boilerplate. It carries no
+// translatable text, but sent to the model it's paid for on input AND echoed back
+// on output. So the run swaps each such element for a tiny numbered placeholder
+// comment before translating and restores the originals after — the model never
+// sees (or can corrupt) the CSS/JS at all.
+const STATIC_BLOCK = /<(style|script)\b[^>]*>[\s\S]*?<\/\1>/gi;
+const PLACEHOLDER = /<!--⟦(\d+)⟧-->/g;
+
+export function swapOutStatic(html: string): { stripped: string; blocks: string[] } {
+  const blocks: string[] = [];
+  const stripped = html.replace(STATIC_BLOCK, (block) => {
+    blocks.push(block);
+    return `<!--⟦${blocks.length - 1}⟧-->`;
+  });
+  return { stripped, blocks };
+}
+
+// Restore the swapped-out blocks. Null unless every placeholder came back exactly
+// once and none were invented — a null means the model mangled the structure, and
+// the caller must skip the item (English fallback) rather than publish it.
+export function swapBackStatic(translated: string, blocks: string[]): string | null {
+  const seen = [...translated.matchAll(PLACEHOLDER)].map((m) => Number(m[1]));
+  if (seen.length !== blocks.length) return null;
+  if (new Set(seen).size !== seen.length) return null;
+  if (seen.some((n) => n >= blocks.length)) return null;
+  // Function replacement — a `$` inside CSS/JS must never be treated as a pattern.
+  return translated.replace(PLACEHOLDER, (_, n) => blocks[Number(n)]!);
+}
+
 // ---- Translation-fidelity guard --------------------------------------------
 
 // Defensive: strip a ```html … ``` fence if the run wraps the document.
@@ -385,8 +668,9 @@ function stripFence(s: string): string {
 
 // True when the quiz-scoring markers survived translation unchanged. The reader
 // derives quiz identity positionally and reads data-correct/data-answer/data-k
-// (lessonSrcDoc), so a changed count means a broken quiz.
-function quizStructureMatches(source: string, out: string): boolean {
+// (lessonSrcDoc), so a changed count means a broken quiz. Reused by the owner
+// prose-edit path (content.editLesson) to reject a structural change to a Lesson.
+export function quizStructureMatches(source: string, out: string): boolean {
   for (const re of [/data-correct=/g, /data-answer=/g, /data-k=/g]) {
     if ((source.match(re) ?? []).length !== (out.match(re) ?? []).length) return false;
   }

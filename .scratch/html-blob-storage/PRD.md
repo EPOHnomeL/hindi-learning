@@ -1,6 +1,6 @@
 # PRD: Move Lesson / Reference HTML out of DB rows into cacheable file storage
 
-Status: ready-for-agent
+Status: done — merged to main via PRs #7/#8/#9. Inline HTML now lives in cacheable content blobs (translations deferred, see issue 05).
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — **Topic**, **Lesson**,
 > **Reference**, **Edition** (a Topic × language, course-translation),

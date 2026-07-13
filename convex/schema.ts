@@ -48,6 +48,12 @@ export default defineSchema({
     // `completed` (ADR 0015) is terminal: the Routine's gate refuses it, so a
     // finished course stops authoring. Reopen returns it to `active`.
     status: v.optional(v.union(v.literal("seeded"), v.literal("active"), v.literal("completed"))),
+    // The course's Provider (ADR 0014): which teaching runtime authors + translates
+    // it. `claude` is the existing claude.ai Routine; `openrouter` runs GLM 4.2
+    // authoring / Gemini translation in Convex actions. Optional and chosen at
+    // creation; ABSENT reads as `claude`, so every pre-existing course (incl. the
+    // legacy Hindi row) stays on the Claude path untouched.
+    provider: v.optional(v.union(v.literal("claude"), v.literal("openrouter"))),
     // The soft `~N lessons` estimate (PRD: Estimated lesson count): the Routine's
     // best guess at the course's eventual total Lesson count, refreshed each run
     // via `reportGeneration`. A property of the course (survives across runs), so
@@ -72,11 +78,6 @@ export default defineSchema({
         ownerSet: v.optional(v.boolean()),
       }),
     ),
-    // The LLM provider a Topic is authored with (e.g. "openrouter"). Owned by a
-    // parallel feature (course-content-editing); declared optional here only so
-    // this branch's schema stays compatible with the shared dev deployment, whose
-    // rows already carry it. Not read by this feature — reconcile at merge.
-    provider: v.optional(v.string()),
   })
     .index("by_slug", ["slug"])
     .index("by_owner", ["ownerId"])
@@ -198,19 +199,30 @@ export default defineSchema({
     // Last on-demand (button) fire, for the per-Topic manual cooldown (issue 08)
     // — the daily cron stays the primary authoring path. Survives reports.
     lastManualFireAt: v.optional(v.number()),
+    // Fire-and-pray (Admin) bookkeeping. `finishRemaining` is how many more lessons
+    // the back-to-back run may still author — set when the Admin starts it and
+    // decremented each time a lesson is reported, so `reportGeneration` re-fires the
+    // course's OWN provider (Claude routine or OpenRouter action) until it hits 0,
+    // the course completes, or `cancelRequested` is set. Both absent for normal runs.
+    finishRemaining: v.optional(v.number()),
+    cancelRequested: v.optional(v.boolean()),
   }).index("by_topic", ["topicId"]),
 
-  // A Share: grants one Viewer read-only access to one **Edition** — a
-  // (Topic, language) pair (course-translation). `lang` is the granted edition's
-  // BCP-47 code; a Viewer may hold several Shares on one Topic (one per language).
-  // `lang` is optional so pre-translation rows read as the English edition ("en").
-  // `by_viewer` powers "Shared with me"; `by_topic` lists a Topic's Viewers (and
-  // cascades on delete); `by_topic_viewer` lists a Viewer's Editions on a Topic
-  // (dedup is done in-memory over these, since legacy rows carry no `lang`).
+  // A Share: grants one person access to one **Edition** — a (Topic, language)
+  // pair (course-translation). `lang` is the granted edition's BCP-47 code; a
+  // person may hold several Shares on one Topic (one per language). `lang` is
+  // optional so pre-translation rows read as the English edition ("en"). `role`
+  // (ADR 0020) is the access level: absent/`viewer` = read-only, `editor` = may
+  // make the owner's in-place prose edits on that one Edition; absent so every
+  // existing Share stays a Viewer (no migration). `by_viewer` powers "Shared with
+  // me"; `by_topic` lists a Topic's Viewers (and cascades on delete);
+  // `by_topic_viewer` lists a person's Editions on a Topic (dedup is done
+  // in-memory over these, since legacy rows carry no `lang`).
   shares: defineTable({
     topicId: v.id("topics"),
     viewerId: v.id("users"),
     lang: v.optional(v.string()),
+    role: v.optional(v.union(v.literal("viewer"), v.literal("editor"))),
   })
     .index("by_viewer", ["viewerId"])
     .index("by_topic", ["topicId"])
@@ -223,10 +235,13 @@ export default defineSchema({
   // (at most one per (Topic, email)); `by_topic` lists a Topic's open invites and
   // would cascade on Topic delete. `lang` names the invited Edition (optional →
   // English), so an invite claimed at sign-up becomes a language-scoped Share.
+  // `role` (ADR 0020) rides through the claim, so an email can be pre-set as an
+  // Editor before it has an account (absent → viewer).
   pendingShares: defineTable({
     topicId: v.id("topics"),
     email: v.string(),
     lang: v.optional(v.string()),
+    role: v.optional(v.union(v.literal("viewer"), v.literal("editor"))),
   })
     .index("by_email", ["email"])
     .index("by_topic", ["topicId"])
@@ -318,13 +333,13 @@ export default defineSchema({
     .index("by_topic_lang_kind_key", ["topicId", "lang", "kind", "key"]),
 
   // One translation job per (Topic, language) — the Editions panel's live status
-  // AND the single-flight lock for the translate Routine (mirrors `generation`).
+  // AND the single-flight lock for the translate run (mirrors `generation`).
   // Seeded "translating" by `startTranslation` on a completed course, which then
-  // fires the routine; the fired run claims it (`claimTranslation` stamps
-  // `claimedAt`/`runId`), `publishTranslation` ticks `done` per item, and
-  // `reportTranslation` flips it "ready" (unpublished items → `failed`, English
-  // fallback) or "failed". `total` counts translatable items. Reused (patched) on
-  // re-translate.
+  // schedules the Gemini translate action; `publishTranslation` ticks `done` per
+  // item, and `reportTranslation` flips it "ready" (unpublished items → `failed`,
+  // English fallback) or "failed". `total` counts translatable items. Reused
+  // (patched) on re-translate — a re-fire RESUMES: `done` is re-seeded with the
+  // items whose translation is already fresh, and the run skips them.
   translationJobs: defineTable({
     topicId: v.id("topics"),
     lang: v.string(),
@@ -333,7 +348,10 @@ export default defineSchema({
     done: v.number(),
     failed: v.number(),
     error: v.optional(v.string()),
-    // Set when a fired run claims this job; keeps a second run from grabbing it.
+    // The run's heartbeat: stamped at acquire, re-stamped by every published
+    // item. A "translating" job whose heartbeat goes silent (the action was
+    // killed infra-side, so nothing ever reported) is presumed dead and its
+    // lock may be retaken (see translate.ts STALE_MS).
     claimedAt: v.optional(v.number()),
     runId: v.optional(v.string()),
   })

@@ -46,7 +46,7 @@ Convex functions in [`convex/translate.ts`](../convex/translate.ts):
 | `startTranslation` | action (owner, completed-gated) | Acquire the lock, then POST the routine's Fire URL. |
 | `tryAcquireTranslation` | internalMutation | The gate + lock: owner + completed + known-language + single-flight; seeds the job `translating` with the item `total`. |
 | `removeEdition` | mutation (owner) | Delete an Edition's translations, job, Shares, and Public link. |
-| `claimTranslation` | mutation (`PUBLISH_SECRET`) | The run grabs one locked-but-unclaimed `(Topic, language)` job + owner. |
+| `claimTranslation` | mutation (`PUBLISH_SECRET`) | Legacy/manual seam: grabs one `(Topic, language)` job whose run is DEAD (heartbeat absent/stale) + owner. |
 | `publishTranslation` | mutation (`PUBLISH_SECRET`) | Upsert one translated item + tick the job; re-reads the source to stamp its hash and reject a quiz-structure drift. |
 | `reportTranslation` | mutation (`PUBLISH_SECRET`) | Finalise the job `ready` (unpublished items → `failed`, English fallback) or `failed`. |
 | `editions` | query (owner) | The Editions panel data (per-language status + share/link counts). |
@@ -114,8 +114,11 @@ safety net, `publishTranslation` re-checks each Lesson's quiz-marker counts and
   English source, so a row exists only for a *successful* translation.
 - **`translationJobs`** — one per `(topicId, lang)`; live
   `status`/`total`/`done`/`failed` drives the Editions panel **and** is the
-  single-flight lock (`claimedAt`/`runId`) the routine claims against. Seeded
-  `translating` by `startTranslation`; `publishTranslation` ticks `done`;
+  single-flight lock. `claimedAt` is the run's **heartbeat** (stamped at acquire,
+  re-stamped per published item); a `translating` job whose heartbeat goes silent
+  past `STALE_MS` is presumed dead and re-fireable — the re-fire **resumes**
+  (fresh rows are skipped, `done` re-seeded). Seeded `translating` by
+  `startTranslation`; `publishTranslation` ticks `done`;
   `reportTranslation` flips it `ready`/`failed`.
 - Sharing an Edition also touches `shares.lang` / `pendingShares.lang` and the
   `publicLinks` table (see §6).
@@ -151,7 +154,7 @@ learner completed in.
 | Symptom | Cause | Fix |
 | --- | --- | --- |
 | `startTranslation` errors `TRANSLATE_FIRE_URL / TRANSLATE_FIRE_TOKEN not set` | env missing on the deployment | `npx convex env set` them (§3). |
-| Add-language does nothing / Edition never leaves `translating` | the cloud translate Routine isn't set up, isn't firing, or crashed mid-run | check the routine exists and its logs; a stuck job is cleared by removing the Edition and re-adding it. |
+| Add-language does nothing / Edition never leaves `translating` and `done` stops ticking | the translate action was killed infra-side (execution ceiling — a big course), so it never reported | wait for the heartbeat to go stale (~10 min of silence), then fire the language again — the run **resumes** from the already-translated items. Runs are chunked (`CHUNK` items per action) precisely so this stays rare. |
 | A translated item still shows English | that item's row is missing (never translated, failed, or a quiz-structure skip) | re-translate the Edition (the panel's retry); the reader falls back to English per item until it lands. |
 | Editions panel shows `Ready · N failed` | the run didn't publish N items (skipped or errored) | retry; if a Lesson keeps failing, its translated quiz markers drifted — the skill must preserve them. |
 | Owner can't translate a course | the course isn't `completed` | mark it complete first — translation is gated on Completion. |

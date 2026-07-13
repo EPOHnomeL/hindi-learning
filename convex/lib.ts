@@ -15,6 +15,12 @@ export function shareLang(s: Doc<"shares">): string {
   return s.lang ?? SOURCE_LANG;
 }
 
+// A Share/pendingShare's access level (ADR 0020). Absent reads as "viewer", so
+// every pre-Editor row stays read-only — mirrors `shareLang`.
+export function shareRole(s: { role?: "viewer" | "editor" }): "viewer" | "editor" {
+  return s.role ?? "viewer";
+}
+
 // Trim + lower-case — the one email normalisation used everywhere a person is
 // named by address (shares, invites), matching how Convex Auth stores
 // `users.email` and how the Allowlist stores its rows. Without it a lookup would
@@ -43,7 +49,9 @@ export async function claimPendingShares(ctx: MutationCtx, userId: Id<"users">, 
       .withIndex("by_topic_viewer", (q) => q.eq("topicId", invite.topicId).eq("viewerId", userId))
       .collect();
     if (!existing.some((s) => shareLang(s) === lang)) {
-      await ctx.db.insert("shares", { topicId: invite.topicId, viewerId: userId, lang });
+      // Carry the invite's role (ADR 0020) onto the real Share, so an email
+      // pre-set as Editor becomes an Editor the moment it signs up.
+      await ctx.db.insert("shares", { topicId: invite.topicId, viewerId: userId, lang, role: shareRole(invite) });
     }
     await ctx.db.delete(invite._id);
   }
@@ -154,6 +162,30 @@ export async function getViewableTopic(ctx: QueryCtx, userId: Id<"users">, slug:
     .withIndex("by_topic_user", (q) => q.eq("topicId", topic._id).eq("userId", userId))
     .first();
   return entitlement ? topic : null;
+}
+
+// A Topic this user may *edit* on one Edition (ADR 0020): one they own, or one
+// they hold an editor-Share for on `lang` (default English). The write-side
+// sibling of getViewableTopic — the guard for the owner's in-place prose edits.
+// Lang is matched in-memory over `by_topic_viewer` (legacy rows carry no `lang`,
+// consistent with `viewerLangs`), so an editor-Share for lang X never authorises
+// an edit to lang Y.
+export async function getEditableTopic(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  slug: string,
+  lang?: string,
+): Promise<Doc<"topics"> | null> {
+  const topic = await topicBySlug(ctx, slug);
+  if (!topic) return null;
+  if (topic.ownerId === userId) return topic;
+  const editionLang = lang ?? SOURCE_LANG;
+  const shares = await ctx.db
+    .query("shares")
+    .withIndex("by_topic_viewer", (q) => q.eq("topicId", topic._id).eq("viewerId", userId))
+    .collect();
+  const canEdit = shares.some((s) => shareLang(s) === editionLang && shareRole(s) === "editor");
+  return canEdit ? topic : null;
 }
 
 // ---- Editions (course-translation) -----------------------------------------

@@ -15,7 +15,7 @@ import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { useResourceUpload } from "./useResourceUpload";
-import { completedKeys, frontierKey, nextLessonKey, seenAfterOpening, unseenReplyKeys } from "./readerDerive";
+import { completedKeys, frontierKey, nextLessonKey, seenAfterOpening } from "./readerDerive";
 
 // localStorage key for answered-question ids the learner has already seen.
 const SEEN_KEY = "hindi:answers-seen";
@@ -31,6 +31,12 @@ type CourseCtx = {
   // hides every write control. Defaults false while access is still loading, so
   // a Viewer never sees a control flash before it's hidden.
   canWrite: boolean;
+  // Whether the caller may make the in-place prose edits on the SERVED Edition
+  // (ADR 0020): the owner, or an Editor of this language. Distinct from
+  // `canWrite` — an Editor is a Viewer for everything else (quiz, questions,
+  // authoring stay owner-only) but sees the hover-pencil. Server-computed;
+  // defaults false while the header loads so the pencil never flashes.
+  canEdit: boolean;
   // True once the Topic is `completed` (ADR 0015): the reader stops offering
   // "Generate next lesson". Defaults false while the header is still loading.
   completed: boolean;
@@ -65,6 +71,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const lang = useEditionLang();
   const header = useQuery(api.content.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
   const canWrite = header?.role === "owner";
+  const canEdit = header?.canEdit ?? false;
   const courseCompleted = header?.status === "completed";
   const { signOut } = useAuthActions();
   const router = useRouter();
@@ -97,7 +104,6 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const previewKey = header?.paywall?.previewKey ?? null;
 
   const completed = completedKeys(progress ?? []);
-  const unseenAnswers = unseenReplyKeys(questions ?? [], seen);
   const frontier = frontierKey(lessons ?? []);
   const nextKey = useCallback((lessonKey: string) => nextLessonKey(lessons ?? [], lessonKey), [lessons]);
 
@@ -135,6 +141,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
         frontierKey: frontier,
         markSeen,
         canWrite,
+        canEdit,
         completed: courseCompleted,
         nextKey,
         dir: header?.dir ?? "ltr",
@@ -181,6 +188,9 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               Sign out
             </button>
           </div>
+          {/* The served Edition's title. Fixing it (and the mission) lives in
+              Course settings → Details, which follows the Edition being viewed
+              (edition-title-edit 02). */}
           <h1 className="mb-4 truncate text-lg font-semibold tracking-tight text-accent">{header?.title ?? "…"}</h1>
 
           <nav className="flex flex-col gap-1">
@@ -194,7 +204,6 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
                 href={withLang(`/courses/${slug}/lessons/${l.key}`, lang)}
                 active={!isRef && activeKey === l.key}
                 done={completed.has(l.key)}
-                notify={unseenAnswers.has(l.key)}
                 locked={preview && l.key !== previewKey}
                 free={preview && l.key === previewKey}
               >
@@ -217,13 +226,14 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             <ResourcesSection topicSlug={slug} canWrite={canWrite} />
           </nav>
 
-          {/* Owner-only "Course settings" (UI redesign): rename + mission, the
-              certificate emblem (ADR 0017), and the completion lifecycle (ADR 0015)
-              — the two buttons that used to crowd the nav — consolidated into one
-              dialog. Absent for Viewers (PRD story 9), and while still `seeded` (a
-              course that hasn't drafted a Lesson can't be completed). */}
-          {canWrite && header && header.status !== "seeded" && (
-            <CourseSettingsButton slug={slug} status={header.status} />
+          {/* "Course settings" (UI redesign): Details (following the Edition
+              being viewed), the certificate emblem (ADR 0017), and the completion
+              lifecycle (ADR 0015) consolidated into one dialog. For the owner —
+              or, on a translated Edition, its Editor, who gets Details only
+              (edition-title-edit 02). Absent for plain Viewers and while still
+              `seeded` (a course that hasn't drafted a Lesson can't be completed). */}
+          {header && header.status !== "seeded" && (canWrite || (header.lang !== "en" && header.canEdit)) && (
+            <CourseSettingsButton slug={slug} owner={canWrite} header={header} />
           )}
 
           {/* Edition switcher + theme toggle, pinned together at the sidebar
@@ -340,13 +350,28 @@ function LanguageSwitcher({
   );
 }
 
-// Owner-only sidebar entry to the consolidated "Course settings" dialog (UI
-// redesign): rename + mission, the certificate emblem, and the completion
-// lifecycle (mark complete / reopen). Replaces the two full-width buttons that
-// used to stack under the lesson nav. Gated by `canWrite` at the call site, so a
-// Viewer never sees it.
-function CourseSettingsButton({ slug, status }: { slug: string; status: "seeded" | "active" | "completed" }) {
+// Sidebar entry to the consolidated "Course settings" dialog (UI redesign).
+// Details follows the Edition being read: on a translated Edition the dialog
+// edits that Edition's title & mission (edition-title-edit 02), on English the
+// owner's source texts. Gated at the call site — owner always, an Edition's
+// Editor only on their translated Edition (they then see Details alone).
+function CourseSettingsButton({
+  slug,
+  owner,
+  header,
+}: {
+  slug: string;
+  owner: boolean;
+  header: {
+    status: "seeded" | "active" | "completed";
+    lang: string;
+    title: string;
+    mission: string | null;
+    editions: { lang: string; native: string }[];
+  };
+}) {
   const [open, setOpen] = useState(false);
+  const native = header.editions.find((e) => e.lang === header.lang)?.native ?? header.lang;
   return (
     <>
       <button
@@ -355,7 +380,19 @@ function CourseSettingsButton({ slug, status }: { slug: string; status: "seeded"
       >
         <Icon name="settings" className="h-4 w-4" /> Course settings
       </button>
-      {open && <CourseSettingsDialog topicSlug={slug} status={status} onClose={() => setOpen(false)} />}
+      {open && (
+        <CourseSettingsDialog
+          topicSlug={slug}
+          status={header.status}
+          owner={owner}
+          edition={
+            header.lang !== "en"
+              ? { lang: header.lang, native, title: header.title, mission: header.mission }
+              : null
+          }
+          onClose={() => setOpen(false)}
+        />
+      )}
     </>
   );
 }

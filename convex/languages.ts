@@ -118,6 +118,44 @@ export const LANGUAGES: LanguageInfo[] = [
   { code: "bm", name: "Bambara", native: "Bamanankan" },
   { code: "ak", name: "Akan (Twi)", native: "Akan" },
   { code: "tl", name: "Filipino", native: "Filipino" },
+  // Romanized (-Latn) Editions: the same language written in Latin letters, for
+  // learners who can't read the native script. One entry per non-Latin-script
+  // language above; the `-Latn` script subtag keeps the code valid BCP-47 and
+  // makes isRtl/isDevanagari treat it as Latin. The English name doubles as the
+  // translate-prompt target ("Translate … into ${name}"), so each spells out
+  // the romanization it wants.
+  { code: "hi-Latn", name: "Romanized Hindi (Latin script)", native: "Roman Hindi (Hinglish)" },
+  { code: "ur-Latn", name: "Romanized Urdu (Latin script)", native: "Roman Urdu" },
+  { code: "ne-Latn", name: "Romanized Nepali (Latin script)", native: "Roman Nepali" },
+  { code: "mr-Latn", name: "Romanized Marathi (Latin script)", native: "Roman Marathi" },
+  { code: "ar-Latn", name: "Romanized Arabic (Latin script)", native: "Roman Arabic (Arabizi)" },
+  { code: "fa-Latn", name: "Romanized Persian (Latin script)", native: "Roman Persian (Fingilish)" },
+  { code: "ps-Latn", name: "Romanized Pashto (Latin script)", native: "Roman Pashto" },
+  { code: "sd-Latn", name: "Romanized Sindhi (Latin script)", native: "Roman Sindhi" },
+  { code: "ug-Latn", name: "Romanized Uyghur (Latin script)", native: "Uyghur Latin (ULY)" },
+  { code: "ckb-Latn", name: "Romanized Kurdish Sorani (Latin script)", native: "Sorani Latin" },
+  { code: "he-Latn", name: "Romanized Hebrew (Latin script)", native: "Roman Hebrew" },
+  { code: "yi-Latn", name: "Romanized Yiddish (Latin script)", native: "Roman Yiddish (YIVO)" },
+  { code: "dv-Latn", name: "Romanized Dhivehi (Latin script)", native: "Roman Dhivehi" },
+  { code: "ru-Latn", name: "Romanized Russian (Latin script)", native: "Russkiy (translit)" },
+  { code: "uk-Latn", name: "Romanized Ukrainian (Latin script)", native: "Ukrayinska (translit)" },
+  { code: "bg-Latn", name: "Romanized Bulgarian (Latin script)", native: "Balgarski (translit)" },
+  { code: "sr-Latn", name: "Serbian (Latin script)", native: "Srpski (latinica)" },
+  { code: "el-Latn", name: "Romanized Greek (Latin script)", native: "Greeklish" },
+  { code: "zh-Latn", name: "Romanized Chinese (Hanyu Pinyin)", native: "Pinyin" },
+  { code: "ja-Latn", name: "Romanized Japanese (Rōmaji)", native: "Rōmaji" },
+  { code: "ko-Latn", name: "Romanized Korean (Revised Romanization)", native: "Romaja" },
+  { code: "th-Latn", name: "Romanized Thai (Latin script)", native: "Roman Thai" },
+  { code: "bn-Latn", name: "Romanized Bengali (Latin script)", native: "Roman Bangla (Banglish)" },
+  { code: "pa-Latn", name: "Romanized Punjabi (Latin script)", native: "Roman Punjabi" },
+  { code: "ta-Latn", name: "Romanized Tamil (Latin script)", native: "Roman Tamil (Thanglish)" },
+  { code: "te-Latn", name: "Romanized Telugu (Latin script)", native: "Roman Telugu" },
+  { code: "gu-Latn", name: "Romanized Gujarati (Latin script)", native: "Roman Gujarati" },
+  { code: "kn-Latn", name: "Romanized Kannada (Latin script)", native: "Roman Kannada" },
+  { code: "ml-Latn", name: "Romanized Malayalam (Latin script)", native: "Roman Malayalam (Manglish)" },
+  { code: "si-Latn", name: "Romanized Sinhala (Latin script)", native: "Roman Sinhala" },
+  { code: "am-Latn", name: "Romanized Amharic (Latin script)", native: "Roman Amharic" },
+  { code: "ti-Latn", name: "Romanized Tigrinya (Latin script)", native: "Roman Tigrinya" },
 ];
 
 const BY_CODE = new Map(LANGUAGES.map((l) => [l.code, l]));
@@ -132,10 +170,18 @@ export function isKnownLang(code: string): boolean {
   return BY_CODE.has(code);
 }
 
+// True when the code carries an explicit Latin script subtag (e.g. "ur-Latn").
+// That pins the script regardless of the base language's default, so the
+// script-derived checks below (RTL, Devanagari) must yield to it.
+function hasLatnSubtag(code: string): boolean {
+  return code.toLowerCase().split("-").includes("latn");
+}
+
 // True when a language code's script is right-to-left. Checks the base subtag
 // (e.g. "fa-AF" → "fa"), so an unlisted regional RTL variant still resolves.
+// A -Latn code is never RTL: Roman Urdu reads left-to-right.
 export function isRtl(code: string): boolean {
-  if (!code) return false;
+  if (!code || hasLatnSubtag(code)) return false;
   const base = code.split("-")[0]!.toLowerCase();
   return RTL_CODES.has(code.toLowerCase()) || RTL_CODES.has(base);
 }
@@ -150,8 +196,9 @@ const DEVANAGARI_CODES = new Set(["hi", "mr", "ne", "sa"]);
 
 // True when a language code's script is Devanagari. Checks the base subtag
 // (e.g. "hi-IN" → "hi"), mirroring isRtl, so a regional variant still resolves.
+// A -Latn code isn't Devanagari — Roman Hindi keeps the default Latin fonts.
 export function isDevanagari(code: string): boolean {
-  if (!code) return false;
+  if (!code || hasLatnSubtag(code)) return false;
   const base = code.split("-")[0]!.toLowerCase();
   return DEVANAGARI_CODES.has(code.toLowerCase()) || DEVANAGARI_CODES.has(base);
 }

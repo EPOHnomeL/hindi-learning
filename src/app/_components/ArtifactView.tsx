@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { CertificateControl } from "./Certificate";
 import { LockedPane, Paygate } from "./Paygate";
 import { useBuyMarker, useEditionLang, withLang } from "./editionUrl";
-import { buildSrcDoc, themeMessage, type Theme } from "./lessonSrcDoc";
+import { buildEditDoc, buildSrcDoc, replaceBodyInner, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
 import { internalNavTarget } from "./readerDerive";
+import { ReaderSkeleton } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
 
@@ -33,6 +35,7 @@ export function ArtifactView({
   topicSlug,
   isFrontier,
   readOnly,
+  canEdit,
   courseCompleted = false,
   nextLessonKey,
   dir,
@@ -46,6 +49,10 @@ export function ArtifactView({
   // recording, asking Questions, next-lesson authoring). Progress is NOT gated by
   // this — a Viewer tracks their own (see setProgress). Reads stay live.
   readOnly: boolean;
+  // Server-computed per-Edition edit capability (ADR 0020): owner, or an Editor
+  // of the served language. Gates ONLY the hover-pencil — an Editor is otherwise
+  // a Viewer (readOnly stays true for them), so no other control is affected.
+  canEdit: boolean;
   // True once the Topic is `completed` (ADR 0015): authoring has stopped, so the
   // reader never offers "Generate next lesson" even on the completed Frontier.
   courseCompleted?: boolean;
@@ -58,13 +65,14 @@ export function ArtifactView({
   contentLang?: string;
 }) {
   if (kind === "reference")
-    return <ReferenceView refKey={artifactKey} topicSlug={topicSlug} dir={dir} contentLang={contentLang} />;
+    return <ReferenceView refKey={artifactKey} topicSlug={topicSlug} canEdit={canEdit} dir={dir} contentLang={contentLang} />;
   return (
     <LessonView
       lessonKey={artifactKey}
       topicSlug={topicSlug}
       isFrontier={isFrontier}
       readOnly={readOnly}
+      canEdit={canEdit}
       courseCompleted={courseCompleted}
       nextLessonKey={nextLessonKey ?? null}
       dir={dir}
@@ -217,6 +225,7 @@ function LessonView({
   topicSlug,
   isFrontier,
   readOnly,
+  canEdit,
   courseCompleted,
   nextLessonKey,
   dir,
@@ -226,6 +235,7 @@ function LessonView({
   topicSlug: string;
   isFrontier: boolean;
   readOnly: boolean;
+  canEdit: boolean;
   courseCompleted: boolean;
   nextLessonKey: string | null;
   dir?: "ltr" | "rtl";
@@ -246,9 +256,20 @@ function LessonView({
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
   const setProgress = useMutation(api.capture.setProgress);
+  const editLesson = useAction(api.content.editLesson);
+  const editTranslatedLesson = useAction(api.content.editTranslatedLesson);
+  const [editing, setEditing] = useState(false);
 
   // The caller's own completion — an owner's, or a Viewer's own on a shared course.
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
+
+  // In-place prose edit (course-content-editing / ADR 0020). Editing the source
+  // (English) edition patches the Lesson blob (`editLesson`); editing a translated
+  // Edition patches that Edition's `translations` row (`editTranslatedLesson`),
+  // leaving the source untouched. Both guard the quiz structure server-side — the
+  // real control; `canEdit` (server, per-Edition) only hides the affordance from
+  // those who can't edit this Edition (Viewers, Guests, an Editor of another lang).
+  const isSource = lang == null || lang === "en";
 
   useEffect(() => {
     // Owner or Viewer: opening a lesson marks it opened in the caller's own
@@ -270,7 +291,7 @@ function LessonView({
     return () => window.removeEventListener("message", onMessage);
   }, [topicSlug, lessonKey, recordResponse, readOnly]);
 
-  if (lesson === undefined || html === undefined) return <p className="text-soft">Loading…</p>;
+  if (lesson === undefined || html === undefined) return <ReaderSkeleton />;
   if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this lesson. Try refreshing.</p>;
 
@@ -339,7 +360,39 @@ function LessonView({
             )}
           </div>
         </div>
-        <Frame html={html} withBridge theme={theme} dir={dir} lang={contentLang} />
+        {/* The pencil rides over the lesson on hover (owner + source edition). The
+            iframe is a descendant, so hovering the lesson body counts as hovering
+            the group and reveals it; focus reveals it for keyboard users. */}
+        <div className="group relative flex min-h-0 flex-1 flex-col">
+          <Frame html={html} withBridge theme={theme} dir={dir} lang={contentLang} />
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              aria-label="Edit this lesson"
+              title="Edit this lesson"
+              className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent opacity-100 shadow-sm backdrop-blur transition-opacity hover:bg-hi focus:opacity-100 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+            >
+              ✎ Edit
+            </button>
+          )}
+        </div>
+        {canEdit && editing && (
+          <ContentEditor
+            topicSlug={topicSlug}
+            html={html}
+            theme={theme}
+            dir={dir}
+            lang={contentLang}
+            label="lesson"
+            onClose={() => setEditing(false)}
+            commit={(storageId) =>
+              isSource
+                ? editLesson({ topicSlug, key: lessonKey, storageId })
+                : editTranslatedLesson({ topicSlug, key: lessonKey, lang: lang!, storageId })
+            }
+          />
+        )}
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
             scrolling, no slide-up trigger. Desktop uses the side column instead.
             Hidden for a `preview` caller: Q&A is past the paygate. */}
@@ -356,6 +409,119 @@ function LessonView({
         </aside>
       )}
     </div>
+  );
+}
+
+// The owner's in-place prose editor (course-content-editing). A modal holding an
+// edit iframe that renders the item with its authored CSS/layout — the same
+// visual surface the reader shows, minus the reader's bridge scripts. The iframe
+// is `sandbox="allow-same-origin"` (no allow-scripts), so the item's own scripts
+// stay inert and the DOM matches the authored source; the parent turns on
+// `designMode` to make it editable and reads `body.innerHTML` back on save. The
+// edited body is spliced into the authored document (`replaceBodyInner`), uploaded
+// as a new content blob, and handed to `commit` — the owner-guarded write path for
+// the item's kind (a Lesson's rejects a quiz-structure change; a Reference's has
+// no guard). Any rejection message is surfaced inline. Shared by Lessons and
+// References; the caller supplies the kind-specific `commit`.
+function ContentEditor({
+  topicSlug,
+  html,
+  theme,
+  themeCss,
+  dir,
+  lang,
+  label,
+  onClose,
+  commit,
+}: {
+  topicSlug: string;
+  html: string;
+  theme: Theme;
+  // Inject the dark palette for items that don't ship their own (References) —
+  // display-only, mirrors the reader Frame's `themeCss`.
+  themeCss?: boolean;
+  // The served Edition's direction/language, for editing a translated Lesson with
+  // the right RTL/localised presentation (display-only, mirrors the reader Frame).
+  dir?: "ltr" | "rtl";
+  lang?: string;
+  label: string;
+  onClose: () => void;
+  commit: (storageId: Id<"_storage">) => Promise<unknown>;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const generateUploadUrl = useMutation(api.content.generateEditUploadUrl);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Bake theme/dir/lang for display only; the read-back takes body content, not
+  // the <html> tag, so none of it reaches the saved HTML.
+  const srcDoc = useMemo(() => buildEditDoc(html, { theme, themeCss, dir, lang }), [html, theme, themeCss, dir, lang]);
+
+  useEffect(() => dialogRef.current?.showModal(), []);
+
+  async function save() {
+    const doc = iframeRef.current?.contentDocument;
+    if (!doc) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const edited = replaceBodyInner(html, doc.body.innerHTML);
+      const url = await generateUploadUrl({ topicSlug });
+      const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/html" }, body: edited });
+      if (!res.ok) throw new Error("Upload failed — please try again.");
+      const { storageId } = (await res.json()) as { storageId: string };
+      // The write path may reject (e.g. a Lesson's quiz-structure guard) — show it.
+      await commit(storageId as Id<"_storage">);
+      onClose(); // live for every reader on the next reactive tick — no publish step.
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      onClose={onClose}
+      className="m-auto flex h-[90vh] w-[96vw] max-w-4xl flex-col rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
+        <h2 className="min-w-0 truncate text-base font-semibold text-ink">Edit {label}</h2>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition-colors hover:bg-hi disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => void save()}
+            disabled={saving}
+            className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+          >
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+      {/* allow-same-origin (no allow-scripts): editable via designMode, lesson
+          scripts inert, contentDocument readable back by the same-origin parent. */}
+      <iframe
+        ref={iframeRef}
+        sandbox="allow-same-origin"
+        srcDoc={srcDoc}
+        onLoad={() => {
+          const doc = iframeRef.current?.contentDocument;
+          if (doc) doc.designMode = "on";
+        }}
+        className="min-h-0 flex-1 bg-card"
+      />
+      {error && (
+        <p className="border-t border-line px-5 py-3 text-sm text-red-600 dark:text-red-400">{error}</p>
+      )}
+    </dialog>
   );
 }
 
@@ -445,11 +611,15 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
 function ReferenceView({
   refKey,
   topicSlug,
+  canEdit,
   dir,
   contentLang,
 }: {
   refKey: string;
   topicSlug: string;
+  // Server per-Edition edit capability (ADR 0020). References are English-source
+  // only, so the pencil is further gated to the source Edition below.
+  canEdit: boolean;
   dir?: "ltr" | "rtl";
   contentLang?: string;
 }) {
@@ -460,7 +630,14 @@ function ReferenceView({
   const ref = useQuery(api.content.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
   const header = useQuery(api.content.courseHeader, { topicSlug, lang: lang ?? undefined });
   const html = useContentHtml(ref);
-  if (ref === undefined || html === undefined) return <p className="text-soft">Loading…</p>;
+  const editReference = useMutation(api.content.editReference);
+  const [editing, setEditing] = useState(false);
+  // Editable by the owner or an English-edition Editor (server `canEdit`), and
+  // only on the source (English) edition — `editReference` patches the source
+  // Reference (translated-Reference editing is out of scope). References are
+  // mutable (ADR 0003), so the save takes the write path with no quiz guard.
+  const canEditRef = canEdit && (lang == null || lang === "en");
+  if (ref === undefined || html === undefined) return <ReaderSkeleton aside={false} />;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this reference. Try refreshing.</p>;
   // Paid marketplace: References sit entirely past the free Preview, so a `preview`
@@ -490,8 +667,33 @@ function ReferenceView({
         {ref.title}
       </h2>
       {/* References carry no dark CSS of their own, so themeCss injects the dark
-          palette (ADR 0011) — the theme then flips them with the rest of the app. */}
-      <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} />
+          palette (ADR 0011) — the theme then flips them with the rest of the app.
+          The pencil rides over the body on hover for the owner (source edition). */}
+      <div className="group relative flex min-h-0 flex-1 flex-col">
+        <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} />
+        {canEditRef && (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            aria-label="Edit this reference"
+            title="Edit this reference"
+            className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent opacity-100 shadow-sm backdrop-blur transition-opacity hover:bg-hi focus:opacity-100 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+          >
+            ✎ Edit
+          </button>
+        )}
+      </div>
+      {canEditRef && editing && (
+        <ContentEditor
+          topicSlug={topicSlug}
+          html={html}
+          theme={theme}
+          themeCss
+          label="reference"
+          onClose={() => setEditing(false)}
+          commit={(storageId) => editReference({ topicSlug, key: refKey, storageId })}
+        />
+      )}
     </div>
   );
 }

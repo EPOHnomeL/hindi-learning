@@ -20,6 +20,7 @@ import type * as languages from "../languages.js";
 import type * as ledger from "../ledger.js";
 import type * as lib from "../lib.js";
 import type * as market from "../market.js";
+import type * as openrouter from "../openrouter.js";
 import type * as payfast from "../payfast.js";
 import type * as public_ from "../public.js";
 import type * as quizShuffle from "../quizShuffle.js";
@@ -49,6 +50,7 @@ declare const fullApi: ApiFromModules<{
   ledger: typeof ledger;
   lib: typeof lib;
   market: typeof market;
+  openrouter: typeof openrouter;
   payfast: typeof payfast;
   public: typeof public_;
   quizShuffle: typeof quizShuffle;

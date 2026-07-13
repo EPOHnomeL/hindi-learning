@@ -1,19 +1,22 @@
-# Issue tracker: Local Markdown
+# Issue tracker: GitHub Issues
 
-Issues and PRDs for this repo live as markdown files in `.scratch/`.
+Issues for this repo live on GitHub: <https://github.com/EPOHnomeL/hindi-learning/issues>.
+Use the `gh` CLI. PRDs still live locally as `.scratch/<feature-slug>/PRD.md`.
 
 ## Conventions
 
-- One feature per directory: `.scratch/<feature-slug>/`
-- The PRD is `.scratch/<feature-slug>/PRD.md`
-- Implementation issues are `.scratch/<feature-slug>/issues/<NN>-<slug>.md`, numbered from `01`
-- Triage state is recorded as a `Status:` line near the top of each issue file (see `triage-labels.md` for the role strings)
-- Comments and conversation history append to the bottom of the file under a `## Comments` heading
+- Issue titles are `<feature-slug>/<NN>: <title>` (e.g. `topic-sharing/06: Share management`), numbered from `01` within a feature
+- Triage state is a GitHub label (see `triage-labels.md` for the role strings)
+- Comments and conversation history go in GitHub issue comments
+
+History: until 2026-07-10 issues were local markdown under `.scratch/<feature>/issues/`;
+the outstanding ones were migrated to GitHub issues #12–#36 and the local files deleted
+(still readable in git history before commit dd70b93).
 
 ## When a skill says "publish to the issue tracker"
 
-Create a new file under `.scratch/<feature-slug>/` (creating the directory if needed).
+Create a GitHub issue: `gh issue create --title "<feature-slug>/<NN>: <title>" --body-file <file> [--label <role>]`.
 
 ## When a skill says "fetch the relevant ticket"
 
-Read the file at the referenced path. The user will normally pass the path or the issue number directly.
+`gh issue view <number>` (the user will normally pass the issue number or URL directly).

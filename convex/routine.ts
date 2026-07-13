@@ -110,6 +110,9 @@ export const generationStatus = query({
       // Raw timestamp; the client compares against the cooldown (queries can't
       // call Date.now()). Lets the button disable when fired within the window.
       lastManualFireAt: gen?.lastManualFireAt ?? null,
+      // A fire-and-pray run the Admin has asked to stop — the ⋯ shows "Cancelling…"
+      // until the loop notices and clears the lock.
+      cancelRequested: gen?.cancelRequested ?? false,
     };
   },
 });
@@ -117,7 +120,7 @@ export const generationStatus = query({
 // ---- The gate + lock (atomic) ----------------------------------------------
 
 type AcquireResult =
-  | { acquired: true; topicSlug: string; frontierKey: string }
+  | { acquired: true; topicSlug: string; frontierKey: string; provider: "claude" | "openrouter" }
   | { acquired: false; reason: string };
 
 // Check the gate and grab the lock in one transaction. Returns whether the
@@ -185,7 +188,9 @@ export const tryAcquireGeneration = internalMutation({
     if (gen) await ctx.db.patch(gen._id, patch);
     else await ctx.db.insert("generation", { topicId: topic._id, ...patch });
 
-    return { acquired: true, topicSlug, frontierKey };
+    // The fire step branches on this: `claude` POSTs the routine, `openrouter`
+    // schedules the authoring action. Absent on the row ⇒ `claude` (ADR 0014).
+    return { acquired: true, topicSlug, frontierKey, provider: topic.provider ?? "claude" };
   },
 });
 
@@ -197,7 +202,9 @@ export const failGeneration = internalMutation({
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return;
     const gen = await generationRow(ctx, topic._id);
-    if (gen) await ctx.db.patch(gen._id, { status: "failed", error, startedAt: undefined });
+    // Also end any fire-and-pray run — the fire never landed, so nothing will
+    // report back to advance it; leaving the flags set would strand the lock.
+    if (gen) await ctx.db.patch(gen._id, { status: "failed", error, startedAt: undefined, finishRemaining: undefined, cancelRequested: undefined });
   },
 });
 
@@ -234,6 +241,36 @@ export const reportGeneration = mutation({
       await ctx.db.patch(gen._id, { status: "caughtUp", error: undefined, ...clear });
     } else {
       await ctx.db.patch(gen._id, { status: "failed", error: error ?? "run failed", ...clear });
+    }
+
+    // Fire-and-pray continuation (Admin). Only a `published` lesson on a live,
+    // un-cancelled finish run advances; `nothing`/`failed` (course complete, caught
+    // up, or errored) end it. Continuing re-arms the lock and schedules the course's
+    // OWN provider to author the next lesson (Claude routine or OpenRouter action) —
+    // so a Claude course is never quietly billed to OpenRouter. Ending clears the
+    // finish flags so the ⋯ menu returns to "Finish generating".
+    const remaining = gen.finishRemaining ?? 0;
+    if (remaining > 0) {
+      if (outcome === "published" && !gen.cancelRequested) {
+        const reArmedAt = Date.now();
+        await ctx.db.patch(gen._id, {
+          status: "generating",
+          startedAt: reArmedAt,
+          error: undefined,
+          finishRemaining: remaining - 1,
+          claimedAt: undefined,
+          runId: undefined,
+        });
+        await ctx.scheduler.runAfter(0, internal.routine.refireFinish, { topicSlug });
+        await ctx.scheduler.runAfter(FINISH_CLAIM_TIMEOUT_MS, internal.routine.expireUnclaimedFinish, {
+          topicSlug,
+          startedAt: reArmedAt,
+        });
+      } else {
+        await ctx.db.patch(gen._id, { finishRemaining: undefined, cancelRequested: undefined });
+      }
+    } else if (gen.cancelRequested) {
+      await ctx.db.patch(gen._id, { cancelRequested: undefined });
     }
   },
 });
@@ -278,31 +315,50 @@ async function fireForTopic(ctx: ActionCtx, topicSlug: string, manual: boolean):
   const acquired: AcquireResult = await ctx.runMutation(internal.routine.tryAcquireGeneration, { topicSlug, manual });
   if (!acquired.acquired) return { fired: false, reason: acquired.reason };
 
+  // OpenRouter path (ADR 0014): author in a Convex action rather than the
+  // claude.ai Routine. No `claim` protocol — hand the action its topic directly.
+  // The gate/lock above is reused unchanged; the action reports via the same
+  // `reportGeneration`. A failed schedule releases the lock, as the POST path does.
+  if (acquired.provider === "openrouter") {
+    try {
+      await ctx.scheduler.runAfter(0, internal.openrouter.authorTopic, { topicSlug });
+      return { fired: true };
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      await ctx.runMutation(internal.routine.failGeneration, { topicSlug, error });
+      return { fired: false, reason: "fire-error", error };
+    }
+  }
+
   try {
-    const url = process.env.ROUTINE_FIRE_URL;
-    const token = process.env.ROUTINE_FIRE_TOKEN;
-    if (!url || !token) throw new Error("ROUTINE_FIRE_URL / ROUTINE_FIRE_TOKEN not set");
-    // The run endpoint has a closed body schema (custom fields are rejected), so
-    // we send none — the routine's instructions fix the Topic (v1: hindi).
-    // Multi-topic will need a per-Topic routine or a supported input field; the
-    // gate/lock are already Topic-keyed for that day. `topicSlug` is still used
-    // locally for the lock and the agent's report.
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "anthropic-version": "2023-06-01",
-        authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({}),
-    });
-    if (!res.ok) throw new Error(`fire ${res.status}: ${await res.text()}`);
+    await postRoutineFire();
     return { fired: true };
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
     await ctx.runMutation(internal.routine.failGeneration, { topicSlug, error });
     return { fired: false, reason: "fire-error", error };
   }
+}
+
+// POST the claude.ai Routine's Fire URL. The run endpoint has a closed body schema
+// (custom fields are rejected), so we send none — the routine claims a locked-but-
+// unclaimed Topic itself (`claimWork`), so the fire body needn't name one. Throws
+// on a missing config or a non-2xx, so callers can release the lock. Shared by the
+// normal fire path and the fire-and-pray re-fire.
+async function postRoutineFire(): Promise<void> {
+  const url = process.env.ROUTINE_FIRE_URL;
+  const token = process.env.ROUTINE_FIRE_TOKEN;
+  if (!url || !token) throw new Error("ROUTINE_FIRE_URL / ROUTINE_FIRE_TOKEN not set");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "anthropic-version": "2023-06-01",
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) throw new Error(`fire ${res.status}: ${await res.text()}`);
 }
 
 // Does the signed-in caller own this Topic? The fire actions are owner-only —
@@ -347,6 +403,184 @@ export const requestSetup = action({
   },
 });
 
+// ---- Admin: finish generating (fire & pray) --------------------------------
+
+// The Admin "fire and pray" driver: author the whole remaining curriculum back to
+// back, WITHOUT waiting for the learner to complete each Frontier lesson (the gate
+// the daily cron / reader button obey). It is event-driven, not a self-contained
+// loop: `startFinishGenerating` arms the lock with a `finishRemaining` budget and
+// fires ONCE via the course's OWN provider; each time a lesson is reported back
+// (`reportGeneration`), the report re-fires the next one until the budget hits 0,
+// the course completes (ADR 0015), or the Admin cancels. Because every fire goes
+// through the course's provider, a Claude course drives the claude.ai Routine (the
+// Claude Code plan) and an OpenRouter course drives `authorTopic` — a Claude course
+// is never billed to OpenRouter.
+
+// Backstop against a never-completing (e.g. open-ended) mission: the teacher is
+// told never to complete a lifelong mission, so an unbounded re-fire would author
+// forever. Cap the lessons one fire-and-pray run adds.
+const MAX_FINISH_LESSONS = 30;
+
+// A fired finish run must claim its topic within this window. A fire is a blind
+// POST — if the run it should start never claims (fire lost, crash in setup,
+// plan limits), the armed lock would sit "Generating…" forever: nothing re-fires
+// a finish loop. Past the window, `expireUnclaimedFinish` fails the row visibly.
+const FINISH_CLAIM_TIMEOUT_MS = 15 * 60 * 1000;
+
+// Actions have no `ctx.db`; the finish action checks admin-ness through this query
+// (run with the action's forwarded identity), mirroring `callerOwnsTopic`.
+export const callerIsAdmin = internalQuery({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx) => isCallerAdmin(ctx),
+});
+
+// The course's authoring Provider (ADR 0014), or null if the Topic is gone —
+// `refireFinish` reads it to fire the RIGHT engine for each lesson.
+export const finishProvider = internalQuery({
+  args: { topicSlug: v.string() },
+  returns: v.union(v.literal("claude"), v.literal("openrouter"), v.null()),
+  handler: async (ctx, { topicSlug }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return null;
+    return topic.provider ?? "claude";
+  },
+});
+
+// Arm the lock for a fire-and-pray run, bypassing the Frontier-completed gate (the
+// whole point). Refuses a completed course and an in-flight run (so two admins
+// can't drive the same course at once) and clears any stale cancel flag. Sets the
+// `finishRemaining` budget that `reportGeneration` counts down.
+export const startFinishGenerating = internalMutation({
+  args: { topicSlug: v.string() },
+  returns: v.object({ started: v.boolean(), reason: v.optional(v.string()) }),
+  handler: async (ctx, { topicSlug }): Promise<{ started: boolean; reason?: string }> => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return { started: false, reason: "no-topic" };
+    if (topic.status === "completed") return { started: false, reason: "completed" };
+    const gen = await generationRow(ctx, topic._id);
+    const now = Date.now();
+    if (gen) {
+      const stale = gen.startedAt !== undefined && now - gen.startedAt > STALE_MS;
+      if (gen.status === "generating" && !stale) return { started: false, reason: "already-generating" };
+    }
+    const patch = {
+      status: "generating" as const,
+      startedAt: now,
+      error: undefined,
+      claimedAt: undefined,
+      runId: undefined,
+      finishRemaining: MAX_FINISH_LESSONS,
+      cancelRequested: undefined,
+    };
+    if (gen) await ctx.db.patch(gen._id, patch);
+    else await ctx.db.insert("generation", { topicId: topic._id, ...patch });
+    await ctx.scheduler.runAfter(FINISH_CLAIM_TIMEOUT_MS, internal.routine.expireUnclaimedFinish, {
+      topicSlug,
+      startedAt: now,
+    });
+    return { started: true };
+  },
+});
+
+// The finish-loop watchdog, scheduled at every finish fire. A no-op unless the
+// SAME fire cycle (matched by `startedAt`) is still armed, generating, and
+// unclaimed — i.e. no run ever picked it up. (The OpenRouter action never claims,
+// but its ~10-min action cap means it has always reported by the time this runs.)
+export const expireUnclaimedFinish = internalMutation({
+  args: { topicSlug: v.string(), startedAt: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, startedAt }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return null;
+    const gen = await generationRow(ctx, topic._id);
+    if (
+      !gen ||
+      gen.status !== "generating" ||
+      gen.claimedAt !== undefined ||
+      gen.startedAt !== startedAt ||
+      gen.finishRemaining === undefined
+    ) {
+      return null;
+    }
+    await ctx.db.patch(gen._id, {
+      status: "failed",
+      error: "finish run never claimed the topic (fire lost or run crashed before starting)",
+      startedAt: undefined,
+      finishRemaining: undefined,
+      cancelRequested: undefined,
+    });
+    return null;
+  },
+});
+
+// The Admin asked to stop a fire-and-pray run. Clear the budget immediately (so no
+// further lesson is fired even if a report is racing) and flag it for the UI; the
+// currently in-flight lesson still reports back and settles the lock.
+export const requestCancelFinish = internalMutation({
+  args: { topicSlug: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return null;
+    const gen = await generationRow(ctx, topic._id);
+    if (gen) await ctx.db.patch(gen._id, { cancelRequested: true, finishRemaining: undefined });
+    return null;
+  },
+});
+
+// Fire ONE lesson through the course's own provider, with NO gate (the lock is
+// already armed). OpenRouter → the in-deployment `authorTopic`; Claude → the
+// claude.ai Routine POST (claimed by slug via `claimWork`). A failed Claude fire
+// ends the run (`failGeneration` clears the finish flags). Scheduled by the start
+// action for the first lesson and by `reportGeneration` for each subsequent one.
+export const refireFinish = internalAction({
+  args: { topicSlug: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug }) => {
+    const provider = await ctx.runQuery(internal.routine.finishProvider, { topicSlug });
+    if (provider === null) return null; // topic gone
+    if (provider === "openrouter") {
+      await ctx.scheduler.runAfter(0, internal.openrouter.authorTopic, { topicSlug });
+      return null;
+    }
+    try {
+      await postRoutineFire();
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      await ctx.runMutation(internal.routine.failGeneration, { topicSlug, error });
+    }
+    return null;
+  },
+});
+
+// The dashboard ⋯ entry point (Admin-only). Arms the lock past the completion gate
+// and fires the first lesson; `reportGeneration` chains the rest. `startFinish…`
+// refuses a completed or already-running course.
+export const finishGenerating = action({
+  args: { topicSlug: v.string() },
+  returns: v.object({ started: v.boolean(), reason: v.optional(v.string()) }),
+  handler: async (ctx, { topicSlug }): Promise<{ started: boolean; reason?: string }> => {
+    if (!(await ctx.runQuery(internal.routine.callerIsAdmin, {}))) throw new Error("forbidden");
+    const res = await ctx.runMutation(internal.routine.startFinishGenerating, { topicSlug });
+    if (!res.started) return res;
+    await ctx.scheduler.runAfter(0, internal.routine.refireFinish, { topicSlug });
+    return { started: true };
+  },
+});
+
+// Stop a running fire-and-pray loop (Admin-only). Flags the lock; the loop halts
+// after the current lesson (a model call already in flight can't be interrupted).
+export const cancelFinishGenerating = action({
+  args: { topicSlug: v.string() },
+  returns: v.object({ cancelled: v.boolean() }),
+  handler: async (ctx, { topicSlug }): Promise<{ cancelled: boolean }> => {
+    if (!(await ctx.runQuery(internal.routine.callerIsAdmin, {}))) throw new Error("forbidden");
+    await ctx.runMutation(internal.routine.requestCancelFinish, { topicSlug });
+    return { cancelled: true };
+  },
+});
+
 // ---- Daily cron ------------------------------------------------------------
 
 export const listTopicSlugs = internalQuery({
@@ -377,18 +611,11 @@ export const dailyFire = internalAction({
 // `topics/<slug>/` and the teach skill runs there (ADR 0009: the Routine pulls
 // from Convex, never the repo). ponytail: returns all Lesson HTML in one query —
 // fine for a curriculum's worth; paginate if a Topic ever grows huge.
-export const materialiseTopic = query({
-  args: { secret: v.string(), ownerEmail: v.string(), topicSlug: v.string() },
-  handler: async (ctx, { secret, ownerEmail, topicSlug }) => {
-    assertAdmin(secret);
-    const owner = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", ownerEmail))
-      .unique();
-    if (!owner) return null;
-    const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
-    if (!topic) return null;
-
+// The whole materialised context for one Topic + owner, in one round-trip. Shared
+// by the secret-guarded `materialiseTopic` (the Claude CLI seam) and the internal
+// `materialiseForProvider` (the OpenRouter action seam), so both see identical
+// context regardless of which path pulls it.
+async function collectTopicContext(ctx: QueryCtx, topic: Doc<"topics">, owner: Doc<"users">) {
     // Bodies live in content blobs (.scratch/html-blob-storage); a query can't
     // read blob bytes, so expose a signed `htmlUrl` the materialise CLI fetches.
     const lessons = await Promise.all(
@@ -440,6 +667,18 @@ export const materialiseTopic = query({
       .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id).eq("userId", owner._id))
       .collect();
 
+    // Fire-and-pray (finishRemaining armed): the loop authors past the learner's
+    // pace by design, but each fired run is a fresh teacher that reads an unread
+    // Frontier as "caught up for today" and reports `nothing` — which ends the
+    // loop one lesson in. So while a finish run is armed, present a caught-up
+    // learner: every current lesson reads as completed. The stored Progress rows
+    // are untouched; only this materialised view is masked.
+    const gen = await generationRow(ctx, topic._id);
+    const progressView =
+      gen?.finishRemaining !== undefined
+        ? lessons.map((l) => ({ lessonKey: l.key, status: "completed" }))
+        : progress.map((p) => ({ lessonKey: p.lessonKey, status: p.status as string }));
+
     return {
       topic: {
         slug: topic.slug,
@@ -458,8 +697,48 @@ export const materialiseTopic = query({
       capture: {
         openQuestions: open.map((q) => ({ id: q._id, lessonKey: q.lessonKey, text: q.text })),
         responses: responses.map((r) => ({ lessonKey: r.lessonKey, quizId: r.quizId, answer: r.answer, correct: r.correct })),
-        progress: progress.map((p) => ({ lessonKey: p.lessonKey, status: p.status })),
+        progress: progressView,
       },
+    };
+}
+
+export const materialiseTopic = query({
+  args: { secret: v.string(), ownerEmail: v.string(), topicSlug: v.string() },
+  handler: async (ctx, { secret, ownerEmail, topicSlug }) => {
+    assertAdmin(secret);
+    const owner = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", ownerEmail))
+      .unique();
+    if (!owner) return null;
+    const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
+    if (!topic) return null;
+    return await collectTopicContext(ctx, topic, owner);
+  },
+});
+
+// The OpenRouter action's context seam. Internal (in-deployment, no secret), keyed
+// by slug: it resolves the Topic's own owner, so the action never needs an owner
+// email out of band. Adds the topicId (publish mutations key by it) and the
+// current Frontier (highest-seq non-superseded Lesson, or null) so the action can
+// pick the ongoing-vs-bootstrap path and compute the next seq. Null if the Topic
+// or its owner is missing.
+export const materialiseForProvider = internalQuery({
+  args: { topicSlug: v.string() },
+  handler: async (ctx, { topicSlug }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic || !topic.ownerId) return null;
+    const owner = await ctx.db.get(topic.ownerId);
+    if (!owner) return null;
+    const frontier = await frontierLesson(ctx, topic._id);
+    return {
+      topicId: topic._id,
+      // The owner's email — the publish mutations (publishMission, etc.) key by it,
+      // and it's intrinsic to the Topic, so the action never supplies it out of band.
+      ownerEmail: owner.email ?? null,
+      provider: topic.provider ?? "claude",
+      frontier: frontier ? { key: frontier.key, seq: frontier.seq } : null,
+      ...(await collectTopicContext(ctx, topic, owner)),
     };
   },
 });

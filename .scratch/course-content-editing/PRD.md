@@ -1,6 +1,6 @@
 # PRD: Owner hover-edit for course text
 
-Status: ready-for-agent
+Status: done — all three hover-edit slices shipped (source lesson, reference, translated edition).
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — **Topic**, **Lesson**,
 > **Reference**, **Edition** (a Topic × language), **owner** vs **Viewer**,

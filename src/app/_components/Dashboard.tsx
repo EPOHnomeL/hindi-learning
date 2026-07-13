@@ -16,7 +16,8 @@ import { formatPrice } from "./Paygate";
 import { Logo } from "./Logo";
 import { Markdown } from "./MarkdownView";
 import { missionPreview } from "./markdown";
-import { Dialog, IconButton } from "./ui";
+import { useTheme } from "./ThemeContext";
+import { Dialog, IconButton, Menu, MenuItem } from "./ui";
 import { useResourceUpload } from "./useResourceUpload";
 
 type Course = {
@@ -76,6 +77,7 @@ export function Dashboard() {
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <ThemeToggle />
           {amAdmin && (
             <Link href="/admin" className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
               Admin
@@ -105,6 +107,25 @@ export function Dashboard() {
       <SharedSection />
       <PurchasedSection />
     </div>
+  );
+}
+
+// Icon-only light/dark toggle for the dashboard header (ADR 0011). A compact
+// sibling of the sidebar's labelled ThemeToggle — same tokens, sized to sit
+// among the header's text buttons. Sun in dark mode (tap for light), moon in
+// light mode (tap for dark).
+function ThemeToggle() {
+  const { theme, toggle } = useTheme();
+  const dark = theme === "dark";
+  return (
+    <button
+      onClick={toggle}
+      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      title={dark ? "Light mode" : "Dark mode"}
+      className="rounded-lg p-1.5 text-soft transition-colors hover:bg-hi hover:text-accent"
+    >
+      <Icon name={dark ? "sun" : "moon"} className="h-4 w-4" />
+    </button>
   );
 }
 
@@ -273,7 +294,7 @@ function CourseCard({ course }: { course: Course }) {
           <button
             onClick={() => void startSetup()}
             disabled={setup === "starting" || setup === "started"}
-            className="w-full rounded-lg bg-gold/20 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-gold/30 disabled:opacity-70"
+            className="flex-1 rounded-lg bg-gold/20 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-gold/30 disabled:opacity-70"
           >
             {setup === "starting"
               ? "Starting setup…"
@@ -301,6 +322,10 @@ function CourseCard({ course }: { course: Course }) {
             {complete && <CourseCertMenu topicSlug={course.slug} />}
           </>
         )}
+        {/* Admin "fire and pray": generate the whole remaining curriculum in one
+            go, without waiting for the learner to finish each lesson. Hidden for
+            everyone but the Admin (self-gated), and never on a completed course. */}
+        {!complete && <AdminCourseMenu slug={course.slug} title={course.title} />}
       </div>
 
       {showMission && course.mission && (
@@ -313,6 +338,54 @@ function CourseCard({ course }: { course: Course }) {
         <EditionsDialog topicSlug={course.slug} title={course.title} onClose={() => setEditionsOpen(false)} />
       )}
     </article>
+  );
+}
+
+// The Admin-only ⋯ on a course card (fire and pray). Self-hides for non-admins,
+// so a plain learner never sees a ⋯ on their own cards. "Finish generating" kicks
+// off the back-to-back authoring loop; while it runs, the live generation status
+// relabels the item ("Generating…") and flags a failed run with a dot on the ⋯.
+function AdminCourseMenu({ slug, title }: { slug: string; title: string }) {
+  const amAdmin = useQuery(api.whitelist.amIAdmin);
+  const status = useQuery(api.routine.generationStatus, { topicSlug: slug });
+  const finish = useAction(api.routine.finishGenerating);
+  const cancel = useAction(api.routine.cancelFinishGenerating);
+  const [busy, setBusy] = useState(false);
+  if (!amAdmin) return null;
+
+  const generating = busy || status?.status === "generating";
+  const cancelling = status?.cancelRequested === true;
+  const failed = status?.status === "failed";
+
+  return (
+    <Menu triggerLabel={`Admin actions for ${title}`} dot={failed}>
+      {(close) =>
+        generating ? (
+          // A run is in flight — offer to stop it (fire-and-pray can loop).
+          <MenuItem
+            icon="x"
+            onClick={() => {
+              close();
+              if (cancelling) return;
+              void cancel({ topicSlug: slug });
+            }}
+          >
+            {cancelling ? "Cancelling…" : "Cancel generation"}
+          </MenuItem>
+        ) : (
+          <MenuItem
+            icon="refresh"
+            onClick={() => {
+              close();
+              setBusy(true);
+              void finish({ topicSlug: slug }).finally(() => setBusy(false));
+            }}
+          >
+            {failed ? "Finish generating — retry" : "Finish generating course"}
+          </MenuItem>
+        )
+      }
+    </Menu>
   );
 }
 
@@ -515,6 +588,9 @@ function NewCourseCard() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [why, setWhy] = useState("");
+  // The course's Provider (ADR 0014). Defaults to Claude — the quality-guaranteed
+  // line; OpenRouter is the experimental spike.
+  const [provider, setProvider] = useState<"claude" | "openrouter">("claude");
   const [links, setLinks] = useState<string[]>([]);
   const [files, setFiles] = useState<File[]>([]);
   const [linkDraft, setLinkDraft] = useState("");
@@ -553,7 +629,7 @@ function NewCourseCard() {
         const chosenLinks = links;
         const chosenFiles = files;
         try {
-          const { slug } = await seedTopic({ title: t, why: why.trim() });
+          const { slug } = await seedTopic({ title: t, why: why.trim(), provider });
           // Land on the new course immediately so the learner sees its "setting up"
           // page right away — instead of watching this form sit in "Creating…"
           // (next to the card the reactive dashboard has already rendered) for the
@@ -580,6 +656,7 @@ function NewCourseCard() {
           })();
           setTitle("");
           setWhy("");
+          setProvider("claude");
           setLinks([]);
           setFiles([]);
           setOpen(false);
@@ -608,6 +685,19 @@ function NewCourseCard() {
         placeholder="Why are you learning this?"
         className="resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
       />
+
+      <label className="mt-1 text-xs font-semibold uppercase tracking-wide text-accent2">Teacher</label>
+      <select
+        value={provider}
+        onChange={(e) => setProvider(e.target.value as "claude" | "openrouter")}
+        className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+      >
+        <option value="claude">Claude (recommended)</option>
+        <option value="openrouter">OpenRouter</option>
+      </select>
+      {provider === "openrouter" && (
+        <p className="text-xs text-soft">Experimental: quality isn&apos;t guaranteed on this teacher.</p>
+      )}
 
       <label className="mt-1 text-xs font-semibold uppercase tracking-wide text-accent2">Resources (optional)</label>
       {(links.length > 0 || files.length > 0) && (
