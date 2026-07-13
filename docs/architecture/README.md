@@ -10,7 +10,9 @@ From the **repo root** (so that the viewer can resolve `CONTEXT.md` and per-pack
 pnpm documentation
 ```
 
-Then open <http://localhost:3000/docs/architecture/>.
+Then open <http://localhost:3000/> — the root redirects straight to the knowledge bank
+(via [`serve.json`](/serve.json)). The canonical URL is still
+<http://localhost:3000/docs/architecture/>; both land on the same viewer.
 
 The viewer fetches the Markdown sources under `docs/architecture/` at runtime and renders them client-side. There is **no build step** — edit the `.md` files and refresh the browser.
 
