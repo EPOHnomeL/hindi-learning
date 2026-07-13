@@ -15,28 +15,37 @@ asynchronous ([ADR 0001](/docs/adr/0001-asynchronous-hub-mediated-teaching-loop.
 
 ## Entry & navigation
 
-[page.tsx](/src/app/page.tsx#L7-L21) renders by auth state: `Unauthenticated → SignIn`,
-`Authenticated → Dashboard`; [middleware.ts](/src/middleware.ts) keeps the Convex Auth session in
-sync. [Dashboard.tsx](/src/app/_components/Dashboard.tsx#L29) is a local state machine — a course grid
-until a Topic is opened, then it mounts [Reader.tsx](/src/app/_components/Reader.tsx#L56), which
-defaults to the first lesson.
+Navigation is now **real, URL-addressable App Router routes** ([ADR 0012](/docs/adr/0012-app-router-url-addressable-navigation.md)
+— shipped). [page.tsx](/src/app/page.tsx) is the ungated front door (`Landing` signed-out, `Dashboard`
+signed-in, same `/` URL). The reader itself lives under an auth-gated route group:
 
-> Navigation is **client state today** — a single page, views chosen by `useState`, no deep-linkable
-> URLs. [ADR 0012](/docs/adr/0012-app-router-url-addressable-navigation.md) records the decision to
-> move to real App Router routes; that work is not yet live.
+- `(app)/courses/[slug]/lessons/[key]` and `.../references/[key]` — the signed-in reader.
+  [`AppGate`](/src/app/_components/AppGate.tsx) renders `<SignIn>` *at the deep-link URL* while signed
+  out rather than redirecting, and [`CourseShell`](/src/app/_components/CourseShell.tsx) is a persistent
+  sidebar that stays mounted across lessons (frontier, `canWrite`/`canEdit`, next-key, dir, Edition
+  switcher).
+- `share/[token]/…` — the anonymous [[Guest]] reader (outside the auth group; the token is the only
+  credential; `robots:noindex` + `referrer:no-referrer`).
+- `certificate/[token]` — the standalone anonymous [[Certificate]] page.
+
+[middleware.ts](/src/middleware.ts) keeps the Convex Auth session in sync. `CourseIndex` waits for both
+`listLessons` and `courseHeader` before choosing a redirect target, so an owner resumes at the
+[[Frontier]] rather than flashing through lesson 1.
 
 ## Lessons in a sandbox
 
-A Lesson is authored HTML, fetched and dropped into an iframe via `srcDoc` with
-`sandbox="allow-scripts"` ([ArtifactView.tsx:81](/src/app/_components/ArtifactView.tsx#L81-L88)) — no
+A Lesson is authored HTML (fetched from its content blob — see below) dropped into an iframe via
+`srcDoc` with `sandbox="allow-scripts"` ([ArtifactView.tsx](/src/app/_components/ArtifactView.tsx)) — no
 same-origin access, so **all parent↔lesson communication is `postMessage`**.
-[`buildSrcDoc`](/src/app/_components/lessonSrcDoc.ts#L113-L128) injects three bridges before
-`</body>` (located with `lastIndexOf` so a `</body>` inside a comment can't fool it):
+[`buildSrcDoc`](/src/app/_components/lessonSrcDoc.ts) injects four bridges before the **last**
+`</body>` (located with `lastIndexOf` so a `</body>` inside a comment can't fool it), and bakes in the
+Edition's `dir`/`lang` (+ Devanagari webfont for that script):
 
-- **HEIGHT_BRIDGE** ([lessonSrcDoc.ts:17](/src/app/_components/lessonSrcDoc.ts#L17-L28)) — reports content
-  height so mobile scrolls the page as one surface, not a nested iframe.
-- **QUIZ_BRIDGE** ([lessonSrcDoc.ts:30](/src/app/_components/lessonSrcDoc.ts#L30-L52)) — posts quiz answers out.
-- **THEME_BRIDGE** ([lessonSrcDoc.ts:54](/src/app/_components/lessonSrcDoc.ts#L54-L61)) — applies a live theme.
+- **HEIGHT_BRIDGE** — reports content height so mobile scrolls the page as one surface, not a nested iframe.
+- **QUIZ_BRIDGE** — reads the authored `data-correct`/`data-k`/`data-answer`/`data-alt` markers and posts answers out.
+- **THEME_BRIDGE** — applies a live theme without reload.
+- **NAV_BRIDGE** — intercepts in-lesson `<a>` clicks (the sandbox has no top-navigation) and forwards
+  them to the parent, which routes internal links and rewrites `/courses/…` → `/share/…` for [[Guest]]s.
 
 ## Theme bridge
 
@@ -55,6 +64,16 @@ Three writes, all in [capture.ts](/convex/capture.ts#L28-L86), all auth-gated an
 | Quiz answered | [`recordResponse`](/convex/capture.ts#L28-L42) | **First answer only**, enforced server-side ([capture.ts:33](/convex/capture.ts#L33-L39)); re-clicks are idempotent. |
 | Lesson opened / "Mark complete" | [`setProgress`](/convex/capture.ts#L44) | Never downgrades `completed → opened`. |
 | Question submitted | [`askQuestion`](/convex/capture.ts#L80) | Creates an `open` [[Question]] for the teacher. |
+
+## Content, Editions & certificates
+
+- **HTML is a content blob.** `getLesson`/`getReference` return a `contentUrl` (a `GET /content?id=…`
+  route, `Cache-Control: immutable`); `useContentHtml` fetches it. See [Hub & Content Model](01-hub-content.md).
+- **Edition switching.** The shell resolves the served language via the Hub's `readableLang` and offers a
+  switcher over the [[Edition]]s the caller holds (`?lang=xx`, honoured only if held). A missing
+  translation falls back to the English source per item. See [Access & Sharing](05-access-sharing.md).
+- **Certificates.** On a completed course the reader offers a [[Certificate]]; "View" opens
+  `/certificate/[token]` (a real anchor — `window.open` popups were blocked on the deployed domain).
 
 ## Gotchas
 

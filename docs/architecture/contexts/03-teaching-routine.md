@@ -3,7 +3,7 @@ slug: teaching-routine
 name: Teaching Routine
 position: 3
 status: draft
-adrs: [0001, 0008, 0009, 0010]
+adrs: [0001, 0008, 0009, 0010, 0014]
 ---
 
 # Teaching Routine
@@ -45,6 +45,12 @@ stateDiagram-v2
   closed fire body still serves many Topics — and how `fire-all` gives each concurrent run a distinct one.
 - **Report:** [`reportGeneration`](/convex/routine.ts#L159-L181) closes the loop with `published`
   (→ `idle`, Frontier advanced), `nothing` (→ `caughtUp`, debounced), or `failed`.
+
+**Two providers, one gate.** Once the gate fires, `fireIfReady` branches on `topic.provider`
+([ADR 0014](/docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md)): `claude` POSTs the
+external Routine (below); `openrouter` schedules the in-Convex `internal.openrouter.authorTopic` action
+instead. Both author against the *same* prompt doctrine — the [Teaching
+Intelligence](06-ai-teaching.md) context is where those prompts live.
 
 ## What fires it
 
