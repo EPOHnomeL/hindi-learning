@@ -43,11 +43,23 @@ export async function chatComplete({ model, messages, webSearch, reasoning }: Ch
   if (webSearch) body.plugins = [{ id: "web" }];
   if (reasoning) body.reasoning = { effort: reasoning };
 
-  const res = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-    body: JSON.stringify(body),
-  });
+  const post = () =>
+    fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+      body: JSON.stringify(body),
+    });
+
+  let res = await post();
+  // Some endpoints mandate reasoning and 400 the "none" opt-out ("Reasoning is
+  // mandatory for this endpoint and cannot be disabled") — retry once with the
+  // model's default reasoning rather than fail every call of the run.
+  if (res.status === 400 && reasoning) {
+    const text = await res.text();
+    if (!/reasoning/i.test(text)) throw new Error(`openrouter 400: ${text}`);
+    delete body.reasoning;
+    res = await post();
+  }
   if (!res.ok) throw new Error(`openrouter ${res.status}: ${await res.text()}`);
 
   const json = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };

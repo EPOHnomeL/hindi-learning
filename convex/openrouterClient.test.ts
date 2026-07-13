@@ -45,6 +45,41 @@ test("chatComplete enables the OpenRouter web plugin when webSearch is set", asy
   expect(body.plugins).toEqual([{ id: "web" }]);
 });
 
+test("chatComplete retries once without reasoning when the endpoint mandates it", async () => {
+  // Real prod failure: gemini-3.5-flash's endpoint 400s on reasoning "none".
+  const bodies: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init: RequestInit) => {
+      bodies.push(init.body as string);
+      if (bodies.length === 1)
+        return new Response(
+          JSON.stringify({ error: { message: "Reasoning is mandatory for this endpoint and cannot be disabled.", code: 400 } }),
+          { status: 400 },
+        );
+      return new Response(JSON.stringify({ choices: [{ message: { content: "traduit" } }] }), { status: 200 });
+    }),
+  );
+
+  const out = await chatComplete({ model: "google/gemini-3.5-flash", messages: [{ role: "user", content: "hi" }], reasoning: "none" });
+  expect(out).toBe("traduit");
+  expect(bodies).toHaveLength(2);
+  expect(JSON.parse(bodies[0]!).reasoning).toEqual({ effort: "none" });
+  expect(JSON.parse(bodies[1]!).reasoning).toBeUndefined();
+});
+
+test("chatComplete does not retry a reasoning-mandatory 400 when reasoning was never sent", async () => {
+  const fetchMock = vi.fn(
+    async () =>
+      new Response(JSON.stringify({ error: { message: "Reasoning is mandatory for this endpoint and cannot be disabled." } }), {
+        status: 400,
+      }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  await expect(chatComplete({ model: "m", messages: [] })).rejects.toThrow(/400/);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
 test("chatComplete throws on a non-OK response and when the key is missing", async () => {
   vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 429 })));
   await expect(chatComplete({ model: "m", messages: [] })).rejects.toThrow(/429/);
