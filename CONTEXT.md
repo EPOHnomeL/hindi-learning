@@ -13,7 +13,7 @@ The shared store for the *content and the conversation* — Topics, Lessons, Ref
 _Avoid_: Backend, database (when speaking about its role as the channel)
 
 **Artifact store** _(retired)_:
-Formerly the R2 bucket of HTML blobs. Retired: Lesson/Reference HTML is now a field on its Hub row ([ADR 0007](docs/adr/0007-nextjs-convex-rebuild.md)), and Resource blobs live in the Hub's file storage ([ADR 0009](docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md)). Not a current concept.
+Formerly the R2 bucket of HTML blobs. Retired: Lesson/Reference HTML now lives as an immutable **content blob** in the Hub's Convex file storage — the row carries an `htmlStorageId` and the body is served over a `GET /content` route ([ADR 0007](docs/adr/0007-nextjs-convex-rebuild.md), [ADR 0009](docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md)). Not a current concept.
 
 **Progress**:
 A reader's relationship to a single Lesson: `unseen → opened → completed`. Cheap metadata, distinct from Responses, that lets the web show "you're here / next" and lets Claude Code spot a learner who opened a lesson but left no Responses (stuck). Per-reader: the owner and each Viewer of a shared Topic track their own, keyed by their account, so a Viewer starts clean on a Topic shared with them. A Guest (no account) has no server-side Progress — only per-device ticks in the browser, set by pressing "Next lesson". The Routine's Frontier gate reads the *owner's* Progress, never a Viewer's. Distinct from a Topic's **Completion** (the whole course being finished, not one Lesson read). Not a heavyweight entity.
@@ -26,6 +26,10 @@ _Avoid_: Terminate, finished, done, archived (as separate terms); "complete" for
 **Topic**:
 A single subject a learner is studying (e.g. Hindi), owned by one User and grounding one Mission, a body of Lessons and References, and the Resources that feed them. A User may own many Topics ("teach me anything"), each isolated to its owner. A Topic is born one of two ways: in a teach-skill workspace, or **seeded** from the dashboard (a title, a "why", and uploaded Resources) and fleshed out by the Routine.
 _Avoid_: Course, subject, workspace (in user-facing language)
+
+**Edition**:
+A single **language rendering** of a Topic — the pair (Topic × language) and the **unit of access**. English is the implicit *source* Edition (no stored translation rows); every other language is a projection held in the `translations` table, produced by the translate [[Routine]] once a course is **completed**, and served with a per-item fallback to the English source when a translation is missing. A [[Share]] and a [[Public link]] each grant one Edition; the owner holds English plus every *ready* Edition. [[Progress]] and [[Certificate]]s stay per-Topic, not per-Edition. Only offered for languages in the picker (`convex/languages.ts`).
+_Avoid_: Translation (that is one item's rendering, not the whole language), version, variant, locale (as a separate term)
 
 **Reference**:
 A durable, compressed cheat-sheet (glossary, syntax, key facts) the learner returns to repeatedly. Unlike a Lesson it is mutable — Claude Code revises it in place as understanding deepens; the current version always wins. Captures nothing.
