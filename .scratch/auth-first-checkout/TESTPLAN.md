@@ -2,9 +2,23 @@
 
 ## Setup (once)
 
-- Run locally: `pnpm dev` in the worktree (Convex dev deployment `judicious-marmot-580` is shared; don't push the branch).
-- Dev env already has sandbox `PAYFAST_*` and `PAYFAST_MODE=sandbox`. **Set dev `SITE_URL=http://localhost:3000`** (it currently points at the branch preview alias; only checkout return/cancel URLs read it). Restore afterwards if needed.
-- You need: a completed course with a priced Edition from a ready Seller, and its Public link. Reuse the existing dev one or price one via the admin/seller flows.
+- **Use your own sandbox merchant account.** PayFast's public demo credentials
+  (`10000100`/`46f0cd694581a`, currently in dev env) are broken server-side: their own
+  minimal documented example POSTed with them returns "400 · Internal Server Error",
+  while a garbage merchant id returns the specific "Invalid merchant ID" — verified
+  2026-07-13. Log in at <https://sandbox.payfast.co.za> with any email → copy YOUR
+  Merchant ID + Merchant Key, set a passphrase → update dev env
+  `PAYFAST_MERCHANT_ID` / `PAYFAST_MERCHANT_KEY` / `PAYFAST_PASSPHRASE`.
+- **The frontend under test must be the new build.** The preview alias serves
+  `origin/feat/paid-marketplace`, which is behind local until the branch is pushed —
+  if the buy dialog still shows an email field, you're on the old build. Either push
+  the branch (preview rebuilds; note this also `npx convex deploy`s the new schema —
+  dropping `pendingEntitlements` — to the shared dev deployment) or run `pnpm dev`
+  locally.
+- If local: **set dev `SITE_URL=http://localhost:3000`** (it currently points at the
+  branch preview alias; only checkout return/cancel URLs read it). Restore afterwards.
+- You need: a completed course with a priced Edition from a ready Seller, and its
+  Public link. Reuse the existing dev one or price one via the admin/seller flows.
 
 ## The journey (the big one)
 
