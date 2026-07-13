@@ -221,6 +221,7 @@ type FireResult = { fired: boolean; reason?: string; error?: string };
 // deployment (the action reads it).
 export const startTranslation = action({
   args: { topicSlug: v.string(), lang: v.string() },
+  returns: v.object({ fired: v.boolean(), reason: v.optional(v.string()), error: v.optional(v.string()) }),
   handler: async (ctx, { topicSlug, lang }): Promise<FireResult> => {
     const acq: AcquireResult = await ctx.runMutation(internal.translate.tryAcquireTranslation, { topicSlug, lang });
     if (!acq.acquired) {
@@ -293,6 +294,10 @@ export const removeEdition = mutation({
 // owner-scoped materialise/publish), or null if none waiting.
 export const claimTranslation = mutation({
   args: { secret: v.string(), runId: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({ topicSlug: v.string(), lang: v.string(), ownerEmail: v.union(v.string(), v.null()) }),
+  ),
   handler: async (
     ctx,
     { secret, runId },
@@ -428,6 +433,22 @@ export const reportTranslation = mutation({
 // side. Null if the Topic or owner is missing.
 export const collectForTranslation = internalQuery({
   args: { topicSlug: v.string(), lang: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      ownerEmail: v.union(v.string(), v.null()),
+      items: v.array(
+        v.object({
+          kind: kindV,
+          key: v.string(),
+          title: v.optional(v.string()),
+          htmlStorageId: v.optional(v.id("_storage")),
+          text: v.optional(v.string()),
+          reply: v.optional(v.string()),
+        }),
+      ),
+    }),
+  ),
   handler: async (ctx, { topicSlug, lang }) => {
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic || !topic.ownerId) return null;
@@ -465,7 +486,9 @@ export function buildTranslateMessages(content: string, langName: string, mode: 
 // as-is (nothing to translate) to avoid a wasted call.
 async function translateField(model: string, content: string, langName: string, mode: "html" | "text"): Promise<string> {
   if (content.trim() === "") return content;
-  return await chatComplete({ model, messages: buildTranslateMessages(content, langName, mode) });
+  // Reasoning off: thinking tokens are billed as output and buy nothing for
+  // constrained translation (translation-cost 02).
+  return await chatComplete({ model, messages: buildTranslateMessages(content, langName, mode), reasoning: "none" });
 }
 
 // Items translated per action invocation. A big course can't finish inside one
@@ -506,9 +529,17 @@ export const translateTopic = internalAction({
       for (const item of items.slice(0, CHUNK)) {
         if (item.kind === "lesson" || item.kind === "reference") {
           // The body is a content blob; an action can read its bytes directly
-          // (no HTTP round-trip) and translate the markup.
+          // (no HTTP round-trip) and translate the markup. Styles/scripts are
+          // swapped out first — the model translates only the real content.
           const blob = item.htmlStorageId ? await ctx.storage.get(item.htmlStorageId) : null;
           const body = blob ? await blob.text() : "";
+          const { stripped, blocks } = swapOutStatic(body);
+          const translated = stripFence(await translateField(model, stripped, langName, "html"));
+          const html = swapBackStatic(translated, blocks);
+          // A mangled placeholder or a dropped quiz marker means a corrupt body:
+          // skip the item (English fallback; counted `failed` at report). The
+          // mutation-side quiz guard can't read blobs, so this is THE check.
+          if (html === null || !quizStructureMatches(body, html)) continue;
           await ctx.runMutation(api.translate.publishTranslation, {
             secret,
             ownerEmail,
@@ -517,7 +548,7 @@ export const translateTopic = internalAction({
             kind: item.kind,
             key: item.key,
             title: await translateField(model, item.title ?? "", langName, "text"),
-            html: await translateField(model, body, langName, "html"),
+            html,
           });
         } else {
           // title / mission — a single text field.
@@ -550,6 +581,37 @@ export const translateTopic = internalAction({
     }
   },
 });
+
+// ---- Static-block placeholder swap (translation-cost 01) --------------------
+
+// ~70% of a Lesson document is fixed <style>/<script> boilerplate. It carries no
+// translatable text, but sent to the model it's paid for on input AND echoed back
+// on output. So the run swaps each such element for a tiny numbered placeholder
+// comment before translating and restores the originals after — the model never
+// sees (or can corrupt) the CSS/JS at all.
+const STATIC_BLOCK = /<(style|script)\b[^>]*>[\s\S]*?<\/\1>/gi;
+const PLACEHOLDER = /<!--⟦(\d+)⟧-->/g;
+
+export function swapOutStatic(html: string): { stripped: string; blocks: string[] } {
+  const blocks: string[] = [];
+  const stripped = html.replace(STATIC_BLOCK, (block) => {
+    blocks.push(block);
+    return `<!--⟦${blocks.length - 1}⟧-->`;
+  });
+  return { stripped, blocks };
+}
+
+// Restore the swapped-out blocks. Null unless every placeholder came back exactly
+// once and none were invented — a null means the model mangled the structure, and
+// the caller must skip the item (English fallback) rather than publish it.
+export function swapBackStatic(translated: string, blocks: string[]): string | null {
+  const seen = [...translated.matchAll(PLACEHOLDER)].map((m) => Number(m[1]));
+  if (seen.length !== blocks.length) return null;
+  if (new Set(seen).size !== seen.length) return null;
+  if (seen.some((n) => n >= blocks.length)) return null;
+  // Function replacement — a `$` inside CSS/JS must never be treated as a pattern.
+  return translated.replace(PLACEHOLDER, (_, n) => blocks[Number(n)]!);
+}
 
 // ---- Translation-fidelity guard --------------------------------------------
 

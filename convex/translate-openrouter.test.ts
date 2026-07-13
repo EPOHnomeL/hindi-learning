@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import { swapBackStatic, swapOutStatic } from "./translate";
 import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -53,6 +54,131 @@ async function seedCompleted(t: ReturnType<typeof convexTest>, provider?: "openr
   });
   return { alice, topicId };
 }
+
+// ---- Static-block placeholder swap (translation-cost 01) --------------------
+
+// A realistic lesson document: styles in the head, quiz markup in the body,
+// scripts at the foot — the shape every published Lesson blob has.
+const LESSON_DOC = `<!doctype html><html><head><meta charset="utf-8"><title>Alpha</title><style>.quiz{color:red}</style></head><body><h1>Read this</h1><div class="quiz" data-correct="a"><button class="opt" data-k="a">yes</button></div><script>var boiler=1;</script><script src="./foot.js"></script></body></html>`;
+
+test("swapOutStatic strips every style/script into placeholders; swapBackStatic restores them verbatim", () => {
+  const { stripped, blocks } = swapOutStatic(LESSON_DOC);
+  expect(blocks).toHaveLength(3);
+  expect(stripped).not.toContain("color:red");
+  expect(stripped).not.toContain("var boiler=1");
+  expect(stripped).toContain("Read this"); // the prose still goes to the translator
+  expect(stripped).toContain("data-correct"); // quiz markers ride through for the guard
+  expect(swapBackStatic(stripped, blocks)).toBe(LESSON_DOC); // untouched round-trip is identity
+
+  // A "translation" that only touched prose reassembles with the originals intact.
+  const translated = stripped.replace("Read this", "Lees dit").replace(">yes<", ">ja<");
+  const out = swapBackStatic(translated, blocks);
+  expect(out).toContain("Lees dit");
+  expect(out).toContain("<style>.quiz{color:red}</style>");
+  expect(out).toContain("var boiler=1");
+});
+
+test("swapBackStatic refuses a dropped, duplicated, or invented placeholder", () => {
+  const { stripped, blocks } = swapOutStatic(LESSON_DOC);
+  const ph = stripped.match(/<!--[^>]*?0[^>]*?-->/)?.[0];
+  expect(ph).toBeTruthy();
+  expect(swapBackStatic(stripped.replace(ph!, ""), blocks)).toBeNull(); // dropped
+  expect(swapBackStatic(stripped + ph!, blocks)).toBeNull(); // duplicated
+  expect(swapBackStatic(stripped.replace(ph!, ph!.replace("0", "9")), blocks)).toBeNull(); // invented
+});
+
+test("the translate run sends bodies without style/script and publishes them restored", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await seedCompleted(t, "openrouter");
+  // Replace the seed lesson's blob with the boilerplate-rich document.
+  await t.run(async (ctx) => {
+    const lesson = await ctx.db.query("lessons").withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", "0001-alpha")).unique();
+    const sid = await ctx.storage.store(new Blob([LESSON_DOC], { type: "text/html" }));
+    await ctx.db.patch(lesson!._id, { htmlStorageId: sid });
+  });
+  await t.run((ctx) => ctx.db.insert("translationJobs", { topicId, lang: "es", status: "translating", total: 3, done: 0, failed: 0 }));
+  const sent: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      sent.push(body.messages[1].content as string);
+      return new Response(JSON.stringify({ choices: [{ message: { content: body.messages[1].content } }] }), { status: 200 });
+    }),
+  );
+
+  await t.action(internal.translate.translateTopic, { topicSlug: "greek", lang: "es" });
+
+  // No request carried the boilerplate — that's the token cut.
+  for (const s of sent) {
+    expect(s).not.toContain("color:red");
+    expect(s).not.toContain("var boiler=1");
+  }
+  // The published row carries the fully restored document.
+  const row = await t.run((ctx) =>
+    ctx.db.query("translations").withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "es").eq("kind", "lesson").eq("key", "0001-alpha")).unique(),
+  );
+  expect(row?.html).toContain("<style>.quiz{color:red}</style>");
+  expect(row?.html).toContain("var boiler=1");
+  expect(row?.html).toContain("data-correct");
+  const job = await t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
+  expect(job).toMatchObject({ status: "ready", done: 3, failed: 0 });
+});
+
+test("a run that loses placeholders or quiz markers skips the item (English fallback), never publishing a corrupt body", async () => {
+  for (const mangle of [
+    (s: string) => s.replace(/<!--[\s\S]*?-->/g, ""), // model ate the placeholders
+    (s: string) => s.replace(/ data-correct="a"/g, ""), // model dropped a quiz marker
+  ]) {
+    const t = convexTest(schema, modules);
+    const { topicId } = await seedCompleted(t, "openrouter");
+    await t.run(async (ctx) => {
+      const lesson = await ctx.db.query("lessons").withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", "0001-alpha")).unique();
+      const sid = await ctx.storage.store(new Blob([LESSON_DOC], { type: "text/html" }));
+      await ctx.db.patch(lesson!._id, { htmlStorageId: sid });
+    });
+    await t.run((ctx) => ctx.db.insert("translationJobs", { topicId, lang: "es", status: "translating", total: 3, done: 0, failed: 0 }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: RequestInit) => {
+        const body = JSON.parse(init.body as string);
+        const content = body.messages[1].content as string;
+        const isHtml = (body.messages[0].content as string).includes("HTML");
+        return new Response(JSON.stringify({ choices: [{ message: { content: isHtml ? mangle(content) : content } }] }), { status: 200 });
+      }),
+    );
+
+    await t.action(internal.translate.translateTopic, { topicSlug: "greek", lang: "es" });
+
+    const row = await t.run((ctx) =>
+      ctx.db.query("translations").withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "es").eq("kind", "lesson").eq("key", "0001-alpha")).unique(),
+    );
+    expect(row).toBeNull(); // skipped — the reader falls back to English
+    const job = await t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
+    expect(job).toMatchObject({ status: "ready", done: 2, failed: 1 }); // title + mission landed
+    vi.unstubAllGlobals();
+  }
+});
+
+test("translation calls disable model reasoning — thinking tokens are pure cost here", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await seedCompleted(t, "openrouter");
+  await t.run((ctx) => ctx.db.insert("translationJobs", { topicId, lang: "es", status: "translating", total: 3, done: 0, failed: 0 }));
+  const bodies: Record<string, unknown>[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      bodies.push(body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: body.messages[1].content } }] }), { status: 200 });
+    }),
+  );
+
+  await t.action(internal.translate.translateTopic, { topicSlug: "greek", lang: "es" });
+
+  expect(bodies.length).toBeGreaterThan(0);
+  for (const b of bodies) expect(b.reasoning).toEqual({ effort: "none" });
+});
 
 test("startTranslation always schedules the Gemini translate action (never POSTs), for BOTH providers", async () => {
   for (const provider of ["openrouter", undefined] as const) {
