@@ -9,16 +9,20 @@
  */
 
 import type * as auth from "../auth.js";
+import type * as authoring from "../authoring.js";
 import type * as backfill from "../backfill.js";
 import type * as capture from "../capture.js";
 import type * as certificates from "../certificates.js";
 import type * as content from "../content.js";
 import type * as crons from "../crons.js";
+import type * as email from "../email.js";
 import type * as emblem from "../emblem.js";
 import type * as http from "../http.js";
+import type * as inviteEmail from "../inviteEmail.js";
 import type * as languages from "../languages.js";
 import type * as lib from "../lib.js";
 import type * as openrouter from "../openrouter.js";
+import type * as openrouterClient from "../openrouterClient.js";
 import type * as public_ from "../public.js";
 import type * as quizShuffle from "../quizShuffle.js";
 import type * as resources from "../resources.js";
@@ -35,16 +39,20 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   auth: typeof auth;
+  authoring: typeof authoring;
   backfill: typeof backfill;
   capture: typeof capture;
   certificates: typeof certificates;
   content: typeof content;
   crons: typeof crons;
+  email: typeof email;
   emblem: typeof emblem;
   http: typeof http;
+  inviteEmail: typeof inviteEmail;
   languages: typeof languages;
   lib: typeof lib;
   openrouter: typeof openrouter;
+  openrouterClient: typeof openrouterClient;
   public: typeof public_;
   quizShuffle: typeof quizShuffle;
   resources: typeof resources;
