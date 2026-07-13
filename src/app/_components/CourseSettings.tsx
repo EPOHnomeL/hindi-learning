@@ -41,10 +41,99 @@ export function CourseSettingsDialog({
   );
 }
 
+// Edit a translated Edition's title & mission in place (edition-title-edit 02).
+// Opened from the course sidebar's title pencil, gated by the server-computed
+// per-Edition `canEdit` (owner or that Edition's Editor, ADR 0020). Clearing a
+// field reverts it to auto: the translated row is dropped, the reader falls back
+// to the English text, and the next re-translate fills it again. The English
+// edition has no pencil — the source keeps the owner-only Course settings paths.
+export function EditionDetailsDialog({
+  topicSlug,
+  lang,
+  native,
+  title: servedTitle,
+  mission: servedMission,
+  onClose,
+}: {
+  topicSlug: string;
+  lang: string;
+  native: string;
+  title: string;
+  mission: string | null;
+  onClose: () => void;
+}) {
+  const edit = useMutation(api.translate.editEditionText);
+  const [title, setTitle] = useState(servedTitle);
+  const [mission, setMission] = useState(servedMission ?? "");
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  return (
+    <Dialog title={`Edition details — ${native}`} onClose={onClose}>
+      <p className="text-[12.5px] text-soft">
+        Fix this edition’s translated title and mission. Clearing a field falls back to the English text until the
+        edition is translated again.
+      </p>
+      <form
+        className="mt-4 flex flex-col gap-4"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
+          setSaved(false);
+          try {
+            if (title.trim() !== servedTitle) await edit({ topicSlug, lang, kind: "title", text: title.trim() });
+            if (servedMission !== null && mission.trim() !== servedMission)
+              await edit({ topicSlug, lang, kind: "mission", text: mission.trim() });
+            setSaved(true);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[11px] font-bold uppercase tracking-wide text-accent2">Title</label>
+          <input
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setSaved(false);
+            }}
+            className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+          />
+        </div>
+        {servedMission !== null && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wide text-accent2">Mission</label>
+            <textarea
+              value={mission}
+              onChange={(e) => {
+                setMission(e.target.value);
+                setSaved(false);
+              }}
+              rows={4}
+              className="resize-y rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+            />
+          </div>
+        )}
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+          >
+            {busy ? "Saving…" : "Save changes"}
+          </button>
+          {saved && <span className="text-xs font-medium text-accent2">Saved</span>}
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 // Rename + mission. Prefills from `listTopics` (owner-scoped, so it's available
-// from both entry points without threading the mission through props — the
-// sidebar's `courseHeader` doesn't carry it). Seeds local state once, on first
-// load, so typing isn't clobbered by the reactive query.
+// from both entry points without threading the mission through props). Seeds
+// local state once, on first load, so typing isn't clobbered by the reactive
+// query.
 function DetailsSection({ topicSlug }: { topicSlug: string }) {
   const topics = useQuery(api.content.listTopics);
   const renameTopic = useMutation(api.content.renameTopic);

@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
 import { action, internalAction, internalMutation, internalQuery, mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, hashString, SOURCE_LANG, shareLang, topicBySlug } from "./lib";
+import { assertAdmin, getEditableTopic, getOwnedTopic, hashString, SOURCE_LANG, shareLang, topicBySlug } from "./lib";
 import { isKnownLang, langInfo } from "./languages";
 import { chatComplete, translateModel, type ChatMessage } from "./openrouterClient";
 
@@ -280,6 +280,51 @@ export const removeEdition = mutation({
     for (const s of shares) if (shareLang(s) === lang) await ctx.db.delete(s._id);
     const pend = await ctx.db.query("pendingShares").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect();
     for (const p of pend) if ((p.lang ?? SOURCE_LANG) === lang) await ctx.db.delete(p._id);
+    return null;
+  },
+});
+
+// ---- Owner/Editor: edition title & mission edit (edition-title-edit 01) -----
+
+// Fix an Edition's translated title or mission in place — the topic-level
+// counterpart of the translated-Lesson edit, same trust boundary (owner or that
+// Edition's Editor, ADR 0020). Stamps the CURRENT source hash so a re-translate
+// sees the item fresh and keeps the edit; it goes stale (re-translated) only if
+// the English source text itself changes later. Blank text reverts to auto:
+// the row is dropped, the reader falls back to the English source, and the next
+// re-translate regenerates it.
+export const editEditionText = mutation({
+  args: {
+    topicSlug: v.string(),
+    lang: v.string(),
+    kind: v.union(v.literal("title"), v.literal("mission")),
+    text: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, lang, kind, text }): Promise<null> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    // The source keeps its owner-only paths (renameTopic / editMission).
+    if (lang === SOURCE_LANG) throw new Error("not a translated edition");
+    const topic = await getEditableTopic(ctx, userId, topicSlug, lang);
+    if (!topic) throw new Error("topic not found");
+    const source = kind === "title" ? topic.title : topic.mission;
+    if (source === undefined) throw new Error("this course has no mission");
+
+    const existing = await ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) =>
+        q.eq("topicId", topic._id).eq("lang", lang).eq("kind", kind).eq("key", ""),
+      )
+      .unique();
+    const trimmed = text.trim();
+    if (trimmed === "") {
+      if (existing) await ctx.db.delete(existing._id);
+      return null;
+    }
+    const row = { topicId: topic._id, lang, kind, key: "", text: trimmed, sourceHash: itemHash(kind, { text: source }) };
+    if (existing) await ctx.db.replace(existing._id, row);
+    else await ctx.db.insert("translations", row);
     return null;
   },
 });

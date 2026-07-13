@@ -609,6 +609,9 @@ export const courseHeader = query({
       editions: v.array(
         v.object({ lang: v.string(), name: v.string(), native: v.string(), rtl: v.boolean() }),
       ),
+      // The served Edition's mission (translated, English fallback) — pre-fills
+      // the edition title/mission edit dialog. Null when the course has none.
+      mission: v.union(v.string(), v.null()),
     }),
   ),
   handler: async (ctx, { topicSlug, lang }) => {
@@ -623,9 +626,11 @@ export const courseHeader = query({
     // guard: owner, or an Editor of the served lang.
     const canEdit = (await getEditableTopic(ctx, userId, topicSlug, effLang)) !== null;
     const t = await trOne(ctx, topic._id, effLang, "title", "");
+    const m = topic.mission ? await trOne(ctx, topic._id, effLang, "mission", "") : null;
     const editions = await switcherEditions(ctx, topic, userId);
     return {
       title: decodeEntities(t?.text ?? topic.title),
+      mission: topic.mission ? decodeEntities(m?.text ?? topic.mission) : null,
       role,
       canEdit,
       status: topic.status ?? "active",

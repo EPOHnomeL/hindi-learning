@@ -7,10 +7,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { CompletionCelebration } from "./Certificate";
-import { CourseSettingsDialog } from "./CourseSettings";
+import { CourseSettingsDialog, EditionDetailsDialog } from "./CourseSettings";
 import { Icon } from "./icons";
 import { LANG_KEY, useEditionLang, withLang } from "./editionUrl";
 import { ResourceItem } from "./ResourceItem";
+import { IconButton } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { useResourceUpload } from "./useResourceUpload";
@@ -181,7 +182,14 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               Sign out
             </button>
           </div>
-          <h1 className="mb-4 truncate text-lg font-semibold tracking-tight text-accent">{header?.title ?? "…"}</h1>
+          {/* The served Edition's title. On a translated Edition an editable
+              caller (owner or that Edition's Editor) gets a pencil to fix the
+              translated title & mission in place; the English source keeps its
+              owner-only Course settings paths (edition-title-edit 02). */}
+          <div className="mb-4 flex items-start gap-1">
+            <h1 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-accent">{header?.title ?? "…"}</h1>
+            {header && header.lang !== "en" && header.canEdit && <EditionDetailsButton slug={slug} header={header} />}
+          </div>
 
           <nav className="flex flex-col gap-1">
             <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">Lessons</p>
@@ -300,6 +308,41 @@ function LanguageSwitcher({
         ))}
       </select>
     </div>
+  );
+}
+
+// The translated-Edition title pencil (edition-title-edit 02): opens the
+// title & mission dialog for the Edition being read. Gated at the call site by
+// the server-computed `canEdit` and `lang !== "en"`.
+function EditionDetailsButton({
+  slug,
+  header,
+}: {
+  slug: string;
+  header: { lang: string; title: string; mission: string | null; editions: { lang: string; native: string }[] };
+}) {
+  const [open, setOpen] = useState(false);
+  const native = header.editions.find((e) => e.lang === header.lang)?.native ?? header.lang;
+  return (
+    <>
+      <IconButton
+        icon="edit"
+        variant="ghost"
+        label="Edit this edition's title and mission"
+        title="Edit title & mission"
+        onClick={() => setOpen(true)}
+      />
+      {open && (
+        <EditionDetailsDialog
+          topicSlug={slug}
+          lang={header.lang}
+          native={native}
+          title={header.title}
+          mission={header.mission}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
   );
 }
 

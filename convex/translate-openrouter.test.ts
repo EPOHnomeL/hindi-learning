@@ -180,6 +180,75 @@ test("translation calls disable model reasoning — thinking tokens are pure cos
   for (const b of bodies) expect(b.reasoning).toEqual({ effort: "none" });
 });
 
+// ---- Edition title & mission edit (edition-title-edit 01) -------------------
+
+async function titleRow(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, kind: "title" | "mission") {
+  return await t.run((ctx) =>
+    ctx.db.query("translations").withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "es").eq("kind", kind).eq("key", "")).unique(),
+  );
+}
+
+test("owner edits an edition's title and mission in place; blank reverts to auto", async () => {
+  const t = convexTest(schema, modules);
+  const { alice, topicId } = await seedCompleted(t, "openrouter");
+
+  await asUser(t, alice).mutation(api.translate.editEditionText, { topicSlug: "greek", lang: "es", kind: "title", text: "Griego Koiné" });
+  await asUser(t, alice).mutation(api.translate.editEditionText, { topicSlug: "greek", lang: "es", kind: "mission", text: "Lee el NT griego." });
+  expect((await titleRow(t, topicId, "title"))?.text).toBe("Griego Koiné");
+  expect((await titleRow(t, topicId, "mission"))?.text).toBe("Lee el NT griego.");
+
+  // Editing again overwrites (update path)…
+  await asUser(t, alice).mutation(api.translate.editEditionText, { topicSlug: "greek", lang: "es", kind: "title", text: "Griego" });
+  expect((await titleRow(t, topicId, "title"))?.text).toBe("Griego");
+  // …and blank deletes the row — the reader falls back to the English source.
+  await asUser(t, alice).mutation(api.translate.editEditionText, { topicSlug: "greek", lang: "es", kind: "title", text: "  " });
+  expect(await titleRow(t, topicId, "title")).toBeNull();
+});
+
+test("edit rights: that edition's Editor may edit; viewer, other-edition editor, the source lang, and guests are refused", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await seedCompleted(t, "openrouter");
+  const editor = await t.run((ctx) => ctx.db.insert("users", { email: "ed@example.com" }));
+  const viewer = await t.run((ctx) => ctx.db.insert("users", { email: "view@example.com" }));
+  const frEditor = await t.run((ctx) => ctx.db.insert("users", { email: "fr@example.com" }));
+  await t.run(async (ctx) => {
+    await ctx.db.insert("shares", { topicId, viewerId: editor, lang: "es", role: "editor" });
+    await ctx.db.insert("shares", { topicId, viewerId: viewer, lang: "es" });
+    await ctx.db.insert("shares", { topicId, viewerId: frEditor, lang: "fr", role: "editor" });
+  });
+
+  await asUser(t, editor).mutation(api.translate.editEditionText, { topicSlug: "greek", lang: "es", kind: "title", text: "Griego (ed)" });
+  expect((await titleRow(t, topicId, "title"))?.text).toBe("Griego (ed)");
+
+  await expect(asUser(t, viewer).mutation(api.translate.editEditionText, { topicSlug: "greek", lang: "es", kind: "title", text: "x" })).rejects.toThrow();
+  await expect(asUser(t, frEditor).mutation(api.translate.editEditionText, { topicSlug: "greek", lang: "es", kind: "title", text: "x" })).rejects.toThrow();
+  await expect(asUser(t, editor).mutation(api.translate.editEditionText, { topicSlug: "greek", lang: "en", kind: "title", text: "x" })).rejects.toThrow();
+  await expect(t.mutation(api.translate.editEditionText, { topicSlug: "greek", lang: "es", kind: "title", text: "x" })).rejects.toThrow();
+});
+
+test("a hand-edited title survives a re-translate (fresh via sourceHash — no Gemini call for it)", async () => {
+  const t = convexTest(schema, modules);
+  const { alice, topicId } = await seedCompleted(t, "openrouter");
+  await asUser(t, alice).mutation(api.translate.editEditionText, { topicSlug: "greek", lang: "es", kind: "title", text: "Griego curado" });
+  await t.run((ctx) => ctx.db.insert("translationJobs", { topicId, lang: "es", status: "translating", total: 3, done: 1, failed: 0 }));
+  const gemini = stubEcho();
+
+  await t.action(internal.translate.translateTopic, { topicSlug: "greek", lang: "es" });
+
+  // Only mission (1) + lesson title/body (2) hit Gemini — the curated title is skipped.
+  expect(gemini.calls).toBe(3);
+  expect((await titleRow(t, topicId, "title"))?.text).toBe("Griego curado");
+  const job = await t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
+  expect(job).toMatchObject({ status: "ready", done: 3, failed: 0 });
+});
+
+test("a mission edit on a course with no mission is refused", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await t.run((ctx) => ctx.db.insert("users", { email: "alice@example.com" }));
+  await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "bare", title: "Bare", status: "completed" }));
+  await expect(asUser(t, alice).mutation(api.translate.editEditionText, { topicSlug: "bare", lang: "es", kind: "mission", text: "x" })).rejects.toThrow();
+});
+
 test("startTranslation always schedules the Gemini translate action (never POSTs), for BOTH providers", async () => {
   for (const provider of ["openrouter", undefined] as const) {
     const t = convexTest(schema, modules);
