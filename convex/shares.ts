@@ -1,9 +1,41 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx } from "./_generated/server";
 import { getOwnedTopic, mintToken, normaliseEmail, shareLang, shareRole, SOURCE_LANG, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
+import { admitEmail } from "./whitelist";
+import type { InviteKind } from "./inviteEmail";
+
+// Schedule a best-effort invite email (see .scratch/invite-emails) after the
+// mutation commits, so a slow/failing send never blocks the invite. `granted` /
+// `role-changed` deep-link into the Edition; `invited` links to sign-up (the
+// recipient has no account yet). `APP_BASE_URL` is the web-app origin (Convex
+// can't read Vercel's env), absent in tests → a relative link.
+async function scheduleInvite(
+  ctx: MutationCtx,
+  opts: { to: string; kind: InviteKind; topic: Doc<"topics">; editionLang: string; inviterEmail: string; role: "viewer" | "editor" },
+): Promise<void> {
+  const { to, kind, topic, editionLang, inviterEmail, role } = opts;
+  const base = process.env.APP_BASE_URL ?? "";
+  const link =
+    kind === "invited"
+      ? `${base}/`
+      : editionLang === SOURCE_LANG
+        ? `${base}/courses/${topic.slug}`
+        : `${base}/courses/${topic.slug}?lang=${encodeURIComponent(editionLang)}`;
+  await ctx.scheduler.runAfter(0, internal.email.sendInvite, {
+    to,
+    kind,
+    courseTitle: topic.title,
+    langName: editionLang === SOURCE_LANG ? "English" : langInfo(editionLang).name,
+    inviterEmail,
+    role,
+    link,
+  });
+}
 
 // Sharing: an owner grants another existing User read-only access to a Topic
 // (a Share). The Viewer then sees it in "Shared with me" and reads it through
@@ -12,8 +44,9 @@ import { langInfo } from "./languages";
 // Share a Topic with a person, named by email. Owner-only. If the recipient has
 // an account, they get a read-only Share now ("shared"); if not, the invite is
 // held as a pending Share ("pending") and claimed when they sign up (see
-// `claimPendingShares`). Both paths are idempotent. Sign-up stays Admin-gated by
-// the Allowlist (ADR 0011) — inviting an email does not itself open sign-up.
+// `claimPendingShares`). Both paths are idempotent. Inviting also admits the
+// email to the Allowlist (so a no-account invitee can actually sign up — see
+// .scratch/invite-emails) and schedules a best-effort invite email.
 export const shareTopic = mutation({
   args: { topicSlug: v.string(), email: v.string(), lang: v.optional(v.string()) },
   returns: v.union(v.literal("shared"), v.literal("pending")),
@@ -33,6 +66,12 @@ export const shareTopic = mutation({
       if (!job || job.status !== "ready") throw new Error("that language edition isn't ready yet");
     }
     const addr = normaliseEmail(email);
+    // Inviting an email unlocks sign-up for it (ADR 0011 gates sign-up on the
+    // Allowlist; without this a no-account invitee could never sign up, making
+    // the pending invite a dead letter). Idempotent; a no-op if already admitted.
+    await admitEmail(ctx, addr);
+    const inviter = await ctx.db.get(userId);
+    const inviterEmail = inviter?.email ?? "";
     const viewer = await ctx.db
       .query("users")
       .withIndex("email", (q) => q.eq("email", addr))
@@ -47,6 +86,9 @@ export const shareTopic = mutation({
       if (!already.some((s) => shareLang(s) === editionLang)) {
         await ctx.db.insert("shares", { topicId: topic._id, viewerId: viewer._id, lang: editionLang });
       }
+      // Email on every invite (incl. re-invites → re-sends). The account exists,
+      // so deep-link into the Edition. Invites grant view access.
+      await scheduleInvite(ctx, { to: addr, kind: "granted", topic, editionLang, inviterEmail, role: "viewer" });
       return "shared";
     }
     // No account yet — hold the invite (for this Edition) until they sign up.
@@ -57,6 +99,9 @@ export const shareTopic = mutation({
     if (!existing.some((p) => (p.lang ?? SOURCE_LANG) === editionLang)) {
       await ctx.db.insert("pendingShares", { topicId: topic._id, email: addr, lang: editionLang });
     }
+    // Email on every invite. No account → link to sign-up (claimPendingShares
+    // grants access on sign-up; admitEmail above unlocked it).
+    await scheduleInvite(ctx, { to: addr, kind: "invited", topic, editionLang, inviterEmail, role: "viewer" });
     return "pending";
   },
 });
@@ -189,6 +234,12 @@ export const setShareRole = mutation({
       ).find((s) => shareLang(s) === lang);
       if (share) {
         await ctx.db.patch(share._id, { role });
+        // Email the new role — but only for an accepted Share (the person has an
+        // account). A pending invite (below) is not emailed on role change: they
+        // haven't signed up, already got the invite email, and their role is
+        // carried through at sign-up.
+        const owner = await ctx.db.get(userId);
+        await scheduleInvite(ctx, { to: addr, kind: "role-changed", topic, editionLang: lang, inviterEmail: owner?.email ?? "", role });
         return null;
       }
     }

@@ -33,8 +33,10 @@ export const isAdmitted = internalQuery({
 // Admit a (normalised) email, idempotently. Inserts the row if absent; if it
 // already exists it's a no-op, except that `isAdmin: true` is applied so the
 // migration/seed can promote an already-admitted email to Admin. Shared by
-// `seedEmail`, `addEmail`, and the migration so they normalise identically.
-async function admitEmail(ctx: MutationCtx, email: string, isAdmin?: boolean): Promise<void> {
+// `seedEmail`, `addEmail`, the migration, and `shareTopic` (inviting someone
+// admits them, so the "they're in when they sign up" promise holds) — so they
+// all normalise identically.
+export async function admitEmail(ctx: MutationCtx, email: string, isAdmin?: boolean): Promise<void> {
   const normalised = normaliseEmail(email);
   const existing = await ctx.db
     .query("whitelist")
