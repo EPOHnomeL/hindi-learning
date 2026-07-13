@@ -7,60 +7,62 @@ import { EmblemSection } from "./Certificate";
 import { Icon } from "./icons";
 import { ConfirmDialog, Dialog, IconButton } from "./ui";
 
-// The consolidated owner "Course settings" dialog (UI redesign): rename + mission
-// (Details), the certificate emblem, and the completion lifecycle — the controls
-// that used to be scattered across the card's inline editor and the course
-// sidebar's two stacked buttons. Opened from the dashboard card (Edit / ⋯) and
-// from the CourseShell sidebar. Reuses every existing mutation unchanged.
+// The consolidated "Course settings" dialog (UI redesign): Details, the
+// certificate emblem, and the completion lifecycle. Details follows the Edition
+// being viewed: on a translated Edition it edits that Edition's title & mission
+// (replacing the old title pencil); otherwise it edits the English source. An
+// Edition's Editor may open the dialog too but sees only Details — everything
+// else stays owner-only (`owner`). Opened from the dashboard card (Edit / ⋯,
+// always the English source) and from the CourseShell sidebar.
 export function CourseSettingsDialog({
   topicSlug,
   status,
   onClose,
+  owner = true,
+  edition = null,
 }: {
   topicSlug: string;
   status: "seeded" | "active" | "completed";
   onClose: () => void;
+  owner?: boolean;
+  edition?: { lang: string; native: string; title: string; mission: string | null } | null;
 }) {
   return (
     <Dialog title="Course settings" onClose={onClose}>
       <div className="flex flex-col">
-        <div className="pb-5">
-          <DetailsSection topicSlug={topicSlug} />
+        <div className={owner ? "pb-5" : ""}>
+          {edition ? <EditionDetailsSection topicSlug={topicSlug} edition={edition} /> : <DetailsSection topicSlug={topicSlug} />}
         </div>
-        <div className="border-t border-line py-5">
-          <LessonsSection topicSlug={topicSlug} />
-        </div>
-        <div className="border-t border-line py-5">
-          <EmblemSection topicSlug={topicSlug} />
-        </div>
-        <div className="border-t border-line pt-5">
-          <CompletionSection topicSlug={topicSlug} status={status} />
-        </div>
+        {owner && (
+          <>
+            <div className="border-t border-line py-5">
+              <LessonsSection topicSlug={topicSlug} />
+            </div>
+            <div className="border-t border-line py-5">
+              <EmblemSection topicSlug={topicSlug} />
+            </div>
+            <div className="border-t border-line pt-5">
+              <CompletionSection topicSlug={topicSlug} status={status} />
+            </div>
+          </>
+        )}
       </div>
     </Dialog>
   );
 }
 
-// Edit a translated Edition's title & mission in place (edition-title-edit 02).
-// Opened from the course sidebar's title pencil, gated by the server-computed
-// per-Edition `canEdit` (owner or that Edition's Editor, ADR 0020). Clearing a
-// field reverts it to auto: the translated row is dropped, the reader falls back
-// to the English text, and the next re-translate fills it again. The English
-// edition has no pencil — the source keeps the owner-only Course settings paths.
-export function EditionDetailsDialog({
+// Details for a translated Edition (edition-title-edit 02): edit its title &
+// mission in place. Rendered as the Details section of Course settings when the
+// reader is on a translated Edition, gated by the server-computed per-Edition
+// `canEdit` (owner or that Edition's Editor, ADR 0020). Clearing a field reverts
+// it to auto: the translated row is dropped, the reader falls back to the
+// English text, and the next re-translate fills it again.
+function EditionDetailsSection({
   topicSlug,
-  lang,
-  native,
-  title: servedTitle,
-  mission: servedMission,
-  onClose,
+  edition: { lang, native, title: servedTitle, mission: servedMission },
 }: {
   topicSlug: string;
-  lang: string;
-  native: string;
-  title: string;
-  mission: string | null;
-  onClose: () => void;
+  edition: { lang: string; native: string; title: string; mission: string | null };
 }) {
   const edit = useMutation(api.translate.editEditionText);
   const [title, setTitle] = useState(servedTitle);
@@ -69,8 +71,9 @@ export function EditionDetailsDialog({
   const [saved, setSaved] = useState(false);
 
   return (
-    <Dialog title={`Edition details — ${native}`} onClose={onClose}>
-      <p className="text-[12.5px] text-soft">
+    <div>
+      <h4 className="text-[13px] font-bold text-ink">Details — {native}</h4>
+      <p className="mt-1 text-[12.5px] text-soft">
         Fix this edition’s translated title and mission. Clearing a field falls back to the English text until the
         edition is translated again.
       </p>
@@ -126,7 +129,7 @@ export function EditionDetailsDialog({
           {saved && <span className="text-xs font-medium text-accent2">Saved</span>}
         </div>
       </form>
-    </Dialog>
+    </div>
   );
 }
 

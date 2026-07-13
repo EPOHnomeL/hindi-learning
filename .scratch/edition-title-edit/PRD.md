@@ -2,6 +2,13 @@
 
 Status: ready — grilled and agreed (2026-07-13).
 
+> **Amendment (2026-07-13):** the surface moved. The title pencil is gone;
+> Course settings → **Details** now follows the Edition being viewed — on a
+> translated Edition it hosts this feature's title/mission form, on English it
+> keeps the owner-only source form. An Edition's Editor may open Course
+> settings and sees Details only. The mutation, gates, and semantics below are
+> unchanged.
+
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — **Topic**, **Edition**,
 > **Editor** (ADR 0020), **owner**. Builds on the per-item translation rows
 > (`translations`, `kind: "title" | "mission"`, `key: ""`) and the

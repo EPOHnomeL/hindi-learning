@@ -7,11 +7,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { CompletionCelebration } from "./Certificate";
-import { CourseSettingsDialog, EditionDetailsDialog } from "./CourseSettings";
+import { CourseSettingsDialog } from "./CourseSettings";
 import { Icon } from "./icons";
 import { LANG_KEY, useEditionLang, withLang } from "./editionUrl";
 import { ResourceItem } from "./ResourceItem";
-import { IconButton } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { useResourceUpload } from "./useResourceUpload";
@@ -182,14 +181,10 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               Sign out
             </button>
           </div>
-          {/* The served Edition's title. On a translated Edition an editable
-              caller (owner or that Edition's Editor) gets a pencil to fix the
-              translated title & mission in place; the English source keeps its
-              owner-only Course settings paths (edition-title-edit 02). */}
-          <div className="mb-4 flex items-start gap-1">
-            <h1 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight text-accent">{header?.title ?? "…"}</h1>
-            {header && header.lang !== "en" && header.canEdit && <EditionDetailsButton slug={slug} header={header} />}
-          </div>
+          {/* The served Edition's title. Fixing it (and the mission) lives in
+              Course settings → Details, which follows the Edition being viewed
+              (edition-title-edit 02). */}
+          <h1 className="mb-4 truncate text-lg font-semibold tracking-tight text-accent">{header?.title ?? "…"}</h1>
 
           <nav className="flex flex-col gap-1">
             <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">Lessons</p>
@@ -217,13 +212,14 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             <ResourcesSection topicSlug={slug} canWrite={canWrite} />
           </nav>
 
-          {/* Owner-only "Course settings" (UI redesign): rename + mission, the
-              certificate emblem (ADR 0017), and the completion lifecycle (ADR 0015)
-              — the two buttons that used to crowd the nav — consolidated into one
-              dialog. Absent for Viewers (PRD story 9), and while still `seeded` (a
-              course that hasn't drafted a Lesson can't be completed). */}
-          {canWrite && header && header.status !== "seeded" && (
-            <CourseSettingsButton slug={slug} status={header.status} />
+          {/* "Course settings" (UI redesign): Details (following the Edition
+              being viewed), the certificate emblem (ADR 0017), and the completion
+              lifecycle (ADR 0015) consolidated into one dialog. For the owner —
+              or, on a translated Edition, its Editor, who gets Details only
+              (edition-title-edit 02). Absent for plain Viewers and while still
+              `seeded` (a course that hasn't drafted a Lesson can't be completed). */}
+          {header && header.status !== "seeded" && (canWrite || (header.lang !== "en" && header.canEdit)) && (
+            <CourseSettingsButton slug={slug} owner={canWrite} header={header} />
           )}
 
           {/* Edition switcher + theme toggle, pinned together at the sidebar
@@ -311,48 +307,28 @@ function LanguageSwitcher({
   );
 }
 
-// The translated-Edition title pencil (edition-title-edit 02): opens the
-// title & mission dialog for the Edition being read. Gated at the call site by
-// the server-computed `canEdit` and `lang !== "en"`.
-function EditionDetailsButton({
+// Sidebar entry to the consolidated "Course settings" dialog (UI redesign).
+// Details follows the Edition being read: on a translated Edition the dialog
+// edits that Edition's title & mission (edition-title-edit 02), on English the
+// owner's source texts. Gated at the call site — owner always, an Edition's
+// Editor only on their translated Edition (they then see Details alone).
+function CourseSettingsButton({
   slug,
+  owner,
   header,
 }: {
   slug: string;
-  header: { lang: string; title: string; mission: string | null; editions: { lang: string; native: string }[] };
+  owner: boolean;
+  header: {
+    status: "seeded" | "active" | "completed";
+    lang: string;
+    title: string;
+    mission: string | null;
+    editions: { lang: string; native: string }[];
+  };
 }) {
   const [open, setOpen] = useState(false);
   const native = header.editions.find((e) => e.lang === header.lang)?.native ?? header.lang;
-  return (
-    <>
-      <IconButton
-        icon="edit"
-        variant="ghost"
-        label="Edit this edition's title and mission"
-        title="Edit title & mission"
-        onClick={() => setOpen(true)}
-      />
-      {open && (
-        <EditionDetailsDialog
-          topicSlug={slug}
-          lang={header.lang}
-          native={native}
-          title={header.title}
-          mission={header.mission}
-          onClose={() => setOpen(false)}
-        />
-      )}
-    </>
-  );
-}
-
-// Owner-only sidebar entry to the consolidated "Course settings" dialog (UI
-// redesign): rename + mission, the certificate emblem, and the completion
-// lifecycle (mark complete / reopen). Replaces the two full-width buttons that
-// used to stack under the lesson nav. Gated by `canWrite` at the call site, so a
-// Viewer never sees it.
-function CourseSettingsButton({ slug, status }: { slug: string; status: "seeded" | "active" | "completed" }) {
-  const [open, setOpen] = useState(false);
   return (
     <>
       <button
@@ -361,7 +337,19 @@ function CourseSettingsButton({ slug, status }: { slug: string; status: "seeded"
       >
         <Icon name="settings" className="h-4 w-4" /> Course settings
       </button>
-      {open && <CourseSettingsDialog topicSlug={slug} status={status} onClose={() => setOpen(false)} />}
+      {open && (
+        <CourseSettingsDialog
+          topicSlug={slug}
+          status={header.status}
+          owner={owner}
+          edition={
+            header.lang !== "en"
+              ? { lang: header.lang, native, title: header.title, mission: header.mission }
+              : null
+          }
+          onClose={() => setOpen(false)}
+        />
+      )}
     </>
   );
 }
