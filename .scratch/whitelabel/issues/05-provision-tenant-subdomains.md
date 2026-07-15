@@ -3,6 +3,7 @@
 **Status:** open
 **Depends on:** —
 **Labels:** wayfinder:task
+**Claimed:** jonathan (opus session, 2026-07-15)
 
 Child of [Whitelabel map](00-whitelabel-map.md).
 
@@ -31,3 +32,44 @@ Checklist (AFK where possible; hand the human precise steps where dashboard acce
 
 Resolution records: the DNS mechanism chosen (wildcard vs explicit), the confirmed tenant slugs,
 and the four live URLs.
+
+---
+
+## Decisions (2026-07-15)
+
+- **Slugs confirmed**: `upf`, `ywampotch`, `almighty-warriors` (**plural** — user's call, supersedes
+  the singular in the scoping README), `yknot`.
+- **DNS approach**: **four explicit CNAMEs**, not a wildcard. Simplest on Cloudflare — each
+  subdomain added to Vercel gets its own cert via CNAME validation, no wildcard-cert TXT dance.
+  A future 5th tenant is one more CNAME + one more Vercel domain. Fits the four-known-tenants
+  reality (ponytail).
+- **Current infra state** (verified via Vercel MCP, 2026-07-15): the Vercel project is
+  `hindi-learning` (`prj_EpTp3OY6HHRta6NDxbVrNHpc719d`, team `team_pWPZwRSNsgPwZhgfoED4podg`).
+  Its domains already include `my-course.app` and `www.my-course.app`, so the base domain is
+  live on the app and adding subdomains is purely additive. DNS for `my-course.app` is on
+  Cloudflare.
+
+## Handoff checklist (HITL — no Cloudflare/Vercel domain tooling available to the agent)
+
+**1. Cloudflare → my-course.app → DNS → Records.** Add four CNAMEs, each **DNS only (grey
+cloud, not proxied)** — Vercel must terminate TLS itself:
+
+| Type  | Name                | Target                  | Proxy    |
+|-------|---------------------|-------------------------|----------|
+| CNAME | `upf`               | `cname.vercel-dns.com`  | DNS only |
+| CNAME | `ywampotch`         | `cname.vercel-dns.com`  | DNS only |
+| CNAME | `almighty-warriors` | `cname.vercel-dns.com`  | DNS only |
+| CNAME | `yknot`             | `cname.vercel-dns.com`  | DNS only |
+
+**2. Vercel → hindi-learning project → Settings → Domains.** Add each of:
+`upf.my-course.app`, `ywampotch.my-course.app`, `almighty-warriors.my-course.app`,
+`yknot.my-course.app`. Each should go "Valid Configuration" once the CNAME resolves and the
+cert issues (seconds-to-minutes).
+
+**3. Verify** each host returns 200 over HTTPS with a valid cert. Until the tenant-resolution
+middleware exists (ticket 02), all four will render the **default site** — that is expected and
+correct; this ticket only makes the hosts resolve.
+
+**Status: awaiting execution.** Reopen/ping this ticket with the outcome (four live URLs) and it
+closes — then it graduates into the map's Decisions-so-far. If Vercel shows the domain as
+"used by another project" or Cloudflare flags a CNAME-at-existing-record conflict, note it here.

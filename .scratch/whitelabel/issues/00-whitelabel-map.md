@@ -18,9 +18,9 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
   prototype tickets, `/ponytail` posture throughout (four known tenants — no speculative platform).
 - **Constraints pinned by the user at charting (2026-07-15)** — treat as requirements, not open
   questions:
-  - Tenants (initial four): **upf, ywampotch, almighty-warrior(s), yknot**, each on
-    `<slug>.my-course.app`. Slug spelling for almighty-warrior vs almighty-warriors to be
-    confirmed against prod tenant data when provisioning.
+  - Tenants (initial four): **upf, ywampotch, almighty-warriors, yknot**, each on
+    `<slug>.my-course.app`. Slug spelling confirmed plural (`almighty-warriors`) by the user
+    on 2026-07-15 while working the provisioning task.
   - **Styling is the top priority**: the subdomain drives the look — same app, re-skinned per
     tenant.
   - Courses get a **subdomain field**: unset = default site only; set = the default site **and**
