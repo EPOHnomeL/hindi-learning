@@ -1,6 +1,6 @@
 # whitelabel/05: Provision the four tenant subdomains
 
-**Status:** open
+**Status:** done
 **Depends on:** —
 **Labels:** wayfinder:task
 **Claimed:** jonathan (opus session, 2026-07-15)
@@ -70,6 +70,17 @@ cert issues (seconds-to-minutes).
 middleware exists (ticket 02), all four will render the **default site** — that is expected and
 correct; this ticket only makes the hosts resolve.
 
-**Status: awaiting execution.** Reopen/ping this ticket with the outcome (four live URLs) and it
-closes — then it graduates into the map's Decisions-so-far. If Vercel shows the domain as
-"used by another project" or Cloudflare flags a CNAME-at-existing-record conflict, note it here.
+## Resolved (2026-07-15)
+
+Done — user executed the checklist. All four hosts are **live over HTTPS with valid TLS**,
+verified by fetching each:
+
+- <https://upf.my-course.app>
+- <https://ywampotch.my-course.app>
+- <https://almighty-warriors.my-course.app>
+- <https://yknot.my-course.app>
+
+Each currently renders the **default site** (the app shell, title "My Course") — correct, since
+tenant-resolution middleware doesn't exist yet ([ticket 02](02-scope-tenant-subdomain-model.md)).
+DNS: four explicit `cname.vercel-dns.com` CNAMEs on Cloudflare (DNS-only); domains attached to the
+Vercel `hindi-learning` project. No conflicts reported.

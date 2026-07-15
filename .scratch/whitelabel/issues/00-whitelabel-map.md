@@ -37,7 +37,10 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
 
 <!-- one line per closed ticket: gist + link -->
 
-(none yet)
+- [Provision the four tenant subdomains](05-provision-tenant-subdomains.md) — the four
+  `<slug>.my-course.app` hosts (upf, ywampotch, almighty-warriors, yknot) are live over HTTPS
+  via four explicit Cloudflare CNAMEs → Vercel `hindi-learning`; all render the default site
+  until tenant-resolution middleware lands.
 
 ## Not yet specified
 
