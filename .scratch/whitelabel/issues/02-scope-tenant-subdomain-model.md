@@ -2,6 +2,20 @@
 
 **Status:** open
 **Depends on:** —
+**Labels:** wayfinder:grilling
+
+Child of [Whitelabel map](00-whitelabel-map.md).
+
+## Pinned by the user (2026-07-15) — requirements, not open questions
+
+- Courses carry a **subdomain field**: unset = default site only; set = default site **and** that
+  subdomain. `my-course.app` lists **all** courses for v1 (revisit later — map fog).
+- Users are connected to **either the default only or exactly one subdomain**.
+- Subdomain hosts are `<slug>.my-course.app` for the four tenants; provisioning is
+  [ticket 05](05-provision-tenant-subdomains.md), not this one.
+
+This pins the *shape* of data isolation (single shared data set, tenant = a visibility filter via
+a subdomain field — not hard per-tenant partitions). The open questions below narrow accordingly.
 
 ## Why
 
@@ -19,10 +33,12 @@ this ticket decides the model everything else (theming, flags, payments, email) 
 - **Where a tenant lives**: a `tenants` table in Convex (slug, domains, theme ref, flags,
   branding assets) vs. static config. Runtime table strongly implied by "features on and off"
   — but who edits it (a platform-admin portal? direct DB?)?
-- **Data isolation**: are users and Topics scoped to a tenant (a `tenantId` on topics/users —
-  a real migration), or shared identities across tenants with per-tenant visibility? What does
-  a Share/Public link mean across tenant boundaries? This is the hardest question — answer it
-  with the marketplace in mind (a course sold on one tenant's site).
+- **Data isolation** (shape pinned above — shared data set, subdomain field as visibility
+  filter): pin the semantics. Visiting `upf.my-course.app` shows only upf-assigned courses —
+  what happens on a direct link to a course not assigned there (404, redirect to default,
+  render anyway)? What does a Share/Public link mean when it crosses a subdomain boundary?
+  What does "user connected to a subdomain" gate — sign-in host, course visibility, both?
+  Answer with the marketplace in mind (a course sold on one tenant's site).
 - **Auth & admission**: Allowlist and Admin become per-tenant (each brand admits its own
   people, has its own admin) — how does that interact with the single Convex Auth install and
   the existing exactly-one-Admin invariant (ADR 0011)?

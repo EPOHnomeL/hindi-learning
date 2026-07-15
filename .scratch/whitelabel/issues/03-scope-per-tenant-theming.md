@@ -2,6 +2,12 @@
 
 **Status:** open
 **Depends on:** 01, 02
+**Labels:** wayfinder:grilling
+
+Child of [Whitelabel map](00-whitelabel-map.md). User-pinned at charting (2026-07-15): styling
+is the **top priority** of the whole whitelabel effort, and tenant themes will be authored as
+**Claude design systems** handed to each tenant — so the theme shape must be something a
+Claude-generated design system can compile down to (a token override set, per ticket 01).
 
 ## Why
 
@@ -25,8 +31,9 @@ authored, stored, and applied.
 - Published lesson blobs: apply the 01 decision — themed at render time so one course looks
   native on its tenant without republishing. Confirm it holds for translations
   (inline-html rows) too.
-- Who edits a theme — platform operator only (config/DB, fine for 4 known tenants) or a
-  tenant-admin UI (real product work — likely deferred)?
+- Who edits a theme — answered at charting: the platform operator, via the whitelabel
+  dashboard ([ticket 06](06-scope-operator-whitelabel-dashboard.md)). This ticket only decides
+  the theme *record* the dashboard will edit; tenant self-service stays out of the map's scope.
 
 ## Out of scope
 

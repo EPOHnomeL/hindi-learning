@@ -2,6 +2,9 @@
 
 **Status:** open
 **Depends on:** —
+**Labels:** wayfinder:grilling
+
+Child of [Whitelabel map](00-whitelabel-map.md).
 
 ## Why
 

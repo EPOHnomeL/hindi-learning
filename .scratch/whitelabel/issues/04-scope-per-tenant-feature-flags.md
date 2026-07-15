@@ -2,6 +2,9 @@
 
 **Status:** open
 **Depends on:** 02
+**Labels:** wayfinder:grilling
+
+Child of [Whitelabel map](00-whitelabel-map.md).
 
 ## Why
 
@@ -32,7 +35,9 @@ call.
 ## Out of scope
 
 - The tenant record/resolution itself (02).
-- Building a flag-management UI (operator edits config/DB for 4 tenants; note as deferred).
+- The flag-management UI — no longer deferred outright: the user wants an operator dashboard,
+  scoped in [ticket 06](06-scope-operator-whitelabel-dashboard.md). This ticket decides the flag
+  *shape and enforcement*; 06 decides how the operator edits it.
 
 ## Deliverable
 
