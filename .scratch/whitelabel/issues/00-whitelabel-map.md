@@ -41,12 +41,27 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
   `<slug>.my-course.app` hosts (upf, ywampotch, almighty-warriors, yknot) are live over HTTPS
   via four explicit Cloudflare CNAMEs → Vercel `hindi-learning`; all render the default site
   until tenant-resolution middleware lands.
+- [Scope Claude design system integration](01-scope-design-system-integration.md) — app chrome is
+  already token-driven, so integration is minimal; the real output is the token **contract**.
+  Theme = a curated ~14-token flat map (`TenantTheme`, light required + dark optional) living in a
+  new `src/design/tokens.ts`; one override re-skins both surfaces via shared var names (per-surface
+  prefix). Lesson blobs re-skin by **render-time injection** (existing `buildSrcDoc` rail), with new
+  courses generated in-style and migration scripts for old ones. Code is canonical; artifact
+  archived. Tenant *application* machinery deferred to 03.
 
 ## Not yet specified
 
-- **Four tenant theme fixtures** — once [Per-tenant branding & theming](03-scope-per-tenant-theming.md)
-  fixes the theme shape, author the actual upf/ywampotch/almighty-warrior/yknot design systems
-  (likely a prototype ticket per tenant, or one covering all four).
+- **Four tenant theme fixtures** — the theme shape is now pinned by
+  [01](01-scope-design-system-integration.md): a fixture is a `TenantTheme` map (curated ~14
+  tokens, light required + dark optional). Once [Per-tenant branding & theming](03-scope-per-tenant-theming.md)
+  fixes how a theme is *stored/edited*, author the actual upf/ywampotch/almighty-warriors/yknot
+  design systems (likely a prototype ticket per tenant, or one covering all four).
+- **Authoring-in-tenant-style + course migration scripts** — new courses should be *generated*
+  in the owning tenant's palette (baked at publish, not just injected), and existing courses need
+  scripts to move them under a tenant. Sharp as a requirement but hangs on
+  [02](02-scope-tenant-subdomain-model.md) (course↔subdomain schema) + [03](03-scope-per-tenant-theming.md)
+  (stored theme shape); lands as implementation issues in the final PRD breakdown, not a decision
+  ticket. (Surfaced resolving [01](01-scope-design-system-integration.md).)
 - **Default-site catalogue policy revisit** — "my-course.app shows all courses" is the pinned v1;
   the user expects to change this later (curation/opt-out). Becomes specifiable after the tenant
   model lands and real tenant courses exist.
