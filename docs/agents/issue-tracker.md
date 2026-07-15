@@ -1,22 +1,24 @@
-# Issue tracker: GitHub Issues
+# Issue tracker: local markdown under `.scratch/`
 
-Issues for this repo live on GitHub: <https://github.com/EPOHnomeL/hindi-learning/issues>.
-Use the `gh` CLI. PRDs still live locally as `.scratch/<feature-slug>/PRD.md`.
+Issues live as local markdown files: `.scratch/<feature-slug>/issues/<NN>-<dash-case-title>.md`.
+PRDs live alongside them as `.scratch/<feature-slug>/PRD.md`.
+
+GitHub Issues are **retired** (2026-07-15): every issue was imported into `.scratch/` (bodies,
+labels, comments preserved, marked `**Imported:** from GitHub #N`) and then deleted on GitHub.
+How work gets shared with other people is being rethought — until that lands, local files are
+the only tracker. (History: local → GitHub #12–#36 on 2026-07-10 → local again on 2026-07-15.)
 
 ## Conventions
 
-- Issue titles are `<feature-slug>/<NN>: <title>` (e.g. `topic-sharing/06: Share management`), numbered from `01` within a feature
-- Triage state is a GitHub label (see `triage-labels.md` for the role strings)
-- Comments and conversation history go in GitHub issue comments
-
-History: until 2026-07-10 issues were local markdown under `.scratch/<feature>/issues/`;
-the outstanding ones were migrated to GitHub issues #12–#36 and the local files deleted
-(still readable in git history before commit dd70b93).
+- The file's H1 is `<feature-slug>/<NN>: <title>`, numbered from `01` within a feature
+- Front lines: `**Status:** open | done` (plus optional `**Depends on:**`, `**Labels:**`)
+- Triage roles (see `triage-labels.md`) go on the `**Labels:**` line
+- Conversation/history goes in the file body (append sections), or git history
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue: `gh issue create --title "<feature-slug>/<NN>: <title>" --body-file <file> [--label <role>]`.
+Create a local file at `.scratch/<feature-slug>/issues/<NN>-<title>.md` in the format above.
 
 ## When a skill says "fetch the relevant ticket"
 
-`gh issue view <number>` (the user will normally pass the issue number or URL directly).
+Read the local file (the user will normally name the feature/ticket or path).

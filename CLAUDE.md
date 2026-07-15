@@ -4,14 +4,14 @@ For any non-trivial feature or change, do **not** use plan mode. Follow this pip
 
 1. **Grill** — run the `grilling` skill to stress-test the idea and pin down requirements.
 2. **PRD** — capture the agreed scope as a PRD under `.scratch/<feature>/` (see Issue tracker).
-3. **Issues** — break the PRD into GitHub issues titled `<feature-slug>/<NN>: <title>`.
+3. **Issues** — break the PRD into local issue files `.scratch/<feature-slug>/issues/<NN>-<title>.md`.
 4. **Implement** — build each issue with the `tdd` skill (test-first) and the `ponytail` skill (laziest solution that works).
 
 ## Agent skills
 
 ### Issue tracker
 
-Issues live on GitHub (`gh` CLI); PRDs live as local markdown under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
+Issues live as local markdown under `.scratch/<feature>/issues/`; PRDs alongside them as `.scratch/<feature>/PRD.md`. GitHub Issues retired 2026-07-15. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
