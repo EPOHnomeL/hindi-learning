@@ -3,7 +3,7 @@ slug: publishing-workspace
 name: Publishing & Workspace
 position: 4
 status: draft
-adrs: [0002, 0009]
+adrs: [0002, 0009, 0014]
 ---
 
 # Publishing & Workspace
@@ -48,9 +48,31 @@ Each artifact type publishes differently — the mutations live in
 drafted mission) or `SEED.md` (only the learner's [[Seed]] "why" — tells the teach skill to draft the
 mission first). Resource blobs download to `topics/<slug>/resources/` with an `_index.json` manifest.
 
+## HTML uploads as a blob
+
+`publish.ts` uploads each lesson/reference body to Convex File Storage first
+(`generateContentUploadUrl`) and passes only the resulting `htmlStorageId` to the mutation — HTML never
+rides through a function. [`assembleLesson`](/scripts/publish.ts) wraps the lean fragment with the shared
+`lessons/_partials/` head/foot and deterministically **shuffles quiz options**
+([`convex/quizShuffle.ts`](/convex/quizShuffle.ts), [ADR 0019](/docs/adr/0019-quiz-option-shuffle.md)).
+See [Hub & Content Model → Content storage](01-hub-content.md).
+
+## The filesystem-less twin (OpenRouter)
+
+For the `openrouter` provider ([ADR 0014](/docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md))
+there is no CLI and no workspace: [`convex/authoring.ts`](/convex/authoring.ts) mirrors this publish path
+*inside a Convex action* — `assembleLesson`/`assembleReference` build from the bundled
+`LESSON_HEAD`/`LESSON_FOOT`/`REFERENCE_HEAD` instead of the filesystem, and the model returns one JSON
+object that Convex publishes. That bundle is generated from the teach skill by
+[`scripts/bundle-authoring-assets.ts`](/scripts/bundle-authoring-assets.ts) →
+[`convex/authoringAssets.generated.ts`](/convex/authoringAssets.generated.ts), so both paths stay in
+sync. The prompts themselves are documented in [Teaching Intelligence](06-ai-teaching.md).
+
 ## Gotchas
 
 - **The workspace is disposable.** Edits there vanish after the run; author for the Hub, not the folder.
+- **Run `pnpm bundle:authoring` after editing the teach skill** — the OpenRouter path ships the
+  *generated* bundle, so a skipped bundle silently sends a stale prompt.
 - **`--prod` targets the live deployment.** [_env.ts](/scripts/_env.ts#L26-L44) reads `CONVEX_PROD_URL`
   for `:prod` (fails early if unset) and the dev URL otherwise. Check the target before `publish:prod`.
 - **Lesson immutability is enforced at the Hub**, not the script — re-publishing a key silently no-ops;

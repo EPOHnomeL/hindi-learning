@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-02T06:48:34.131Z",
+  "generatedAt": "2026-07-13T15:08:51.758Z",
   "files": {
     "/docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md": {
       "title": "Asynchronous, hub-mediated teaching loop (no live tutor on the web)",
@@ -10,12 +10,20 @@
           "title": "Provider-agnostic teaching runtime with two compute lines: a managed Claude line (quality-guaranteed) and a BYOK gateway line (any OpenAI-compatible model)"
         },
         {
+          "path": "/docs/adr/0018-lesson-count-estimate-advisory.md",
+          "title": "The lesson-count estimate is advisory — never a quota"
+        },
+        {
           "path": "/docs/architecture/contexts/02-reader.md",
           "title": "Reader"
         },
         {
           "path": "/docs/architecture/overview.md",
           "title": "My Course — Technical Overview"
+        },
+        {
+          "path": "/docs/translation.md",
+          "title": "Course translation (Editions) — operational runbook"
         }
       ]
     },
@@ -35,7 +43,7 @@
     },
     "/docs/adr/0003-immutable-lessons-mutable-references.md": {
       "title": "Immutable Lessons, mutable References",
-      "updated": "2026-06-09T19:50:08+02:00",
+      "updated": "2026-07-08T22:37:22+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/01-hub-content.md",
@@ -172,12 +180,127 @@
     "/docs/adr/0013-public-link-shares.md": {
       "title": "Public link shares (anonymous, read-only Topic links)",
       "updated": "2026-06-30T10:00:02+02:00",
-      "backlinks": []
+      "backlinks": [
+        {
+          "path": "/docs/architecture/contexts/01-hub-content.md",
+          "title": "Hub & Content Model"
+        },
+        {
+          "path": "/docs/architecture/contexts/05-access-sharing.md",
+          "title": "Access & Sharing"
+        }
+      ]
     },
     "/docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md": {
       "title": "Provider-agnostic teaching runtime with two compute lines: a managed Claude line (quality-guaranteed) and a BYOK gateway line (any OpenAI-compatible model)",
       "updated": "2026-06-30T11:43:49+02:00",
       "backlinks": [
+        {
+          "path": "/docs/architecture/contexts/01-hub-content.md",
+          "title": "Hub & Content Model"
+        },
+        {
+          "path": "/docs/architecture/contexts/03-teaching-routine.md",
+          "title": "Teaching Routine"
+        },
+        {
+          "path": "/docs/architecture/contexts/04-publishing-workspace.md",
+          "title": "Publishing & Workspace"
+        },
+        {
+          "path": "/docs/architecture/contexts/06-ai-teaching.md",
+          "title": "Teaching Intelligence"
+        },
+        {
+          "path": "/docs/architecture/overview.md",
+          "title": "My Course — Technical Overview"
+        },
+        {
+          "path": "/CONTEXT.md",
+          "title": "My Course Glossary"
+        }
+      ]
+    },
+    "/docs/adr/0015-course-completion-and-certificates.md": {
+      "title": "Course completion & certificates",
+      "updated": "2026-07-03T11:04:16+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/adr/0017-topic-emblem-on-certificates.md",
+          "title": "Topic Emblem on Certificates"
+        },
+        {
+          "path": "/docs/adr/0018-lesson-count-estimate-advisory.md",
+          "title": "The lesson-count estimate is advisory — never a quota"
+        },
+        {
+          "path": "/docs/architecture/contexts/01-hub-content.md",
+          "title": "Hub & Content Model"
+        },
+        {
+          "path": "/docs/architecture/contexts/05-access-sharing.md",
+          "title": "Access & Sharing"
+        },
+        {
+          "path": "/CONTEXT.md",
+          "title": "My Course Glossary"
+        }
+      ]
+    },
+    "/docs/adr/0017-topic-emblem-on-certificates.md": {
+      "title": "Topic Emblem on Certificates",
+      "updated": "2026-07-06T12:18:18+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/contexts/01-hub-content.md",
+          "title": "Hub & Content Model"
+        },
+        {
+          "path": "/docs/architecture/contexts/05-access-sharing.md",
+          "title": "Access & Sharing"
+        },
+        {
+          "path": "/CONTEXT.md",
+          "title": "My Course Glossary"
+        }
+      ]
+    },
+    "/docs/adr/0018-lesson-count-estimate-advisory.md": {
+      "title": "The lesson-count estimate is advisory — never a quota",
+      "updated": "2026-07-08T12:52:17+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/contexts/01-hub-content.md",
+          "title": "Hub & Content Model"
+        },
+        {
+          "path": "/docs/architecture/contexts/06-ai-teaching.md",
+          "title": "Teaching Intelligence"
+        }
+      ]
+    },
+    "/docs/adr/0019-quiz-option-shuffle.md": {
+      "title": "Quiz option order is shuffled at publish, not authored",
+      "updated": "2026-07-08T13:25:26+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/contexts/04-publishing-workspace.md",
+          "title": "Publishing & Workspace"
+        },
+        {
+          "path": "/docs/architecture/contexts/06-ai-teaching.md",
+          "title": "Teaching Intelligence"
+        }
+      ]
+    },
+    "/docs/adr/0020-editor-rights-as-a-share-role.md": {
+      "title": "Editor rights as a role on a Share",
+      "updated": "2026-07-10T10:27:12+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/contexts/05-access-sharing.md",
+          "title": "Access & Sharing"
+        },
         {
           "path": "/CONTEXT.md",
           "title": "My Course Glossary"
@@ -190,18 +313,18 @@
       "backlinks": []
     },
     "/docs/agents/issue-tracker.md": {
-      "title": "Issue tracker: Local Markdown",
-      "updated": "2026-06-09T19:18:22+02:00",
+      "title": "Issue tracker: GitHub Issues",
+      "updated": "2026-07-10T11:26:41+02:00",
       "backlinks": []
     },
     "/docs/agents/triage-labels.md": {
       "title": "Triage Labels",
-      "updated": "2026-06-09T19:18:22+02:00",
+      "updated": "2026-07-10T11:26:41+02:00",
       "backlinks": []
     },
     "/docs/architecture/contexts/01-hub-content.md": {
       "title": "Hub & Content Model",
-      "updated": "2026-06-27T10:46:00+02:00",
+      "updated": "2026-07-03T10:08:24+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/02-reader.md",
@@ -230,6 +353,10 @@
           "title": "Teaching Routine"
         },
         {
+          "path": "/docs/architecture/contexts/06-ai-teaching.md",
+          "title": "Teaching Intelligence"
+        },
+        {
           "path": "/docs/architecture/overview.md",
           "title": "My Course — Technical Overview"
         }
@@ -250,6 +377,10 @@
         {
           "path": "/docs/architecture/contexts/04-publishing-workspace.md",
           "title": "Publishing & Workspace"
+        },
+        {
+          "path": "/docs/architecture/contexts/06-ai-teaching.md",
+          "title": "Teaching Intelligence"
         },
         {
           "path": "/docs/architecture/overview.md",
@@ -277,11 +408,33 @@
     },
     "/docs/architecture/contexts/05-access-sharing.md": {
       "title": "Access & Sharing",
-      "updated": "2026-06-27T10:46:00+02:00",
+      "updated": "2026-07-03T10:08:24+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/01-hub-content.md",
           "title": "Hub & Content Model"
+        },
+        {
+          "path": "/docs/architecture/contexts/02-reader.md",
+          "title": "Reader"
+        },
+        {
+          "path": "/docs/architecture/overview.md",
+          "title": "My Course — Technical Overview"
+        }
+      ]
+    },
+    "/docs/architecture/contexts/06-ai-teaching.md": {
+      "title": "Teaching Intelligence",
+      "updated": "2026-07-13T15:01:30.675Z",
+      "backlinks": [
+        {
+          "path": "/docs/architecture/contexts/03-teaching-routine.md",
+          "title": "Teaching Routine"
+        },
+        {
+          "path": "/docs/architecture/contexts/04-publishing-workspace.md",
+          "title": "Publishing & Workspace"
         },
         {
           "path": "/docs/architecture/overview.md",
@@ -291,7 +444,7 @@
     },
     "/docs/architecture/overview.md": {
       "title": "My Course — Technical Overview",
-      "updated": "2026-06-27T10:34:54+02:00",
+      "updated": "2026-07-02T08:50:37+02:00",
       "backlinks": []
     },
     "/docs/architecture/README.md": {
@@ -301,8 +454,12 @@
     },
     "/docs/routine-prompt.md": {
       "title": "The next-lesson Routine — canonical Instructions",
-      "updated": "2026-07-01T10:36:57+02:00",
+      "updated": "2026-07-08T12:52:17+02:00",
       "backlinks": [
+        {
+          "path": "/docs/architecture/contexts/06-ai-teaching.md",
+          "title": "Teaching Intelligence"
+        },
         {
           "path": "/docs/routine.md",
           "title": "The next-lesson Routine — operational runbook"
@@ -318,14 +475,27 @@
           "title": "Next-lesson Routine: gate in Convex, API-only routine, one routine for all Topics"
         },
         {
+          "path": "/docs/architecture/contexts/06-ai-teaching.md",
+          "title": "Teaching Intelligence"
+        },
+        {
           "path": "/docs/routine-prompt.md",
           "title": "The next-lesson Routine — canonical Instructions"
+        },
+        {
+          "path": "/docs/translation.md",
+          "title": "Course translation (Editions) — operational runbook"
         }
       ]
     },
+    "/docs/translation.md": {
+      "title": "Course translation (Editions) — operational runbook",
+      "updated": "2026-07-12T21:47:56+02:00",
+      "backlinks": []
+    },
     "/CONTEXT.md": {
       "title": "My Course Glossary",
-      "updated": "2026-07-01T14:56:10+02:00",
+      "updated": "2026-07-10T10:27:12+02:00",
       "backlinks": [
         {
           "path": "/docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md",
@@ -343,7 +513,7 @@
     },
     "/CLAUDE.md": {
       "title": "/CLAUDE.md",
-      "updated": "2026-06-27T10:34:54+02:00",
+      "updated": "2026-07-10T11:26:41+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/README.md",

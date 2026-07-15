@@ -31,8 +31,17 @@ best single thing to read.
 | [`progress`](/convex/schema.ts) | capture | Per-lesson `opened → completed`, one row per (Topic, User, Lesson). Every reader tracks their own via `by_topic_user_lesson`; the gate reads the *owner's* rows. |
 | [`questions`](/convex/schema.ts#L165-L174) | capture | An unprompted [[Question]]: `open → answered`, with the teacher's `reply`. |
 | [`generation`](/convex/schema.ts#L131-L150) | lock | The [Teaching Routine](03-teaching-routine.md)'s single-flight lock. See that page. |
-| [`shares`](/convex/schema.ts#L156-L162) | grant | A [[Share]]. See [Access & Sharing](05-access-sharing.md). |
+| [`shares`](/convex/schema.ts) | grant | A [[Share]] to one [[Edition]] (Topic × `lang`), `role` viewer/editor. See [Access & Sharing](05-access-sharing.md). |
+| [`pendingShares`](/convex/schema.ts) | grant | An invite to an email with no account yet; becomes a Share on sign-up. |
+| [`publicLinks`](/convex/schema.ts) | grant | Per-Edition [[Public link]] token for [[Guest]]s ([ADR 0013](/docs/adr/0013-public-link-shares.md)). |
+| [`certificates`](/convex/schema.ts) | proof | An immutable earned [[Certificate]], one per (User, Topic) ([ADR 0015](/docs/adr/0015-course-completion-and-certificates.md)). |
+| [`translations`](/convex/schema.ts) | projection | A translated item of an Edition; a **missing** row ⇒ English fallback. |
+| [`translationJobs`](/convex/schema.ts) | lock | One per (Topic, `lang`): the Editions panel status **and** the translate single-flight lock. |
 | [`whitelist`](/convex/schema.ts#L17-L20) | gate | The [[Allowlist]]. See [Access & Sharing](05-access-sharing.md). |
+
+The `topics` row also carries `provider` (`claude`/`openrouter`, [ADR 0014](/docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md)),
+`estimatedLessons` (advisory forecast, [ADR 0018](/docs/adr/0018-lesson-count-estimate-advisory.md)),
+`publicToken` (legacy English Public link), and `emblem` ([ADR 0017](/docs/adr/0017-topic-emblem-on-certificates.md)).
 
 ## Content API
 
@@ -51,6 +60,18 @@ title + "why"), `editMission`, `renameTopic` (title only — slug is immutable, 
 [`assertAdmin`](/convex/lib.ts#L7-L10)): `ensureTopic`, `publishMission`, `publishLesson`,
 `publishLearningRecord`, `upsertReference`. These are the Hub end of the
 [publish path](04-publishing-workspace.md).
+
+## Content storage: HTML lives in a blob, not a column
+
+Rendered [[Lesson]]/[[Reference]] HTML is stored as an immutable **content blob** in Convex File
+Storage — the row carries `htmlStorageId → _storage`, not an inline `html` string. Bodies are served
+over a custom [`GET /content?id=<storageId>`](/convex/http.ts) route (`Cache-Control: immutable`,
+`ACAO:*`) and fetched client-side by the [Reader](02-reader.md). The storageId is an unguessable bearer
+capability minted only *after* a query authorises the caller, so the route needs no per-request auth.
+The publish path uploads the HTML to storage first (`generateContentUploadUrl`) and passes only the id
+into the mutation, so HTML never rides through a Convex function. (The old inline `html` column was
+migrated out — see [backfill.ts](/convex/backfill.ts); only some transitional `translations` rows still
+carry inline `html`, and [`pickContentBody`](/convex/lib.ts) serves whichever is present.)
 
 ## Resource lifecycle
 

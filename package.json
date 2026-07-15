@@ -41,7 +41,9 @@
     "publish-translation": "tsx scripts/publish-translation.ts",
     "publish-translation:prod": "tsx scripts/publish-translation.ts --prod",
     "report-translation": "tsx scripts/report-translation.ts",
-    "report-translation:prod": "tsx scripts/report-translation.ts --prod"
+    "report-translation:prod": "tsx scripts/report-translation.ts --prod",
+    "resource": "tsx scripts/remove-resource.ts",
+    "resource:prod": "tsx scripts/remove-resource.ts --prod"
   },
   "dependencies": {
     "@auth/core": "0.37.0",

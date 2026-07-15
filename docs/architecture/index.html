@@ -1184,11 +1184,12 @@
       // Data
       // ──────────────────────────────────────────────────────────
       const CONTEXTS = [
-        { slug: "hub-content",          name: "Hub & Content Model",  file: "contexts/01-hub-content.md",          status: "stub" },
-        { slug: "reader",               name: "Reader",               file: "contexts/02-reader.md",               status: "stub" },
-        { slug: "teaching-routine",     name: "Teaching Routine",     file: "contexts/03-teaching-routine.md",     status: "stub" },
-        { slug: "publishing-workspace", name: "Publishing & Workspace", file: "contexts/04-publishing-workspace.md", status: "stub" },
-        { slug: "access-sharing",       name: "Access & Sharing",     file: "contexts/05-access-sharing.md",       status: "stub" },
+        { slug: "hub-content",          name: "Hub & Content Model",  file: "contexts/01-hub-content.md",          status: "draft" },
+        { slug: "reader",               name: "Reader",               file: "contexts/02-reader.md",               status: "draft" },
+        { slug: "teaching-routine",     name: "Teaching Routine",     file: "contexts/03-teaching-routine.md",     status: "draft" },
+        { slug: "publishing-workspace", name: "Publishing & Workspace", file: "contexts/04-publishing-workspace.md", status: "draft" },
+        { slug: "access-sharing",       name: "Access & Sharing",     file: "contexts/05-access-sharing.md",       status: "draft" },
+        { slug: "ai-teaching",          name: "Teaching Intelligence", file: "contexts/06-ai-teaching.md",         status: "exemplar" },
       ];
 
       const SUBMODULES = [];
@@ -1213,6 +1214,17 @@
         { slug: "ref-context",  group: "agent-context", name: "CONTEXT.md", file: "/CONTEXT.md" },
         { slug: "ref-glossary", group: "agent-context", name: "GLOSSARY.md (Hindi)", file: "/GLOSSARY.md" },
 
+        // The prompt-engineering surface — the actual instruction text the
+        // teaching runtime runs on. Absolute *.md links render inline in the
+        // article pane (see the "Any absolute *.md link" branch in loadPage).
+        // The Teaching Intelligence context page (ai-teaching) narrates these.
+        { slug: "ref-routine-prompt", group: "agent-context", name: "▸ Routine Instructions (system prompt)", file: "/docs/routine-prompt.md" },
+        { slug: "ref-teach-skill",    group: "agent-context", name: "▸ teach — SKILL.md (pedagogy)",         file: "/.agents/skills/teach/SKILL.md" },
+        { slug: "ref-teach-authoring",group: "agent-context", name: "▸ teach — AUTHORING.md (contract)",     file: "/.agents/skills/teach/AUTHORING.md" },
+        { slug: "ref-translate-skill",group: "agent-context", name: "▸ translate — SKILL.md (fidelity)",     file: "/.agents/skills/translate/SKILL.md" },
+        { slug: "ref-routine-runbook",group: "agent-context", name: "▸ Routine runbook",                     file: "/docs/routine.md" },
+        { slug: "ref-translation-runbook", group: "agent-context", name: "▸ Translation runbook",            file: "/docs/translation.md" },
+
         { slug: "ref-adrs",     group: "reference",     name: "ADRs",       route: "_adrs" },
       ];
 
@@ -1230,6 +1242,13 @@
         { num: "0011", slug: "allowlist-in-convex-admin-portal",                   title: "Allowlist in Convex, managed by an Admin" },
         { num: "0011", slug: "app-driven-theme-into-sandboxed-lesson-iframe",      title: "App-driven theme into the sandboxed lesson iframe" },
         { num: "0012", slug: "app-router-url-addressable-navigation",              title: "URL-addressable navigation via the App Router" },
+        { num: "0013", slug: "public-link-shares",                                 title: "Public-link Shares" },
+        { num: "0014", slug: "provider-agnostic-teaching-runtime-two-lines",       title: "Provider-agnostic teaching runtime (two lines)" },
+        { num: "0015", slug: "course-completion-and-certificates",                 title: "Course completion & certificates" },
+        { num: "0017", slug: "topic-emblem-on-certificates",                       title: "Topic Emblem on certificates" },
+        { num: "0018", slug: "lesson-count-estimate-advisory",                     title: "Lesson-count estimate is advisory" },
+        { num: "0019", slug: "quiz-option-shuffle",                                title: "Quiz option shuffle" },
+        { num: "0020", slug: "editor-rights-as-a-share-role",                      title: "Editor rights as a Share role" },
         { num: "0021", slug: "open-signup-allowlist-gates-course-creation",        title: "Open sign-up; Allowlist gates course creation; auth-first checkout" },
       ];
 
@@ -1240,6 +1259,7 @@
         ROUTINE: "teaching-routine",
         PUB: "publishing-workspace",
         ACCESS: "access-sharing",
+        AI: "ai-teaching",
       };
 
       // ──────────────────────────────────────────────────────────

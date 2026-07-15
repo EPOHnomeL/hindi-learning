@@ -16,6 +16,11 @@ version of the core flow:
 > **Questions**. Completing the Frontier fires the Routine to author the next one. **Access & Sharing**
 > gates who may sign up (the **Allowlist**) and who may read a Topic (**Shares**).
 
+Both authoring paths — the cloud Claude Code Routine and an in-Convex **OpenRouter** action — run on the
+same prompt-engineering doctrine: the **Teaching Intelligence** context
+([ADR 0014](/docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md)). That is where the `teach`
+skill, the Routine's system prompt, and the grounding/structured-output guardrails live.
+
 ## What this site is
 
 A drill-down view of the system. Each box in the **System map** below is a _domain context_ — a
@@ -37,12 +42,15 @@ flowchart LR
     direction LR
     CC([Claude Code teach skill]):::ext
     LEARNER([Learner]):::ext
+    AI[Teaching Intelligence]:::ctx
     HUB[Hub &amp; Content Model]:::ctx
     READER[Reader]:::ctx
     ROUTINE[Teaching Routine]:::ctx
     PUB[Publishing &amp; Workspace]:::ctx
     ACCESS[Access &amp; Sharing]:::ctx
 
+    AI --> CC
+    AI --> ROUTINE
     CC --> PUB
     PUB --> HUB
     ROUTINE --> HUB
@@ -61,7 +69,7 @@ flowchart LR
 ```
 
 **How to read this map.** Click any rust box to jump into that context's panel. Rust = domain context;
-sand = platform; pale = external actor. The mermaid node ids (`HUB`, `READER`, `ROUTINE`, `PUB`,
+sand = platform; pale = external actor. The mermaid node ids (`AI`, `HUB`, `READER`, `ROUTINE`, `PUB`,
 `ACCESS`) are the keys of `NODE_TO_SLUG` in `index.html` — that's what makes the boxes clickable, so
 keep them in sync.
 
@@ -72,5 +80,6 @@ keep them in sync.
 | New to the codebase              | Root [`CONTEXT.md`](/CONTEXT.md) → this page → [Hub & Content Model](contexts/01-hub-content.md). |
 | Working on what a learner sees   | [Reader](contexts/02-reader.md).                                                                  |
 | Touching how lessons get authored| [Teaching Routine](contexts/03-teaching-routine.md) + [Publishing & Workspace](contexts/04-publishing-workspace.md). |
+| Curious about the prompts / AI   | [Teaching Intelligence](contexts/06-ai-teaching.md) — skills, system prompts, grounding, guardrails. |
 | Working on sign-up / sharing     | [Access & Sharing](contexts/05-access-sharing.md).                                                |
 | Hunting an ADR for a decision    | Sidebar Reference → ADRs.                                                                         |
