@@ -12,6 +12,15 @@ Child of [Whitelabel map](00-whitelabel-map.md).
 > with role-scoped views: a sys admin sees all tenants + tenant create/remove; a tenant admin sees
 > only their tenant's members/theme/flags/assignment. Tenant *creation* and cross-tenant reach stay
 > sys-admin-only. Access is gated by the scope-aware `isCallerAdmin` from ADR 0021.
+>
+> **Updated by [03](03-scope-per-tenant-theming.md) (2026-07-15):** the theme record 06 edits is an
+> inline `theme` object on the `tenants` row — `{ light, dark?, logo?, favicon? }` (14-token palette
+> + two raster asset uploads). So "theme editing" here = **palette fields/JSON + logo + favicon
+> upload**, edit-is-live. **Landing pages are explicitly OUT** of the dashboard: 03 chose bespoke
+> per-tenant landing components hand-authored in code, shipped via commit + deploy — not runtime
+> content. So 06 manages palette + assets + flags + assignment + members, **not** landing copy. The
+> "theme editing fidelity" question below (raw token JSON vs structured fields) is now the main open
+> theming decision for 06.
 
 ## Question
 

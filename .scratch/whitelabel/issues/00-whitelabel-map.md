@@ -57,14 +57,28 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
   (scope change, see Out of scope) on `whitelist` via `isAdmin`+`tenantSlug`; **retires ADR 0011's
   one-Admin invariant**. Invite emails tenant-aware at v1; middleware host-label resolution; tenant
   slug a spoof-safe Convex arg; `*.localhost` for dev. Unblocks 03 + 04.
+- [Scope per-tenant branding & theming](03-scope-per-tenant-theming.md) — theme is an **inline
+  object on the `tenants` row** (`{ light, dark?, logo?, favicon? }`), edit-is-live. Palette = the
+  14-token `TenantTheme` from 01 (stored as a validated record). **No per-tenant fonts** (shared
+  stack); **logo + favicon** as raster storage blobs via the emblem rail (og-image deferred).
+  **Application = SSR server-fetch, no flash:** root layout reads Host → `fetchQuery` theme → inline
+  `<style>` (light+dark) before paint; favicon via `generateMetadata`; logo via a client tenant
+  context. **Landing pages are bespoke per-tenant, hand-authored in code** (slug→component registry,
+  default `<Landing/>` fallback) — not DB, not dashboard-editable. Lessons/references/translated
+  Editions re-skin via a `buildSrcDoc` palette param (partial fidelity on legacy). Email
+  full-palette-derived + logo (light-only); certificate identity-only with frozen styling
+  (print not themed). Mock palettes for the four tenants captured as the acceptance fixture
+  (placeholders — real Claude design systems land later). Unblocks the theming half of 06.
 
 ## Not yet specified
 
-- **Four tenant theme fixtures** — the theme shape is now pinned by
-  [01](01-scope-design-system-integration.md): a fixture is a `TenantTheme` map (curated ~14
-  tokens, light required + dark optional). Once [Per-tenant branding & theming](03-scope-per-tenant-theming.md)
-  fixes how a theme is *stored/edited*, author the actual upf/ywampotch/almighty-warriors/yknot
-  design systems (likely a prototype ticket per tenant, or one covering all four).
+- **Four tenant theme fixtures** — the theme shape is pinned by
+  [01](01-scope-design-system-integration.md) (14-token `TenantTheme`) and its storage/application by
+  [03](03-scope-per-tenant-theming.md) (inline `theme` object on the `tenants` row; SSR override).
+  03 carries **placeholder mock palettes** for all four as its acceptance fixture — the remaining
+  work is authoring the **real** upf/ywampotch/almighty-warriors/yknot design systems (one Claude
+  design system per tenant, per the operator) plus the hand-authored per-tenant **landing pages**.
+  Likely a prototype/build ticket per tenant, or one covering all four.
 - **Authoring-in-tenant-style + course migration scripts** — new courses should be *generated*
   in the owning tenant's palette (baked at publish, not just injected), and existing courses need
   scripts to move them under a tenant. Sharp as a requirement but hangs on

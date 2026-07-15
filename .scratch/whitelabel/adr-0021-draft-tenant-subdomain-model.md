@@ -31,9 +31,12 @@ Shape (grows as 03/04 land):
 - `slug` (string, indexed `by_slug`) — the subdomain label, effectively immutable
   (renaming needs DNS work).
 - `displayName` (string) — brand name shown in UI + emails.
-- theme ref / tokens — **shape defined by ticket 03** (placeholder here).
+- `theme` — **resolved by [ticket 03](issues/03-scope-per-tenant-theming.md)**: an inline
+  object `{ light, dark?, logo?, favicon? }` (14-token palette as a validated record +
+  two raster asset storage ids). Edit-is-live; no separate `themes` table.
 - feature flags — **shape defined by ticket 04** (placeholder here).
-- branding assets (logo, etc.) — with 03.
+- branding assets (logo, favicon) — **inline on `theme`** per ticket 03 (raster storage
+  blobs via the emblem rail).
 - Per-tenant domain is derivable as `<slug>.my-course.app` for v1; an explicit
   custom-domain list is deferred fog.
 

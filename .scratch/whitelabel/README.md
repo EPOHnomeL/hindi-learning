@@ -15,12 +15,12 @@ holds the destination, the decisions so far, and the fog. Work it with `/wayfind
 |---|--------|------|------------|
 | 01 | [Design system integration](issues/01-scope-design-system-integration.md) ✅ done | grilling | — |
 | 02 | [Tenant & subdomain model](issues/02-scope-tenant-subdomain-model.md) ✅ done | grilling | — |
-| 03 | [Per-tenant branding & theming](issues/03-scope-per-tenant-theming.md) | grilling | 01, 02 |
+| 03 | [Per-tenant branding & theming](issues/03-scope-per-tenant-theming.md) ✅ done | grilling | 01, 02 |
 | 04 | [Per-tenant feature flags](issues/04-scope-per-tenant-feature-flags.md) | grilling | 02 |
 | 05 | [Provision the four tenant subdomains](issues/05-provision-tenant-subdomains.md) ✅ done | task | — |
 | 06 | [Operator + tenant-admin whitelabel dashboard](issues/06-scope-operator-whitelabel-dashboard.md) | grilling | 02, 03, 04 |
 
-**Frontier** (open, unblocked, unclaimed): 03, 04.
+**Frontier** (open, unblocked, unclaimed): 04. (06 still blocked on 04.)
 
 ## Interactions to keep in view
 
