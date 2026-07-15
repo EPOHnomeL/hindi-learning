@@ -146,6 +146,76 @@ test("addResourceAdmin records an operator upload owner-scoped by email, and ded
   ).rejects.toThrow();
 });
 
+test("removeResourceAdmin deletes the row, its raw blob, and processed-artifact blobs", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  const as = asUser(t, alice);
+  const secret = "test-secret";
+
+  const sid = await storeBlob(t, "%PDF the book");
+  const rid = await as.mutation(api.resources.addResource, { topicSlug: "hindi", filename: "book.pdf", storageId: sid });
+  // a rendered artifact (e.g. a page PNG) referenced from the processed manifest
+  const artifact = await storeBlob(t, "rendered page png");
+  const hash = (await t.run((ctx) => ctx.db.get(rid)))!.contentHash;
+  await t.mutation(api.resources.cacheProcessedResource, {
+    secret,
+    ownerEmail: "alice@example.com",
+    topicSlug: "hindi",
+    contentHash: hash,
+    processed: { kind: "pdf", pages: [{ n: 1, storageId: artifact, label: "page-1" }] },
+  });
+
+  const removed = await t.mutation(api.resources.removeResourceAdmin, { secret, resourceId: rid });
+  expect(removed).toMatchObject({ filename: "book.pdf", kind: "file", blobsDeleted: 2 });
+
+  expect(await as.query(api.resources.listResources, { topicSlug: "hindi" })).toEqual([]);
+  expect(await t.run((ctx) => ctx.db.get(rid))).toBeNull(); // row gone
+  expect(await t.run((ctx) => ctx.db.system.get(sid))).toBeNull(); // raw blob gone
+  expect(await t.run((ctx) => ctx.db.system.get(artifact))).toBeNull(); // artifact blob gone
+});
+
+test("removeResourceAdmin removes a url resource (row only), rejects a bad secret and an unknown id", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  const as = asUser(t, alice);
+  const secret = "test-secret";
+
+  const rid = await as.mutation(api.resources.addUrlResource, { topicSlug: "hindi", url: "https://example.com/book" });
+  await expect(t.mutation(api.resources.removeResourceAdmin, { secret: "wrong", resourceId: rid })).rejects.toThrow();
+
+  const removed = await t.mutation(api.resources.removeResourceAdmin, { secret, resourceId: rid });
+  expect(removed).toMatchObject({ kind: "url", blobsDeleted: 0 });
+  expect(await as.query(api.resources.listResources, { topicSlug: "hindi" })).toEqual([]);
+
+  // already deleted → unknown id
+  await expect(t.mutation(api.resources.removeResourceAdmin, { secret, resourceId: rid })).rejects.toThrow();
+});
+
+test("listResourcesAdmin inventories every topic + resource for an owner email", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  await seedTopic(t, alice, "spanish");
+  const as = asUser(t, alice);
+
+  const sid = await storeBlob(t, "book bytes");
+  await as.mutation(api.resources.addResource, { topicSlug: "hindi", filename: "book.pdf", storageId: sid });
+  await as.mutation(api.resources.addUrlResource, { topicSlug: "spanish", url: "https://x.test/doc" });
+
+  const inventory = await t.query(api.resources.listResourcesAdmin, { secret: "test-secret", ownerEmail: "alice@example.com" });
+  expect(inventory).toMatchObject([
+    { topicSlug: "hindi", topicTitle: "hindi", resources: [{ filename: "book.pdf", kind: "file", status: "raw" }] },
+    { topicSlug: "spanish", resources: [{ filename: "https://x.test/doc", kind: "url", url: "https://x.test/doc" }] },
+  ]);
+  // a file resource exposes a signed blob url so the operator can back it up
+  expect(inventory[0]!.resources[0]!.url).toBeTruthy();
+
+  await expect(t.query(api.resources.listResourcesAdmin, { secret: "wrong", ownerEmail: "alice@example.com" })).rejects.toThrow();
+  await expect(t.query(api.resources.listResourcesAdmin, { secret: "test-secret", ownerEmail: "nobody@example.com" })).rejects.toThrow();
+});
+
 test("cacheProcessedResource rejects a bad secret and an unknown contentHash", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");

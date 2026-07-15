@@ -149,6 +149,103 @@ export const cacheProcessedResource = mutation({
   },
 });
 
+// Operator inventory (PUBLISH_SECRET-guarded): every Topic + Resource for an
+// owner named by email — how the operator finds a Resource to act on
+// (remove/inspect) without dashboard access. Mirrors addResourceAdmin's
+// owner-by-email resolution.
+export const listResourcesAdmin = query({
+  args: { secret: v.string(), ownerEmail: v.string() },
+  returns: v.array(
+    v.object({
+      topicSlug: v.string(),
+      topicTitle: v.string(),
+      resources: v.array(
+        v.object({
+          id: v.id("resources"),
+          filename: v.string(),
+          kind: v.union(v.literal("file"), v.literal("url")),
+          status: v.union(v.literal("raw"), v.literal("processing"), v.literal("ready")),
+          url: v.union(v.string(), v.null()),
+        }),
+      ),
+    }),
+  ),
+  handler: async (ctx, { secret, ownerEmail }) => {
+    assertAdmin(secret);
+    const owner = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", ownerEmail))
+      .unique();
+    if (!owner) throw new Error("owner not found");
+    const topics = await ctx.db
+      .query("topics")
+      .withIndex("by_owner", (q) => q.eq("ownerId", owner._id))
+      .collect();
+    return await Promise.all(
+      topics.map(async (topic) => ({
+        topicSlug: topic.slug,
+        topicTitle: topic.title,
+        resources: await Promise.all(
+          (
+            await ctx.db.query("resources").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()
+          ).map(async (r) => ({
+            id: r._id,
+            filename: r.filename,
+            kind: r.kind,
+            status: r.status,
+            // the openable link — the external URL, or a signed blob URL so the
+            // operator can back a file up before removing it
+            url: r.kind === "url" ? (r.url ?? null) : r.rawStorageId ? await ctx.storage.getUrl(r.rawStorageId) : null,
+          })),
+        ),
+      })),
+    );
+  },
+});
+
+// Walk an opaque `processed` manifest for anything that is a _storage id, so a
+// removal can also delete the rendered artifacts (page PNGs etc.) it references.
+function collectStorageIds(ctx: MutationCtx, value: unknown, into: Set<Id<"_storage">>): void {
+  if (typeof value === "string") {
+    const id = ctx.db.system.normalizeId("_storage", value);
+    if (id) into.add(id);
+  } else if (Array.isArray(value)) {
+    for (const item of value) collectStorageIds(ctx, item, into);
+  } else if (value && typeof value === "object") {
+    for (const item of Object.values(value)) collectStorageIds(ctx, item, into);
+  }
+}
+
+// Operator removal (PUBLISH_SECRET-guarded): hard-delete a Resource — the row,
+// its raw blob, and every artifact blob its processed manifest references.
+// Deleting the blobs is the point: storage URLs are permanent bearer links, so
+// a row-only delete would leave the file fetchable by anyone who kept the URL.
+export const removeResourceAdmin = mutation({
+  args: { secret: v.string(), resourceId: v.id("resources") },
+  returns: v.object({
+    filename: v.string(),
+    kind: v.union(v.literal("file"), v.literal("url")),
+    blobsDeleted: v.number(),
+  }),
+  handler: async (ctx, { secret, resourceId }) => {
+    assertAdmin(secret);
+    const res = await ctx.db.get(resourceId);
+    if (!res) throw new Error("resource not found");
+    const blobs = new Set<Id<"_storage">>();
+    if (res.rawStorageId) blobs.add(res.rawStorageId);
+    collectStorageIds(ctx, res.processed, blobs);
+    let blobsDeleted = 0;
+    for (const id of blobs) {
+      if (await ctx.db.system.get(id)) {
+        await ctx.storage.delete(id);
+        blobsDeleted++;
+      }
+    }
+    await ctx.db.delete(resourceId);
+    return { filename: res.filename, kind: res.kind, blobsDeleted };
+  },
+});
+
 // The Topic's Resources, for the owner or a read-only Viewer. Owner-or-Viewer
 // gated so a Viewer sees the list and gets working open/signed links (PRD story
 // 15); adding/recording Resources stays owner-only.
