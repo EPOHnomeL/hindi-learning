@@ -82,6 +82,21 @@ structure is load-bearing.
 - the quiz feedback in `data-ok` / `data-no` (translating these is the only safe
   way to localise feedback — keep any object-of-study tokens inside them as-is).
 
+**Quoted and cited passages are learner-read prose — translate them.** This is the
+single most common miss: the narration gets translated while the quotations it
+introduces are left in the source language. A verbatim quote the course cites (a
+`.book` / `.note` / `.verse` card, a block quote, an epigraph) **and the entire
+"Sources" / citation footer** (`<footer>` — the "ذرائع / حوالہ جات / Sources"
+apparatus that quotes the source works) are read by the learner and **must** be
+rendered in the target language, exactly like body prose. Never leave a quoted
+teaching passage in the source language just because it is a quotation. What you
+keep inside such a citation is only the **attribution**: author names, the *titles*
+of works (e.g. *Walking in Power*), proper nouns, and the page / verse references —
+translate the quoted words themselves. (Scripture quotations follow the
+published-Bible rule below.) A fill-in-the-blank quiz whose answer is a
+**source-language** word (the blank asks the learner to type that word) is object
+of study — keep its sentence in the source language.
+
 > The server-side guard only compares the **counts** of
 > `data-correct`/`data-answer`/`data-k`; it does **not** catch a changed key value
 > or a reordered option. Getting those right is your job, not the guard's.
