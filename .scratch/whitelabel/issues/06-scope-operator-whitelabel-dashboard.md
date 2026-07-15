@@ -6,6 +6,13 @@
 
 Child of [Whitelabel map](00-whitelabel-map.md).
 
+> **Updated by [02](02-scope-tenant-subdomain-model.md) (2026-07-15):** the auth model is now
+> **two-tier** — sys admin (global) + **tenant admins** (scoped to their own tenant). This dashboard
+> is therefore **operator *and* tenant-admin**-facing, not operator-only. Scope it as one surface
+> with role-scoped views: a sys admin sees all tenants + tenant create/remove; a tenant admin sees
+> only their tenant's members/theme/flags/assignment. Tenant *creation* and cross-tenant reach stay
+> sys-admin-only. Access is gated by the scope-aware `isCallerAdmin` from ADR 0021.
+
 ## Question
 
 The platform operator (the user) wants a dashboard to run the whitelabel system — this

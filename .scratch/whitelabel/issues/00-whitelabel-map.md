@@ -48,6 +48,15 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
   prefix). Lesson blobs re-skin by **render-time injection** (existing `buildSrcDoc` rail), with new
   courses generated in-style and migration scripts for old ones. Code is canonical; artifact
   archived. Tenant *application* machinery deferred to 03.
+- [Scope tenant & subdomain model](02-scope-tenant-subdomain-model.md) — the deepest cut, captured
+  as [ADR 0021 draft](adr-0021-draft-tenant-subdomain-model.md). Tenant = a Convex `tenants` row
+  keyed by slug (seed the four). Courses/users carry `tenantSlug?` (slug string, no join). Isolation
+  = shared dataset, subdomain is a **visibility filter**: default lists all, subdomain lists its own;
+  user↔subdomain gates admission + home only (access stays grant-based); **skin follows the host**;
+  cross-host links redirect to canonical host. **Two-tier admin** — sys admin + tenant admins
+  (scope change, see Out of scope) on `whitelist` via `isAdmin`+`tenantSlug`; **retires ADR 0011's
+  one-Admin invariant**. Invite emails tenant-aware at v1; middleware host-label resolution; tenant
+  slug a spoof-safe Convex arg; `*.localhost` for dev. Unblocks 03 + 04.
 
 ## Not yet specified
 
@@ -67,7 +76,11 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
   model lands and real tenant courses exist.
 - **Per-tenant payments & email** — merchant accounts (PayFast/Paystack) and Resend sender
   domains per tenant; flagged in the tenant-model ticket, deliberately not solved there. Hangs on
-  the payments roadmap's gated phases.
+  the payments roadmap's gated phases. (Invite/notification email *branding* is v1 per
+  [02](02-scope-tenant-subdomain-model.md); the per-tenant *sender domain* is the deferred part.)
+- **Open/public self-signup for the marketplace** — v1 sign-up stays allowlist-gated per tenant
+  ([02](02-scope-tenant-subdomain-model.md)); public buyers self-registering (no allowlist) is
+  deferred, tied to the payments roadmap.
 - **Apex/custom domains per tenant** (e.g. a brand's own domain instead of a my-course.app
   subdomain) — later; the subdomain model should merely not preclude it.
 - **Rich-media/video as a tenant flag** — parallel [rich-media](../../rich-media/README.md)
@@ -77,8 +90,11 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
 
 ## Out of scope
 
-- **Tenant self-service administration** — tenant admins editing their own branding/flags/members.
-  The dashboard in this effort is operator-only; self-service is a future effort if tenants ask.
+- **Tenant *provisioning* self-service** — tenants creating their own tenant, billing/subscription
+  self-management. Stays out. (⚠️ **Narrowed by [02](02-scope-tenant-subdomain-model.md), 2026-07-15:**
+  tenant *admins* managing their own members/branding/flags/assignment are now **in** scope — a
+  two-tier sys-admin/tenant-admin model. Ticket 06's dashboard is therefore operator **and
+  tenant-admin**-facing, not operator-only.)
 - **Building per-tenant payment rails** — the payments roadmap is separately gated
   (Paystack-first); this map only keeps the tenant record from precluding it.
 - **Redesigning flows/visuals** — visual decisions were agreed in the UI-redesign prototype;
