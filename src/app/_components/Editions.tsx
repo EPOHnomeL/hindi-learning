@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { LANGUAGES } from "../../../convex/languages";
 import { Icon } from "./icons";
+import { formatPrice } from "./Paygate";
 import { Dialog } from "./ui";
 
 // One row of the owner's Editions panel, straight from api.translate.editions.
@@ -80,7 +81,7 @@ export function EditionsDialog({ topicSlug, title, onClose }: { topicSlug: strin
               onAdded={(code) => setTab(code)}
             />
           ) : active ? (
-            <EditionPanel topicSlug={topicSlug} title={title} edition={active} />
+            <EditionPanel topicSlug={topicSlug} title={title} edition={active} completed={data.completed} />
           ) : null}
         </>
       )}
@@ -119,7 +120,17 @@ function EditionTab({ edition, active, onSelect }: { edition: Edition; active: b
 // The active edition's panel. Ready editions get the share controls; a
 // translating one shows progress, a failed one shows retry — both with a quiet
 // Remove (translations only; the source can't be removed).
-function EditionPanel({ topicSlug, title, edition }: { topicSlug: string; title: string; edition: Edition }) {
+function EditionPanel({
+  topicSlug,
+  title,
+  edition,
+  completed,
+}: {
+  topicSlug: string;
+  title: string;
+  edition: Edition;
+  completed: boolean;
+}) {
   if (edition.status === "translating") {
     const pct = edition.total > 0 ? Math.round((edition.done / edition.total) * 100) : 0;
     return (
@@ -158,6 +169,7 @@ function EditionPanel({ topicSlug, title, edition }: { topicSlug: string; title:
     <div className="flex flex-col gap-4">
       <InviteByEmail topicSlug={topicSlug} lang={edition.lang} />
       <PublicLinkToggle topicSlug={topicSlug} lang={edition.lang} publicToken={edition.publicToken} />
+      <SellEdition topicSlug={topicSlug} lang={edition.lang} native={edition.native} rtl={edition.rtl} completed={completed} />
       <div className="flex flex-col items-start gap-2 border-t border-line pt-4">
         <AccessRoster topicSlug={topicSlug} lang={edition.lang} />
         {!edition.source && (
@@ -398,6 +410,268 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
           >
             <Icon name="refresh" className="h-3.75 w-3.75" /> Regenerate link
           </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// The payout bank-details form (paid marketplace, PayFast rail): a granted
+// Seller saves the SA bank account their earnings are EFT'd to — the step that
+// makes them a ready Seller. Write-only by design: details are never read back
+// into any non-admin UI, so the form always starts blank (re-submitting
+// overwrites). Rendered inside the SellEdition gate.
+function PayoutDetailsForm() {
+  const save = useMutation(api.sellers.savePayoutDetails);
+  const [form, setForm] = useState({ accountHolder: "", bank: "", accountNumber: "", branchCode: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const field = (key: keyof typeof form, label: string, placeholder: string, inputMode?: "numeric") => (
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{label}</span>
+      <input
+        value={form[key]}
+        inputMode={inputMode}
+        onChange={(e) => {
+          setForm((f) => ({ ...f, [key]: e.target.value }));
+          setError(null);
+        }}
+        placeholder={placeholder}
+        className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+      />
+    </label>
+  );
+
+  return (
+    <form
+      className="mt-2.5 flex flex-col gap-2.5"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError(null);
+        try {
+          await save(form);
+        } catch {
+          setError("Couldn’t save — check every field (account number and branch code are digits).");
+          setBusy(false);
+        }
+      }}
+    >
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        {field("accountHolder", "Account holder", "Full name on the account")}
+        {field("bank", "Bank", "e.g. FNB")}
+        {field("accountNumber", "Account number", "62…", "numeric")}
+        {field("branchCode", "Branch code", "6 digits", "numeric")}
+      </div>
+      <button
+        type="submit"
+        disabled={busy}
+        className="self-start rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+      >
+        {busy ? "Saving…" : "Save payout details"}
+      </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </form>
+  );
+}
+
+// "Sell this edition" (paid marketplace, ADR 0016, Slice 2). Prices ONE Edition
+// of a completed course. Setting a price makes the Edition paid (its first Lesson
+// stays a free Preview; the rest needs a purchase); clearing it makes it free
+// again. Guarded to a ready Seller: a not-yet-Seller sees a "Set up selling"
+// gate (Admin grant → payout bank details) instead of the control.
+// gold = paid/price throughout (the design system's monetisation colour).
+function SellEdition({
+  topicSlug,
+  lang,
+  native,
+  rtl,
+  completed,
+}: {
+  topicSlug: string;
+  lang: string;
+  native: string;
+  rtl: boolean;
+  completed: boolean;
+}) {
+  const status = useQuery(api.sellers.sellerStatus);
+  const pricing = useQuery(api.market.editionPricing, { topicSlug });
+  const setPrice = useMutation(api.market.setEditionPrice);
+  const clearPrice = useMutation(api.market.clearEditionPrice);
+
+  const current = pricing?.find((p) => p.lang === lang) ?? null;
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Only a completed course is sellable (its content is frozen) — mirror the
+  // AddLanguage "complete first" hint rather than showing a dead control.
+  if (!completed) {
+    return (
+      <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-line px-3 py-2.5 text-[12.5px] text-soft">
+        <Icon name="tag" className="h-4 w-4 shrink-0" />
+        <span>Selling opens once the course is marked complete.</span>
+      </div>
+    );
+  }
+
+  // Seller gate: not a ready Seller yet → the two-step "set up selling" path
+  // (Admin grant, then payout bank details — .scratch/payfast-payments), never
+  // the price control. The bank-details form lands with ticket 02.
+  if (status !== "ready") {
+    return (
+      <div className="flex items-start gap-3 rounded-xl border border-dashed border-line px-3.5 py-3 text-[13px] leading-relaxed text-soft">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-hi text-accent">
+          <Icon name="tag" className="h-4.5 w-4.5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          {status === undefined ? (
+            <span>Checking your seller status…</span>
+          ) : status === "payments-unconfigured" ? (
+            // The deployment's PayFast rail isn't provisioned (env vars absent) —
+            // selling is off platform-wide and enables itself when they land.
+            <span>
+              <b className="font-semibold text-ink">Selling isn&rsquo;t available yet.</b> Payments aren&rsquo;t
+              configured on this deployment — selling opens automatically once they are.
+            </span>
+          ) : status === "not-granted" ? (
+            <span>
+              <b className="font-semibold text-ink">Sell this course.</b> Selling is enabled by the workspace admin —
+              ask them to turn it on for your account.
+            </span>
+          ) : (
+            <>
+              <span>
+                <b className="font-semibold text-ink">Add your payout details to sell.</b> Save the bank account your
+                earnings are paid to; then you can price this edition.
+              </span>
+              <PayoutDetailsForm />
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Ready Seller: the price control. Header shows the current state + a toggle to
+  // the editor; the editor sets/updates the price or stops selling.
+  const openEditor = () => {
+    setAmount(current ? (current.amount / 100).toFixed(2) : "");
+    setError(null);
+    setOpen((o) => !o);
+  };
+  const save = async () => {
+    const minor = Math.round(parseFloat(amount) * 100);
+    if (!Number.isFinite(minor) || minor <= 0) {
+      setError("Enter a price greater than zero.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      // ZAR-only (PayFast settles in Rand) — the server enforces the same.
+      await setPrice({ topicSlug, lang, amount: minor, currency: "ZAR" });
+      setOpen(false);
+    } catch {
+      setError("Couldn’t save the price — please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const stopSelling = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await clearPrice({ topicSlug, lang });
+      setOpen(false);
+    } catch {
+      setError("Couldn’t update — please try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className={`rounded-xl border bg-card p-3.5 ${current ? "border-gold/40" : "border-line"}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${
+              current ? "bg-gold/15 text-gold" : "bg-hi text-soft"
+            }`}
+          >
+            <Icon name="tag" className="h-4.5 w-4.5" />
+          </span>
+          <div className="min-w-0">
+            <b className="block text-[13.5px] font-semibold text-ink">Sell this edition</b>
+            <span className="text-[11.5px] text-soft">
+              {current ? (
+                <>
+                  Paid · <span className="font-semibold text-gold">{formatPrice(current.amount, current.currency)}</span> ·
+                  first lesson free
+                </>
+              ) : (
+                <>
+                  Free — set a price to sell{" "}
+                  <span dir={rtl ? "rtl" : undefined}>{native}</span>
+                </>
+              )}
+            </span>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={openEditor}
+          className={`shrink-0 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+            current
+              ? "border border-line text-soft hover:bg-hi hover:text-accent"
+              : "bg-gold/20 text-accent hover:bg-gold/30"
+          }`}
+        >
+          {current ? "Edit price" : "Set a price"}
+        </button>
+      </div>
+
+      {open && (
+        <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
+          <div className="flex flex-wrap items-end gap-2.5">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">Price (ZAR)</span>
+              <input
+                value={amount}
+                inputMode="decimal"
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setError(null);
+                }}
+                placeholder="0.00"
+                className="w-32 rounded-lg border border-line bg-card px-3 py-2 text-sm tabular-nums focus:border-gold focus:outline-none"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void save()}
+              className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+            >
+              {busy ? "Saving…" : "Save"}
+            </button>
+          </div>
+          {error && <p className="text-xs text-danger">{error}</p>}
+          {current ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void stopSelling()}
+              className="inline-flex items-center gap-1.5 self-start text-[12.5px] text-soft transition-colors hover:text-danger disabled:opacity-60"
+            >
+              <Icon name="x" className="h-3.75 w-3.75" /> Stop selling — make this edition free
+            </button>
+          ) : (
+            <p className="text-xs text-soft">Each language is priced on its own — sell some editions, keep others free.</p>
+          )}
         </div>
       )}
     </div>

@@ -3,12 +3,13 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery } from "convex/react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { CompletionCelebration } from "./Certificate";
 import { CourseSettingsDialog } from "./CourseSettings";
 import { Icon } from "./icons";
+import { NavItem } from "./NavItem";
 import { LANG_KEY, useEditionLang, withLang } from "./editionUrl";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
@@ -95,6 +96,12 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
       /* unavailable or corrupt storage — start empty */
     }
   }, []);
+
+  // Paid marketplace (ADR 0016): a `preview` caller holds no access to a paid
+  // Edition, so every Lesson past the free Preview (and every Reference) is locked
+  // in the nav. The Preview itself — `paywall.previewKey` — is flagged Free.
+  const preview = header?.role === "preview";
+  const previewKey = header?.paywall?.previewKey ?? null;
 
   const completed = completedKeys(progress ?? []);
   const frontier = frontierKey(lessons ?? []);
@@ -197,6 +204,8 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
                 href={withLang(`/courses/${slug}/lessons/${l.key}`, lang)}
                 active={!isRef && activeKey === l.key}
                 done={completed.has(l.key)}
+                locked={preview && l.key !== previewKey}
+                free={preview && l.key === previewKey}
               >
                 {l.seq}. {l.title.split("—")[0]!.trim()}
               </NavItem>
@@ -204,7 +213,12 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
 
             <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">References</p>
             {references?.map((r) => (
-              <NavItem key={r.key} href={withLang(`/courses/${slug}/references/${r.key}`, lang)} active={isRef && activeKey === r.key}>
+              <NavItem
+                key={r.key}
+                href={withLang(`/courses/${slug}/references/${r.key}`, lang)}
+                active={isRef && activeKey === r.key}
+                locked={preview}
+              >
                 {r.title}
               </NavItem>
             ))}
@@ -237,7 +251,10 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
           </div>
         </aside>
 
-        <section className="min-w-0 flex-1 md:overflow-hidden md:p-4">{children}</section>
+        <section className="flex min-w-0 flex-1 flex-col md:overflow-hidden md:p-4">
+          <ConfirmingBanner />
+          <div className="min-h-0 flex-1">{children}</div>
+        </section>
       </div>
       {/* Completion celebration (ADR 0015): fires once per device when the caller
           is newly eligible or just-earned on a completed course — owner or Viewer.
@@ -245,6 +262,32 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
           lesson switches. */}
       {courseCompleted && <CompletionCelebration topicSlug={slug} />}
     </Ctx.Provider>
+  );
+}
+
+// The payment-return banner (auth-first checkout): PayFast sends the buyer back
+// with `?purchase=return&mp=<intent token>`, carried through the CourseIndex
+// redirect. Until the ITN lands, reassure; `checkoutStatus` is reactive, so the
+// moment the Entitlement writes, this query flips to `granted`, the banner goes,
+// and the content queries unlock in place — no refresh. No timeout/failure
+// branch (ponytail: the sandbox-verified norm is seconds; support owns the freak
+// case).
+function ConfirmingBanner() {
+  const params = useSearchParams();
+  const mp = params.get("purchase") === "return" ? params.get("mp") : null;
+  const status = useQuery(api.market.checkoutStatus, mp ? { mPaymentId: mp } : "skip");
+  if (!mp || !status || status.state === "granted") return null;
+  return (
+    <div
+      aria-busy
+      className="mb-3 flex items-center gap-2.5 rounded-xl border border-gold/40 bg-card px-4 py-3 text-sm text-soft shadow-sm"
+    >
+      <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-gold" />
+      <span>
+        <b className="font-semibold text-ink">Confirming your payment</b> — this usually takes a few seconds. Your
+        course unlocks here the moment it&rsquo;s confirmed.
+      </span>
+    </div>
   );
 }
 
@@ -351,36 +394,6 @@ function CourseSettingsButton({
         />
       )}
     </>
-  );
-}
-
-function NavItem({
-  href,
-  active,
-  done = false,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  done?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors md:py-1.5 ${
-        active ? "bg-accent text-white" : "text-ink hover:bg-hi"
-      }`}
-    >
-      <span className="min-w-0">{children}</span>
-      <span className="flex shrink-0 items-center gap-1.5">
-        {done && (
-          <span aria-label="completed" title="Completed" className={`text-xs ${active ? "text-white" : "text-accent2"}`}>
-            ✓
-          </span>
-        )}
-      </span>
-    </Link>
   );
 }
 

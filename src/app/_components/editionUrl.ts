@@ -26,3 +26,10 @@ export function withLang(href: string, lang: string | null | undefined): string 
   const sep = href.includes("?") ? "&" : "?";
   return `${href}${sep}lang=${encodeURIComponent(lang)}`;
 }
+
+// The Buy marker (`?buy=1`, auth-first checkout ADR 0021): set when a share
+// reader's Buy CTA routed the visitor here. SignIn defaults to "Create account"
+// on it, and the locked authed reader auto-opens the buy dialog.
+export function useBuyMarker(): boolean {
+  return useSearchParams().get("buy") === "1";
+}

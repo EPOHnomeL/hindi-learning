@@ -2,7 +2,18 @@ import { defineSchema, defineTable } from "convex/server";
 import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
-// A tenant's theme (whitelabel, ticket 03 / ADR 0021 §1): the 14-token palette
+// A Seller's SA payout bank details — where the operator EFTs their Ledger
+// share. Single source of truth for the shape: the `sellers.payout` field, the
+// save mutation's args (sellers.ts), and the admin payout reads (sellers.ts /
+// ledger.ts) all derive from this one declaration.
+export const payoutDetailsValidator = v.object({
+  accountHolder: v.string(),
+  bank: v.string(),
+  accountNumber: v.string(),
+  branchCode: v.string(),
+});
+
+// A tenant's theme (whitelabel, ticket 03 / whitelabel ADR draft §1): the 14-token palette
 // plus optional brand assets. `light`/`dark` are loose records — not a fixed
 // v.object — because CSS-friendly hyphenated token names (good-b, bad-b) can't
 // be object keys in a validator; the exact key set is checked in code against
@@ -51,12 +62,12 @@ export default defineSchema({
     .index("email", ["email"])
     .index("phone", ["phone"]),
 
-  // The whitelabel tenant record (ADR 0021 §1, ticket 03 theme / 04 flags): one
-  // row per branded subdomain (`<slug>.my-course.app`), holding its palette +
-  // brand assets + feature flags. `slug` is the subdomain label (effectively
-  // immutable). One indexed `by_slug` read resolves skin + flags on the hot
-  // host→tenant path. Tenancy is a visibility filter and a skin, not a hard
-  // partition — access control stays ownership/Shares/public links.
+  // The whitelabel tenant record (whitelabel ADR draft §1, ticket 03 theme / 04
+  // flags): one row per branded subdomain (`<slug>.my-course.app`), holding its
+  // palette + brand assets + feature flags. `slug` is the subdomain label
+  // (effectively immutable). One indexed `by_slug` read resolves skin + flags on
+  // the hot host→tenant path. Tenancy is a visibility filter and a skin, not a
+  // hard partition — access control stays ownership/Shares/public links.
   tenants: defineTable({
     slug: v.string(),
     displayName: v.string(),
@@ -64,13 +75,14 @@ export default defineSchema({
     flags: tenantFlagsValidator,
   }).index("by_slug", ["slug"]),
 
-  // The Allowlist (ADR 0011): the set of emails permitted to sign up, managed at
-  // runtime by the single Admin instead of the old `AUTH_ALLOWED_EMAILS` env var.
-  // Emails are stored already-normalised (trimmed, lower-cased) so a lookup at
-  // sign-up never misses on casing/whitespace. `isAdmin` marks an Admin row,
-  // which the portal shows but refuses to remove. An empty table admits nobody.
-  // `tenantSlug` (whitelabel, issue 07 / ADR 0021 §4) scopes an admin: absent =
-  // sys admin (every tenant); set = tenant admin (only that tenant).
+  // The Allowlist (ADR 0011, semantics revised by ADR 0021 — open sign-up): the
+  // set of emails permitted to CREATE COURSES, managed at runtime by the Admin.
+  // Emails are stored already-normalised (trimmed, lower-cased) so a lookup
+  // never misses on casing/whitespace. `isAdmin` marks an Admin row, which the
+  // portal shows but refuses to remove. An empty table admits nobody to course
+  // creation. `tenantSlug` (whitelabel, issue 07 / whitelabel ADR draft §4)
+  // scopes an admin: absent = sys admin (every tenant); set = tenant admin
+  // (only that tenant).
   whitelist: defineTable({
     email: v.string(),
     isAdmin: v.optional(v.boolean()),
@@ -281,9 +293,8 @@ export default defineSchema({
 
   // A pending Share: an invite to an email that has *no account yet*. Recorded
   // when an owner shares to an unregistered address, and turned into a real Share
-  // by `claimPendingShares` the moment that email signs up. Sign-up itself stays
-  // gated by the Admin's Allowlist (ADR 0011) — an invite does not open that door.
-  // `by_email` is the claim-on-sign-up lookup; `by_topic_email` dedups an invite
+  // by `claimPendingShares` the moment that email signs up (sign-up is open —
+  // ADR 0021). `by_email` is the claim-on-sign-up lookup; `by_topic_email` dedups an invite
   // (at most one per (Topic, email)); `by_topic` lists a Topic's open invites and
   // would cascade on Topic delete. `lang` names the invited Edition (optional →
   // English), so an invite claimed at sign-up becomes a language-scoped Share.
@@ -423,4 +434,107 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_topic", ["topicId"])
     .index("by_topic_lang", ["topicId", "lang"]),
+
+  // ---- Monetisation (paid marketplace, ADR 0016) ---------------------------
+
+  // The price of one **Edition** — a (Topic, language) pair. The PRESENCE of a
+  // listing row is what makes an Edition **paid**; its absence means the Edition
+  // is free and behaves exactly as course-translation serves it today. `amount`
+  // is in the currency's minor units (cents) and `currency` is a lower-case
+  // ISO-4217 code — **ZAR-only** on the PayFast rail (the platform's settlement
+  // currency; .scratch/payfast-payments). One row per Edition — `by_topic_lang`
+  // is the price lookup the access resolver consults; `by_topic` lists a Topic's
+  // priced Editions (and cascades on Topic delete).
+  listings: defineTable({
+    topicId: v.id("topics"),
+    lang: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+  })
+    .index("by_topic", ["topicId"])
+    .index("by_topic_lang", ["topicId", "lang"]),
+
+  // An **Entitlement**: an account's purchased, permanent right to read one paid
+  // **Edition** — a (Topic, language) pair — past its free **Preview**. One row
+  // per (buyer, Topic, language); the presence of the row *is* the access. It is
+  // the paid twin of a language-scoped Share: an entitled buyer is treated as a
+  // Viewer of that Edition everywhere (read access, own Progress, Certificate
+  // eligibility), and — like a Share — is scoped to one language (buying `es`
+  // does not unlock `ur`). Never expires. `by_topic_user` is the resolver's hold
+  // check (a buyer may hold several, one per language — matched in-memory like
+  // Shares); `by_topic` cascades on Topic delete; `by_user` backs "my purchases".
+  // Rows are minted by the verified PayFast ITN (or the manual Admin grant).
+  entitlements: defineTable({
+    userId: v.id("users"),
+    topicId: v.id("topics"),
+    lang: v.string(),
+    // The PayFast payment that bought this Edition — provenance back to the sale
+    // (and its Ledger row). Optional: Admin-granted / legacy rows carry none.
+    pfPaymentId: v.optional(v.string()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_topic", ["topicId"])
+    .index("by_topic_user", ["topicId", "userId"]),
+
+  // A checkout-intent (.scratch/payfast-payments, auth-first per
+  // .scratch/auth-first-checkout): one row per Buy click, linking our
+  // `m_payment_id` reference to the buyer's ACCOUNT email (frozen at Buy —
+  // never a typed argument), the Edition being bought, and the PRICE SHOWN at
+  // that moment (`amount`, cents). The return page resolves it by
+  // `m_payment_id` (an unguessable token — a bearer capability) to drive the
+  // confirming banner, and the ITN matches the paid amount against `amount` —
+  // the intent, not the live listing, so a re-price/un-list between Buy and
+  // payment never strands a genuine payment. The intent itself grants nothing;
+  // only the verified ITN does.
+  checkoutIntents: defineTable({
+    mPaymentId: v.string(),
+    email: v.string(),
+    topicId: v.id("topics"),
+    lang: v.string(),
+    amount: v.number(),
+  }).index("by_m_payment_id", ["mPaymentId"]),
+
+  // The ITN idempotency ledger (.scratch/payfast-payments): one row per PayFast
+  // payment id already processed. fulfillPurchase records it inside the same
+  // transaction that mints access + writes the Ledger, so a re-delivered ITN
+  // (PayFast retries) is a no-op — never a double grant or double Ledger row.
+  payfastEvents: defineTable({
+    pfPaymentId: v.string(),
+  }).index("by_pf_payment_id", ["pfPaymentId"]),
+
+  // The money **Ledger** (.scratch/payfast-payments): one row per sale, written by
+  // the verified ITN in the same transaction as the Entitlement. All sales settle
+  // into the operator's single PayFast account, so this is the record of what the
+  // operator owes each Seller: the ITN's gross/fee/net (cents) split 50/50 on net
+  // into sellerShare (owed to the Seller) and platformShare. The operator pays out
+  // by EFT out of band and flips `owed` → `paid` with a reference — `by_status`
+  // is the owed-per-Seller rollup's scan.
+  ledger: defineTable({
+    topicId: v.id("topics"),
+    lang: v.string(),
+    sellerId: v.id("users"),
+    buyerEmail: v.string(),
+    gross: v.number(),
+    fee: v.number(),
+    net: v.number(),
+    sellerShare: v.number(),
+    platformShare: v.number(),
+    pfPaymentId: v.string(),
+    status: v.union(v.literal("owed"), v.literal("paid")),
+    payoutRef: v.optional(v.string()),
+  }).index("by_status", ["status"]),
+
+  // A **Seller**'s capability record (ADR 0016 / .scratch/payfast-payments).
+  // Selling is a two-gate capability: the PRESENCE of a row is the Admin's
+  // **can-sell** grant, and the Seller then saves the SA payout bank details the
+  // operator EFTs their Ledger share to — no external onboarding, Sellers never
+  // register a payment account. A Seller (CONTEXT) requires BOTH before pricing.
+  // Revoking can-sell deletes this row (which stops *new* pricing) but never
+  // touches already-sold Entitlements. One row per user; `by_user` is the
+  // grant/status lookup. Bank details are Admin-readable only (never returned by
+  // a non-admin query, never logged).
+  sellers: defineTable({
+    userId: v.id("users"),
+    payout: v.optional(payoutDetailsValidator),
+  }).index("by_user", ["userId"]),
 });

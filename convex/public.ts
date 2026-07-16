@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { decodeEntities } from "./content";
-import { pickContentBody, SOURCE_LANG } from "./lib";
+import { buildPaywall, editionAccessLevel, lessonLocked, pickContentBody, SOURCE_LANG, type EditionAccess } from "./lib";
 import { langInfo } from "./languages";
 
 // The Guest read seam (issue 07 / ADR 0013). Every function here authorizes by
@@ -31,6 +31,22 @@ async function resolveEdition(ctx: QueryCtx, token: string): Promise<{ topic: Do
     .withIndex("by_public_token", (q) => q.eq("publicToken", token))
     .unique();
   return topic ? { topic, lang: SOURCE_LANG } : null;
+}
+
+// The Guest's Edition plus their access level (paid marketplace, ADR 0016). A
+// valid Public link is the Guest's grant: on a FREE Edition it resolves to
+// `viewer` (today's anonymous full read); on a PAID Edition it resolves to
+// `preview`, so a Guest sees only the free first Lesson + the table of contents.
+// The single access resolver (`editionAccessLevel`) decides, exactly as it does
+// for the authed reader — this seam only supplies the token-based grant.
+async function resolveGuestEdition(
+  ctx: QueryCtx,
+  token: string,
+): Promise<{ topic: Doc<"topics">; lang: string; level: EditionAccess } | null> {
+  const resolved = await resolveEdition(ctx, token);
+  if (!resolved) return null;
+  const level = await editionAccessLevel(ctx, resolved.topic, resolved.lang, null, true);
+  return { ...resolved, level };
 }
 
 // One Edition's translated rows, keyed `${kind}:${key}` (empty for English).
@@ -62,6 +78,9 @@ export const publicCourse = query({
     v.null(),
     v.object({
       title: v.string(),
+      // The Topic slug — not secret (it's the course identifier), exposed so a
+      // Guest on a paid Edition can start checkout (paid marketplace, ADR 0016).
+      slug: v.string(),
       // The Edition this token serves + its text direction (course-translation).
       lang: v.string(),
       dir: v.union(v.literal("ltr"), v.literal("rtl")),
@@ -88,12 +107,24 @@ export const publicCourse = query({
           reply: v.union(v.string(), v.null()),
         }),
       ),
+      // Present only on a PAID Edition (paid marketplace): the price and which
+      // Lesson is the free Preview, so a Guest sees the paygate. On a free
+      // Edition it is absent and the Guest reads everything, exactly as today.
+      paywall: v.optional(
+        v.object({ amount: v.number(), currency: v.string(), previewKey: v.union(v.string(), v.null()) }),
+      ),
     }),
   ),
   handler: async (ctx, { token }) => {
-    const resolved = await resolveEdition(ctx, token);
+    const resolved = await resolveGuestEdition(ctx, token);
     if (!resolved) return null;
-    const { topic, lang } = resolved;
+    const { topic, lang, level } = resolved;
+    // On a paid Edition a Guest is `preview`: the table of contents (Lesson &
+    // Reference titles) still renders so the paygate has structure, but the paid
+    // material — Resources, the owner's Progress, and Q&A — is withheld, and the
+    // per-Lesson bodies are locked in publicLesson. A free Edition is `viewer`
+    // and unchanged.
+    const preview = level === "preview";
     const tmap = await editionMap(ctx, topic._id, lang);
 
     const lessons = (
@@ -151,15 +182,19 @@ export const publicCourse = query({
       : [];
 
     const title = decodeEntities(tmap.get("title:")?.text ?? topic.title);
+    const paywall = preview ? await buildPaywall(ctx, topic._id, lang) : undefined;
     return {
       title,
+      slug: topic.slug,
       lang,
       dir: langInfo(lang).rtl ? ("rtl" as const) : ("ltr" as const),
       lessons,
       references,
-      resources,
-      progress,
-      questions,
+      // Paid material is withheld from a Guest until they buy; the TOC above stays.
+      resources: preview ? [] : resources,
+      progress: preview ? [] : progress,
+      questions: preview ? [] : questions,
+      paywall,
     };
   },
 });
@@ -168,23 +203,24 @@ export const publicCourse = query({
 // or a superseded Lesson (mirrors the authed getLesson).
 export const publicLesson = query({
   args: { token: v.string(), key: v.string() },
-  // `contentUrl` (content blob) or inline `html` during the migration — exactly
-  // one is present (see .scratch/html-blob-storage). After the narrow step this
-  // becomes a required `contentUrl`.
+  // A locked marker (paid Edition, past the Preview) OR the body: `contentUrl`
+  // (content blob) or inline `html` during the migration — exactly one body form
+  // is present (see .scratch/html-blob-storage).
   returns: v.union(
     v.null(),
     v.object({
       key: v.string(),
       seq: v.number(),
       title: v.string(),
+      locked: v.boolean(),
       contentUrl: v.optional(v.string()),
       html: v.optional(v.string()),
     }),
   ),
   handler: async (ctx, { token, key }) => {
-    const resolved = await resolveEdition(ctx, token);
+    const resolved = await resolveGuestEdition(ctx, token);
     if (!resolved) return null;
-    const { topic, lang } = resolved;
+    const { topic, lang, level } = resolved;
     const lesson = await ctx.db
       .query("lessons")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
@@ -199,12 +235,13 @@ export const publicLesson = query({
               q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "lesson").eq("key", key),
             )
             .unique();
-    return {
-      key: lesson.key,
-      seq: lesson.seq,
-      title: decodeEntities(t?.title ?? lesson.title),
-      ...pickContentBody(t, lesson),
-    };
+    const title = decodeEntities(t?.title ?? lesson.title);
+    // Paygate: on a paid Edition (`preview`) only the Preview Lesson's body is
+    // served; every other Lesson is a locked marker (never a bare null 404).
+    if (await lessonLocked(ctx, topic._id, level, key)) {
+      return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
+    }
+    return { key: lesson.key, seq: lesson.seq, title, locked: false, ...pickContentBody(t, lesson) };
   },
 });
 
@@ -216,14 +253,15 @@ export const publicReference = query({
     v.object({
       key: v.string(),
       title: v.string(),
+      locked: v.boolean(),
       contentUrl: v.optional(v.string()),
       html: v.optional(v.string()),
     }),
   ),
   handler: async (ctx, { token, key }) => {
-    const resolved = await resolveEdition(ctx, token);
+    const resolved = await resolveGuestEdition(ctx, token);
     if (!resolved) return null;
-    const { topic, lang } = resolved;
+    const { topic, lang, level } = resolved;
     const ref = await ctx.db
       .query("references")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
@@ -238,6 +276,9 @@ export const publicReference = query({
               q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "reference").eq("key", key),
             )
             .unique();
-    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), ...pickContentBody(t, ref) };
+    const title = decodeEntities(t?.title ?? ref.title);
+    // References sit entirely past the Preview — locked for a `preview` Guest.
+    if (level === "preview") return { key: ref.key, title, html: "", locked: true };
+    return { key: ref.key, title, locked: false, ...pickContentBody(t, ref) };
   },
 });

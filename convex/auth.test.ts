@@ -35,49 +35,32 @@ async function signIn(t: ReturnType<typeof convexTest>, email: string, password:
   });
 }
 
-test("sign-up is rejected for an email that isn't on the Allowlist", async () => {
+test("sign-up succeeds for an email with no Allowlist row (open sign-up)", async () => {
   const t = convexTest(schema, modules);
-  // Allowlist seeded with someone else — the table is not empty, but this email
-  // is not admitted.
-  await t.mutation(internal.whitelist.seedEmail, { email: "admitted@example.com" });
+  // The Allowlist gates course creation, not sign-up (ADR 0021). A non-empty
+  // table that doesn't include this email must not matter.
+  await t.mutation(internal.whitelist.seedEmail, { email: "someone-else@example.com" });
 
-  await expect(signUp(t, "stranger@example.com", "hunter2-strong")).rejects.toThrow();
-  // No account was created.
+  await signUp(t, "stranger@example.com", "hunter2-strong");
+
   const user = await t.run((ctx) =>
     ctx.db.query("users").withIndex("email", (q) => q.eq("email", "stranger@example.com")).unique(),
   );
-  expect(user).toBeNull();
-});
-
-test("sign-up creates a user for an admitted email", async () => {
-  const t = convexTest(schema, modules);
-  await t.mutation(internal.whitelist.seedEmail, { email: "admitted@example.com" });
-
-  await signUp(t, "admitted@example.com", "hunter2-strong");
-
-  const user = await t.run((ctx) =>
-    ctx.db.query("users").withIndex("email", (q) => q.eq("email", "admitted@example.com")).unique(),
-  );
-  expect(user?.email).toBe("admitted@example.com");
+  expect(user?.email).toBe("stranger@example.com");
 });
 
 test("sign-up normalises the stored email, so casing can't mint a second identity", async () => {
   const t = convexTest(schema, modules);
-  await t.mutation(internal.whitelist.seedEmail, { email: "admitted@example.com" });
-
-  // Admitted email, typed with different casing. The gate admits it AND the
-  // stored account identity must be normalised — otherwise the same person
-  // could sign up again as a distinct mixed-case account past one Allowlist row.
-  await signUp(t, "Admitted@Example.com", "hunter2-strong");
+  // Typed with scattered casing, stored normalised — otherwise the same person
+  // could sign up again as a distinct mixed-case account.
+  await signUp(t, "Learner@Example.com", "hunter2-strong");
 
   const users = await t.run((ctx) => ctx.db.query("users").collect());
-  expect(users.map((u) => u.email)).toEqual(["admitted@example.com"]);
+  expect(users.map((u) => u.email)).toEqual(["learner@example.com"]);
 });
 
 test("signing up claims a Share invited before the account existed", async () => {
   const t = convexTest(schema, modules);
-  await t.mutation(internal.whitelist.seedEmail, { email: "invitee@example.com" });
-
   // An owner invited invitee@ to a Topic while they still had no account, so it
   // was held as a pending Share.
   const topicId = await t.run(async (ctx) => {
@@ -100,21 +83,20 @@ test("signing up claims a Share invited before the account existed", async () =>
   expect(pending).toEqual([]);
 });
 
-test("an existing account still signs in after its email is removed (sign-up gate only)", async () => {
+test("an existing account still signs in after its Allowlist row is removed (the Allowlist never gates auth)", async () => {
   const t = convexTest(schema, modules);
-  await t.mutation(internal.whitelist.seedEmail, { email: "admitted@example.com" });
-  await signUp(t, "admitted@example.com", "hunter2-strong");
+  await t.mutation(internal.whitelist.seedEmail, { email: "member@example.com" });
+  await signUp(t, "member@example.com", "hunter2-strong");
 
-  // Remove the email from the Allowlist — new sign-ups for it are now closed.
+  // Remove the email from the Allowlist — that revokes course creation, nothing else.
   await t.run(async (ctx) => {
     const row = await ctx.db
       .query("whitelist")
-      .withIndex("by_email", (q) => q.eq("email", "admitted@example.com"))
+      .withIndex("by_email", (q) => q.eq("email", "member@example.com"))
       .unique();
     if (row) await ctx.db.delete(row._id);
   });
 
-  // The existing account can still sign in — removal gates sign-up, not sign-in.
-  const result = await signIn(t, "admitted@example.com", "hunter2-strong");
+  const result = await signIn(t, "member@example.com", "hunter2-strong");
   expect(result).toMatchObject({ tokens: expect.anything() });
 });

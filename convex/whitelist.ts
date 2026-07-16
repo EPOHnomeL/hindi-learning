@@ -3,19 +3,21 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 
-// The Allowlist backend (ADR 0011, PRD §"Implementation Decisions"). The Admin
-// edits who may sign up at runtime; the sign-up gate asks `isAdmitted`. Emails
-// are normalised on the way in and stored normalised, so every comparison is a
-// plain equality on the `by_email` index.
+// The Allowlist backend (ADR 0011, semantics revised by ADR 0021). Sign-up is
+// open; the Allowlist answers "who may create courses" — the Admin edits it at
+// runtime and `seedTopic` asks `isEmailAdmitted`. Emails are normalised on the
+// way in and stored normalised, so every comparison is a plain equality on the
+// `by_email` index.
 
 // Trim + lower-case — the one normalisation used on both store and lookup.
 function normaliseEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-// The single admission decision, shared by the auth sign-up gate and the tests.
-// An empty Allowlist returns false (closed by design). Case- and whitespace-
-// insensitive: the input is normalised the same way the stored row was.
+// The single membership decision, shared by the course-creation gate
+// (content.seedTopic), `amIAllowlisted`, and the tests. An empty Allowlist
+// returns false (closed by design). Case- and whitespace-insensitive: the input
+// is normalised the same way the stored row was.
 export async function isEmailAdmitted(ctx: QueryCtx, email: string): Promise<boolean> {
   const row = await ctx.db
     .query("whitelist")
@@ -33,10 +35,8 @@ export const isAdmitted = internalQuery({
 // Admit a (normalised) email, idempotently. Inserts the row if absent; if it
 // already exists it's a no-op, except that `isAdmin: true` is applied so the
 // migration/seed can promote an already-admitted email to Admin. Shared by
-// `seedEmail`, `addEmail`, the migration, and `shareTopic` (inviting someone
-// admits them, so the "they're in when they sign up" promise holds) — so they
-// all normalise identically.
-export async function admitEmail(ctx: MutationCtx, email: string, isAdmin?: boolean): Promise<void> {
+// `seedEmail`, `addEmail`, and the migration so they normalise identically.
+async function admitEmail(ctx: MutationCtx, email: string, isAdmin?: boolean): Promise<void> {
   const normalised = normaliseEmail(email);
   const existing = await ctx.db
     .query("whitelist")
@@ -97,6 +97,21 @@ export const amIAdmin = query({
   handler: async (ctx) => isCallerAdmin(ctx),
 });
 
+// Whether the caller's account email is on the Allowlist — backs the dashboard's
+// "new course" affordance (UX only; seedTopic's server gate is the boundary).
+// Identity is derived server-side, false when unauthenticated, like `amIAdmin`.
+export const amIAllowlisted = query({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return false;
+    const user = await ctx.db.get(userId);
+    if (!user?.email) return false;
+    return isEmailAdmitted(ctx, user.email);
+  },
+});
+
 // Admit an email (Admin-only). Normalises, validates a basic shape, inserts if
 // absent, no-ops if already present.
 export const addEmail = mutation({
@@ -112,8 +127,8 @@ export const addEmail = mutation({
 
 // Remove an email from the Allowlist (Admin-only). Refuses to remove an Admin
 // row — the non-removable-Admin guard that stops the Admin locking themselves
-// out. Removing closes off *new* sign-ups; it does not evict an existing
-// account (sign-up gate only — ADR 0011).
+// out. Removing revokes creating *new* courses; it does not evict the account
+// or touch the courses they already own (ADR 0021).
 export const removeEmail = mutation({
   args: { email: v.string() },
   returns: v.null(),

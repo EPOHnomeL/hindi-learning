@@ -28,6 +28,7 @@ export type IconName =
   | "book"
   | "lock"
   | "chevron"
+  | "tag"
   | "users"
   | "chat";
 
@@ -117,6 +118,13 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   chevron: <path d="M6 9l6 6 6-6" />,
+  // A price tag (marketplace: paid Editions, ADR 0016). Gold-tinted at call sites.
+  tag: (
+    <>
+      <path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.8 8.8a2 2 0 0 0 2.8 0l6.4-6.4a2 2 0 0 0 0-2.8z" />
+      <circle cx="7.5" cy="7.5" r="1.1" />
+    </>
+  ),
   users: (
     <>
       <path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-6A3.5 3.5 0 0 0 4 18.5V20" />

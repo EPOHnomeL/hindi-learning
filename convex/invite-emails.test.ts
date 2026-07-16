@@ -3,7 +3,6 @@ import { convexTest } from "convex-test";
 import { afterEach, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { isEmailAdmitted } from "./whitelist";
 import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -19,44 +18,11 @@ async function seedUser(t: ReturnType<typeof convexTest>, email: string) {
 async function seedTopic(t: ReturnType<typeof convexTest>, ownerId: Id<"users">, slug: string, title: string) {
   return await t.run((ctx) => ctx.db.insert("topics", { ownerId, slug, title, status: "active" }));
 }
-const admitted = (t: ReturnType<typeof convexTest>, email: string) =>
-  t.run((ctx) => isEmailAdmitted(ctx, email));
-
-// ---- issue 01: auto-admit invited emails to the Allowlist -------------------
-
-test("inviting a no-account email admits it to the Allowlist (so they can sign up)", async () => {
-  const t = convexTest(schema, modules);
-  const owner = await seedUser(t, "owner@example.com");
-  await seedTopic(t, owner, "hindi", "Hindi");
-
-  expect(await admitted(t, "future@example.com")).toBe(false);
-  await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "Future@Example.com" });
-  expect(await admitted(t, "future@example.com")).toBe(true);
-});
-
-test("inviting an existing user also admits their email (harmless, idempotent)", async () => {
-  const t = convexTest(schema, modules);
-  const owner = await seedUser(t, "owner@example.com");
-  await seedUser(t, "viewer@example.com");
-  await seedTopic(t, owner, "hindi", "Hindi");
-
-  await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "viewer@example.com" });
-  expect(await admitted(t, "viewer@example.com")).toBe(true);
-});
-
-test("auto-admit is idempotent — re-inviting adds no second Allowlist row", async () => {
-  const t = convexTest(schema, modules);
-  const owner = await seedUser(t, "owner@example.com");
-  await seedTopic(t, owner, "hindi", "Hindi");
-
-  await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "future@example.com" });
-  await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "Future@example.com" });
-
-  const rows = await t.run((ctx) =>
-    ctx.db.query("whitelist").withIndex("by_email", (q) => q.eq("email", "future@example.com")).collect(),
-  );
-  expect(rows.length).toBe(1);
-});
+// Note: the invites feature originally auto-admitted invited emails to the
+// Allowlist (ADR 0011's "gate sign-up" model). ADR 0021 opened sign-up and made
+// the Allowlist gate course *creation*, so auto-admitting an invitee would grant
+// them creation rights. That mechanism (and its tests) were dropped on merge —
+// open sign-up + claimPendingShares already gives the invitee access.
 
 // ---- issue 02: Resend sender action ----------------------------------------
 

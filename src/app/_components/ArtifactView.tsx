@@ -7,7 +7,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CertificateControl } from "./Certificate";
-import { useEditionLang, withLang } from "./editionUrl";
+import { LockedPane, Paygate } from "./Paygate";
+import { useBuyMarker, useEditionLang, withLang } from "./editionUrl";
 import { buildEditDoc, buildSrcDoc, replaceBodyInner, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
 import { internalNavTarget } from "./readerDerive";
@@ -242,8 +243,15 @@ function LessonView({
 }) {
   const { theme } = useTheme();
   const lang = useEditionLang();
+  const buyMarker = useBuyMarker();
   const navHidden = useHideOnScroll();
   const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey, lang: lang ?? undefined });
+  // Same subscription CourseShell holds (deduped by Convex), for the caller's
+  // access level + the Edition's price. A `preview` caller (paid marketplace, ADR
+  // 0016) holds no access: locked Lessons show the paygate, and they track no
+  // Progress — so the open/complete writes below are gated off for them.
+  const header = useQuery(api.content.courseHeader, { topicSlug, lang: lang ?? undefined });
+  const preview = header?.role === "preview";
   const html = useContentHtml(lesson);
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
@@ -264,10 +272,12 @@ function LessonView({
   const isSource = lang == null || lang === "en";
 
   useEffect(() => {
-    // Owner or Viewer: opening a lesson marks it opened in the caller's own Progress.
-    if (lesson) void setProgress({ topicSlug, lessonKey, status: "opened" });
+    // Owner or Viewer: opening a lesson marks it opened in the caller's own
+    // Progress. A `preview` caller holds no Progress (the write would be refused),
+    // so skip it — gated once the header resolves the role.
+    if (lesson && header && header.role !== "preview") void setProgress({ topicSlug, lessonKey, status: "opened" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lesson?.key]);
+  }, [lesson?.key, header?.role]);
 
   useEffect(() => {
     if (readOnly) return; // Viewers' quiz attempts aren't recorded against the owner.
@@ -284,6 +294,24 @@ function LessonView({
   if (lesson === undefined || html === undefined) return <ReaderSkeleton />;
   if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this lesson. Try refreshing.</p>;
+
+  // Paid marketplace: a locked Lesson (past the free Preview on a paid Edition the
+  // caller doesn't hold) shows the paygate in place of the content — never a blank
+  // pane. The title still renders so the reader knows what they'd unlock.
+  if (lesson.locked) {
+    return (
+      <LockedPane title={lesson.title}>
+        <Paygate
+          kind="lesson"
+          paywall={header?.paywall ?? null}
+          courseTitle={header?.title}
+          topicSlug={topicSlug}
+          lang={lang ?? "en"}
+          autoOpenBuy={buyMarker}
+        />
+      </LockedPane>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
@@ -306,18 +334,21 @@ function LessonView({
             {/* On a completed course, offer the Certificate (claim / view) in its
                 place — for owner and Viewer alike. Self-hides until eligible. */}
             {courseCompleted && <CertificateControl topicSlug={topicSlug} />}
-            {/* Mark complete writes the caller's own Progress — owner or Viewer. */}
-            <button
-              onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
-              disabled={completed}
-              className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                completed
-                  ? "cursor-default border-accent2 bg-accent2 text-white"
-                  : "border-accent text-accent hover:bg-hi"
-              }`}
-            >
-              {completed ? "✓ Completed" : "Mark complete"}
-            </button>
+            {/* Mark complete writes the caller's own Progress — owner or Viewer.
+                A `preview` caller holds no Progress, so it's hidden for them. */}
+            {!preview && (
+              <button
+                onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
+                disabled={completed}
+                className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                  completed
+                    ? "cursor-default border-accent2 bg-accent2 text-white"
+                    : "border-accent text-accent hover:bg-hi"
+                }`}
+              >
+                {completed ? "✓ Completed" : "Mark complete"}
+              </button>
+            )}
             {/* A Viewer also gets plain navigation to the next lesson. */}
             {readOnly && nextLessonKey && (
               <Link
@@ -363,15 +394,20 @@ function LessonView({
           />
         )}
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
-            scrolling, no slide-up trigger. Desktop uses the side column instead. */}
-        <div className="p-3 md:hidden">
-          <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} variant="inline" readOnly={readOnly} />
-        </div>
+            scrolling, no slide-up trigger. Desktop uses the side column instead.
+            Hidden for a `preview` caller: Q&A is past the paygate. */}
+        {!preview && (
+          <div className="p-3 md:hidden">
+            <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} variant="inline" readOnly={readOnly} />
+          </div>
+        )}
       </div>
-      {/* Desktop: persistent ask column on the right. */}
-      <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
-        <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} readOnly={readOnly} />
-      </aside>
+      {/* Desktop: persistent ask column on the right (past the paygate for preview). */}
+      {!preview && (
+        <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
+          <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} readOnly={readOnly} />
+        </aside>
+      )}
     </div>
   );
 }
@@ -589,8 +625,10 @@ function ReferenceView({
 }) {
   const { theme } = useTheme();
   const lang = useEditionLang();
+  const buyMarker = useBuyMarker();
   const navHidden = useHideOnScroll();
   const ref = useQuery(api.content.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
+  const header = useQuery(api.content.courseHeader, { topicSlug, lang: lang ?? undefined });
   const html = useContentHtml(ref);
   const editReference = useMutation(api.content.editReference);
   const [editing, setEditing] = useState(false);
@@ -602,6 +640,23 @@ function ReferenceView({
   if (ref === undefined || html === undefined) return <ReaderSkeleton aside={false} />;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this reference. Try refreshing.</p>;
+  // Paid marketplace: References sit entirely past the free Preview, so a `preview`
+  // caller gets the paygate here (the reader returns `locked` on a paid Edition).
+  // A locked body is served as html:"" so the guards above pass to here.
+  if (ref.locked) {
+    return (
+      <LockedPane title={ref.title}>
+        <Paygate
+          kind="reference"
+          paywall={header?.paywall ?? null}
+          courseTitle={header?.title}
+          topicSlug={topicSlug}
+          lang={lang ?? "en"}
+          autoOpenBuy={buyMarker}
+        />
+      </LockedPane>
+    );
+  }
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3">
       <h2

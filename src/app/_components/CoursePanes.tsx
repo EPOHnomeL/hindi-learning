@@ -1,14 +1,14 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { api } from "../../../convex/_generated/api";
 import { ArtifactView } from "./ArtifactView";
 import { useCourse } from "./CourseShell";
 import { ReaderSkeleton } from "./ui";
-import { LANG_KEY, useEditionLang, withLang } from "./editionUrl";
-import { firstLessonKey, frontierKey } from "./readerDerive";
+import { LANG_KEY, useEditionLang } from "./editionUrl";
+import { courseIndexRedirect, firstLessonKey, frontierKey } from "./readerDerive";
 
 // The course index (`/courses/[slug]`): redirect to a Lesson so the URL always
 // names what's shown (ADR 0012). An owner resumes at the newest lesson (the
@@ -17,6 +17,7 @@ import { firstLessonKey, frontierKey } from "./readerDerive";
 // bouncing through here again.
 export function CourseIndex({ slug }: { slug: string }) {
   const lang = useEditionLang();
+  const search = useSearchParams();
   const lessons = useQuery(api.content.listLessons, { topicSlug: slug, lang: lang ?? undefined });
   const header = useQuery(api.content.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
   const router = useRouter();
@@ -44,8 +45,9 @@ export function CourseIndex({ slug }: { slug: string }) {
       }
       if (stored && stored !== "en" && header.editions.some((e) => e.lang === stored)) effLang = stored;
     }
-    router.replace(withLang(`/courses/${slug}/lessons/${target}`, effLang));
-  }, [target, slug, router, lang, header]);
+    // Carry the query string through (purchase/mp — the payment-return banner).
+    router.replace(courseIndexRedirect(`/courses/${slug}/lessons/${target}`, search.toString(), effLang));
+  }, [target, slug, router, lang, header, search]);
 
   if (lessons === undefined) return <CourseStatus variant="loading" />;
   if (lessons.length === 0)

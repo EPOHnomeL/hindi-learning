@@ -8,7 +8,9 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
 import { Frame, useContentHtml } from "./ArtifactView";
+import { NavItem } from "./NavItem";
 import { Markdown } from "./MarkdownView";
+import { LockedPane, Paygate } from "./Paygate";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { CourseSkeleton, ReaderSkeleton } from "./ui";
@@ -45,6 +47,16 @@ function useGuestCourse() {
 
 function Centered({ children }: { children: React.ReactNode }) {
   return <p className="p-8 text-center text-soft">{children}</p>;
+}
+
+// Buy on a Public link routes into the authed app (auth-first, ADR 0021): the
+// SAME Lesson/Reference under /courses, carrying the Edition and a `buy` marker.
+// Signed out, that URL renders SignIn (defaulting to "Create account"); signed
+// in, it lands on the locked page with the buy dialog open.
+function buyLink(slug: string, kind: "lessons" | "references", key: string, lang: string): string {
+  const params = new URLSearchParams({ buy: "1" });
+  if (lang !== "en") params.set("lang", lang);
+  return `/courses/${slug}/${kind}/${key}?${params.toString()}`;
 }
 
 // The persistent sidebar + pane shell, fixed by the URL token. Fetches the
@@ -90,6 +102,13 @@ export function PublicCourseShell({ token, children }: { token: string; children
   const isRef = pathname.includes("/references/");
   const activeKey = decodeURIComponent(pathname.split("/").pop() ?? "");
   const base = `/share/${token}`;
+
+  // Paid marketplace (ADR 0016): a Public link to a PAID Edition serves a Guest
+  // only the free Preview + the table of contents (`publicCourse.paywall` is
+  // present). Everything past the Preview is locked in the nav; the Preview Lesson
+  // itself is flagged Free. A free Edition has no paywall and reads as before.
+  const preview = !!course.paywall;
+  const previewKey = course.paywall?.previewKey ?? null;
 
   return (
     <Ctx.Provider value={{ token, course, completed, markComplete }}>
@@ -137,6 +156,8 @@ export function PublicCourseShell({ token, children }: { token: string; children
                 href={`${base}/lessons/${l.key}`}
                 active={!isRef && activeKey === l.key}
                 done={completed.has(l.key)}
+                locked={preview && l.key !== previewKey}
+                free={preview && l.key === previewKey}
               >
                 {l.seq}. {l.title.split("—")[0]!.trim()}
               </NavItem>
@@ -146,7 +167,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
               <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">References</p>
             )}
             {course.references.map((r) => (
-              <NavItem key={r.key} href={`${base}/references/${r.key}`} active={isRef && activeKey === r.key}>
+              <NavItem key={r.key} href={`${base}/references/${r.key}`} active={isRef && activeKey === r.key} locked={preview}>
                 {r.title}
               </NavItem>
             ))}
@@ -185,34 +206,6 @@ export function PublicCourseShell({ token, children }: { token: string; children
         <section className="min-w-0 flex-1 md:overflow-hidden md:p-4">{children}</section>
       </div>
     </Ctx.Provider>
-  );
-}
-
-function NavItem({
-  href,
-  active,
-  done = false,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  done?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors md:py-1.5 ${
-        active ? "bg-accent text-white" : "text-ink hover:bg-hi"
-      }`}
-    >
-      <span className="min-w-0">{children}</span>
-      {done && (
-        <span aria-label="completed" title="Completed" className={`shrink-0 text-xs ${active ? "text-white" : "text-accent2"}`}>
-          ✓
-        </span>
-      )}
-    </Link>
   );
 }
 
@@ -260,6 +253,24 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
   if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this lesson. Try refreshing.</p>;
 
+  // Paid marketplace: on a paid Edition's Public link a Guest gets the paygate for
+  // every Lesson past the free Preview (the reader returns `locked`).
+  const editionName = course.lang !== "en" ? langInfo(course.lang).native : undefined;
+  if (lesson.locked) {
+    return (
+      <LockedPane title={lesson.title}>
+        <Paygate
+          kind="lesson"
+          paywall={course.paywall ?? null}
+          courseTitle={course.title}
+          editionName={editionName}
+          buyHref={buyLink(course.slug, "lessons", lessonKey, course.lang)}
+        />
+      </LockedPane>
+    );
+  }
+  const preview = !!course.paywall;
+
   return (
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
       <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3">
@@ -281,13 +292,18 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
         </div>
         {/* Quizzes stay interactive (self-check); nothing is recorded for a Guest. */}
         <Frame html={html} withBridge theme={theme} dir={course.dir} lang={course.lang} />
-        <div className="p-3 md:hidden">
-          <GuestQuestions qa={qa} />
-        </div>
+        {/* Q&A sits past the paygate — withheld from a paid-Edition Guest. */}
+        {!preview && (
+          <div className="p-3 md:hidden">
+            <GuestQuestions qa={qa} />
+          </div>
+        )}
       </div>
-      <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
-        <GuestQuestions qa={qa} />
-      </aside>
+      {!preview && (
+        <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
+          <GuestQuestions qa={qa} />
+        </aside>
+      )}
     </div>
   );
 }
@@ -326,6 +342,21 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
   if (ref === undefined || html === undefined) return <ReaderSkeleton aside={false} />;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this reference. Try refreshing.</p>;
+  // Paid marketplace: References sit past the free Preview — the paygate for a
+  // Guest on a paid Edition (a locked body is served as html:"" so it reaches here).
+  if (ref.locked) {
+    return (
+      <LockedPane title={ref.title}>
+        <Paygate
+          kind="reference"
+          paywall={course.paywall ?? null}
+          courseTitle={course.title}
+          editionName={course.lang !== "en" ? langInfo(course.lang).native : undefined}
+          buyHref={buyLink(course.slug, "references", refKey, course.lang)}
+        />
+      </LockedPane>
+    );
+  }
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3">
       <h2

@@ -24,7 +24,7 @@ async function seedAdmin(t: ReturnType<typeof convexTest>, email: string) {
 }
 
 // The Allowlist is closed by default: an empty table admits nobody. This is the
-// single admission decision the sign-up gate and the tests share.
+// single membership decision the course-creation gate and the tests share.
 test("isAdmitted: an empty Allowlist admits nobody", async () => {
   const t = convexTest(schema, modules);
   expect(await t.query(internal.whitelist.isAdmitted, { email: "anyone@example.com" })).toBe(false);
@@ -140,4 +140,15 @@ test("amIAdmin: true for the Admin, false for a non-Admin, false when unauthenti
   expect(await asUser(t, admin).query(api.whitelist.amIAdmin, {})).toBe(true);
   expect(await asUser(t, intruder).query(api.whitelist.amIAdmin, {})).toBe(false);
   expect(await t.query(api.whitelist.amIAdmin, {})).toBe(false);
+});
+
+test("amIAllowlisted: answers by the caller's Allowlist row, false when unauthenticated", async () => {
+  const t = convexTest(schema, modules);
+  const member = await seedUser(t, "member@example.com");
+  await t.mutation(internal.whitelist.seedEmail, { email: "member@example.com" });
+  const outsider = await seedUser(t, "outsider@example.com");
+
+  expect(await asUser(t, member).query(api.whitelist.amIAllowlisted, {})).toBe(true);
+  expect(await asUser(t, outsider).query(api.whitelist.amIAllowlisted, {})).toBe(false);
+  expect(await t.query(api.whitelist.amIAllowlisted, {})).toBe(false);
 });

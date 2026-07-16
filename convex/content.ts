@@ -3,11 +3,11 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { action, internalMutation, internalQuery, mutation, query, type ActionCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, getEditableTopic, getOwnedTopic, getViewableTopic, heldLangs, pickContentBody, readableLang, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import { assertAdmin, buildPaywall, getEditableTopic, getOwnedTopic, heldLangs, lessonLocked, pickContentBody, resolveReaderEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import { itemHash, quizStructureMatches } from "./translate";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
-import { isCallerAdmin } from "./whitelist";
+import { isCallerAdmin, isEmailAdmitted } from "./whitelist";
 
 // A learner may seed at most one new course per this window — an anti-abuse / cost
 // cap that mirrors the routine's per-user on-demand cap. Rolling 24h window.
@@ -163,6 +163,13 @@ export const seedTopic = mutation({
   handler: async (ctx, { title, why, provider }): Promise<{ slug: string }> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
+    // Course creation is Allowlist-gated (ADR 0021): sign-up is open, so the
+    // Allowlist is what stands between anyone-with-an-account and Claude
+    // generation spend. The Admin's own row admits them like any member.
+    const user = await ctx.db.get(userId);
+    if (!user?.email || !(await isEmailAdmitted(ctx, user.email))) {
+      throw new Error("Course creation is limited to Allowlisted emails.");
+    }
     // One new course per user per day (issue 08 — bounds Claude usage). The Admin
     // is exempt (they drive the app and aren't the runaway-usage risk this guards
     // against, mirroring the routine's on-demand bypass). Checked against the
@@ -593,7 +600,10 @@ export const courseHeader = query({
     v.null(),
     v.object({
       title: v.string(),
-      role: v.union(v.literal("owner"), v.literal("viewer")),
+      // The caller's access level to the served Edition (paid marketplace). An
+      // `entitled` buyer reads exactly like a `viewer`; a `preview` caller sees
+      // only the free first Lesson of a paid Edition (the rest is locked).
+      role: v.union(v.literal("owner"), v.literal("viewer"), v.literal("entitled"), v.literal("preview")),
       // Whether the caller may make the in-place prose edits on the SERVED
       // Edition (ADR 0020): the owner, or an Editor of this `lang`. The reader
       // gates its hover-pencil on this, NOT on `role` — a Viewer of one Edition
@@ -612,22 +622,30 @@ export const courseHeader = query({
       // The served Edition's mission (translated, English fallback) — pre-fills
       // the edition title/mission edit dialog. Null when the course has none.
       mission: v.union(v.string(), v.null()),
+      // Present only for a `preview` caller: the paid Edition's price and which
+      // Lesson is the free Preview, so the reader can render the paygate.
+      paywall: v.optional(
+        v.object({ amount: v.number(), currency: v.string(), previewKey: v.union(v.string(), v.null()) }),
+      ),
     }),
   ),
   handler: async (ctx, { topicSlug, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
-    if (!effLang) return null;
-    const role = topic.ownerId === userId ? ("owner" as const) : ("viewer" as const);
+    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    // `level` is now narrowed to the four access roles (the returns validator's
+    // union) — the "none" case is not-found above, so `role` is just `level`.
+    if (level === "none") return null;
+    const role = level;
     // Per-Edition edit capability (ADR 0020), same logic as the edit mutations'
     // guard: owner, or an Editor of the served lang.
     const canEdit = (await getEditableTopic(ctx, userId, topicSlug, effLang)) !== null;
     const t = await trOne(ctx, topic._id, effLang, "title", "");
     const m = topic.mission ? await trOne(ctx, topic._id, effLang, "mission", "") : null;
     const editions = await switcherEditions(ctx, topic, userId);
+    const paywall = level === "preview" ? await buildPaywall(ctx, topic._id, effLang) : undefined;
     return {
       title: decodeEntities(t?.text ?? topic.title),
       mission: topic.mission ? decodeEntities(m?.text ?? topic.mission) : null,
@@ -637,6 +655,7 @@ export const courseHeader = query({
       lang: effLang,
       dir: langInfo(effLang).rtl ? ("rtl" as const) : ("ltr" as const),
       editions,
+      paywall,
     };
   },
 });
@@ -646,10 +665,13 @@ export const listLessons = query({
   handler: async (ctx, { topicSlug, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return [];
-    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
-    if (!effLang) return [];
+    // The table of contents is served in full even to a `preview` caller (only
+    // the Lesson *bodies* past the Preview are locked, in getLesson); `none` is
+    // not-found (a free Edition the caller holds no grant to).
+    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    if (level === "none") return [];
     const lessons = (
       await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
     ).filter((l) => !l.supersededBy);
@@ -667,20 +689,28 @@ export const getLesson = query({
   handler: async (ctx, { topicSlug, key, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
-    if (!effLang) return null;
+    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    if (level === "none") return null;
     const lesson = await ctx.db
       .query("lessons")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     if (!lesson || lesson.supersededBy) return null;
     const t = await trOne(ctx, topic._id, effLang, "lesson", key);
+    const title = decodeEntities(t?.title ?? lesson.title);
+    // Paygate: on a paid Edition the caller doesn't hold (`preview`), only the
+    // Preview — the lowest-ordered non-superseded Lesson — is served; every other
+    // Lesson returns an explicit `locked` marker, distinct from a not-found null.
+    if (await lessonLocked(ctx, topic._id, level, key)) {
+      return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
+    }
     return {
       key: lesson.key,
       seq: lesson.seq,
-      title: decodeEntities(t?.title ?? lesson.title),
+      title,
+      locked: false,
       // The body is served as a content URL (content blob) or, on transition
       // rows, inline html — from the translated row if it has one, else source.
       ...pickContentBody(t, lesson),
@@ -693,10 +723,13 @@ export const listReferences = query({
   handler: async (ctx, { topicSlug, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return [];
-    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
-    if (!effLang) return [];
+    // References are past the Preview, but their titles ride along in the table
+    // of contents even for a `preview` caller (the bodies are locked in
+    // getReference). `none` is not-found.
+    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    if (level === "none") return [];
     const refs = await ctx.db
       .query("references")
       .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
@@ -713,17 +746,20 @@ export const getReference = query({
   handler: async (ctx, { topicSlug, key, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return null;
-    const topic = await getViewableTopic(ctx, userId, topicSlug);
+    const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    const effLang = await readableLang(ctx, topic, userId, lang ?? null);
-    if (!effLang) return null;
+    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    if (level === "none") return null;
     const ref = await ctx.db
       .query("references")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     if (!ref) return null;
     const t = await trOne(ctx, topic._id, effLang, "reference", key);
-    return { key: ref.key, title: decodeEntities(t?.title ?? ref.title), ...pickContentBody(t, ref) };
+    const title = decodeEntities(t?.title ?? ref.title);
+    // References sit entirely past the Preview — locked for a `preview` caller.
+    if (level === "preview") return { key: ref.key, title, html: "", locked: true };
+    return { key: ref.key, title, locked: false, ...pickContentBody(t, ref) };
   },
 });
 

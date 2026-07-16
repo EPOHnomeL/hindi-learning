@@ -6,7 +6,6 @@ import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
 import { getOwnedTopic, mintToken, normaliseEmail, shareLang, shareRole, SOURCE_LANG, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
-import { admitEmail } from "./whitelist";
 import type { InviteKind } from "./inviteEmail";
 
 // Schedule a best-effort invite email (see .scratch/invite-emails) after the
@@ -44,9 +43,9 @@ async function scheduleInvite(
 // Share a Topic with a person, named by email. Owner-only. If the recipient has
 // an account, they get a read-only Share now ("shared"); if not, the invite is
 // held as a pending Share ("pending") and claimed when they sign up (see
-// `claimPendingShares`). Both paths are idempotent. Inviting also admits the
-// email to the Allowlist (so a no-account invitee can actually sign up — see
-// .scratch/invite-emails) and schedules a best-effort invite email.
+// `claimPendingShares` — sign-up is open, ADR 0021, so no Allowlist admission
+// is needed for the invitee to join). Both paths are idempotent, and each
+// schedules a best-effort invite email (see .scratch/invite-emails).
 export const shareTopic = mutation({
   args: { topicSlug: v.string(), email: v.string(), lang: v.optional(v.string()) },
   returns: v.union(v.literal("shared"), v.literal("pending")),
@@ -66,10 +65,6 @@ export const shareTopic = mutation({
       if (!job || job.status !== "ready") throw new Error("that language edition isn't ready yet");
     }
     const addr = normaliseEmail(email);
-    // Inviting an email unlocks sign-up for it (ADR 0011 gates sign-up on the
-    // Allowlist; without this a no-account invitee could never sign up, making
-    // the pending invite a dead letter). Idempotent; a no-op if already admitted.
-    await admitEmail(ctx, addr);
     const inviter = await ctx.db.get(userId);
     const inviterEmail = inviter?.email ?? "";
     const viewer = await ctx.db
@@ -99,8 +94,8 @@ export const shareTopic = mutation({
     if (!existing.some((p) => (p.lang ?? SOURCE_LANG) === editionLang)) {
       await ctx.db.insert("pendingShares", { topicId: topic._id, email: addr, lang: editionLang });
     }
-    // Email on every invite. No account → link to sign-up (claimPendingShares
-    // grants access on sign-up; admitEmail above unlocked it).
+    // Email on every invite. No account → link to sign-up (open under ADR 0021;
+    // claimPendingShares grants access the moment they sign up).
     await scheduleInvite(ctx, { to: addr, kind: "invited", topic, editionLang, inviterEmail, role: "viewer" });
     return "pending";
   },
