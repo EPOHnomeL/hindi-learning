@@ -29,7 +29,6 @@ const ENV = [
   "PAYFAST_MERCHANT_ID",
   "PAYFAST_MERCHANT_KEY",
   "PAYFAST_PASSPHRASE",
-  "PAYFAST_DISABLED",
 ] as const;
 const saved: Record<string, string | undefined> = {};
 beforeEach(() => {
@@ -214,34 +213,36 @@ test("processUrl / validateUrl switch on PAYFAST_MODE and default to sandbox", (
   expect(processUrl()).toBe("https://sandbox.payfast.co.za/eng/process");
 });
 
-// ---- selling kill switch (PAYFAST_DISABLED) ------------------------------------
+// ---- selling kill switch (PAYFAST_MODE=off) ------------------------------------
 
-test("sellingEnabled: a provisioned rail is live unless PAYFAST_DISABLED pauses it", () => {
+test("sellingEnabled: a provisioned rail is live unless PAYFAST_MODE=off pauses it", () => {
   process.env.PAYFAST_MERCHANT_ID = "10000100";
   process.env.PAYFAST_MERCHANT_KEY = "46f0cd694581a";
   process.env.PAYFAST_PASSPHRASE = "jt7NOE43FZPn";
 
-  // Provisioned and no pause → live.
-  delete process.env.PAYFAST_DISABLED;
-  expect(sellingDisabled()).toBe(false);
-  expect(sellingEnabled()).toBe(true);
-
-  // Any truthy pause value turns selling off, even with the rail fully provisioned.
-  for (const v of ["true", "TRUE", " True ", "1", "yes"]) {
-    process.env.PAYFAST_DISABLED = v;
-    expect(sellingDisabled()).toBe(true);
-    expect(sellingEnabled()).toBe(false);
-  }
-
-  // A non-truthy value is ignored — selling stays on.
-  for (const v of ["false", "0", ""]) {
-    process.env.PAYFAST_DISABLED = v;
+  // Every valid mode except "off" sells — unset, sandbox, live (case tolerant).
+  for (const m of [undefined, "sandbox", "live", "SANDBOX", "Live"]) {
+    if (m === undefined) delete process.env.PAYFAST_MODE;
+    else process.env.PAYFAST_MODE = m;
     expect(sellingDisabled()).toBe(false);
     expect(sellingEnabled()).toBe(true);
   }
 
-  // Missing credentials → off regardless of the switch.
-  delete process.env.PAYFAST_DISABLED;
+  // PAYFAST_MODE=off pauses selling (case/space tolerant), rail fully provisioned.
+  for (const m of ["off", "OFF", " Off "]) {
+    process.env.PAYFAST_MODE = m;
+    expect(sellingDisabled()).toBe(true);
+    expect(sellingEnabled()).toBe(false);
+  }
+
+  // An unrecognised mode is a misconfiguration — fail loud, never silently guess.
+  for (const m of ["disable", "prod", "true"]) {
+    process.env.PAYFAST_MODE = m;
+    expect(() => sellingEnabled()).toThrow(/PAYFAST_MODE/);
+  }
+
+  // Missing credentials → off regardless of mode.
+  delete process.env.PAYFAST_MODE;
   delete process.env.PAYFAST_PASSPHRASE;
   expect(sellingEnabled()).toBe(false);
 });

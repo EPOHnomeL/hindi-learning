@@ -295,14 +295,14 @@ test("startCheckout rejects an unpriced Edition and a not-ready Seller", async (
   void topicId;
 });
 
-test("startCheckout refuses while PAYFAST_DISABLED pauses selling — no buyer reaches the gateway", async () => {
+test("startCheckout refuses while PAYFAST_MODE=off pauses selling — no buyer reaches the gateway", async () => {
   const t = convexTest(schema, modules);
   await sellableTopic(t);
   const buyer = await seedUser(t, "buyer@example.com");
 
   // The rail is provisioned (beforeAll) and the Edition is sellable, but the
   // platform pause is on: the checkout that would form-POST to PayFast is refused.
-  process.env.PAYFAST_DISABLED = "true";
+  process.env.PAYFAST_MODE = "off";
   try {
     await expect(
       asUser(t, buyer).mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "en" }),
@@ -311,7 +311,7 @@ test("startCheckout refuses while PAYFAST_DISABLED pauses selling — no buyer r
     const intents = await t.run((ctx) => ctx.db.query("checkoutIntents").collect());
     expect(intents).toEqual([]);
   } finally {
-    delete process.env.PAYFAST_DISABLED;
+    delete process.env.PAYFAST_MODE;
   }
 });
 

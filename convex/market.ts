@@ -41,7 +41,7 @@ export const setEditionPrice = mutation({
   returns: v.null(),
   handler: async (ctx, { topicSlug, lang, amount, currency }) => {
     // Selling must be live before a listing can exist — either the deployment's
-    // PayFast rail isn't configured, or PAYFAST_DISABLED has paused it. A listing
+    // PayFast rail isn't configured, or PAYFAST_MODE=off has paused it. A listing
     // that checkout can't sell must never come into being. Env is read at call
     // time: provisioning the vars (and clearing the pause) enables selling.
     if (!sellingEnabled()) {
@@ -390,7 +390,7 @@ export const startCheckout = mutation({
   // must POST them in exactly this order.
   returns: v.object({ action: v.string(), fields: v.array(v.object({ name: v.string(), value: v.string() })) }),
   handler: async (ctx, { topicSlug, lang }) => {
-    // Selling can be paused platform-wide (PAYFAST_DISABLED) even with the rail
+    // Selling can be paused platform-wide (PAYFAST_MODE=off) even with the rail
     // provisioned — e.g. while the merchant account is blocked. No checkout may
     // start, so no buyer is ever sent to a gateway that would 400 them.
     if (!sellingEnabled()) throw new Error("this edition isn't for sale right now");

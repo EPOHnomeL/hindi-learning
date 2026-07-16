@@ -118,7 +118,7 @@ export const savePayoutDetails = mutation({
 // The caller's own Seller status — drives the "set up selling" UI (ask the
 // admin / save bank details / ready) and gates the pricing controls.
 // Unauthenticated ⇒ not-granted. When selling isn't live on this deployment
-// (the PayFast rail isn't configured, or PAYFAST_DISABLED has paused it),
+// (the PayFast rail isn't configured, or PAYFAST_MODE=off has paused it),
 // selling is off for everyone regardless of grants — the UI shows why instead
 // of a price control that can only error.
 export const sellerStatus = query({

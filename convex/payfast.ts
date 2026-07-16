@@ -5,11 +5,12 @@
 // sandbox/live gateway URLs. The ONE network call on the rail (the ITN's server
 // postback to /eng/query/validate) lives in http.ts, mocked at that boundary.
 //
-// Provision before the money path runs live:
+// Provision before the money path runs live (declared + validated in ./env):
 //   PAYFAST_MERCHANT_ID / PAYFAST_MERCHANT_KEY / PAYFAST_PASSPHRASE
-//   PAYFAST_MODE      — "sandbox" | "live" (anything else ⇒ sandbox, never live)
+//   PAYFAST_MODE      — "live" | "sandbox" | "off" (off pauses selling)
 //   PLATFORM_FEE_BPS  — the platform's share of net, default 5000 (50%)
 //   SITE_URL          — the app origin, for return/cancel URLs
+import { env } from "./env";
 
 // ---- inline MD5 (RFC 1321) ---------------------------------------------------
 
@@ -148,9 +149,7 @@ export function buildCheckoutFields(opts: {
 // so a missing env var doesn't silently zero either side; bounded to [0, 10000]
 // so a stray value can't invert the economics.
 export function platformFeeBps(): number {
-  const raw = Number(process.env.PLATFORM_FEE_BPS ?? "5000");
-  if (!Number.isFinite(raw) || raw < 0 || raw > 10_000) return 5000;
-  return Math.round(raw);
+  return env().PLATFORM_FEE_BPS;
 }
 
 // Split a sale's net (cents, from the ITN's amount_net) into the Seller's and
@@ -180,30 +179,39 @@ export function randFromCents(cents: number): string {
 // they exist, so a listing checkout can't sell never comes into being; the env
 // is read at call time, so provisioning the vars enables selling by itself.
 export function payfastConfigured(): boolean {
-  return !!(process.env.PAYFAST_MERCHANT_ID && process.env.PAYFAST_MERCHANT_KEY && process.env.PAYFAST_PASSPHRASE);
+  const e = env();
+  return !!(e.PAYFAST_MERCHANT_ID && e.PAYFAST_MERCHANT_KEY && e.PAYFAST_PASSPHRASE);
 }
 
-// A hard pause switch, independent of provisioning: PAYFAST_DISABLED turns
-// selling off platform-wide WITHOUT tearing down the merchant credentials — the
-// off state to reach for while the PayFast merchant account is blocked. Truthy
-// values ("true"/"1"/"yes", case-insensitive) pause; anything else is ignored.
+// The deployment's PayFast mode — the single value gating both the gateway host
+// and whether selling is live. One of "live" | "sandbox" | "off" (off pauses
+// selling platform-wide, credentials left in place). Declared, validated, and
+// defaulted in ./env: unset ⇒ sandbox (never live); any other value throws there.
+export function payfastMode(): "live" | "sandbox" | "off" {
+  return env().PAYFAST_MODE;
+}
+
+// Whether selling is paused platform-wide — PAYFAST_MODE=off. The pause turns
+// selling off WITHOUT tearing down the merchant credentials — the state to reach
+// for while the PayFast merchant account is blocked. Independent of provisioning.
 export function sellingDisabled(): boolean {
-  const v = (process.env.PAYFAST_DISABLED ?? "").trim().toLowerCase();
-  return v === "true" || v === "1" || v === "yes";
+  return payfastMode() === "off";
 }
 
 // Whether selling is live on this deployment: the rail is provisioned AND not
-// explicitly paused. The single gate the Seller controls and the checkout
-// consult — content access is deliberately independent of it (a listing's
-// presence alone gates reads, so a pause never strands a bought Edition).
+// paused. The single gate the Seller controls and the checkout consult — content
+// access is deliberately independent of it (a listing's presence alone gates
+// reads, so a pause never strands a bought Edition).
 export function sellingEnabled(): boolean {
   return payfastConfigured() && !sellingDisabled();
 }
 
-// Sandbox unless PAYFAST_MODE is exactly "live" — a missing/typo'd env var must
-// never send a buyer (or a validate postback) to the live gateway.
+// The gateway host for the current mode — the live host only for "live", the
+// sandbox host for "sandbox"/"off". A missing/typo'd mode can't reach here: it
+// either defaults to sandbox or throws in payfastMode, so a buyer (or a validate
+// postback) is never sent to the live gateway by accident.
 function gatewayHost(): string {
-  return process.env.PAYFAST_MODE === "live" ? "https://www.payfast.co.za" : "https://sandbox.payfast.co.za";
+  return payfastMode() === "live" ? "https://www.payfast.co.za" : "https://sandbox.payfast.co.za";
 }
 // The hosted checkout the client form-POSTs the signed fields to.
 export function processUrl(): string {
@@ -222,7 +230,7 @@ export function validateUrl(): string {
 // `//evil.com` — is discarded for the origin root, closing the open-redirect
 // that would otherwise flow into PayFast's return/cancel URLs.
 export function appUrl(path = "/"): string {
-  const base = process.env.SITE_URL;
+  const base = env().SITE_URL;
   if (!base) throw new Error("SITE_URL is not set — provision it as a Convex env var");
   const baseUrl = new URL(base);
   let resolved: URL;

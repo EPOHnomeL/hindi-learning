@@ -151,7 +151,7 @@ test("sellerStatus walks not-granted → granted-no-payout-details → ready", a
   expect(await asUser(t, seller).query(api.sellers.sellerStatus, {})).toBe("ready");
 });
 
-test("PAYFAST_DISABLED pauses selling platform-wide — even a ready Seller sees payments-unconfigured", async () => {
+test("PAYFAST_MODE=off pauses selling platform-wide — even a ready Seller sees payments-unconfigured", async () => {
   const t = convexTest(schema, modules);
   const admin = await seedAdmin(t, "admin@example.com");
   const seller = await seedUser(t, "seller@example.com");
@@ -161,11 +161,11 @@ test("PAYFAST_DISABLED pauses selling platform-wide — even a ready Seller sees
 
   // Flip the kill switch: the rail is still provisioned (the beforeAll trio),
   // but selling is off for everyone — the price control shows "not available".
-  process.env.PAYFAST_DISABLED = "true";
+  process.env.PAYFAST_MODE = "off";
   try {
     expect(await asUser(t, seller).query(api.sellers.sellerStatus, {})).toBe("payments-unconfigured");
   } finally {
-    delete process.env.PAYFAST_DISABLED;
+    delete process.env.PAYFAST_MODE;
   }
 });
 
