@@ -234,12 +234,17 @@ export function Landing() {
           <p>
             Born teaching Hindi — <span className="font-deva">नमस्ते</span> — built to teach anything.
           </p>
-          {/* PayFast compliance: terms, privacy, and the refund policy linked site-wide. */}
-          <nav className="mt-1 flex gap-4">
+          {/* PayFast compliance: terms, privacy, and the refund policy linked site-wide,
+              plus the payment method and a contact address visible on the home page. */}
+          <nav className="mt-1 flex flex-wrap justify-center gap-4">
             <Link href="/terms" className="hover:text-accent">Terms &amp; Conditions</Link>
             <Link href="/privacy" className="hover:text-accent">Privacy Policy</Link>
             <Link href="/refunds" className="hover:text-accent">Refunds &amp; Cancellation</Link>
           </nav>
+          <p className="text-xs">
+            Payments securely processed by Payfast (card &amp; Instant EFT) ·{" "}
+            <a href="mailto:support@my-course.app" className="hover:text-accent">support@my-course.app</a>
+          </p>
         </div>
       </footer>
     </div>
