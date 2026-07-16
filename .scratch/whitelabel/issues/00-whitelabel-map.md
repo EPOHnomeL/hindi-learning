@@ -1,6 +1,7 @@
 # whitelabel/00: Whitelabel map
 
-**Status:** open
+**Status:** destination reached — see Decisions so far; next step is the PRD, not another
+`/wayfinder` session.
 **Labels:** wayfinder:map
 
 ## Destination
@@ -83,6 +84,20 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
   Certificates/Editions/Questions/Public links; never touches ones already granted. A flag added
   later defaults `false` (opt-in) — the going-forward policy, distinct from the v1 migration's
   `true` seed. Unblocks the flags half of 06 — **06 is now fully unblocked** (02✓ 03✓ 04✓).
+- [Scope the operator + tenant-admin whitelabel dashboard](06-scope-operator-whitelabel-dashboard.md)
+  — the map's last scoping ticket, **destination reached**. All five candidate surfaces are v1
+  (tenant list+create, theme editing, flags, course/user↔subdomain assignment) — no CLI exists to
+  defer any of them to. Lives as a new **"Tenants" tab extending `/admin`**, scope-aware: sys admin
+  gets a tenant picker + create/remove, tenant admin is locked to their own tenant. **Theme editor
+  is both** — JSON import (matches how a design handoff actually arrives) plus structured per-token
+  fields for fine-tuning. **Assignment pickers live inside the tenant's own tab** (tenant-centric,
+  not item-centric). **Only tenant removal needs a confirm, and it's a hard block** (not a cascade)
+  while any course/member still references the tenant — mirrors ADR 0011's refuse-to-remove-the-
+  one-Admin pattern; 04's flag-off rule already covers the other "existing grants" safety question.
+  Ran a `/prototype` pass for the one open layout question (three structurally different
+  tenant-detail layouts, mounted on the real `/admin` route, mock data, then deleted once judged):
+  **winner is the stacked-scroll layout** — sidebar tenant list, selected tenant's Theme/Flags/
+  Courses/Members/Remove stacked as sections on one scrolling page, no sub-navigation.
 
 ## Not yet specified
 
@@ -118,8 +133,9 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
   raised by the operator mid-grilling [04](04-scope-per-tenant-feature-flags.md); neither exists
   in the codebase today. Reserved as future rows in 04's inventory; get their own scoping ticket
   (feature + flag together) once the operator wants to build them.
-- **PRD + implementation-issue breakdown** — the destination's final step; specifiable only once
-  the scoping tickets close.
+- **PRD + implementation-issue breakdown** — the destination's final step. All six scoping
+  tickets are now closed; this is the next session's work, per CLAUDE.md's grill → PRD → local
+  issues → TDD + ponytail pipeline (grilling is done, so start at PRD).
 
 ## Out of scope
 
