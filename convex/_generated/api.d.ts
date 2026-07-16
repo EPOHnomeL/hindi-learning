@@ -28,6 +28,7 @@ import type * as quizShuffle from "../quizShuffle.js";
 import type * as resources from "../resources.js";
 import type * as routine from "../routine.js";
 import type * as shares from "../shares.js";
+import type * as tenants from "../tenants.js";
 import type * as translate from "../translate.js";
 import type * as whitelist from "../whitelist.js";
 
@@ -58,6 +59,7 @@ declare const fullApi: ApiFromModules<{
   resources: typeof resources;
   routine: typeof routine;
   shares: typeof shares;
+  tenants: typeof tenants;
   translate: typeof translate;
   whitelist: typeof whitelist;
 }>;

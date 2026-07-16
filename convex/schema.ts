@@ -2,6 +2,31 @@ import { defineSchema, defineTable } from "convex/server";
 import { authTables } from "@convex-dev/auth/server";
 import { v } from "convex/values";
 
+// A tenant's theme (whitelabel, ticket 03 / ADR 0021 §1): the 14-token palette
+// plus optional brand assets. `light`/`dark` are loose records — not a fixed
+// v.object — because CSS-friendly hyphenated token names (good-b, bad-b) can't
+// be object keys in a validator; the exact key set is checked in code against
+// the token list (see convex/tenants.ts assertThemeTokens). `dark` is optional
+// and partial (else the default dark palette applies). Assets are raster blobs,
+// mint-new-never-overwrite; absent → displayName wordmark / shared /icon.svg.
+export const tenantThemeValidator = v.object({
+  light: v.record(v.string(), v.string()),
+  dark: v.optional(v.record(v.string(), v.string())),
+  logo: v.optional(v.id("_storage")),
+  favicon: v.optional(v.id("_storage")),
+});
+
+// A tenant's feature flags (ticket 04): five flat required booleans, each
+// enforced server-side inside the gated mutation. v1 migration default is all
+// `true` (no regression from today's always-on behaviour).
+export const tenantFlagsValidator = v.object({
+  certificates: v.boolean(),
+  translations: v.boolean(),
+  publicLinks: v.boolean(),
+  qa: v.boolean(),
+  seeding: v.boolean(),
+});
+
 // The Hub, as Convex tables (see PRD §4). Local workspace files (lessons/,
 // references/) remain the source of truth; `pnpm run publish` mirrors them
 // here. Capture tables (responses/progress/questions) are written by the
@@ -9,14 +34,47 @@ import { v } from "convex/values";
 export default defineSchema({
   ...authTables,
 
+  // Convex Auth's users table, inlined so we can extend it (per
+  // https://labs.convex.dev/auth/setup/schema). All fields + both indexes match
+  // `authTables.users` verbatim; the only addition is `tenantSlug` (whitelabel,
+  // issue 07) — the tenant a user belongs to; absent = default site.
+  users: defineTable({
+    name: v.optional(v.string()),
+    image: v.optional(v.string()),
+    email: v.optional(v.string()),
+    emailVerificationTime: v.optional(v.number()),
+    phone: v.optional(v.string()),
+    phoneVerificationTime: v.optional(v.number()),
+    isAnonymous: v.optional(v.boolean()),
+    tenantSlug: v.optional(v.string()),
+  })
+    .index("email", ["email"])
+    .index("phone", ["phone"]),
+
+  // The whitelabel tenant record (ADR 0021 §1, ticket 03 theme / 04 flags): one
+  // row per branded subdomain (`<slug>.my-course.app`), holding its palette +
+  // brand assets + feature flags. `slug` is the subdomain label (effectively
+  // immutable). One indexed `by_slug` read resolves skin + flags on the hot
+  // host→tenant path. Tenancy is a visibility filter and a skin, not a hard
+  // partition — access control stays ownership/Shares/public links.
+  tenants: defineTable({
+    slug: v.string(),
+    displayName: v.string(),
+    theme: tenantThemeValidator,
+    flags: tenantFlagsValidator,
+  }).index("by_slug", ["slug"]),
+
   // The Allowlist (ADR 0011): the set of emails permitted to sign up, managed at
   // runtime by the single Admin instead of the old `AUTH_ALLOWED_EMAILS` env var.
   // Emails are stored already-normalised (trimmed, lower-cased) so a lookup at
-  // sign-up never misses on casing/whitespace. `isAdmin` marks the one Admin row,
+  // sign-up never misses on casing/whitespace. `isAdmin` marks an Admin row,
   // which the portal shows but refuses to remove. An empty table admits nobody.
+  // `tenantSlug` (whitelabel, issue 07 / ADR 0021 §4) scopes an admin: absent =
+  // sys admin (every tenant); set = tenant admin (only that tenant).
   whitelist: defineTable({
     email: v.string(),
     isAdmin: v.optional(v.boolean()),
+    tenantSlug: v.optional(v.string()),
   }).index("by_email", ["email"]),
 
   // A subject space, owned by its creator. `ownerId` is optional only so the
@@ -66,11 +124,16 @@ export default defineSchema({
         ownerSet: v.optional(v.boolean()),
       }),
     ),
+    // The whitelabel tenant this course belongs to (issue 07 / ADR 0021 §3):
+    // absent = default site (shows on my-course.app only). `by_tenant` lists a
+    // subdomain's own courses. Legacy rows carry none — a safe no-op backfill.
+    tenantSlug: v.optional(v.string()),
   })
     .index("by_slug", ["slug"])
     .index("by_owner", ["ownerId"])
     .index("by_owner_slug", ["ownerId", "slug"])
-    .index("by_public_token", ["publicToken"]),
+    .index("by_public_token", ["publicToken"])
+    .index("by_tenant", ["tenantSlug"]),
 
   // Immutable once published. A replacement carries `supersededBy` (the key of
   // the lesson that retired it). `key` is the filename stem, e.g.
