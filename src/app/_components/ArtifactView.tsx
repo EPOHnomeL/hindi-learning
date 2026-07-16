@@ -483,7 +483,7 @@ function ContentEditor({
         className="min-h-0 flex-1 bg-card"
       />
       {error && (
-        <p className="border-t border-line px-5 py-3 text-sm text-red-600 dark:text-red-400">{error}</p>
+        <p className="border-t border-line px-5 py-3 text-sm text-danger">{error}</p>
       )}
     </dialog>
   );
