@@ -1,6 +1,7 @@
 # whitelabel/04: Scope per-tenant feature flags
 
 **Status:** open
+**Claimed:** session 2026-07-15 (feature-flags grilling)
 **Depends on:** 02
 **Labels:** wayfinder:grilling
 
