@@ -183,6 +183,23 @@ export function payfastConfigured(): boolean {
   return !!(process.env.PAYFAST_MERCHANT_ID && process.env.PAYFAST_MERCHANT_KEY && process.env.PAYFAST_PASSPHRASE);
 }
 
+// A hard pause switch, independent of provisioning: PAYFAST_DISABLED turns
+// selling off platform-wide WITHOUT tearing down the merchant credentials — the
+// off state to reach for while the PayFast merchant account is blocked. Truthy
+// values ("true"/"1"/"yes", case-insensitive) pause; anything else is ignored.
+export function sellingDisabled(): boolean {
+  const v = (process.env.PAYFAST_DISABLED ?? "").trim().toLowerCase();
+  return v === "true" || v === "1" || v === "yes";
+}
+
+// Whether selling is live on this deployment: the rail is provisioned AND not
+// explicitly paused. The single gate the Seller controls and the checkout
+// consult — content access is deliberately independent of it (a listing's
+// presence alone gates reads, so a pause never strands a bought Edition).
+export function sellingEnabled(): boolean {
+  return payfastConfigured() && !sellingDisabled();
+}
+
 // Sandbox unless PAYFAST_MODE is exactly "live" — a missing/typo'd env var must
 // never send a buyer (or a validate postback) to the live gateway.
 function gatewayHost(): string {

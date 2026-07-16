@@ -8,6 +8,8 @@ import {
   platformFeeBps,
   processUrl,
   randFromCents,
+  sellingDisabled,
+  sellingEnabled,
   signFields,
   splitNet,
   validateUrl,
@@ -20,7 +22,15 @@ import {
 // formatting, and the mode-switched gateway URLs. The vectors were computed
 // independently (node:crypto), so a wrong MD5/canonicalisation can't self-verify.
 
-const ENV = ["PLATFORM_FEE_BPS", "PAYFAST_MODE", "SITE_URL"] as const;
+const ENV = [
+  "PLATFORM_FEE_BPS",
+  "PAYFAST_MODE",
+  "SITE_URL",
+  "PAYFAST_MERCHANT_ID",
+  "PAYFAST_MERCHANT_KEY",
+  "PAYFAST_PASSPHRASE",
+  "PAYFAST_DISABLED",
+] as const;
 const saved: Record<string, string | undefined> = {};
 beforeEach(() => {
   for (const k of ENV) saved[k] = process.env[k];
@@ -202,6 +212,38 @@ test("processUrl / validateUrl switch on PAYFAST_MODE and default to sandbox", (
   // Unset → sandbox: a missing env var must never hit the live gateway.
   delete process.env.PAYFAST_MODE;
   expect(processUrl()).toBe("https://sandbox.payfast.co.za/eng/process");
+});
+
+// ---- selling kill switch (PAYFAST_DISABLED) ------------------------------------
+
+test("sellingEnabled: a provisioned rail is live unless PAYFAST_DISABLED pauses it", () => {
+  process.env.PAYFAST_MERCHANT_ID = "10000100";
+  process.env.PAYFAST_MERCHANT_KEY = "46f0cd694581a";
+  process.env.PAYFAST_PASSPHRASE = "jt7NOE43FZPn";
+
+  // Provisioned and no pause → live.
+  delete process.env.PAYFAST_DISABLED;
+  expect(sellingDisabled()).toBe(false);
+  expect(sellingEnabled()).toBe(true);
+
+  // Any truthy pause value turns selling off, even with the rail fully provisioned.
+  for (const v of ["true", "TRUE", " True ", "1", "yes"]) {
+    process.env.PAYFAST_DISABLED = v;
+    expect(sellingDisabled()).toBe(true);
+    expect(sellingEnabled()).toBe(false);
+  }
+
+  // A non-truthy value is ignored — selling stays on.
+  for (const v of ["false", "0", ""]) {
+    process.env.PAYFAST_DISABLED = v;
+    expect(sellingDisabled()).toBe(false);
+    expect(sellingEnabled()).toBe(true);
+  }
+
+  // Missing credentials → off regardless of the switch.
+  delete process.env.PAYFAST_DISABLED;
+  delete process.env.PAYFAST_PASSPHRASE;
+  expect(sellingEnabled()).toBe(false);
 });
 
 // ---- appUrl (moved over from stripe.ts, behaviour unchanged) --------------------

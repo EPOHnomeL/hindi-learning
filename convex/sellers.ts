@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import { getSeller, normaliseEmail, sellerStatusOf, sellerStatusValidator, type SellerStatus } from "./lib";
-import { payfastConfigured } from "./payfast";
+import { sellingEnabled } from "./payfast";
 import { payoutDetailsValidator } from "./schema";
 import { isCallerAdmin } from "./whitelist";
 
@@ -117,14 +117,15 @@ export const savePayoutDetails = mutation({
 
 // The caller's own Seller status — drives the "set up selling" UI (ask the
 // admin / save bank details / ready) and gates the pricing controls.
-// Unauthenticated ⇒ not-granted. When the deployment's PayFast rail isn't
-// configured, selling is off for everyone regardless of grants — the UI shows
-// why instead of a price control that can only error.
+// Unauthenticated ⇒ not-granted. When selling isn't live on this deployment
+// (the PayFast rail isn't configured, or PAYFAST_DISABLED has paused it),
+// selling is off for everyone regardless of grants — the UI shows why instead
+// of a price control that can only error.
 export const sellerStatus = query({
   args: {},
   returns: sellerStatusValidator,
   handler: async (ctx): Promise<SellerStatus> => {
-    if (!payfastConfigured()) return "payments-unconfigured";
+    if (!sellingEnabled()) return "payments-unconfigured";
     const userId = await getAuthUserId(ctx);
     if (!userId) return "not-granted";
     return sellerStatusOf(await getSeller(ctx, userId));

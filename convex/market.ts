@@ -16,7 +16,7 @@ import {
   translatedTitle,
 } from "./lib";
 import { langInfo } from "./languages";
-import { appUrl, buildCheckoutFields, payfastConfigured, platformFeeBps, processUrl, splitNet } from "./payfast";
+import { appUrl, buildCheckoutFields, platformFeeBps, processUrl, sellingEnabled, splitNet } from "./payfast";
 import { isCallerAdmin } from "./whitelist";
 
 // Paid marketplace (ADR 0016, PayFast rail — .scratch/payfast-payments) — the
@@ -40,11 +40,12 @@ export const setEditionPrice = mutation({
   args: { topicSlug: v.string(), lang: v.string(), amount: v.number(), currency: v.string() },
   returns: v.null(),
   handler: async (ctx, { topicSlug, lang, amount, currency }) => {
-    // Selling is disabled until the deployment's PayFast rail is configured —
-    // a listing that checkout can't sell must never come into being. Env is
-    // read at call time: provisioning the vars enables selling by itself.
-    if (!payfastConfigured()) {
-      throw new Error("Selling is disabled — PayFast isn't configured on this deployment yet.");
+    // Selling must be live before a listing can exist — either the deployment's
+    // PayFast rail isn't configured, or PAYFAST_DISABLED has paused it. A listing
+    // that checkout can't sell must never come into being. Env is read at call
+    // time: provisioning the vars (and clearing the pause) enables selling.
+    if (!sellingEnabled()) {
+      throw new Error("Selling is disabled on this deployment.");
     }
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("forbidden");
@@ -389,6 +390,10 @@ export const startCheckout = mutation({
   // must POST them in exactly this order.
   returns: v.object({ action: v.string(), fields: v.array(v.object({ name: v.string(), value: v.string() })) }),
   handler: async (ctx, { topicSlug, lang }) => {
+    // Selling can be paused platform-wide (PAYFAST_DISABLED) even with the rail
+    // provisioned — e.g. while the merchant account is blocked. No checkout may
+    // start, so no buyer is ever sent to a gateway that would 400 them.
+    if (!sellingEnabled()) throw new Error("this edition isn't for sale right now");
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("sign in to buy — a purchase attaches to your account");
     const user = await ctx.db.get(userId);

@@ -151,6 +151,24 @@ test("sellerStatus walks not-granted → granted-no-payout-details → ready", a
   expect(await asUser(t, seller).query(api.sellers.sellerStatus, {})).toBe("ready");
 });
 
+test("PAYFAST_DISABLED pauses selling platform-wide — even a ready Seller sees payments-unconfigured", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  await asUser(t, admin).mutation(api.sellers.grantCanSell, { email: "seller@example.com" });
+  await asUser(t, seller).mutation(api.sellers.savePayoutDetails, PAYOUT);
+  expect(await asUser(t, seller).query(api.sellers.sellerStatus, {})).toBe("ready");
+
+  // Flip the kill switch: the rail is still provisioned (the beforeAll trio),
+  // but selling is off for everyone — the price control shows "not available".
+  process.env.PAYFAST_DISABLED = "true";
+  try {
+    expect(await asUser(t, seller).query(api.sellers.sellerStatus, {})).toBe("payments-unconfigured");
+  } finally {
+    delete process.env.PAYFAST_DISABLED;
+  }
+});
+
 // ---- Seam — payout bank details ------------------------------------------------
 
 test("a granted author can save and update bank details; a non-granted user cannot", async () => {
@@ -342,7 +360,7 @@ test("selling is disabled while PayFast isn't configured — pricing refused, st
     // Even a ready Seller can't price — a listing checkout can't sell must never exist.
     await expect(
       asUser(t, owner).mutation(api.market.setEditionPrice, { topicSlug: "hindi", lang: "en", amount: 50000, currency: "zar" }),
-    ).rejects.toThrow(/PayFast/);
+    ).rejects.toThrow(/[Ss]elling is disabled/);
     // The self-status query says why, so the UI shows the reason, not a dead control.
     expect(await asUser(t, owner).query(api.sellers.sellerStatus, {})).toBe("payments-unconfigured");
     // Un-listing stays allowed — an owner can always stop selling.
