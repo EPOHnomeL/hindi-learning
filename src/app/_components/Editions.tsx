@@ -462,7 +462,7 @@ function PayoutDetailsForm() {
         {field("accountHolder", "Account holder", "Full name on the account")}
         {field("bank", "Bank", "e.g. FNB")}
         {field("accountNumber", "Account number", "62…", "numeric")}
-        {field("branchCode", "Branch code", "6 digits", "numeric")}
+        {field("branchCode", "Branch code", "Digits", "numeric")}
       </div>
       <button
         type="submit"

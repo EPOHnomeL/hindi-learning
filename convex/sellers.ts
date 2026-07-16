@@ -107,7 +107,7 @@ export const savePayoutDetails = mutation({
     };
     if (!payout.accountHolder || !payout.bank) throw new Error("every field is required");
     if (!/^\d{4,20}$/.test(payout.accountNumber)) throw new Error("account number must be 4–20 digits");
-    if (!/^\d{6}$/.test(payout.branchCode)) throw new Error("branch code must be 6 digits");
+    if (!/^\d+$/.test(payout.branchCode)) throw new Error("branch code must be digits");
     await ctx.db.patch(seller._id, { payout });
     return null;
   },

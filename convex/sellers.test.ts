@@ -189,7 +189,7 @@ test("savePayoutDetails rejects blank or non-numeric account/branch fields", asy
     asUser(t, seller).mutation(api.sellers.savePayoutDetails, { ...PAYOUT, accountNumber: "not-digits" }),
   ).rejects.toThrow();
   await expect(
-    asUser(t, seller).mutation(api.sellers.savePayoutDetails, { ...PAYOUT, branchCode: "12" }),
+    asUser(t, seller).mutation(api.sellers.savePayoutDetails, { ...PAYOUT, branchCode: "12ab" }),
   ).rejects.toThrow();
   expect(await asUser(t, seller).query(api.sellers.sellerStatus, {})).toBe("granted-no-payout-details");
 });
