@@ -27,7 +27,8 @@ undecided (2026-07-15): whether phases are *structural* or *policy*.
   the evidence-backed teach-skill principles)? Frame the feature on the *modalities*, not the
   debunked numbers.
 - Mapping table: pyramid step → owning component (existing ticket or gap). "Demonstration"
-  and "teach others" have no owner today — do they need tickets or fold into 02?
+  has no owner today — does it need a ticket or fold into 02? ("Teach others" now has a
+  skill-level owner: pedagogy/03; platform-level teach-back stays with 02.)
 - Does [[Progress]]/[[Completion]] change meaning if a concept has phases (complete = all
   phases done)?
 - Naming: **Phase** as a CONTEXT.md term (vs the retired "module"? vs "step").

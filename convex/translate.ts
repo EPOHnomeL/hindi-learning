@@ -519,7 +519,7 @@ export const collectForTranslation = internalQuery({
 export function buildTranslateMessages(content: string, langName: string, mode: "html" | "text"): ChatMessage[] {
   const system =
     mode === "html"
-      ? `You are a professional translator. Translate the human-readable text of the following HTML into ${langName}. Preserve EVERY HTML tag, attribute, and value EXACTLY — especially quiz markers (class names, data-correct, data-answer, data-k, data-alt). Do not add, remove, or reorder elements. Return ONLY the translated HTML, with no code fence and no commentary.`
+      ? `You are a professional translator. Translate ALL human-readable text of the following HTML into ${langName}. This INCLUDES quoted passages, block quotes, and the "Sources"/citation footer (e.g. a <footer> that quotes source works) — a quoted teaching passage is learner-read prose; never leave it in the source language just because it is a quotation. Preserve EVERY HTML tag, attribute, and value EXACTLY — especially quiz markers (class names, data-correct, data-answer, data-k, data-alt). Do not add, remove, or reorder elements. Keep unchanged: author names, the titles of cited works, proper nouns, and page/verse references (translate the quoted words themselves, not the attribution); and any fill-in-the-blank quiz sentence whose answer is a word the learner must type in the source language. For Bible quotations, use the wording of a widely-used published ${langName} Bible rather than translating the English yourself. Return ONLY the translated HTML, with no code fence and no commentary.`
       : `You are a professional translator. Translate the following text into ${langName}. Return ONLY the translation, with no quotes or commentary.`;
   return [
     { role: "system", content: system },
@@ -758,5 +758,51 @@ export const editions = query({
         }),
     ];
     return { completed: (topic.status ?? "active") === "completed", editions };
+  },
+});
+
+// Read one Edition's translated bodies for an out-of-band correction pass — the
+// read sibling of `publishTranslation`, same secret-guarded trust model as
+// `materialiseTopic` (the run has no auth identity). Topic+lang scoped, read-only,
+// carries no tokens/PII. Returns inline `html` directly and a signed `url` for a
+// blob-backed body, so the correction CLI can pull an Edition to disk, fix the
+// text, and republish through `publishTranslation`. Null if the Topic is missing.
+export const readEditionBodies = query({
+  args: { secret: v.string(), topicSlug: v.string(), lang: v.string() },
+  returns: v.union(
+    v.null(),
+    v.array(
+      v.object({
+        kind: kindV,
+        key: v.string(),
+        title: v.optional(v.string()),
+        html: v.optional(v.string()),
+        url: v.union(v.string(), v.null()),
+        text: v.optional(v.string()),
+        reply: v.optional(v.string()),
+      }),
+    ),
+  ),
+  handler: async (ctx, { secret, topicSlug, lang }) => {
+    assertAdmin(secret);
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return null;
+    const rows = await ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", lang))
+      .collect();
+    const out = [];
+    for (const r of rows) {
+      out.push({
+        kind: r.kind,
+        key: r.key,
+        title: r.title,
+        html: r.html,
+        url: r.htmlStorageId ? await ctx.storage.getUrl(r.htmlStorageId) : null,
+        text: r.text,
+        reply: r.reply,
+      });
+    }
+    return out;
   },
 });

@@ -1,14 +1,18 @@
 # whitelabel/00: Whitelabel map
 
-**Status:** open
+**Status:** destination reached. [PRD](../PRD.md) written, broken into 17 local implementation
+issues (07–23) — next step is building them (`/tdd` + `/ponytail`), not another `/wayfinder`
+session.
 **Labels:** wayfinder:map
 
-## Destination
+## Destination — reached
 
-Whitelabel v1 is fully specified and ready to build: an agreed tenant/subdomain model, per-subdomain
+Whitelabel v1 is fully specified and captured as a [PRD](../PRD.md) + 17 local implementation
+issues (07–23), per the CLAUDE.md pipeline: an agreed tenant/subdomain model, per-subdomain
 theming on a tokenised design system, per-tenant feature flags with backend enforcement, and an
-operator whitelabel dashboard — captured as PRD(s) + implementation issues per the CLAUDE.md
-pipeline. One task is carried in-map as execution: the four tenant subdomains live on my-course.app.
+operator whitelabel dashboard. One task was carried in-map as execution: the four tenant
+subdomains live on my-course.app. Building the implementation issues (`/tdd` + `/ponytail`, one
+issue per session in dependency order) is the next work — not another `/wayfinder` session.
 
 ## Notes
 
@@ -69,6 +73,34 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
   full-palette-derived + logo (light-only); certificate identity-only with frozen styling
   (print not themed). Mock palettes for the four tenants captured as the acceptance fixture
   (placeholders — real Claude design systems land later). Unblocks the theming half of 06.
+- [Scope per-tenant feature flags](04-scope-per-tenant-feature-flags.md) — **flat required
+  booleans** on the `tenants` row (`certificates`, `translations`, `publicLinks`, `qa`,
+  `seeding`), all default `true` at the v1 migration (no regression from today's always-on
+  behaviour). Sharing/invites and Routine on-demand fire stay **hardwired-on** (the former is the
+  admission path itself; the latter already has its own cost guard). Marketplace/payments,
+  rich-media/video, and two ideas the operator raised mid-grill — AI content-regeneration /
+  "Builder prompt box" and a more dynamic content-aware Q&A — are **future rows**: name reserved,
+  no enforcement built (nothing to enforce yet). **Enforcement is a new `assertTenantFlag` helper
+  called explicitly from each gated mutation** (`claimCertificate`, `setTopicPublic`/
+  `setEditionPublic`, `askQuestion`, `startTranslation`, `seedTopic`) — `getOwnedTopic`/
+  `getViewableTopic` stay flag-agnostic. **Flag-off is frozen, not revoked**: blocks new
+  Certificates/Editions/Questions/Public links; never touches ones already granted. A flag added
+  later defaults `false` (opt-in) — the going-forward policy, distinct from the v1 migration's
+  `true` seed. Unblocks the flags half of 06 — **06 is now fully unblocked** (02✓ 03✓ 04✓).
+- [Scope the operator + tenant-admin whitelabel dashboard](06-scope-operator-whitelabel-dashboard.md)
+  — the map's last scoping ticket, **destination reached**. All five candidate surfaces are v1
+  (tenant list+create, theme editing, flags, course/user↔subdomain assignment) — no CLI exists to
+  defer any of them to. Lives as a new **"Tenants" tab extending `/admin`**, scope-aware: sys admin
+  gets a tenant picker + create/remove, tenant admin is locked to their own tenant. **Theme editor
+  is both** — JSON import (matches how a design handoff actually arrives) plus structured per-token
+  fields for fine-tuning. **Assignment pickers live inside the tenant's own tab** (tenant-centric,
+  not item-centric). **Only tenant removal needs a confirm, and it's a hard block** (not a cascade)
+  while any course/member still references the tenant — mirrors ADR 0011's refuse-to-remove-the-
+  one-Admin pattern; 04's flag-off rule already covers the other "existing grants" safety question.
+  Ran a `/prototype` pass for the one open layout question (three structurally different
+  tenant-detail layouts, mounted on the real `/admin` route, mock data, then deleted once judged):
+  **winner is the stacked-scroll layout** — sidebar tenant list, selected tenant's Theme/Flags/
+  Courses/Members/Remove stacked as sections on one scrolling page, no sub-navigation.
 
 ## Not yet specified
 
@@ -98,9 +130,12 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
 - **Apex/custom domains per tenant** (e.g. a brand's own domain instead of a my-course.app
   subdomain) — later; the subdomain model should merely not preclude it.
 - **Rich-media/video as a tenant flag** — parallel [rich-media](../../rich-media/README.md)
-  effort; would land through the flag inventory once both exist.
-- **PRD + implementation-issue breakdown** — the destination's final step; specifiable only once
-  the scoping tickets close.
+  effort; reserved as a **future** row in [04](04-scope-per-tenant-feature-flags.md)'s flag
+  inventory, enforced once the feature itself exists.
+- **AI content-regeneration ("Builder prompt box") and a more dynamic, content-aware Q&A** —
+  raised by the operator mid-grilling [04](04-scope-per-tenant-feature-flags.md); neither exists
+  in the codebase today. Reserved as future rows in 04's inventory; get their own scoping ticket
+  (feature + flag together) once the operator wants to build them.
 
 ## Out of scope
 

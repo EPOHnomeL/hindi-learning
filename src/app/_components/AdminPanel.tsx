@@ -352,7 +352,7 @@ function AddEmailForm() {
           {busy ? "Adding…" : "Add"}
         </button>
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
     </form>
   );
 }
@@ -376,7 +376,7 @@ function EmailRow({ email, isAdmin }: { email: string; isAdmin: boolean }) {
         <span className="shrink-0 text-xs text-soft">Can't be removed</span>
       ) : (
         <div className="flex shrink-0 items-center gap-2">
-          {error && <span className="text-xs text-red-600">Failed — retry</span>}
+          {error && <span className="text-xs text-danger">Failed — retry</span>}
           <button
             onClick={async () => {
               setBusy(true);

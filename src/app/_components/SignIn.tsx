@@ -54,7 +54,7 @@ export function SignIn() {
           <button type="submit" disabled={busy} className="rounded-lg bg-accent px-3 py-2 font-medium text-white disabled:opacity-50">
             {busy ? "…" : flow === "signIn" ? "Sign in" : "Sign up"}
           </button>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
           <button
             type="button"
             className="text-sm text-soft hover:text-accent"

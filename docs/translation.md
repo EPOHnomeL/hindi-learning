@@ -105,6 +105,12 @@ DOM order and reads `data-correct`/`data-k`/`data-answer`
 safety net, `publishTranslation` re-checks each Lesson's quiz-marker counts and
 **skips** a drifted item (it falls back to English) rather than store a broken quiz.
 
+The rules also require translating **quoted passages and the "Sources" citation
+footer** — a quote the course cites is learner-read prose, not object-of-study, so
+it must be rendered in the target language (keeping only the attribution: author
+names, work titles, proper nouns, page/verse refs; Bible verses from a published
+translation). Skipping these is the most common real-world miss — see §7 / §8.
+
 ---
 
 ## 5. Data it writes
@@ -159,3 +165,65 @@ learner completed in.
 | Editions panel shows `Ready · N failed` | the run didn't publish N items (skipped or errored) | retry; if a Lesson keeps failing, its translated quiz markers drifted — the skill must preserve them. |
 | Owner can't translate a course | the course isn't `completed` | mark it complete first — translation is gated on Completion. |
 | "unsupported language" | the target isn't in the offered `LANGUAGES` menu | pick a listed language (extend `convex/languages.ts` to grow the menu). |
+| A whole class of prose stays in English — block quotes and especially the lesson "Sources / ذرائع" **footer** | the translator translated the narration but **skipped the verbatim quotations it cites**; the job still reports `ready` (there is no leftover-source-language check) | correct the Edition out-of-band (§8). The fidelity rule now covers this (§4), so *new* translations shouldn't regress. |
+
+---
+
+## 8. Correcting an already-translated Edition (out-of-band fix)
+
+The machine translator has one recurring quality gap: it translates the narration
+but **leaves verbatim quotations in the source language** — block quotes,
+`.book`/`.note`/`.verse` cards, and especially the lesson `<footer>` "Sources /
+ذرائع" citation apparatus. `translationJobs` still reports these `ready` /
+0-failed — there is **no leftover-source-language check**, so *ready ≠ fully
+translated*. The fidelity rule for this is now explicit (§4 / the `translate` skill
+and the `buildTranslateMessages` prompt in `convex/translate.ts`), so **new**
+translations should not regress; Editions translated before 2026-07-15 need an
+out-of-band correction.
+
+> Corrected so far: **prophetic-school** (Growing in the Holy Spirit) **`ur`** —
+> lessons 0004, 0008, 0009, 0023, 0029 (2026-07-15). Its other editions
+> (`af`, `es`, `fr`, `mg`) and other tenants' translated courses are **not yet
+> checked** and are likely affected the same way.
+
+**Detect** — for each `translations` row: strip `<!-- -->` / `<style>` / `<script>`
+/ tags, then flag runs of ≥6 consecutive Latin-script words; segment at `<footer>`
+(body vs footer). **Not** bugs — leave these: each lesson's fill-in-the-blank quiz
+whose answer is a source-language word; author names, titles of cited works, proper
+nouns, page/verse references; Bible verses (render from a published target-language
+Bible, never a back-translation).
+
+**Read** the Edition's bodies to disk (a row is inline `html` **or** a blob
+`htmlStorageId`): either a scoped `runOneoffQuery` via the prod Convex MCP (needs
+`--cautiously-allow-production-pii` — see below), or the secret-guarded
+`translate.readEditionBodies` (topic+lang scoped; returns inline `html` or a signed
+`url` per item — a CLI fetches the URLs byte-perfect).
+
+**Write** in place — stage **only** the corrected lessons at
+`topics/<slug>/translations/<lang>/lessons/<key>.html`, then:
+
+```bash
+TRANSLATE_LANG=<lang> pnpm run publish-translation:prod --topic <slug>
+```
+
+This re-publishes via the `PUBLISH_SECRET`-guarded `publishTranslation`, which
+re-stamps the source hash so a later re-translate keeps the correction, and
+preserves the quiz markers (edit only footer/citation/body prose, never `.quiz`
+markup). It is **owner-scoped**: `OWNER_EMAIL` in `.env.local` must be the **course
+owner's** account — a *tenant* account, **not** the operator — or it throws
+"topic not found" (e.g. prophetic-school is owned by the YWAM tenant account, not
+`jvorster63`).
+
+### Prod Convex MCP read access
+
+The official `convex` plugin marks the **prod** deployment `readOnly` for the agent
+MCP, so `runOneoffQuery` / `data` / `logs` reject it. To read prod, add a second MCP
+server started with `--cautiously-allow-production-pii` (read-only tools only — it
+does **not** grant writes) and restart the session:
+
+```json
+{"mcpServers":{"convex-prod":{"command":"npx","args":["convex","mcp","start","--cautiously-allow-production-pii","--project-dir","<repo>"]}}}
+```
+
+This is a **standing prod-PII read grant in a git-tracked file — remove the entry
+when the correction pass is done.**

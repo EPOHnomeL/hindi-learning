@@ -17,6 +17,13 @@
   --color-gold: #b88a2e;
   --color-hi: #fbeecb;
   --color-danger: #b4442f;
+  /* Quiz correct/wrong states (issue 09): part of the 14-token contract so a
+     tenant override sets all 14 uniformly. The app chrome doesn't render quiz
+     states, so these are inert here — values mirror lessons/_partials/head.html. */
+  --color-good: #e7f3ec;
+  --color-good-b: #3f8f63;
+  --color-bad: #fbe9e7;
+  --color-bad-b: #c0573f;
 }
 
 /* App-wide dark mode (ADR 0011). Overriding the color tokens under the dark
@@ -34,6 +41,10 @@ html[data-theme="dark"] {
   --color-gold: #d8ab57;
   --color-hi: #4a3c1f;
   --color-danger: #e0785f;
+  --color-good: #1e3328;
+  --color-good-b: #74cf9b;
+  --color-bad: #3c241e;
+  --color-bad-b: #e0937c;
 }
 
 body {

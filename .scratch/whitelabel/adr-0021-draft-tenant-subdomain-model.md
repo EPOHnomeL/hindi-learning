@@ -34,7 +34,11 @@ Shape (grows as 03/04 land):
 - `theme` — **resolved by [ticket 03](issues/03-scope-per-tenant-theming.md)**: an inline
   object `{ light, dark?, logo?, favicon? }` (14-token palette as a validated record +
   two raster asset storage ids). Edit-is-live; no separate `themes` table.
-- feature flags — **shape defined by ticket 04** (placeholder here).
+- `flags` — **resolved by [ticket 04](issues/04-scope-per-tenant-feature-flags.md)**: a flat
+  `{ certificates, translations, publicLinks, qa, seeding }` object of required booleans (no
+  optional-with-implicit-default — every tenant row always carries an explicit value per flag).
+  Enforced by a new `assertTenantFlag` helper called from each gated mutation, not baked into
+  `getOwnedTopic`/`getViewableTopic`.
 - branding assets (logo, favicon) — **inline on `theme`** per ticket 03 (raster storage
   blobs via the emblem rail).
 - Per-tenant domain is derivable as `<slug>.my-course.app` for v1; an explicit
