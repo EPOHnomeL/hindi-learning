@@ -69,6 +69,20 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
   full-palette-derived + logo (light-only); certificate identity-only with frozen styling
   (print not themed). Mock palettes for the four tenants captured as the acceptance fixture
   (placeholders — real Claude design systems land later). Unblocks the theming half of 06.
+- [Scope per-tenant feature flags](04-scope-per-tenant-feature-flags.md) — **flat required
+  booleans** on the `tenants` row (`certificates`, `translations`, `publicLinks`, `qa`,
+  `seeding`), all default `true` at the v1 migration (no regression from today's always-on
+  behaviour). Sharing/invites and Routine on-demand fire stay **hardwired-on** (the former is the
+  admission path itself; the latter already has its own cost guard). Marketplace/payments,
+  rich-media/video, and two ideas the operator raised mid-grill — AI content-regeneration /
+  "Builder prompt box" and a more dynamic content-aware Q&A — are **future rows**: name reserved,
+  no enforcement built (nothing to enforce yet). **Enforcement is a new `assertTenantFlag` helper
+  called explicitly from each gated mutation** (`claimCertificate`, `setTopicPublic`/
+  `setEditionPublic`, `askQuestion`, `startTranslation`, `seedTopic`) — `getOwnedTopic`/
+  `getViewableTopic` stay flag-agnostic. **Flag-off is frozen, not revoked**: blocks new
+  Certificates/Editions/Questions/Public links; never touches ones already granted. A flag added
+  later defaults `false` (opt-in) — the going-forward policy, distinct from the v1 migration's
+  `true` seed. Unblocks the flags half of 06 — **06 is now fully unblocked** (02✓ 03✓ 04✓).
 
 ## Not yet specified
 
@@ -98,7 +112,12 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
 - **Apex/custom domains per tenant** (e.g. a brand's own domain instead of a my-course.app
   subdomain) — later; the subdomain model should merely not preclude it.
 - **Rich-media/video as a tenant flag** — parallel [rich-media](../../rich-media/README.md)
-  effort; would land through the flag inventory once both exist.
+  effort; reserved as a **future** row in [04](04-scope-per-tenant-feature-flags.md)'s flag
+  inventory, enforced once the feature itself exists.
+- **AI content-regeneration ("Builder prompt box") and a more dynamic, content-aware Q&A** —
+  raised by the operator mid-grilling [04](04-scope-per-tenant-feature-flags.md); neither exists
+  in the codebase today. Reserved as future rows in 04's inventory; get their own scoping ticket
+  (feature + flag together) once the operator wants to build them.
 - **PRD + implementation-issue breakdown** — the destination's final step; specifiable only once
   the scoping tickets close.
 

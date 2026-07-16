@@ -21,6 +21,15 @@ Child of [Whitelabel map](00-whitelabel-map.md).
 > content. So 06 manages palette + assets + flags + assignment + members, **not** landing copy. The
 > "theme editing fidelity" question below (raw token JSON vs structured fields) is now the main open
 > theming decision for 06.
+>
+> **Updated by [04](04-scope-per-tenant-feature-flags.md) (2026-07-15):** the flags 06 edits are five
+> flat required booleans on the `tenants` row — `certificates`, `translations`, `publicLinks`, `qa`,
+> `seeding` (all default `true` at the v1 migration; a flag added later defaults `false` and needs an
+> explicit opt-in per tenant). So "flag editing" here is a **plain toggle row, one per flag** — no
+> plan/preset picker. **Safety note for the "existing grants" question below:** 04 already answered
+> it — flipping a flag off is **frozen, not revoked** (blocks new Certificates/Editions/Questions/
+> Public links; never touches ones already granted) — so 06 needs no extra confirm/undo step beyond
+> the toggle itself; there is nothing destructive to warn about.
 
 ## Question
 
