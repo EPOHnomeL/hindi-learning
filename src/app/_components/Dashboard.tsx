@@ -16,6 +16,7 @@ import { formatPrice } from "./Paygate";
 import { Logo } from "./Logo";
 import { Markdown } from "./MarkdownView";
 import { missionPreview } from "./markdown";
+import { SiteFooter } from "./SiteFooter";
 import { useTheme } from "./ThemeContext";
 import { Dialog, IconButton, Menu, MenuItem } from "./ui";
 import { useResourceUpload } from "./useResourceUpload";
@@ -63,50 +64,73 @@ export function Dashboard() {
   // Course creation is Allowlist-gated (ADR 0021): non-members get a clean
   // library with no "New course" card (UX only — seedTopic enforces server-side).
   const amAllowlisted = useQuery(api.whitelist.amIAllowlisted);
+  // Shared / purchased are queried here (not only inside their sections) so we can
+  // tell a truly-empty library from one that merely lacks *owned* courses. Convex
+  // dedupes the subscription with SharedSection/PurchasedSection, so it's free.
+  const shared = useQuery(api.shares.listSharedTopics);
+  const purchased = useQuery(api.market.myPurchases);
   const { signOut } = useAuthActions();
   const router = useRouter();
 
+  // A learner with nothing to their name who also can't author (open sign-up
+  // admits everyone; the Allowlist gates creation, not existence — ADR 0021).
+  // They get a friendly "marketplace coming soon" note instead of a bare grid;
+  // allowlisted members get the "New course" card as their empty state instead.
+  const emptyLibrary =
+    courses !== undefined &&
+    courses.length === 0 &&
+    shared !== undefined &&
+    shared.length === 0 &&
+    purchased !== undefined &&
+    purchased.length === 0 &&
+    amAllowlisted === false;
+
   return (
-    <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
-      <header className="mb-8 flex items-end justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Logo className="h-9 w-9 shrink-0 text-accent md:h-10 md:w-10" />
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">My Course</h1>
-            <p className="mt-0.5 text-sm text-soft">Your learning workspace</p>
+    <>
+      <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
+        <header className="mb-8 flex items-end justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Logo className="h-9 w-9 shrink-0 text-accent md:h-10 md:w-10" />
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">My Course</h1>
+              <p className="mt-0.5 text-sm text-soft">Your learning workspace</p>
+            </div>
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <ThemeToggle />
-          {amAdmin && (
-            <Link href="/admin" className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
-              Admin
-            </Link>
-          )}
-          <button onClick={() => void signOut().then(() => router.replace("/"))} className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
-            Sign out
-          </button>
-        </div>
-      </header>
+          <div className="flex shrink-0 items-center gap-1">
+            <ThemeToggle />
+            {amAdmin && (
+              <Link href="/admin" className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
+                Admin
+              </Link>
+            )}
+            <button onClick={() => void signOut().then(() => router.replace("/"))} className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
+              Sign out
+            </button>
+          </div>
+        </header>
 
-      {courses === undefined ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy>
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-44 animate-pulse rounded-2xl border border-line bg-card" />
-          ))}
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map((c) => (
-            <CourseCard key={c.slug} course={c} />
-          ))}
-          {amAllowlisted && <NewCourseCard />}
-        </div>
-      )}
+        {courses === undefined ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-44 animate-pulse rounded-2xl border border-line bg-card" />
+            ))}
+          </div>
+        ) : emptyLibrary ? (
+          <EmptyLibrary />
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {courses.map((c) => (
+              <CourseCard key={c.slug} course={c} />
+            ))}
+            {amAllowlisted && <NewCourseCard />}
+          </div>
+        )}
 
-      <SharedSection />
-      <PurchasedSection />
-    </div>
+        <SharedSection />
+        <PurchasedSection />
+      </div>
+      <SiteFooter />
+    </>
   );
 }
 
@@ -575,6 +599,27 @@ function MissionDialog({ title, mission, onClose }: { title: string; mission: st
     <Dialog title={title} onClose={onClose} className="max-w-2xl">
       <Markdown source={mission} />
     </Dialog>
+  );
+}
+
+// The empty state for a signed-in learner who owns nothing yet and can't author
+// their own courses. Open sign-up admits everyone, but the Allowlist gates course
+// creation (ADR 0021) — so rather than strand these learners on a bare grid, we
+// tell them their account works and that a way to get courses is on its way. The
+// paid marketplace exists in the backend (ADR 0016) but has no public browse
+// surface yet, hence "coming soon".
+function EmptyLibrary() {
+  return (
+    <div className="flex flex-col items-center rounded-2xl border border-dashed border-line bg-card px-6 py-16 text-center">
+      <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-hi text-accent">
+        <Icon name="book" className="h-6 w-6" />
+      </span>
+      <h2 className="text-lg font-semibold tracking-tight text-ink">No courses yet</h2>
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-soft">
+        You don&apos;t own any courses yet. A marketplace to browse and buy courses is coming soon — check back before
+        long.
+      </p>
+    </div>
   );
 }
 
