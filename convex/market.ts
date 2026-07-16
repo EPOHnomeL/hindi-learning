@@ -16,7 +16,7 @@ import {
   translatedTitle,
 } from "./lib";
 import { langInfo } from "./languages";
-import { appUrl, buildCheckoutFields, platformFeeBps, processUrl, splitNet } from "./payfast";
+import { appUrl, buildCheckoutFields, payfastConfigured, platformFeeBps, processUrl, splitNet } from "./payfast";
 import { isCallerAdmin } from "./whitelist";
 
 // Paid marketplace (ADR 0016, PayFast rail — .scratch/payfast-payments) — the
@@ -40,6 +40,12 @@ export const setEditionPrice = mutation({
   args: { topicSlug: v.string(), lang: v.string(), amount: v.number(), currency: v.string() },
   returns: v.null(),
   handler: async (ctx, { topicSlug, lang, amount, currency }) => {
+    // Selling is disabled until the deployment's PayFast rail is configured —
+    // a listing that checkout can't sell must never come into being. Env is
+    // read at call time: provisioning the vars enables selling by itself.
+    if (!payfastConfigured()) {
+      throw new Error("Selling is disabled — PayFast isn't configured on this deployment yet.");
+    }
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("forbidden");
     const topic = await getOwnedTopic(ctx, userId, topicSlug);

@@ -529,6 +529,13 @@ function SellEdition({
         <div className="min-w-0 flex-1">
           {status === undefined ? (
             <span>Checking your seller status…</span>
+          ) : status === "payments-unconfigured" ? (
+            // The deployment's PayFast rail isn't provisioned (env vars absent) —
+            // selling is off platform-wide and enables itself when they land.
+            <span>
+              <b className="font-semibold text-ink">Selling isn&rsquo;t available yet.</b> Payments aren&rsquo;t
+              configured on this deployment — selling opens automatically once they are.
+            </span>
           ) : status === "not-granted" ? (
             <span>
               <b className="font-semibold text-ink">Sell this course.</b> Selling is enabled by the workspace admin —

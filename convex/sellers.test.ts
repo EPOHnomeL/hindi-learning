@@ -1,9 +1,17 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { expect, test } from "vitest";
+import { beforeAll, expect, test } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
+
+// Selling requires a configured PayFast rail (merchant credentials + passphrase)
+// — pricing is refused without them, so the tests provide the sandbox trio.
+beforeAll(() => {
+  process.env.PAYFAST_MERCHANT_ID = "10000100";
+  process.env.PAYFAST_MERCHANT_KEY = "46f0cd694581a";
+  process.env.PAYFAST_PASSPHRASE = "jt7NOE43FZPn";
+});
 
 // Paid marketplace (PayFast rail — .scratch/payfast-payments): the **Seller**
 // side. Two seams are tested here:
@@ -312,4 +320,44 @@ test("pricing is ZAR-only — any other currency is rejected", async () => {
   expect(await t.query(api.market.editionPricing, { topicSlug: "hindi" })).toEqual([
     { lang: "en", amount: 50000, currency: "zar" },
   ]);
+});
+
+test("selling is disabled while PayFast isn't configured — pricing refused, status says why", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  await makeReadySeller(t, owner);
+  const topicId = await seedTopic(t, owner, "hindi", "completed");
+  await addLesson(t, topicId, "0001", 1);
+
+  // Simulate a deployment whose PayFast env vars haven't been provisioned yet.
+  const saved = {
+    id: process.env.PAYFAST_MERCHANT_ID,
+    key: process.env.PAYFAST_MERCHANT_KEY,
+    pass: process.env.PAYFAST_PASSPHRASE,
+  };
+  delete process.env.PAYFAST_MERCHANT_ID;
+  delete process.env.PAYFAST_MERCHANT_KEY;
+  delete process.env.PAYFAST_PASSPHRASE;
+  try {
+    // Even a ready Seller can't price — a listing checkout can't sell must never exist.
+    await expect(
+      asUser(t, owner).mutation(api.market.setEditionPrice, { topicSlug: "hindi", lang: "en", amount: 50000, currency: "zar" }),
+    ).rejects.toThrow(/PayFast/);
+    // The self-status query says why, so the UI shows the reason, not a dead control.
+    expect(await asUser(t, owner).query(api.sellers.sellerStatus, {})).toBe("payments-unconfigured");
+    // Un-listing stays allowed — an owner can always stop selling.
+    await asUser(t, owner).mutation(api.market.clearEditionPrice, { topicSlug: "hindi", lang: "en" });
+  } finally {
+    if (saved.id) process.env.PAYFAST_MERCHANT_ID = saved.id;
+    if (saved.key) process.env.PAYFAST_MERCHANT_KEY = saved.key;
+    if (saved.pass) process.env.PAYFAST_PASSPHRASE = saved.pass;
+  }
+
+  // The moment the env vars exist again, selling enables itself — no redeploy flag.
+  expect(await asUser(t, owner).query(api.sellers.sellerStatus, {})).toBe("ready");
+  await asUser(t, owner).mutation(api.market.setEditionPrice, { topicSlug: "hindi", lang: "en", amount: 50000, currency: "zar" });
+  expect(await t.query(api.market.editionPricing, { topicSlug: "hindi" })).toEqual([
+    { lang: "en", amount: 50000, currency: "zar" },
+  ]);
+  void topicId;
 });

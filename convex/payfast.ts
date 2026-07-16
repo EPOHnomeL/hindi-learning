@@ -175,6 +175,14 @@ export function randFromCents(cents: number): string {
 
 // ---- gateway URLs -----------------------------------------------------------------------
 
+// Whether the PayFast rail is configured — the merchant credentials + passphrase
+// every signed checkout needs. Selling (pricing an Edition) is disabled until
+// they exist, so a listing checkout can't sell never comes into being; the env
+// is read at call time, so provisioning the vars enables selling by itself.
+export function payfastConfigured(): boolean {
+  return !!(process.env.PAYFAST_MERCHANT_ID && process.env.PAYFAST_MERCHANT_KEY && process.env.PAYFAST_PASSPHRASE);
+}
+
 // Sandbox unless PAYFAST_MODE is exactly "live" — a missing/typo'd env var must
 // never send a buyer (or a validate postback) to the live gateway.
 function gatewayHost(): string {

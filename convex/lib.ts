@@ -261,6 +261,10 @@ export const sellerStatusValidator = v.union(
   v.literal("not-granted"),
   v.literal("granted-no-payout-details"),
   v.literal("ready"),
+  // The deployment itself can't sell: PayFast env vars aren't provisioned
+  // (payfastConfigured). Reported by the self-status query only — per-Seller
+  // row readiness (the admin list) is independent of deployment config.
+  v.literal("payments-unconfigured"),
 );
 export type SellerStatus = Infer<typeof sellerStatusValidator>;
 
