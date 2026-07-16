@@ -43,7 +43,9 @@
     "report-translation": "tsx scripts/report-translation.ts",
     "report-translation:prod": "tsx scripts/report-translation.ts --prod",
     "resource": "tsx scripts/remove-resource.ts",
-    "resource:prod": "tsx scripts/remove-resource.ts --prod"
+    "resource:prod": "tsx scripts/remove-resource.ts --prod",
+    "seed-tenants": "tsx scripts/seed-tenants.ts",
+    "seed-tenants:prod": "tsx scripts/seed-tenants.ts --prod"
   },
   "dependencies": {
     "@auth/core": "0.37.0",
