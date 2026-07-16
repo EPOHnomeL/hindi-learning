@@ -1,6 +1,6 @@
 # whitelabel/10: Tenant resolution middleware
 
-**Status:** open
+**Status:** done (2026-07-16, `/tdd` + `/ponytail`)
 **Depends on:** [07](07-tenant-schema-and-seed.md)
 **Labels:** ready-for-agent
 
@@ -37,3 +37,26 @@ that question.
 - The resolved slug is available to both server components (root layout) and the client (via
   whatever mechanism 11's tenant context uses).
 - No behaviour change for the default site.
+
+## Resolution (2026-07-16)
+
+Built test-first. **Seam:** the pure `resolveTenantSlug(host)` — 13 cases in
+[`src/lib/tenant.test.ts`](../../../src/lib/tenant.test.ts) (subdomain, hyphenated slug,
+`<slug>.localhost:3000`, case-insensitivity, apex/www/unknown → null, null/undefined).
+
+- **Resolver** ([`src/lib/tenant.ts`](../../../src/lib/tenant.ts)): `TENANT_SLUGS` (static — adding a
+  tenant is an operator task, no per-request Convex read on the hot path), `resolveTenantSlug` (strip
+  port → lowercase → leftmost label → match), and `TENANT_SLUG_HEADER`. Pure; runs in middleware,
+  server, or client.
+- **Middleware** ([`src/middleware.ts`](../../../src/middleware.ts)): the Convex Auth wrapper's custom
+  handler resolves from Host and forwards `x-tenant-slug`, **deleting any inbound value first** so a
+  client can't force a skin. Convex Auth ports its cookies onto the returned `NextResponse.next`.
+- **Server read** ([`src/lib/tenant-server.ts`](../../../src/lib/tenant-server.ts)): `getTenantSlug()`
+  reads the header with a **direct Host fallback**, so correctness never depends on the header
+  surviving Convex Auth's response re-wrap. This is the mechanism 11's layout/context consumes.
+
+**Verified at runtime** (dev + a temporary probe route, since removed): `localhost` → null;
+`ywampotch.localhost:3000` → `ywampotch`; `almighty-warriors.my-course.app` → `almighty-warriors`;
+`yknot.my-course.app` → `yknot`; `www.*`/unknown → null; **spoof** (`Host: my-course.app` +
+`x-tenant-slug: yknot`) → null. Default & tenant homepages both 200, no middleware errors, auth
+intact. Full suite 305/305; typecheck + `pnpm build` clean. **Unblocks 11 (SSR theme), 18 (redirect).**
