@@ -31,3 +31,27 @@ export type TenantTheme = {
   light: Record<Token, string>;
   dark?: Partial<Record<Token, string>>;
 };
+
+// The pure seam behind issue 11's SSR no-flash <style>: turn a tenant palette into
+// the `--color-*` var overrides the root layout injects (verified end-to-end in a
+// browser; the string it builds is pinned in tokens.test.ts).
+//
+// Light overrides all 14 tokens under `:root:root` — the doubled `:root` raises
+// specificity above Tailwind's `@theme` `:root` so the tenant palette wins no matter
+// the stylesheet source order (a plain `:root` would only tie, leaving it to load
+// order). Dark is intentionally partial: we emit only the tokens the tenant actually
+// overrode, so the rest fall through to globals.css's default dark palette via the
+// cascade (decision 03 #5 — "tenant dark, else default dark"). No dark block at all
+// when the tenant has no dark palette.
+export function buildTenantThemeCss(theme: TenantTheme): string {
+  const decls = (palette: Partial<Record<Token, string>>) =>
+    TENANT_THEME_TOKENS.filter((tok) => palette[tok] != null)
+      .map((tok) => `--color-${tok}:${palette[tok]}`)
+      .join(";");
+
+  let css = `:root:root{${decls(theme.light)}}`;
+  if (theme.dark && Object.keys(theme.dark).length > 0) {
+    css += `:root:root[data-theme="dark"]{${decls(theme.dark)}}`;
+  }
+  return css;
+}
