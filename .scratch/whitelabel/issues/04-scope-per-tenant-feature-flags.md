@@ -1,7 +1,7 @@
 # whitelabel/04: Scope per-tenant feature flags
 
 **Status:** done
-**Claimed:** session 2026-07-15 (feature-flags grilling)
+**Claimed:** session 2026-07-16 (feature-flags grilling)
 **Depends on:** 02
 **Labels:** wayfinder:grilling
 
@@ -47,7 +47,7 @@ worked example (e.g. `certificates` off end-to-end), and the flag-off-after-gran
 
 ---
 
-## Resolution (2026-07-15, grilling session)
+## Resolution (2026-07-16, grilling session)
 
 Grilled to shared understanding across 5 decisions. ADR 0021 (ticket 02) left `flags` a placeholder
 on the `tenants` row; this ticket fixes its shape and — the part that actually matters — where

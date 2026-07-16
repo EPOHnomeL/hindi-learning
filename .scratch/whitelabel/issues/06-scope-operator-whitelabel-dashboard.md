@@ -22,7 +22,7 @@ Child of [Whitelabel map](00-whitelabel-map.md).
 > "theme editing fidelity" question below (raw token JSON vs structured fields) is now the main open
 > theming decision for 06.
 >
-> **Updated by [04](04-scope-per-tenant-feature-flags.md) (2026-07-15):** the flags 06 edits are five
+> **Updated by [04](04-scope-per-tenant-feature-flags.md) (2026-07-16):** the flags 06 edits are five
 > flat required booleans on the `tenants` row — `certificates`, `translations`, `publicLinks`, `qa`,
 > `seeding` (all default `true` at the v1 migration; a flag added later defaults `false` and needs an
 > explicit opt-in per tenant). So "flag editing" here is a **plain toggle row, one per flag** — no
