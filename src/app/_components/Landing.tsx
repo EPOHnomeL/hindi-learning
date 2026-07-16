@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState, type CSSProperties } from "react";
 import { CertificateCard, type CertificateData } from "./Certificate";
 import { Icon, type IconName } from "./icons";
 import { Logo } from "./Logo";
 import { SignIn } from "./SignIn";
+import { SiteFooter } from "./SiteFooter";
 import { useTheme } from "./ThemeContext";
 
 // The public front door (landing-page/01): what a logged-out visitor sees at `/`.
@@ -225,23 +225,7 @@ export function Landing() {
         </div>
       </section>
 
-      <footer className="border-t border-line">
-        <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-2 px-6 py-10 text-center text-sm text-soft">
-          <span className="flex items-center gap-2 text-accent">
-            <Logo className="h-6 w-6" />
-            <span className="font-semibold">My Course</span>
-          </span>
-          <p>
-            Born teaching Hindi — <span className="font-deva">नमस्ते</span> — built to teach anything.
-          </p>
-          {/* PayFast compliance: terms, privacy, and the refund policy linked site-wide. */}
-          <nav className="mt-1 flex gap-4">
-            <Link href="/terms" className="hover:text-accent">Terms &amp; Conditions</Link>
-            <Link href="/privacy" className="hover:text-accent">Privacy Policy</Link>
-            <Link href="/refunds" className="hover:text-accent">Refunds &amp; Cancellation</Link>
-          </nav>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }
