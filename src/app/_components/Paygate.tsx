@@ -214,6 +214,12 @@ function BuyDialog({
           <Icon name="globe" className="h-3.5 w-3.5 text-accent2" /> Card or Instant EFT · pay once, keep forever
         </p>
       )}
+      {/* Point-of-sale compliance: the refund policy (all sales final) linked where the buyer commits. */}
+      <p className="mt-1 text-center text-xs text-soft">
+        By purchasing you agree to the{" "}
+        <Link href="/terms" className="text-accent2 underline-offset-2 hover:underline">Terms</Link> and{" "}
+        <Link href="/refunds" className="text-accent2 underline-offset-2 hover:underline">Refund Policy</Link>.
+      </p>
     </Dialog>
   );
 }

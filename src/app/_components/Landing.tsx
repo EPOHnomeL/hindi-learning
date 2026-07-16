@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, type CSSProperties } from "react";
 import { CertificateCard, type CertificateData } from "./Certificate";
 import { Icon, type IconName } from "./icons";
@@ -233,6 +234,12 @@ export function Landing() {
           <p>
             Born teaching Hindi — <span className="font-deva">नमस्ते</span> — built to teach anything.
           </p>
+          {/* PayFast compliance: terms, privacy, and the refund policy linked site-wide. */}
+          <nav className="mt-1 flex gap-4">
+            <Link href="/terms" className="hover:text-accent">Terms &amp; Conditions</Link>
+            <Link href="/privacy" className="hover:text-accent">Privacy Policy</Link>
+            <Link href="/refunds" className="hover:text-accent">Refunds &amp; Cancellation</Link>
+          </nav>
         </div>
       </footer>
     </div>

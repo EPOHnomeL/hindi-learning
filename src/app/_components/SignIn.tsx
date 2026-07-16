@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
+import Link from "next/link";
 import { useState } from "react";
 import { useBuyMarker } from "./editionUrl";
 import { Logo } from "./Logo";
@@ -64,6 +65,13 @@ export function SignIn() {
           >
             {flow === "signIn" ? "No account? Sign up" : "Already have an account? Sign in"}
           </button>
+          {flow === "signUp" && (
+            <p className="text-center text-xs text-soft">
+              By creating an account you agree to the{" "}
+              <Link href="/terms" className="text-accent2 underline-offset-2 hover:underline">Terms</Link> and{" "}
+              <Link href="/privacy" className="text-accent2 underline-offset-2 hover:underline">Privacy Policy</Link>.
+            </p>
+          )}
         </form>
       </div>
     </div>
