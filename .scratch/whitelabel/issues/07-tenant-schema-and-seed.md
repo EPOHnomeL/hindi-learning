@@ -1,6 +1,6 @@
 # whitelabel/07: Tenant schema & seed
 
-**Status:** open
+**Status:** done (2026-07-16, `/tdd` + `/ponytail`)
 **Depends on:** —
 **Labels:** ready-for-agent
 
@@ -61,3 +61,26 @@ tenants: defineTable({
 - Seed script run against dev creates exactly the four tenant rows with the fixture data; running
   it twice doesn't duplicate rows.
 - No existing `topics`/`users`/`whitelist` row is modified by this issue.
+
+## Resolution (2026-07-16)
+
+Built test-first. **Seam:** `api.tenants.seedTenant` (secret-gated public mutation the seed script
+drives) — six `convex/tenants.test.ts` cases lock creation, per-slug idempotency (skip, never
+overwrite), the token-key contract, and the secret guard.
+
+- **Schema** ([`convex/schema.ts`](../../../convex/schema.ts)): `tenants` table (`by_slug`);
+  `tenantSlug?` on `topics` (+ `by_tenant`), `users`, `whitelist`. Shared `tenantThemeValidator` /
+  `tenantFlagsValidator` are exported for reuse. `users` is inlined from `authTables` (all original
+  fields + `email`/`phone` indexes preserved) to carry the new field.
+- **Mutation** ([`convex/tenants.ts`](../../../convex/tenants.ts)): `seedTenant` upserts one tenant
+  idempotently. `TENANT_THEME_TOKENS` + `assertThemeTokens` enforce the 14-key contract in code
+  (light complete, dark partial). *ponytail:* convex can't import `src/`, so the token list mirrors
+  09's future `src/design/tokens.ts` — keep in sync when 09 lands.
+- **Seed** ([`scripts/seed-tenants.ts`](../../../scripts/seed-tenants.ts), `pnpm seed-tenants[:prod]`):
+  the four fixtures inline; `yknot` carries a partial dark palette.
+
+**Verified on dev:** typecheck clean; seed created exactly 4 rows (14 light tokens each, dark on
+`yknot` only, all flags true); second run skipped all four. Full suite green (the one failing
+`bundle-authoring-assets` test is a pre-existing CRLF artifact, untouched here). Tenant *admin*
+assignment (marking `whitelist` rows) is deferred to [08](08-scope-aware-admin-roles.md)'s mutations
+per scope. **Unblocks 08, 10, 12, 14, 15, 17, 18, 23.**
