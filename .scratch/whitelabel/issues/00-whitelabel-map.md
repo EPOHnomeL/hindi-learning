@@ -1,15 +1,18 @@
 # whitelabel/00: Whitelabel map
 
-**Status:** destination reached — see Decisions so far; next step is the PRD, not another
-`/wayfinder` session.
+**Status:** destination reached. [PRD](../PRD.md) written, broken into 17 local implementation
+issues (07–23) — next step is building them (`/tdd` + `/ponytail`), not another `/wayfinder`
+session.
 **Labels:** wayfinder:map
 
-## Destination
+## Destination — reached
 
-Whitelabel v1 is fully specified and ready to build: an agreed tenant/subdomain model, per-subdomain
+Whitelabel v1 is fully specified and captured as a [PRD](../PRD.md) + 17 local implementation
+issues (07–23), per the CLAUDE.md pipeline: an agreed tenant/subdomain model, per-subdomain
 theming on a tokenised design system, per-tenant feature flags with backend enforcement, and an
-operator whitelabel dashboard — captured as PRD(s) + implementation issues per the CLAUDE.md
-pipeline. One task is carried in-map as execution: the four tenant subdomains live on my-course.app.
+operator whitelabel dashboard. One task was carried in-map as execution: the four tenant
+subdomains live on my-course.app. Building the implementation issues (`/tdd` + `/ponytail`, one
+issue per session in dependency order) is the next work — not another `/wayfinder` session.
 
 ## Notes
 
@@ -133,9 +136,6 @@ pipeline. One task is carried in-map as execution: the four tenant subdomains li
   raised by the operator mid-grilling [04](04-scope-per-tenant-feature-flags.md); neither exists
   in the codebase today. Reserved as future rows in 04's inventory; get their own scoping ticket
   (feature + flag together) once the operator wants to build them.
-- **PRD + implementation-issue breakdown** — the destination's final step. All six scoping
-  tickets are now closed; this is the next session's work, per CLAUDE.md's grill → PRD → local
-  issues → TDD + ponytail pipeline (grilling is done, so start at PRD).
 
 ## Out of scope
 

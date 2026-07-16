@@ -9,6 +9,11 @@ This effort is charted as a **wayfinder map**: [Whitelabel map](issues/00-whitel
 holds the destination, the decisions so far, and the fog. Work it with `/wayfinder <ticket>`
 (or bare `/wayfinder` on the map to take the next frontier ticket) — one ticket per session.
 
+**The map has reached its destination.** All six scoping tickets are closed, synthesized into
+[PRD.md](PRD.md), broken into 17 local implementation issues (07–23, `ready-for-agent`, listed in
+the PRD's own table). Current work is building those issues one at a time with `/tdd` +
+`/ponytail`, in the PRD's dependency order — not another `/wayfinder` session.
+
 ## Tickets (children of the map)
 
 | # | Ticket | Type | Depends on |
