@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { assertAdmin } from "./lib";
 import { tenantFlagsValidator, tenantThemeValidator } from "./schema";
 
@@ -58,5 +58,48 @@ export const seedTenant = mutation({
 
     await ctx.db.insert("tenants", { slug, displayName, theme, flags });
     return { created: true };
+  },
+});
+
+// Resolve everything the frontend needs about a tenant, by slug (issue 11). One
+// indexed `by_slug` read serves all three consumers, so they never drift:
+//   - the SSR no-flash <style> in the root layout reads `theme` (the palette),
+//   - `generateMetadata` reads `faviconUrl`,
+//   - the client tenant context reads `displayName`, `logoUrl`, `flags`.
+// Public by design: a resolved slug only selects a skin (ADR 0021 §6) and all of
+// this is served on anonymous pages anyway; privileged actions stay guarded by
+// identity elsewhere. Returns `null` for an unknown slug (the default site), so
+// callers treat "no tenant" and "not found" the same. Storage ids are surfaced as
+// resolved urls (logo/favicon); the returned `theme` is palette-only.
+export const getTheme = query({
+  args: { slug: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      displayName: v.string(),
+      theme: v.object({
+        light: v.record(v.string(), v.string()),
+        dark: v.optional(v.record(v.string(), v.string())),
+      }),
+      logoUrl: v.union(v.string(), v.null()),
+      faviconUrl: v.union(v.string(), v.null()),
+      flags: tenantFlagsValidator,
+    }),
+  ),
+  handler: async (ctx, { slug }) => {
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .unique();
+    if (!tenant) return null;
+
+    const { light, dark, logo, favicon } = tenant.theme;
+    return {
+      displayName: tenant.displayName,
+      theme: dark ? { light, dark } : { light },
+      logoUrl: logo ? await ctx.storage.getUrl(logo) : null,
+      faviconUrl: favicon ? await ctx.storage.getUrl(favicon) : null,
+      flags: tenant.flags,
+    };
   },
 });

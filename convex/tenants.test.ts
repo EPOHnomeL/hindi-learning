@@ -76,3 +76,47 @@ test("seedTenant refuses an incorrect secret", async () => {
     t.mutation(api.tenants.seedTenant, { secret: "wrong", slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS }),
   ).rejects.toThrow(/unauthorized/i);
 });
+
+// getTheme — the frontend's read seam (issue 11): the SSR no-flash palette, the
+// server favicon, and the client tenant context all resolve one tenant row by slug
+// through this single indexed read.
+
+test("getTheme returns the resolved frontend view for a seeded slug", async () => {
+  const t = convexTest(schema, modules);
+  const dark = { paper: "#111", ink: "#eee" };
+  await t.mutation(api.tenants.seedTenant, {
+    secret, slug: "yknot", displayName: "Y-Knot", theme: { light: LIGHT, dark }, flags: FLAGS,
+  });
+
+  const view = await t.query(api.tenants.getTheme, { slug: "yknot" });
+  expect(view).toMatchObject({
+    displayName: "Y-Knot",
+    theme: { light: LIGHT, dark },
+    flags: FLAGS,
+    // No assets were seeded — the client falls back to the wordmark / shared favicon.
+    logoUrl: null,
+    faviconUrl: null,
+  });
+});
+
+test("getTheme returns null for an unknown slug (default site / not a tenant)", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  expect(await t.query(api.tenants.getTheme, { slug: "nope" })).toBeNull();
+});
+
+test("getTheme resolves logo and favicon storage ids to urls", async () => {
+  const t = convexTest(schema, modules);
+  const logo = await t.run((ctx) => ctx.storage.store(new Blob(["logo"], { type: "image/png" })));
+  const favicon = await t.run((ctx) => ctx.storage.store(new Blob(["fav"], { type: "image/png" })));
+  await t.run((ctx) =>
+    ctx.db.insert("tenants", { slug: "upf", displayName: "UPF", theme: { light: LIGHT, logo, favicon }, flags: FLAGS }),
+  );
+
+  const view = await t.query(api.tenants.getTheme, { slug: "upf" });
+  expect(typeof view?.logoUrl).toBe("string");
+  expect(typeof view?.faviconUrl).toBe("string");
+  // The palette-only theme is returned without the storage ids (surfaced as urls).
+  expect(view?.theme).not.toHaveProperty("logo");
+  expect(view?.theme).not.toHaveProperty("favicon");
+});
