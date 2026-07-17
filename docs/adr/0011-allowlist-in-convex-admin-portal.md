@@ -5,6 +5,13 @@
 > now open and the Allowlist gates **course creation** instead. The storage,
 > portal, Admin, and normalisation decisions below all stand — only the
 > *admission* semantics changed.
+>
+> **Also superseded in part by
+> [ADR 0022](0022-tenant-subdomain-model.md) §4:** the **exactly-one-Admin
+> invariant** is retired in favour of a two-tier model — sys admins (global) and
+> per-tenant admins, encoded by `whitelist.tenantSlug`. `isCallerAdmin` is now
+> scope-aware and the lockout guard protects the last *sys* admin rather than a
+> single Admin row (whitelabel issue 08).
 
 The private-alpha **Allowlist** moves from the `AUTH_ALLOWED_EMAILS` env var into
 a Convex `whitelist` table, editable at runtime by a single **Admin** through a

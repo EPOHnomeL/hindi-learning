@@ -1,11 +1,16 @@
 # Tenant & subdomain model (whitelabel v1)
 
-> **ADR draft** — deliverable of [whitelabel/02](issues/02-scope-tenant-subdomain-model.md).
-> Graduates to `docs/adr/0021-*.md` when implementation starts. Reserve **ADR 0021**.
+> Deliverable of [whitelabel/02](../../.scratch/whitelabel/issues/02-scope-tenant-subdomain-model.md).
+> Promoted from draft when whitelabel implementation started. The draft reserved
+> "ADR 0021", but that number was taken by
+> [ADR 0021 (open sign-up)](0021-open-signup-allowlist-gates-course-creation.md)
+> in the interim, so this graduated as **ADR 0022**.
 
 ## Status
 
-draft — decisions agreed with the operator (jvorster63@gmail.com) 2026-07-15
+accepted — decisions agreed with the operator (jvorster63@gmail.com) 2026-07-15;
+two-tier admin model implemented in whitelabel issue 08 (2026-07-17). Supersedes
+[ADR 0011](0011-allowlist-in-convex-admin-portal.md)'s one-Admin invariant.
 
 ## Context
 
@@ -31,10 +36,10 @@ Shape (grows as 03/04 land):
 - `slug` (string, indexed `by_slug`) — the subdomain label, effectively immutable
   (renaming needs DNS work).
 - `displayName` (string) — brand name shown in UI + emails.
-- `theme` — **resolved by [ticket 03](issues/03-scope-per-tenant-theming.md)**: an inline
+- `theme` — **resolved by [ticket 03](../../.scratch/whitelabel/issues/03-scope-per-tenant-theming.md)**: an inline
   object `{ light, dark?, logo?, favicon? }` (14-token palette as a validated record +
   two raster asset storage ids). Edit-is-live; no separate `themes` table.
-- `flags` — **resolved by [ticket 04](issues/04-scope-per-tenant-feature-flags.md)**: a flat
+- `flags` — **resolved by [ticket 04](../../.scratch/whitelabel/issues/04-scope-per-tenant-feature-flags.md)**: a flat
   `{ certificates, translations, publicLinks, qa, seeding }` object of required booleans (no
   optional-with-implicit-default — every tenant row always carries an explicit value per flag).
   Enforced by a new `assertTenantFlag` helper called from each gated mutation, not baked into
@@ -100,6 +105,15 @@ Roles encoded on the `whitelist` row by scope — reuse `isAdmin`, add `tenantSl
 - **One account → one tenant.** `users.tenantSlug` is stamped at sign-up from the
   host (this *is* the admission). Single Convex Auth install unchanged;
   authoring/ownership (`topics.ownerId`) stays orthogonal to admin role.
+
+> **Implementation status (issue 08, 2026-07-17):** the scope-aware
+> `isCallerAdmin(ctx, tenantSlug?)`, the scoped last-sys-admin lockout guard, and
+> `seedEmail`'s `tenantSlug` bootstrap are **built and tested**. The **sign-up
+> host→`users.tenantSlug` stamping** (threading the host through the
+> `createOrUpdateUser` auth callback) and the tenant-admin-facing Allowlist
+> editing surface are **deferred** to the dashboard chain (issues 19–22) — no
+> current gate depends on them, and the auth-callback host plumbing is its own
+> piece. Tenant-admin rows are creatable today via `seedEmail`.
 
 ### 5. Cross-cutting singletons — disposition
 
