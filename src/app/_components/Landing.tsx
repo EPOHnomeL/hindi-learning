@@ -3,7 +3,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { CertificateCard, type CertificateData } from "./Certificate";
 import { Icon, type IconName } from "./icons";
-import { Logo } from "./Logo";
+import { Brand } from "./Brand";
 import { SignIn } from "./SignIn";
 import { SiteFooter } from "./SiteFooter";
 import { useTheme } from "./ThemeContext";
@@ -107,10 +107,7 @@ export function Landing() {
       {/* ── Hero — the certificate stage's aurora + gold flecks as atmosphere ── */}
       <header className="cert-stage">
         <nav className="relative z-10 mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5">
-          <span className="flex items-center gap-2">
-            <Logo className="h-8 w-8 text-accent" />
-            <span className="text-lg font-semibold tracking-tight text-accent">My Course</span>
-          </span>
+          <Brand />
           <span className="flex items-center gap-2">
             <ThemeToggle />
             <a

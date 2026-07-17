@@ -212,19 +212,16 @@ html[data-theme="dark"] .cert-card--showcase {
    drifting aurora blobs and a faint floating gold-fleck field, so the paper
    sits in an atmosphere rather than on a flat page. Theme-aware; the motion is
    suppressed under prefers-reduced-motion and everything flattens for print. */
+/* Colours derive from the live palette tokens (color-mix over transparent) so
+   the stage follows a tenant's brand instead of the default gold/green — the
+   tokens already flip in dark mode, so one rule serves both themes. */
 .cert-stage {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(130% 120% at 50% -10%, rgba(184, 138, 46, 0.14), transparent 55%),
-    radial-gradient(120% 120% at 50% 115%, rgba(63, 111, 94, 0.12), transparent 55%),
+    radial-gradient(130% 120% at 50% -10%, color-mix(in srgb, var(--color-accent) 22%, transparent), transparent 55%),
+    radial-gradient(120% 120% at 50% 115%, color-mix(in srgb, var(--color-accent2) 18%, transparent), transparent 55%),
     var(--color-paper);
-}
-html[data-theme="dark"] .cert-stage {
-  background:
-    radial-gradient(130% 120% at 50% -10%, rgba(216, 171, 87, 0.16), transparent 55%),
-    radial-gradient(120% 120% at 50% 115%, rgba(121, 179, 155, 0.12), transparent 55%),
-    #141110;
 }
 /* Aurora blobs — three soft coloured lights drifting behind the card. */
 .cert-stage::before {
@@ -233,19 +230,19 @@ html[data-theme="dark"] .cert-stage {
   inset: -25%;
   z-index: 0;
   background:
-    radial-gradient(38% 38% at 22% 30%, rgba(184, 138, 46, 0.28), transparent 60%),
-    radial-gradient(42% 42% at 78% 68%, rgba(63, 111, 94, 0.22), transparent 60%),
-    radial-gradient(34% 34% at 62% 18%, rgba(216, 171, 87, 0.2), transparent 60%);
+    radial-gradient(38% 38% at 22% 30%, color-mix(in srgb, var(--color-accent) 34%, transparent), transparent 60%),
+    radial-gradient(42% 42% at 78% 68%, color-mix(in srgb, var(--color-accent2) 30%, transparent), transparent 60%),
+    radial-gradient(34% 34% at 62% 18%, color-mix(in srgb, var(--color-gold) 28%, transparent), transparent 60%);
   filter: blur(40px);
   animation: cert-aurora 22s ease-in-out infinite alternate;
 }
-/* A drifting field of fine gold flecks, faded out toward the edges. */
+/* A drifting field of fine flecks in the brand's ornament colour, faded toward the edges. */
 .cert-stage::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 0;
-  background-image: radial-gradient(rgba(184, 138, 46, 0.55) 1px, transparent 1.6px);
+  background-image: radial-gradient(color-mix(in srgb, var(--color-gold) 60%, transparent) 1px, transparent 1.6px);
   background-size: 46px 46px;
   -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 45%, #000 30%, transparent 78%);
   mask-image: radial-gradient(ellipse 80% 80% at 50% 45%, #000 30%, transparent 78%);
