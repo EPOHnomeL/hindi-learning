@@ -17,6 +17,7 @@ import type * as content from "../content.js";
 import type * as crons from "../crons.js";
 import type * as email from "../email.js";
 import type * as emblem from "../emblem.js";
+import type * as env from "../env.js";
 import type * as http from "../http.js";
 import type * as inviteEmail from "../inviteEmail.js";
 import type * as languages from "../languages.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   email: typeof email;
   emblem: typeof emblem;
+  env: typeof env;
   http: typeof http;
   inviteEmail: typeof inviteEmail;
   languages: typeof languages;
