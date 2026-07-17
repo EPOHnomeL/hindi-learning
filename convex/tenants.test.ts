@@ -96,6 +96,80 @@ test("seedTenant refuses an incorrect secret", async () => {
   ).rejects.toThrow(/unauthorized/i);
 });
 
+// setTenantTheme — the palette overwrite path seedTenant refuses (create-only).
+// Secret-guarded; repaints an existing tenant, preserving brand assets.
+
+const LIGHT2 = {
+  paper: "#f8f8f8", card: "#ffffff", ink: "#111827", soft: "#858fa2", line: "#ede7e0",
+  accent: "#a48a66", accent2: "#49a2b7", gold: "#a48a66", hi: "#e7faff",
+  danger: "#c0432f", good: "#3f7d54", "good-b": "#cfe6d6", bad: "#c0432f", "bad-b": "#f2d6cf",
+};
+
+test("setTenantTheme overwrites an existing tenant's palette", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
+  await t.mutation(api.tenants.setTenantTheme, { secret, slug: "yknot", theme: { light: LIGHT2 } });
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "yknot")).unique(),
+  );
+  expect(row?.theme.light).toEqual(LIGHT2);
+});
+
+test("setTenantTheme preserves logo/favicon and clears a stale dark when none is given", async () => {
+  const t = convexTest(schema, modules);
+  const logo = await storeImage(t);
+  await t.run((ctx) =>
+    ctx.db.insert("tenants", {
+      slug: "yknot", displayName: "Y-Knot",
+      theme: { light: LIGHT, dark: { paper: "#111" }, logo }, flags: FLAGS,
+    }),
+  );
+  await t.mutation(api.tenants.setTenantTheme, { secret, slug: "yknot", theme: { light: LIGHT2 } });
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "yknot")).unique(),
+  );
+  expect(row?.theme.light).toEqual(LIGHT2);
+  expect(row?.theme.logo).toBe(logo); // asset preserved
+  expect(row?.theme.dark).toBeUndefined(); // stale dark cleared → falls back to default
+});
+
+test("setTenantTheme sets a partial dark when supplied", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
+  await t.mutation(api.tenants.setTenantTheme, {
+    secret, slug: "yknot", theme: { light: LIGHT2, dark: { paper: "#111", ink: "#eee" } },
+  });
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "yknot")).unique(),
+  );
+  expect(row?.theme.dark).toEqual({ paper: "#111", ink: "#eee" });
+});
+
+test("setTenantTheme rejects a theme missing a required light token", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
+  const light: Record<string, string> = { ...LIGHT2 };
+  delete light["gold"];
+  await expect(
+    t.mutation(api.tenants.setTenantTheme, { secret, slug: "yknot", theme: { light } }),
+  ).rejects.toThrow(/missing/i);
+});
+
+test("setTenantTheme refuses an incorrect secret", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
+  await expect(
+    t.mutation(api.tenants.setTenantTheme, { secret: "wrong", slug: "yknot", theme: { light: LIGHT2 } }),
+  ).rejects.toThrow(/unauthorized/i);
+});
+
+test("setTenantTheme rejects an unknown tenant slug", async () => {
+  const t = convexTest(schema, modules);
+  await expect(
+    t.mutation(api.tenants.setTenantTheme, { secret, slug: "ghost", theme: { light: LIGHT2 } }),
+  ).rejects.toThrow(/not found/i);
+});
+
 // getTheme — the frontend's read seam (issue 11): the SSR no-flash palette, the
 // server favicon, and the client tenant context all resolve one tenant row by slug
 // through this single indexed read.

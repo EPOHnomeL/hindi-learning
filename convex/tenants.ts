@@ -63,6 +63,39 @@ export const seedTenant = mutation({
   },
 });
 
+// Overwrite an existing tenant's palette (the update path seedTenant deliberately
+// refuses — it's create-only for idempotent re-seeds). PUBLISH_SECRET-guarded like
+// seedTenant, so the operator scripts can repaint a tenant without an authed
+// session; the dashboard (ticket 20) will drive the same write through an identity
+// guard later. Replaces `light` (and `dark` if given; a missing `dark` clears any
+// stale dark so it falls back to the default). Brand assets are preserved — this
+// touches the palette only, never the logo/favicon storage ids.
+export const setTenantTheme = mutation({
+  args: {
+    secret: v.string(),
+    slug: v.string(),
+    theme: tenantThemeValidator,
+  },
+  returns: v.null(),
+  handler: async (ctx, { secret, slug, theme }) => {
+    assertAdmin(secret);
+    assertThemeTokens(theme);
+
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", slug))
+      .unique();
+    if (!tenant) throw new Error("tenant not found");
+
+    const next: typeof tenant.theme = { light: theme.light };
+    if (theme.dark) next.dark = theme.dark;
+    if (tenant.theme.logo) next.logo = tenant.theme.logo;
+    if (tenant.theme.favicon) next.favicon = tenant.theme.favicon;
+    await ctx.db.patch(tenant._id, { theme: next });
+    return null;
+  },
+});
+
 // Resolve everything the frontend needs about a tenant, by slug (issue 11). One
 // indexed `by_slug` read serves all three consumers, so they never drift:
 //   - the SSR no-flash <style> in the root layout reads `theme` (the palette),
