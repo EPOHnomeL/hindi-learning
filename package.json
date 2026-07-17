@@ -43,7 +43,8 @@
     "resource": "tsx scripts/remove-resource.ts",
     "resource:prod": "tsx scripts/remove-resource.ts --prod",
     "seed-tenants": "tsx scripts/seed-tenants.ts",
-    "seed-tenants:prod": "tsx scripts/seed-tenants.ts --prod"
+    "seed-tenants:prod": "tsx scripts/seed-tenants.ts --prod",
+    "tenant-branding": "tsx scripts/tenant-branding.ts"
   },
   "dependencies": {
     "@auth/core": "0.37.0",
