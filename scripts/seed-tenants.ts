@@ -60,17 +60,18 @@ const TENANTS: Tenant[] = [
     },
   },
   {
+    // Real Yknot brand system (mapped from the Brand Showcase reference):
+    // Knot #a48a66 = primary accent/CTAs, Sails #49a2b7 = secondary/links, warm
+    // greys for text/borders, pale blue highlight. Light-only — the brand is
+    // specified for light backgrounds, so dark falls back to the app default.
+    // State colours (danger/good/bad) are app defaults: the brand has no red/green.
     slug: "yknot",
     displayName: "Y-Knot",
     theme: {
       light: {
-        paper: "#f7f6fb", card: "#ffffff", ink: "#201c2e", soft: "#635d78", line: "#e2def0",
-        accent: "#5b46c9", accent2: "#2f9c8f", gold: "#c99a3a", hi: "#ece8fb",
-        danger: "#c23a52", good: "#3a7d63", "good-b": "#cde7dc", bad: "#c23a52", "bad-b": "#f2d3da",
-      },
-      dark: {
-        paper: "#151320", card: "#1e1a2b", ink: "#e7e2f2", soft: "#a49bbd", line: "#332d47",
-        accent: "#9a86f0", accent2: "#5fc7b6", gold: "#d8b45a", hi: "#2a2340",
+        paper: "#f8f8f8", card: "#ffffff", ink: "#111827", soft: "#858fa2", line: "#ede7e0",
+        accent: "#a48a66", accent2: "#49a2b7", gold: "#a48a66", hi: "#e7faff",
+        danger: "#c0432f", good: "#3f7d54", "good-b": "#cfe6d6", bad: "#c0432f", "bad-b": "#f2d6cf",
       },
     },
   },
