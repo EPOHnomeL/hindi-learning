@@ -34,6 +34,16 @@ Dates are absolute. `[[links]]` in older notes have been resolved to sections he
   data (indexes only); the other branch's next `convex dev` recreates them.
   Expect this tug-of-war when two branches with divergent schemas share dev.
 - **Deployments:** prod is `capable-barracuda-769`; dev is `judicious-marmot-580`.
+- **CLI auth is a per-repo deploy key, not the global login.** This machine runs
+  two Convex accounts (company Y-Knot/FuelSwitch + the personal course app), and
+  the CLI stores ONE token at `~/.convex/config.json` — so `npx convex login` is a
+  machine-wide toggle. To skip the logout/login churn, this repo pins a **dev
+  deploy key** in `.env.local` (`CONVEX_DEPLOY_KEY=dev:...|ey...`); the env var
+  wins over the global login, so `npx convex dev`/`deploy` always run against this
+  project's deployment. A **"You don't have access to the selected project"** error
+  means the key is missing/stale (regenerate: personal account → dev deployment →
+  Settings → Deploy keys), not a code problem. A plain dev key can lack perms for
+  `convex logs`/env reads — grant those role actions when generating if needed.
 - **Real tenant/user accounts exist only on prod.** Dev holds just the two
   operator accounts (jvorster63@gmail.com, josuavorster2003@gmail.com). Any
   request to inspect/change a tenant's data is a **prod** operation — use the
