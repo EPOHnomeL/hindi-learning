@@ -1,27 +1,30 @@
-# Hindi — Served Teach
+# My Course
 
-A personal, AI-tutored learning workspace + reader. Claude (via the `teach`
-skill) authors lessons in this repo; a Next.js reader (backed by Convex) serves
-them to the learner on any device and feeds answers/questions back. See
-[PRD.md](PRD.md) for the full concept and [docs/adr](docs/adr) for decisions.
+An AI-tutored course platform, heading toward a **whitelabel course-generator
+LMS** (one codebase, multiple branded tenant sites). Claude (via the `teach`
+skill) authors lessons; a Next.js reader backed by Convex serves them to learners
+on any device and feeds answers/questions/progress back.
+
+- **Domain model & vocabulary** → [CONTEXT.md](CONTEXT.md)
+- **How to work in this repo** (conventions, workflow) → [CLAUDE.md](CLAUDE.md)
+- **Project facts** (environments, deploy, payments, whitelabel) →
+  [docs/agents/project-context.md](docs/agents/project-context.md)
+- **Decisions** → [docs/adr/](docs/adr)
 
 ## Stack
 
 - **Next.js (App Router)** + Tailwind — the reader.
-- **Convex** — database, server functions, and realtime (the "Hub").
-- **Convex Auth** — email/password sign-in (no JWT/cookie plumbing).
-- **tsx** — runs the teach CLI (`publish` / `review` / `reply`).
-
-Local workspace files are the source of truth:
-`MISSION.md`, `lessons/*.html`, `references/*.html`, `learning-records/*.md`,
-`GLOSSARY.md`. `pnpm run publish` mirrors lessons/references into Convex.
+- **Convex** — database, server functions, realtime, and file storage (the
+  "Hub"; the source of truth for content since ADR 0009).
+- **Convex Auth** — email/password sign-in.
+- **tsx** — runs the operator/teach CLIs (`publish` / `review` / `reply`).
 
 ## First-time setup
 
 ```bash
 pnpm install
 
-# 1) Create the Convex deployment + generate convex/_generated (interactive,
+# 1) Create the Convex deployment + generate convex/_generated (interactive;
 #    logs you into Convex and writes NEXT_PUBLIC_CONVEX_URL to .env.local).
 npx convex dev            # leave running in its own terminal
 
@@ -36,22 +39,16 @@ npx convex env set PUBLISH_SECRET "<a-long-random-string>"
 pnpm dev                  # http://localhost:3000  (another terminal)
 ```
 
-Then publish the existing content and sign in:
-
-```bash
-pnpm run publish          # pushes lessons/ + references/ into Convex
-```
-
-Open the app, create an account, and the lessons appear.
-
 ## The teach loop
 
 - `pnpm run publish` — push new/changed lessons & references to Convex.
-- `pnpm run review` — read the learner's open questions, quiz responses, progress.
+- `pnpm run review` — read a learner's open questions, quiz responses, progress.
 - `pnpm run reply <question-id> "<answer>"` — answer a question (shows in reader).
 
 ## Deploy (Vercel)
 
-Push to GitHub, import the repo in Vercel, set `NEXT_PUBLIC_CONVEX_URL` (and run
-`npx convex deploy` for the production Convex deployment). Convex Auth and the
-reader need no other secrets in the app.
+Push to `main` — the Vercel GitHub integration builds a production deployment,
+and the build command (`npx convex deploy --cmd 'pnpm run build'`) also pushes
+Convex functions + schema to prod. See
+[docs/agents/project-context.md](docs/agents/project-context.md) for the full
+deploy/environments picture.

@@ -20,8 +20,6 @@
     "publish:prod": "tsx scripts/publish.ts --prod",
     "materialise": "tsx scripts/materialise.ts",
     "materialise:prod": "tsx scripts/materialise.ts --prod",
-    "migrate-hindi": "tsx scripts/migrate-hindi.ts",
-    "migrate-hindi:prod": "tsx scripts/migrate-hindi.ts --prod",
     "backfill-quiz-shuffle": "tsx scripts/backfill-quiz-shuffle.ts",
     "backfill-quiz-shuffle:prod": "tsx scripts/backfill-quiz-shuffle.ts --prod",
     "backfill-html-blobs": "tsx scripts/backfill-html-blobs.ts",
