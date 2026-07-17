@@ -53,6 +53,15 @@ test("buildTenantThemeCss emits all 14 light tokens as --color-<t> under a speci
   expect(css).not.toContain('data-theme="dark"');
 });
 
+test("buildTenantThemeCss with a bare prefix emits --<t> (the lesson-iframe var names)", () => {
+  // App chrome reads --color-<t>; the lesson design system (head.html) reads bare
+  // --<t>. Same builder, different prefix — so issue 13 rides the same contract.
+  const css = buildTenantThemeCss({ light: LIGHT }, "");
+  expect(css).toContain(`--paper:${LIGHT.paper}`);
+  expect(css).toContain(`--good-b:${LIGHT["good-b"]}`); // hyphenated token
+  expect(css).not.toContain("--color-paper");
+});
+
 test("buildTenantThemeCss emits a dark block with ONLY the tenant's partial dark tokens", () => {
   const css = buildTenantThemeCss({ light: LIGHT, dark: { paper: "#000000", "good-b": "#00ff00" } });
   expect(css).toContain(':root:root[data-theme="dark"]{');

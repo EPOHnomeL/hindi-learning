@@ -1,4 +1,5 @@
 import { isDevanagari } from "../../../convex/languages";
+import { buildTenantThemeCss, type TenantTheme } from "../../design/tokens";
 
 export type Theme = "light" | "dark";
 
@@ -147,6 +148,20 @@ function injectDevanagariCss(html: string): string {
   return i === -1 ? DEVANAGARI_CSS + html : html.slice(0, i) + DEVANAGARI_CSS + html.slice(i);
 }
 
+// Inject the tenant's palette (issue 13 / decision 03 #6) before </head> so it
+// applies before the artifact paints. Uses BARE var names (--paper, --accent…) —
+// the lesson design system's namespace (head.html), not the app chrome's --color-*
+// — via the shared token builder. Rides the same before-</head> rail as the
+// dark/Devanagari injections, and is injected LAST so it sits closest to </head>
+// (winning any source-order tie on top of its :root:root specificity). Moves only
+// the 14 contract vars: head.html hardcodes dozens of hex beyond them, so legacy
+// content is re-skinned partially by design — full fidelity is issue 23's job.
+function injectTenantPaletteCss(html: string, palette: TenantTheme): string {
+  const style = `<style>${buildTenantThemeCss(palette, "")}</style>`;
+  const i = html.indexOf("</head>");
+  return i === -1 ? style + html : html.slice(0, i) + style + html.slice(i);
+}
+
 // Some authored references arrive as a bare fragment (e.g. `<section
 // class="glossary">…</section>`) with all page styling scoped to that element,
 // not a full <html> document. The rest of this pipeline assumes a document:
@@ -212,7 +227,16 @@ function stripLegacyThemePill(html: string): string {
 // `lang` also gets the Devanagari font + size bump so its prose is legible.
 export function buildSrcDoc(
   html: string,
-  opts: { quiz: boolean; theme?: Theme; themeCss?: boolean; dir?: "ltr" | "rtl"; lang?: string },
+  opts: {
+    quiz: boolean;
+    theme?: Theme;
+    themeCss?: boolean;
+    dir?: "ltr" | "rtl";
+    lang?: string;
+    // The resolved tenant's palette (issue 13), from the client tenant context.
+    // Absent on the default site → no override, the authored palette stands.
+    tenantPalette?: TenantTheme;
+  },
 ): string {
   let doc = ensureDocument(html);
   if (opts.theme) {
@@ -222,6 +246,7 @@ export function buildSrcDoc(
   }
   doc = setRootDirLang(doc, opts.dir, opts.lang);
   if (opts.lang && isDevanagari(opts.lang)) doc = injectDevanagariCss(doc);
+  if (opts.tenantPalette) doc = injectTenantPaletteCss(doc, opts.tenantPalette);
   const scripts = HEIGHT_BRIDGE + NAV_BRIDGE + (opts.quiz ? QUIZ_BRIDGE : "") + (opts.theme ? THEME_BRIDGE : "");
   // Inject before the LAST </body>. A first-match replace is unsafe: an assembled
   // lesson can carry an authoring comment (or a code sample) that contains a

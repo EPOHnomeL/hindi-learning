@@ -32,21 +32,27 @@ export type TenantTheme = {
   dark?: Partial<Record<Token, string>>;
 };
 
-// The pure seam behind issue 11's SSR no-flash <style>: turn a tenant palette into
-// the `--color-*` var overrides the root layout injects (verified end-to-end in a
-// browser; the string it builds is pinned in tokens.test.ts).
+// The pure seam behind the tenant palette overrides (issue 11's SSR no-flash
+// <style> for app chrome; issue 13's lesson-iframe injection). Turn a tenant
+// palette into the CSS var overrides the consumer injects. The string it builds is
+// pinned in tokens.test.ts; the rendered result is verified in a browser.
+//
+// `prefix` selects the var namespace: `"color-"` (default) for app chrome, which
+// reads `--color-<t>` (Tailwind `@theme`, globals.css); `""` for the lesson design
+// system, which reads bare `--<t>` (head.html). Same 14-token contract, one builder.
 //
 // Light overrides all 14 tokens under `:root:root` — the doubled `:root` raises
-// specificity above Tailwind's `@theme` `:root` so the tenant palette wins no matter
-// the stylesheet source order (a plain `:root` would only tie, leaving it to load
+// specificity above the authored `:root` palette (Tailwind's `@theme` for chrome,
+// head.html's `:root{}` for lessons) so the tenant palette wins no matter the
+// stylesheet source order (a plain `:root` would only tie, leaving it to load
 // order). Dark is intentionally partial: we emit only the tokens the tenant actually
-// overrode, so the rest fall through to globals.css's default dark palette via the
-// cascade (decision 03 #5 — "tenant dark, else default dark"). No dark block at all
-// when the tenant has no dark palette.
-export function buildTenantThemeCss(theme: TenantTheme): string {
+// overrode, so the rest fall through to the default dark palette via the cascade
+// (decision 03 #5 — "tenant dark, else default dark"). No dark block at all when the
+// tenant has no dark palette.
+export function buildTenantThemeCss(theme: TenantTheme, prefix = "color-"): string {
   const decls = (palette: Partial<Record<Token, string>>) =>
     TENANT_THEME_TOKENS.filter((tok) => palette[tok] != null)
-      .map((tok) => `--color-${tok}:${palette[tok]}`)
+      .map((tok) => `--${prefix}${tok}:${palette[tok]}`)
       .join(";");
 
   let css = `:root:root{${decls(theme.light)}}`;

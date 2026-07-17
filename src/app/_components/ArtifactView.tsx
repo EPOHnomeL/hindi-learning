@@ -14,6 +14,7 @@ import { Markdown } from "./MarkdownView";
 import { internalNavTarget } from "./readerDerive";
 import { ReaderSkeleton } from "./ui";
 import { useTheme } from "./ThemeContext";
+import { useTenant } from "./TenantContext";
 import { useHideOnScroll } from "./useHideOnScroll";
 
 // Mirror of the server's stale threshold (convex/routine.ts STALE_MS): a run
@@ -144,9 +145,15 @@ export function Frame({
   // the value at build time; the effect below handles live changes.
   const themeRef = useRef(theme);
   themeRef.current = theme;
+  // The tenant palette (issue 13) is baked into srcDoc, unlike the light/dark theme
+  // (pushed live via postMessage). It's flash-tolerant per decision 03 #6: the
+  // iframe only renders once `html` has loaded, by which point this client query has
+  // resolved too — and a tenant's palette never changes mid-session. `null`/default
+  // site → undefined → no override. Convex returns a stable ref so the memo is quiet.
+  const tenantPalette = useTenant()?.theme;
   const srcDoc = useMemo(
-    () => buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss, dir, lang }),
-    [html, withBridge, themeCss, dir, lang],
+    () => buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss, dir, lang, tenantPalette }),
+    [html, withBridge, themeCss, dir, lang, tenantPalette],
   );
 
   // Push theme changes into the already-loaded iframe (no reload). Also fires

@@ -103,6 +103,24 @@ describe("buildSrcDoc", () => {
     expect(out.match(/<html/gi)?.length).toBe(1); // still exactly one <html>
   });
 
+  it("injects a tenant palette as bare :root vars into <head> when tenantPalette is given", () => {
+    // The lesson design system reads bare --<t> vars (not the app chrome's --color-*),
+    // so the override moves the 14 tokens for the surfaces those vars drive (issue 13).
+    const palette = { light: { paper: "#111111", accent: "#222222" }, dark: { paper: "#000000" } };
+    const out = buildSrcDoc(LESSON, { quiz: true, theme: "light", tenantPalette: palette });
+    expect(out).toContain("--paper:#111111"); // bare var, matching head.html
+    expect(out).not.toContain("--color-paper"); // NOT the app-chrome prefix
+    expect(out).toContain(':root:root[data-theme="dark"]'); // partial dark override
+    expect(out).toContain("--paper:#000000");
+    // Must land inside <head> so it applies before the body renders (no flash).
+    expect(out.indexOf("--paper:#111111")).toBeLessThan(out.indexOf("</head>"));
+  });
+
+  it("injects no tenant palette when tenantPalette is absent (default site unchanged)", () => {
+    const out = buildSrcDoc(LESSON, { quiz: true, theme: "light" });
+    expect(out).not.toContain(":root:root"); // no tenant palette block
+  });
+
   it("themes a reference: bakes theme, injects the dark palette into <head>, adds the bridge", () => {
     const ref = `<!DOCTYPE html><html lang="en"><head><style>:root{--paper:#fbf7f0}</style></head><body><div class="term"><div class="name">x</div></div></body></html>`;
     const out = buildSrcDoc(ref, { quiz: false, theme: "dark", themeCss: true });
