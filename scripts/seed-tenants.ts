@@ -42,10 +42,10 @@ const TENANTS: Tenant[] = [
     slug: "ywampotch",
     displayName: "YWAM Potch",
     theme: {
-      // YWAM Potch brand (ywampotch.com): slate blue-greys + a gold ornament.
+      // YWAM Potch brand (from their logo): deep royal-blue wordmark on warm cream.
       light: {
-        paper: "#f7f8fa", card: "#ffffff", ink: "#222930", soft: "#727f97", line: "#dee3ea",
-        accent: "#394250", accent2: "#8496b3", gold: "#e0bf5c", hi: "#eaeef4",
+        paper: "#f9f4ea", card: "#fffdf8", ink: "#1e2740", soft: "#6a7290", line: "#ece3d2",
+        accent: "#1b2a80", accent2: "#3a52a8", gold: "#d8a93f", hi: "#e7ebf7",
         danger: "#c0432f", good: "#3f7d54", "good-b": "#cfe6d6", bad: "#c0432f", "bad-b": "#f2d6cf",
       },
     },

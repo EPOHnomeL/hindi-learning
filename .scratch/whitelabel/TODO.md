@@ -25,10 +25,10 @@ issues where a mechanism already exists.
 - [x] **yknot** — horizontal lockup (from the Brand Showcase) + cube favicon.
 - [x] **upf** — logo rasterised from upfsa.co.za `logo.svg` (via `pnpm dlx sharp-cli`,
       since no local SVG rasteriser); favicon from their `cropped-favicon-192x192.png`.
-- [x] **ywampotch** — University of the Nations seal (their site logo) for logo + favicon.
-- [ ] **almighty-warriors** — still needs art. The B/W logo was pasted into chat but not
-      saved as a file; re-share it as a file or a URL, then `pnpm tenant-branding
-      logo|favicon` + upload. (No standalone website found for it.)
+- [x] **ywampotch** — real YWAM Potch banner logo (blue mark + wordmark on cream); favicon
+      cropped from the blue person-mark. (First pass wrongly used the UofN seal — corrected,
+      and the palette re-derived to deep royal-blue on cream, not the Weebly slate-grey.)
+- [x] **almighty-warriors** — charcoal impossible-triangle logo; favicon cropped to the triangle.
 - Rails: `resources.generateProcessedUploadUrl` + `tenants.seedTenantAsset` (both
   secret-guarded); upload needs `PROD_CONVEX_DEPLOY_KEY` only for the one-time function deploy.
 
