@@ -1,6 +1,8 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { assertAdmin } from "./lib";
+import { assertEmblemImage } from "./emblem";
+import { isCallerAdmin } from "./whitelist";
 import { tenantFlagsValidator, tenantThemeValidator } from "./schema";
 
 // The 14-token whitelabel palette contract (ticket 01 / 03). A tenant's
@@ -101,5 +103,40 @@ export const getTheme = query({
       faviconUrl: favicon ? await ctx.storage.getUrl(favicon) : null,
       flags: tenant.flags,
     };
+  },
+});
+
+// Set a tenant's brand logo or favicon (issue 12 / ADR 0022 §1). The dashboard
+// (ticket 20) uploads the raster via the existing `resources.generateUploadUrl`
+// flow, then hands the storage id here — the same two-step rail the Emblem uses.
+//
+// Reuses `assertEmblemImage` verbatim: raster only (PNG/JPEG/WebP), **SVG
+// refused** (an XSS vector — tenant logos render on anonymous landing pages), and
+// size-capped. Scope-gated by `isCallerAdmin(ctx, tenantSlug)` (issue 08): a sys
+// admin may set any tenant's asset, a tenant admin only their own; a member is
+// refused server-side, never merely hidden in the UI.
+//
+// Mint-new-never-overwrite (matches the Emblem): this records the *new* storage
+// id and never deletes the previous blob, so any reference that already resolved
+// to the old asset keeps resolving until GC. The palette is untouched — an asset
+// swap spreads the existing `theme` and replaces one id.
+export const setTenantAsset = mutation({
+  args: {
+    tenantSlug: v.string(),
+    asset: v.union(v.literal("logo"), v.literal("favicon")),
+    storageId: v.id("_storage"),
+    contentType: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, { tenantSlug, asset, storageId, contentType }) => {
+    if (!(await isCallerAdmin(ctx, tenantSlug))) throw new Error("forbidden");
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", tenantSlug))
+      .unique();
+    if (!tenant) throw new Error("tenant not found");
+    await assertEmblemImage(ctx, storageId, contentType);
+    await ctx.db.patch(tenant._id, { theme: { ...tenant.theme, [asset]: storageId } });
+    return null;
   },
 });

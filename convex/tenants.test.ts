@@ -1,10 +1,29 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
+
+// `userId|session` is the subject shape Convex Auth's getAuthUserId parses back.
+function asUser(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
+  return t.withIdentity({ subject: `${userId}|session` });
+}
+
+// A signed-in admin: a user account plus their Allowlist admin row. A sys admin
+// unless a slug is given, in which case a tenant admin scoped to that slug.
+async function seedAdmin(t: ReturnType<typeof convexTest>, email: string, tenantSlug?: string) {
+  const userId = await t.run((ctx) => ctx.db.insert("users", { email }));
+  await t.mutation(internal.whitelist.seedEmail, { email, isAdmin: true, tenantSlug });
+  return userId;
+}
+
+// Stash a raster (or, for the negative test, an SVG) blob and return its id.
+async function storeImage(t: ReturnType<typeof convexTest>, type = "image/png") {
+  return await t.run((ctx) => ctx.storage.store(new Blob(["x"], { type })));
+}
 
 beforeAll(() => {
   process.env.PUBLISH_SECRET = "test-secret";
@@ -119,4 +138,110 @@ test("getTheme resolves logo and favicon storage ids to urls", async () => {
   // The palette-only theme is returned without the storage ids (surfaced as urls).
   expect(view?.theme).not.toHaveProperty("logo");
   expect(view?.theme).not.toHaveProperty("favicon");
+});
+
+// setTenantAsset — the brand logo/favicon upload record (issue 12). The client
+// uploads a raster via resources.generateUploadUrl, then hands the storage id
+// here; this validates it (reusing the emblem rail) and swaps it onto the tenant.
+
+test("setTenantAsset: a sys admin sets a tenant logo and favicon", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+
+  const logo = await storeImage(t);
+  const favicon = await storeImage(t, "image/webp");
+  await asUser(t, sys).mutation(api.tenants.setTenantAsset, {
+    tenantSlug: "upf", asset: "logo", storageId: logo, contentType: "image/png",
+  });
+  await asUser(t, sys).mutation(api.tenants.setTenantAsset, {
+    tenantSlug: "upf", asset: "favicon", storageId: favicon, contentType: "image/webp",
+  });
+
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
+  );
+  expect(row?.theme.logo).toBe(logo);
+  expect(row?.theme.favicon).toBe(favicon);
+  // The palette is untouched by an asset swap.
+  expect(row?.theme.light).toEqual(LIGHT);
+});
+
+test("setTenantAsset: an SVG upload is refused (XSS on the anonymous page)", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+
+  const svg = await storeImage(t, "image/svg+xml");
+  await expect(
+    asUser(t, sys).mutation(api.tenants.setTenantAsset, {
+      tenantSlug: "upf", asset: "logo", storageId: svg, contentType: "image/svg+xml",
+    }),
+  ).rejects.toThrow(/PNG|JPEG|WebP/i);
+});
+
+test("setTenantAsset: a tenant admin can set their own tenant but not another's", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "ywampotch", displayName: "YW", theme: THEME, flags: FLAGS });
+
+  const logo = await storeImage(t);
+  // Own tenant → allowed.
+  await asUser(t, upfAdmin).mutation(api.tenants.setTenantAsset, {
+    tenantSlug: "upf", asset: "logo", storageId: logo, contentType: "image/png",
+  });
+  // Another tenant → refused.
+  await expect(
+    asUser(t, upfAdmin).mutation(api.tenants.setTenantAsset, {
+      tenantSlug: "ywampotch", asset: "logo", storageId: logo, contentType: "image/png",
+    }),
+  ).rejects.toThrow(/forbidden/i);
+});
+
+test("setTenantAsset: a plain member is refused", async () => {
+  const t = convexTest(schema, modules);
+  const member = await t.run((ctx) => ctx.db.insert("users", { email: "member@example.com" }));
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  const logo = await storeImage(t);
+  await expect(
+    asUser(t, member).mutation(api.tenants.setTenantAsset, {
+      tenantSlug: "upf", asset: "logo", storageId: logo, contentType: "image/png",
+    }),
+  ).rejects.toThrow(/forbidden/i);
+});
+
+test("setTenantAsset: mint-new — a new logo swaps the id and leaves the old blob resolvable", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+
+  const first = await storeImage(t);
+  await asUser(t, sys).mutation(api.tenants.setTenantAsset, {
+    tenantSlug: "upf", asset: "logo", storageId: first, contentType: "image/png",
+  });
+  const second = await storeImage(t);
+  await asUser(t, sys).mutation(api.tenants.setTenantAsset, {
+    tenantSlug: "upf", asset: "logo", storageId: second, contentType: "image/png",
+  });
+
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
+  );
+  expect(row?.theme.logo).toBe(second);
+  expect(row?.theme.logo).not.toBe(first);
+  // The old blob was never deleted — a previously-minted reference still resolves.
+  const oldUrl = await t.run((ctx) => ctx.storage.getUrl(first));
+  expect(oldUrl).not.toBeNull();
+});
+
+test("setTenantAsset: an unknown tenant slug is rejected", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  const logo = await storeImage(t);
+  await expect(
+    asUser(t, sys).mutation(api.tenants.setTenantAsset, {
+      tenantSlug: "ghost", asset: "logo", storageId: logo, contentType: "image/png",
+    }),
+  ).rejects.toThrow(/not found/i);
 });
