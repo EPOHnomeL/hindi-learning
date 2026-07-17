@@ -157,8 +157,16 @@ which decays every session — re-verify before resuming).
   helper called explicitly from each gated mutation; `getOwnedTopic`/
   `getViewableTopic` stay flag-agnostic. Flag-off is frozen-not-revoked (blocks
   new grants only); a flag added later defaults `false`.
-- Treat single-site assumptions (site-wide Allowlist, exactly-one Admin, one
-  Resend domain, one payments merchant) as **tenancy debt** when you touch them.
+- Treat single-site assumptions (site-wide Allowlist, one Resend domain, one
+  payments merchant) as **tenancy debt** when you touch them. (The one-Admin
+  assumption is retired — see the two-tier admin model below.)
+- **Admin roles are two-tier** (ADR 0022 §4, issue 08): a `whitelist` row with
+  `isAdmin` and no `tenantSlug` is a **sys admin** (global); with a `tenantSlug`
+  it's a **tenant admin** (that tenant only). `isCallerAdmin(ctx, tenantSlug?)`
+  is scope-aware — no arg = "is sys admin"; `amITenantAdmin` is the client seam.
+- **Producing a tenant's branding** (palette JSON + logo/favicon from a Claude
+  design system): see [tenant-branding.md](tenant-branding.md) —
+  `pnpm tenant-branding validate|logo|favicon`, then seed + `setTenantAsset`.
 
 ## Product rules
 
