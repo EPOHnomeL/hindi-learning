@@ -10,8 +10,19 @@ import { Logo } from "./Logo";
 export function Brand({ className }: { className?: string }) {
   const tenant = useTenant();
   if (tenant?.logoUrl) {
-    // eslint-disable-next-line @next/next/no-img-element -- Convex storage URL, not a static asset
-    return <img src={tenant.logoUrl} alt={tenant.displayName} className={className ?? "h-8 w-auto"} />;
+    // A logo "slot" rather than a fixed height: tenant logos vary wildly in aspect
+    // (yknot ~2.6:1 horizontal, YWAM ~7:1 banner, Almighty Warriors ~1:1 stacked).
+    // Cap both height and width and object-contain so a square/stacked lockup fills
+    // the height (legible) while a wide banner is clamped by width instead of
+    // rendering as a tiny sliver. eslint-disable: Convex storage URL, not a static asset.
+    // eslint-disable-next-line @next/next/no-img-element
+    return (
+      <img
+        src={tenant.logoUrl}
+        alt={tenant.displayName}
+        className={className ?? "h-12 w-auto max-w-48 object-contain"}
+      />
+    );
   }
   return (
     <span className="flex items-center gap-2">
