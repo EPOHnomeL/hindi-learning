@@ -173,3 +173,29 @@ export const setTenantAsset = mutation({
     return null;
   },
 });
+
+// Operator-script twin of setTenantAsset: same validation and mint-new semantics,
+// but PUBLISH_SECRET-guarded (like seedTenant) instead of identity-guarded, so the
+// branding scripts can set a tenant's logo/favicon without an authed session. The
+// blob is uploaded via resources.generateProcessedUploadUrl (also secret-guarded).
+export const seedTenantAsset = mutation({
+  args: {
+    secret: v.string(),
+    tenantSlug: v.string(),
+    asset: v.union(v.literal("logo"), v.literal("favicon")),
+    storageId: v.id("_storage"),
+    contentType: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, { secret, tenantSlug, asset, storageId, contentType }) => {
+    assertAdmin(secret);
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", tenantSlug))
+      .unique();
+    if (!tenant) throw new Error("tenant not found");
+    await assertEmblemImage(ctx, storageId, contentType);
+    await ctx.db.patch(tenant._id, { theme: { ...tenant.theme, [asset]: storageId } });
+    return null;
+  },
+});

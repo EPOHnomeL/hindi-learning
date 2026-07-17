@@ -319,3 +319,41 @@ test("setTenantAsset: an unknown tenant slug is rejected", async () => {
     }),
   ).rejects.toThrow(/not found/i);
 });
+
+// seedTenantAsset — the secret-guarded operator twin used by the branding scripts.
+
+test("seedTenantAsset: a correct secret sets the logo without an auth identity", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
+  const logo = await storeImage(t, "image/webp");
+  await t.mutation(api.tenants.seedTenantAsset, {
+    secret, tenantSlug: "yknot", asset: "logo", storageId: logo, contentType: "image/webp",
+  });
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "yknot")).unique(),
+  );
+  expect(row?.theme.logo).toBe(logo);
+  expect(row?.theme.light).toEqual(LIGHT); // palette untouched
+});
+
+test("seedTenantAsset: refuses an incorrect secret", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
+  const logo = await storeImage(t);
+  await expect(
+    t.mutation(api.tenants.seedTenantAsset, {
+      secret: "wrong", tenantSlug: "yknot", asset: "logo", storageId: logo, contentType: "image/png",
+    }),
+  ).rejects.toThrow(/unauthorized/i);
+});
+
+test("seedTenantAsset: refuses an SVG (XSS on the anonymous page)", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
+  const svg = await storeImage(t, "image/svg+xml");
+  await expect(
+    t.mutation(api.tenants.seedTenantAsset, {
+      secret, tenantSlug: "yknot", asset: "logo", storageId: svg, contentType: "image/svg+xml",
+    }),
+  ).rejects.toThrow(/PNG|JPEG|WebP/i);
+});
