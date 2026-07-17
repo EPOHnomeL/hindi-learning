@@ -17,9 +17,11 @@ async function seedUser(t: ReturnType<typeof convexTest>, email: string) {
 }
 
 // A signed-in Admin: a user account plus their Admin row in the Allowlist.
-async function seedAdmin(t: ReturnType<typeof convexTest>, email: string) {
+// A sys admin (no tenantSlug) unless a slug is passed, in which case it seeds a
+// tenant admin scoped to that slug.
+async function seedAdmin(t: ReturnType<typeof convexTest>, email: string, tenantSlug?: string) {
   const userId = await seedUser(t, email);
-  await t.mutation(internal.whitelist.seedEmail, { email, isAdmin: true });
+  await t.mutation(internal.whitelist.seedEmail, { email, isAdmin: true, tenantSlug });
   return userId;
 }
 
@@ -140,6 +142,57 @@ test("amIAdmin: true for the Admin, false for a non-Admin, false when unauthenti
   expect(await asUser(t, admin).query(api.whitelist.amIAdmin, {})).toBe(true);
   expect(await asUser(t, intruder).query(api.whitelist.amIAdmin, {})).toBe(false);
   expect(await t.query(api.whitelist.amIAdmin, {})).toBe(false);
+});
+
+// --- Scope-aware admin roles (whitelabel issue 08 / ADR 0022) ---
+
+test("amIAdmin (no scope): true only for a sys admin, not a tenant admin", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  const tenantAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+
+  // No-arg check means "is sys admin" — unchanged meaning for every existing gate.
+  expect(await asUser(t, sys).query(api.whitelist.amIAdmin, {})).toBe(true);
+  expect(await asUser(t, tenantAdmin).query(api.whitelist.amIAdmin, {})).toBe(false);
+});
+
+test("amITenantAdmin: sys admin passes any tenant; a tenant admin passes only its own", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  const member = await seedUser(t, "member@example.com");
+
+  // Sys admin passes every tenant-scoped check.
+  expect(await asUser(t, sys).query(api.whitelist.amITenantAdmin, { tenantSlug: "ywampotch" })).toBe(true);
+  // Tenant admin passes only its own tenant.
+  expect(await asUser(t, upfAdmin).query(api.whitelist.amITenantAdmin, { tenantSlug: "upf" })).toBe(true);
+  expect(await asUser(t, upfAdmin).query(api.whitelist.amITenantAdmin, { tenantSlug: "ywampotch" })).toBe(false);
+  // A plain member never passes.
+  expect(await asUser(t, member).query(api.whitelist.amITenantAdmin, { tenantSlug: "upf" })).toBe(false);
+});
+
+test("removeEmail: refuses to remove the last sys admin, but frees the row once a second sys admin exists", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  // The lone sys admin can't be removed.
+  await expect(
+    asUser(t, sys).mutation(api.whitelist.removeEmail, { email: "sys@example.com" }),
+  ).rejects.toThrow();
+  expect(await t.query(internal.whitelist.isAdmitted, { email: "sys@example.com" })).toBe(true);
+
+  // Add a second sys admin; now the first is removable (the tier keeps >=1 row).
+  await t.mutation(internal.whitelist.seedEmail, { email: "sys2@example.com", isAdmin: true });
+  await asUser(t, sys).mutation(api.whitelist.removeEmail, { email: "sys2@example.com" });
+  expect(await t.query(internal.whitelist.isAdmitted, { email: "sys2@example.com" })).toBe(false);
+});
+
+test("removeEmail: tenant-admin rows can be removed freely (they aren't the sys-admin tier)", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await seedAdmin(t, "upfadmin@example.com", "upf");
+
+  await asUser(t, sys).mutation(api.whitelist.removeEmail, { email: "upfadmin@example.com" });
+  expect(await t.query(internal.whitelist.isAdmitted, { email: "upfadmin@example.com" })).toBe(false);
 });
 
 test("amIAllowlisted: answers by the caller's Allowlist row, false when unauthenticated", async () => {

@@ -34,9 +34,16 @@ export const isAdmitted = internalQuery({
 
 // Admit a (normalised) email, idempotently. Inserts the row if absent; if it
 // already exists it's a no-op, except that `isAdmin: true` is applied so the
-// migration/seed can promote an already-admitted email to Admin. Shared by
+// migration/seed can promote an already-admitted email to Admin. `tenantSlug`
+// scopes a new row (issue 08 / ADR 0022); on an existing row it's left alone
+// (re-scoping an account's tenant is not an idempotent-admit concern). Shared by
 // `seedEmail`, `addEmail`, and the migration so they normalise identically.
-async function admitEmail(ctx: MutationCtx, email: string, isAdmin?: boolean): Promise<void> {
+async function admitEmail(
+  ctx: MutationCtx,
+  email: string,
+  isAdmin?: boolean,
+  tenantSlug?: string,
+): Promise<void> {
   const normalised = normaliseEmail(email);
   const existing = await ctx.db
     .query("whitelist")
@@ -46,7 +53,11 @@ async function admitEmail(ctx: MutationCtx, email: string, isAdmin?: boolean): P
     if (isAdmin && !existing.isAdmin) await ctx.db.patch(existing._id, { isAdmin: true });
     return;
   }
-  await ctx.db.insert("whitelist", { email: normalised, ...(isAdmin ? { isAdmin: true } : {}) });
+  await ctx.db.insert("whitelist", {
+    email: normalised,
+    ...(isAdmin ? { isAdmin: true } : {}),
+    ...(tenantSlug ? { tenantSlug } : {}),
+  });
 }
 
 // A basic email shape — enough to reject obvious garbage on add, not a full
@@ -55,12 +66,22 @@ function looksLikeEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normaliseEmail(email));
 }
 
-// The Admin test, shared by the throwing guard and the non-throwing query:
-// the caller is the Admin iff their account email has an `isAdmin` Allowlist
-// row. Identity is derived server-side (never a client arg), so the route guard
-// stays UX-only and the API can't be bypassed. Exported so other domains (e.g.
-// the generation gate's Admin cooldown bypass) can ask the same question.
-export async function isCallerAdmin(ctx: MutationCtx | QueryCtx): Promise<boolean> {
+// The scope-aware Admin test (whitelabel issue 08 / ADR 0022, superseding ADR
+// 0011's one-Admin invariant). Roles are encoded on the `whitelist` row: an
+// `isAdmin` row with no `tenantSlug` is a **sys admin** (global reach); an
+// `isAdmin` row with a `tenantSlug` is a **tenant admin** (that tenant only).
+//   - No `tenantSlug` arg → "is the caller a sys admin". This is the meaning
+//     every existing call site already relies on (Routine/content/market/…
+//     operator gates), so their behaviour is unchanged.
+//   - `tenantSlug` given → "may the caller act on this tenant" — true for a sys
+//     admin (passes every tenant) or a tenant admin whose own slug matches.
+// Identity is derived server-side (never a client arg), so the route guard stays
+// UX-only and the API can't be bypassed. Exported so other domains (e.g. the
+// generation gate's Admin cooldown bypass) can ask the same question.
+export async function isCallerAdmin(
+  ctx: MutationCtx | QueryCtx,
+  tenantSlug?: string,
+): Promise<boolean> {
   const userId = await getAuthUserId(ctx);
   if (!userId) return false;
   const user = await ctx.db.get(userId);
@@ -69,10 +90,15 @@ export async function isCallerAdmin(ctx: MutationCtx | QueryCtx): Promise<boolea
     .query("whitelist")
     .withIndex("by_email", (q) => q.eq("email", normaliseEmail(user.email!)))
     .unique();
-  return row?.isAdmin ?? false;
+  if (!row?.isAdmin) return false;
+  // Sys admin (no tenantSlug on the row) passes every check, scoped or not.
+  if (!row.tenantSlug) return true;
+  // Tenant admin: only their own tenant, and never an unscoped (sys-level) check.
+  return tenantSlug !== undefined && row.tenantSlug === tenantSlug;
 }
 
 // The Admin authorization boundary: every Admin-only function calls this first.
+// Unscoped, so it gates on sys admin (its historical meaning).
 async function requireAdmin(ctx: MutationCtx | QueryCtx): Promise<void> {
   if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
 }
@@ -88,13 +114,24 @@ export const list = query({
   },
 });
 
-// Whether the caller is the Admin — backs the /admin route guard (UX only).
+// Whether the caller is a sys admin — backs the /admin route guard (UX only).
 // Returns false when unauthenticated rather than throwing, so the page can
 // render a not-authorised view instead of erroring.
 export const amIAdmin = query({
   args: {},
   returns: v.boolean(),
   handler: async (ctx) => isCallerAdmin(ctx),
+});
+
+// Whether the caller may administer a specific tenant (issue 08 / ADR 0022):
+// true for a sys admin (any tenant) or that tenant's own tenant admin. Backs a
+// tenant dashboard's route guard (UX only; every mutation re-checks server-side).
+// Kept separate from `amIAdmin` so the common unscoped sys-admin guard stays a
+// no-arg call at its many existing sites.
+export const amITenantAdmin = query({
+  args: { tenantSlug: v.string() },
+  returns: v.boolean(),
+  handler: async (ctx, { tenantSlug }) => isCallerAdmin(ctx, tenantSlug),
 });
 
 // Whether the caller's account email is on the Allowlist — backs the dashboard's
@@ -125,10 +162,12 @@ export const addEmail = mutation({
   },
 });
 
-// Remove an email from the Allowlist (Admin-only). Refuses to remove an Admin
-// row — the non-removable-Admin guard that stops the Admin locking themselves
-// out. Removing revokes creating *new* courses; it does not evict the account
-// or touch the courses they already own (ADR 0021).
+// Remove an email from the Allowlist (Admin-only). The lockout guard is now
+// scoped (issue 08 / ADR 0022): a sys-admin row can't be removed while it's the
+// *only* sys admin (the equivalent of the old one-Admin guard, now tier-scoped),
+// but tenant-admin and member rows are freely removable. Removing revokes
+// creating *new* courses; it does not evict the account or touch the courses
+// they already own (ADR 0021).
 export const removeEmail = mutation({
   args: { email: v.string() },
   returns: v.null(),
@@ -139,7 +178,13 @@ export const removeEmail = mutation({
       .withIndex("by_email", (q) => q.eq("email", normaliseEmail(email)))
       .unique();
     if (!row) return null;
-    if (row.isAdmin) throw new Error("The Admin can't be removed from the Allowlist.");
+    // A sys admin is `isAdmin` with no `tenantSlug`; refuse to drop the last one.
+    if (row.isAdmin && !row.tenantSlug) {
+      const sysAdmins = (await ctx.db.query("whitelist").collect()).filter(
+        (r) => r.isAdmin && !r.tenantSlug,
+      );
+      if (sysAdmins.length <= 1) throw new Error("The last sys admin can't be removed from the Allowlist.");
+    }
     await ctx.db.delete(row._id);
     return null;
   },
@@ -147,12 +192,14 @@ export const removeEmail = mutation({
 
 // Bootstrap an admitted (optionally Admin) row from the CLI: `npx convex run`.
 // The expected first step in local dev/tests, where the table starts empty and
-// is therefore closed. Idempotent.
+// is therefore closed. Idempotent. `tenantSlug` scopes the row (issue 08 / ADR
+// 0022): omit for a sys admin / default-site member, pass a slug to bootstrap a
+// tenant admin or tenant member.
 export const seedEmail = internalMutation({
-  args: { email: v.string(), isAdmin: v.optional(v.boolean()) },
+  args: { email: v.string(), isAdmin: v.optional(v.boolean()), tenantSlug: v.optional(v.string()) },
   returns: v.null(),
-  handler: async (ctx, { email, isAdmin }) => {
-    await admitEmail(ctx, email, isAdmin);
+  handler: async (ctx, { email, isAdmin, tenantSlug }) => {
+    await admitEmail(ctx, email, isAdmin, tenantSlug);
     return null;
   },
 });
