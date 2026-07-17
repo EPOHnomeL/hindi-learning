@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
+import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { CourseCertMenu } from "./Certificate";
 import { CourseSettingsDialog } from "./CourseSettings";
 import { EditionsDialog } from "./Editions";
@@ -103,7 +104,13 @@ export function Dashboard() {
                 Admin
               </Link>
             )}
-            <button onClick={() => void signOut().then(() => router.replace("/"))} className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
+            <button
+              onClick={() => {
+                clearAccountLocalStateOnSignOut();
+                void signOut().then(() => router.replace("/"));
+              }}
+              className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
+            >
               Sign out
             </button>
           </div>

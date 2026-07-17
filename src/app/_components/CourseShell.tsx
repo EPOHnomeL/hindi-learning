@@ -10,6 +10,7 @@ import { CompletionCelebration } from "./Certificate";
 import { CourseSettingsDialog } from "./CourseSettings";
 import { Icon } from "./icons";
 import { NavItem } from "./NavItem";
+import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { LANG_KEY, useEditionLang, withLang } from "./editionUrl";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
@@ -182,7 +183,10 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               <span aria-hidden>←</span> Courses
             </Link>
             <button
-              onClick={() => void signOut().then(() => router.replace("/"))}
+              onClick={() => {
+                clearAccountLocalStateOnSignOut();
+                void signOut().then(() => router.replace("/"));
+              }}
               className="shrink-0 text-xs text-soft hover:text-accent"
             >
               Sign out
