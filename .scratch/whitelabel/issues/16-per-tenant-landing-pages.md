@@ -1,6 +1,6 @@
 # whitelabel/16: Per-tenant landing pages
 
-**Status:** open
+**Status:** done
 **Depends on:** [11](11-ssr-theme-application.md)
 **Labels:** ready-for-agent
 
@@ -33,3 +33,29 @@ not any particular tenant's actual copy.
 - Registering a component for a slug in `registry.ts` makes that tenant's subdomain render it
   instead, without touching any other tenant's route.
 - The default site (`my-course.app`) is unaffected.
+
+## Resolution (2026-07-18)
+
+Built the registry mechanism only — no bespoke tenant pages (correct v1 deliverable;
+authoring copy is later content work, `06`/`20` keep it out of the dashboard).
+
+- **`src/app/_landing/registry.ts`** — `LANDING_REGISTRY` (a `slug → component` map,
+  **empty at v1**) plus `landingFor(slug, registry?)`, a pure, registry-injectable
+  lookup that returns the registered component or `null`. Import-light on purpose
+  (types only, no `Landing` import) so it unit-tests under the `edge-runtime` vitest
+  env. Covered by `registry.test.ts`: every real slug → `null` (falls through),
+  default site (`null` slug) → `null`, a registered slug resolves and doesn't leak to
+  siblings, and the shipped map is empty.
+- **`TenantContext.tsx`** — added `useTenantSlug()` over a new `SlugCtx`. The registry
+  keys on the slug (not the theme) and must resolve while `<Unauthenticated>`, before
+  the `getTheme` query, so the slug rides its own context rather than being derived
+  from the tenant object (which omits it). One resolution point preserved (issue 10):
+  `TenantProvider` already received `slug` server-side.
+- **`page.tsx`** — the `<Unauthenticated>` branch now renders
+  `landingFor(slug) ?? Landing`. All four tenants fall back to `<Landing/>` today,
+  which still re-skins via the SSR palette (issue 11).
+
+Gates green: `pnpm typecheck`, `pnpm build`, and `vitest run src/app/_landing`. Full
+suite has one unrelated red (`convex/invite-emails.test.ts` — another session's
+in-flight invites/tenant-branding work, not touched here). **Browser render check
+pending** (same posture as 11/13/19–22/24).
