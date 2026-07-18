@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import { assertAdmin } from "./lib";
 import { assertEmblemImage } from "./emblem";
 import { isCallerAdmin } from "./whitelist";
@@ -50,6 +51,23 @@ function assertThemeTokens(theme: { light: Record<string, string>; dark?: Record
     if (unknownDark.length) throw new Error(`theme.dark has unknown token(s): ${unknownDark.join(", ")}`);
     // dark is intentionally partial — no missing-token check.
   }
+}
+
+// Fold a validated palette onto an existing tenant's stored theme: replace
+// `light`, take `dark` only when supplied (a missing `dark` clears any stale one
+// so it falls back to the default dark), and carry the brand assets across
+// untouched (a repaint never disturbs the logo/favicon). Shared by both write
+// paths — the secret-guarded `setTenantTheme` (operator scripts) and the
+// identity-guarded `updateTenantTheme` (dashboard) — so the two never drift.
+function themeWithAssetsPreserved(
+  existing: Doc<"tenants">["theme"],
+  theme: { light: Record<string, string>; dark?: Record<string, string> },
+): Doc<"tenants">["theme"] {
+  const next: Doc<"tenants">["theme"] = { light: theme.light };
+  if (theme.dark) next.dark = theme.dark;
+  if (existing.logo) next.logo = existing.logo;
+  if (existing.favicon) next.favicon = existing.favicon;
+  return next;
 }
 
 // The dashboard sidebar's tenant list (issue 19): every tenant's slug + display
@@ -158,11 +176,37 @@ export const setTenantTheme = mutation({
       .unique();
     if (!tenant) throw new Error("tenant not found");
 
-    const next: typeof tenant.theme = { light: theme.light };
-    if (theme.dark) next.dark = theme.dark;
-    if (tenant.theme.logo) next.logo = tenant.theme.logo;
-    if (tenant.theme.favicon) next.favicon = tenant.theme.favicon;
-    await ctx.db.patch(tenant._id, { theme: next });
+    await ctx.db.patch(tenant._id, { theme: themeWithAssetsPreserved(tenant.theme, theme) });
+    return null;
+  },
+});
+
+// The dashboard's palette write (ticket 20) — the identity-guarded twin of
+// setTenantTheme. Same validation and asset-preserving repaint, but gated by
+// `isCallerAdmin(ctx, tenantSlug)` (issue 08) instead of PUBLISH_SECRET, so a
+// signed-in admin repaints from the panel without a secret: a sys admin any
+// tenant, a tenant admin only their own, a member refused server-side (never
+// merely hidden in the UI). Edit-is-live (03): the patch lands on `tenants.theme`
+// and the tenant's live subdomain reflects it on the next SSR render (11) — no
+// draft/published states. `tenantSlug` (not `slug`) matches setTenantAsset's arg
+// shape, the other identity-guarded tenant write.
+export const updateTenantTheme = mutation({
+  args: {
+    tenantSlug: v.string(),
+    theme: tenantThemeValidator,
+  },
+  returns: v.null(),
+  handler: async (ctx, { tenantSlug, theme }) => {
+    if (!(await isCallerAdmin(ctx, tenantSlug))) throw new Error("forbidden");
+    assertThemeTokens(theme);
+
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", tenantSlug))
+      .unique();
+    if (!tenant) throw new Error("tenant not found");
+
+    await ctx.db.patch(tenant._id, { theme: themeWithAssetsPreserved(tenant.theme, theme) });
     return null;
   },
 });

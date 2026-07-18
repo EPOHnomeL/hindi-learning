@@ -252,6 +252,101 @@ test("setTenantTheme rejects an unknown tenant slug", async () => {
   ).rejects.toThrow(/not found/i);
 });
 
+// updateTenantTheme — the identity-guarded dashboard twin of setTenantTheme
+// (ticket 20). Same validation + asset-preserving semantics, but gated by
+// `isCallerAdmin(ctx, tenantSlug)` so a signed-in admin repaints from the panel
+// (no PUBLISH_SECRET). A sys admin may repaint any tenant; a tenant admin only
+// their own; a member is refused server-side.
+
+test("updateTenantTheme: a sys admin repaints any tenant's palette", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
+  await asUser(t, sys).mutation(api.tenants.updateTenantTheme, { tenantSlug: "yknot", theme: { light: LIGHT2 } });
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "yknot")).unique(),
+  );
+  expect(row?.theme.light).toEqual(LIGHT2);
+});
+
+test("updateTenantTheme: a tenant admin repaints their own tenant but not another's", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "ywampotch", displayName: "YW", theme: THEME, flags: FLAGS });
+
+  // Own tenant → allowed.
+  await asUser(t, upfAdmin).mutation(api.tenants.updateTenantTheme, { tenantSlug: "upf", theme: { light: LIGHT2 } });
+  const own = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
+  );
+  expect(own?.theme.light).toEqual(LIGHT2);
+
+  // Another tenant → refused (acceptance: a tenant admin can't edit another's theme).
+  await expect(
+    asUser(t, upfAdmin).mutation(api.tenants.updateTenantTheme, { tenantSlug: "ywampotch", theme: { light: LIGHT2 } }),
+  ).rejects.toThrow(/forbidden/i);
+});
+
+test("updateTenantTheme: a plain member is refused", async () => {
+  const t = convexTest(schema, modules);
+  const member = await t.run((ctx) => ctx.db.insert("users", { email: "member@example.com" }));
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await expect(
+    asUser(t, member).mutation(api.tenants.updateTenantTheme, { tenantSlug: "upf", theme: { light: LIGHT2 } }),
+  ).rejects.toThrow(/forbidden/i);
+});
+
+test("updateTenantTheme: preserves logo/favicon, clears a stale dark, sets a partial dark", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  const logo = await storeImage(t);
+  await t.run((ctx) =>
+    ctx.db.insert("tenants", {
+      slug: "yknot", displayName: "Y-Knot",
+      theme: { light: LIGHT, dark: { paper: "#111" }, logo }, flags: FLAGS,
+    }),
+  );
+
+  // No dark given → stale dark cleared, asset preserved.
+  await asUser(t, sys).mutation(api.tenants.updateTenantTheme, { tenantSlug: "yknot", theme: { light: LIGHT2 } });
+  let row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "yknot")).unique(),
+  );
+  expect(row?.theme.light).toEqual(LIGHT2);
+  expect(row?.theme.logo).toBe(logo);
+  expect(row?.theme.dark).toBeUndefined();
+
+  // A supplied partial dark is stored.
+  await asUser(t, sys).mutation(api.tenants.updateTenantTheme, {
+    tenantSlug: "yknot", theme: { light: LIGHT2, dark: { paper: "#111", ink: "#eee" } },
+  });
+  row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "yknot")).unique(),
+  );
+  expect(row?.theme.dark).toEqual({ paper: "#111", ink: "#eee" });
+  expect(row?.theme.logo).toBe(logo); // asset still preserved
+});
+
+test("updateTenantTheme: rejects a theme missing a required light token", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
+  const light: Record<string, string> = { ...LIGHT2 };
+  delete light["gold"];
+  await expect(
+    asUser(t, sys).mutation(api.tenants.updateTenantTheme, { tenantSlug: "yknot", theme: { light } }),
+  ).rejects.toThrow(/missing/i);
+});
+
+test("updateTenantTheme: rejects an unknown tenant slug", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await expect(
+    asUser(t, sys).mutation(api.tenants.updateTenantTheme, { tenantSlug: "ghost", theme: { light: LIGHT2 } }),
+  ).rejects.toThrow(/not found/i);
+});
+
 // getTheme — the frontend's read seam (issue 11): the SSR no-flash palette, the
 // server favicon, and the client tenant context all resolve one tenant row by slug
 // through this single indexed read.
