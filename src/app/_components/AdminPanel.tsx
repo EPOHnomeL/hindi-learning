@@ -3,21 +3,23 @@
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { SellerStatus } from "../../../convex/lib";
 
-// The Admin portal (/admin, ADR 0011 + issue 02): the single Admin manages the
-// Allowlist — who may create courses (ADR 0021) — without the CLI. Client-guarded by `amIAdmin`
-// (UX only; the mutations are the real security boundary). The list is a live
-// Convex query, so adds/removes reflect immediately.
+// The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
+// dashboard is now scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
+// Sellers/Payouts, and every tenant via a tab switcher + tenant picker; a
+// **tenant admin** is locked to their own tenant's panel (no Allowlist, no
+// picker). Client-guarded by `myAdminScope` (UX only; the mutations are the real
+// security boundary). Lists are live Convex queries, so edits reflect immediately.
 export function AdminPanel() {
-  const amAdmin = useQuery(api.whitelist.amIAdmin);
+  const scope = useQuery(api.whitelist.myAdminScope);
 
-  if (amAdmin === undefined) {
+  if (scope === undefined) {
     return <div className="grid min-h-dvh place-items-center text-soft">Checking access…</div>;
   }
-  if (!amAdmin) {
+  if (scope.role === "none") {
     return (
       <div className="mx-auto grid min-h-dvh max-w-2xl place-items-center px-4">
         <div className="text-center">
@@ -30,25 +32,74 @@ export function AdminPanel() {
       </div>
     );
   }
-  return <AllowlistManager />;
+  // A tenant admin sees only their own tenant's panel, directly — no tabs, no
+  // sidebar picker, no create action (issue 19).
+  if (scope.role === "tenant") {
+    return (
+      <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
+        <header className="mb-8 flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Tenant</h1>
+          <Link href="/" className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
+            ← Courses
+          </Link>
+        </header>
+        <TenantDetail slug={scope.tenantSlug!} />
+      </div>
+    );
+  }
+  return <SysAdminDashboard />;
 }
 
-// Mounted only once the caller is confirmed Admin, so `whitelist.list` (which
-// rejects non-admins server-side) is never queried by anyone else.
-function AllowlistManager() {
-  const rows = useQuery(api.whitelist.list);
-
+// The sys-admin dashboard: a tab switcher between the platform Allowlist and the
+// per-tenant Tenants panel. Allowlist is the default tab (its historical landing).
+function SysAdminDashboard() {
+  const [tab, setTab] = useState<"allowlist" | "tenants">("allowlist");
   return (
-    <div className="mx-auto min-h-dvh max-w-2xl px-4 py-8 md:py-12">
-      <header className="mb-8 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Allowlist</h1>
-          <p className="mt-0.5 text-sm text-soft">Who can create courses</p>
+    <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
+      <header className="mb-8 flex items-center justify-between gap-4">
+        <div className="flex gap-1 rounded-xl border border-line bg-card p-1">
+          <TabButton active={tab === "allowlist"} onClick={() => setTab("allowlist")}>
+            Allowlist
+          </TabButton>
+          <TabButton active={tab === "tenants"} onClick={() => setTab("tenants")}>
+            Tenants
+          </TabButton>
         </div>
         <Link href="/" className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
           ← Courses
         </Link>
       </header>
+      {tab === "allowlist" ? <AllowlistManager /> : <TenantsManager />}
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-current={active ? "page" : undefined}
+      className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
+        active ? "bg-accent text-white" : "text-soft hover:bg-hi hover:text-accent"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// The Allowlist tab body (sys-admin only, so `whitelist.list` — which rejects
+// non-admins server-side — is never queried by anyone else). Centred at the
+// original width inside the wider dashboard shell.
+function AllowlistManager() {
+  const rows = useQuery(api.whitelist.list);
+
+  return (
+    <div className="mx-auto max-w-2xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Allowlist</h1>
+        <p className="mt-0.5 text-sm text-soft">Who can create courses</p>
+      </div>
 
       <AddEmailForm />
 
@@ -303,6 +354,168 @@ function SellerRow({
         </button>
       </div>
     </li>
+  );
+}
+
+// The Tenants tab (sys admin): a sidebar list of every tenant + a "+ New tenant"
+// action on the left, the selected tenant's stacked panel on the right. The list
+// is a live `listTenants` query (sys-admin-gated server-side). Selecting a tenant
+// — or creating one — opens its panel; nothing is selected on first load.
+function TenantsManager() {
+  const tenants = useQuery(api.tenants.listTenants);
+  const [selected, setSelected] = useState<string | null>(null);
+
+  return (
+    <div className="grid gap-8 md:grid-cols-[16rem_1fr]">
+      <aside className="flex flex-col gap-4">
+        <NewTenantForm onCreated={setSelected} />
+        {tenants === undefined ? (
+          <ul className="flex flex-col gap-2" aria-busy>
+            {[0, 1, 2].map((i) => (
+              <li key={i} className="h-10 animate-pulse rounded-lg border border-line bg-card" />
+            ))}
+          </ul>
+        ) : tenants.length === 0 ? (
+          <p className="text-sm text-soft">No tenants yet — create one above.</p>
+        ) : (
+          <ul className="flex flex-col gap-1">
+            {tenants.map((t) => (
+              <li key={t.slug}>
+                <button
+                  onClick={() => setSelected(t.slug)}
+                  aria-current={selected === t.slug ? "true" : undefined}
+                  className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                    selected === t.slug ? "bg-hi text-accent" : "text-ink hover:bg-hi"
+                  }`}
+                >
+                  <span className="block truncate font-medium">{t.displayName}</span>
+                  <span className="block truncate text-xs text-soft">{t.slug}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </aside>
+
+      {selected === null ? (
+        <div className="grid place-items-center rounded-2xl border border-dashed border-line py-24 text-sm text-soft">
+          Select a tenant to manage its branding, flags, courses, and members.
+        </div>
+      ) : (
+        <TenantDetail slug={selected} />
+      )}
+    </div>
+  );
+}
+
+// Create a tenant: slug + display name → `createTenant` (sys-admin-gated). On
+// success the new tenant's panel opens. Slug validity/dupes are enforced
+// server-side; the surfaced error is whatever the mutation threw.
+function NewTenantForm({ onCreated }: { onCreated: (slug: string) => void }) {
+  const create = useMutation(api.tenants.createTenant);
+  const [slug, setSlug] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <form
+      className="flex flex-col gap-2 rounded-2xl border border-gold/50 bg-card p-4 shadow-sm"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setBusy(true);
+        setError(null);
+        try {
+          const { slug: created } = await create({ slug, displayName });
+          setSlug("");
+          setDisplayName("");
+          onCreated(created);
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Couldn't create the tenant.");
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">New tenant</label>
+      <input
+        value={displayName}
+        onChange={(e) => {
+          setDisplayName(e.target.value);
+          setError(null);
+        }}
+        placeholder="Display name"
+        className="min-w-0 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+      />
+      <input
+        value={slug}
+        onChange={(e) => {
+          setSlug(e.target.value);
+          setError(null);
+        }}
+        placeholder="subdomain-slug"
+        className="min-w-0 rounded-lg border border-line bg-card px-3 py-2 text-sm lowercase focus:border-gold focus:outline-none"
+      />
+      <button
+        type="submit"
+        disabled={busy || !slug.trim() || !displayName.trim()}
+        className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+      >
+        {busy ? "Creating…" : "+ New tenant"}
+      </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </form>
+  );
+}
+
+// The selected tenant's panel: the stacked-scroll layout the prototype settled on
+// (issue 06 / 19) — Theme, Flags, Courses, Members, Remove tenant as sections on
+// one scrolling page, no sub-navigation. This issue builds the shell + section
+// scaffolding; tickets 20–22 fill in each section's real content and mutations.
+// `displayName` comes from the public `getTheme` read (also serves both admin
+// tiers, so a tenant admin needs no extra query).
+function TenantDetail({ slug }: { slug: string }) {
+  const view = useQuery(api.tenants.getTheme, { slug });
+  const displayName = view?.displayName ?? slug;
+
+  return (
+    <div className="flex flex-col gap-10">
+      <div>
+        <h2 className="text-xl font-semibold tracking-tight text-accent md:text-2xl">{displayName}</h2>
+        <p className="mt-0.5 text-sm text-soft">{slug}.my-course.app</p>
+      </div>
+
+      <TenantSection title="Theme" hint="Brand palette, logo, and favicon.">
+        Coming in the theme editor (ticket 20).
+      </TenantSection>
+      <TenantSection title="Flags" hint="Which features are on for this tenant.">
+        Coming in the flag toggles (ticket 21).
+      </TenantSection>
+      <TenantSection title="Courses" hint="Which courses belong to this tenant.">
+        Coming in course assignment (ticket 22).
+      </TenantSection>
+      <TenantSection title="Members" hint="Who belongs to this tenant, and its admins.">
+        Coming in member assignment (ticket 22).
+      </TenantSection>
+      <TenantSection title="Remove tenant" hint="Delete this tenant. Blocked while any course or member still references it.">
+        Coming in the removal guard (ticket 22).
+      </TenantSection>
+    </div>
+  );
+}
+
+// One stacked section of the tenant panel: a titled, bordered block. The body is
+// placeholder scaffolding until 20–22 land — the headings + scroll structure are
+// what issue 19 delivers.
+function TenantSection({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
+  return (
+    <section>
+      <h3 className="text-lg font-semibold tracking-tight text-accent">{title}</h3>
+      <p className="mt-0.5 text-sm text-soft">{hint}</p>
+      <div className="mt-3 rounded-xl border border-dashed border-line bg-card px-4 py-6 text-sm text-soft">
+        {children}
+      </div>
+    </section>
   );
 }
 
