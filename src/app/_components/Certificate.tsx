@@ -8,6 +8,7 @@ import { langDir } from "../../../convex/languages";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Icon } from "./icons";
 import { Menu, MenuItem } from "./ui";
+import { useTenant } from "./TenantContext";
 
 // The resolved Emblem (ADR 0017) as the read seams return it — an image resolves
 // to a same-origin URL, otherwise a glyph (a subject emoji or the generic default).
@@ -42,6 +43,24 @@ function EmblemMark({ emblem, large }: { emblem: CertificateEmblem; large?: bool
       {emblem.glyph}
     </span>
   );
+}
+
+// The issuing brand on the certificate — the tenant's identity, NOT its palette
+// (the card's colours are frozen to the default gold-foil look via the `.cert-card`
+// reset in globals.css; whitelabel 15). Renders the tenant's uploaded logo when it
+// has one, else the display name; falls back to "My Course" on the default site /
+// while the tenant context is still loading. `className` styles the text variant so
+// each surface (compact vs. showcase signature) keeps its own type treatment.
+function CertIssuer({ className }: { className?: string }) {
+  const tenant = useTenant();
+  const name = tenant?.displayName ?? "My Course";
+  if (tenant?.logoUrl) {
+    // Same object-contain slot logic as the Brand lockup — tenant logos vary wildly
+    // in aspect, so clamp both dimensions rather than fixing a height.
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={tenant.logoUrl} alt={name} className="mx-auto h-8 w-auto max-w-40 object-contain" />;
+  }
+  return <span className={className}>{name}</span>;
 }
 
 // A pointer-tracked tilt + spotlight for the card (ADR 0017). Sets CSS custom
@@ -80,8 +99,9 @@ function onCardLeave(e: React.MouseEvent<HTMLDivElement>) {
 //     corners, a guilloché weave, a foil wax seal, and signature rules. Sized in
 //     container units so it scales as one block from phone to desktop and prints
 //     to a true A4 page (globals.css `.cert-doc*`, `@media print`).
-// Both degrade to a flat engraved document under print + reduced-motion. Brand:
-// "My Course".
+// Both degrade to a flat engraved document under print + reduced-motion. Carries
+// the tenant's name/logo (CertIssuer) but its default gold-foil palette is frozen
+// against the SSR tenant override (globals.css `.cert-card` reset; whitelabel 15).
 export function CertificateCard(props: CertificateData) {
   return props.showcase ? <CertificateShowcase {...props} /> : <CertificateCompact {...props} />;
 }
@@ -110,7 +130,9 @@ function CertificateCompact({ learnerName, courseTitle, lessonCount, issuedAt, l
         <p className="mt-6 text-sm text-soft">
           {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"} · {date}
         </p>
-        <p className="mt-8 text-[11px] font-semibold uppercase tracking-[0.2em] text-accent2">My Course</p>
+        <div className="mt-8">
+          <CertIssuer className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent2" />
+        </div>
       </div>
     </div>
   );
@@ -177,7 +199,7 @@ function CertificateShowcase({ learnerName, courseTitle, lessonCount, issuedAt, 
 
         <div className="cert-doc-footer">
           <div className="cert-doc-sig">
-            <span className="cert-doc-sig-mark">My Course</span>
+            <CertIssuer className="cert-doc-sig-mark" />
             <span className="cert-doc-sig-line" />
             <span className="cert-doc-sig-label">Issued by</span>
           </div>

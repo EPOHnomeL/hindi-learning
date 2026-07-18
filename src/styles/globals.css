@@ -113,6 +113,49 @@ body {
   transition: transform 160ms ease-out;
 }
 
+/* Palette freeze (whitelabel 15). The certificate carries the tenant's NAME and
+   LOGO, but not its palette — the gold-foil look is part of what makes it read as
+   a certificate, so a tenant skin must not recolour it. The SSR tenant override
+   (issue 11) sets `--color-*` on `:root:root`; re-declaring the same 14 tokens on
+   `.cert-card` itself pins them back to the DEFAULT palette for the card and every
+   descendant, regardless of `:root:root`'s specificity (custom-property resolution
+   picks the declaration on the element itself over any inherited one). Values MUST
+   stay identical to the default `:root` / `html[data-theme="dark"]` palettes above
+   — that equality (light + dark) is asserted in globals-cert-freeze.test.ts. Media-
+   agnostic, so screen and print freeze alike (print is not a tenant dimension, 01). */
+.cert-card {
+  --color-paper: #fbf7f0;
+  --color-card: #fffdf9;
+  --color-ink: #2b2622;
+  --color-soft: #6b6258;
+  --color-line: #e7ddd4;
+  --color-accent: #9c5b34;
+  --color-accent2: #3f6f5e;
+  --color-gold: #b88a2e;
+  --color-hi: #fbeecb;
+  --color-danger: #b4442f;
+  --color-good: #e7f3ec;
+  --color-good-b: #3f8f63;
+  --color-bad: #fbe9e7;
+  --color-bad-b: #c0573f;
+}
+html[data-theme="dark"] .cert-card {
+  --color-paper: #1b1815;
+  --color-card: #241f1a;
+  --color-ink: #e9e1d4;
+  --color-soft: #a99d8a;
+  --color-line: #3a322a;
+  --color-accent: #dd9863;
+  --color-accent2: #79b39b;
+  --color-gold: #d8ab57;
+  --color-hi: #4a3c1f;
+  --color-danger: #e0785f;
+  --color-good: #1e3328;
+  --color-good-b: #74cf9b;
+  --color-bad: #3c241e;
+  --color-bad-b: #e0937c;
+}
+
 /* The metallic seal holding the Emblem — a brushed-gold gradient with an inset
    rim, so a glyph reads as struck into metal and an image sits framed by it. */
 .cert-medallion {
