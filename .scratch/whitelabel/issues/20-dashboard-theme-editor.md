@@ -1,6 +1,7 @@
 # whitelabel/20: Dashboard — theme editor
 
-**Status:** open
+**Status:** implemented (2026-07-18, `/tdd` + `/ponytail`) — UI browser check pending (needs an
+authed sys-admin/tenant-admin session; static gates green)
 **Depends on:** [11](11-ssr-theme-application.md), [12](12-brand-asset-upload.md),
 [19](19-dashboard-tenants-tab-shell.md)
 **Labels:** ready-for-agent
@@ -36,3 +37,30 @@ change how their tenant looks, without touching Convex directly.
 - Uploading a logo/favicon through this UI results in the tenant's live subdomain showing the
   new asset (via 12 + 11).
 - A tenant admin cannot edit another tenant's theme (mutation throws if attempted).
+
+## Resolution (2026-07-18)
+
+Built test-first across a Theme-editor stream (see handoff B). Committed on `main`.
+
+**Backend** ([convex/tenants.ts](../../../convex/tenants.ts), commit `46ff5fc`)
+- **`updateTenantTheme`** — identity-guarded (`isCallerAdmin(ctx, tenantSlug)`) twin of the
+  secret-guarded `setTenantTheme`, so a signed-in admin repaints from the dashboard without
+  `PUBLISH_SECRET`. Extracted **`themeWithAssetsPreserved`** so both write paths fold a palette
+  identically (replace `light`, take `dark` only if given, carry `logo`/`favicon` across). 6 TDD
+  tests: sys repaints any tenant; tenant admin own-only + cross-tenant throws; member refused;
+  asset preservation / stale-dark clear / partial dark; missing-token reject; unknown-slug reject.
+
+**Frontend** ([src/app/_components/AdminPanel.tsx](../../../src/app/_components/AdminPanel.tsx),
+committed in `be39b9a`)
+- **`ThemeEditor`** fills the Theme `<TenantSection>`: JSON-import textarea (validates the 14-token
+  light/dark contract against `src/design/tokens.ts` before applying), structured per-token color
+  fields with light/dark tabs, a live preview pane, and logo/favicon upload slots (reusing
+  `generateUploadUrl` → `setTenantAsset`, SVG refused). Edit-is-live — save calls
+  `updateTenantTheme`; the tenant's subdomain reflects it on next SSR render (11).
+
+**Verified:** `pnpm typecheck` clean; 451 backend tests pass; `pnpm build` compiles `/admin`. UI
+behaviour (import↔structured sync, single-token edit, upload → live subdomain) is the pending
+browser check — dev has operator accounts only, same posture as 11/13/19/21/22 in this feature.
+
+**Note:** committed by a concurrent session; its subject (`be39b9a`) bundles the Flags-toggle UI
+too, so attribution is mixed — but the theme-editor code and its backend are all present and green.
