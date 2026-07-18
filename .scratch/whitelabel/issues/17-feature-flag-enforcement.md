@@ -1,6 +1,6 @@
 # whitelabel/17: Feature flag enforcement
 
-**Status:** open
+**Status:** done
 **Depends on:** [07](07-tenant-schema-and-seed.md)
 **Labels:** ready-for-agent
 
@@ -49,3 +49,35 @@ call directly.
   keeps resolving via its existing read query after the flag flips off.
 - Content with no `tenantSlug` (default site, or not-yet-tenanted) is unaffected by any flag —
   every one of the five mutations still succeeds there exactly as today.
+
+## Resolution (2026-07-18)
+
+Built test-first (`/tdd`) and minimal (`/ponytail`). Shipped in commit `9ffbb48`.
+
+**Helper** — `assertTenantFlag(ctx, tenantSlug, flag)` in
+[convex/lib.ts](../../../convex/lib.ts): no-ops when `tenantSlug` is `undefined` (default
+site — every flag implicitly on, no regression), else reads the `tenants` row by `by_slug`
+and throws unless `flags[flag]` is `true`. Fail-closed on an unknown slug. `TenantFlag` is
+derived from the schema's `tenantFlagsValidator` so the flag keys can't drift.
+
+**Five create-side call sites** (each `await assertTenantFlag(...)`, inline):
+- `claimCertificate` ([certificates.ts](../../../convex/certificates.ts)) — flag `certificates`,
+  tenant from the resolved Topic. Placed **after** the idempotent existing-cert return, so a cert
+  earned before the flag flipped keeps resolving (frozen, not revoked).
+- `setTopicPublic` / `setEditionPublic` ([shares.ts](../../../convex/shares.ts)) — flag
+  `publicLinks`, only when `isPublic === true`; revoking a link stays allowed.
+- `askQuestion` ([capture.ts](../../../convex/capture.ts)) — flag `qa`.
+- `tryAcquireTranslation` ([translate.ts](../../../convex/translate.ts)) — flag `translations`;
+  throws (rather than returning a reason) so a disabled feature surfaces as an error like the rest.
+- `seedTopic` ([content.ts](../../../convex/content.ts)) — flag `seeding`, tenant from the
+  **caller's own** `user.tenantSlug` (no Topic exists yet at creation).
+
+Read paths (`myCertificate`, `myQuestions`, the Editions link display, etc.) are left untouched.
+
+**Tests** — [convex/lib.test.ts](../../../convex/lib.test.ts): the helper (no-op / on / off /
+fail-closed) plus each of the five mutations throwing when off and succeeding both on-tenant and
+on the default site, and the frozen-read case (a cert earned before the flip keeps resolving and
+re-claims idempotently). 15 pass; `pnpm typecheck` clean; existing suites for the five touched
+files green (97 pass).
+
+Browser check pending (needs an authed tenant session dev can't fully supply), as with 11/13/19.
