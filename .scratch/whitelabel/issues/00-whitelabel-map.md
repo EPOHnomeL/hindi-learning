@@ -120,6 +120,15 @@ issue per session in dependency order) is the next work — not another `/wayfin
 - **Default-site catalogue policy revisit** — "my-course.app shows all courses" is the pinned v1;
   the user expects to change this later (curation/opt-out). Becomes specifiable after the tenant
   model lands and real tenant courses exist.
+- **Per-tenant default course-access policy + self-enroll** (raised & parked 2026-07-18) — a
+  sys-admin per-tenant toggle: either a tenant's members get *default access* to all its courses on
+  join, or access stays *grant-only* (today's model — Shares/invites/Entitlements/public links)
+  with a new **self-enroll** path for free courses (paid Editions still purchased, private still
+  Share-gated). Genuinely foggy: the app has **no "enroll" concept** today (access is entirely
+  grant-based via `shares`/`entitlements`), so this is a new access-policy layer, not a toggle —
+  needs a `/grilling` + `/domain-modeling` pass (what "enroll" means, paid/private interactions,
+  per-course opt-out) before it can be ticketed. Interacts with the Default-site catalogue revisit
+  above and the flags model ([04](04-scope-per-tenant-feature-flags.md)).
 - **Per-tenant payments & email** — merchant accounts (PayFast/Paystack) and Resend sender
   domains per tenant; flagged in the tenant-model ticket, deliberately not solved there. Hangs on
   the payments roadmap's gated phases. (Invite/notification email *branding* is v1 per

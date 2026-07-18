@@ -586,8 +586,13 @@ function TenantCourses({ slug }: { slug: string }) {
 // Allowlist emails). Assigning sets `whitelist.tenantSlug`.
 function TenantMembers({ slug }: { slug: string }) {
   const data = useQuery(api.tenants.memberAssignment, { tenantSlug: slug });
+  const scope = useQuery(api.whitelist.myAdminScope);
   const assign = useMutation(api.tenants.assignMember);
   const unassign = useMutation(api.tenants.unassignMember);
+  const setAdmin = useMutation(api.tenants.setTenantAdmin);
+  // Only a sys admin mints tenant admins (issue 24) — the grant/revoke control is
+  // hidden for a tenant admin (UX only; setTenantAdmin re-checks server-side).
+  const isSys = scope?.role === "sys";
 
   if (data === undefined) {
     return (
@@ -616,9 +621,18 @@ function TenantMembers({ slug }: { slug: string }) {
               key={m.email}
               label={m.email}
               badge={m.isAdmin ? "Admin" : undefined}
+              // An admin can't be unassigned directly — demote first (revoke admin),
+              // then the normal picker Remove applies (mirrors the DB-privilege lock).
               onRemove={m.isAdmin ? undefined : () => unassign({ tenantSlug: slug, email: m.email })}
-              lockedNote={m.isAdmin ? "Remove via Allowlist" : undefined}
+              lockedNote={m.isAdmin && !isSys ? "Remove via Allowlist" : undefined}
               removeAria={`Unassign ${m.email}`}
+              action={
+                isSys
+                  ? m.isAdmin
+                    ? { label: "Revoke admin", busyLabel: "Revoking…", aria: `Revoke admin for ${m.email}`, run: () => setAdmin({ tenantSlug: slug, email: m.email, makeAdmin: false }) }
+                    : { label: "Make admin", busyLabel: "Granting…", aria: `Make ${m.email} an admin`, run: () => setAdmin({ tenantSlug: slug, email: m.email, makeAdmin: true }) }
+                  : undefined
+              }
             />
           ))}
         </ul>
@@ -759,12 +773,16 @@ function AssignedRow({
   onRemove,
   lockedNote,
   removeAria,
+  action,
 }: {
   label: string;
   badge?: string;
   onRemove?: () => Promise<unknown>;
   lockedNote?: string;
   removeAria?: string;
+  // An optional secondary control (e.g. "Make admin" / "Revoke admin"), rendered
+  // before the remove/lockedNote. Manages its own busy/error, independent of remove.
+  action?: { label: string; busyLabel: string; run: () => Promise<unknown>; aria?: string };
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -777,32 +795,64 @@ function AssignedRow({
           <span className="shrink-0 rounded-full bg-hi px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent">{badge}</span>
         )}
       </div>
-      {onRemove ? (
-        <div className="flex shrink-0 items-center gap-2">
-          {error && <span className="text-xs text-danger">Failed — retry</span>}
-          <button
-            onClick={async () => {
-              setBusy(true);
-              setError(false);
-              try {
-                await onRemove();
-              } catch {
-                setError(true);
-              } finally {
-                setBusy(false);
-              }
-            }}
-            disabled={busy}
-            aria-label={removeAria}
-            className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
-          >
-            {busy ? "Removing…" : "Remove"}
-          </button>
-        </div>
-      ) : (
-        <span className="shrink-0 text-xs text-soft">{lockedNote}</span>
-      )}
+      <div className="flex shrink-0 items-center gap-2">
+        {action && <RowActionButton {...action} />}
+        {onRemove ? (
+          <>
+            {error && <span className="text-xs text-danger">Failed — retry</span>}
+            <button
+              onClick={async () => {
+                setBusy(true);
+                setError(false);
+                try {
+                  await onRemove();
+                } catch {
+                  setError(true);
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              disabled={busy}
+              aria-label={removeAria}
+              className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
+            >
+              {busy ? "Removing…" : "Remove"}
+            </button>
+          </>
+        ) : (
+          lockedNote && <span className="text-xs text-soft">{lockedNote}</span>
+        )}
+      </div>
     </li>
+  );
+}
+
+// A secondary row action with its own busy/error state (e.g. grant/revoke admin).
+function RowActionButton({ label, busyLabel, run, aria }: { label: string; busyLabel: string; run: () => Promise<unknown>; aria?: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  return (
+    <>
+      {error && <span className="text-xs text-danger">Failed</span>}
+      <button
+        onClick={async () => {
+          setBusy(true);
+          setError(false);
+          try {
+            await run();
+          } catch {
+            setError(true);
+          } finally {
+            setBusy(false);
+          }
+        }}
+        disabled={busy}
+        aria-label={aria}
+        className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
+      >
+        {busy ? busyLabel : label}
+      </button>
+    </>
   );
 }
 
