@@ -3,10 +3,11 @@
 import { useMutation, useQuery } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { SellerStatus, TenantFlag } from "../../../convex/lib";
+import { TENANT_THEME_TOKENS, type Token } from "../../design/tokens";
 
 // The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
 // dashboard is now scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
@@ -487,7 +488,13 @@ function TenantDetail({ slug, onRemoved }: { slug: string; onRemoved?: () => voi
       </div>
 
       <TenantSection title="Theme" hint="Brand palette, logo, and favicon.">
-        Coming in the theme editor (ticket 20).
+        {view === undefined ? (
+          <span>Loading…</span>
+        ) : view === null ? (
+          <span>This tenant has no theme yet.</span>
+        ) : (
+          <ThemeEditor key={slug} slug={slug} view={view} />
+        )}
       </TenantSection>
       <TenantSection title="Flags" hint="Which features are on for this tenant.">
         {view === undefined ? (
@@ -799,6 +806,496 @@ function AssignedRow({
   );
 }
 
+// The five feature flags in display order, with human labels (issue 21). The keys
+// mirror the schema's tenantFlagsValidator (issue 04); enforced server-side by
+// assertTenantFlag (issue 17), this is only the operator's on/off surface.
+const FLAG_META: { key: TenantFlag; label: string; hint: string }[] = [
+  { key: "certificates", label: "Certificates", hint: "Learners can claim a completion certificate." },
+  { key: "translations", label: "Translations", hint: "Owners can translate a completed course into other languages." },
+  { key: "publicLinks", label: "Public links", hint: "Owners can publish a shareable public link to a course." },
+  { key: "qa", label: "Questions", hint: "Learners can ask questions on a lesson." },
+  { key: "seeding", label: "Course creation", hint: "Members can seed new courses on this tenant." },
+];
+
+// The Flags section (ticket 21): one plain switch per feature flag over the
+// scope-gated setTenantFlags patch. Flag-off is frozen-not-revoked (issue 04), so
+// there's no confirm dialog — a toggle only changes what the server permits going
+// forward, granting and deleting nothing. The live getTheme query drives `flags`,
+// so a toggle reflects immediately (Convex reactivity); a per-key busy flag guards
+// against a double-click mid-write. Keyed by slug at the call site so switching
+// tenants remounts with fresh state.
+function FlagToggles({ slug, flags }: { slug: string; flags: Record<TenantFlag, boolean> }) {
+  const setFlags = useMutation(api.tenants.setTenantFlags);
+  const [busy, setBusy] = useState<TenantFlag | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggle(key: TenantFlag, next: boolean) {
+    setError(null);
+    setBusy(key);
+    try {
+      await setFlags({ tenantSlug: slug, flags: { [key]: next } });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't update that flag.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1 text-ink">
+      {FLAG_META.map(({ key, label, hint }) => {
+        const on = flags[key];
+        return (
+          <div key={key} className="flex items-center justify-between gap-4 py-2">
+            <div className="min-w-0">
+              <b className="block text-[13.5px] font-semibold text-ink">{label}</b>
+              <span className="text-[11.5px] text-soft">{hint}</span>
+            </div>
+            <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+              <input
+                type="checkbox"
+                checked={on}
+                disabled={busy !== null}
+                onChange={(e) => toggle(key, e.target.checked)}
+                className="peer sr-only"
+              />
+              <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 peer-checked:after:translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-disabled:opacity-60" />
+            </label>
+          </div>
+        );
+      })}
+      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
+// The tenant view getTheme resolves (issue 11) — a non-null tenant's resolved
+// palette + brand asset urls, which the editor seeds from.
+type TenantThemeView = NonNullable<FunctionReturnType<typeof api.tenants.getTheme>>;
+type Palette = Record<string, string>;
+
+// Short human labels for the structured token fields — the semantic role of each
+// token (mirrors the contract in src/design/tokens.ts). The token name is shown
+// alongside so a JSON paste and a structured field are obviously the same key.
+const TOKEN_LABELS: Record<Token, string> = {
+  paper: "Page background",
+  card: "Raised surface",
+  ink: "Primary text",
+  soft: "Muted text",
+  line: "Hairline borders",
+  accent: "Primary brand",
+  accent2: "Secondary brand",
+  gold: "Highlight / ornament",
+  hi: "Highlight-mark bg",
+  danger: "Error / destructive",
+  good: "Correct-answer surface",
+  "good-b": "Correct-answer accent",
+  bad: "Wrong-answer surface",
+  "bad-b": "Wrong-answer accent",
+};
+
+// Validate a pasted palette into a { light?, dark? } update (ticket 20's import
+// mode). Accepts either the `{ light, dark }` envelope a Claude/Figma handoff
+// arrives in, or a bare 14-token map (treated as a complete light palette). Light,
+// when present, must be complete and use only known tokens; dark may be a partial
+// subset. Throws a human-readable message the UI surfaces. Mirrors the server's
+// assertThemeTokens so a bad paste fails before the round-trip — the server is
+// still the boundary.
+function coerceImportedTheme(parsed: unknown): { light?: Palette; dark?: Palette } {
+  if (!parsed || typeof parsed !== "object") throw new Error("Expected a JSON object.");
+  const obj = parsed as Record<string, unknown>;
+  const hasEnvelope = "light" in obj || "dark" in obj;
+  const result: { light?: Palette; dark?: Palette } = {};
+  const rawLight = hasEnvelope ? obj.light : obj;
+  if (rawLight !== undefined) result.light = validatePalette(rawLight, "light", true);
+  if (hasEnvelope && obj.dark !== undefined) result.dark = validatePalette(obj.dark, "dark", false);
+  if (result.light === undefined && result.dark === undefined) {
+    throw new Error('Expected "light" and/or "dark" token maps.');
+  }
+  return result;
+}
+
+function validatePalette(raw: unknown, name: string, complete: boolean): Palette {
+  if (!raw || typeof raw !== "object") throw new Error(`${name} must be an object of token → colour.`);
+  const known = new Set<string>(TENANT_THEME_TOKENS);
+  const entries = Object.entries(raw as Record<string, unknown>);
+  const unknown = entries.map(([k]) => k).filter((k) => !known.has(k));
+  if (unknown.length) throw new Error(`${name} has unknown token(s): ${unknown.join(", ")}`);
+  const palette: Palette = {};
+  for (const [k, val] of entries) {
+    if (typeof val !== "string") throw new Error(`${name} token "${k}" must be a colour string.`);
+    palette[k] = val;
+  }
+  if (complete) {
+    const missing = TENANT_THEME_TOKENS.filter((tok) => !(tok in palette));
+    if (missing.length) throw new Error(`${name} is missing required token(s): ${missing.join(", ")}`);
+  }
+  return palette;
+}
+
+// The Theme section's editor (ticket 20): JSON import + structured per-token
+// fields (light/dark tabs) + a live preview, over the identity-guarded
+// updateTenantTheme. Edit-is-live (03) — Save patches `tenants.theme` and the
+// tenant's subdomain reflects it on the next SSR render (11), no draft state.
+// Keyed by slug at the call site so switching tenants remounts with fresh state,
+// so local edits never bleed across tenants and the live getTheme never clobbers
+// an in-progress edit.
+function ThemeEditor({ slug, view }: { slug: string; view: TenantThemeView }) {
+  const save = useMutation(api.tenants.updateTenantTheme);
+
+  // Editable palettes seeded from the tenant's current theme: light is complete
+  // (all 14); dark is a partial override map (only the tokens the tenant set).
+  const [light, setLight] = useState<Palette>(() => ({ ...view.theme.light }));
+  const [dark, setDark] = useState<Palette>(() => ({ ...(view.theme.dark ?? {}) }));
+  const [tab, setTab] = useState<"light" | "dark">("light");
+  const [importText, setImportText] = useState("");
+  const [importError, setImportError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+
+  function setToken(mode: "light" | "dark", tok: string, value: string) {
+    setSaved(false);
+    (mode === "light" ? setLight : setDark)((prev) => ({ ...prev, [tok]: value }));
+  }
+  function clearDarkToken(tok: string) {
+    setSaved(false);
+    setDark((prev) => {
+      const next = { ...prev };
+      delete next[tok];
+      return next;
+    });
+  }
+
+  function applyImport() {
+    setImportError(null);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(importText);
+    } catch {
+      setImportError("That isn't valid JSON.");
+      return;
+    }
+    try {
+      const next = coerceImportedTheme(parsed);
+      if (next.light) setLight(next.light);
+      if (next.dark !== undefined) setDark(next.dark);
+      setImportText("");
+      setSaved(false);
+    } catch (e) {
+      setImportError(e instanceof Error ? e.message : "Couldn't read that palette.");
+    }
+  }
+
+  async function onSave() {
+    setError(null);
+    setSaved(false);
+    const missing = TENANT_THEME_TOKENS.filter((tok) => !light[tok]?.trim());
+    if (missing.length) {
+      setError(`Light palette is missing: ${missing.join(", ")}`);
+      setTab("light");
+      return;
+    }
+    setBusy(true);
+    try {
+      const theme: { light: Palette; dark?: Palette } = {
+        // Every light token is present (the missing-check above guarantees it).
+        light: Object.fromEntries(TENANT_THEME_TOKENS.map((tok) => [tok, light[tok]!])),
+      };
+      const darkEntries = Object.fromEntries(
+        TENANT_THEME_TOKENS.filter((tok) => dark[tok]?.trim()).map((tok) => [tok, dark[tok]!]),
+      );
+      if (Object.keys(darkEntries).length) theme.dark = darkEntries;
+      await save({ tenantSlug: slug, theme });
+      setSaved(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save the theme.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Preview the active tab. Dark shows its overrides on the light base for the
+  // tokens it doesn't set (a representative approximation — the real fallback is
+  // the default dark palette, which the client doesn't carry).
+  const activePalette = tab === "light" ? light : { ...light, ...dark };
+  const previewStyle = Object.fromEntries(
+    TENANT_THEME_TOKENS.filter((tok) => activePalette[tok]).map((tok) => [`--color-${tok}`, activePalette[tok]]),
+  ) as CSSProperties;
+
+  return (
+    <div className="flex flex-col gap-6 text-ink">
+      <div>
+        <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Import palette (JSON)</label>
+        <p className="mt-0.5 text-xs text-soft">
+          Paste a full 14-token set as <code>{`{ "light": { … }, "dark": { … } }`}</code> (dark optional). Applying
+          fills the fields below — nothing saves until you press Save.
+        </p>
+        <textarea
+          value={importText}
+          onChange={(e) => {
+            setImportText(e.target.value);
+            setImportError(null);
+          }}
+          rows={4}
+          placeholder='{ "light": { "paper": "#fbf7f0", … } }'
+          className="mt-2 w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-xs focus:border-gold focus:outline-none"
+        />
+        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={applyImport}
+            disabled={!importText.trim()}
+            className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
+          >
+            Apply to fields
+          </button>
+          {importError && <span className="text-xs text-danger">{importError}</span>}
+        </div>
+      </div>
+
+      <div className="flex gap-1 self-start rounded-lg border border-line bg-card p-1">
+        <ModeButton active={tab === "light"} onClick={() => setTab("light")}>
+          Light
+        </ModeButton>
+        <ModeButton active={tab === "dark"} onClick={() => setTab("dark")}>
+          Dark
+        </ModeButton>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          {tab === "dark" && (
+            <p className="text-xs text-soft">
+              Dark is optional and partial — set only the tokens to override; the rest fall back to the default dark
+              palette.
+            </p>
+          )}
+          {TENANT_THEME_TOKENS.map((tok) => (
+            <TokenField
+              key={tok}
+              token={tok}
+              label={TOKEN_LABELS[tok]}
+              value={tab === "light" ? (light[tok] ?? "") : (dark[tok] ?? "")}
+              overridden={tab === "light" || Boolean(dark[tok])}
+              mode={tab}
+              onChange={(v) => setToken(tab, tok, v)}
+              onClear={tab === "dark" ? () => clearDarkToken(tok) : undefined}
+            />
+          ))}
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-accent2">Preview ({tab})</p>
+          <div style={previewStyle} className="rounded-xl border border-line bg-paper p-4">
+            <p className="text-sm font-semibold text-accent">Sample heading</p>
+            <div className="mt-3 rounded-lg border border-line bg-card p-3">
+              <p className="text-sm text-ink">A card surface with primary text.</p>
+              <p className="mt-1 text-xs text-soft">Muted secondary text.</p>
+              <a className="mt-2 inline-block text-xs text-accent underline underline-offset-2">A link</a>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                <span className="rounded-md border border-good-b bg-good px-2 py-0.5 text-[11px] text-good-b">Correct</span>
+                <span className="rounded-md border border-bad-b bg-bad px-2 py-0.5 text-[11px] text-bad-b">Wrong</span>
+                <span className="rounded-md bg-hi px-2 py-0.5 text-[11px] text-ink">Highlight</span>
+                <span className="rounded-md bg-gold px-2 py-0.5 text-[11px] text-white">Gold</span>
+              </div>
+              <button className="mt-3 rounded-md bg-accent px-3 py-1 text-xs font-medium text-white">Primary action</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={busy}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+        >
+          {busy ? "Saving…" : "Save theme"}
+        </button>
+        {saved && <span className="text-xs text-accent2">Saved — live on the subdomain now.</span>}
+        {error && <span className="text-xs text-danger">{error}</span>}
+      </div>
+
+      <AssetUploads slug={slug} logoUrl={view.logoUrl} faviconUrl={view.faviconUrl} />
+    </div>
+  );
+}
+
+// A light/dark toggle within the theme editor (kept local to avoid coupling to the
+// page-level TabButton, which styles a different context).
+function ModeButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+        active ? "bg-accent text-white" : "text-soft hover:bg-hi hover:text-accent"
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// One structured token field: a native colour picker paired with the exact hex
+// text. The picker only understands 6-digit hex, so it seeds from a normalised
+// value while the text field keeps the authored string verbatim (#fff, rgb(), a
+// var). On the dark tab an empty field means "not overridden" and the × clears it.
+function TokenField({
+  token,
+  label,
+  value,
+  overridden,
+  mode,
+  onChange,
+  onClear,
+}: {
+  token: string;
+  label: string;
+  value: string;
+  overridden: boolean;
+  mode: "light" | "dark";
+  onChange: (v: string) => void;
+  onClear?: () => void;
+}) {
+  const swatch = /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#000000";
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="color"
+        aria-label={`${label} colour picker`}
+        value={swatch}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-8 w-8 shrink-0 cursor-pointer rounded border border-line bg-card p-0.5"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="truncate text-xs text-ink">{label}</span>
+          <code className="shrink-0 text-[10px] text-soft">{token}</code>
+        </div>
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={mode === "dark" ? "(default dark)" : "#…"}
+          className="mt-0.5 w-full rounded border border-line bg-card px-2 py-1 font-mono text-xs focus:border-gold focus:outline-none"
+        />
+      </div>
+      {onClear && (
+        <button
+          type="button"
+          onClick={onClear}
+          disabled={!overridden}
+          aria-label={`Clear ${label} dark override`}
+          className="shrink-0 rounded px-1.5 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-40"
+        >
+          ×
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Logo + favicon upload slots (issue 12), wired to the identity-guarded
+// setTenantAsset via the shared generateUploadUrl → POST → record rail. The file
+// uploads as-is (raster only; the server refuses SVG and caps size at 256 KB) so a
+// logo keeps its aspect ratio. The live getTheme query re-resolves the new url, so
+// the slot's thumbnail and the header logo update on their own after a save.
+function AssetUploads({ slug, logoUrl, faviconUrl }: { slug: string; logoUrl: string | null; faviconUrl: string | null }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-accent2">Brand assets</p>
+      <p className="mt-0.5 text-xs text-soft">PNG, JPEG, or WebP up to 256&nbsp;KB. Uploads are live immediately.</p>
+      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        <AssetSlot slug={slug} asset="logo" label="Logo" currentUrl={logoUrl} />
+        <AssetSlot slug={slug} asset="favicon" label="Favicon" currentUrl={faviconUrl} />
+      </div>
+    </div>
+  );
+}
+
+function AssetSlot({
+  slug,
+  asset,
+  label,
+  currentUrl,
+}: {
+  slug: string;
+  asset: "logo" | "favicon";
+  label: string;
+  currentUrl: string | null;
+}) {
+  const generateUploadUrl = useMutation(api.resources.generateUploadUrl);
+  const setAsset = useMutation(api.tenants.setTenantAsset);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function upload(file: File) {
+    setError(null);
+    if (file.type === "image/svg+xml") {
+      setError("SVG isn't allowed — use a PNG, JPEG, or WebP.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const url = await generateUploadUrl();
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!res.ok) throw new Error(`upload failed (${res.status})`);
+      const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
+      await setAsset({ tenantSlug: slug, asset, storageId, contentType: file.type });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't upload that image.");
+    } finally {
+      setBusy(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-line bg-card p-3">
+      <div className="flex items-center gap-3">
+        <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg border border-line bg-paper">
+          {currentUrl ? (
+            <img src={currentUrl} alt="" className="h-full w-full object-contain" />
+          ) : (
+            <span className="text-[10px] text-soft">none</span>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-ink">{label}</p>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={busy}
+            className="mt-1 rounded-lg border border-line px-2.5 py-1 text-xs text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
+          >
+            {busy ? "Uploading…" : currentUrl ? "Replace" : "Upload"}
+          </button>
+        </div>
+      </div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void upload(f);
+        }}
+      />
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
 // Add an email to the Allowlist. The mutation normalises + validates; on success
 // the live list above re-renders with the new row, so there's nothing to do here
 // but clear the field.
@@ -887,69 +1384,6 @@ function EmailRow({ email, isAdmin }: { email: string; isAdmin: boolean }) {
             aria-label={`Remove ${email}`}
           >
             {busy ? "Removing…" : "Remove"}
-
-// The five feature flags in display order, with human labels (issue 21). The keys
-// mirror the schema's tenantFlagsValidator (issue 04); enforced server-side by
-// assertTenantFlag (issue 17), this is only the operator's on/off surface.
-const FLAG_META: { key: TenantFlag; label: string; hint: string }[] = [
-  { key: "certificates", label: "Certificates", hint: "Learners can claim a completion certificate." },
-  { key: "translations", label: "Translations", hint: "Owners can translate a completed course into other languages." },
-  { key: "publicLinks", label: "Public links", hint: "Owners can publish a shareable public link to a course." },
-  { key: "qa", label: "Questions", hint: "Learners can ask questions on a lesson." },
-  { key: "seeding", label: "Course creation", hint: "Members can seed new courses on this tenant." },
-];
-
-// The Flags section (ticket 21): one plain switch per feature flag over the
-// scope-gated setTenantFlags patch. Flag-off is frozen-not-revoked (issue 04), so
-// there's no confirm dialog — a toggle only changes what the server permits going
-// forward, granting and deleting nothing. The live getTheme query drives `flags`,
-// so a toggle reflects immediately (Convex reactivity); a per-key busy flag guards
-// against a double-click mid-write. Keyed by slug at the call site so switching
-// tenants remounts with fresh state.
-function FlagToggles({ slug, flags }: { slug: string; flags: Record<TenantFlag, boolean> }) {
-  const setFlags = useMutation(api.tenants.setTenantFlags);
-  const [busy, setBusy] = useState<TenantFlag | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function toggle(key: TenantFlag, next: boolean) {
-    setError(null);
-    setBusy(key);
-    try {
-      await setFlags({ tenantSlug: slug, flags: { [key]: next } });
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't update that flag.");
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-1 text-ink">
-      {FLAG_META.map(({ key, label, hint }) => {
-        const on = flags[key];
-        return (
-          <div key={key} className="flex items-center justify-between gap-4 py-2">
-            <div className="min-w-0">
-              <b className="block text-[13.5px] font-semibold text-ink">{label}</b>
-              <span className="text-[11.5px] text-soft">{hint}</span>
-            </div>
-            <label className="relative inline-flex shrink-0 cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={on}
-                disabled={busy !== null}
-                onChange={(e) => toggle(key, e.target.checked)}
-                className="peer sr-only"
-              />
-              <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 peer-checked:after:translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-disabled:opacity-60" />
-            </label>
-          </div>
-        );
-      })}
-      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
-    </div>
-  );
-}
           </button>
         </div>
       )}
