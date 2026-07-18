@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
-import { renderInviteEmail } from "./inviteEmail";
+import { paletteFromTokens, renderInviteEmail } from "./inviteEmail";
+import type { Brand } from "./inviteEmail";
 
 // Best-effort transactional email for invites (see .scratch/invite-emails).
 // Scheduled from `shareTopic` / `setShareRole` after the mutation commits, so a
@@ -21,9 +22,21 @@ export const sendInvite = internalAction({
     inviterEmail: v.string(),
     role: v.union(v.literal("viewer"), v.literal("editor")),
     link: v.string(),
+    // The inviter's tenant brand, resolved by the calling mutation from the shared
+    // course's tenant (whitelabel issue 14 / ADR 0021): the tenant `displayName`,
+    // its raw **light** theme tokens (the action derives the email palette from
+    // them), and the logo's absolute URL (null → wordmark). Absent → the default
+    // site: house branding, byte-identical to the pre-whitelabel email.
+    brand: v.optional(
+      v.object({
+        name: v.string(),
+        light: v.record(v.string(), v.string()),
+        logoUrl: v.union(v.string(), v.null()),
+      }),
+    ),
   },
   returns: v.null(),
-  handler: async (_ctx, { to, kind, courseTitle, langName, inviterEmail, role, link }) => {
+  handler: async (_ctx, { to, kind, courseTitle, langName, inviterEmail, role, link, brand: brandArg }) => {
     const apiKey = process.env.RESEND_API_KEY;
     const from = process.env.INVITE_FROM_EMAIL;
     if (!apiKey || !from) {
@@ -32,7 +45,11 @@ export const sendInvite = internalAction({
       return null;
     }
 
-    const { subject, html, text } = renderInviteEmail(kind, { courseTitle, langName, inviterEmail, role, link });
+    const brand: Brand | undefined = brandArg
+      ? { name: brandArg.name, colors: paletteFromTokens(brandArg.light), logoUrl: brandArg.logoUrl }
+      : undefined;
+
+    const { subject, html, text } = renderInviteEmail(kind, { courseTitle, langName, inviterEmail, role, link }, brand);
     try {
       const res = await fetch(RESEND_URL, {
         method: "POST",

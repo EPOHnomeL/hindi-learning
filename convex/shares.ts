@@ -33,7 +33,33 @@ async function scheduleInvite(
     inviterEmail,
     role,
     link,
+    // The invite carries the shared course's tenant brand (whitelabel issue 14).
+    // The owner owns the topic, so its `tenantSlug` is the inviter's tenant (ADR
+    // 0021); absent = default site → the action renders the house-branded email.
+    brand: await tenantBrand(ctx, topic.tenantSlug),
   });
+}
+
+// Resolve a tenant's invite-email brand from its slug (whitelabel issue 14): the
+// `displayName`, the raw **light** theme tokens (the email action derives its
+// palette from them), and the logo's absolute URL (null when unset → wordmark).
+// The same one-row `by_slug` read `tenants.getTheme` uses; returns `undefined`
+// for the default site (no slug / unknown slug), so the invite stays house-branded.
+async function tenantBrand(
+  ctx: MutationCtx,
+  slug: string | undefined,
+): Promise<{ name: string; light: Record<string, string>; logoUrl: string | null } | undefined> {
+  if (!slug) return undefined;
+  const tenant = await ctx.db
+    .query("tenants")
+    .withIndex("by_slug", (q) => q.eq("slug", slug))
+    .unique();
+  if (!tenant) return undefined;
+  return {
+    name: tenant.displayName,
+    light: tenant.theme.light,
+    logoUrl: tenant.theme.logo ? await ctx.storage.getUrl(tenant.theme.logo) : null,
+  };
 }
 
 // Sharing: an owner grants another existing User read-only access to a Topic
