@@ -12,15 +12,41 @@ Take the merged marketplace live on real money — everything after PR #3. The c
 done; this is operations. **No refunds on this rail** (`revokeEntitlement` only
 removes access), so the smoke test stays cheap.
 
-Already in place (2026-07-13):
+Already in place (2026-07-13 … 2026-07-16):
 
 - Prod env (`capable-barracuda-769`): `PAYFAST_MERCHANT_ID=29853249`,
-  `PAYFAST_MERCHANT_KEY`, `PAYFAST_PASSPHRASE`, `PAYFAST_MODE=live`,
-  `PLATFORM_FEE_BPS=5000`, `SITE_URL=https://my-course.app`.
+  `PAYFAST_MERCHANT_KEY`, `PAYFAST_PASSPHRASE`, `PLATFORM_FEE_BPS=5000`,
+  `SITE_URL=https://my-course.app` (operator-set; verify below).
 - Sandbox journey passed end-to-end on the preview (own sandbox merchant `10051521`).
+- PR #3 merged to main (`bb237bb`, 2026-07-16) — marketplace live on prod, selling
+  auto-disabled until the PayFast env vars are complete (`payfastConfigured()`).
+- Compliance pages live: /terms, /privacy, /refunds (privacy de-stacked in `3e7e66a`).
 
 ## Checklist
 
+- [ ] **Reply to PayFast's compliance email** (Vuyisile) with the live policy URLs —
+      draft ready:
+
+      > Hi Vuyisile,
+      >
+      > Thank you for the guidance. The requested policies are now live on our website:
+      >
+      > - Terms & Conditions: https://my-course.app/terms
+      > - Privacy Policy: https://my-course.app/privacy
+      > - Refund & Cancellation Policy: https://my-course.app/refunds
+      >
+      > All three are linked from the site footer, and the terms and refund policy
+      > are also shown at checkout before payment.
+      >
+      > Please let me know if anything further is needed for compliance.
+      >
+      > Regards, Jonathan Vorster — My Course, https://my-course.app
+
+- [ ] **Turn PayFast live mode ON** — verify/set on prod:
+      `npx convex env get --prod PAYFAST_MODE` must be exactly `live`
+      (`npx convex env set --prod PAYFAST_MODE live` if not). Anything else —
+      absent, typo'd, "Live" — silently means SANDBOX by design, and a real buyer
+      would be sent to the sandbox gateway. This is the go-live switch.
 - [ ] **FICA verification clears** — the payfast.io dashboard's "Account pending
       verification" banner disappears + PayFast emails. Confirm all three documents
       are uploaded (SA ID, proof of address <3mo, bank letter) or it never resolves.
@@ -46,5 +72,5 @@ Already in place (2026-07-13):
 
 ## Blocked by
 
-- PR #3 merged (deploys the marketplace schema + functions to prod).
-- FICA verification (blocks only the smoke purchase, not the merge).
+- ~~PR #3 merged~~ done — `bb237bb`, 2026-07-16.
+- FICA verification (blocks the smoke purchase and real selling).
