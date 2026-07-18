@@ -44,7 +44,9 @@
     "resource:prod": "tsx scripts/remove-resource.ts --prod",
     "seed-tenants": "tsx scripts/seed-tenants.ts",
     "seed-tenants:prod": "tsx scripts/seed-tenants.ts --prod",
-    "tenant-branding": "tsx scripts/tenant-branding.ts"
+    "tenant-branding": "tsx scripts/tenant-branding.ts",
+    "tenant-course-backfill": "tsx scripts/tenant-course-backfill.ts",
+    "tenant-course-backfill:prod": "tsx scripts/tenant-course-backfill.ts --prod"
   },
   "dependencies": {
     "@auth/core": "0.37.0",

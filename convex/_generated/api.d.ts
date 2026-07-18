@@ -33,6 +33,7 @@ import type * as resources from "../resources.js";
 import type * as routine from "../routine.js";
 import type * as sellers from "../sellers.js";
 import type * as shares from "../shares.js";
+import type * as tenantBackfill from "../tenantBackfill.js";
 import type * as tenants from "../tenants.js";
 import type * as translate from "../translate.js";
 import type * as whitelist from "../whitelist.js";
@@ -69,6 +70,7 @@ declare const fullApi: ApiFromModules<{
   routine: typeof routine;
   sellers: typeof sellers;
   shares: typeof shares;
+  tenantBackfill: typeof tenantBackfill;
   tenants: typeof tenants;
   translate: typeof translate;
   whitelist: typeof whitelist;
