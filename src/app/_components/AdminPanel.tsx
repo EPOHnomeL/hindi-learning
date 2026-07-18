@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import type { SellerStatus } from "../../../convex/lib";
+import type { SellerStatus, TenantFlag } from "../../../convex/lib";
 
 // The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
 // dashboard is now scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
@@ -490,7 +490,13 @@ function TenantDetail({ slug, onRemoved }: { slug: string; onRemoved?: () => voi
         Coming in the theme editor (ticket 20).
       </TenantSection>
       <TenantSection title="Flags" hint="Which features are on for this tenant.">
-        Coming in the flag toggles (ticket 21).
+        {view === undefined ? (
+          <span>Loading…</span>
+        ) : view === null ? (
+          <span>This tenant has no flags yet.</span>
+        ) : (
+          <FlagToggles key={slug} slug={slug} flags={view.flags} />
+        )}
       </TenantSection>
       <TenantSection title="Courses" hint="Which courses belong to this tenant.">
         <TenantCourses slug={slug} />
@@ -881,6 +887,69 @@ function EmailRow({ email, isAdmin }: { email: string; isAdmin: boolean }) {
             aria-label={`Remove ${email}`}
           >
             {busy ? "Removing…" : "Remove"}
+
+// The five feature flags in display order, with human labels (issue 21). The keys
+// mirror the schema's tenantFlagsValidator (issue 04); enforced server-side by
+// assertTenantFlag (issue 17), this is only the operator's on/off surface.
+const FLAG_META: { key: TenantFlag; label: string; hint: string }[] = [
+  { key: "certificates", label: "Certificates", hint: "Learners can claim a completion certificate." },
+  { key: "translations", label: "Translations", hint: "Owners can translate a completed course into other languages." },
+  { key: "publicLinks", label: "Public links", hint: "Owners can publish a shareable public link to a course." },
+  { key: "qa", label: "Questions", hint: "Learners can ask questions on a lesson." },
+  { key: "seeding", label: "Course creation", hint: "Members can seed new courses on this tenant." },
+];
+
+// The Flags section (ticket 21): one plain switch per feature flag over the
+// scope-gated setTenantFlags patch. Flag-off is frozen-not-revoked (issue 04), so
+// there's no confirm dialog — a toggle only changes what the server permits going
+// forward, granting and deleting nothing. The live getTheme query drives `flags`,
+// so a toggle reflects immediately (Convex reactivity); a per-key busy flag guards
+// against a double-click mid-write. Keyed by slug at the call site so switching
+// tenants remounts with fresh state.
+function FlagToggles({ slug, flags }: { slug: string; flags: Record<TenantFlag, boolean> }) {
+  const setFlags = useMutation(api.tenants.setTenantFlags);
+  const [busy, setBusy] = useState<TenantFlag | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggle(key: TenantFlag, next: boolean) {
+    setError(null);
+    setBusy(key);
+    try {
+      await setFlags({ tenantSlug: slug, flags: { [key]: next } });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't update that flag.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-1 text-ink">
+      {FLAG_META.map(({ key, label, hint }) => {
+        const on = flags[key];
+        return (
+          <div key={key} className="flex items-center justify-between gap-4 py-2">
+            <div className="min-w-0">
+              <b className="block text-[13.5px] font-semibold text-ink">{label}</b>
+              <span className="text-[11.5px] text-soft">{hint}</span>
+            </div>
+            <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+              <input
+                type="checkbox"
+                checked={on}
+                disabled={busy !== null}
+                onChange={(e) => toggle(key, e.target.checked)}
+                className="peer sr-only"
+              />
+              <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 peer-checked:after:translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-disabled:opacity-60" />
+            </label>
+          </div>
+        );
+      })}
+      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
           </button>
         </div>
       )}
