@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getViewableTopic, mintToken, readableLang, SOURCE_LANG, topicLessonCounts } from "./lib";
+import { assertTenantFlag, getViewableTopic, mintToken, readableLang, SOURCE_LANG, topicLessonCounts } from "./lib";
 import { decodeEntities } from "./content";
 import { langInfo } from "./languages";
 import { resolveEmblem, resolvedEmblemValidator, snapshotEmblem } from "./emblem";
@@ -106,8 +106,14 @@ export const claimCertificate = mutation({
     if (!topic) throw new Error("topic not found");
 
     // Idempotent: an existing Certificate wins, unchanged (its frozen Emblem too).
+    // Returned BEFORE the flag gate so a cert earned while `certificates` was on
+    // keeps resolving after it flips off (frozen, not revoked — issue 04/17).
     const existing = await certificateFor(ctx, topic._id, userId);
     if (existing) return await certificatePayload(ctx, existing);
+
+    // Whitelabel: minting a NEW certificate is a create-side act — gated by the
+    // Topic's tenant `certificates` flag (no-op on the default site, issue 17).
+    await assertTenantFlag(ctx, topic.tenantSlug, "certificates");
 
     // Re-check eligibility and snapshot the lesson count from one read (the same
     // counts the dashboard shows). lessonCount is frozen onto the Certificate.

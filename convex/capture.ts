@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, getViewableTopic, readableLang, SOURCE_LANG } from "./lib";
+import { assertAdmin, assertTenantFlag, getOwnedTopic, getViewableTopic, readableLang, SOURCE_LANG } from "./lib";
 
 // The conversation loop (PRD §4–§5). Reader writes responses/progress/questions
 // for the signed-in learner, scoped to the active Topic so identical lesson keys
@@ -88,6 +88,9 @@ export const askQuestion = mutation({
   handler: async (ctx, { topicSlug, lessonKey, text }) => {
     const userId = await requireUser(ctx);
     const topic = await requireOwnedTopic(ctx, userId, topicSlug);
+    // Whitelabel: asking a question is create-side — gated by the tenant's `qa`
+    // flag (no-op on the default site, issue 17). Reading the thread stays open.
+    await assertTenantFlag(ctx, topic.tenantSlug, "qa");
     await ctx.db.insert("questions", { userId, topicId: topic._id, lessonKey, text, status: "open" });
   },
 });

@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { action, internalMutation, internalQuery, mutation, query, type ActionCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, buildPaywall, getEditableTopic, getOwnedTopic, heldLangs, lessonLocked, pickContentBody, resolveReaderEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import { assertAdmin, assertTenantFlag, buildPaywall, getEditableTopic, getOwnedTopic, heldLangs, lessonLocked, pickContentBody, resolveReaderEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import { itemHash, quizStructureMatches } from "./translate";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
@@ -170,6 +170,10 @@ export const seedTopic = mutation({
     if (!user?.email || !(await isEmailAdmitted(ctx, user.email))) {
       throw new Error("Course creation is limited to Allowlisted emails.");
     }
+    // Whitelabel: seeding a course is create-side — gated by the CALLER's own
+    // tenant `seeding` flag (there's no Topic yet at creation, so the tenant comes
+    // from the user, not a Topic). No-op for a default-site user (issue 17).
+    await assertTenantFlag(ctx, user.tenantSlug, "seeding");
     // One new course per user per day (issue 08 — bounds Claude usage). The Admin
     // is exempt (they drive the app and aren't the runaway-usage risk this guards
     // against, mirroring the routine's on-demand bypass). Checked against the

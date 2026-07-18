@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
 import { action, internalAction, internalMutation, internalQuery, mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, getEditableTopic, getOwnedTopic, hashString, SOURCE_LANG, shareLang, topicBySlug } from "./lib";
+import { assertAdmin, assertTenantFlag, getEditableTopic, getOwnedTopic, hashString, SOURCE_LANG, shareLang, topicBySlug } from "./lib";
 import { isKnownLang, langInfo } from "./languages";
 import { chatComplete, translateModel, type ChatMessage } from "./openrouterClient";
 
@@ -153,6 +153,11 @@ export const tryAcquireTranslation = internalMutation({
     if (!isKnownLang(lang)) return { acquired: false, reason: "unsupported-language" };
     const topic = await getOwnedTopic(ctx, userId, topicSlug);
     if (!topic) return { acquired: false, reason: "no-topic" };
+    // Whitelabel: starting a translation (a billable Edition) is create-side —
+    // gated by the tenant's `translations` flag (no-op on the default site).
+    // Throws rather than returning a reason, so a disabled feature surfaces as an
+    // error to the caller exactly like the other four gated mutations (issue 17).
+    await assertTenantFlag(ctx, topic.tenantSlug, "translations");
     // Frozen content only — an Edition can't go stale under the reader (ADR 0015).
     if ((topic.status ?? "active") !== "completed") return { acquired: false, reason: "not-completed" };
 

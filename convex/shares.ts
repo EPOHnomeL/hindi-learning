@@ -4,7 +4,7 @@ import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { getOwnedTopic, mintToken, normaliseEmail, shareLang, shareRole, SOURCE_LANG, topicLessonCounts } from "./lib";
+import { assertTenantFlag, getOwnedTopic, mintToken, normaliseEmail, shareLang, shareRole, SOURCE_LANG, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import type { InviteKind } from "./inviteEmail";
 
@@ -113,6 +113,10 @@ export const setTopicPublic = mutation({
     if (!userId) throw new Error("unauthenticated");
     const topic = await getOwnedTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
+    // Whitelabel: minting a public link is a create-side act — gated by the
+    // tenant's `publicLinks` flag. Revoking (`isPublic: false`) stays allowed so
+    // an existing link can always be turned off (frozen, not revoked — issue 17).
+    if (isPublic) await assertTenantFlag(ctx, topic.tenantSlug, "publicLinks");
     const publicToken = isPublic ? mintToken() : undefined;
     await ctx.db.patch(topic._id, { publicToken });
     return publicToken ?? null;
@@ -132,6 +136,9 @@ export const setEditionPublic = mutation({
     if (!userId) throw new Error("unauthenticated");
     const topic = await getOwnedTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
+    // Same create-side gate as setTopicPublic: publishing a link needs the
+    // tenant's `publicLinks` flag; revoking is always allowed (issue 17).
+    if (isPublic) await assertTenantFlag(ctx, topic.tenantSlug, "publicLinks");
     if (lang === SOURCE_LANG) {
       const publicToken = isPublic ? mintToken() : undefined;
       await ctx.db.patch(topic._id, { publicToken });
