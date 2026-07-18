@@ -195,6 +195,18 @@ test("removeEmail: tenant-admin rows can be removed freely (they aren't the sys-
   expect(await t.query(internal.whitelist.isAdmitted, { email: "upfadmin@example.com" })).toBe(false);
 });
 
+test("myAdminScope: sys / tenant / none, and none when unauthenticated", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  const member = await seedUser(t, "member@example.com");
+
+  expect(await asUser(t, sys).query(api.whitelist.myAdminScope, {})).toEqual({ role: "sys", tenantSlug: null });
+  expect(await asUser(t, upfAdmin).query(api.whitelist.myAdminScope, {})).toEqual({ role: "tenant", tenantSlug: "upf" });
+  expect(await asUser(t, member).query(api.whitelist.myAdminScope, {})).toEqual({ role: "none", tenantSlug: null });
+  expect(await t.query(api.whitelist.myAdminScope, {})).toEqual({ role: "none", tenantSlug: null });
+});
+
 test("amIAllowlisted: answers by the caller's Allowlist row, false when unauthenticated", async () => {
   const t = convexTest(schema, modules);
   const member = await seedUser(t, "member@example.com");

@@ -18,6 +18,25 @@ export const TENANT_THEME_TOKENS = [
   "hi", "danger", "good", "good-b", "bad", "bad-b",
 ] as const;
 
+// The house default palette a freshly-created tenant starts from (issue 19). A
+// new tenant needs a *complete* 14-token light palette so the SSR no-flash
+// <style> and getTheme never break before the operator opens the theme editor
+// (ticket 20) to paint the real brand. These are the light-mode `--color-*`
+// values from src/styles/globals.css — Convex can't import from src/, so they're
+// mirrored here (like TENANT_THEME_TOKENS); the dark palette is left to fall back
+// to the shared default dark (a tenant dark is opt-in, per 03). Flags default all
+// on — the v1 no-regression posture (ticket 04).
+const DEFAULT_TENANT_THEME = {
+  light: {
+    paper: "#fbf7f0", card: "#fffdf9", ink: "#2b2622", soft: "#6b6258", line: "#e7ddd4",
+    accent: "#9c5b34", accent2: "#3f6f5e", gold: "#b88a2e", hi: "#fbeecb",
+    danger: "#b4442f", good: "#e7f3ec", "good-b": "#3f8f63", bad: "#fbe9e7", "bad-b": "#c0573f",
+  },
+};
+const DEFAULT_TENANT_FLAGS = {
+  certificates: true, translations: true, publicLinks: true, qa: true, seeding: true,
+};
+
 function assertThemeTokens(theme: { light: Record<string, string>; dark?: Record<string, string> }) {
   const known = new Set<string>(TENANT_THEME_TOKENS);
 
@@ -32,6 +51,58 @@ function assertThemeTokens(theme: { light: Record<string, string>; dark?: Record
     // dark is intentionally partial — no missing-token check.
   }
 }
+
+// The dashboard sidebar's tenant list (issue 19): every tenant's slug + display
+// name, sorted by display name. **Sys-admin only** — a tenant admin has no picker
+// (they're locked to their own tenant), so this list is never theirs to see. The
+// `tenants` table is bounded by the operator (one row per branded subdomain), so
+// a full scan is the right read here.
+export const listTenants = query({
+  args: {},
+  returns: v.array(v.object({ slug: v.string(), displayName: v.string() })),
+  handler: async (ctx) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const rows = await ctx.db.query("tenants").collect();
+    return rows
+      .map((r) => ({ slug: r.slug, displayName: r.displayName }))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  },
+});
+
+// Create a tenant from the dashboard's "+ New tenant" action (issue 19). **Sys
+// admin only** — creating a tenant is a platform act, never a tenant admin's.
+// The new row is seeded with the house default palette + all flags on so it's
+// immediately resolvable (SSR/getTheme) and behaves like today; the operator then
+// paints the real brand via the theme editor (ticket 20). Slug is normalised
+// (trim + lower-case) and constrained to a subdomain-safe shape; a duplicate is
+// refused (the slug is the tenant's identity on `by_slug`).
+export const createTenant = mutation({
+  args: { slug: v.string(), displayName: v.string() },
+  returns: v.object({ slug: v.string() }),
+  handler: async (ctx, { slug, displayName }) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const normalisedSlug = slug.trim().toLowerCase();
+    if (!/^[a-z0-9-]+$/.test(normalisedSlug)) {
+      throw new Error("Slug must be lower-case letters, numbers, and hyphens only.");
+    }
+    const name = displayName.trim();
+    if (!name) throw new Error("A display name is required.");
+
+    const existing = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", normalisedSlug))
+      .unique();
+    if (existing) throw new Error("A tenant with that slug already exists.");
+
+    await ctx.db.insert("tenants", {
+      slug: normalisedSlug,
+      displayName: name,
+      theme: DEFAULT_TENANT_THEME,
+      flags: DEFAULT_TENANT_FLAGS,
+    });
+    return { slug: normalisedSlug };
+  },
+});
 
 // Seed one tenant row, idempotently (issue 07). PUBLISH_SECRET-guarded like the
 // other operator-script mutations; the seed driver (scripts/seed-tenants.ts)

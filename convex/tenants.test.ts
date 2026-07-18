@@ -3,6 +3,7 @@ import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import { TENANT_THEME_TOKENS } from "./tenants";
 import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -94,6 +95,87 @@ test("seedTenant refuses an incorrect secret", async () => {
   await expect(
     t.mutation(api.tenants.seedTenant, { secret: "wrong", slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS }),
   ).rejects.toThrow(/unauthorized/i);
+});
+
+// listTenants — the dashboard sidebar's tenant list (issue 19). Sys-admin only;
+// returns each tenant's slug + display name, sorted by display name.
+
+test("listTenants: a sys admin sees every tenant, sorted by display name", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "Almighty Warriors", theme: THEME, flags: FLAGS });
+
+  const rows = await asUser(t, sys).query(api.tenants.listTenants, {});
+  expect(rows).toEqual([
+    { slug: "aw", displayName: "Almighty Warriors" },
+    { slug: "upf", displayName: "UPF" },
+  ]);
+});
+
+test("listTenants: a tenant admin is refused (sys-admin only)", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await expect(asUser(t, upfAdmin).query(api.tenants.listTenants, {})).rejects.toThrow(/forbidden/i);
+});
+
+test("listTenants: a plain member is refused", async () => {
+  const t = convexTest(schema, modules);
+  const member = await t.run((ctx) => ctx.db.insert("users", { email: "member@example.com" }));
+  await expect(asUser(t, member).query(api.tenants.listTenants, {})).rejects.toThrow(/forbidden/i);
+});
+
+// createTenant — the "+ New tenant" action (issue 19). Sys-admin only; seeds the
+// row with the house default theme + all-on flags, ready for the theme editor (20).
+
+test("createTenant: a sys admin creates a tenant seeded with a complete default theme + all flags on", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await asUser(t, sys).mutation(api.tenants.createTenant, { slug: "newco", displayName: "New Co" });
+
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "newco")).unique(),
+  );
+  expect(row?.displayName).toBe("New Co");
+  // The seeded theme is a complete 14-token light palette (so getTheme/SSR never breaks).
+  expect(Object.keys(row!.theme.light).sort()).toEqual([...TENANT_THEME_TOKENS].sort());
+  expect(row?.flags).toEqual({ certificates: true, translations: true, publicLinks: true, qa: true, seeding: true });
+});
+
+test("createTenant: normalises the slug (trim + lower-case)", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await asUser(t, sys).mutation(api.tenants.createTenant, { slug: "  NewCo  ", displayName: "New Co" });
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "newco")).unique(),
+  );
+  expect(row).not.toBeNull();
+});
+
+test("createTenant: rejects a slug with illegal characters", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await expect(
+    asUser(t, sys).mutation(api.tenants.createTenant, { slug: "bad slug!", displayName: "Bad" }),
+  ).rejects.toThrow(/slug/i);
+});
+
+test("createTenant: rejects a duplicate slug", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await expect(
+    asUser(t, sys).mutation(api.tenants.createTenant, { slug: "upf", displayName: "Dup" }),
+  ).rejects.toThrow(/exists/i);
+});
+
+test("createTenant: a tenant admin is refused (sys-admin only)", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  await expect(
+    asUser(t, upfAdmin).mutation(api.tenants.createTenant, { slug: "newco", displayName: "New Co" }),
+  ).rejects.toThrow(/forbidden/i);
 });
 
 // setTenantTheme — the palette overwrite path seedTenant refuses (create-only).

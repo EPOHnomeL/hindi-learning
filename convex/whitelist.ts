@@ -134,6 +134,33 @@ export const amITenantAdmin = query({
   handler: async (ctx, { tenantSlug }) => isCallerAdmin(ctx, tenantSlug),
 });
 
+// The caller's admin scope in one read — backs the /admin dashboard shell (issue
+// 19), which admits both tiers: a sys admin gets the tenant picker + Allowlist, a
+// tenant admin is locked to their own tenant's panel. `role` is the row shape
+// (sys = isAdmin, no slug; tenant = isAdmin + slug; none = everyone else),
+// `tenantSlug` is the tenant admin's own slug (null otherwise). Identity is
+// derived server-side; UX only — every mutation re-checks via isCallerAdmin.
+export const myAdminScope = query({
+  args: {},
+  returns: v.object({
+    role: v.union(v.literal("sys"), v.literal("tenant"), v.literal("none")),
+    tenantSlug: v.union(v.string(), v.null()),
+  }),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return { role: "none" as const, tenantSlug: null };
+    const user = await ctx.db.get(userId);
+    if (!user?.email) return { role: "none" as const, tenantSlug: null };
+    const row = await ctx.db
+      .query("whitelist")
+      .withIndex("by_email", (q) => q.eq("email", normaliseEmail(user.email!)))
+      .unique();
+    if (!row?.isAdmin) return { role: "none" as const, tenantSlug: null };
+    if (!row.tenantSlug) return { role: "sys" as const, tenantSlug: null };
+    return { role: "tenant" as const, tenantSlug: row.tenantSlug };
+  },
+});
+
 // Whether the caller's account email is on the Allowlist — backs the dashboard's
 // "new course" affordance (UX only; seedTopic's server gate is the boundary).
 // Identity is derived server-side, false when unauthenticated, like `amIAdmin`.
