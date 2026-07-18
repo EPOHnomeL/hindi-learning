@@ -814,3 +814,91 @@ test("removeTenant: a plain member is refused", async () => {
     asUser(t, member).mutation(api.tenants.removeTenant, { tenantSlug: "upf" }),
   ).rejects.toThrow(/forbidden/i);
 });
+
+// setTenantAdmin — grant/revoke tenant admin (issue 24). Sys-admin only mints
+// tenant admins; a tenant admin can't. Promote = isAdmin + tenantSlug (assigning
+// in the same step if unscoped); revoke = clear isAdmin, keep tenantSlug (demote
+// to a plain member of the same tenant).
+
+async function seedMember(t: ReturnType<typeof convexTest>, email: string, tenantSlug?: string) {
+  await t.mutation(internal.whitelist.seedEmail, { email, tenantSlug });
+}
+async function adminScopeOf(t: ReturnType<typeof convexTest>, email: string) {
+  const row = await t.run((ctx) =>
+    ctx.db.query("whitelist").withIndex("by_email", (q) => q.eq("email", email)).unique(),
+  );
+  return { isAdmin: row?.isAdmin ?? false, tenantSlug: row?.tenantSlug };
+}
+
+test("setTenantAdmin: a sys admin promotes an assigned member, then revokes back to member", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await seedMember(t, "m@example.com", "upf");
+
+  await asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: true });
+  expect(await adminScopeOf(t, "m@example.com")).toEqual({ isAdmin: true, tenantSlug: "upf" });
+
+  await asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: false });
+  expect(await adminScopeOf(t, "m@example.com")).toEqual({ isAdmin: false, tenantSlug: "upf" });
+});
+
+test("setTenantAdmin: promoting an unassigned admitted email assigns + promotes in one step", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await seedMember(t, "free@example.com"); // admitted, no tenant
+
+  await asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "free@example.com", makeAdmin: true });
+  expect(await adminScopeOf(t, "free@example.com")).toEqual({ isAdmin: true, tenantSlug: "upf" });
+});
+
+test("setTenantAdmin: a tenant admin is refused (sys-admin only mints admins)", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await seedMember(t, "m@example.com", "upf");
+  await expect(
+    asUser(t, upfAdmin).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: true }),
+  ).rejects.toThrow(/forbidden/i);
+});
+
+test("setTenantAdmin: refuses an email that isn't on the Allowlist", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await expect(
+    asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "ghost@example.com", makeAdmin: true }),
+  ).rejects.toThrow(/Allowlist/i);
+});
+
+test("setTenantAdmin: refuses promoting a sys admin", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await seedAdmin(t, "sys2@example.com"); // another sys admin
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await expect(
+    asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "sys2@example.com", makeAdmin: true }),
+  ).rejects.toThrow(/sys admin/i);
+});
+
+test("setTenantAdmin: refuses promoting a member of another tenant", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "AW", theme: THEME, flags: FLAGS });
+  await seedMember(t, "m@example.com", "aw");
+  await expect(
+    asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: true }),
+  ).rejects.toThrow(/another tenant/i);
+});
+
+test("setTenantAdmin: revoking someone who isn't an admin of this tenant throws", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await seedMember(t, "m@example.com", "upf");
+  await expect(
+    asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: false }),
+  ).rejects.toThrow(/isn't an admin/i);
+});

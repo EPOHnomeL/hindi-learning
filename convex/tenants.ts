@@ -498,6 +498,41 @@ export const unassignMember = mutation({
   },
 });
 
+// Grant or revoke tenant-admin on a member (issue 24). **Sys-admin only** — minting
+// a tenant admin is a platform privilege, never a tenant admin's own (matches the
+// Allowlist "Admit email" being sys-admin-only); gated by `isCallerAdmin(ctx)`
+// unscoped, not the scoped check the other member mutations use.
+//   - `makeAdmin: true` — promote to tenant admin (`isAdmin` + `tenantSlug`),
+//     assigning the tenant in the same step if the row was an unassigned member.
+//     Refuses a sys admin (isAdmin, no slug — promoting would be meaningless /
+//     a demotion) and a member already owned by another tenant.
+//   - `makeAdmin: false` — demote to a plain member of the *same* tenant: clear
+//     `isAdmin`, keep `tenantSlug`. Refuses anyone not currently an admin of this
+//     tenant. (The inverse of promote; unassigning the member is then the normal
+//     picker action.)
+export const setTenantAdmin = mutation({
+  args: { tenantSlug: v.string(), email: v.string(), makeAdmin: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, { tenantSlug, email, makeAdmin }) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const row = await ctx.db
+      .query("whitelist")
+      .withIndex("by_email", (q) => q.eq("email", normaliseEmail(email)))
+      .unique();
+    if (!row) throw new Error("That email isn't on the Allowlist — admit it first.");
+    if (row.isAdmin && !row.tenantSlug) throw new Error("That's a sys admin — they can't be scoped to a tenant.");
+
+    if (makeAdmin) {
+      if (row.tenantSlug && row.tenantSlug !== tenantSlug) throw new Error("That member belongs to another tenant.");
+      await ctx.db.patch(row._id, { isAdmin: true, tenantSlug });
+    } else {
+      if (!(row.isAdmin && row.tenantSlug === tenantSlug)) throw new Error("That member isn't an admin of this tenant.");
+      await ctx.db.patch(row._id, { isAdmin: undefined });
+    }
+    return null;
+  },
+});
+
 // Count everything that still references a tenant's slug — courses, Allowlist
 // members, and user accounts — through indexed reads on the growable tables. The
 // Remove section reads this to disable the control and explain what's still
