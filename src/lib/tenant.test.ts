@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { resolveTenantSlug, TENANT_SLUGS } from "./tenant";
+import { canonicalRedirect, resolveTenantSlug, TENANT_SLUGS } from "./tenant";
 
 test("TENANT_SLUGS is exactly the four seeded tenants", () => {
   expect([...TENANT_SLUGS].sort()).toEqual(["upf", "ywampotch", "almighty-warriors", "yknot"].sort());
@@ -30,4 +30,53 @@ test.each([
 test("null / undefined host → default (no tenant)", () => {
   expect(resolveTenantSlug(null)).toBeNull();
   expect(resolveTenantSlug(undefined)).toBeNull();
+});
+
+// ---- canonicalRedirect (issue 18) ----------------------------------------
+
+test("tenanted course on the wrong tenant's host → redirect to its subdomain", () => {
+  expect(
+    canonicalRedirect("https://ywampotch.my-course.app/courses/verbs/lessons/1", "upf"),
+  ).toBe("https://upf.my-course.app/courses/verbs/lessons/1");
+});
+
+test("tenanted course on the default site → redirect to its subdomain", () => {
+  expect(canonicalRedirect("https://my-course.app/courses/verbs", "upf")).toBe(
+    "https://upf.my-course.app/courses/verbs",
+  );
+});
+
+test("untenanted course on a tenant subdomain → redirect to the default site", () => {
+  expect(canonicalRedirect("https://ywampotch.my-course.app/courses/verbs", null)).toBe(
+    "https://my-course.app/courses/verbs",
+  );
+});
+
+test("preserves path AND query string when redirecting", () => {
+  expect(
+    canonicalRedirect("https://my-course.app/courses/verbs/lessons/3?lang=hi&x=1", "upf"),
+  ).toBe("https://upf.my-course.app/courses/verbs/lessons/3?lang=hi&x=1");
+});
+
+// Loop safety: the already-canonical cases MUST be strict no-ops (null), or we
+// ship a redirect loop.
+test.each([
+  // Tenanted course already on its own subdomain.
+  ["https://upf.my-course.app/courses/verbs", "upf"],
+  // Untenanted course already on the apex default site.
+  ["https://my-course.app/courses/verbs", null],
+])("already-canonical is a no-op: canonicalRedirect(%j, %j) → null", (url, tenant) => {
+  expect(canonicalRedirect(url, tenant as (typeof TENANT_SLUGS)[number] | null)).toBeNull();
+});
+
+// Local dev uses <slug>.localhost subdomains (see resolveTenantSlug tests), so
+// the base-domain swap must work there too — including the port.
+test("dev: swaps the subdomain label on <slug>.localhost, preserving the port", () => {
+  expect(canonicalRedirect("http://ywampotch.localhost:3000/courses/verbs", "upf")).toBe(
+    "http://upf.localhost:3000/courses/verbs",
+  );
+  expect(canonicalRedirect("http://ywampotch.localhost:3000/courses/verbs", null)).toBe(
+    "http://localhost:3000/courses/verbs",
+  );
+  expect(canonicalRedirect("http://upf.localhost:3000/courses/verbs", "upf")).toBeNull();
 });

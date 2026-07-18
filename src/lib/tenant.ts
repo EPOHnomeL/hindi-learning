@@ -26,3 +26,25 @@ export function resolveTenantSlug(host: string | null | undefined): TenantSlug |
   const label = host.split(":")[0]?.trim().toLowerCase().split(".")[0];
   return label && KNOWN.has(label) ? (label as TenantSlug) : null;
 }
+
+// The cross-host canonical redirect (issue 18 / ADR 0022 §3). A course's canonical
+// host is its `<tenant>` subdomain when the course is tenanted, else the default
+// site (the apex, no subdomain). Given the current request URL and the course's
+// canonical tenant, return the absolute URL the request should be redirected to —
+// same path, query, and port, only the host swapped — or `null` when the request
+// is already on the canonical host.
+//
+// The `null` no-op is load-bearing: links are minted canonical by construction, so
+// this net is rarely hit; returning `null` for the already-canonical case is what
+// guarantees no redirect loop. Pure, so the whole decision is unit-tested.
+export function canonicalRedirect(currentUrl: string, courseTenant: TenantSlug | null): string | null {
+  const url = new URL(currentUrl);
+  // Strip an existing known-tenant label to find the base domain (`my-course.app`
+  // or `localhost`), then re-attach the course's tenant (or none for the default).
+  const first = url.hostname.split(".")[0];
+  const base = first && KNOWN.has(first) ? url.hostname.slice(first.length + 1) : url.hostname;
+  const target = courseTenant ? `${courseTenant}.${base}` : base;
+  if (target === url.hostname) return null;
+  url.hostname = target;
+  return url.toString();
+}

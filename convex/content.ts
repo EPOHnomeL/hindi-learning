@@ -76,6 +76,21 @@ async function switcherEditions(ctx: QueryCtx, topic: Doc<"topics">, userId: Id<
   });
 }
 
+// The canonical tenant of a course, by its route slug — the one datum the
+// cross-host canonical redirect needs (issue 18 / ADR 0022 §3). Public and
+// unauthenticated by design: it exposes only which host a course belongs on (its
+// tenant label), never any content, and it runs before the reader's own auth-gated
+// queries. An unknown slug → `null`, i.e. treated as the default site, so a stale
+// or bogus link can never force a redirect toward a course that isn't there.
+export const topicTenant = query({
+  args: { slug: v.string() },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, { slug }): Promise<string | null> => {
+    const topic = await topicBySlug(ctx, slug);
+    return topic?.tenantSlug ?? null;
+  },
+});
+
 // ---- Reader (learner) ------------------------------------------------------
 
 // The signed-in user's Topics, ordered by `seq` (unsequenced last), then age.

@@ -18,6 +18,10 @@ export default convexAuthNextjsMiddleware(
     headers.delete(TENANT_SLUG_HEADER);
     const slug = resolveTenantSlug(request.headers.get("host"));
     if (slug) headers.set(TENANT_SLUG_HEADER, slug);
+    // Server components can't read the request URL directly, so stamp it here for
+    // the course layout's cross-host canonical redirect (issue 18) to reconstruct
+    // path + query when it swaps the host. Cheap and additive; consumed only there.
+    headers.set("x-url", request.url);
     return NextResponse.next({ request: { headers } });
   },
   { convexUrl: process.env.NEXT_PUBLIC_CONVEX_URL },
