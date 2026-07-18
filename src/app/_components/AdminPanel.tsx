@@ -5,6 +5,7 @@ import type { FunctionReturnType } from "convex/server";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import type { SellerStatus } from "../../../convex/lib";
 
 // The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
@@ -402,7 +403,7 @@ function TenantsManager() {
           Select a tenant to manage its branding, flags, courses, and members.
         </div>
       ) : (
-        <TenantDetail slug={selected} />
+        <TenantDetail slug={selected} onRemoved={() => setSelected(null)} />
       )}
     </div>
   );
@@ -474,7 +475,7 @@ function NewTenantForm({ onCreated }: { onCreated: (slug: string) => void }) {
 // scaffolding; tickets 20–22 fill in each section's real content and mutations.
 // `displayName` comes from the public `getTheme` read (also serves both admin
 // tiers, so a tenant admin needs no extra query).
-function TenantDetail({ slug }: { slug: string }) {
+function TenantDetail({ slug, onRemoved }: { slug: string; onRemoved?: () => void }) {
   const view = useQuery(api.tenants.getTheme, { slug });
   const displayName = view?.displayName ?? slug;
 
@@ -492,13 +493,13 @@ function TenantDetail({ slug }: { slug: string }) {
         Coming in the flag toggles (ticket 21).
       </TenantSection>
       <TenantSection title="Courses" hint="Which courses belong to this tenant.">
-        Coming in course assignment (ticket 22).
+        <TenantCourses slug={slug} />
       </TenantSection>
       <TenantSection title="Members" hint="Who belongs to this tenant, and its admins.">
-        Coming in member assignment (ticket 22).
+        <TenantMembers slug={slug} />
       </TenantSection>
       <TenantSection title="Remove tenant" hint="Delete this tenant. Blocked while any course or member still references it.">
-        Coming in the removal guard (ticket 22).
+        <TenantRemoval slug={slug} displayName={displayName} onRemoved={onRemoved} />
       </TenantSection>
     </div>
   );
@@ -516,6 +517,279 @@ function TenantSection({ title, hint, children }: { title: string; hint: string;
         {children}
       </div>
     </section>
+  );
+}
+
+// The Courses section (ticket 22): this tenant's assigned courses (each removable
+// back to the default site) plus a search-and-add picker over the assignable pool
+// (default-only courses). Assigning sets `topics.tenantSlug`; the live
+// `courseAssignment` query re-renders both lists on every write. Tenant-centric —
+// the same course is managed here, never on CourseSettings.
+function TenantCourses({ slug }: { slug: string }) {
+  const data = useQuery(api.tenants.courseAssignment, { tenantSlug: slug });
+  const assign = useMutation(api.tenants.assignCourse);
+  const unassign = useMutation(api.tenants.unassignCourse);
+
+  if (data === undefined) {
+    return (
+      <ul className="flex flex-col gap-2" aria-busy>
+        {[0, 1].map((i) => (
+          <li key={i} className="h-10 animate-pulse rounded-lg border border-line bg-card" />
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SearchAddPicker
+        placeholder="Search a course by title…"
+        empty="No unassigned courses left to add."
+        options={data.available.map((c) => ({ id: c.topicId, label: c.title }))}
+        onAdd={(topicId) => assign({ tenantSlug: slug, topicId: topicId as Id<"topics"> })}
+      />
+      {data.assigned.length === 0 ? (
+        <p className="text-sm text-soft">No courses assigned yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {data.assigned.map((c) => (
+            <AssignedRow
+              key={c.topicId}
+              label={c.title}
+              onRemove={() => unassign({ tenantSlug: slug, topicId: c.topicId as Id<"topics"> })}
+              removeAria={`Unassign ${c.title}`}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// The Members section (ticket 22): this tenant's Allowlist members (plain members
+// removable back to the default site; a tenant admin is badged and only removable
+// via the Allowlist, since clearing their slug would promote them to a sys admin)
+// plus a search-and-add picker over the assignable pool (unassigned, non-admin
+// Allowlist emails). Assigning sets `whitelist.tenantSlug`.
+function TenantMembers({ slug }: { slug: string }) {
+  const data = useQuery(api.tenants.memberAssignment, { tenantSlug: slug });
+  const assign = useMutation(api.tenants.assignMember);
+  const unassign = useMutation(api.tenants.unassignMember);
+
+  if (data === undefined) {
+    return (
+      <ul className="flex flex-col gap-2" aria-busy>
+        {[0, 1].map((i) => (
+          <li key={i} className="h-10 animate-pulse rounded-lg border border-line bg-card" />
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <SearchAddPicker
+        placeholder="Search an admitted email…"
+        empty="No unassigned emails to add — admit one on the Allowlist first."
+        options={data.available.map((m) => ({ id: m.email, label: m.email }))}
+        onAdd={(email) => assign({ tenantSlug: slug, email })}
+      />
+      {data.assigned.length === 0 ? (
+        <p className="text-sm text-soft">No members assigned yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {data.assigned.map((m) => (
+            <AssignedRow
+              key={m.email}
+              label={m.email}
+              badge={m.isAdmin ? "Admin" : undefined}
+              onRemove={m.isAdmin ? undefined : () => unassign({ tenantSlug: slug, email: m.email })}
+              lockedNote={m.isAdmin ? "Remove via Allowlist" : undefined}
+              removeAria={`Unassign ${m.email}`}
+            />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// The Remove tenant section (ticket 22): destructive, and **blocked outright**
+// (disabled + explanation, not merely a confirm) while any course, member, or
+// user account still references the slug — the counts come from
+// `tenantReferenceCounts` and `removeTenant` re-checks them server-side. Only an
+// empty tenant is removable, behind a plain confirm. No cascade delete (mirrors
+// ADR 0011's refuse-to-remove-the-one-Admin guard).
+function TenantRemoval({ slug, displayName, onRemoved }: { slug: string; displayName: string; onRemoved?: () => void }) {
+  const counts = useQuery(api.tenants.tenantReferenceCounts, { tenantSlug: slug });
+  const remove = useMutation(api.tenants.removeTenant);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (counts === undefined) {
+    return <div className="h-10 animate-pulse rounded-lg border border-line bg-card" aria-busy />;
+  }
+
+  const blockers: string[] = [];
+  if (counts.courses > 0) blockers.push(`${counts.courses} course${counts.courses === 1 ? "" : "s"}`);
+  if (counts.members > 0) blockers.push(`${counts.members} member${counts.members === 1 ? "" : "s"}`);
+  if (counts.users > 0) blockers.push(`${counts.users} user account${counts.users === 1 ? "" : "s"}`);
+  const removable = blockers.length === 0;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {removable ? (
+        <p className="text-sm text-soft">This tenant has nothing assigned — it can be removed.</p>
+      ) : (
+        <p className="text-sm text-soft">
+          Still assigned: {blockers.join(", ")}. Clear them above before this tenant can be removed.
+        </p>
+      )}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          disabled={!removable || busy}
+          onClick={async () => {
+            if (!window.confirm(`Remove the “${displayName}” tenant? This can't be undone.`)) return;
+            setBusy(true);
+            setError(null);
+            try {
+              await remove({ tenantSlug: slug });
+              onRemoved?.();
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Couldn't remove the tenant.");
+            } finally {
+              setBusy(false);
+            }
+          }}
+          className="rounded-lg border border-danger/50 px-3.5 py-1.5 text-sm font-medium text-danger transition-colors hover:bg-danger hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-danger"
+        >
+          {busy ? "Removing…" : "Remove tenant"}
+        </button>
+        {error && <span className="text-xs text-danger">{error}</span>}
+      </div>
+    </div>
+  );
+}
+
+// A search-and-add picker shared by the Courses and Members sections: type to
+// filter the assignable options by label, click one to add it. Bounded to the
+// first handful of matches so a long pool never floods the panel. `onAdd` is the
+// assign mutation; the live query re-renders the lists once it resolves.
+function SearchAddPicker({
+  placeholder,
+  empty,
+  options,
+  onAdd,
+}: {
+  placeholder: string;
+  empty: string;
+  options: { id: string; label: string }[];
+  onAdd: (id: string) => Promise<unknown>;
+}) {
+  const [query, setQuery] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  const q = query.trim().toLowerCase();
+  const matches = (q ? options.filter((o) => o.label.toLowerCase().includes(q)) : options).slice(0, 8);
+
+  return (
+    <div className="flex flex-col gap-2">
+      <input
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={placeholder}
+        className="min-w-0 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+      />
+      {options.length === 0 ? (
+        <p className="text-xs text-soft">{empty}</p>
+      ) : matches.length === 0 ? (
+        <p className="text-xs text-soft">No matches.</p>
+      ) : (
+        <ul className="flex flex-wrap gap-2">
+          {matches.map((o) => (
+            <li key={o.id}>
+              <button
+                type="button"
+                disabled={busyId !== null}
+                onClick={async () => {
+                  setBusyId(o.id);
+                  setError(false);
+                  try {
+                    await onAdd(o.id);
+                    setQuery("");
+                  } catch {
+                    setError(true);
+                  } finally {
+                    setBusyId(null);
+                  }
+                }}
+                className="rounded-full border border-line bg-card px-3 py-1 text-sm text-ink transition-colors hover:border-accent hover:bg-hi hover:text-accent disabled:opacity-60"
+              >
+                {busyId === o.id ? "Adding…" : `+ ${o.label}`}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {error && <span className="text-xs text-danger">Couldn't add — retry.</span>}
+    </div>
+  );
+}
+
+// One assigned-item row: a label, an optional badge (e.g. a tenant admin), and
+// either a Remove control or a locked note when the row can't be removed here.
+function AssignedRow({
+  label,
+  badge,
+  onRemove,
+  lockedNote,
+  removeAria,
+}: {
+  label: string;
+  badge?: string;
+  onRemove?: () => Promise<unknown>;
+  lockedNote?: string;
+  removeAria?: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+
+  return (
+    <li className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-4 py-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="min-w-0 truncate text-sm text-ink">{label}</span>
+        {badge && (
+          <span className="shrink-0 rounded-full bg-hi px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent">{badge}</span>
+        )}
+      </div>
+      {onRemove ? (
+        <div className="flex shrink-0 items-center gap-2">
+          {error && <span className="text-xs text-danger">Failed — retry</span>}
+          <button
+            onClick={async () => {
+              setBusy(true);
+              setError(false);
+              try {
+                await onRemove();
+              } catch {
+                setError(true);
+              } finally {
+                setBusy(false);
+              }
+            }}
+            disabled={busy}
+            aria-label={removeAria}
+            className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
+          >
+            {busy ? "Removing…" : "Remove"}
+          </button>
+        </div>
+      ) : (
+        <span className="shrink-0 text-xs text-soft">{lockedNote}</span>
+      )}
+    </li>
   );
 }
 
