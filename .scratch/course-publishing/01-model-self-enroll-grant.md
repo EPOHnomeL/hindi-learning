@@ -1,6 +1,7 @@
 # course-publishing/01: Model free self-enroll — the grant primitive, granularity & resolver precedence
 
-**Status:** open
+**Status:** done (2026-07-18, `/grilling` + `/domain-modeling`)
+**Claimed:** 2026-07-18 (session continuing from whitelabel-handoff-session-2026-07-18.md)
 **Depends on:** —
 **Labels:** wayfinder:grilling
 
@@ -35,3 +36,31 @@ Out of scope for this ticket (and the map): member-initiated **un-enroll** — s
 for v1.
 
 Record the resolution as a comment + the ADR link, close, and add a Decisions-so-far line to the map.
+
+## Resolution (2026-07-18)
+
+Captured as [ADR 0023 draft — Self-enroll as a first-class access primitive](adr-0023-draft-self-enroll-access-primitive.md).
+
+1. **Primitive:** a new **`enrollments`** table — *not* a reused free `entitlements` row or self-
+   `shares` row. Both reuses would mislabel a self-join under "Purchases" / "Shared with me" (this is
+   a discovery feature — the label is what the learner sees) and pollute the ledger/role invariants.
+   The dedicated table keeps `entitlements` = money and `shares` = owner-granted.
+2. **Granularity:** per-**Edition** — row `{ userId, topicId, lang }` — matching the grain of every
+   other grant and the resolver seam.
+3. **Resolver precedence & coexistence:** `editionAccessLevel` gains one branch returning a distinct
+   **`enrolled`** level (parallel to `entitled`, treated ≡ viewer for access, kept distinct for the
+   "joined" badge + a future "my enrolled courses" query). The enrollment is a **permanent /
+   grandfathered** grant: if a previously-free Edition is later **priced**, already-enrolled users
+   keep full access (the enrollment check wins regardless of current price); only *new* free joins
+   stop. Enrollment rows are created only for a currently-free, **published** Edition (creation-side
+   guard — tickets 03/05), idempotent per `(user, topic, lang)`. **Private/unpublished courses stay
+   grant-only** (no catalogue → no self-enroll path); existing enrollments grandfather on unpublish.
+
+**Surfaced (fed back into the map):** the user added a **language axis** — access should be scoped to
+a user's chosen content language, cross-language courses shown *disabled* in the catalogue, gated by
+the tenant `translations` flag; and a separate desire to translate the **whole app UI** ("app in
+English, enrol in another language"). Split three ways (user decision 2026-07-18): (1) per-language
+enrollment = this ticket; (2) **language-scoped access + user content-language** = new
+[ticket 07](07-language-scoped-access.md) on this map; (3) **full app-UI translation** = its own
+future effort (map fog pointer). **Whether** a user may enrol in a given language is ticket 07's job,
+not this one.

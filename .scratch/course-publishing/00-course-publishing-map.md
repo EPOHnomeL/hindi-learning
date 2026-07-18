@@ -1,6 +1,6 @@
 # course-publishing/00: Course publishing, tenant catalogue & free self-enroll — map
 
-**Status:** charting — frontier open (tickets 01–06 created 2026-07-18).
+**Status:** in progress — ticket 01 resolved 2026-07-18; frontier open (02, 04 takeable; 07 added).
 **Labels:** wayfinder:map
 
 ## Destination
@@ -57,9 +57,26 @@ not the feature.
 
 <!-- one line per closed ticket: gist + link -->
 
+- [Model free self-enroll](01-model-self-enroll-grant.md) — self-enroll is a **new fifth access
+  grant**: a dedicated **`enrollments`** table (row `{ userId, topicId, lang }`, per-Edition), *not*
+  a reused free-entitlement or self-share (both would mislabel the join under "Purchases" /
+  "Shared with me"). The resolver gains one branch → a distinct **`enrolled`** level (≡ viewer for
+  access). The grant is **permanent/grandfathered**: pricing a formerly-free Edition keeps existing
+  enrollees in, stops only new free joins. Created only for a currently-free **published** Edition;
+  private/unpublished stays grant-only. Captured as
+  [ADR 0023 draft](adr-0023-draft-self-enroll-access-primitive.md). Surfaced the language axis →
+  split three ways (see [ticket 07](07-language-scoped-access.md) + fog below).
+
 ## Not yet specified
 
 <!-- in-scope fog, too dim to ticket sharply yet -->
+
+- **Full app-UI (chrome) translation** ("the entire app translation going forward") — localizing the
+  interface itself, and running the **app UI in one language while enrolling in another** (app-language
+  and content-language as two independent settings). No i18n exists in the app today (English-only).
+  Large and only loosely coupled to publishing — **a candidate for its own wayfinder effort/map**,
+  not this one (user decision 2026-07-18, the three-way language split). The *content-language* half
+  is in-scope here as [ticket 07](07-language-scoped-access.md); this fog item is the *app-UI* half.
 
 - **New-course-published notifications** — telling a tenant's members when a course lands in their
   catalogue. Dim until the catalogue/publish model exists.
