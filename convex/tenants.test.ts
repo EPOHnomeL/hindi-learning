@@ -534,3 +534,283 @@ test("seedTenantAsset: refuses an SVG (XSS on the anonymous page)", async () => 
     }),
   ).rejects.toThrow(/PNG|JPEG|WebP/i);
 });
+
+// ---- Course assignment (issue 22) ----------------------------------------
+// A tenant's Courses section: which `topics` carry this tenant's `tenantSlug`,
+// which are still assignable (default-only), and the assign/unassign writes.
+
+async function seedTopic(t: ReturnType<typeof convexTest>, slug: string, title: string, tenantSlug?: string) {
+  return await t.run((ctx) => ctx.db.insert("topics", { slug, title, ...(tenantSlug ? { tenantSlug } : {}) }));
+}
+
+test("courseAssignment: splits a tenant's own courses from the assignable (default-only) pool", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await seedTopic(t, "greek", "Greek", "upf");
+  await seedTopic(t, "hebrew", "Hebrew"); // default-only → assignable
+  await seedTopic(t, "latin", "Latin", "other"); // another tenant's → neither list
+
+  const view = await asUser(t, sys).query(api.tenants.courseAssignment, { tenantSlug: "upf" });
+  expect(view.assigned.map((c) => c.title)).toEqual(["Greek"]);
+  expect(view.available.map((c) => c.title)).toEqual(["Hebrew"]);
+});
+
+test("assignCourse sets the tenantSlug; unassignCourse clears it back to unset", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  const topicId = await seedTopic(t, "greek", "Greek");
+
+  await asUser(t, sys).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId });
+  expect(await t.run((ctx) => ctx.db.get(topicId)).then((r) => r?.tenantSlug)).toBe("upf");
+
+  await asUser(t, sys).mutation(api.tenants.unassignCourse, { tenantSlug: "upf", topicId });
+  expect(await t.run((ctx) => ctx.db.get(topicId)).then((r) => r?.tenantSlug)).toBeUndefined();
+});
+
+test("assignCourse refuses stealing a course already owned by another tenant", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  const topicId = await seedTopic(t, "greek", "Greek", "other");
+  await expect(
+    asUser(t, sys).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId }),
+  ).rejects.toThrow(/another tenant/i);
+});
+
+test("assignCourse: a tenant admin may assign to their own tenant but not another's; a member is refused", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  const member = await t.run((ctx) => ctx.db.insert("users", { email: "member@example.com" }));
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "AW", theme: THEME, flags: FLAGS });
+  const own = await seedTopic(t, "greek", "Greek");
+  const other = await seedTopic(t, "hebrew", "Hebrew");
+
+  await asUser(t, upfAdmin).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId: own });
+  await expect(
+    asUser(t, upfAdmin).mutation(api.tenants.assignCourse, { tenantSlug: "aw", topicId: other }),
+  ).rejects.toThrow(/forbidden/i);
+  await expect(
+    asUser(t, member).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId: other }),
+  ).rejects.toThrow(/forbidden/i);
+});
+
+// ---- Member assignment (issue 22) ----------------------------------------
+// A tenant's Members section: which `whitelist` rows carry this tenant's slug,
+// which unassigned non-admin emails are assignable, and the assign/unassign writes.
+
+test("memberAssignment: lists a tenant's own members and the assignable (unassigned, non-admin) pool", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com"); // sys admin — never assignable
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(internal.whitelist.seedEmail, { email: "amy@example.com", tenantSlug: "upf" }); // assigned member
+  await t.mutation(internal.whitelist.seedEmail, { email: "ben@example.com" }); // free → assignable
+  await t.mutation(internal.whitelist.seedEmail, { email: "cara@example.com", tenantSlug: "other" }); // another tenant's
+  void sys;
+
+  const view = await asUser(t, sys).query(api.tenants.memberAssignment, { tenantSlug: "upf" });
+  expect(view.assigned.map((m) => m.email)).toEqual(["amy@example.com"]);
+  expect(view.available.map((m) => m.email)).toEqual(["ben@example.com"]);
+});
+
+test("assignMember sets the whitelist row's tenantSlug; unassignMember clears it", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(internal.whitelist.seedEmail, { email: "ben@example.com" });
+
+  await asUser(t, sys).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ben@example.com" });
+  const after = await t.run((ctx) =>
+    ctx.db.query("whitelist").withIndex("by_email", (q) => q.eq("email", "ben@example.com")).unique(),
+  );
+  expect(after?.tenantSlug).toBe("upf");
+
+  await asUser(t, sys).mutation(api.tenants.unassignMember, { tenantSlug: "upf", email: "ben@example.com" });
+  const cleared = await t.run((ctx) =>
+    ctx.db.query("whitelist").withIndex("by_email", (q) => q.eq("email", "ben@example.com")).unique(),
+  );
+  expect(cleared?.tenantSlug).toBeUndefined();
+});
+
+test("assignMember refuses to scope a sys admin, and refuses stealing another tenant's member", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(internal.whitelist.seedEmail, { email: "cara@example.com", tenantSlug: "other" });
+
+  await expect(
+    asUser(t, sys).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "sys@example.com" }),
+  ).rejects.toThrow(/sys admin/i);
+  await expect(
+    asUser(t, sys).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "cara@example.com" }),
+  ).rejects.toThrow(/another tenant/i);
+});
+
+test("assignMember refuses an email that isn't on the Allowlist", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await expect(
+    asUser(t, sys).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ghost@example.com" }),
+  ).rejects.toThrow(/allowlist/i);
+});
+
+// setTenantFlags — the dashboard flag toggles (issue 21). A patch-style write
+// over `tenants.flags`, scope-gated by isCallerAdmin(ctx, tenantSlug). Enforced
+// server-side by assertTenantFlag (issue 17); this is the operator's toggle.
+
+test("setTenantFlags patches only the given flags, leaving the rest intact", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await asUser(t, sys).mutation(api.tenants.setTenantFlags, { tenantSlug: "upf", flags: { qa: false } });
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
+  );
+  expect(row?.flags).toEqual({ ...FLAGS, qa: false });
+});
+
+test("setTenantFlags can toggle a flag back on", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, {
+    secret, slug: "upf", displayName: "UPF", theme: THEME, flags: { ...FLAGS, publicLinks: false },
+  });
+  await asUser(t, sys).mutation(api.tenants.setTenantFlags, { tenantSlug: "upf", flags: { publicLinks: true } });
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
+  );
+  expect(row?.flags.publicLinks).toBe(true);
+});
+
+test("setTenantFlags: a tenant admin may toggle only their own tenant's flags", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "AW", theme: THEME, flags: FLAGS });
+  // Own tenant → allowed.
+  await asUser(t, upfAdmin).mutation(api.tenants.setTenantFlags, { tenantSlug: "upf", flags: { seeding: false } });
+  const upf = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
+  );
+  expect(upf?.flags.seeding).toBe(false);
+  // Another tenant → refused.
+  await expect(
+    asUser(t, upfAdmin).mutation(api.tenants.setTenantFlags, { tenantSlug: "aw", flags: { seeding: false } }),
+  ).rejects.toThrow(/forbidden/i);
+});
+
+test("setTenantFlags: a plain member is refused", async () => {
+  const t = convexTest(schema, modules);
+  const member = await t.run((ctx) => ctx.db.insert("users", { email: "member@example.com" }));
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await expect(
+    asUser(t, member).mutation(api.tenants.setTenantFlags, { tenantSlug: "upf", flags: { qa: false } }),
+  ).rejects.toThrow(/forbidden/i);
+});
+
+test("setTenantFlags rejects an unknown tenant slug", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await expect(
+    asUser(t, sys).mutation(api.tenants.setTenantFlags, { tenantSlug: "ghost", flags: { qa: false } }),
+  ).rejects.toThrow(/not found/i);
+});
+
+test("unassignMember refuses a tenant admin (clearing the slug would promote them to sys admin)", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(internal.whitelist.seedEmail, { email: "upfadmin@example.com", isAdmin: true, tenantSlug: "upf" });
+  await expect(
+    asUser(t, sys).mutation(api.tenants.unassignMember, { tenantSlug: "upf", email: "upfadmin@example.com" }),
+  ).rejects.toThrow(/tenant admin/i);
+});
+
+test("assignMember: a tenant admin may act on their own tenant but not another's; a member is refused", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  const plain = await t.run((ctx) => ctx.db.insert("users", { email: "plain@example.com" }));
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "AW", theme: THEME, flags: FLAGS });
+  await t.mutation(internal.whitelist.seedEmail, { email: "ben@example.com" });
+
+  await asUser(t, upfAdmin).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ben@example.com" });
+  await asUser(t, upfAdmin).mutation(api.tenants.unassignMember, { tenantSlug: "upf", email: "ben@example.com" });
+  await expect(
+    asUser(t, upfAdmin).mutation(api.tenants.assignMember, { tenantSlug: "aw", email: "ben@example.com" }),
+  ).rejects.toThrow(/forbidden/i);
+  await expect(
+    asUser(t, plain).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ben@example.com" }),
+  ).rejects.toThrow(/forbidden/i);
+});
+
+// ---- Tenant removal guard (issue 22 / mirrors ADR 0011's refuse-to-remove) --
+
+test("removeTenant is blocked while a course still references the tenant", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await seedTopic(t, "greek", "Greek", "upf");
+  await expect(
+    asUser(t, sys).mutation(api.tenants.removeTenant, { tenantSlug: "upf" }),
+  ).rejects.toThrow(/still (has|references)|assigned/i);
+});
+
+test("removeTenant is blocked while a member (whitelist) references the tenant", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(internal.whitelist.seedEmail, { email: "amy@example.com", tenantSlug: "upf" });
+  await expect(
+    asUser(t, sys).mutation(api.tenants.removeTenant, { tenantSlug: "upf" }),
+  ).rejects.toThrow(/still (has|references)|assigned/i);
+});
+
+test("removeTenant is blocked while a user account references the tenant", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.run((ctx) => ctx.db.insert("users", { email: "learner@example.com", tenantSlug: "upf" }));
+  await expect(
+    asUser(t, sys).mutation(api.tenants.removeTenant, { tenantSlug: "upf" }),
+  ).rejects.toThrow(/still (has|references)|assigned/i);
+});
+
+test("removeTenant deletes an empty tenant's row", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await asUser(t, sys).mutation(api.tenants.removeTenant, { tenantSlug: "upf" });
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
+  );
+  expect(row).toBeNull();
+});
+
+test("tenantReferenceCounts reports courses / members / users referencing the slug", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await seedTopic(t, "greek", "Greek", "upf");
+  await seedTopic(t, "hebrew", "Hebrew", "upf");
+  await t.mutation(internal.whitelist.seedEmail, { email: "amy@example.com", tenantSlug: "upf" });
+  await t.run((ctx) => ctx.db.insert("users", { email: "learner@example.com", tenantSlug: "upf" }));
+
+  expect(await asUser(t, sys).query(api.tenants.tenantReferenceCounts, { tenantSlug: "upf" })).toEqual({
+    courses: 2,
+    members: 1,
+    users: 1,
+  });
+});
+
+test("removeTenant: a plain member is refused", async () => {
+  const t = convexTest(schema, modules);
+  const member = await t.run((ctx) => ctx.db.insert("users", { email: "member@example.com" }));
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await expect(
+    asUser(t, member).mutation(api.tenants.removeTenant, { tenantSlug: "upf" }),
+  ).rejects.toThrow(/forbidden/i);
+});

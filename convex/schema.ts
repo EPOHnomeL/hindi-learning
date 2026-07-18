@@ -60,7 +60,11 @@ export default defineSchema({
     tenantSlug: v.optional(v.string()),
   })
     .index("email", ["email"])
-    .index("phone", ["phone"]),
+    .index("phone", ["phone"])
+    // Whitelabel issue 22: the tenant-removal guard counts user accounts still
+    // scoped to a slug via an indexed read (never a full scan of this growable
+    // table). Absent slug = the default site; only referenced tenants match.
+    .index("by_tenant", ["tenantSlug"]),
 
   // The whitelabel tenant record (whitelabel ADR draft §1, ticket 03 theme / 04
   // flags): one row per branded subdomain (`<slug>.my-course.app`), holding its
@@ -87,7 +91,12 @@ export default defineSchema({
     email: v.string(),
     isAdmin: v.optional(v.boolean()),
     tenantSlug: v.optional(v.string()),
-  }).index("by_email", ["email"]),
+  })
+    .index("by_email", ["email"])
+    // Whitelabel issue 22: the tenant Members section reads a tenant's own rows
+    // (slug match) and the assignable pool (unscoped) by tenant, and the removal
+    // guard counts them — all indexed, never a full scan of the Allowlist.
+    .index("by_tenant", ["tenantSlug"]),
 
   // A subject space, owned by its creator. `ownerId` is optional only so the
   // schema push accepts the pre-existing unowned Hindi row; `ensureTopic`

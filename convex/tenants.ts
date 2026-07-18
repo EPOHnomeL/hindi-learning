@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { assertAdmin } from "./lib";
 import { assertEmblemImage } from "./emblem";
@@ -211,6 +212,38 @@ export const updateTenantTheme = mutation({
   },
 });
 
+// Toggle a tenant's feature flags from the dashboard (issue 21). A **patch**: only
+// the flags given are changed, the rest are left as-is — so the UI can send one
+// flag per switch without re-sending the whole set. Scope-gated by
+// `isCallerAdmin(ctx, tenantSlug)` (issue 08): a sys admin toggles any tenant, a
+// tenant admin only their own. There's no confirm dialog and no destructive edit
+// here — flag-off is frozen-not-revoked (issue 04): the flip only changes what
+// `assertTenantFlag` (issue 17) permits on the CREATE path, granting nothing and
+// deleting nothing. Each flag is optional so a caller sends just the one it flips.
+export const setTenantFlags = mutation({
+  args: {
+    tenantSlug: v.string(),
+    flags: v.object({
+      certificates: v.optional(v.boolean()),
+      translations: v.optional(v.boolean()),
+      publicLinks: v.optional(v.boolean()),
+      qa: v.optional(v.boolean()),
+      seeding: v.optional(v.boolean()),
+    }),
+  },
+  returns: v.null(),
+  handler: async (ctx, { tenantSlug, flags }) => {
+    if (!(await isCallerAdmin(ctx, tenantSlug))) throw new Error("forbidden");
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", tenantSlug))
+      .unique();
+    if (!tenant) throw new Error("tenant not found");
+    await ctx.db.patch(tenant._id, { flags: { ...tenant.flags, ...flags } });
+    return null;
+  },
+});
+
 // Resolve everything the frontend needs about a tenant, by slug (issue 11). One
 // indexed `by_slug` read serves all three consumers, so they never drift:
 //   - the SSR no-flash <style> in the root layout reads `theme` (the palette),
@@ -311,6 +344,203 @@ export const seedTenantAsset = mutation({
     if (!tenant) throw new Error("tenant not found");
     await assertEmblemImage(ctx, storageId, contentType);
     await ctx.db.patch(tenant._id, { theme: { ...tenant.theme, [asset]: storageId } });
+    return null;
+  },
+});
+
+// ---- Course & member assignment + removal guard (issue 22) ----------------
+// The tenant panel's Courses / Members / Remove sections. Assignment is
+// tenant-centric — a course/member "belongs" to a tenant by carrying its slug on
+// `topics.tenantSlug` / `whitelist.tenantSlug` (ADR 0021 §3 / 0022 §4), so
+// assigning is a one-field patch and unassigning clears it back to the default
+// site. Every write is scope-gated by `isCallerAdmin(ctx, tenantSlug)`: a sys
+// admin acts on any tenant, a tenant admin only their own, a member refused
+// server-side (never merely hidden in the UI). Reads that touch the growable
+// `topics`/`users` tables go through the `by_tenant` index — never a full scan.
+
+// Trim + lower-case, the one email normalisation the Allowlist stores and looks
+// up on (mirrors whitelist.ts's private `normaliseEmail`; not exported there).
+function normaliseEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+// The Courses section's read: a tenant's own courses plus the pool it may still
+// assign from (default-only courses — those carrying no tenant). A course owned
+// by *another* tenant appears in neither list (it isn't this tenant's to touch).
+// Both lists are sorted by title for a stable picker.
+export const courseAssignment = query({
+  args: { tenantSlug: v.string() },
+  returns: v.object({
+    assigned: v.array(v.object({ topicId: v.id("topics"), title: v.string() })),
+    available: v.array(v.object({ topicId: v.id("topics"), title: v.string() })),
+  }),
+  handler: async (ctx, { tenantSlug }) => {
+    if (!(await isCallerAdmin(ctx, tenantSlug))) throw new Error("forbidden");
+    const assignedRows = await ctx.db
+      .query("topics")
+      .withIndex("by_tenant", (q) => q.eq("tenantSlug", tenantSlug))
+      .collect();
+    const availableRows = await ctx.db
+      .query("topics")
+      .withIndex("by_tenant", (q) => q.eq("tenantSlug", undefined))
+      .collect();
+    const shape = (r: { _id: (typeof assignedRows)[number]["_id"]; title: string }) => ({ topicId: r._id, title: r.title });
+    const byTitle = (a: { title: string }, b: { title: string }) => a.title.localeCompare(b.title);
+    return {
+      assigned: assignedRows.map(shape).sort(byTitle),
+      available: availableRows.map(shape).sort(byTitle),
+    };
+  },
+});
+
+// Assign a course to this tenant: patch `topics.tenantSlug`. Idempotent for a
+// course already on this tenant; refuses to steal one already owned by another
+// tenant (a tenant admin, scoped to their own slug, must never yank another
+// tenant's course by id).
+export const assignCourse = mutation({
+  args: { tenantSlug: v.string(), topicId: v.id("topics") },
+  returns: v.null(),
+  handler: async (ctx, { tenantSlug, topicId }) => {
+    if (!(await isCallerAdmin(ctx, tenantSlug))) throw new Error("forbidden");
+    const topic = await ctx.db.get(topicId);
+    if (!topic) throw new Error("course not found");
+    if (topic.tenantSlug && topic.tenantSlug !== tenantSlug) {
+      throw new Error("That course belongs to another tenant.");
+    }
+    await ctx.db.patch(topicId, { tenantSlug });
+    return null;
+  },
+});
+
+// Unassign a course: clear `tenantSlug` back to unset (default-only). Refuses a
+// course that isn't this tenant's, so the slug arg (the scope) and the row agree.
+export const unassignCourse = mutation({
+  args: { tenantSlug: v.string(), topicId: v.id("topics") },
+  returns: v.null(),
+  handler: async (ctx, { tenantSlug, topicId }) => {
+    if (!(await isCallerAdmin(ctx, tenantSlug))) throw new Error("forbidden");
+    const topic = await ctx.db.get(topicId);
+    if (!topic) throw new Error("course not found");
+    if (topic.tenantSlug !== tenantSlug) throw new Error("That course isn't assigned to this tenant.");
+    await ctx.db.patch(topicId, { tenantSlug: undefined });
+    return null;
+  },
+});
+
+// The Members section's read: a tenant's own members (any `whitelist` row
+// carrying its slug — plain members and the tenant admin, badged by `isAdmin`)
+// plus the assignable pool: unassigned, non-admin Allowlist emails. A sys-admin
+// row (isAdmin, no slug) is deliberately excluded from `available` — scoping it
+// to a tenant would silently demote a sys admin. Both reads go through the
+// `by_tenant` index (own rows by slug, the pool by the unset slug), never a full
+// Allowlist scan.
+export const memberAssignment = query({
+  args: { tenantSlug: v.string() },
+  returns: v.object({
+    assigned: v.array(v.object({ email: v.string(), isAdmin: v.boolean() })),
+    available: v.array(v.object({ email: v.string() })),
+  }),
+  handler: async (ctx, { tenantSlug }) => {
+    if (!(await isCallerAdmin(ctx, tenantSlug))) throw new Error("forbidden");
+    const byEmail = (a: { email: string }, b: { email: string }) => a.email.localeCompare(b.email);
+    const ownRows = await ctx.db
+      .query("whitelist")
+      .withIndex("by_tenant", (q) => q.eq("tenantSlug", tenantSlug))
+      .collect();
+    const unscopedRows = await ctx.db
+      .query("whitelist")
+      .withIndex("by_tenant", (q) => q.eq("tenantSlug", undefined))
+      .collect();
+    return {
+      assigned: ownRows.map((r) => ({ email: r.email, isAdmin: r.isAdmin ?? false })).sort(byEmail),
+      available: unscopedRows.filter((r) => !r.isAdmin).map((r) => ({ email: r.email })).sort(byEmail),
+    };
+  },
+});
+
+// Assign an Allowlisted email to this tenant: patch `whitelist.tenantSlug`. The
+// email must already be on the Allowlist (you scope an existing member, you don't
+// admit one here — that's the Allowlist tab). Refuses to scope a sys admin (a
+// silent demotion) or to steal a member already owned by another tenant.
+export const assignMember = mutation({
+  args: { tenantSlug: v.string(), email: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { tenantSlug, email }) => {
+    if (!(await isCallerAdmin(ctx, tenantSlug))) throw new Error("forbidden");
+    const row = await ctx.db
+      .query("whitelist")
+      .withIndex("by_email", (q) => q.eq("email", normaliseEmail(email)))
+      .unique();
+    if (!row) throw new Error("That email isn't on the Allowlist — admit it first.");
+    if (row.isAdmin && !row.tenantSlug) throw new Error("That's a sys admin — they can't be scoped to a tenant.");
+    if (row.tenantSlug && row.tenantSlug !== tenantSlug) throw new Error("That member belongs to another tenant.");
+    await ctx.db.patch(row._id, { tenantSlug });
+    return null;
+  },
+});
+
+// Unassign a member: clear `tenantSlug` back to unset. Refuses a tenant *admin*
+// row — clearing its slug would promote it to a sys admin (isAdmin, no slug), a
+// privilege change that must go through the Allowlist, not this picker.
+export const unassignMember = mutation({
+  args: { tenantSlug: v.string(), email: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { tenantSlug, email }) => {
+    if (!(await isCallerAdmin(ctx, tenantSlug))) throw new Error("forbidden");
+    const row = await ctx.db
+      .query("whitelist")
+      .withIndex("by_email", (q) => q.eq("email", normaliseEmail(email)))
+      .unique();
+    if (!row || row.tenantSlug !== tenantSlug) throw new Error("That member isn't assigned to this tenant.");
+    if (row.isAdmin) throw new Error("That's a tenant admin — remove them from the Allowlist instead.");
+    await ctx.db.patch(row._id, { tenantSlug: undefined });
+    return null;
+  },
+});
+
+// Count everything that still references a tenant's slug — courses, Allowlist
+// members, and user accounts — through indexed reads on the growable tables. The
+// Remove section reads this to disable the control and explain what's still
+// assigned; `removeTenant` re-derives it server-side as the real guard.
+async function tenantReferences(
+  ctx: QueryCtx,
+  slug: string,
+): Promise<{ courses: number; members: number; users: number }> {
+  const courses = await ctx.db.query("topics").withIndex("by_tenant", (q) => q.eq("tenantSlug", slug)).collect();
+  const users = await ctx.db.query("users").withIndex("by_tenant", (q) => q.eq("tenantSlug", slug)).collect();
+  const members = await ctx.db.query("whitelist").withIndex("by_tenant", (q) => q.eq("tenantSlug", slug)).collect();
+  return { courses: courses.length, members: members.length, users: users.length };
+}
+
+export const tenantReferenceCounts = query({
+  args: { tenantSlug: v.string() },
+  returns: v.object({ courses: v.number(), members: v.number(), users: v.number() }),
+  handler: async (ctx, { tenantSlug }) => {
+    if (!(await isCallerAdmin(ctx, tenantSlug))) throw new Error("forbidden");
+    return tenantReferences(ctx, tenantSlug);
+  },
+});
+
+// Remove a tenant — the destructive act, guarded like ADR 0011's refuse-to-remove
+// pattern: **blocked outright** while any course, member, or user account still
+// references the slug (no cascade delete exists in this codebase and this issue
+// introduces none). Only an empty tenant is deletable. The UI disables the
+// control on the same counts, but this server guard is the boundary.
+export const removeTenant = mutation({
+  args: { tenantSlug: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { tenantSlug }) => {
+    if (!(await isCallerAdmin(ctx, tenantSlug))) throw new Error("forbidden");
+    const { courses, members, users } = await tenantReferences(ctx, tenantSlug);
+    if (courses + members + users > 0) {
+      throw new Error("This tenant still has courses or members assigned — clear them first.");
+    }
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", tenantSlug))
+      .unique();
+    if (!tenant) throw new Error("tenant not found");
+    await ctx.db.delete(tenant._id);
     return null;
   },
 });
