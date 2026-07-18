@@ -1,6 +1,6 @@
 # course-publishing/00: Course publishing, tenant catalogue & free self-enroll — map
 
-**Status:** in progress — ticket 01 resolved 2026-07-18; frontier open (02, 04 takeable; 07 added).
+**Status:** in progress — tickets 01, 02 resolved 2026-07-18; frontier open (03, 04, 07 takeable).
 **Labels:** wayfinder:map
 
 ## Destination
@@ -66,6 +66,15 @@ not the feature.
   private/unpublished stays grant-only. Captured as
   [ADR 0023 draft](adr-0023-draft-self-enroll-access-primitive.md). Surfaced the language axis →
   split three ways (see [ticket 07](07-language-scoped-access.md) + fog below).
+
+- [Per-tenant `selling` flag](02-per-tenant-selling-flag.md) — a **sixth required `tenants.flags`
+  boolean, `selling`**, defaulting **`false`** everywhere (migration backfills the four existing rows;
+  seed path defaults false). Gates `assertTenantFlag(…, "selling")` at **both** `setEditionPrice` and
+  `startCheckout`, composing with (not replacing) the deployment-wide `sellingEnabled()`. Flag-off is
+  frozen-not-revoked: listing persists, existing buyers keep access, the Edition becomes unbuyable,
+  and `clearEditionPrice` stays **un-gated** so an owner can always drop a stuck price to free.
+  Default-site selling (undefined slug → flag implicitly on) is deferred to
+  [ticket 04](04-default-site-vs-tenant-scope.md).
 
 ## Not yet specified
 
