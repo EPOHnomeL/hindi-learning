@@ -1,7 +1,7 @@
 # course-publishing/06: PRD + implementation-issue breakdown
 
 **Status:** open
-**Depends on:** 01, 02, 03, 04, 05, 07
+**Depends on:** 01, 02, 03, 04, 05, 07, 08
 **Labels:** wayfinder:task
 
 Child of [Course publishing map](00-course-publishing-map.md).

@@ -1,6 +1,6 @@
 # course-publishing/00: Course publishing, tenant catalogue & free self-enroll — map
 
-**Status:** in progress — tickets 01, 02 resolved 2026-07-18; frontier open (03, 04, 07 takeable).
+**Status:** in progress — tickets 01, 02, 03 resolved 2026-07-18; frontier open (04, 07, 08 takeable).
 **Labels:** wayfinder:map
 
 ## Destination
@@ -76,6 +76,17 @@ not the feature.
   Default-site selling (undefined slug → flag implicitly on) is deferred to
   [ticket 04](04-default-site-vs-tenant-scope.md).
 
+- [Define the "publish" action](03-define-publish-action.md) — **`published` is a course lifecycle
+  *status***, not an orthogonal flag: `status` becomes `seeded | active | completed | published`.
+  `completed` = content-done + generation-frozen editing/proofing phase (editors, internal shares);
+  `published` = **owner-only**, reachable only from `completed`, lists the course in its tenant
+  catalogue (`unpublish → completed`, `reopen → active`). Publish is **orthogonal to price** (a
+  status flip; free/priced stays per-Edition `listings`). Publish = catalogue **visibility only, not
+  an acquisition gate**: self-enroll needs `published`, but **buy works via direct link regardless**
+  (unlisted-but-buyable); public link + listings sit beside publish, unchanged. Surfaced
+  [ticket 08 — Tenant-domain link generation](08-tenant-domain-links.md) (blocks the PRD) and parked
+  the learner-progress %/estimate pain out of scope (below).
+
 ## Not yet specified
 
 <!-- in-scope fog, too dim to ticket sharply yet -->
@@ -104,3 +115,10 @@ not the feature.
   this map only adds a per-tenant *flag* over the one existing platform rail.
 - **Replacing/removing the anonymous public link** — it persists unchanged (user chose to keep both
   the link and the new catalogue/enroll path).
+- **Learner-progress percentage & lesson-estimate accuracy** (surfaced resolving
+  [ticket 03](03-define-publish-action.md), ruled out 2026-07-18) — the moving-denominator churn
+  ("15/16 → 16/17") and a wildly-off time estimate (~20 → 85). Publishing structurally cures the
+  moving-denominator half (published ⟹ frozen lesson count; members only enroll from the catalogue).
+  The remaining estimate-accuracy + in-progress %-display concerns are learner-facing and orthogonal
+  to publish/catalogue/self-enroll → a **separate effort** (existing `lesson-estimate` /
+  `course-completion` scratch dirs), not this destination.
