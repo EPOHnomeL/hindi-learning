@@ -1,6 +1,6 @@
 # course-publishing/00: Course publishing, tenant catalogue & free self-enroll — map
 
-**Status:** in progress — tickets 01, 02, 03 resolved 2026-07-18, 04 & 08 resolved 2026-07-19; frontier open (07 takeable).
+**Status:** in progress — tickets 01, 02, 03 resolved 2026-07-18, 04, 07 & 08 resolved 2026-07-19; frontier open (05 now unblocked → 06 PRD).
 **Labels:** wayfinder:map
 
 ## Destination
@@ -109,16 +109,31 @@ not the feature.
   (already tenant-correct — built client-side off `window.location.origin`). Research + build notes in
   the [ticket](08-tenant-domain-links.md); PRD-blocker for [ticket 06](06-prd-and-issue-breakdown.md) cleared.
 
+- [Language-scoped access](07-language-scoped-access.md) — **rescoped mid-grilling; premise obsolete.**
+  Content-translation is **already live** (the `translations` table, `convex/translate.ts`, the
+  reader's per-Edition switcher; access is already per-Edition), so the chartered
+  content-language-**access** layer solved a non-problem. **Dropped:** no `users.contentLang` field, no
+  access rule, no **disabled/greyed cross-language cards**, no switching/grandfather logic (all Q1–Q6
+  discarded). **What survived** — the thin enroll-language question ticket 01 left: catalogue self-enroll
+  uses a **per-card language pick, default English**; **Join enrolls the selected Edition** (one
+  `enrollments` row); re-Join for another language (idempotent, per-Edition, grandfathered — ticket 01
+  unchanged, **no new data model**); every published course joinable in ≥ English (**no locked cards**);
+  the language control is **gated by the tenant `translations` flag** (off ⟹ English-only Join). **No
+  `/prototype`** — the card affordance (language selector beside **Join**, native names from
+  `LANGUAGES`) is **spec'd in words for [ticket 05](05-tenant-catalogue-surface.md)**. **Unblocks
+  ticket 05.** Spun off the **chrome / app-UI i18n** effort (see below) as the user's actual priority.
+
 ## Not yet specified
 
 <!-- in-scope fog, too dim to ticket sharply yet -->
 
 - **Full app-UI (chrome) translation** ("the entire app translation going forward") — localizing the
-  interface itself, and running the **app UI in one language while enrolling in another** (app-language
-  and content-language as two independent settings). No i18n exists in the app today (English-only).
-  Large and only loosely coupled to publishing — **a candidate for its own wayfinder effort/map**,
-  not this one (user decision 2026-07-18, the three-way language split). The *content-language* half
-  is in-scope here as [ticket 07](07-language-scoped-access.md); this fog item is the *app-UI* half.
+  interface itself (buttons, menus, nav, the reader frame). No i18n exists in the app today (English-only).
+  Large and only loosely coupled to publishing — **its own wayfinder effort/map**, not this one (user
+  decision 2026-07-18, the three-way language split). **PROMOTED 2026-07-19:** resolving
+  [ticket 07](07-language-scoped-access.md) surfaced that the *content-language* half was obsolete
+  (content translation already live) and that **chrome i18n is the user's actual current priority** —
+  to be stood up as a **new wayfinder effort with its own map**, separate from this course-publishing map.
 
 - **New-course-published notifications** — telling a tenant's members when a course lands in their
   catalogue. Dim until the catalogue/publish model exists.
