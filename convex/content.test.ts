@@ -191,6 +191,23 @@ test("publicLesson serves a blob-backed lesson as a content URL", async () => {
   expect(lesson).not.toHaveProperty("html");
 });
 
+test("courseHeader exposes publicLink only when the course is publicly shared (reference-cards/03)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedMember(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  const as = asUser(t, alice);
+
+  // Private course: no public page for a stranger, so no share destination.
+  const priv = await as.query(api.content.courseHeader, { topicSlug: "hindi" });
+  expect(priv?.publicLink).toBeNull();
+
+  // Once shared, the header carries the share token + tenant so the reader can
+  // build the public `/share/<token>` link for the per-card share.
+  await t.run((ctx) => ctx.db.patch(topicId, { publicToken: "pubtok", tenantSlug: "yknot" }));
+  const shared = await as.query(api.content.courseHeader, { topicSlug: "hindi" });
+  expect(shared?.publicLink).toEqual({ shareToken: "pubtok", tenantSlug: "yknot" });
+});
+
 test("publishLesson stores the body as a blob (htmlStorageId, no inline html) and stays immutable", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");

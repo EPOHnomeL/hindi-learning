@@ -653,6 +653,13 @@ export const courseHeader = query({
       paywall: v.optional(
         v.object({ amount: v.number(), currency: v.string(), previewKey: v.union(v.string(), v.null()) }),
       ),
+      // The course's public `/share/<token>` link when it's publicly shared, else
+      // null (reference-cards/03). Drives the per-card share affordance in the reader
+      // — only offered when there's a public page a stranger can open. The token is
+      // the course identifier (not secret; it's what the Guest reader is keyed on),
+      // and `tenantSlug` mints the link on the course's canonical host. Mirrors the
+      // certificate's `course` field (certificates.ts).
+      publicLink: v.union(v.null(), v.object({ shareToken: v.string(), tenantSlug: v.union(v.null(), v.string()) })),
     }),
   ),
   handler: async (ctx, { topicSlug, lang }) => {
@@ -682,6 +689,11 @@ export const courseHeader = query({
       dir: langInfo(effLang).rtl ? ("rtl" as const) : ("ltr" as const),
       editions,
       paywall,
+      // Public link when the course is publicly shared (the legacy per-Topic English
+      // Public link, ADR 0013) — same source the certificate share uses.
+      publicLink: topic.publicToken
+        ? { shareToken: topic.publicToken, tenantSlug: topic.tenantSlug ?? null }
+        : null,
     };
   },
 });

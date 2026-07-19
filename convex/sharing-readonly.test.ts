@@ -56,6 +56,7 @@ test("courseHeader reports the role: owner, viewer, or null for a stranger", asy
     role: "owner",
     canEdit: true,
     status: "active",
+    publicLink: null,
     ...enEdition,
   });
   expect(await asUser(t, viewer).query(api.content.courseHeader, { topicSlug: "hindi" })).toEqual({
@@ -64,6 +65,7 @@ test("courseHeader reports the role: owner, viewer, or null for a stranger", asy
     role: "viewer",
     canEdit: false,
     status: "active",
+    publicLink: null,
     ...enEdition,
   });
   // A non-Viewer can't even learn the Topic's title (private Topics don't leak).
