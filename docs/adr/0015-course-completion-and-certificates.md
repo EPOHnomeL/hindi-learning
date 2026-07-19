@@ -56,10 +56,16 @@ Two facts about the current model shape the design:
 - **A Certificate is a stored, per-(User, Topic) entity — not a derivation.** A
   new `certificates` table: `(topicId, userId, token, learnerName, courseTitle,
   lessonCount, issuedAt)`, indexed `by_token` (public read) and `by_topic_user`
-  (dedup + "do I have one"). The `learnerName`, `courseTitle`, and `lessonCount`
-  are **snapshots** frozen at issue, so a later reopen/extend of the course does
-  not mutate an earned Certificate. Issued **once** per (User, Topic); never
-  revoked, never re-issued.
+  (dedup + "do I have one"). The `learnerName` and `lessonCount` are **snapshots**
+  frozen at issue, so a later reopen/extend of the course does not mutate an earned
+  Certificate. Issued **once** per (User, Topic); never revoked, never re-issued.
+  - **Amendment (course title is live, not frozen):** the read seams now resolve
+    the course's **current** title (in the Edition language the certificate was
+    earned in) rather than the frozen `courseTitle` column, so renaming a course —
+    e.g. fixing a placeholder title after certificates were already issued — shows
+    on every issued certificate. The `courseTitle` column is retained only as a
+    fallback when the Topic has been deleted. `learnerName`/`lessonCount` stay
+    frozen. See `convex/certificates.ts` (`liveCourseTitle`).
 - **Eligibility is derived; issuance is a claim.** A User is *eligible* when the
   Topic is `completed` **and** they have marked every non-superseded Lesson
   `completed`. Because the certificate must carry a **name** and none is stored,

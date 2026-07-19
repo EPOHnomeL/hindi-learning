@@ -240,14 +240,80 @@ test("publicCertificate returns only the allowlisted achievement fields; a bad/a
     lang: "en",
     dir: "ltr",
     emblem: { kind: "glyph", glyph: "🎓" },
+    // Private course (no public link) → nothing to link the Share button back to.
+    course: null,
   });
-  // The allowlist is exact — the achievement + Edition metadata + Emblem, never
-  // the email, userId, topicId, or the token.
-  expect(Object.keys(pub!).sort()).toEqual(["courseTitle", "dir", "emblem", "issuedAt", "lang", "learnerName", "lessonCount"]);
+  // The allowlist is exact — the achievement + Edition metadata + Emblem + the
+  // (here null) course link, never the email, userId, topicId, or the token.
+  expect(Object.keys(pub!).sort()).toEqual([
+    "course",
+    "courseTitle",
+    "dir",
+    "emblem",
+    "issuedAt",
+    "lang",
+    "learnerName",
+    "lessonCount",
+  ]);
 
   // A made-up / empty token reveals nothing — uniform null, no enumeration.
   expect(await t.query(api.certificates.publicCertificate, { token: "not-a-real-token" })).toBeNull();
   expect(await t.query(api.certificates.publicCertificate, { token: "" })).toBeNull();
+});
+
+test("a course rename shows on an already-issued certificate (live title, not the frozen snapshot)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  // Created under a placeholder title (the slug's origin), then earned.
+  const topicId = await seedTopic(t, alice, "prophetic-school", "Prophetic School", "completed");
+  await addLesson(t, topicId, "0001", 1);
+  await complete(t, alice, topicId, "0001");
+  const cert = await asUser(t, alice).mutation(api.certificates.claimCertificate, {
+    topicSlug: "prophetic-school",
+    name: "Alice",
+  });
+  expect(cert.courseTitle).toBe("Prophetic School");
+
+  // The owner renames the course after the certificate was issued (the slug is
+  // immutable, so it stays `prophetic-school`).
+  await asUser(t, alice).mutation(api.content.renameTopic, {
+    topicSlug: "prophetic-school",
+    title: "Growing in your relationship with the Holy Spirit",
+  });
+
+  // Both read seams now reflect the current title — no re-mint, one row.
+  const mine = await asUser(t, alice).query(api.certificates.myCertificate, { topicSlug: "prophetic-school" });
+  expect(mine?.certificate?.courseTitle).toBe("Growing in your relationship with the Holy Spirit");
+  const pub = await t.query(api.certificates.publicCertificate, { token: cert.token });
+  expect(pub?.courseTitle).toBe("Growing in your relationship with the Holy Spirit");
+  expect(await certRows(t, topicId, alice)).toHaveLength(1);
+});
+
+test("publicCertificate exposes the course share link only when the course is publicly available", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  await addLesson(t, topicId, "0001", 1);
+  await complete(t, alice, topicId, "0001");
+  const cert = await asUser(t, alice).mutation(api.certificates.claimCertificate, { topicSlug: "hindi", name: "Alice" });
+
+  // Private course → no course link.
+  expect((await t.query(api.certificates.publicCertificate, { token: cert.token }))?.course).toBeNull();
+
+  // Make the course public (a live token) on a tenant → the Share button gets the
+  // course's own share token plus its canonical tenant.
+  await t.run((ctx) => ctx.db.patch(topicId, { publicToken: "pub-tok-123", tenantSlug: "ywampotch" }));
+  expect((await t.query(api.certificates.publicCertificate, { token: cert.token }))?.course).toEqual({
+    shareToken: "pub-tok-123",
+    tenantSlug: "ywampotch",
+  });
+
+  // A default-site course (no tenant) reports a null tenantSlug (apex host).
+  await t.run((ctx) => ctx.db.patch(topicId, { tenantSlug: undefined }));
+  expect((await t.query(api.certificates.publicCertificate, { token: cert.token }))?.course).toEqual({
+    shareToken: "pub-tok-123",
+    tenantSlug: null,
+  });
 });
 
 // ---- Emblem (ADR 0017) -----------------------------------------------------

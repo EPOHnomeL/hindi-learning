@@ -23,11 +23,38 @@ const earnedCertificateValidator = v.object({
   emblem: resolvedEmblemValidator,
 });
 
+// The course's CURRENT title, in the Edition language the certificate was earned
+// in (course-translation): the source `topic.title`, or its translated title for
+// a non-source Edition. Falls back to the certificate's frozen `courseTitle`
+// snapshot only when the Topic is gone. Live by product decision — a course rename
+// shows on every already-issued certificate (this supersedes ADR 0015's original
+// "frozen title" rule; the snapshot column now only backstops a deleted Topic).
+async function liveCourseTitle(
+  ctx: QueryCtx,
+  row: Doc<"certificates">,
+  topic: Doc<"topics"> | null,
+): Promise<string> {
+  if (!topic) return row.courseTitle;
+  const lang = row.lang ?? SOURCE_LANG;
+  let title = topic.title;
+  if (lang !== SOURCE_LANG) {
+    const t = await ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) =>
+        q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "title").eq("key", ""),
+      )
+      .unique();
+    if (t?.text) title = t.text;
+  }
+  return decodeEntities(title);
+}
+
 async function certificatePayload(ctx: QueryCtx, row: Doc<"certificates">) {
+  const topic = await ctx.db.get(row.topicId);
   return {
     token: row.token,
     learnerName: row.learnerName,
-    courseTitle: row.courseTitle,
+    courseTitle: await liveCourseTitle(ctx, row, topic),
     lessonCount: row.lessonCount,
     issuedAt: row._creationTime,
     lang: row.lang ?? SOURCE_LANG,
@@ -181,6 +208,17 @@ export const publicCertificate = query({
       lang: v.string(),
       dir: v.union(v.literal("ltr"), v.literal("rtl")),
       emblem: resolvedEmblemValidator,
+      // The course's public link, present ONLY when the course is publicly
+      // available (its `publicToken` is live). `shareToken` is the course's own
+      // anonymous read capability — already designed to be handed out — so the
+      // certificate's Share button can point back at the course; `tenantSlug`
+      // picks the canonical host (my-course.app apex or a tenant subdomain). Null
+      // when the course is private: the certificate stays viewable, but there's
+      // no course to link to. Never leaks the topicId, owner, or Lesson content.
+      course: v.union(
+        v.null(),
+        v.object({ shareToken: v.string(), tenantSlug: v.union(v.null(), v.string()) }),
+      ),
     }),
   ),
   handler: async (ctx, { token }) => {
@@ -190,15 +228,19 @@ export const publicCertificate = query({
       .withIndex("by_token", (q) => q.eq("token", token))
       .unique();
     if (!row) return null;
+    const topic = await ctx.db.get(row.topicId);
     const lang = row.lang ?? SOURCE_LANG;
     return {
       learnerName: row.learnerName,
-      courseTitle: row.courseTitle,
+      courseTitle: await liveCourseTitle(ctx, row, topic),
       issuedAt: row._creationTime,
       lessonCount: row.lessonCount,
       lang,
       dir: langInfo(lang).rtl ? ("rtl" as const) : ("ltr" as const),
       emblem: await resolveEmblem(ctx, row.emblem),
+      course: topic?.publicToken
+        ? { shareToken: topic.publicToken, tenantSlug: topic.tenantSlug ?? null }
+        : null,
     };
   },
 });
