@@ -39,10 +39,14 @@ export function resolveTenantSlug(host: string | null | undefined): TenantSlug |
 // guarantees no redirect loop. Pure, so the whole decision is unit-tested.
 export function canonicalRedirect(currentUrl: string, courseTenant: TenantSlug | null): string | null {
   const url = new URL(currentUrl);
-  // Strip an existing known-tenant label to find the base domain (`my-course.app`
-  // or `localhost`), then re-attach the course's tenant (or none for the default).
+  // Strip an existing known-tenant label — or a leading `www` — to find the base
+  // domain (`my-course.app` or `localhost`), then re-attach the course's tenant (or
+  // none for the default). `www` matters because the default site is served there:
+  // without stripping it, a tenant link off `www.my-course.app` would mint the
+  // unresolvable `<tenant>.www.my-course.app`.
   const first = url.hostname.split(".")[0];
-  const base = first && KNOWN.has(first) ? url.hostname.slice(first.length + 1) : url.hostname;
+  const strippable = !!first && (KNOWN.has(first) || first === "www");
+  const base = strippable ? url.hostname.slice(first.length + 1) : url.hostname;
   const target = courseTenant ? `${courseTenant}.${base}` : base;
   if (target === url.hostname) return null;
   url.hostname = target;

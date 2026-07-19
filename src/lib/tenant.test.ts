@@ -58,6 +58,21 @@ test("preserves path AND query string when redirecting", () => {
   ).toBe("https://upf.my-course.app/courses/verbs/lessons/3?lang=hi&x=1");
 });
 
+// The default site is served at `www.my-course.app` too, so the base-domain swap
+// must strip `www` — otherwise a tenant link off the main site mints the
+// unresolvable `<tenant>.www.my-course.app` (the "Server Not Found" bug).
+test("tenanted course on the www main site → redirect to its subdomain (no www)", () => {
+  expect(canonicalRedirect("https://www.my-course.app/courses/verbs", "yknot")).toBe(
+    "https://yknot.my-course.app/courses/verbs",
+  );
+});
+
+test("untenanted course on the www main site → canonicalise to the apex", () => {
+  expect(canonicalRedirect("https://www.my-course.app/courses/verbs", null)).toBe(
+    "https://my-course.app/courses/verbs",
+  );
+});
+
 // Loop safety: the already-canonical cases MUST be strict no-ops (null), or we
 // ship a redirect loop.
 test.each([
