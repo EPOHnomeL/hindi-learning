@@ -24,7 +24,8 @@ before any build. No PRD exists yet by design.
 | 07 | [Video-anchored teach mode](issues/07-scope-video-anchored-teach-mode.md) | Teach skill / AUTHORING.md |
 | 08 | [Ingestion across provider paths](issues/08-scope-provider-path-ingestion.md) | Routine vs OpenRouter runtime |
 | 09 | [Editions × embedded media](issues/09-scope-editions-embedded-media.md) | Translate pipeline |
-| 10 | [AI deep-linking into Resources](issues/10-scope-resource-deep-linking.md) | Citations → owned Resources (page/timestamp anchors) |
+| 10 | [AI linking into Resources](issues/10-scope-resource-deep-linking.md) — **resolved** | Citations → owned Resources (whole-resource; anchors deferred) |
+| 11 | [Implement Resource links](issues/11-implement-resource-links.md) — **ready-for-agent** | materialise + reader interceptor + skill guidance |
 
 Rough dependency order: 01–03 are independent; 04 → 05, 07, 10; 03 → 07, 09; 02 → 09.
 06 and 08 are decisions that shape everything downstream but can be scoped in parallel.

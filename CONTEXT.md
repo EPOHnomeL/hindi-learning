@@ -63,6 +63,10 @@ _Avoid_: Goal, objective, purpose (as separate terms)
 A trusted source a Topic's teaching is grounded in — a handbook, a scripture, a reference site, an uploaded document. Owned by its Topic and supplied either by the learner (uploaded in the dashboard) or by Claude Code. The Routine reads Resources to author Lessons and never trusts ungrounded knowledge over them.
 _Avoid_: File, upload, attachment, asset (in domain language)
 
+**Resource link**:
+An in-lesson citation whose href is a Topic-scoped Resource's **reader route** (`/courses/<slug>/resources/<id>`) rather than an external URL. Because the route is keyed on the Resource `id` (stable across Editions) and never on a signed blob URL (which expires), it survives in immutable Lesson HTML and across translation. The reader resolves it to a fresh signed URL at click time from the Resource list it already holds, and opens it with sidebar parity (new tab for a PDF/URL, dialog for Markdown). A click whose `id` isn't in the reader's bundle — a paid Preview's withheld Resources, or a since-deleted Resource — is a graceful no-op. Preferred over an external-URL citation whenever the claim is grounded in an owned Resource.
+_Avoid_: Deep link (implies page/timestamp anchors — those are deferred), signed URL, attachment link
+
 **Seed**:
 The minimal input that brings a Topic into being from the dashboard — a title, a free-text "why", and an initial set of Resources — before any Mission or Lesson exists. The Routine's first run turns a Seed into a drafted Mission and a first Lesson.
 _Avoid_: Draft, stub, request
