@@ -6,7 +6,10 @@
      (references/ref-*.html) so the reader's REFERENCE_DARK_CSS override
      (src/app/_components/lessonSrcDoc.ts) re-skins them in dark mode. This is a
      SUPERSET: header.ref/.kicker/.intro, .term (glossary entries), .word
-     (compact word list), a styled table for tabular cheat-sheets, plus prose. -->
+     (compact word list), a styled table for tabular cheat-sheets, plus prose.
+     Glossary entries (.term / .word) carry a stable id="<slug>" so a lesson can
+     deep-link to a single card and the reader can offer a per-card share — see
+     AUTHORING.md §7 for the slug rule. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">

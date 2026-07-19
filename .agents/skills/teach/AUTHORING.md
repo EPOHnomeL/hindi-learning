@@ -104,7 +104,11 @@ Link to sibling lessons and references by their **reader routes** (the `key` is
 the filename without `.html`):
 
 - Lesson: `/courses/<slug>/lessons/<key>` (e.g. `/courses/<slug>/lessons/0002-...`)
-- Reference: `/courses/<slug>/references/<key>`
+- Reference: `/courses/<slug>/references/<key>` — or link to a **single glossary
+  card** with `/courses/<slug>/references/<key>#<cardId>`, which scrolls the reader
+  straight to that entry and flashes it. **Copy the `<cardId>` from the entry's
+  existing `id` in the reference** (see §7); don't recompute a slug — the id already
+  on the card is the source of truth.
 - Resource (the Topic's own uploaded sources): `/courses/<slug>/resources/<id>` —
   **copy the `readerPath` for that Resource verbatim from `resources/_index.json`.**
   Never hand-type the id or link a signed blob URL (it expires; lessons are
@@ -132,6 +136,24 @@ memory; verify quoted source text character-for-character.**
 - **Glossary / references** (`references/*.html`): keep the glossary current with
   any new term the learner now owns. References are stored **as authored** (they
   are NOT head/foot-wrapped like lessons). Shape: [`GLOSSARY-FORMAT.md`](./GLOSSARY-FORMAT.md).
+  **Give every glossary entry a stable `id`** so a lesson can deep-link to that
+  exact card and the reader can offer a per-card share:
+  - Put `id="<slug>"` on each entry element — the `.term` card or the `.word` row.
+  - **Slug rule:** lowercase ASCII; strip diacritics; spaces/punctuation → single
+    hyphens; trim stray hyphens. Source the slug from the entry's **Latin** text —
+    a `.term`'s `.name`, or a `.word`'s `.tr` transliteration (the Devanagari
+    headword doesn't slug) — e.g. `dhanya`, `परन्तु`/`parantu` → `parantu`. On a
+    collision within one reference, suffix `-2`, `-3`.
+  - **Ids are stable — never renumber.** Once an entry has an id, keep it across
+    revisions; other lessons link to it. Add ids to new entries only.
+  ```html
+  <div class="term" id="perfective-aspect">
+    <span class="name">Perfective aspect</span>
+    <div class="def">An action viewed as a complete whole, not its internal unfolding.</div>
+  </div>
+  <div class="word" id="dhanya"><div class="w deva">धन्य</div>
+    <div class="g"><span class="tr">dhanya</span> — <b>blessed</b>, fortunate, happy.</div></div>
+  ```
 - **Learning record** (`learning-records/00NN-<dash-case>.md`): one short record
   capturing what this lesson advanced and the next ZPD step. Shape:
   [`LEARNING-RECORD-FORMAT.md`](./LEARNING-RECORD-FORMAT.md).
