@@ -68,3 +68,7 @@ Changing the per-card **language selector should also localize the card's own ti
 the selected language (not just which Edition Join/Buy targets). Deferred: needs translated
 title/mission surfaced per Edition; the catalogue query returns only the source-language title/mission
 today. Fold into the chrome/app-UI i18n effort or a follow-up — **do not build now.**
+
+> **Absorbed (2026-07-19):** this deferred item now lives in the chrome-i18n effort as
+> [`app-language-i18n/06` — Catalogue localisation spec](../app-language-i18n/issues/06-catalogue-localisation-spec.md)
+> (child of the [Chrome i18n map](../app-language-i18n/issues/00-app-language-i18n-map.md)). Tracked there, not here.

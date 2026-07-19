@@ -1,7 +1,13 @@
 # app-language-i18n/01: Global app-language picker (full chrome i18n)
 
-**Status:** open
+**Status:** prior-art — folded into [00 — Chrome i18n map](00-app-language-i18n-map.md) (2026-07-19)
 **Imported:** from GitHub #14 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
+
+> **Prior art, not a live ticket.** As of 2026-07-19 this is superseded by the wayfinder map
+> [00 — Chrome i18n map](00-app-language-i18n-map.md), which folds its proposed solution shape in as
+> prior art to grill *against* (adopt / revise / reject), not as settled decisions. Notably its
+> **"RTL is app-wide"** decision is now **out of scope** — all five target languages (English,
+> Afrikaans, Spanish, French, Hindi) are left-to-right. Read the map for the current frontier.
 
 > Migrated from [`.scratch/app-language-i18n/issues/01-global-app-language-picker.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/app-language-i18n/issues/01-global-app-language-picker.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
