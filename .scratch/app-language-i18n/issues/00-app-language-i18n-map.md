@@ -44,7 +44,13 @@ Shipping the code is the *next* effort, not this map.
 
 <!-- one line per closed ticket: enough to judge relevance, then zoom the link -->
 
-_(none yet — charting session only; no tickets resolved)_
+- [Research — App Router i18n approach](02-research-app-router-i18n-approach.md) — recommends
+  **`next-intl` "without i18n routing"** (locale from a cookie) over an in-house `t()` layer, with
+  **repo per-locale JSON** catalogues (not a Convex `localizations` table + LLM rail). Corrects ticket
+  01: `convex/translate.ts` is a `PUBLISH_SECRET`-guarded **OpenRouter cloud routine** for *content*,
+  wrong shape for chrome strings. `convex/languages.ts` already is the shared language registry (all 5
+  langs) — reuse it (pre-answers ticket 03's shared-list note). Hindi chrome needs a Devanagari font.
+  Full asset: [research-app-router-i18n.md](research-app-router-i18n.md). **Feeds ticket 04.**
 
 ## Not yet specified
 
@@ -57,7 +63,9 @@ _(none yet — charting session only; no tickets resolved)_
   content Edition's language, so the mixed state isn't read as a bug (from ticket 01's notes).
   Graduates once storage (03) + architecture (04) settle.
 - **Pluralization & number/date/currency formatting** for the 5 languages — whether the platform
-  `Intl` APIs suffice or a heavier layer is needed. Coarse now; graduates after 04.
+  `Intl` APIs suffice or a heavier layer is needed. **Likely absorbed:** ticket 02 found `next-intl`'s
+  ICU format gives pluralization + `Intl` formatting for free, so this collapses into ticket 04's
+  layer choice rather than becoming its own ticket. Confirm when 04 lands.
 - **Per-locale acceptance / QA.** How we judge a language "done" — visual QA pass across each
   learner surface. Graduates near the end.
 

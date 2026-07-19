@@ -1,6 +1,6 @@
 # app-language-i18n/02: Research — App Router i18n approach for a no-URL-locale, runtime-addable app
 
-**Status:** open
+**Status:** done (2026-07-19, session 782007d9)
 **Labels:** wayfinder:research
 **Parent:** [00 — Chrome i18n map](00-app-language-i18n-map.md)
 
@@ -30,3 +30,27 @@ covering at least:
 
 This ticket **decides nothing** — it feeds ticket 04 (the architecture decision). Output is the
 options doc + a recommendation, not a chosen framework.
+
+## Resolution (2026-07-19)
+
+Asset: **[research-app-router-i18n.md](../research-app-router-i18n.md)** — full options survey + a
+recommendation for ticket 04.
+
+**Findings, in brief:**
+
+- **`next-intl` works cleanly without a URL locale** — App Router "without i18n routing" mode reads the
+  locale from a **cookie** in an async `getRequestConfig` (English fallback). Server + Client
+  Components supported; ICU format gives pluralization + `Intl` formatting for free. This is the
+  recommended layer; an in-house `t()` layer (ticket 01's proposal) reinvents it.
+- **Catalogues should be repo per-locale JSON, not a Convex `localizations` table.** The Convex-table
+  + LLM-generation rail ticket 01 sketched only pays off if non-developers add languages at runtime —
+  which the map ruled out (personal-only, fixed known set, owners work in English). Repo JSON makes
+  "add a language" = add one file + one `LANGUAGES` entry.
+- **`convex/translate.ts` should NOT generate chrome strings.** Correction to ticket 01: it's a
+  `PUBLISH_SECRET`-guarded **cloud routine over OpenRouter** for per-Topic *content* (ADR 0001 — no
+  LLM/key in the app), not an in-app Claude call. Wrong shape for a small fixed UI-string set. Draft
+  JSON offline once per language if LLM help is wanted; commit it.
+- **`convex/languages.ts` already is the shared language registry** — has all 5 target languages +
+  `langInfo`/`langDir`/`isDevanagari`. Reuse it (this pre-answers ticket 03's "shared ISO list" note).
+- **Hindi chrome needs a Devanagari-capable font**, mirroring the reader's existing `isDevanagari`/Noto
+  handling — flag for the build.
