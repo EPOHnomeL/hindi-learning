@@ -189,7 +189,16 @@ export async function getViewableTopic(ctx: QueryCtx, userId: Id<"users">, slug:
     .query("entitlements")
     .withIndex("by_topic_user", (q) => q.eq("topicId", topic._id).eq("userId", userId))
     .first();
-  return entitlement ? topic : null;
+  if (entitlement) return topic;
+  // A self-enroll grant (ADR 0023) is the account-based free twin of an
+  // Entitlement — it grants the same topic-level visibility (own Progress,
+  // Resources, Certificate eligibility all follow). Matched in-memory elsewhere;
+  // here any enrollment on the Topic is enough for visibility.
+  const enrollment = await ctx.db
+    .query("enrollments")
+    .withIndex("by_topic_user", (q) => q.eq("topicId", topic._id).eq("userId", userId))
+    .first();
+  return enrollment ? topic : null;
 }
 
 // A Topic this user may *edit* on one Edition (ADR 0020): one they own, or one
@@ -237,6 +246,17 @@ export async function entitledLangs(ctx: QueryCtx, topicId: Id<"topics">, userId
   return new Set(rows.map((e) => e.lang));
 }
 
+// The Edition languages a learner holds on a Topic from their self-enroll grants
+// (ADR 0023). The self-service twin of `viewerLangs`/`entitledLangs`; enrollments
+// always carry a `lang`.
+export async function enrolledLangs(ctx: QueryCtx, topicId: Id<"topics">, userId: Id<"users">): Promise<Set<string>> {
+  const rows = await ctx.db
+    .query("enrollments")
+    .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
+    .collect();
+  return new Set(rows.map((e) => e.lang));
+}
+
 // The set of Editions the caller may read on a Topic. The owner holds the source
 // English edition plus every language with a READY translation job (a generated
 // Edition); a non-owner holds the languages their Shares grant PLUS the languages
@@ -254,6 +274,7 @@ export async function heldLangs(ctx: QueryCtx, topic: Doc<"topics">, userId: Id<
   }
   const shared = await viewerLangs(ctx, topic._id, userId);
   for (const l of await entitledLangs(ctx, topic._id, userId)) shared.add(l);
+  for (const l of await enrolledLangs(ctx, topic._id, userId)) shared.add(l);
   return shared;
 }
 
@@ -319,10 +340,12 @@ export async function isReadySeller(ctx: QueryCtx, userId: Id<"users">): Promise
 
 // ---- Paid marketplace: the Edition access resolver (ADR 0016) ---------------
 
-// The caller's relationship to a requested Edition. `owner`/`viewer`/`entitled`
-// read the whole Edition; `preview` gets only the free first Lesson of a PAID
-// Edition; `none` is not-found (a free Edition the caller holds no grant to).
-export type EditionAccess = "owner" | "viewer" | "entitled" | "preview" | "none";
+// The caller's relationship to a requested Edition. `owner`/`viewer`/`entitled`/
+// `enrolled` read the whole Edition; `preview` gets only the free first Lesson of
+// a PAID Edition; `none` is not-found (a free Edition the caller holds no grant
+// to). `enrolled` (self-enroll, ADR 0023) reads ≡ a Viewer, kept distinct only
+// for the "Joined" badge and the "my enrolled courses" query.
+export type EditionAccess = "owner" | "viewer" | "entitled" | "enrolled" | "preview" | "none";
 
 // The price of an Edition (Topic, language), or null when the Edition is free.
 // The PRESENCE of a listing row is the single source of truth for "paid".
@@ -362,6 +385,10 @@ export async function editionAccessLevel(
   if (userId) {
     if ((await viewerLangs(ctx, topic._id, userId)).has(lang)) return "viewer";
     if ((await entitledLangs(ctx, topic._id, userId)).has(lang)) return "entitled";
+    // A self-enroll grant (ADR 0023) reads ≡ a Viewer. Checked before the price
+    // fallback and never re-checking the price, so a grandfathered enrollee keeps
+    // full access even after their formerly-free Edition is later priced.
+    if ((await enrolledLangs(ctx, topic._id, userId)).has(lang)) return "enrolled";
   }
   const paid = (await editionPrice(ctx, topic._id, lang)) !== null;
   if (publicGrant) return paid ? "preview" : "viewer";

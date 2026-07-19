@@ -1,6 +1,6 @@
 # course-publishing/09: Enrollments table & the `enrolled` access grant
 
-**Status:** ready-for-agent
+**Status:** done (2026-07-19, `/tdd` + `/ponytail`)
 **Depends on:** —
 **Labels:** ready-for-agent
 **Loop:** `/tdd` (test-first) + `/ponytail`
@@ -79,3 +79,27 @@ the "my enrolled courses" dashboard query ([issue 16](16-enrolled-on-dashboard.m
 - ADR 0023 lives at `docs/adr/0023-*.md`.
 
 **Unblocks:** 13, 14, 16.
+
+## Resolution (2026-07-19)
+
+Built test-first. **Seams** (confirmed with the user): the resolver helpers directly via
+`t.run` (precedence + grandfather), and the reader query end-to-end (an enrollee reads the course).
+
+- **Schema** ([`convex/schema.ts`](../../convex/schema.ts)): the `enrollments` table
+  (`{ userId, topicId, lang }`, indexes `by_user` / `by_topic` / `by_topic_user`).
+- **Resolver** ([`convex/lib.ts`](../../convex/lib.ts)): `EditionAccess` extended with `"enrolled"`;
+  new `enrolledLangs` helper; `editionAccessLevel` gains the `enrolled` branch (checked before the
+  price fallback → grandfathered, no price re-check); `heldLangs` (non-owner branch) and
+  `getViewableTopic` union in enrollments.
+- **Consumer** ([`convex/content.ts`](../../convex/content.ts)): `courseHeader.role` union += `enrolled`
+  (the only `EditionAccess` level that leaks to the client). `lessonLocked` locks only `preview`, so an
+  enrollee reads freely — no change needed.
+- **ADR** graduated to [`docs/adr/0023-self-enroll-access-primitive.md`](../../docs/adr/0023-self-enroll-access-primitive.md);
+  the scratch draft is now a redirect stub.
+- **Tests** ([`convex/enrollment.test.ts`](../../convex/enrollment.test.ts)): 6 cases — resolver
+  returns `enrolled`; grandfather after pricing; per-Edition isolation; `getViewableTopic`/`heldLangs`;
+  reader end-to-end (`courseHeader` role + `getLesson` unlocked); owner-regression.
+
+**Verified:** `tsc --noEmit` clean; full convex suite **395 passed / 31 files**, no regressions. The
+`enroll` mutation (creation-side `published`+free guards) is [issue 13](13-self-enroll-mutation.md);
+"my enrolled courses" surfacing is [issue 16](16-enrolled-on-dashboard.md).

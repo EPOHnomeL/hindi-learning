@@ -444,6 +444,30 @@ export default defineSchema({
     .index("by_topic", ["topicId"])
     .index("by_topic_lang", ["topicId", "lang"]),
 
+  // A self-enroll grant (ADR 0023): a member's own, self-initiated read access to
+  // ONE **Edition** — a (Topic, language) pair — of a **free, published** course.
+  // The fifth access primitive, distinct from owner-granted `shares` and paid
+  // `entitlements` so a self-join is never mislabelled under "Shared with me" /
+  // "Purchases" (this is a discovery feature — the label is what the learner sees).
+  // One row per (user, Topic, language); the presence of the row IS the access. An
+  // enrolled learner is treated ≡ a Viewer of that Edition everywhere (read access,
+  // own Progress, Certificate eligibility), scoped to one language (joining `en`
+  // does not unlock `es`). PERMANENT / grandfathered like an Entitlement: pricing a
+  // formerly-free Edition keeps existing enrollees in, stops only new free joins —
+  // the resolver's enrollment check wins regardless of current price. Written only
+  // for a currently-free, `published` Edition; idempotent per (user, Topic, lang).
+  // `by_topic_user` is the resolver's hold check (a learner may hold several, one
+  // per language — matched in-memory like Shares/Entitlements); `by_topic` cascades
+  // on Topic delete; `by_user` backs "my enrolled courses".
+  enrollments: defineTable({
+    userId: v.id("users"),
+    topicId: v.id("topics"),
+    lang: v.string(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_topic", ["topicId"])
+    .index("by_topic_user", ["topicId", "userId"]),
+
   // ---- Monetisation (paid marketplace, ADR 0016) ---------------------------
 
   // The price of one **Edition** — a (Topic, language) pair. The PRESENCE of a

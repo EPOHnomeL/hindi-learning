@@ -620,9 +620,16 @@ export const courseHeader = query({
     v.object({
       title: v.string(),
       // The caller's access level to the served Edition (paid marketplace). An
-      // `entitled` buyer reads exactly like a `viewer`; a `preview` caller sees
-      // only the free first Lesson of a paid Edition (the rest is locked).
-      role: v.union(v.literal("owner"), v.literal("viewer"), v.literal("entitled"), v.literal("preview")),
+      // `entitled` buyer and an `enrolled` self-joiner (ADR 0023) both read
+      // exactly like a `viewer`; a `preview` caller sees only the free first
+      // Lesson of a paid Edition (the rest is locked).
+      role: v.union(
+        v.literal("owner"),
+        v.literal("viewer"),
+        v.literal("entitled"),
+        v.literal("enrolled"),
+        v.literal("preview"),
+      ),
       // Whether the caller may make the in-place prose edits on the SERVED
       // Edition (ADR 0020): the owner, or an Editor of this `lang`. The reader
       // gates its hover-pencil on this, NOT on `role` — a Viewer of one Edition
@@ -654,7 +661,7 @@ export const courseHeader = query({
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
     const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
-    // `level` is now narrowed to the four access roles (the returns validator's
+    // `level` is now narrowed to the five access roles (the returns validator's
     // union) — the "none" case is not-found above, so `role` is just `level`.
     if (level === "none") return null;
     const role = level;
