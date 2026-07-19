@@ -1,6 +1,6 @@
 # course-publishing/00: Course publishing, tenant catalogue & free self-enroll — map
 
-**Status:** in progress — tickets 01, 02, 03 resolved 2026-07-18, 04, 07 & 08 resolved 2026-07-19; frontier open (05 now unblocked → 06 PRD).
+**Status:** in progress — tickets 01, 02, 03 resolved 2026-07-18, 04, 05, 07 & 08 resolved 2026-07-19; **only ticket 06 (PRD) remains** — all decision tickets closed.
 **Labels:** wayfinder:map
 
 ## Destination
@@ -122,6 +122,18 @@ not the feature.
   `/prototype`** — the card affordance (language selector beside **Join**, native names from
   `LANGUAGES`) is **spec'd in words for [ticket 05](05-tenant-catalogue-surface.md)**. **Unblocks
   ticket 05.** Spun off the **chrome / app-UI i18n** effort (see below) as the user's actual priority.
+
+- [The catalogue surface](05-tenant-catalogue-surface.md) — `/prototype` judged with the user; winner
+  **Variant A "flat grid + filters"** (throwaway route built, judged, deleted). Spec for ticket 06: a
+  new member **"Browse courses"** route in the authed chrome; a **filter chip row** (All / Free /
+  Premium / My courses) over **one responsive card grid** at dashboard-parity density. Each card =
+  title + **state badge** (Free · price · Joined · Purchased), 2-line mission, language chips,
+  progress bar (joined/owned only), and a bottom **affordance**: **Join now** (free → ticket-01
+  enroll grant) · **Buy·price** (priced → `startCheckout`) · **Continue/Open** (held). The **ticket-07
+  language selector** sits beside Join/Buy when the tenant `translations` flag is on and the course
+  has > 1 Edition (English default; acquires the selected Edition; **no disabled cards**). Empty state
+  = "Nothing published yet." **Deferred (not this build):** the language pick should also localize the
+  card's **title + mission**, not just the target Edition.
 
 ## Not yet specified
 
