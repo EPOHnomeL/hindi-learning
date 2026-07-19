@@ -67,10 +67,12 @@ test("tenanted course on the www main site → redirect to its subdomain (no www
   );
 });
 
-test("untenanted course on the www main site → canonicalise to the apex", () => {
-  expect(canonicalRedirect("https://www.my-course.app/courses/verbs", null)).toBe(
-    "https://my-course.app/courses/verbs",
-  );
+// An untenanted course on `www` is already on the default site — `www` and the apex
+// both serve it. Forcing www→apex here fights the host-level www↔apex redirect and
+// loops forever, so this MUST be a no-op (null). `www` is only stripped when a tenant
+// is being re-attached (see the tenanted-www test above).
+test("untenanted course on the www main site → no-op (www already serves the default site)", () => {
+  expect(canonicalRedirect("https://www.my-course.app/courses/verbs", null)).toBeNull();
 });
 
 // Loop safety: the already-canonical cases MUST be strict no-ops (null), or we

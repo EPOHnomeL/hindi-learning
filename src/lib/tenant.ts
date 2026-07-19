@@ -39,13 +39,16 @@ export function resolveTenantSlug(host: string | null | undefined): TenantSlug |
 // guarantees no redirect loop. Pure, so the whole decision is unit-tested.
 export function canonicalRedirect(currentUrl: string, courseTenant: TenantSlug | null): string | null {
   const url = new URL(currentUrl);
-  // Strip an existing known-tenant label — or a leading `www` — to find the base
-  // domain (`my-course.app` or `localhost`), then re-attach the course's tenant (or
-  // none for the default). `www` matters because the default site is served there:
-  // without stripping it, a tenant link off `www.my-course.app` would mint the
-  // unresolvable `<tenant>.www.my-course.app`.
+  // Strip an existing known-tenant label to find the base domain (`my-course.app`
+  // or `localhost`), then re-attach the course's tenant (or none for the default).
+  //
+  // A leading `www` is stripped ONLY when re-attaching a tenant: without it a tenant
+  // link off `www.my-course.app` would mint the unresolvable `<tenant>.www…`. But for
+  // the default site (untenanted), `www` and the apex BOTH serve it — forcing one
+  // over the other fights the host-level www↔apex canonicalization (Cloudflare) and
+  // produces an endless redirect loop, so we leave the host as-is.
   const first = url.hostname.split(".")[0];
-  const strippable = !!first && (KNOWN.has(first) || first === "www");
+  const strippable = !!first && (KNOWN.has(first) || (first === "www" && courseTenant !== null));
   const base = strippable ? url.hostname.slice(first.length + 1) : url.hostname;
   const target = courseTenant ? `${courseTenant}.${base}` : base;
   if (target === url.hostname) return null;
