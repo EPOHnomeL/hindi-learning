@@ -1,6 +1,6 @@
 # course-publishing/00: Course publishing, tenant catalogue & free self-enroll — map
 
-**Status:** in progress — tickets 01, 02, 03 resolved 2026-07-18, 04 resolved 2026-07-19; frontier open (07, 08 takeable).
+**Status:** in progress — tickets 01, 02, 03 resolved 2026-07-18, 04 & 08 resolved 2026-07-19; frontier open (07 takeable).
 **Labels:** wayfinder:map
 
 ## Destination
@@ -97,6 +97,17 @@ not the feature.
   (unlisted-but-buyable); public link + listings sit beside publish, unchanged. Surfaced
   [ticket 08 — Tenant-domain link generation](08-tenant-domain-links.md) (blocks the PRD) and parked
   the learner-progress %/estimate pain out of scope (below).
+
+- [Tenant-domain link generation](08-tenant-domain-links.md) — a tenant course's server-built links
+  land on its **own subdomain**, derived by **convention** `<slug>.<base>` where `base` = `SITE_URL`'s
+  host minus a leading `www` (no new env, no `tenants` host column — custom domains stay ADR-0022 fog).
+  `appUrl` gains an optional `tenantSlug`; the **open-redirect guard** now validates against that
+  single **server-resolved** origin (slug is a topic column, never client input → trusted set implicit,
+  no allow-list). **In scope:** checkout `return_url`/`cancel_url` + invite deep-links, routed through
+  the **one** `appUrl` helper — **retiring redundant `APP_BASE_URL` onto `SITE_URL`**. **Unchanged:**
+  ITN `notify_url` (stays `CONVEX_SITE_URL`, reachability a non-issue), and **public/share links**
+  (already tenant-correct — built client-side off `window.location.origin`). Research + build notes in
+  the [ticket](08-tenant-domain-links.md); PRD-blocker for [ticket 06](06-prd-and-issue-breakdown.md) cleared.
 
 ## Not yet specified
 
