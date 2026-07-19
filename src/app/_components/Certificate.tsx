@@ -3,14 +3,12 @@
 import { useMutation, useQuery } from "convex/react";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { useEditionLang } from "./editionUrl";
+import { publicCourseUrl as buildPublicCourseUrl, useEditionLang } from "./editionUrl";
 import { langDir } from "../../../convex/languages";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Icon } from "./icons";
 import { Menu, MenuItem } from "./ui";
 import { useTenant } from "./TenantContext";
-import { canonicalRedirect, type TenantSlug } from "~/lib/tenant";
-
 // The resolved Emblem (ADR 0017) as the read seams return it — an image resolves
 // to a same-origin URL, otherwise a glyph (a subject emoji or the generic default).
 export type CertificateEmblem = { kind: "image"; url: string } | { kind: "glyph"; glyph: string };
@@ -722,10 +720,7 @@ type PublicCourseLink = { shareToken: string; tenantSlug: string | null };
 // same rule links elsewhere in the app are minted with, so a shared certificate
 // always points at the course on the right skin.
 function publicCourseUrl(course: PublicCourseLink): string | null {
-  if (typeof window === "undefined") return null;
-  const u = new URL(window.location.origin);
-  u.pathname = `/share/${course.shareToken}`;
-  return canonicalRedirect(u.toString(), (course.tenantSlug as TenantSlug | null) ?? null) ?? u.toString();
+  return buildPublicCourseUrl(course.shareToken, course.tenantSlug);
 }
 
 // The public certificate's Share affordance. Opens the native share sheet (phones,

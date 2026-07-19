@@ -94,6 +94,40 @@ export function resourceOpenMode(filename: string, kind: "file" | "url"): "dialo
   return kind === "file" && /\.(md|markdown)$/i.test(filename) ? "dialog" : "tab";
 }
 
+// The target glossary card id from a URL hash (reference-cards/02). A Lesson
+// deep-links to a card as `…/references/<key>#<cardId>`; the reference reader
+// forwards this id to the iframe bridge to scroll + flash it. Strips the leading
+// `#`, decodes percent-encoding, and returns null for an empty/absent hash so the
+// reader treats "no fragment" and "unknown card" alike (a graceful no-op).
+export function cardIdFromHash(hash: string): string | null {
+  const raw = hash.replace(/^#/, "").trim();
+  if (!raw) return null;
+  try {
+    return decodeURIComponent(raw) || null;
+  } catch {
+    return raw || null;
+  }
+}
+
+// The shareable snippet for a glossary card (reference-cards/03): the term + its
+// definition, then a branded CTA line and the public course link. Composed in one
+// pure place so the format is testable and identical for the clipboard copy and the
+// native share sheet. `brand` is the tenant's display name; `url` the course's
+// public `/share/<token>` page (publicCourseUrl). Whitespace in term/definition is
+// collapsed (the iframe hands us raw textContent, which carries authored newlines).
+export function composeCardShare(input: {
+  term: string;
+  definition: string;
+  courseTitle: string;
+  brand: string;
+  url: string;
+}): string {
+  const term = input.term.replace(/\s+/g, " ").trim();
+  const definition = input.definition.replace(/\s+/g, " ").trim();
+  const head = definition ? `📖 ${term}\n${definition}` : `📖 ${term}`;
+  return `${head}\n\nLearn ${input.courseTitle.trim()} on ${input.brand.trim()} →\n${input.url}`;
+}
+
 // Opening a lesson counts as seeing its teacher Replies. Returns the next `seen`
 // set with that lesson's replied-Question ids added — or the *same* reference
 // when there's nothing new, so a React state setter can skip a re-render.

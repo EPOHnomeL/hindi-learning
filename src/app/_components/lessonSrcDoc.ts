@@ -93,6 +93,88 @@ const NAV_BRIDGE = `<script>(function(){
   document.addEventListener('auxclick', onClick, true);
 }());<\/script>`;
 
+// REFERENCE_BRIDGE (references only): two concerns for a glossary card.
+//  - Deep-link (reference-cards/02): a Lesson links `…/references/<key>#<cardId>`.
+//    The card lives in a sandboxed iframe, so the parent URL hash never reaches it —
+//    the parent posts a `scrollToCard` message (on load + on hash change) and this
+//    scrolls the card into view and flashes a brief highlight. A missing id (old
+//    reference with no ids, a deleted term) is a silent no-op.
+//  - Share (reference-cards/03, only when `share`): inject a hover share button into
+//    each `.term[id] / .word[id]`; on click it reads the card's term + definition
+//    (by shape) and posts a `shareCard` intent — the PARENT composes the branded
+//    snippet and runs clipboard/Web Share, since a sandboxed iframe can do neither.
+function referenceBridge(share: boolean): string {
+  return `<script>(function(){
+  function post(m){ try{ parent.postMessage(Object.assign({__lesson:true}, m), '*'); }catch(e){} }
+  function flash(el){
+    if(!el) return;
+    el.scrollIntoView({behavior:'smooth', block:'start'});
+    el.classList.remove('card-flash');
+    void el.offsetWidth; // restart the animation if the same card is re-targeted
+    el.classList.add('card-flash');
+    setTimeout(function(){ el.classList.remove('card-flash'); }, 1700);
+  }
+  function target(id){
+    if(!id) return;
+    var el = null; try{ el = document.getElementById(id); }catch(e){}
+    if(el) flash(el);
+  }
+  window.addEventListener('message', function(e){
+    var d = e.data;
+    if(d && d.__lesson && d.type==='scrollToCard') target(String(d.id||''));
+  });
+  ${
+    share
+      ? `function txt(el){ return el ? (el.textContent||'').replace(/\\s+/g,' ').trim() : ''; }
+  document.querySelectorAll('.term[id], .word[id]').forEach(function(card){
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'card-share';
+    btn.setAttribute('aria-label', 'Share this definition');
+    btn.title = 'Share this definition';
+    btn.textContent = '\\u2197'; // ↗ share-out glyph
+    btn.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      var term, def;
+      if (card.classList.contains('term')) { term = txt(card.querySelector('.name')); def = txt(card.querySelector('.def')); }
+      else { var tr = txt(card.querySelector('.tr')); term = txt(card.querySelector('.w')) + (tr ? ' ('+tr+')' : ''); def = txt(card.querySelector('.g')); }
+      post({type:'shareCard', term: term, definition: def});
+    });
+    card.appendChild(btn);
+  });`
+      : ""
+  }
+}());<\/script>`;
+}
+
+// The card affordances' CSS (reference-cards/02+03). The ~1.7s fading highlight for
+// a deep-linked card, and the hover-revealed per-card share button. Theme-aware via
+// the reference palette vars (which REFERENCE_DARK_CSS flips in dark). Injected only
+// for references. `.term`/`.word` are made positioning contexts so the share button
+// anchors to the card corner without disturbing the `.word` grid.
+const REFERENCE_CARD_CSS = `<style>
+@keyframes cardflash{from{box-shadow:0 0 0 3px var(--gold); background:var(--hi)} to{box-shadow:0 0 0 3px transparent; background:transparent}}
+.card-flash{animation:cardflash 1.7s ease-out; border-radius:10px; scroll-margin-top:16px}
+.term, .word{position:relative}
+.card-share{position:absolute; top:8px; right:8px; border:0; background:transparent; cursor:pointer;
+  font-size:15px; line-height:1; padding:5px 7px; border-radius:7px; color:var(--soft);
+  opacity:0; transition:opacity .15s, background .15s, color .15s}
+.term:hover .card-share, .word:hover .card-share, .card-share:focus-visible{opacity:1}
+.card-share:hover{background:var(--hi); color:var(--accent)}
+@media (hover:none){.card-share{opacity:.55}}
+</style>`;
+
+function injectReferenceCardCss(html: string): string {
+  const i = html.indexOf("</head>");
+  return i === -1 ? REFERENCE_CARD_CSS + html : html.slice(0, i) + REFERENCE_CARD_CSS + html.slice(i);
+}
+
+// The message the parent posts to a reference iframe's REFERENCE_BRIDGE to scroll
+// to and flash a card. `id` is the card's anchor id (the `#<cardId>` fragment).
+export function scrollToCardMessage(id: string): { __lesson: true; type: "scrollToCard"; id: string } {
+  return { __lesson: true, type: "scrollToCard", id };
+}
+
 // The message the parent posts to an iframe's THEME_BRIDGE to re-skin it live.
 export function themeMessage(theme: Theme): { __lessonTheme: true; theme: Theme } {
   return { __lessonTheme: true, theme };
@@ -236,6 +318,14 @@ export function buildSrcDoc(
     // The resolved tenant's palette (issue 13), from the client tenant context.
     // Absent on the default site → no override, the authored palette stands.
     tenantPalette?: TenantTheme;
+    // References only (reference-cards/02): add the reference bridge + card CSS so a
+    // lesson can deep-link to a single glossary card. The parent drives the scroll
+    // via a `scrollToCard` postMessage, so the target isn't baked (no reload on a
+    // same-reference card change).
+    reference?: boolean;
+    // References only (reference-cards/03): also inject the per-card share button.
+    // Implies `reference`. Set only when the course has a public link to share.
+    refShare?: boolean;
   },
 ): string {
   let doc = ensureDocument(html);
@@ -244,10 +334,17 @@ export function buildSrcDoc(
     doc = setRootTheme(doc, opts.theme);
     if (opts.themeCss) doc = injectReferenceDarkCss(doc);
   }
+  const reference = opts.reference || opts.refShare;
+  if (reference) doc = injectReferenceCardCss(doc);
   doc = setRootDirLang(doc, opts.dir, opts.lang);
   if (opts.lang && isDevanagari(opts.lang)) doc = injectDevanagariCss(doc);
   if (opts.tenantPalette) doc = injectTenantPaletteCss(doc, opts.tenantPalette);
-  const scripts = HEIGHT_BRIDGE + NAV_BRIDGE + (opts.quiz ? QUIZ_BRIDGE : "") + (opts.theme ? THEME_BRIDGE : "");
+  const scripts =
+    HEIGHT_BRIDGE +
+    NAV_BRIDGE +
+    (opts.quiz ? QUIZ_BRIDGE : "") +
+    (opts.theme ? THEME_BRIDGE : "") +
+    (reference ? referenceBridge(!!opts.refShare) : "");
   // Inject before the LAST </body>. A first-match replace is unsafe: an assembled
   // lesson can carry an authoring comment (or a code sample) that contains a
   // literal "</body>" earlier in the document, and injecting there would bury the

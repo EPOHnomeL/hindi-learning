@@ -8,11 +8,11 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CertificateControl } from "./Certificate";
 import { LockedPane, Paygate } from "./Paygate";
-import { useBuyMarker, useEditionLang, withLang } from "./editionUrl";
-import { buildEditDoc, buildSrcDoc, replaceBodyInner, themeMessage, type Theme } from "./lessonSrcDoc";
+import { publicCourseUrl, useBuyMarker, useEditionLang, withLang } from "./editionUrl";
+import { buildEditDoc, buildSrcDoc, replaceBodyInner, scrollToCardMessage, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
 import { MarkdownResourceDialog } from "./ResourceItem";
-import { resolveArtifactClick, resourceOpenMode } from "./readerDerive";
+import { cardIdFromHash, composeCardShare, resolveArtifactClick, resourceOpenMode } from "./readerDerive";
 import { ReaderSkeleton } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useTenant } from "./TenantContext";
@@ -135,6 +135,9 @@ export function Frame({
   dir,
   lang,
   resources,
+  reference,
+  cardTarget,
+  share,
 }: {
   html: string;
   withBridge: boolean;
@@ -148,9 +151,24 @@ export function Frame({
   // link opens the Resource with sidebar parity (rich-media/11). Absent → Resource
   // links are inert (graceful no-op), which is also what a withheld id resolves to.
   resources?: ResourceLink[];
+  // References only (reference-cards/02): add the reference bridge so a lesson can
+  // deep-link to a single glossary card, and drive the scroll from the parent.
+  reference?: boolean;
+  // The target card id (the `#<cardId>` fragment) to scroll to + flash, or null.
+  // Threaded from the reader's URL hash; changes (same-reference re-navigation) are
+  // pushed to the already-loaded iframe without a reload.
+  cardTarget?: string | null;
+  // References only (reference-cards/03): the course's title + public `/share/<token>`
+  // URL. When set, each card gets a share button that copies a branded snippet +
+  // opens the native share sheet. Null/absent → no share buttons (private course).
+  share?: { courseTitle: string; url: string } | null;
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const router = useRouter();
+  // Card share is offered only when there's a public course link (reference-cards/03).
+  // A boolean (not the object) drives srcDoc so the share contents changing never
+  // reloads the iframe — the compose reads the live object via a ref below.
+  const shareable = !!share;
   // An uploaded Markdown Resource clicked from a lesson opens in the same in-app
   // dialog the sidebar uses (resourceOpenMode → "dialog").
   const [mdResource, setMdResource] = useState<{ title: string; url: string } | null>(null);
@@ -164,11 +182,80 @@ export function Frame({
   // iframe only renders once `html` has loaded, by which point this client query has
   // resolved too — and a tenant's palette never changes mid-session. `null`/default
   // site → undefined → no override. Convex returns a stable ref so the memo is quiet.
-  const tenantPalette = useTenant()?.theme;
+  const tenant = useTenant();
+  const tenantPalette = tenant?.theme;
+  // The tenant's brand name for the share snippet's CTA (reference-cards/03), read
+  // live via a ref so the once-bound share listener never needs re-binding.
+  const brandRef = useRef("My Course");
+  brandRef.current = tenant?.displayName ?? "My Course";
+  const shareRef = useRef(share);
+  shareRef.current = share;
+  const [copied, setCopied] = useState(false);
   const srcDoc = useMemo(
-    () => buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss, dir, lang, tenantPalette }),
-    [html, withBridge, themeCss, dir, lang, tenantPalette],
+    () => buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss, dir, lang, tenantPalette, reference, refShare: shareable }),
+    [html, withBridge, themeCss, dir, lang, tenantPalette, reference, shareable],
   );
+
+  // Deep-link to a glossary card (reference-cards/02). Read the target via a ref so
+  // the iframe onLoad handler always posts the latest without re-binding.
+  const cardTargetRef = useRef(cardTarget);
+  cardTargetRef.current = cardTarget;
+  const postScroll = (id: string | null | undefined) => {
+    if (!reference || !id) return;
+    iframeRef.current?.contentWindow?.postMessage(scrollToCardMessage(id), "*");
+  };
+  // Same-reference re-navigation (a new `#<cardId>` with the doc already loaded):
+  // post without rebuilding srcDoc, so the iframe never reloads just to move scroll.
+  // The fresh-load case (cross-artifact navigation) is handled by the iframe onLoad
+  // below — posting here on srcDoc change would race the reload (bridge not ready).
+  useEffect(() => {
+    postScroll(cardTarget);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardTarget]);
+
+  // Share a glossary card (reference-cards/03). The sandboxed iframe posts the
+  // card's term + definition; here (the parent) we compose the branded snippet and
+  // either open the native share sheet (mobile → straight to a status) or copy it to
+  // the clipboard with a brief "Copied" confirmation. Bound once; the live course
+  // link + brand are read via refs. Only messages from THIS iframe count.
+  useEffect(() => {
+    function onShare(e: MessageEvent) {
+      if (e.source !== iframeRef.current?.contentWindow) return;
+      const d = e.data as { __lesson?: boolean; type?: string; term?: unknown; definition?: unknown };
+      if (!(d?.__lesson && d.type === "shareCard")) return;
+      const s = shareRef.current;
+      if (!s) return; // no public link → nothing to share (also: no buttons injected)
+      const term = String(d.term ?? "");
+      const snippet = composeCardShare({
+        term,
+        definition: String(d.definition ?? ""),
+        courseTitle: s.courseTitle,
+        brand: brandRef.current,
+        url: s.url,
+      });
+      void (async () => {
+        if (typeof navigator !== "undefined" && navigator.share) {
+          try {
+            await navigator.share({ title: term, text: snippet, url: s.url });
+            return; // shared (or the sheet handled it) — no toast
+          } catch (err) {
+            // User dismissed the sheet on purpose — don't silently copy behind them.
+            if (err instanceof Error && err.name === "AbortError") return;
+            /* genuinely unsupported/failed payload — fall through to clipboard */
+          }
+        }
+        try {
+          await navigator.clipboard?.writeText(snippet);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1600);
+        } catch {
+          /* clipboard blocked — nothing more we can do */
+        }
+      })();
+    }
+    window.addEventListener("message", onShare);
+    return () => window.removeEventListener("message", onShare);
+  }, []);
 
   // Push theme changes into the already-loaded iframe (no reload). Also fires
   // when srcDoc changes (lesson switch) so a freshly loaded frame is in sync.
@@ -247,14 +334,46 @@ export function Frame({
         ref={iframeRef}
         sandbox="allow-scripts"
         srcDoc={srcDoc}
+        onLoad={() => {
+          // The freshly loaded reference's bridge is now listening. Post the target,
+          // then again after a beat so a late reflow (fonts/height) doesn't strand it.
+          const id = cardTargetRef.current;
+          postScroll(id);
+          if (reference && id) setTimeout(() => postScroll(id), 350);
+        }}
         style={mobile && contentH ? { height: contentH } : undefined}
         className={`w-full border-y border-line bg-card md:min-h-[60vh] md:flex-1 md:rounded-xl md:border ${contentH ? "" : "min-h-[60vh]"}`}
       />
       {mdResource && (
         <MarkdownResourceDialog title={mdResource.title} url={mdResource.url} onClose={() => setMdResource(null)} />
       )}
+      {/* Share-card confirmation (reference-cards/03), shown when we fell back to a
+          clipboard copy (desktop, no native share sheet). */}
+      {copied && (
+        <div
+          role="status"
+          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-card px-4 py-2 text-sm text-ink shadow-lg"
+        >
+          Copied — paste it anywhere ✓
+        </div>
+      )}
     </>
   );
+}
+
+// The deep-link target card id from the URL hash (reference-cards/02), kept live so
+// a same-reference re-navigation (a new `#<cardId>`) re-scrolls without a reload.
+// `dep` (the reference key) re-reads on a cross-reference navigation. Shared by the
+// authed ReferenceView and the Guest PublicReferencePane so both paths behave alike.
+export function useCardTarget(dep: string): string | null {
+  const [cardTarget, setCardTarget] = useState<string | null>(null);
+  useEffect(() => {
+    const read = () => setCardTarget(cardIdFromHash(window.location.hash));
+    read();
+    window.addEventListener("hashchange", read);
+    return () => window.removeEventListener("hashchange", read);
+  }, [dep]);
+  return cardTarget;
 }
 
 function LessonView({
@@ -674,6 +793,12 @@ function ReferenceView({
   const resources = useQuery(api.resources.listResources, { topicSlug });
   const editReference = useMutation(api.content.editReference);
   const [editing, setEditing] = useState(false);
+  const cardTarget = useCardTarget(refKey);
+  // Per-card share (reference-cards/03), only when the course has a public link. The
+  // snippet points at the course's public `/share/<token>` page on its canonical host.
+  const publicLink = header?.publicLink ?? null;
+  const shareUrl = publicLink ? publicCourseUrl(publicLink.shareToken, publicLink.tenantSlug) : null;
+  const share = publicLink && shareUrl && header ? { courseTitle: header.title, url: shareUrl } : null;
   // Editable by the owner or an English-edition Editor (server `canEdit`), and
   // only on the source (English) edition — `editReference` patches the source
   // Reference (translated-Reference editing is out of scope). References are
@@ -712,7 +837,7 @@ function ReferenceView({
           palette (ADR 0011) — the theme then flips them with the rest of the app.
           The pencil rides over the body on hover for the owner (source edition). */}
       <div className="group relative flex min-h-0 flex-1 flex-col">
-        <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} resources={resources} />
+        <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} resources={resources} reference cardTarget={cardTarget} share={share} />
         {canEditRef && (
           <button
             type="button"

@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
-import { Frame, useContentHtml } from "./ArtifactView";
+import { Frame, useCardTarget, useContentHtml } from "./ArtifactView";
 import { NavItem } from "./NavItem";
 import { Markdown } from "./MarkdownView";
 import { LockedPane, Paygate } from "./Paygate";
@@ -341,6 +341,11 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
   const navHidden = useHideOnScroll();
   const ref = useQuery(api.public.publicReference, { token, key: refKey });
   const html = useContentHtml(ref);
+  const cardTarget = useCardTarget(refKey);
+  // A Guest is already on the course's public page, so the card share always has a
+  // destination (reference-cards/03): the `/share/<token>` landing on this host.
+  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/share/${token}` : null;
+  const share = shareUrl ? { courseTitle: course.title, url: shareUrl } : null;
   if (ref === undefined || html === undefined) return <ReaderSkeleton aside={false} />;
   if (ref === null) return <p className="text-soft">Reference not found.</p>;
   if (html === null) return <p className="text-soft">Couldn’t load this reference. Try refreshing.</p>;
@@ -368,7 +373,7 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
       >
         {ref.title}
       </h2>
-      <Frame html={html} withBridge={false} theme={theme} themeCss dir={course.dir} lang={course.lang} resources={course.resources} />
+      <Frame html={html} withBridge={false} theme={theme} themeCss dir={course.dir} lang={course.lang} resources={course.resources} reference cardTarget={cardTarget} share={share} />
     </div>
   );
 }

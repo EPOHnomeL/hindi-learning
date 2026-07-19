@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
+import { canonicalRedirect, type TenantSlug } from "~/lib/tenant";
 
 // The reader's Edition language lives in the URL as `?lang=<code>` (course-
 // translation). English is the default and carries no param, so an English URL
@@ -32,4 +33,16 @@ export function withLang(href: string, lang: string | null | undefined): string 
 // on it, and the locked authed reader auto-opens the buy dialog.
 export function useBuyMarker(): boolean {
   return useSearchParams().get("buy") === "1";
+}
+
+// The absolute URL of a course's public `/share/<token>` Guest reader, minted on
+// its canonical host — the tenant subdomain (or apex for a default-site course) —
+// so a link shared out of the app always points at the course on the right skin.
+// Null on the server (no `window`). Used by the reference card share (reference-
+// cards/03) and the certificate share; keep it the one place this URL is built.
+export function publicCourseUrl(shareToken: string, tenantSlug: string | null): string | null {
+  if (typeof window === "undefined") return null;
+  const u = new URL(window.location.origin);
+  u.pathname = `/share/${shareToken}`;
+  return canonicalRedirect(u.toString(), (tenantSlug as TenantSlug | null) ?? null) ?? u.toString();
 }

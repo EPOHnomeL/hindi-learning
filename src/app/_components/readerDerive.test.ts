@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  cardIdFromHash,
+  composeCardShare,
   completedKeys,
   courseIndexRedirect,
   firstLessonKey,
@@ -207,6 +209,63 @@ describe("unseenReplyKeys", () => {
     const dots = unseenReplyKeys(questions, new Set(["q1"]));
     expect(dots.has("0001-alpha")).toBe(false);
     expect(dots.has("0003-gamma")).toBe(true);
+  });
+});
+
+describe("cardIdFromHash", () => {
+  it("returns the card id from a hash, stripping the leading #", () => {
+    expect(cardIdFromHash("#dhanya")).toBe("dhanya");
+    expect(cardIdFromHash("#perfective-aspect")).toBe("perfective-aspect");
+  });
+
+  it("returns null for an empty or bare-# hash (no fragment → no-op)", () => {
+    expect(cardIdFromHash("")).toBeNull();
+    expect(cardIdFromHash("#")).toBeNull();
+    expect(cardIdFromHash("   ")).toBeNull();
+  });
+
+  it("decodes percent-encoding, falling back to the raw value on a malformed escape", () => {
+    expect(cardIdFromHash("#is%20karan")).toBe("is karan");
+    expect(cardIdFromHash("#bad%")).toBe("bad%");
+  });
+});
+
+describe("composeCardShare (reference-cards/03)", () => {
+  const base = { courseTitle: "Hindi", brand: "Y-Knot", url: "https://app.example.com/share/tok1" };
+
+  it("builds the branded snippet: term, definition, CTA line, link", () => {
+    expect(
+      composeCardShare({ ...base, term: "Perfective aspect", definition: "An action viewed as a complete whole." }),
+    ).toBe(
+      "📖 Perfective aspect\nAn action viewed as a complete whole.\n\nLearn Hindi on Y-Knot →\nhttps://app.example.com/share/tok1",
+    );
+  });
+
+  it("collapses the authored whitespace/newlines the iframe hands back as textContent", () => {
+    expect(
+      composeCardShare({ ...base, term: "  dhanya \n (dhanya)", definition: "blessed,\n  fortunate,   happy" }),
+    ).toBe("📖 dhanya (dhanya)\nblessed, fortunate, happy\n\nLearn Hindi on Y-Knot →\nhttps://app.example.com/share/tok1");
+  });
+
+  it("omits the definition line when a card has no definition text", () => {
+    expect(composeCardShare({ ...base, term: "जो", definition: "" })).toBe(
+      "📖 जो\n\nLearn Hindi on Y-Knot →\nhttps://app.example.com/share/tok1",
+    );
+  });
+});
+
+describe("resolveArtifactClick — card deep-link hash preservation (reference-cards/02)", () => {
+  it("preserves the #card fragment on a reference cross-link for an authed reader", () => {
+    // The Frame handler appends url.hash after resolving; the resolver navigates the
+    // reference path unchanged, so the fragment survives to the router.
+    const action = resolveArtifactClick("/courses/hindi/references/glossary", "/courses/hindi/lessons/0003");
+    expect(action).toEqual({ kind: "navigate", path: "/courses/hindi/references/glossary" });
+  });
+
+  it("rewrites a reference card link into the Guest share context, ready for the #card fragment", () => {
+    expect(internalNavTarget("/courses/hindi/references/glossary", "/share/tok1/lessons/0003")).toBe(
+      "/share/tok1/references/glossary",
+    );
   });
 });
 
