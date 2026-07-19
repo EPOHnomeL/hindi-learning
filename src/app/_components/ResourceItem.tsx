@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "./MarkdownView";
+import { resourceOpenMode } from "./readerDerive";
 
 // One Resource in a reader sidebar. Shared by the authed reader (CourseShell) and
 // the Guest reader (PublicReader) — both list the same row shape. A PDF or an
@@ -15,8 +16,6 @@ type Resource = {
   url: string | null;
   status?: string;
 };
-
-const isMarkdown = (name: string) => /\.(md|markdown)$/i.test(name);
 
 const rowClass =
   "flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-sm text-ink transition-colors hover:bg-hi md:py-1.5";
@@ -41,7 +40,7 @@ export function ResourceItem({ resource }: { resource: Resource }) {
     );
   }
 
-  if (kind === "file" && isMarkdown(filename)) {
+  if (resourceOpenMode(filename, kind) === "dialog") {
     return (
       <>
         <button type="button" onClick={() => setOpen(true)} className={`w-full text-left ${rowClass}`}>
@@ -71,7 +70,7 @@ export function ResourceItem({ resource }: { resource: Resource }) {
 // the dashboard's MissionDialog — Esc, backdrop-click, and focus trap for free).
 // The blob text is fetched from its signed storage URL; if that fails (offline,
 // CORS), we fall back to opening the raw file directly.
-function MarkdownResourceDialog({ title, url, onClose }: { title: string; url: string; onClose: () => void }) {
+export function MarkdownResourceDialog({ title, url, onClose }: { title: string; url: string; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   const [state, setState] = useState<
     { status: "loading" } | { status: "ready"; text: string } | { status: "error" }

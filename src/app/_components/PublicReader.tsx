@@ -290,8 +290,10 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
             </Link>
           )}
         </div>
-        {/* Quizzes stay interactive (self-check); nothing is recorded for a Guest. */}
-        <Frame html={html} withBridge theme={theme} dir={course.dir} lang={course.lang} />
+        {/* Quizzes stay interactive (self-check); nothing is recorded for a Guest.
+            Resource links open from the in-bundle list (rich-media/11); a paid
+            Preview withholds Resources, so those links no-op. */}
+        <Frame html={html} withBridge theme={theme} dir={course.dir} lang={course.lang} resources={course.resources} />
         {/* Q&A sits past the paygate — withheld from a paid-Edition Guest. */}
         {!preview && (
           <div className="p-3 md:hidden">
@@ -366,7 +368,7 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
       >
         {ref.title}
       </h2>
-      <Frame html={html} withBridge={false} theme={theme} themeCss dir={course.dir} lang={course.lang} />
+      <Frame html={html} withBridge={false} theme={theme} themeCss dir={course.dir} lang={course.lang} resources={course.resources} />
     </div>
   );
 }

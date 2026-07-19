@@ -11,7 +11,8 @@ import { LockedPane, Paygate } from "./Paygate";
 import { useBuyMarker, useEditionLang, withLang } from "./editionUrl";
 import { buildEditDoc, buildSrcDoc, replaceBodyInner, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
-import { internalNavTarget } from "./readerDerive";
+import { MarkdownResourceDialog } from "./ResourceItem";
+import { resolveArtifactClick, resourceOpenMode } from "./readerDerive";
 import { ReaderSkeleton } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useTenant } from "./TenantContext";
@@ -121,6 +122,11 @@ export function useContentHtml(
   return body.html ?? ""; // translation still stored inline
 }
 
+// The Topic's Resources, in the shape both reader shells already hold (authed
+// `listResources`, Guest `publicEdition`). Threaded in so a Resource link inside a
+// lesson resolves to a fresh signed `url` at click time (rich-media/11).
+export type ResourceLink = { id: string; filename: string; kind: "file" | "url"; url: string | null };
+
 export function Frame({
   html,
   withBridge,
@@ -128,6 +134,7 @@ export function Frame({
   themeCss,
   dir,
   lang,
+  resources,
 }: {
   html: string;
   withBridge: boolean;
@@ -137,9 +144,16 @@ export function Frame({
   // translated lesson renders RTL/localised (course-translation).
   dir?: "ltr" | "rtl";
   lang?: string;
+  // The reader's in-bundle Resource list, so a `/courses/<slug>/resources/<id>`
+  // link opens the Resource with sidebar parity (rich-media/11). Absent → Resource
+  // links are inert (graceful no-op), which is also what a withheld id resolves to.
+  resources?: ResourceLink[];
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const router = useRouter();
+  // An uploaded Markdown Resource clicked from a lesson opens in the same in-app
+  // dialog the sidebar uses (resourceOpenMode → "dialog").
+  const [mdResource, setMdResource] = useState<{ title: string; url: string } | null>(null);
   // Read theme via a ref so changing it does NOT rebuild srcDoc (which would
   // reload the iframe, losing scroll + answered-quiz state). The bake only needs
   // the value at build time; the effect below handles live changes.
@@ -203,7 +217,18 @@ export function Frame({
       if (url.protocol !== "http:" && url.protocol !== "https:") return;
       const internal = url.origin === window.location.origin;
       if (internal) {
-        const path = internalNavTarget(url.pathname, window.location.pathname) + url.search + url.hash;
+        const action = resolveArtifactClick(url.pathname, window.location.pathname);
+        if (action.kind === "resource") {
+          // Resolve the id against the reader's in-bundle Resources → a fresh signed
+          // url. A withheld (paid Preview) or deleted Resource isn't in the list, so
+          // this is a graceful no-op (rich-media/11).
+          const res = resources?.find((r) => r.id === action.id);
+          if (!res?.url) return;
+          if (resourceOpenMode(res.filename, res.kind) === "dialog") setMdResource({ title: res.filename, url: res.url });
+          else window.open(res.url, "_blank", "noopener,noreferrer");
+          return;
+        }
+        const path = action.path + url.search + url.hash;
         if (d.newTab) window.open(path, "_blank", "noopener,noreferrer");
         else router.push(path);
       } else {
@@ -212,18 +237,23 @@ export function Frame({
     }
     window.addEventListener("message", onNav);
     return () => window.removeEventListener("message", onNav);
-  }, [router]);
+  }, [router, resources]);
 
   // Full-bleed on mobile (edge-to-edge, no side border/rounding); a bordered card
   // that fills and scrolls internally on desktop.
   return (
-    <iframe
-      ref={iframeRef}
-      sandbox="allow-scripts"
-      srcDoc={srcDoc}
-      style={mobile && contentH ? { height: contentH } : undefined}
-      className={`w-full border-y border-line bg-card md:min-h-[60vh] md:flex-1 md:rounded-xl md:border ${contentH ? "" : "min-h-[60vh]"}`}
-    />
+    <>
+      <iframe
+        ref={iframeRef}
+        sandbox="allow-scripts"
+        srcDoc={srcDoc}
+        style={mobile && contentH ? { height: contentH } : undefined}
+        className={`w-full border-y border-line bg-card md:min-h-[60vh] md:flex-1 md:rounded-xl md:border ${contentH ? "" : "min-h-[60vh]"}`}
+      />
+      {mdResource && (
+        <MarkdownResourceDialog title={mdResource.title} url={mdResource.url} onClose={() => setMdResource(null)} />
+      )}
+    </>
   );
 }
 
@@ -253,6 +283,9 @@ function LessonView({
   const buyMarker = useBuyMarker();
   const navHidden = useHideOnScroll();
   const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey, lang: lang ?? undefined });
+  // The Topic's Resources, so a Resource link in the lesson opens with sidebar
+  // parity (rich-media/11). Same query the sidebar holds — deduped by Convex.
+  const resources = useQuery(api.resources.listResources, { topicSlug });
   // Same subscription CourseShell holds (deduped by Convex), for the caller's
   // access level + the Edition's price. A `preview` caller (paid marketplace, ADR
   // 0016) holds no access: locked Lessons show the paygate, and they track no
@@ -371,7 +404,7 @@ function LessonView({
             iframe is a descendant, so hovering the lesson body counts as hovering
             the group and reveals it; focus reveals it for keyboard users. */}
         <div className="group relative flex min-h-0 flex-1 flex-col">
-          <Frame html={html} withBridge theme={theme} dir={dir} lang={contentLang} />
+          <Frame html={html} withBridge theme={theme} dir={dir} lang={contentLang} resources={resources} />
           {canEdit && (
             <button
               type="button"
@@ -637,6 +670,8 @@ function ReferenceView({
   const ref = useQuery(api.content.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
   const header = useQuery(api.content.courseHeader, { topicSlug, lang: lang ?? undefined });
   const html = useContentHtml(ref);
+  // Resource links work inside a Reference body too (rich-media/11).
+  const resources = useQuery(api.resources.listResources, { topicSlug });
   const editReference = useMutation(api.content.editReference);
   const [editing, setEditing] = useState(false);
   // Editable by the owner or an English-edition Editor (server `canEdit`), and
@@ -677,7 +712,7 @@ function ReferenceView({
           palette (ADR 0011) — the theme then flips them with the rest of the app.
           The pencil rides over the body on hover for the owner (source edition). */}
       <div className="group relative flex min-h-0 flex-1 flex-col">
-        <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} />
+        <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} resources={resources} />
         {canEditRef && (
           <button
             type="button"

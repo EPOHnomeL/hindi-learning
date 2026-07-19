@@ -72,6 +72,28 @@ export function internalNavTarget(targetPath: string, currentPath: string): stri
   return m ? `/share/${share[1]}/${m[1]}/${m[2]}` : targetPath;
 }
 
+// What a click on an internal artifact link resolves to. A lesson/reference
+// cross-link is a `navigate` (SPA route, with the Guest share rewrite folded in);
+// a Resource link (`/courses/<slug>/resources/<id>`, AUTHORING.md §5) is a
+// `resource` carrying its id — opened against the reader's in-bundle Resource
+// list rather than navigated, so the /share context never rewrites it (Resources
+// are Topic-scoped, addressed by id). Only ever called for same-origin links.
+export type ArtifactClick = { kind: "navigate"; path: string } | { kind: "resource"; id: string };
+
+export function resolveArtifactClick(targetPath: string, currentPath: string): ArtifactClick {
+  const res = targetPath.match(/^\/courses\/[^/]+\/resources\/(.+)$/);
+  if (res) return { kind: "resource", id: res[1]! };
+  return { kind: "navigate", path: internalNavTarget(targetPath, currentPath) };
+}
+
+// How a clicked Resource opens, matching the sidebar (ResourceItem): an uploaded
+// Markdown file renders in the in-app dialog; everything else — a PDF, an image,
+// an external URL — opens in a new tab. A `url` Resource is always a tab even if
+// its address ends `.md`.
+export function resourceOpenMode(filename: string, kind: "file" | "url"): "dialog" | "tab" {
+  return kind === "file" && /\.(md|markdown)$/i.test(filename) ? "dialog" : "tab";
+}
+
 // Opening a lesson counts as seeing its teacher Replies. Returns the next `seen`
 // set with that lesson's replied-Question ids added — or the *same* reference
 // when there's nothing new, so a React state setter can skip a re-render.

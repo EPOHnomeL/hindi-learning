@@ -6,6 +6,8 @@ import {
   frontierKey,
   internalNavTarget,
   nextLessonKey,
+  resolveArtifactClick,
+  resourceOpenMode,
   seenAfterOpening,
   unseenReplyKeys,
 } from "./readerDerive";
@@ -55,6 +57,66 @@ describe("internalNavTarget", () => {
 
   it("leaves a non-artifact same-origin path alone even in a share context", () => {
     expect(internalNavTarget("/Handbook.pdf", "/share/tok123/lessons/0004-y")).toBe("/Handbook.pdf");
+  });
+});
+
+describe("resolveArtifactClick", () => {
+  it("classifies a Resource link into a resource action carrying the id", () => {
+    expect(resolveArtifactClick("/courses/biz/resources/r7c2ab", "/courses/biz/lessons/0001-x")).toEqual({
+      kind: "resource",
+      id: "r7c2ab",
+    });
+  });
+
+  it("resolves a Resource link the same way regardless of reader context (a Guest too)", () => {
+    // The lesson authors the owner's /courses route; a Resource is opened by id,
+    // not navigated, so the /share context never rewrites it.
+    expect(resolveArtifactClick("/courses/biz/resources/r7c2ab", "/share/tok123/lessons/0004-y")).toEqual({
+      kind: "resource",
+      id: "r7c2ab",
+    });
+  });
+
+  it("classifies a cross-lesson link into a navigate action, unchanged for the owner", () => {
+    expect(resolveArtifactClick("/courses/biz/lessons/0001-x", "/courses/biz/lessons/0004-y")).toEqual({
+      kind: "navigate",
+      path: "/courses/biz/lessons/0001-x",
+    });
+  });
+
+  it("navigate actions still carry the Guest share rewrite (lessons and references)", () => {
+    expect(resolveArtifactClick("/courses/biz/lessons/0001-x", "/share/tok123/lessons/0004-y")).toEqual({
+      kind: "navigate",
+      path: "/share/tok123/lessons/0001-x",
+    });
+    expect(resolveArtifactClick("/courses/biz/references/ref-1", "/share/tok123/lessons/0004-y")).toEqual({
+      kind: "navigate",
+      path: "/share/tok123/references/ref-1",
+    });
+  });
+
+  it("passes a non-artifact path through as a navigate action", () => {
+    expect(resolveArtifactClick("/Handbook.pdf", "/share/tok123/lessons/0004-y")).toEqual({
+      kind: "navigate",
+      path: "/Handbook.pdf",
+    });
+  });
+});
+
+describe("resourceOpenMode", () => {
+  it("opens an uploaded Markdown file in the in-app dialog", () => {
+    expect(resourceOpenMode("notes.md", "file")).toBe("dialog");
+    expect(resourceOpenMode("READ.markdown", "file")).toBe("dialog");
+  });
+
+  it("opens a PDF or any other file in a new tab", () => {
+    expect(resourceOpenMode("Handbook.pdf", "file")).toBe("tab");
+    expect(resourceOpenMode("poster.png", "file")).toBe("tab");
+  });
+
+  it("opens an external URL Resource in a new tab, even one ending .md", () => {
+    // A `url` Resource is a link to open, never our Markdown dialog.
+    expect(resourceOpenMode("https://example.com/readme.md", "url")).toBe("tab");
   });
 });
 
