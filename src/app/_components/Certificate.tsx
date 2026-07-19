@@ -9,6 +9,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { Icon } from "./icons";
 import { Menu, MenuItem } from "./ui";
 import { useTenant } from "./TenantContext";
+import { canonicalRedirect, type TenantSlug } from "~/lib/tenant";
 
 // The resolved Emblem (ADR 0017) as the read seams return it — an image resolves
 // to a same-origin URL, otherwise a glyph (a subject emoji or the generic default).
@@ -710,10 +711,69 @@ export function EmblemSection({ topicSlug }: { topicSlug: string }) {
   );
 }
 
+// The course the certificate was earned in, when it's publicly available — a
+// same-origin share token plus its canonical tenant. Null when the course is
+// private (nothing to link to). Mirrors publicCertificate's `course` field.
+type PublicCourseLink = { shareToken: string; tenantSlug: string | null };
+
+// The absolute URL of the public course, minted on its canonical host: the
+// `/share/<token>` Guest reader, with the host swapped to the course's tenant
+// subdomain (or the apex for a default-site course) via `canonicalRedirect` — the
+// same rule links elsewhere in the app are minted with, so a shared certificate
+// always points at the course on the right skin.
+function publicCourseUrl(course: PublicCourseLink): string | null {
+  if (typeof window === "undefined") return null;
+  const u = new URL(window.location.origin);
+  u.pathname = `/share/${course.shareToken}`;
+  return canonicalRedirect(u.toString(), (course.tenantSlug as TenantSlug | null) ?? null) ?? u.toString();
+}
+
+// The public certificate's Share affordance. Opens the native share sheet (phones,
+// and some desktop browsers) for the certificate's own URL, folding a link to the
+// course into the shared text when the course is publicly available. Where there's
+// no share sheet it copies the same links to the clipboard instead, so the button
+// always does something. Print-hidden — it's chrome, not part of the document.
+function CertificateShareButton({ courseTitle, course }: { courseTitle: string; course: PublicCourseLink | null }) {
+  const [copied, setCopied] = useState(false);
+  async function share() {
+    const certUrl = window.location.href;
+    const courseUrl = course ? publicCourseUrl(course) : null;
+    const text = courseUrl
+      ? `I completed “${courseTitle}”. Take the course: ${courseUrl}`
+      : `I completed “${courseTitle}”.`;
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: `Certificate — ${courseTitle}`, text, url: certUrl });
+      } catch {
+        /* cancelled or the payload was rejected — nothing to do */
+      }
+      return;
+    }
+    // No share sheet (most desktops) — copy the certificate link, and the course
+    // link beneath it when there is one.
+    try {
+      await navigator.clipboard?.writeText(courseUrl ? `${certUrl}\n${courseUrl}` : certUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* clipboard blocked — the URL bar still holds the certificate link */
+    }
+  }
+  return (
+    <button
+      onClick={() => void share()}
+      className="no-print relative z-10 inline-flex items-center gap-2 rounded-xl border border-gold/50 bg-card px-5 py-2.5 text-sm font-semibold text-accent shadow-sm transition-colors hover:bg-hi"
+    >
+      <Icon name="link" className="h-4 w-4" /> {copied ? "Link copied" : "Share certificate"}
+    </button>
+  );
+}
+
 // The anonymous /certificate/[token] page (ADR 0015): renders the earned
 // Certificate from the token-only publicCertificate query — no account needed.
 // Reuses CertificateCard so the public and in-app views can't drift. "Download"
-// prints to PDF via the browser (the print stylesheet strips the chrome). A
+// prints to PDF via the browser (the print stylesheet strips the chrome), and
+// "Share" opens the share sheet (folding in the course link when it's public). A
 // missing/invalid token gets a uniform not-found — no existence signal.
 export function PublicCertificatePage({ token }: { token: string }) {
   const cert = useQuery(api.certificates.publicCertificate, { token });
@@ -738,12 +798,15 @@ export function PublicCertificatePage({ token }: { token: string }) {
       <div className="cert-enter relative z-10 flex w-full max-w-6xl justify-center" dir={cert.dir}>
         <CertificateCard {...cert} showcase />
       </div>
-      <button
-        onClick={() => window.print()}
-        className="no-print relative z-10 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
-      >
-        Download PDF
-      </button>
+      <div className="no-print relative z-10 flex flex-wrap items-center justify-center gap-3">
+        <button
+          onClick={() => window.print()}
+          className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
+        >
+          Download PDF
+        </button>
+        <CertificateShareButton courseTitle={cert.courseTitle} course={cert.course} />
+      </div>
     </main>
   );
 }
