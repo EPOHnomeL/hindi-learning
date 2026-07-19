@@ -231,6 +231,43 @@ export const seedEmail = internalMutation({
   },
 });
 
+// Re-scope one or more emails to **tenant admins** of a given tenant (issue 08 /
+// ADR 0022) — the "separate operator action" seed-tenants.ts defers. Unlike
+// `admitEmail` (which leaves `tenantSlug` alone on an existing row), this upserts
+// the role: it PATCHES an existing sys-admin/member row to `{ isAdmin, tenantSlug }`,
+// demoting a sys admin (isAdmin + no slug) to that tenant's admin, and INSERTS a
+// tenant-admin row for an email not yet on the Allowlist. Idempotent. Internal —
+// run via `npx convex run whitelist:scopeToTenant`, so it has no auth identity and
+// never enforces the last-sys-admin guard (the caller is the operator by
+// deploy-key). Returns what happened to each email for the run log.
+export const scopeToTenant = internalMutation({
+  args: { emails: v.array(v.string()), tenantSlug: v.string() },
+  returns: v.array(
+    v.object({
+      email: v.string(),
+      action: v.union(v.literal("patched"), v.literal("inserted")),
+    }),
+  ),
+  handler: async (ctx, { emails, tenantSlug }) => {
+    const results: { email: string; action: "patched" | "inserted" }[] = [];
+    for (const email of emails) {
+      const normalised = normaliseEmail(email);
+      const existing = await ctx.db
+        .query("whitelist")
+        .withIndex("by_email", (q) => q.eq("email", normalised))
+        .unique();
+      if (existing) {
+        await ctx.db.patch(existing._id, { isAdmin: true, tenantSlug });
+        results.push({ email: normalised, action: "patched" });
+      } else {
+        await ctx.db.insert("whitelist", { email: normalised, isAdmin: true, tenantSlug });
+        results.push({ email: normalised, action: "inserted" });
+      }
+    }
+    return results;
+  },
+});
+
 // The single fixed Admin (PRD/ADR 0011). Flagged by the migration; the portal
 // shows but won't remove this row.
 const ADMIN_EMAIL = "jvorster63@gmail.com";
