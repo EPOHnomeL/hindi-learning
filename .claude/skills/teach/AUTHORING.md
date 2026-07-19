@@ -105,6 +105,11 @@ the filename without `.html`):
 
 - Lesson: `/courses/<slug>/lessons/<key>` (e.g. `/courses/<slug>/lessons/0002-...`)
 - Reference: `/courses/<slug>/references/<key>`
+- Resource (the Topic's own uploaded sources): `/courses/<slug>/resources/<id>` —
+  **copy the `readerPath` for that Resource verbatim from `resources/_index.json`.**
+  Never hand-type the id or link a signed blob URL (it expires; lessons are
+  immutable). Clicking it opens the Resource for the reader (a PDF/link in a new
+  tab, an uploaded Markdown file in a dialog) — see §6.
 
 ## 6. Grounding & citations
 
@@ -117,6 +122,10 @@ memory; verify quoted source text character-for-character.**
   earlier lesson, reuse it; do **not** re-fetch/re-verify the same URL.
 - Litter the lesson with inline citations (`.cite` + `<a>`), and end with a
   `<footer>` `Sources —` line naming what was verified.
+- **When a claim is grounded in one of the Topic's own `resources/`, cite that
+  Resource** — link the `.cite` `<a>` to its `readerPath` (§5) so the reader can
+  jump straight to the source it came from, rather than to a general external URL.
+  Keep external-URL citations for claims grounded outside the workspace.
 
 ## 7. The other two artifacts (update as needed)
 
