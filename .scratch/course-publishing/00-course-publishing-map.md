@@ -1,6 +1,9 @@
 # course-publishing/00: Course publishing, tenant catalogue & free self-enroll — map
 
-**Status:** in progress — tickets 01, 02, 03 resolved 2026-07-18, 04, 05, 07 & 08 resolved 2026-07-19; **only ticket 06 (PRD) remains** — all decision tickets closed.
+**Status:** **destination reached** (2026-07-19) — all decision tickets (01–05, 07, 08) closed and
+ticket 06 resolved. The spec is captured in **[PRD.md](PRD.md)** + eight implementation issues
+(`09`–`16` in this directory), ready to hand to a `/tdd` build. Planning is complete; the next step is
+a separate build effort against the PRD.
 **Labels:** wayfinder:map
 
 ## Destination
@@ -134,6 +137,14 @@ not the feature.
   has > 1 Edition (English default; acquires the selected Edition; **no disabled cards**). Empty state
   = "Nothing published yet." **Deferred (not this build):** the language pick should also localize the
   card's **title + mission**, not just the target Edition.
+
+- [PRD + implementation issues](06-prd-and-issue-breakdown.md) — the convergence ticket. Synthesized
+  all eight decisions into **[PRD.md](PRD.md)** and eight dependency-ordered, `/tdd`-sized
+  implementation issues (`09`–`16`): the `enrollments` grant + `enrolled` resolver branch (09), the
+  `topics.status → published` lifecycle (10), the `tenants.flags.selling` flag + widen-migrate-narrow
+  (11), tenant-domain links via `appUrl(path, tenantSlug?)` (12), the self-enroll mutation (13), the
+  catalogue query (14), the "Browse courses" surface (15), and enrolled-on-dashboard (16, safe to
+  defer). No re-decisions; the collapsed ticket-07 content-language layer is kept out. **Map complete.**
 
 ## Not yet specified
 

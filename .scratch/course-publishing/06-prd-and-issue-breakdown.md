@@ -1,6 +1,6 @@
 # course-publishing/06: PRD + implementation-issue breakdown
 
-**Status:** open
+**Status:** done (2026-07-19) — the map's destination.
 **Depends on:** 01, 02, 03, 04, 05, 07, 08
 **Labels:** wayfinder:task
 
@@ -24,3 +24,16 @@ capture the agreed model as the handoff spec, following the repo's feature pipel
 Not a decision or an investigation — a writing/organising task once 01–05 have supplied the content.
 It **does** rather than decides, and earns its place as the artifact the whole map exists to produce.
 This is where the planning map ends and a build effort would begin. Resolve, comment, close.
+
+## Resolution (2026-07-19)
+
+Assembled the eight closed decisions (01–05, 07, 08) into **[PRD.md](PRD.md)** and eight
+dependency-ordered implementation issues (`09`–`16` in this directory), each sized for a `/tdd` +
+`/ponytail` build. No decisions were re-litigated. The late rescopes were held out of the spec: the
+collapsed ticket-07 content-language *access* layer (no `users.contentLang`, no disabled cards) is
+absent; only the thin per-card language pick survives. Two implementation calls the tickets left
+implicit are flagged in the PRD/issues rather than silently decided — extending `setEditionPrice`'s
+`completed`-only gate to also accept `published` (issue 10), and the `SITE_URL`-now-required
+consequence of retiring `APP_BASE_URL` (issue 12). Map Status flipped to **destination reached**; the
+next step is a separate `/tdd` build effort against the PRD.
+
