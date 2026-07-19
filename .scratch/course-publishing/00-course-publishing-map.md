@@ -1,6 +1,6 @@
 # course-publishing/00: Course publishing, tenant catalogue & free self-enroll — map
 
-**Status:** in progress — tickets 01, 02, 03 resolved 2026-07-18; frontier open (04, 07, 08 takeable).
+**Status:** in progress — tickets 01, 02, 03 resolved 2026-07-18, 04 resolved 2026-07-19; frontier open (07, 08 takeable).
 **Labels:** wayfinder:map
 
 ## Destination
@@ -75,6 +75,17 @@ not the feature.
   and `clearEditionPrice` stays **un-gated** so an owner can always drop a stuck price to free.
   Default-site selling (undefined slug → flag implicitly on) is deferred to
   [ticket 04](04-default-site-vs-tenant-scope.md).
+
+- [Default-site vs tenant scope](04-default-site-vs-tenant-scope.md) — the default site **is** in
+  scope (discovery pain is strongest on the flagship), but every catalogue is **scoped symmetrically**:
+  subdomain *X* lists `tenantSlug = X`, the default site lists **only `tenantSlug`-absent** courses —
+  **never** a tenant's (UPF/AW/Y-Knot). A learner wanting a tenant course signs up on that subdomain;
+  no cross-tenant firehose on any member surface. Resolves **one facet** of the whitelabel map's parked
+  *"default-site lists all courses"* fog (tightens it for the new member catalogue); per-course opt-out
+  and default-site curation stay parked there, and platform-admin cross-tenant visibility is unchanged.
+  **`selling` on the default site = implicitly on** (option A): absent `tenantSlug` **satisfies** the
+  per-tenant flag gate and defers to the deployment-wide `sellingEnabled()` — no phantom tenant row
+  (`assertTenantFlag` treats `tenantSlug == null` as pass).
 
 - [Define the "publish" action](03-define-publish-action.md) — **`published` is a course lifecycle
   *status***, not an orthogonal flag: `status` becomes `seeded | active | completed | published`.
