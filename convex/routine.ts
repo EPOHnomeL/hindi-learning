@@ -643,6 +643,7 @@ async function collectTopicContext(ctx: QueryCtx, topic: Doc<"topics">, owner: D
     const resources = await Promise.all(
       (await ctx.db.query("resources").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()).map(
         async (r) => ({
+          id: r._id, // the stable key the teach skill mints Resource links from (rich-media/11)
           filename: r.filename,
           kind: r.kind,
           status: r.status,

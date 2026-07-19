@@ -238,6 +238,9 @@ test("materialiseTopic returns one owner's topic context and is owner-scoped", a
   expect(ctx?.references).toMatchObject([{ key: "grammar", htmlUrl: expect.any(String) }]);
   expect(ctx?.resources[0]).toMatchObject({ filename: "h.pdf", status: "raw" });
   expect(ctx?.resources[0]?.rawUrl).toBeTruthy();
+  // The Resource id lets the teach skill mint a stable Resource link
+  // (/courses/<slug>/resources/<id>) — rich-media/11.
+  expect(ctx?.resources[0]?.id).toBeTruthy();
 
   // Wrong owner → null.
   expect(await t.query(api.routine.materialiseTopic, { secret, ownerEmail: "nobody@example.com", topicSlug: "hindi" })).toBeNull();

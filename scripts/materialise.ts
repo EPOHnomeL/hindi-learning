@@ -71,7 +71,18 @@ for (const res of ctx.resources) {
 writeFileSync(
   `${base}/resources/_index.json`,
   JSON.stringify(
-    ctx.resources.map((r) => ({ filename: r.filename, kind: r.kind, status: r.status, contentHash: r.contentHash, processed: r.processed })),
+    // `readerPath` is the stable Resource link the teach skill copies verbatim into
+    // a lesson (rich-media/11): the reader resolves it to a fresh signed URL at
+    // click time. `id` is the key that path is built from.
+    ctx.resources.map((r) => ({
+      id: r.id,
+      filename: r.filename,
+      kind: r.kind,
+      status: r.status,
+      contentHash: r.contentHash,
+      processed: r.processed,
+      readerPath: `/courses/${slug}/resources/${r.id}`,
+    })),
     null,
     2,
   ),
