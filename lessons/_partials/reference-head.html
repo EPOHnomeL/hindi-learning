@@ -19,10 +19,20 @@
     --accent:#9c5b34; --accent2:#3f6f5e; --gold:#b88a2e; --hi:#fbeecb;
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
+  html{scroll-behavior:smooth; max-width:100%; overflow-x:hidden}
   body{margin:0; background:var(--paper); color:var(--ink);
-    font-family:'Spectral',Georgia,'Times New Roman',serif; line-height:1.62; font-size:18px;}
+    font-family:'Spectral',Georgia,'Times New Roman',serif; line-height:1.62; font-size:18px;
+    max-width:100%; overflow-x:hidden; word-wrap:break-word; overflow-wrap:break-word;}
   .wrap{max-width:760px; margin:0 auto; padding:48px 26px 110px}
+  @media (max-width: 640px) {
+    .wrap { padding: 24px 16px 80px; }
+  }
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
   .deva{font-family:'Noto Serif Devanagari','Noto Sans Devanagari',serif;}
 
   header.ref{border-bottom:1px solid #e7ddd4; padding-bottom:24px; margin-bottom:24px}

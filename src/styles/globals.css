@@ -47,6 +47,12 @@ html[data-theme="dark"] {
   --color-bad-b: #e0937c;
 }
 
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
 body {
   background: var(--color-paper);
   color: var(--color-ink);
