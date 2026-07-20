@@ -51,21 +51,31 @@ Shipping the code is the *next* effort, not this map.
   wrong shape for chrome strings. `convex/languages.ts` already is the shared language registry (all 5
   langs) — reuse it (pre-answers ticket 03's shared-list note). Hindi chrome needs a Devanagari font.
   Full asset: [research-app-router-i18n.md](research-app-router-i18n.md). **Feeds ticket 04.**
+- [Architecture — i18n layer + catalogue storage](04-architecture-i18n-layer-catalogue-storage.md) —
+  **the spine, LOCKED.** Layer = **`next-intl`, "without i18n routing"**, locale from a cookie via async
+  `getRequestConfig` (Server = `getTranslations`, Client = `NextIntlClientProvider`); in-house `t()`
+  rejected. Catalogues = **repo `messages/<code>.json`** (static import); Convex `localizations` table +
+  LLM rail rejected. The **set of chrome languages = the message files that exist** — *not* all of
+  `convex/languages.ts` (that's a ~130-entry *content* menu; it only supplies names). Strings are
+  **hand-authored committed JSON** (LLM may draft offline, may reuse translate.ts's OpenRouter model);
+  **no runtime generation, no `convex/translate.ts` wiring**. **Add-a-language = one JSON file** (+ a
+  font if a new script — Hindi/Devanagari→Noto; + a `LANGUAGES` entry only if the code isn't already
+  among the ~130). **Unblocks 05 + 06.**
 
 ## Not yet specified
 
 <!-- in-scope fog: real but not yet sharp enough to ticket; graduates as the frontier advances -->
 
-- **Catalogue staleness / sync.** When the learner-surface string set changes during development, how
-  a language's catalogue stays in sync (a `sourceHash`-style staleness marker, mirroring
-  `translations.sourceHash`). Graduates once the layer (04) and extraction (05) settle.
+- **Catalogue staleness / sync.** With repo JSON locked (04), this is **no longer a runtime
+  `sourceHash` problem** but a **build-time key-parity check** ("every `messages/*.json` carries exactly
+  `en.json`'s keys"). Ticket 04 deliberately did **not** fold the guard in — it **graduates with ticket
+  05 (extraction)**, which owns the source key set.
 - **Mixed-language UX marker.** Whether to surface a subtle banner/marker when chrome language ≠ the
   content Edition's language, so the mixed state isn't read as a bug (from ticket 01's notes).
   Graduates once storage (03) + architecture (04) settle.
-- **Pluralization & number/date/currency formatting** for the 5 languages — whether the platform
-  `Intl` APIs suffice or a heavier layer is needed. **Likely absorbed:** ticket 02 found `next-intl`'s
-  ICU format gives pluralization + `Intl` formatting for free, so this collapses into ticket 04's
-  layer choice rather than becoming its own ticket. Confirm when 04 lands.
+- ~~**Pluralization & number/date/currency formatting.**~~ **Resolved by 04** — absorbed into the
+  `next-intl` layer choice: ICU message format + `Intl` give pluralization and number/date/currency
+  formatting for free. No longer fog, not a separate ticket.
 - **Per-locale acceptance / QA.** How we judge a language "done" — visual QA pass across each
   learner surface. Graduates near the end.
 
