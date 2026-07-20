@@ -593,4 +593,17 @@ export default defineSchema({
     userId: v.id("users"),
     payout: v.optional(payoutDetailsValidator),
   }).index("by_user", ["userId"]),
+
+  // A signed-in user's personal preferences (app-language-i18n ticket 03 §1).
+  // One row per user, minted on their first app-language pick. `locale` is a
+  // free-form BCP-47 chrome-language code (e.g. "es"); absent = never picked.
+  // This is the durable, cross-device ACCOUNT truth — it is NOT read on the hot
+  // render path (that's the `hindi:locale` cookie); the client reads it at login
+  // and syncs it into the cookie, so a new device Just Works. Future personal
+  // prefs grow as new typed optional fields here (same model as `users`), never
+  // a key/value bag. `by_user` is the single lookup.
+  userPrefs: defineTable({
+    userId: v.id("users"),
+    locale: v.optional(v.string()),
+  }).index("by_user", ["userId"]),
 });

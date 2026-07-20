@@ -55,7 +55,7 @@ export function AdminPanel() {
 // The sys-admin dashboard: a tab switcher between the platform Allowlist and the
 // per-tenant Tenants panel. Allowlist is the default tab (its historical landing).
 function SysAdminDashboard() {
-  const [tab, setTab] = useState<"allowlist" | "tenants">("allowlist");
+  const [tab, setTab] = useState<"allowlist" | "tenants" | "generation">("allowlist");
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
       <header className="mb-8 flex items-center justify-between gap-4">
@@ -66,13 +66,147 @@ function SysAdminDashboard() {
           <TabButton active={tab === "tenants"} onClick={() => setTab("tenants")}>
             Tenants
           </TabButton>
+          <TabButton active={tab === "generation"} onClick={() => setTab("generation")}>
+            Generation
+          </TabButton>
         </div>
         <Link href="/" className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
           ← Courses
         </Link>
       </header>
-      {tab === "allowlist" ? <AllowlistManager /> : <TenantsManager />}
+      {tab === "allowlist" ? <AllowlistManager /> : tab === "tenants" ? <TenantsManager /> : <GenerationManager />}
     </div>
+  );
+}
+
+// The Generation tab (generation-observability, issue 04): what the Routine is
+// authoring right now over a history of past Generation Runs. Both are live Convex
+// queries (sys-admin-gated server-side), so they update on their own while open.
+function GenerationManager() {
+  return (
+    <div className="mx-auto max-w-2xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Generation</h1>
+        <p className="mt-0.5 text-sm text-soft">What the routine is building, and what it has built</p>
+      </div>
+      <GeneratingNow />
+      <RunHistory />
+    </div>
+  );
+}
+
+// A short "time ago" for a past timestamp (ms). Coarse buckets — this is a
+// monitoring glance, not a precise clock.
+function timeAgo(ms: number): string {
+  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
+  if (s < 60) return `${s}s ago`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.round(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.round(h / 24)}d ago`;
+}
+
+// The live "what's busy now" section — reads the generation lock via generatingNow.
+function GeneratingNow() {
+  const rows = useQuery(api.routine.generatingNow);
+  return (
+    <section>
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold tracking-tight text-accent">Generating now</h2>
+        <p className="mt-0.5 text-sm text-soft">Courses the routine is authoring this moment</p>
+      </div>
+      {rows === undefined ? (
+        <ul className="flex flex-col gap-2" aria-busy>
+          {[0, 1].map((i) => (
+            <li key={i} className="h-14 animate-pulse rounded-xl border border-line bg-card" />
+          ))}
+        </ul>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-soft">Nothing generating right now.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {rows.map((r) => (
+            <li
+              key={r.topicSlug}
+              className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-4 py-3"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent2/60" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent2" />
+                </span>
+                <span className="min-w-0 truncate text-sm font-medium text-ink">{r.topicTitle}</span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {r.stale && (
+                  <span className="rounded-full bg-hi px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-soft">
+                    Stale — will retry
+                  </span>
+                )}
+                {r.startedAt !== null && <span className="text-xs tabular-nums text-soft">{timeAgo(r.startedAt)}</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// One outcome's badge styling: published (accent2), nothing (muted), failed (danger).
+const OUTCOME_BADGE: Record<"published" | "nothing" | "failed", { label: string; className: string }> = {
+  published: { label: "Published", className: "bg-accent2/15 text-accent2" },
+  nothing: { label: "Caught up", className: "bg-hi text-soft" },
+  failed: { label: "Failed", className: "bg-danger/15 text-danger" },
+};
+
+// The past-runs history — reads generationRuns via runHistory, newest first.
+function RunHistory() {
+  const rows = useQuery(api.routine.runHistory);
+  return (
+    <section className="mt-12">
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold tracking-tight text-accent">History</h2>
+        <p className="mt-0.5 text-sm text-soft">Recent runs, newest first</p>
+      </div>
+      {rows === undefined ? (
+        <ul className="flex flex-col gap-2" aria-busy>
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="h-16 animate-pulse rounded-xl border border-line bg-card" />
+          ))}
+        </ul>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-soft">No runs recorded yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {rows.map((r, i) => {
+            const badge = OUTCOME_BADGE[r.outcome];
+            return (
+              <li key={i} className="rounded-xl border border-line bg-card px-4 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 truncate text-sm font-medium text-ink">{r.topicTitle}</span>
+                    <span
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${badge.className}`}
+                    >
+                      {badge.label}
+                    </span>
+                  </div>
+                  <span className="shrink-0 text-xs tabular-nums text-soft">{timeAgo(r.endedAt)}</span>
+                </div>
+                {r.outcome === "published" && r.producedLessonTitle && (
+                  <p className="mt-1 truncate text-xs text-soft">Lesson: {r.producedLessonTitle}</p>
+                )}
+                {r.outcome === "failed" && r.error && (
+                  <p className="mt-1 break-words text-xs text-danger">{r.error}</p>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 
