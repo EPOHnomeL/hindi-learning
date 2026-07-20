@@ -71,6 +71,15 @@ Shipping the code is the *next* effort, not this map.
   **header/footer** control; offer-set = the `messages/*.json` that exist (`en/af/es/fr/hi`), labels reused
   from `convex/languages.ts` (`langInfo`), UI mirrors `Editions.tsx`. Adds nothing to the add-a-language
   cost. Build-time key-parity check → owned by 05; mixed-language marker → still fog.
+- [Catalogue localisation spec](06-catalogue-localisation-spec.md) — **the catalogue's two language axes,
+  specced.** Frame strings ("Join now", filter chips, badges, empty state) = `next-intl` keys off the
+  **app-language** (04); inventory owned by 05, under its `Catalogue` namespace. Card **title + mission** =
+  **app-language by default, the per-card selector (course-publishing 05) overrides, English source fallback** —
+  this *builds* 05's parked "localize card title+mission" deferral. Query = a **join, not new translation**: reuse
+  `translatedTitle` (`lib.ts:439`) + a mirror `translatedMission` (`kind:"mission"`), no `convex/translate.ts`.
+  Selector default refined to **app-language-if-that-Edition-exists-else-English** so text + Join/Buy target agree.
+  **Guest path: none** — catalogue is behind `AppGate`, so title+mission always ride the signed-in app-language.
+  App-language consumed as an **abstract input** (03's concept, the cookie), so ran parallel to 03.
 - [Extraction — string inventory + key convention](05-string-extraction-inventory-key-convention.md) —
   **key convention + extraction, RESOLVED.** Keys = **`next-intl` nested namespaces by surface**
   (`Common`/`Reader`/`Dashboard`/`Catalogue`/`Auth`/`Editions`); **English `en.json` is the source of

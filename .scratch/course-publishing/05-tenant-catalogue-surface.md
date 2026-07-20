@@ -72,3 +72,10 @@ today. Fold into the chrome/app-UI i18n effort or a follow-up — **do not build
 > **Absorbed (2026-07-19):** this deferred item now lives in the chrome-i18n effort as
 > [`app-language-i18n/06` — Catalogue localisation spec](../app-language-i18n/issues/06-catalogue-localisation-spec.md)
 > (child of the [Chrome i18n map](../app-language-i18n/issues/00-app-language-i18n-map.md)). Tracked there, not here.
+>
+> **Specced (2026-07-20):** ticket 06 is now **resolved** and specs this deferral as built. Rule: a card's
+> title + mission ride the **app-language by default, with the per-card selector below overriding them** (the
+> selector now flips both the card text *and* the Join/Buy Edition target together), English source fallback.
+> The selector's default is refined from "English" (point 4 above) to **the app-language when the course has
+> that Edition, else English**, so the shown text and the Join/Buy target agree at rest. Query is a join over
+> `translatedTitle` + a new `translatedMission` helper — no new translation. See 06 for the full spec.

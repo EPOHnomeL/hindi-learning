@@ -1,6 +1,8 @@
 # app-language-i18n/06: Catalogue (marketplace) localisation spec
 
-**Status:** open
+**Status:** done
+**Claimed:** session db93fffc (2026-07-20)
+**Resolved:** 2026-07-20 (session db93fffc)
 **Labels:** wayfinder:grilling
 **Depends on:** 04
 **Parent:** [00 — Chrome i18n map](00-app-language-i18n-map.md)
@@ -28,3 +30,91 @@ Decide:
 
 Output: a spec for the localised catalogue covering both halves. Depends on 04 for the frame-string
 layer.
+
+## Resolution — 2026-07-20 (grilling session, db93fffc)
+
+Grilled the two genuine forks one at a time; the rest resolved from locked upstream facts (04) and
+already-shipped design (course-publishing 05, `AppGate`). **Both halves specced below; the query half
+is a join over two existing-shaped helpers, not a new translation pipeline (ponytail).**
+
+### The seam — one surface, two language axes
+
+The catalogue is **one surface carrying two independent language axes** (the founding premise, map §Notes):
+
+| Axis | What it covers | Driven by | Layer (locked, 04) |
+| --- | --- | --- | --- |
+| **Frame strings** | "Join now", "Free", "Premium", "Continue", "Open", filter chips (All/Free/Premium/My courses), state badges (Joined/Purchased), header ("Browse courses", "← My courses"), empty state | **app-language** | `next-intl`, cookie-resolved |
+| **Card title + mission** | the course's own name and one-line mission on each card | **app-language by default, per-card selector overrides**, English source fallback | `translations` table join |
+
+### Half 1 — frame strings (app-language)
+
+Plain `next-intl` message keys (04), keyed off the active app-language. **06 does not own the key set** —
+the inventory + key convention is ticket 05's job, which resolved in parallel: keys are **`next-intl` nested
+namespaces by surface**, and the catalogue's namespace is **`Catalogue`**. So the catalogue's frame strings
+live under `Catalogue.*` in `en.json` (e.g. `Catalogue.filter.all`, `Catalogue.badge.joined`,
+`Catalogue.action.join`, `Catalogue.empty.title`) — the exact leaf keys are 05's one-shot extraction sweep, not
+enumerated here.
+
+### Half 2 — card title + mission (content-language)
+
+**Rule (grilled): the active app-language drives each card's title + mission by default; the existing
+per-card language selector overrides it; English source is the fallback whenever the chosen language has
+no translation.**
+
+- **Default** — a card renders its title + mission in the learner's active app-language. The query joins
+  `translations` for that language and falls back to the English source (`topics.title` / `topics.mission`)
+  when no row exists. The fallback is **per-card, silent, and expected** (not an error state): the app-language
+  offer-set (5 `messages/*.json`, per 04) and a course's translation set are independent, so a Spanish-chrome
+  learner will see English titles on any course not translated to Spanish.
+- **Override** — the per-card language selector shipped by course-publishing 05 (globe + native names, present
+  only when the tenant `translations` flag is on **and** the course has > 1 Edition) now drives **that card's
+  displayed title + mission too**, not just which Edition Join/Buy grants. Picking a language flips the card's
+  text and the Join/Buy target together. **This is exactly course-publishing 05's parked deferral, now built here.**
+- **Selector default (grilled, refines 05)** — when the selector is present it defaults to the **app-language
+  if the course has that Edition, else English**, so the displayed text and the Join/Buy target agree at rest.
+  (05's flat "English default" is superseded by this: text and action must not disagree until the learner touches
+  the control.)
+- **No selector** (flag off, or single-Edition course) ⟹ title + mission = app-language with English fallback,
+  which for a single-Edition English-only course is simply English. No control is shown.
+
+**Coherence note:** Edition existence and title/mission-translation-row existence are the same event — the
+translate run that produces an Edition also writes its `kind:"title"`/`kind:"mission"` rows. So "the course has
+an `es` Edition" ⟺ "`es` title/mission rows exist", and the default rule above never lands text and selector on
+different languages.
+
+### The query change (convex — spec for the downstream build)
+
+The join is trivial and mirrors code that already ships:
+
+- `translatedTitle(ctx, topicId, lang, sourceTitle)` (`convex/lib.ts:439`) **already** joins `translations`
+  (`by_topic_lang_kind_key`, `kind:"title"`, `key:""`) with English fallback and short-circuits `SOURCE_LANG`
+  to the source with no query. Reuse it verbatim.
+- Add a mirror **`translatedMission(ctx, topicId, lang, sourceMission)`** — identical shape, `kind:"mission"`,
+  `key:""`, `text` payload, `topics.mission` as the fallback. (Today `market.ts`'s `myPurchases` returns
+  `topic.mission` raw — the un-joined source; the catalogue is the first place mission is localised.)
+- The catalogue query (built by the downstream PRD, **not** in this spec ticket) resolves per card a
+  `displayLang` = the selector pick when the learner has touched it, else the active app-language; then
+  `title = translatedTitle(…, displayLang, topic.title)` and `mission = translatedMission(…, displayLang, topic.mission)`.
+  This is a `.map` over the already-loaded card list calling two O(1)-indexed helpers — **no `convex/translate.ts`
+  call, no new pipeline.**
+- **App-language is consumed as an abstract query input** — the *concept* ticket 03 resolves (03 landed it as the
+  **cookie**, synced from a `userPrefs` table; a Convex query can't read the cookie, so the client passes the active
+  language as an arg). 06 does not decide where it is stored; the catalogue query reads the same resolved active
+  language the rest of the chrome uses. Nothing here re-decides 03.
+
+### Guest vs. signed-in
+
+Resolved from fact, not grilled. The catalogue lives in the `(app)` route group, which is wrapped by **`AppGate`**
+(`src/app/_components/AppGate.tsx`): a signed-out visitor to the catalogue URL is shown `<SignIn>` **at that URL**
+(no redirect) and lands on the catalogue only after authenticating. **No guest ever renders a catalogue card.** So
+the app-language driving title + mission is always the signed-in learner's resolved app-language (03: the cookie,
+synced from the `userPrefs` table at login). The guest app-language (03: the cookie itself, pre-login) still exists
+globally — it themes the `SignIn` chrome the visitor lands on — but never drives a catalogue card. **There is no
+divergent guest catalogue path to build.**
+
+### Boundary held
+
+06 owns catalogue localisation (both halves' spec + the query join). It did **not** re-decide: where the
+app-language setting is stored (03), the global string-key convention/inventory (05), or the catalogue's *layout*
+(course-publishing 05, shipped). No dependency on 03's resolution specifics surfaced — the abstract "active
+app-language" input was sufficient, so 06 ran fully in parallel.
