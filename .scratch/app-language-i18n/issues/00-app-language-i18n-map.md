@@ -29,8 +29,11 @@ Shipping the code is the *next* effort, not this map.
   operation** — not a code change scattered across components.
 - **Scope:** learner-facing surfaces only — the reader, dashboard, catalogue, and the auth/checkout
   a learner hits.
-- **App-language is personal-only and preference-resolved:** signed-in → a field on `users`; guest →
-  `localStorage`. **No URL segment**, no per-locale routing.
+- **App-language is personal-only and preference-resolved:** the active locale is a **cookie** (04);
+  when signed-in it is *also* persisted in a new **`userPrefs` table** and synced into the cookie at
+  login (03) — **not** a `users` field (07's skip stands). Guest = **the cookie itself** (03
+  superseded the original `localStorage` plan, to avoid an SSR flash). **No URL segment**, no
+  per-locale routing.
 - **Ponytail posture throughout** — four known tenants, a bounded learner base. Don't chart a
   speculative many-locale platform; the 5 languages are the target.
 - **Prior art:** ticket [Global app-language picker (full chrome i18n)](01-global-app-language-picker-full-chrome-i18n.md)
