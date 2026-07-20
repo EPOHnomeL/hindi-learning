@@ -547,6 +547,30 @@ test("runHistory returns runs newest-first with topic titles", async () => {
   expect(rows[1]).toMatchObject({ topicTitle: "hindi", producedLessonTitle: "First" });
 });
 
+test("runHistory and generatingNow name the course owner (name preferred, else email)", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  // A named owner, an email-only owner, and an unowned (legacy) topic.
+  const named = await t.run((ctx) => ctx.db.insert("users", { name: "Alice", email: "alice@example.com" }));
+  const emailOnly = await t.run((ctx) => ctx.db.insert("users", { email: "bob@example.com" }));
+  const namedTopic = await t.run((ctx) => ctx.db.insert("topics", { ownerId: named, slug: "a", title: "A" }));
+  const emailTopic = await t.run((ctx) => ctx.db.insert("topics", { ownerId: emailOnly, slug: "b", title: "B" }));
+  const orphan = await t.run((ctx) => ctx.db.insert("topics", { slug: "c", title: "C" }));
+  await t.run(async (ctx) => {
+    await ctx.db.insert("generationRuns", { topicId: namedTopic, outcome: "published", startedAt: 1, endedAt: 2 });
+    await ctx.db.insert("generationRuns", { topicId: emailTopic, outcome: "nothing", startedAt: 3, endedAt: 4 });
+    await ctx.db.insert("generationRuns", { topicId: orphan, outcome: "failed", startedAt: 5, endedAt: 6 });
+    await ctx.db.insert("generation", { topicId: namedTopic, status: "generating", startedAt: 7 });
+  });
+
+  const hist = await asUser(t, admin).query(api.routine.runHistory, {});
+  const byTitle = Object.fromEntries(hist.map((r) => [r.topicTitle, r.owner]));
+  expect(byTitle).toEqual({ A: "Alice", B: "bob@example.com", C: null });
+
+  const live = await asUser(t, admin).query(api.routine.generatingNow, {});
+  expect(live[0]).toMatchObject({ topicTitle: "A", owner: "Alice" });
+});
+
 test("runHistory keeps a run whose topic was deleted, with a placeholder title", async () => {
   const t = convexTest(schema, modules);
   const admin = await seedAdmin(t, "admin@example.com");

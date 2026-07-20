@@ -153,6 +153,14 @@ export const generationStatus = query({
 // handful of internal courses this is ample; add a cursor if it ever isn't.
 const HISTORY_LIMIT = 100;
 
+// A human label for the course owner a run authored for — the "who" behind a run.
+// Prefers the display name, falls back to email, null for a legacy unowned Topic.
+async function ownerLabel(ctx: QueryCtx, topic: Doc<"topics"> | null): Promise<string | null> {
+  if (!topic?.ownerId) return null;
+  const owner = await ctx.db.get(topic.ownerId);
+  return owner?.name ?? owner?.email ?? null;
+}
+
 // What the Routine is authoring RIGHT NOW (sys-admin only). Reads the live
 // `generation` lock, not the run log, so both the Claude Routine and the
 // OpenRouter action path (which share the lock) appear with no extra work. A lock
@@ -164,6 +172,7 @@ export const generatingNow = query({
     v.object({
       topicSlug: v.string(),
       topicTitle: v.string(),
+      owner: v.union(v.string(), v.null()),
       startedAt: v.union(v.number(), v.null()),
       stale: v.boolean(),
     }),
@@ -178,6 +187,7 @@ export const generatingNow = query({
         return {
           topicSlug: topic?.slug ?? "(deleted)",
           topicTitle: topic?.title ?? "(deleted course)",
+          owner: await ownerLabel(ctx, topic),
           startedAt: g.startedAt ?? null,
           stale: g.startedAt !== undefined && now - g.startedAt > STALE_MS,
         };
@@ -196,6 +206,7 @@ export const runHistory = query({
     v.object({
       topicSlug: v.string(),
       topicTitle: v.string(),
+      owner: v.union(v.string(), v.null()),
       outcome: v.union(v.literal("published"), v.literal("nothing"), v.literal("failed")),
       startedAt: v.number(),
       endedAt: v.number(),
@@ -213,6 +224,7 @@ export const runHistory = query({
         return {
           topicSlug: topic?.slug ?? "(deleted)",
           topicTitle: topic?.title ?? "(deleted course)",
+          owner: await ownerLabel(ctx, topic),
           outcome: r.outcome,
           startedAt: r.startedAt,
           endedAt: r.endedAt,

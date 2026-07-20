@@ -136,7 +136,10 @@ function GeneratingNow() {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent2/60" />
                   <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent2" />
                 </span>
-                <span className="min-w-0 truncate text-sm font-medium text-ink">{r.topicTitle}</span>
+                <span className="min-w-0 truncate text-sm font-medium text-ink">
+                  {r.topicTitle}
+                  {r.owner && <span className="ml-2 font-normal text-soft">· {r.owner}</span>}
+                </span>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {r.stale && (
@@ -195,6 +198,7 @@ function RunHistory() {
                   </div>
                   <span className="shrink-0 text-xs tabular-nums text-soft">{timeAgo(r.endedAt)}</span>
                 </div>
+                {r.owner && <p className="mt-0.5 truncate text-xs text-soft">by {r.owner}</p>}
                 {r.outcome === "published" && r.producedLessonTitle && (
                   <p className="mt-1 truncate text-xs text-soft">Lesson: {r.producedLessonTitle}</p>
                 )}
