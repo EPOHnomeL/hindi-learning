@@ -56,3 +56,7 @@ yarn-error.log*
 
 # scratch handbook page renders (scripts/render_pages.py output)
 /scripts/_pages/
+
+# agent handoff docs — transient session-to-session execution notes, not durable
+# repo context (that lives in CLAUDE.md / docs/). Matches at any depth.
+HANDOFF*.md
