@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
 
@@ -70,4 +70,39 @@ test("backfillHtmlBlobs migrates only lesson/reference translation rows, skips o
 test("backfillHtmlBlobs rejects a bad secret", async () => {
   const t = convexTest(schema, modules);
   await expect(t.action(api.backfill.backfillHtmlBlobs, { secret: "wrong", table: "lessons", cursor: null })).rejects.toThrow();
+});
+
+// ---- generation-observability issue 03: backfill runs from lessons ----------
+
+test("backfillGenerationRuns seeds one published run per lesson (superseded included)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await t.run((ctx) => ctx.db.insert("users", { email: "alice@example.com" }));
+  const hindi = await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "hindi", title: "Hindi" }));
+  const greek = await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "greek", title: "Greek" }));
+  const l1 = await t.run((ctx) => ctx.db.insert("lessons", { topicId: hindi, key: "0001", seq: 1, title: "One" }));
+  // A superseded lesson is still a real past authoring event — it must appear.
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId: hindi, key: "0000", seq: 0, title: "Old", supersededBy: "0001" }));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId: greek, key: "0001", seq: 1, title: "Alpha" }));
+
+  const res = await t.mutation(internal.backfill.backfillGenerationRuns, {});
+  expect(res).toEqual({ inserted: 3 });
+
+  const runs = await t.run((ctx) => ctx.db.query("generationRuns").collect());
+  expect(runs).toHaveLength(3);
+  expect(runs.every((r) => r.outcome === "published")).toBe(true);
+  // endedAt mirrors the lesson's creation time.
+  const l1Doc = await t.run((ctx) => ctx.db.get(l1));
+  const l1Run = runs.find((r) => r.producedLessonKey === "0001" && r.topicId === hindi);
+  expect(l1Run).toMatchObject({ producedLessonTitle: "One", endedAt: l1Doc!._creationTime, startedAt: l1Doc!._creationTime });
+});
+
+test("backfillGenerationRuns is idempotent — a re-run inserts nothing", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await t.run((ctx) => ctx.db.insert("users", { email: "alice@example.com" }));
+  const hindi = await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "hindi", title: "Hindi" }));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId: hindi, key: "0001", seq: 1, title: "One" }));
+
+  expect(await t.mutation(internal.backfill.backfillGenerationRuns, {})).toEqual({ inserted: 1 });
+  expect(await t.mutation(internal.backfill.backfillGenerationRuns, {})).toEqual({ inserted: 0 });
+  expect(await t.run((ctx) => ctx.db.query("generationRuns").collect())).toHaveLength(1);
 });

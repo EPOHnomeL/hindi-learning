@@ -180,3 +180,35 @@ export const verifyHtmlBlobs = action({
 // `stripInlineHtml` (the pre-narrow data-strip, PR #9) is intentionally gone from
 // here: once `lessons`/`references` no longer carry inline `html`, it can't
 // compile and its job (strip prod rows before this narrow deploys) is complete.
+
+// ---- generation-observability issue 03: seed run history from lessons -------
+//
+// One-shot backfill so the Generation Run history isn't empty on launch: insert a
+// synthetic `published` run per existing Lesson (ALL lessons, incl. superseded —
+// each was a real past authoring event), stamping the Lesson's creation time as
+// both `startedAt` and `endedAt` (the true start is unknown) and its key/title as
+// the produced Lesson. Run once per deployment via `npx convex run
+// backfill:backfillGenerationRuns`. Idempotent by design: it no-ops if any run row
+// already exists, so it only ever runs against a fresh log and never races the
+// real going-forward rows recordRun writes. Lesson counts are curriculum-sized, so
+// a single unpaginated pass is fine.
+export const backfillGenerationRuns = internalMutation({
+  args: {},
+  returns: v.object({ inserted: v.number() }),
+  handler: async (ctx) => {
+    const existing = await ctx.db.query("generationRuns").first();
+    if (existing) return { inserted: 0 };
+    const lessons = await ctx.db.query("lessons").collect();
+    for (const l of lessons) {
+      await ctx.db.insert("generationRuns", {
+        topicId: l.topicId,
+        outcome: "published",
+        startedAt: l._creationTime,
+        endedAt: l._creationTime,
+        producedLessonKey: l.key,
+        producedLessonTitle: l.title,
+      });
+    }
+    return { inserted: lessons.length };
+  },
+});
