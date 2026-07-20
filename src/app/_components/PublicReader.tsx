@@ -229,7 +229,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
           <ThemeToggle />
         </aside>
 
-        <section className="min-w-0 flex-1 md:overflow-hidden md:p-4">{children}</section>
+        <section className="flex min-w-0 flex-1 flex-col md:overflow-hidden md:p-4">{children}</section>
       </div>
     </Ctx.Provider>
   );

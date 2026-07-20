@@ -285,7 +285,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
 
         <section className="flex min-w-0 flex-1 flex-col md:overflow-hidden md:p-4">
           <ConfirmingBanner />
-          <div className="min-h-0 flex-1">{children}</div>
+          <div className="flex min-h-0 flex-1 flex-col">{children}</div>
         </section>
       </div>
       {/* Completion celebration (ADR 0015): fires once per device when the caller

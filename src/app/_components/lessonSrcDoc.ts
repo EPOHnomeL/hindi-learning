@@ -23,11 +23,18 @@ const HEIGHT_BRIDGE = `<script>(function(){
     var doc=document.documentElement;
     post({type:'height', height: Math.max(document.body?document.body.scrollHeight:0, doc.scrollHeight)});
   }
-  window.addEventListener('load', reportHeight);
   window.addEventListener('resize', reportHeight);
-  if(window.ResizeObserver){ try{ new ResizeObserver(reportHeight).observe(document.documentElement); }catch(e){} }
-  setTimeout(reportHeight, 100);
-  setTimeout(reportHeight, 600);
+  function init(){
+    if(window.ResizeObserver){ try{ new ResizeObserver(reportHeight).observe(document.documentElement); }catch(e){} }
+    reportHeight();
+    setTimeout(reportHeight, 100);
+    setTimeout(reportHeight, 600);
+  }
+  if(document.readyState === 'complete'){
+    init();
+  } else {
+    window.addEventListener('load', init);
+  }
 }());<\/script>`;
 
 const QUIZ_BRIDGE = `<script>(function(){
@@ -220,7 +227,7 @@ function injectReferenceDarkCss(html: string): string {
 //    entire px scale uniformly and, unlike `transform:scale`, still contributes
 //    to layout height, so the iframe's HEIGHT_BRIDGE measures the scaled document
 //    correctly. Tune the factor here if it reads too large/small.
-const DEVANAGARI_CSS = `<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&display=swap" rel="stylesheet">
+const DEVANAGARI_CSS = `<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&display=block" rel="stylesheet">
 <style>html{zoom:1.2;}
 html body{font-family:'Spectral','Noto Serif Devanagari','Noto Sans Devanagari',Georgia,serif; line-height:1.75;}</style>`;
 

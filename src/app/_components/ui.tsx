@@ -217,7 +217,7 @@ export function ReaderSkeleton({ aside = true }: { aside?: boolean }) {
   // Ragged widths so the body reads like paragraphs rather than a solid block.
   const lines = ["w-11/12", "w-full", "w-4/5", "w-full", "w-3/4", "w-11/12", "w-2/3"];
   return (
-    <div className="flex flex-col gap-4 md:h-full md:flex-row">
+    <div className="flex flex-col flex-1 gap-4 md:h-full md:flex-row">
       {/* Centred reading column, mirroring the lesson body's centred measure. */}
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Title + actions bar skeleton */}
