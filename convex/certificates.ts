@@ -2,8 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertTenantFlag, getViewableTopic, mintToken, readableLang, SOURCE_LANG, topicLessonCounts } from "./lib";
-import { decodeEntities } from "./content";
+import { assertTenantFlag, getViewableTopic, loadEdition, mintToken, readableLang, SOURCE_LANG, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import { resolveEmblem, resolvedEmblemValidator, snapshotEmblem } from "./emblem";
 
@@ -36,17 +35,8 @@ async function liveCourseTitle(
 ): Promise<string> {
   if (!topic) return row.courseTitle;
   const lang = row.lang ?? SOURCE_LANG;
-  let title = topic.title;
-  if (lang !== SOURCE_LANG) {
-    const t = await ctx.db
-      .query("translations")
-      .withIndex("by_topic_lang_kind_key", (q) =>
-        q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "title").eq("key", ""),
-      )
-      .unique();
-    if (t?.text) title = t.text;
-  }
-  return decodeEntities(title);
+  // Translated-else-source course title (decoded), via the shared Edition reader.
+  return await loadEdition(ctx, topic, lang).title();
 }
 
 async function certificatePayload(ctx: QueryCtx, row: Doc<"certificates">) {
@@ -154,17 +144,9 @@ export const claimCertificate = mutation({
     // Snapshot the title of the Edition the learner completed in — a Viewer who
     // only holds the Spanish edition earns a Spanish-titled certificate.
     const effLang = (await readableLang(ctx, topic, userId, lang ?? null)) ?? SOURCE_LANG;
-    let courseTitle = topic.title;
-    if (effLang !== SOURCE_LANG) {
-      const t = await ctx.db
-        .query("translations")
-        .withIndex("by_topic_lang_kind_key", (q) =>
-          q.eq("topicId", topic._id).eq("lang", effLang).eq("kind", "title").eq("key", ""),
-        )
-        .unique();
-      if (t?.text) courseTitle = t.text;
-    }
-    courseTitle = decodeEntities(courseTitle);
+    // The title of the Edition the learner completed in (translated else source,
+    // decoded), via the shared Edition reader.
+    const courseTitle = await loadEdition(ctx, topic, effLang).title();
     const token = mintToken();
 
     // Freeze the Topic's Emblem onto the row, exactly as title/lessonCount are

@@ -1,8 +1,7 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
-import type { Doc, Id } from "./_generated/dataModel";
-import { decodeEntities } from "./content";
-import { buildPaywall, editionAccessLevel, lessonLocked, pickContentBody, SOURCE_LANG, type EditionAccess } from "./lib";
+import type { Doc } from "./_generated/dataModel";
+import { buildPaywall, editionAccessLevel, lessonLocked, loadEdition, SOURCE_LANG, type EditionAccess } from "./lib";
 import { langInfo } from "./languages";
 
 // The Guest read seam (issue 07 / ADR 0013). Every function here authorizes by
@@ -47,20 +46,6 @@ async function resolveGuestEdition(
   if (!resolved) return null;
   const level = await editionAccessLevel(ctx, resolved.topic, resolved.lang, null, true);
   return { ...resolved, level };
-}
-
-// One Edition's translated rows, keyed `${kind}:${key}` (empty for English).
-async function editionMap(
-  ctx: QueryCtx,
-  topicId: Id<"topics">,
-  lang: string,
-): Promise<Map<string, Doc<"translations">>> {
-  if (lang === SOURCE_LANG) return new Map();
-  const rows = await ctx.db
-    .query("translations")
-    .withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", lang))
-    .collect();
-  return new Map(rows.map((r) => [`${r.kind}:${r.key}`, r]));
 }
 
 // Everything a Guest needs to render the course shell + read-only panels, in one
@@ -125,19 +110,19 @@ export const publicCourse = query({
     // per-Lesson bodies are locked in publicLesson. A free Edition is `viewer`
     // and unchanged.
     const preview = level === "preview";
-    const tmap = await editionMap(ctx, topic._id, lang);
+    const m = await loadEdition(ctx, topic, lang).map();
 
     const lessons = (
       await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
     )
       .filter((l) => !l.supersededBy)
-      .map((l) => ({ key: l.key, seq: l.seq, title: decodeEntities(tmap.get(`lesson:${l.key}`)?.title ?? l.title) }));
+      .map((l) => ({ key: l.key, seq: l.seq, title: m.lessonTitle(l) }));
 
     const references = (
       await ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()
     )
       .sort((a, b) => a.key.localeCompare(b.key))
-      .map((r) => ({ key: r.key, title: decodeEntities(tmap.get(`reference:${r.key}`)?.title ?? r.title) }));
+      .map((r) => ({ key: r.key, title: m.referenceTitle(r) }));
 
     const resources = await Promise.all(
       (await ctx.db.query("resources").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()).map(
@@ -170,18 +155,12 @@ export const publicCourse = query({
         )
           .sort((a, b) => b._creationTime - a._creationTime)
           .map((q) => {
-            const t = tmap.get(`question:${q._id}`);
-            return {
-              id: q._id,
-              lessonKey: q.lessonKey,
-              text: t?.text ?? q.text,
-              status: q.status,
-              reply: (q.reply ? (t?.reply ?? q.reply) : null) ?? null,
-            };
+            const { text, reply } = m.question(q);
+            return { id: q._id, lessonKey: q.lessonKey, text, status: q.status, reply };
           })
       : [];
 
-    const title = decodeEntities(tmap.get("title:")?.text ?? topic.title);
+    const title = m.title(topic);
     const paywall = preview ? await buildPaywall(ctx, topic._id, lang) : undefined;
     return {
       title,
@@ -226,22 +205,13 @@ export const publicLesson = query({
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     if (!lesson || lesson.supersededBy) return null;
-    const t =
-      lang === SOURCE_LANG
-        ? null
-        : await ctx.db
-            .query("translations")
-            .withIndex("by_topic_lang_kind_key", (q) =>
-              q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "lesson").eq("key", key),
-            )
-            .unique();
-    const title = decodeEntities(t?.title ?? lesson.title);
+    const { title, body } = await loadEdition(ctx, topic, lang).lesson(lesson);
     // Paygate: on a paid Edition (`preview`) only the Preview Lesson's body is
     // served; every other Lesson is a locked marker (never a bare null 404).
     if (await lessonLocked(ctx, topic._id, level, key)) {
       return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
     }
-    return { key: lesson.key, seq: lesson.seq, title, locked: false, ...pickContentBody(t, lesson) };
+    return { key: lesson.key, seq: lesson.seq, title, locked: false, ...body };
   },
 });
 
@@ -267,18 +237,9 @@ export const publicReference = query({
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     if (!ref) return null;
-    const t =
-      lang === SOURCE_LANG
-        ? null
-        : await ctx.db
-            .query("translations")
-            .withIndex("by_topic_lang_kind_key", (q) =>
-              q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "reference").eq("key", key),
-            )
-            .unique();
-    const title = decodeEntities(t?.title ?? ref.title);
+    const { title, body } = await loadEdition(ctx, topic, lang).reference(ref);
     // References sit entirely past the Preview — locked for a `preview` Guest.
     if (level === "preview") return { key: ref.key, title, html: "", locked: true };
-    return { key: ref.key, title, locked: false, ...pickContentBody(t, ref) };
+    return { key: ref.key, title, locked: false, ...body };
   },
 });
