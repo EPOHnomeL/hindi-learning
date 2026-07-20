@@ -296,6 +296,116 @@ export async function readableLang(
   return [...held].sort()[0]!;
 }
 
+// Titles are authored upstream from generated HTML and can arrive entity-encoded
+// (e.g. "Maps &amp; List"). Decode the handful of named/numeric entities that
+// show up in plain-text titles so the UI never renders a raw "&amp;".
+// ponytail: covers the common entities; extend the map if a new one appears.
+// (Lives here, not content.ts, so lib.loadEdition can decode without a cycle;
+// re-exported from content.ts for its existing importers.)
+export function decodeEntities(s: string): string {
+  return s.replace(/&(amp|lt|gt|quot|#39|apos);/g, (_, e) =>
+    ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'" })[e as string] ?? _,
+  );
+}
+
+// ---- The Edition reader (edition-deepening/01) ------------------------------
+
+// The "translated row else English source" projection — the ONE place it lives.
+// Every reader (authed content.ts, Guest public.ts, capture/shares/certificates)
+// binds an Edition to (topic, lang) here and reads through the accessors below,
+// so the fallback ladder and the title-decode rule are defined exactly once.
+//
+// Read profile (deliberate): single-item accessors (`title`/`mission`/`lesson`/
+// `reference`) point-read one translation row — the hot getLesson path never
+// collects the whole Edition. `map()` collects the Edition once (memoised) to
+// back list queries. Both paths delegate to the same fallback helpers, so the
+// rule stays single-sourced even though the two read profiles differ.
+
+// The translated-item title (lesson/reference use the `title` field), decoded,
+// else the source row's title. Distinct from the course title, which uses `text`.
+function itemTitle(row: { title?: string } | null | undefined, sourceTitle: string): string {
+  return decodeEntities(row?.title ?? sourceTitle);
+}
+
+// A loaded snapshot of one Edition's translated rows (`${kind}:${key}` → row),
+// with sync accessors for the list queries. Titles decode; question text/reply
+// stay raw (learner-typed, never generated-HTML-derived).
+export type EditionSnapshot = {
+  title(topic: { title: string }): string;
+  lessonTitle(lesson: Doc<"lessons">): string;
+  referenceTitle(reference: Doc<"references">): string;
+  question(q: Doc<"questions">): { text: string; reply: string | null };
+};
+
+export type EditionReader = {
+  title(): Promise<string>;
+  mission(): Promise<string | null>;
+  lesson(lesson: Doc<"lessons">): Promise<{ title: string; body: ContentBody }>;
+  reference(reference: Doc<"references">): Promise<{ title: string; body: ContentBody }>;
+  map(): Promise<EditionSnapshot>;
+};
+
+export function loadEdition(ctx: QueryCtx, topic: Doc<"topics">, lang: string): EditionReader {
+  const source = lang === SOURCE_LANG;
+
+  // One point-read of a single translated row (skipped for the source language).
+  const one = async (
+    kind: "lesson" | "reference" | "mission" | "title" | "question",
+    key: string,
+  ): Promise<Doc<"translations"> | null> => {
+    if (source) return null;
+    return await ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) =>
+        q.eq("topicId", topic._id).eq("lang", lang).eq("kind", kind).eq("key", key),
+      )
+      .unique();
+  };
+
+  let snapshot: Promise<EditionSnapshot> | null = null;
+
+  return {
+    // Course title uses the shared `translatedTitle` primitive (the `text` field),
+    // then decodes — folding in the lookup shares.ts/certificates.ts hand-inlined.
+    title: async () => decodeEntities(await translatedTitle(ctx, topic._id, lang, topic.title)),
+    mission: async () => {
+      if (!topic.mission) return null;
+      const row = await one("mission", "");
+      return decodeEntities(row?.text ?? topic.mission);
+    },
+    lesson: async (lesson) => {
+      const row = await one("lesson", lesson.key);
+      return { title: itemTitle(row, lesson.title), body: pickContentBody(row, lesson) };
+    },
+    reference: async (reference) => {
+      const row = await one("reference", reference.key);
+      return { title: itemTitle(row, reference.title), body: pickContentBody(row, reference) };
+    },
+    map: () => {
+      // Memoise the single collect: list queries may touch it many times.
+      snapshot ??= (async () => {
+        const rows = source
+          ? []
+          : await ctx.db
+              .query("translations")
+              .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", lang))
+              .collect();
+        const byKey = new Map(rows.map((r) => [`${r.kind}:${r.key}`, r]));
+        return {
+          title: (tp) => decodeEntities(byKey.get("title:")?.text ?? tp.title),
+          lessonTitle: (lesson) => itemTitle(byKey.get(`lesson:${lesson.key}`), lesson.title),
+          referenceTitle: (reference) => itemTitle(byKey.get(`reference:${reference.key}`), reference.title),
+          question: (q) => {
+            const row = byKey.get(`question:${q._id}`);
+            return { text: row?.text ?? q.text, reply: (q.reply ? (row?.reply ?? q.reply) : null) ?? null };
+          },
+        };
+      })();
+      return snapshot;
+    },
+  };
+}
+
 // ---- Paid marketplace: Sellers (ADR 0016) -----------------------------------
 
 // A Seller's readiness stage, derived from their `sellers` row (see schema):
