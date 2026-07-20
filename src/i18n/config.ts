@@ -15,9 +15,16 @@ export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "en";
 
 // The cookie `getRequestConfig` reads on every request — the sole render source
-// of truth (ticket 03). Namespaced to sit beside the reader's `hindi:*` client
-// keys without colliding with `hindi:lang` (the content-Edition preference).
-export const LOCALE_COOKIE = "hindi:locale";
+// of truth (ticket 03). Underscore (not the `hindi:*` colon the reader's
+// localStorage keys use): a colon is not a valid RFC 6265 cookie-name token, and
+// this is distinct from `hindi:lang` (the content-Edition preference) regardless.
+export const LOCALE_COOKIE = "hindi_locale";
+
+// A long-lived persistent cookie (ticket 03 §2): the app-language is a durable
+// device preference, so it outlives the session like the theme does. One year,
+// shared by every writer (middleware sniff + client pick) so the cookie's
+// lifetime never depends on which path wrote it.
+export const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 // Coerce a raw cookie value into an offered locale, English otherwise. Wrapping
 // the cookie in this guard stops an absent or unknown code from selecting a

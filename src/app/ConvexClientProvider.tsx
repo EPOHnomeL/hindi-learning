@@ -5,6 +5,7 @@ import { ConvexReactClient } from "convex/react";
 import { type ReactNode } from "react";
 import { ThemeProvider } from "./_components/ThemeContext";
 import { TenantProvider } from "./_components/TenantContext";
+import { LocaleSync } from "~/i18n/locale-client";
 import type { TenantSlug } from "~/lib/tenant";
 
 // Next inlines NEXT_PUBLIC_* at build; `npx convex dev` writes it to .env.local.
@@ -22,6 +23,9 @@ export function ConvexClientProvider({
   return (
     <ConvexAuthNextjsProvider client={convex}>
       <TenantProvider slug={tenantSlug}>
+        {/* Login-sync (ticket 03 §3): seeds the locale cookie from the account's
+            stored preference on a fresh device. Renders nothing. */}
+        <LocaleSync />
         <ThemeProvider>{children}</ThemeProvider>
       </TenantProvider>
     </ConvexAuthNextjsProvider>

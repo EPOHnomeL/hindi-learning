@@ -1,6 +1,8 @@
 import { convexAuthNextjsMiddleware } from "@convex-dev/auth/nextjs/server";
 import { NextResponse } from "next/server";
 import { resolveTenantSlug, TENANT_SLUG_HEADER } from "./lib/tenant";
+import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from "./i18n/config";
+import { matchAcceptLanguage } from "./i18n/acceptLanguage";
 
 // Convex Auth keeps the session in sync across server/client for the App Router.
 // The custom handler resolves the whitelabel tenant from the Host header and
@@ -22,7 +24,30 @@ export default convexAuthNextjsMiddleware(
     // the course layout's cross-host canonical redirect (issue 18) to reconstruct
     // path + query when it swaps the host. Cheap and additive; consumed only there.
     headers.set("x-url", request.url);
-    return NextResponse.next({ request: { headers } });
+
+    // Cookie-writer #3 (app-language-i18n ticket 03 §3): first visit, nothing
+    // stored → sniff Accept-Language ONCE, map to an offered locale (else
+    // English), and persist so the negotiation never re-runs. Stamping the
+    // forwarded Cookie header makes it visible to THIS request's getRequestConfig,
+    // so a Spanish browser lands in Spanish chrome on first paint (no flash); the
+    // Set-Cookie below makes it durable. An explicit pick always overrides later.
+    const sniffed = request.cookies.get(LOCALE_COOKIE)
+      ? null
+      : matchAcceptLanguage(request.headers.get("accept-language"));
+    if (sniffed) {
+      const existing = headers.get("cookie");
+      headers.set("cookie", existing ? `${existing}; ${LOCALE_COOKIE}=${sniffed}` : `${LOCALE_COOKIE}=${sniffed}`);
+    }
+
+    const response = NextResponse.next({ request: { headers } });
+    if (sniffed) {
+      response.cookies.set(LOCALE_COOKIE, sniffed, {
+        path: "/",
+        maxAge: LOCALE_COOKIE_MAX_AGE,
+        sameSite: "lax",
+      });
+    }
+    return response;
   },
   { convexUrl: process.env.NEXT_PUBLIC_CONVEX_URL },
 );
