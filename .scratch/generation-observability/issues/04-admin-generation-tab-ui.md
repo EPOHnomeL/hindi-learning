@@ -1,6 +1,6 @@
 # 04 — `/admin` "Generation" tab UI
 
-**Status:** open · **Blocked by:** [02](02-admin-queries-live-and-history.md)
+**Status:** resolved (commit c5a696c) · **Blocked by:** [02](02-admin-queries-live-and-history.md) ✓
 **PRD:** [`../PRD.md`](../PRD.md)
 
 ## What to build

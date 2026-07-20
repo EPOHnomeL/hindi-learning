@@ -1,6 +1,6 @@
 # 02 — sys-admin queries: `generatingNow` + `runHistory`
 
-**Status:** open · **Blocked by:** [01](01-generation-runs-table-and-recording.md)
+**Status:** resolved (commit 9749c31) · **Blocked by:** [01](01-generation-runs-table-and-recording.md) ✓
 **PRD:** [`../PRD.md`](../PRD.md)
 
 ## What to build

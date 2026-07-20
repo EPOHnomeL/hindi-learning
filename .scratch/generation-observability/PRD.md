@@ -1,6 +1,6 @@
 # PRD: Admin generation observability
 
-Status: open — grilled & scoped 2026-07-20; not yet built.
+Status: **shipped** 2026-07-20 — all four issues built test-first, full suite green (537 tests). Backfill (`backfill:backfillGenerationRuns`) still to be run once per deployment.
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) (**Routine**, **Topic**,
 > **Frontier**, **Lesson**). Respects [ADR 0008](../../docs/adr/0008-next-lesson-routine-gate-in-convex.md)

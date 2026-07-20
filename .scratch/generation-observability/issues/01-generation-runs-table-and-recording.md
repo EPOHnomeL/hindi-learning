@@ -1,6 +1,6 @@
 # 01 — `generationRuns` table + record at terminal exits
 
-**Status:** open
+**Status:** resolved (commit d625b3a)
 **PRD:** [`../PRD.md`](../PRD.md) · Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Routine, Topic, Frontier, Generation Run)
 
 ## What to build

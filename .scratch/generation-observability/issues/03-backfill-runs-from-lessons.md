@@ -1,6 +1,6 @@
 # 03 — one-shot backfill: `generationRuns` from existing Lessons
 
-**Status:** open · **Blocked by:** [01](01-generation-runs-table-and-recording.md)
+**Status:** resolved (commit 873ac6d) · **Blocked by:** [01](01-generation-runs-table-and-recording.md) ✓
 **PRD:** [`../PRD.md`](../PRD.md)
 
 ## What to build
