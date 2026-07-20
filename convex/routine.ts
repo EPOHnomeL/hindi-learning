@@ -147,6 +147,84 @@ export const generationStatus = query({
   },
 });
 
+// ---- Admin observability (generation-observability, issue 02) --------------
+
+// How many recent runs the history query returns. Bounded (no pagination) — for a
+// handful of internal courses this is ample; add a cursor if it ever isn't.
+const HISTORY_LIMIT = 100;
+
+// What the Routine is authoring RIGHT NOW (sys-admin only). Reads the live
+// `generation` lock, not the run log, so both the Claude Routine and the
+// OpenRouter action path (which share the lock) appear with no extra work. A lock
+// still "generating" past the 10-min stale window is flagged (crashed/stuck), not
+// dropped. Newest-first by start.
+export const generatingNow = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      topicSlug: v.string(),
+      topicTitle: v.string(),
+      startedAt: v.union(v.number(), v.null()),
+      stale: v.boolean(),
+    }),
+  ),
+  handler: async (ctx) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const now = Date.now();
+    const locks = (await ctx.db.query("generation").collect()).filter((g) => g.status === "generating");
+    const rows = await Promise.all(
+      locks.map(async (g) => {
+        const topic = await ctx.db.get(g.topicId);
+        return {
+          topicSlug: topic?.slug ?? "(deleted)",
+          topicTitle: topic?.title ?? "(deleted course)",
+          startedAt: g.startedAt ?? null,
+          stale: g.startedAt !== undefined && now - g.startedAt > STALE_MS,
+        };
+      }),
+    );
+    return rows.sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
+  },
+});
+
+// The Generation Run history (sys-admin only): recent runs newest-first, each
+// joined to its Topic's title/slug. A run whose Topic was later deleted is kept
+// (with a placeholder title) rather than dropped — the history is the record.
+export const runHistory = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      topicSlug: v.string(),
+      topicTitle: v.string(),
+      outcome: v.union(v.literal("published"), v.literal("nothing"), v.literal("failed")),
+      startedAt: v.number(),
+      endedAt: v.number(),
+      error: v.union(v.string(), v.null()),
+      producedLessonKey: v.union(v.string(), v.null()),
+      producedLessonTitle: v.union(v.string(), v.null()),
+    }),
+  ),
+  handler: async (ctx) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const runs = await ctx.db.query("generationRuns").order("desc").take(HISTORY_LIMIT);
+    return await Promise.all(
+      runs.map(async (r) => {
+        const topic = await ctx.db.get(r.topicId);
+        return {
+          topicSlug: topic?.slug ?? "(deleted)",
+          topicTitle: topic?.title ?? "(deleted course)",
+          outcome: r.outcome,
+          startedAt: r.startedAt,
+          endedAt: r.endedAt,
+          error: r.error ?? null,
+          producedLessonKey: r.producedLessonKey ?? null,
+          producedLessonTitle: r.producedLessonTitle ?? null,
+        };
+      }),
+    );
+  },
+});
+
 // ---- The gate + lock (atomic) ----------------------------------------------
 
 type AcquireResult =

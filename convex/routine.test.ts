@@ -495,6 +495,71 @@ test("expireUnclaimedFinish records a failed run (the finish run never claimed)"
   expect(rows[0]!.error).toContain("never claimed");
 });
 
+// ---- Admin observability queries (generation-observability, issue 02) -------
+
+test("generatingNow lists only in-flight locks, with titles and a stale flag", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const live = await seedTopic(t, admin, "live");
+  const stuck = await seedTopic(t, admin, "stuck");
+  const idle = await seedTopic(t, admin, "idle");
+  const now = Date.now();
+  await t.run(async (ctx) => {
+    // Fresh in-flight run, well within the 10-min stale window.
+    await ctx.db.insert("generation", { topicId: live, status: "generating", startedAt: now - 1000 });
+    // In-flight but past the stale window (crashed / stuck) — flagged, not dropped.
+    await ctx.db.insert("generation", { topicId: stuck, status: "generating", startedAt: now - 11 * 60 * 1000 });
+    // Not generating — must be excluded.
+    await ctx.db.insert("generation", { topicId: idle, status: "idle", startedAt: now - 5000 });
+  });
+
+  const rows = await asUser(t, admin).query(api.routine.generatingNow, {});
+  const bySlug = Object.fromEntries(rows.map((r) => [r.topicSlug, r]));
+  expect(Object.keys(bySlug).sort()).toEqual(["live", "stuck"]);
+  expect(bySlug.live).toMatchObject({ topicTitle: "live", stale: false });
+  expect(bySlug.stuck).toMatchObject({ topicTitle: "stuck", stale: true });
+});
+
+test("generatingNow and runHistory reject a non-admin", async () => {
+  const t = convexTest(schema, modules);
+  const eve = await seedUser(t, "eve@example.com");
+  await expect(asUser(t, eve).query(api.routine.generatingNow, {})).rejects.toThrow();
+  await expect(asUser(t, eve).query(api.routine.runHistory, {})).rejects.toThrow();
+  // Unauthenticated too.
+  await expect(t.query(api.routine.generatingNow, {})).rejects.toThrow();
+});
+
+test("runHistory returns runs newest-first with topic titles", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const topicId = await seedTopic(t, admin, "hindi");
+  // Insert two runs in order; _creationTime orders them, newest first on read.
+  await t.run(async (ctx) => {
+    await ctx.db.insert("generationRuns", { topicId, outcome: "published", startedAt: 1, endedAt: 2, producedLessonKey: "0001", producedLessonTitle: "First" });
+  });
+  await t.run(async (ctx) => {
+    await ctx.db.insert("generationRuns", { topicId, outcome: "failed", startedAt: 3, endedAt: 4, error: "nope" });
+  });
+
+  const rows = await asUser(t, admin).query(api.routine.runHistory, {});
+  expect(rows.map((r) => r.outcome)).toEqual(["failed", "published"]); // newest first
+  expect(rows[0]).toMatchObject({ topicTitle: "hindi", outcome: "failed", error: "nope" });
+  expect(rows[1]).toMatchObject({ topicTitle: "hindi", producedLessonTitle: "First" });
+});
+
+test("runHistory keeps a run whose topic was deleted, with a placeholder title", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const topicId = await seedTopic(t, admin, "gone");
+  await t.run((ctx) => ctx.db.insert("generationRuns", { topicId, outcome: "nothing", startedAt: 1, endedAt: 2 }));
+  await t.run((ctx) => ctx.db.delete(topicId));
+
+  const rows = await asUser(t, admin).query(api.routine.runHistory, {});
+  expect(rows).toHaveLength(1);
+  expect(rows[0]!.outcome).toBe("nothing");
+  expect(rows[0]!.topicTitle).toBeTruthy(); // placeholder, not a crash
+});
+
 // ---- The `~N lessons` estimate (PRD: Estimated lesson count) ---------------
 
 test("reportGeneration folds an estimate onto the topic; a later report without one never wipes it", async () => {
