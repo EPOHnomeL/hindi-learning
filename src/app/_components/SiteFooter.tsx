@@ -1,5 +1,6 @@
 import { useTranslations } from "next-intl";
 import Link from "next/link";
+import { LocalePicker } from "./LocalePicker";
 import { Logo } from "./Logo";
 
 // The site-wide footer: brand mark, origin note, and the PayFast-compliance legal
@@ -21,6 +22,12 @@ export function SiteFooter() {
           <Link href="/privacy" className="hover:text-accent">{t("privacyPolicy")}</Link>
           <Link href="/refunds" className="hover:text-accent">{t("refundsAndCancellation")}</Link>
         </nav>
+        {/* The app-language picker (ticket 03 §4): site-wide chrome, so it's the
+            guest-reachable home for the setting — the landing/legal pages all
+            render this footer, pre-login. */}
+        <div className="mt-2">
+          <LocalePicker />
+        </div>
       </div>
     </footer>
   );

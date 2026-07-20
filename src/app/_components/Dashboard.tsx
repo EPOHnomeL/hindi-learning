@@ -2,6 +2,7 @@
 
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -13,6 +14,7 @@ import { CourseSettingsDialog } from "./CourseSettings";
 import { EditionsDialog } from "./Editions";
 import { withLang } from "./editionUrl";
 import { Icon } from "./icons";
+import { LocalePicker } from "./LocalePicker";
 import { formatPrice } from "./Paygate";
 import { Logo } from "./Logo";
 import { Markdown } from "./MarkdownView";
@@ -72,6 +74,7 @@ export function Dashboard() {
   const purchased = useQuery(api.market.myPurchases);
   const { signOut } = useAuthActions();
   const router = useRouter();
+  const tc = useTranslations("Common");
 
   // A learner with nothing to their name who also can't author (open sign-up
   // admits everyone; the Allowlist gates creation, not existence — ADR 0021).
@@ -94,10 +97,11 @@ export function Dashboard() {
             <Logo className="h-9 w-9 shrink-0 text-accent md:h-10 md:w-10" />
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">My Course</h1>
-              <p className="mt-0.5 text-sm text-soft">Your learning workspace</p>
+              <p className="mt-0.5 text-sm text-soft">{tc("tagline")}</p>
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <LocalePicker />
             <ThemeToggle />
             {amAdmin && (
               <Link href="/admin" className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
@@ -111,7 +115,7 @@ export function Dashboard() {
               }}
               className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
             >
-              Sign out
+              {tc("signOut")}
             </button>
           </div>
         </header>
@@ -146,13 +150,14 @@ export function Dashboard() {
 // among the header's text buttons. Sun in dark mode (tap for light), moon in
 // light mode (tap for dark).
 function ThemeToggle() {
+  const tc = useTranslations("Common");
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
   return (
     <button
       onClick={toggle}
-      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-      title={dark ? "Light mode" : "Dark mode"}
+      aria-label={dark ? tc("themeToLight") : tc("themeToDark")}
+      title={dark ? tc("lightMode") : tc("darkMode")}
       className="rounded-lg p-1.5 text-soft transition-colors hover:bg-hi hover:text-accent"
     >
       <Icon name={dark ? "sun" : "moon"} className="h-4 w-4" />
@@ -187,27 +192,28 @@ function LangChips({ langs }: { langs: { lang: string; native: string; rtl: bool
 // The single status pill on an owner card. One badge only, by priority:
 // Complete (the course is concluded) → Public (a link is live) → Setting up.
 function StatusPill({ course }: { course: Course }) {
+  const t = useTranslations("Dashboard");
   if (course.status === "completed") {
     return (
       <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
-        <Icon name="award" className="h-3 w-3" /> Complete
+        <Icon name="award" className="h-3 w-3" /> {t("complete")}
       </span>
     );
   }
   if (course.publicToken) {
     return (
       <span
-        title="A public link is live"
+        title={t("publicLinkLive")}
         className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent2/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-accent2"
       >
-        <Icon name="globe" className="h-3 w-3" /> Public
+        <Icon name="globe" className="h-3 w-3" /> {t("public")}
       </span>
     );
   }
   if (course.status === "seeded") {
     return (
       <span className="shrink-0 rounded-full bg-hi px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-accent">
-        Setting up
+        {t("settingUp")}
       </span>
     );
   }
@@ -219,17 +225,19 @@ function StatusPill({ course }: { course: Course }) {
 // the most salient state, and only a completed course can be priced. "from" when
 // several Editions are priced (they may differ in price/currency).
 function PaidPill({ pricing }: { pricing: { amount: number; currency: string }[] }) {
+  const t = useTranslations("Dashboard");
   const min = pricing.reduce((a, b) => (b.amount < a.amount ? b : a));
   return (
     <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
       <Icon name="tag" className="h-3 w-3" />
-      {pricing.length > 1 ? "from " : ""}
+      {pricing.length > 1 ? t("from") : ""}
       {formatPrice(min.amount, min.currency)}
     </span>
   );
 }
 
 function CourseCard({ course }: { course: Course }) {
+  const t = useTranslations("Dashboard");
   const [showMission, setShowMission] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editionsOpen, setEditionsOpen] = useState(false);
@@ -273,14 +281,14 @@ function CourseCard({ course }: { course: Course }) {
       {course.mission ? (
         <button
           onClick={() => setShowMission(true)}
-          title="View full mission"
+          title={t("viewMission")}
           className="line-clamp-2 min-h-[38px] text-left text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
         >
           {missionPreview(course.mission)}
         </button>
       ) : (
         <p className="min-h-[38px] text-[13.5px] text-soft">
-          {seeded ? "Your teacher is preparing the first lesson." : "No mission yet."}
+          {seeded ? t("preparingMission") : t("noMission")}
         </p>
       )}
 
@@ -292,16 +300,17 @@ function CourseCard({ course }: { course: Course }) {
         <div className="mb-1.5 flex items-center justify-between text-xs text-soft">
           <span>
             {course.lessonCount === 0 ? (
-              "No lessons yet"
+              t("noLessonsYet")
             ) : (
               <>
-                <span className="tabular-nums font-medium text-ink">{course.completedCount}</span> / {course.lessonCount} lessons
+                <span className="tabular-nums font-medium text-ink">{course.completedCount}</span> / {course.lessonCount}{" "}
+                {t("lessons", { count: course.lessonCount })}
               </>
             )}
             {/* Soft estimate of the eventual total (owner-only; server-gated). */}
             {course.estimatedLessons != null && (
               <span title="Your teacher's estimate of the course's eventual size — a rough guide, not a promise.">
-                {" · ~"}{course.estimatedLessons} total
+                {t("estimatedTotal", { count: course.estimatedLessons })}
               </span>
             )}
           </span>
@@ -328,12 +337,12 @@ function CourseCard({ course }: { course: Course }) {
             className="flex-1 rounded-lg bg-gold/20 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-gold/30 disabled:opacity-70"
           >
             {setup === "starting"
-              ? "Starting setup…"
+              ? t("startingSetup")
               : setup === "started"
-                ? "Setup started — first lesson in ~1 min"
+                ? t("setupStarted")
                 : setup === "error"
-                  ? "Couldn’t start — retry"
-                  : "Set up now"}
+                  ? t("setupError")
+                  : t("setUpNow")}
           </button>
         ) : (
           <>
@@ -341,13 +350,13 @@ function CourseCard({ course }: { course: Course }) {
               href={`/courses/${course.slug}`}
               className="flex-1 rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
             >
-              Open course
+              {t("openCourse")}
             </Link>
-            <IconButton icon="edit" label={`Edit ${course.title}`} title="Edit" onClick={() => setSettingsOpen(true)} />
+            <IconButton icon="edit" label={t("editCourse", { title: course.title })} title={t("edit")} onClick={() => setSettingsOpen(true)} />
             <IconButton
               icon="globe"
-              label={`Editions & sharing for ${course.title}`}
-              title="Editions"
+              label={t("editionsSharingFor", { title: course.title })}
+              title={t("editions")}
               onClick={() => setEditionsOpen(true)}
             />
             {complete && <CourseCertMenu topicSlug={course.slug} />}
@@ -422,12 +431,13 @@ function AdminCourseMenu({ slug, title }: { slug: string; title: string }) {
 
 // Courses other learners have shared with me — read-only. Hidden when none.
 function SharedSection() {
+  const t = useTranslations("Dashboard");
   const shared = useQuery(api.shares.listSharedTopics);
   if (!shared || shared.length === 0) return null;
   return (
     <section className="mt-12">
-      <h2 className="mb-1 text-lg font-semibold tracking-tight text-accent">Shared with me</h2>
-      <p className="mb-4 text-sm text-soft">Courses others have shared with you — view only.</p>
+      <h2 className="mb-1 text-lg font-semibold tracking-tight text-accent">{t("sharedWithMe")}</h2>
+      <p className="mb-4 text-sm text-soft">{t("sharedSubtitle")}</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {shared.map((c) => (
           <SharedCourseCard key={c.slug} course={c} />
@@ -442,6 +452,7 @@ function SharedSection() {
 // ⋯ appears with their own certificate. They read the single edition shared to
 // them (viewer-cannot-switch-edition); the chips are informational.
 function SharedCourseCard({ course }: { course: SharedCourse }) {
+  const t = useTranslations("Dashboard");
   const [showMission, setShowMission] = useState(false);
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
   const allDone = course.lessonCount > 0 && course.completedCount === course.lessonCount;
@@ -454,14 +465,14 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
       <div className="mb-2 flex items-start justify-between gap-2">
         <h2 className="min-w-0 text-lg font-semibold leading-snug text-ink">{course.title}</h2>
         <span className="shrink-0 rounded-full bg-hi px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-accent">
-          Shared
+          {t("sharedBadge")}
         </span>
       </div>
 
       {course.mission && (
         <button
           onClick={() => setShowMission(true)}
-          title="View full mission"
+          title={t("viewMission")}
           className="line-clamp-2 min-h-[38px] text-left text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
         >
           {missionPreview(course.mission)}
@@ -469,7 +480,9 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
       )}
 
       <p className="mt-1 text-xs text-soft">
-        Shared by <span className="text-ink">{course.ownerEmail ?? "another learner"}</span>
+        {t.rich("sharedBy", {
+          owner: () => <span className="text-ink">{course.ownerEmail ?? t("anotherLearner")}</span>,
+        })}
       </p>
 
       <LangChips langs={course.langs} />
@@ -478,10 +491,11 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
         <div className="mb-1.5 flex items-center justify-between text-xs text-soft">
           <span>
             {course.lessonCount === 0 ? (
-              "No lessons yet"
+              t("noLessonsYet")
             ) : (
               <>
-                <span className="tabular-nums font-medium text-ink">{course.completedCount}</span> / {course.lessonCount} lessons
+                <span className="tabular-nums font-medium text-ink">{course.completedCount}</span> / {course.lessonCount}{" "}
+                {t("lessons", { count: course.lessonCount })}
               </>
             )}
           </span>
@@ -499,7 +513,7 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
           href={withLang(`/courses/${course.slug}`, openLang)}
           className="flex-1 rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
         >
-          Open course
+          {t("openCourse")}
         </Link>
         {allDone && <CourseCertMenu topicSlug={course.slug} />}
       </div>
@@ -514,12 +528,13 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
 // Courses I've bought (paid marketplace, ADR 0016) — read-only, full access, my
 // own progress + certificate. Hidden when none. The paid twin of SharedSection.
 function PurchasedSection() {
+  const t = useTranslations("Dashboard");
   const purchased = useQuery(api.market.myPurchases);
   if (!purchased || purchased.length === 0) return null;
   return (
     <section className="mt-12">
-      <h2 className="mb-1 text-lg font-semibold tracking-tight text-accent">Purchased</h2>
-      <p className="mb-4 text-sm text-soft">Courses you’ve bought — yours to read for life.</p>
+      <h2 className="mb-1 text-lg font-semibold tracking-tight text-accent">{t("purchased")}</h2>
+      <p className="mb-4 text-sm text-soft">{t("purchasedSubtitle")}</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {purchased.map((c) => (
           <PurchasedCourseCard key={c.slug} course={c} />
@@ -535,6 +550,7 @@ function PurchasedSection() {
 // read the Edition(s) they bought (chips are informational); buying another
 // language is a separate purchase.
 function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
+  const t = useTranslations("Dashboard");
   const [showMission, setShowMission] = useState(false);
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
   const allDone = course.lessonCount > 0 && course.completedCount === course.lessonCount;
@@ -545,21 +561,21 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
       <div className="mb-2 flex items-start justify-between gap-2">
         <h2 className="min-w-0 text-lg font-semibold leading-snug text-ink">{course.title}</h2>
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
-          <Icon name="check" className="h-3 w-3" /> Purchased
+          <Icon name="check" className="h-3 w-3" /> {t("purchased")}
         </span>
       </div>
 
       {course.mission && (
         <button
           onClick={() => setShowMission(true)}
-          title="View full mission"
+          title={t("viewMission")}
           className="line-clamp-2 min-h-[38px] text-left text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
         >
           {missionPreview(course.mission)}
         </button>
       )}
 
-      <p className="mt-1 text-xs text-soft">Yours for life</p>
+      <p className="mt-1 text-xs text-soft">{t("yoursForLife")}</p>
 
       <LangChips langs={course.langs} />
 
@@ -567,10 +583,11 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
         <div className="mb-1.5 flex items-center justify-between text-xs text-soft">
           <span>
             {course.lessonCount === 0 ? (
-              "No lessons yet"
+              t("noLessonsYet")
             ) : (
               <>
-                <span className="tabular-nums font-medium text-ink">{course.completedCount}</span> / {course.lessonCount} lessons
+                <span className="tabular-nums font-medium text-ink">{course.completedCount}</span> / {course.lessonCount}{" "}
+                {t("lessons", { count: course.lessonCount })}
               </>
             )}
           </span>
@@ -588,7 +605,7 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
           href={withLang(`/courses/${course.slug}`, openLang)}
           className="flex-1 rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
         >
-          Open course
+          {t("openCourse")}
         </Link>
         {allDone && <CourseCertMenu topicSlug={course.slug} />}
       </div>
@@ -616,16 +633,14 @@ function MissionDialog({ title, mission, onClose }: { title: string; mission: st
 // paid marketplace exists in the backend (ADR 0016) but has no public browse
 // surface yet, hence "coming soon".
 function EmptyLibrary() {
+  const t = useTranslations("Dashboard");
   return (
     <div className="flex flex-col items-center rounded-2xl border border-dashed border-line bg-card px-6 py-16 text-center">
       <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-hi text-accent">
         <Icon name="book" className="h-6 w-6" />
       </span>
-      <h2 className="text-lg font-semibold tracking-tight text-ink">No courses yet</h2>
-      <p className="mt-2 max-w-md text-sm leading-relaxed text-soft">
-        You don&apos;t own any courses yet. A marketplace to browse and buy courses is coming soon — check back before
-        long.
-      </p>
+      <h2 className="text-lg font-semibold tracking-tight text-ink">{t("noCoursesYet")}</h2>
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-soft">{t("emptyLibraryBody")}</p>
     </div>
   );
 }
