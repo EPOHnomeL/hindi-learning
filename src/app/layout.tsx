@@ -8,6 +8,7 @@ import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { getTenantSlug, getTenantView } from "~/lib/tenant-server";
 import { buildTenantThemeCss } from "~/design/tokens";
+import { isDevanagari } from "../../convex/languages";
 
 // Per-host metadata (issue 11): a tenant serves its own favicon (and browser-tab
 // name), so the whitelabel site never shows the default "My Course" mark. Falls
@@ -72,7 +73,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             }}
           />
         </head>
-        <body>
+        {/* Escape hatch A (ticket 04): a Devanagari chrome locale (Hindi) needs a
+            Devanagari-capable face — the Spectral body font has no such glyphs.
+            Mirror the reader's isDevanagari handling: swap the body font to Noto
+            Devanagari for the whole chrome. Latin text falls back within the stack. */}
+        <body className={isDevanagari(locale) ? "font-deva" : undefined}>
           {/* Messages + locale flow to every Client Component from the request
               config (getRequestConfig) — no props needed; the provider inherits
               them server-side. Server Components use getTranslations directly. */}
