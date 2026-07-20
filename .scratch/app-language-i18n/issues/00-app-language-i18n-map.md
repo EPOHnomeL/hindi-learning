@@ -61,15 +61,33 @@ Shipping the code is the *next* effort, not this map.
   **no runtime generation, no `convex/translate.ts` wiring**. **Add-a-language = one JSON file** (+ a
   font if a new script — Hindi/Devanagari→Noto; + a `LANGUAGES` entry only if the code isn't already
   among the ~130). **Unblocks 05 + 06.**
+- [Storage, resolution order + picker](03-app-language-storage-resolution-picker.md) — **the settings-model
+  half, RESOLVED.** Render source of truth = **the cookie only** (04); `getRequestConfig` never reads
+  Convex. Signed-in storage = a new **`userPrefs`** table (`{ userId, locale? }`, `by_user`) — *not* a
+  `users` field (07's skip stands); guest storage = **the cookie itself** (map's `localStorage` superseded
+  by 04 — avoids the SSR flash). The cookie is written by three events: **explicit pick** (+ `userPrefs`
+  if signed-in) → **login sync** from `userPrefs` → **one-time `Accept-Language` sniff** (mapped to an
+  offered locale, else English, then persisted). Picker lives in **account settings** + a guest-reachable
+  **header/footer** control; offer-set = the `messages/*.json` that exist (`en/af/es/fr/hi`), labels reused
+  from `convex/languages.ts` (`langInfo`), UI mirrors `Editions.tsx`. Adds nothing to the add-a-language
+  cost. Build-time key-parity check → owned by 05; mixed-language marker → still fog.
+- [Extraction — string inventory + key convention](05-string-extraction-inventory-key-convention.md) —
+  **key convention + extraction, RESOLVED.** Keys = **`next-intl` nested namespaces by surface**
+  (`Common`/`Reader`/`Dashboard`/`Catalogue`/`Auth`/`Editions`); **English `en.json` is the source of
+  truth**, key names semantic (re-wording English never renames a key). Extraction = **one bounded
+  mechanical sweep** of the ~8 in-scope learner components (~90–120 keys), not as-you-touch (half-English
+  chrome reads as a bug). Interpolation/counts = ICU (one key each); concatenations restructured to a
+  single whole-sentence key. **Key-parity fog item closed:** a `vitest` test asserts every
+  `messages/<code>.json` carries exactly `en.json`'s leaf keys — **CI fails on drift** (no runtime
+  `sourceHash`, no Convex rail). Devanagari chrome needs the app-shell font per 04's escape hatch.
 
 ## Not yet specified
 
 <!-- in-scope fog: real but not yet sharp enough to ticket; graduates as the frontier advances -->
 
-- **Catalogue staleness / sync.** With repo JSON locked (04), this is **no longer a runtime
-  `sourceHash` problem** but a **build-time key-parity check** ("every `messages/*.json` carries exactly
-  `en.json`'s keys"). Ticket 04 deliberately did **not** fold the guard in — it **graduates with ticket
-  05 (extraction)**, which owns the source key set.
+- ~~**Catalogue staleness / sync.**~~ **Closed by 05** — specced as a build-time **key-parity
+  `vitest` test** ("every `messages/<code>.json` carries exactly `en.json`'s leaf keys; CI fails on
+  drift"), owned by ticket 05. No longer fog.
 - **Mixed-language UX marker.** Whether to surface a subtle banner/marker when chrome language ≠ the
   content Edition's language, so the mixed state isn't read as a bug (from ticket 01's notes).
   Graduates once storage (03) + architecture (04) settle.
