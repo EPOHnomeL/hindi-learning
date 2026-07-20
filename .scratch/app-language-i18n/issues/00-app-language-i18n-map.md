@@ -1,6 +1,8 @@
 # app-language-i18n/00: Chrome i18n — map
 
-**Status:** open
+**Status:** **destination reached** (2026-07-20) — all decision tickets (02–06) resolved & committed;
+the architecture + spec are build-ready. Two fog items (mixed-language UX marker, per-locale QA) are
+**intentionally deferred** — neither blocks a build; either can graduate to a ticket later if wanted.
 **Labels:** wayfinder:map
 
 <!-- The canonical wayfinder map for learner-facing app-UI (chrome) internationalisation.
@@ -51,8 +53,9 @@ Shipping the code is the *next* effort, not this map.
   **`next-intl` "without i18n routing"** (locale from a cookie) over an in-house `t()` layer, with
   **repo per-locale JSON** catalogues (not a Convex `localizations` table + LLM rail). Corrects ticket
   01: `convex/translate.ts` is a `PUBLISH_SECRET`-guarded **OpenRouter cloud routine** for *content*,
-  wrong shape for chrome strings. `convex/languages.ts` already is the shared language registry (all 5
-  langs) — reuse it (pre-answers ticket 03's shared-list note). Hindi chrome needs a Devanagari font.
+  wrong shape for chrome strings. `convex/languages.ts` reused for language **names** only (04 corrected
+  the research's "shared registry, all 5 langs" framing: it's a ~130-entry *content* menu, so the chrome
+  offer-set is the `messages/*.json` that exist, not `LANGUAGES`). Hindi chrome needs a Devanagari font.
   Full asset: [research-app-router-i18n.md](research-app-router-i18n.md). **Feeds ticket 04.**
 - [Architecture — i18n layer + catalogue storage](04-architecture-i18n-layer-catalogue-storage.md) —
   **the spine, LOCKED.** Layer = **`next-intl`, "without i18n routing"**, locale from a cookie via async
