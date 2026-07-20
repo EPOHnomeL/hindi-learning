@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "convex/react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
@@ -70,10 +71,10 @@ export function Paygate({
   // Authed reader: arriving with the buy marker opens the dialog immediately.
   autoOpenBuy?: boolean;
 }) {
+  const t = useTranslations("Checkout");
   const [buying, setBuying] = useState(!!autoOpenBuy && !buyHref);
   const price = paywall ? formatPrice(paywall.amount, paywall.currency) : null;
-  const heading =
-    kind === "reference" ? "This reference is part of the full course" : "The rest of this course is locked";
+  const heading = kind === "reference" ? t("referenceLockedTitle") : t("courseLockedTitle");
   const ctaClass =
     "rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90";
 
@@ -85,24 +86,25 @@ export function Paygate({
         </span>
         <h3 className="text-lg font-semibold tracking-tight text-ink">{heading}</h3>
         <p className="mt-1.5 text-sm leading-relaxed text-soft">
-          You’ve read the free first lesson. Unlock every lesson and reference — lifetime access to
-          {editionName ? ` the ${editionName} edition` : " this edition"}, in a single payment.
+          {t("unlockEditionBody", {
+            edition: editionName ? t("namedEdition", { name: editionName }) : t("thisEdition"),
+          })}
         </p>
         <div className="mt-5 flex flex-wrap items-center gap-4">
           {buyHref ? (
             <Link href={buyHref} className={ctaClass}>
-              Unlock the full course
+              {t("unlockFullCourse")}
             </Link>
           ) : (
             <button onClick={() => setBuying(true)} className={ctaClass}>
-              Unlock the full course
+              {t("unlockFullCourse")}
             </button>
           )}
           {price && <span className="text-2xl font-semibold tabular-nums text-ink">{price}</span>}
         </div>
         <p className="mt-3 flex items-center gap-1.5 text-xs text-soft">
           <Icon name="globe" className="h-3.5 w-3.5 text-accent2" />
-          Card or Instant EFT via PayFast · pay once, keep forever
+          {t("payFastNote")}
         </p>
       </div>
       {buying && !buyHref && (
@@ -141,6 +143,7 @@ function BuyDialog({
   lang?: string;
   onClose: () => void;
 }) {
+  const t = useTranslations("Checkout");
   const startCheckout = useMutation(api.market.startCheckout);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,17 +171,21 @@ function BuyDialog({
       document.body.appendChild(form);
       form.submit();
     } catch {
-      setError("Couldn’t start checkout — please try again.");
+      setError(t("checkoutFailed"));
       setBusy(false);
     }
   };
 
   return (
-    <Dialog title="Unlock this course" onClose={onClose}>
+    <Dialog title={t("unlockThisCourse")} onClose={onClose}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <b className="block text-[15px] text-ink">{courseTitle ?? "This course"}</b>
-          <span className="text-xs text-soft">{editionName ? `${editionName} edition` : "This edition"} · lifetime access</span>
+          <b className="block text-[15px] text-ink">{courseTitle ?? t("thisCourse")}</b>
+          <span className="text-xs text-soft">
+            {t("editionLifetime", {
+              edition: editionName ? t("editionName", { name: editionName }) : t("thisEditionTitle"),
+            })}
+          </span>
         </div>
         {price && (
           <span className="shrink-0 rounded-full bg-gold/15 px-2.5 py-1 text-xs font-bold tabular-nums text-gold">{price}</span>
@@ -187,10 +194,7 @@ function BuyDialog({
 
       <div className="mt-4 flex items-start gap-3 rounded-xl border border-line bg-hi/40 p-3.5 text-sm leading-relaxed text-soft">
         <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-accent2" />
-        <span>
-          You’ve read the free first lesson. This unlocks every remaining lesson and reference — yours for good, in
-          {editionName ? ` ${editionName}` : " this language"}.
-        </span>
+        <span>{t("unlockDialogBody", { edition: editionName ?? t("thisLanguage") })}</span>
       </div>
 
       <form
@@ -204,21 +208,22 @@ function BuyDialog({
           disabled={!canBuy || busy}
           className="mt-4 w-full rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          {busy ? "Redirecting to PayFast…" : `Continue to PayFast${price ? ` · ${price}` : ""}`}
+          {busy ? t("redirecting") : price ? `${t("continueToPayFast")} · ${price}` : t("continueToPayFast")}
         </button>
       </form>
       {error ? (
         <p className="mt-2.5 text-center text-xs text-danger">{error}</p>
       ) : (
         <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-xs text-soft">
-          <Icon name="globe" className="h-3.5 w-3.5 text-accent2" /> Card or Instant EFT · pay once, keep forever
+          <Icon name="globe" className="h-3.5 w-3.5 text-accent2" /> {t("payFastNoteShort")}
         </p>
       )}
       {/* Point-of-sale compliance: the refund policy (all sales final) linked where the buyer commits. */}
       <p className="mt-1 text-center text-xs text-soft">
-        By purchasing you agree to the{" "}
-        <Link href="/terms" className="text-accent2 underline-offset-2 hover:underline">Terms</Link> and{" "}
-        <Link href="/refunds" className="text-accent2 underline-offset-2 hover:underline">Refund Policy</Link>.
+        {t.rich("purchaseAgreement", {
+          terms: (c) => <Link href="/terms" className="text-accent2 underline-offset-2 hover:underline">{c}</Link>,
+          refund: (c) => <Link href="/refunds" className="text-accent2 underline-offset-2 hover:underline">{c}</Link>,
+        })}
       </p>
     </Dialog>
   );

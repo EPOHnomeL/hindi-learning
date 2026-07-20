@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import type React from "react";
 import { Icon } from "./icons";
@@ -26,6 +27,7 @@ export function NavItem({
   free?: boolean;
   children: React.ReactNode;
 }) {
+  const t = useTranslations("Reader");
   return (
     <Link
       href={href}
@@ -41,18 +43,18 @@ export function NavItem({
               active ? "bg-white/20 text-white" : "bg-accent2/15 text-accent2"
             }`}
           >
-            Free
+            {t("free")}
           </span>
         )}
         {notify && (
           <span
-            aria-label="New reply from your teacher"
-            title="Your teacher answered a question here"
+            aria-label={t("newReply")}
+            title={t("answeredHere")}
             className={`h-2 w-2 rounded-full ${active ? "bg-white" : "bg-gold"}`}
           />
         )}
         {done && (
-          <span aria-label="completed" title="Completed" className={`text-xs ${active ? "text-white" : "text-accent2"}`}>
+          <span aria-label={t("completedLabel")} title={t("completed")} className={`text-xs ${active ? "text-white" : "text-accent2"}`}>
             ✓
           </span>
         )}

@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { Logo } from "./Logo";
 
@@ -5,6 +6,7 @@ import { Logo } from "./Logo";
 // links (terms, privacy, refunds) that must appear site-wide. Shared by the public
 // Landing and the signed-in Dashboard so the legal links live in exactly one place.
 export function SiteFooter() {
+  const t = useTranslations("Footer");
   return (
     <footer className="border-t border-line">
       <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-2 px-6 py-10 text-center text-sm text-soft">
@@ -12,14 +14,12 @@ export function SiteFooter() {
           <Logo className="h-6 w-6" />
           <span className="font-semibold">My Course</span>
         </span>
-        <p>
-          Born teaching Hindi — <span className="font-deva">नमस्ते</span> — built to teach anything.
-        </p>
+        <p>{t.rich("origin", { deva: (c) => <span className="font-deva">{c}</span> })}</p>
         {/* PayFast compliance: terms, privacy, and the refund policy linked site-wide. */}
         <nav className="mt-1 flex gap-4">
-          <Link href="/terms" className="hover:text-accent">Terms &amp; Conditions</Link>
-          <Link href="/privacy" className="hover:text-accent">Privacy Policy</Link>
-          <Link href="/refunds" className="hover:text-accent">Refunds &amp; Cancellation</Link>
+          <Link href="/terms" className="hover:text-accent">{t("termsAndConditions")}</Link>
+          <Link href="/privacy" className="hover:text-accent">{t("privacyPolicy")}</Link>
+          <Link href="/refunds" className="hover:text-accent">{t("refundsAndCancellation")}</Link>
         </nav>
       </div>
     </footer>

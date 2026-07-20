@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "./MarkdownView";
 import { resourceOpenMode } from "./readerDerive";
@@ -71,6 +72,7 @@ export function ResourceItem({ resource }: { resource: Resource }) {
 // The blob text is fetched from its signed storage URL; if that fails (offline,
 // CORS), we fall back to opening the raw file directly.
 export function MarkdownResourceDialog({ title, url, onClose }: { title: string; url: string; onClose: () => void }) {
+  const t = useTranslations("Resource");
   const ref = useRef<HTMLDialogElement>(null);
   const [state, setState] = useState<
     { status: "loading" } | { status: "ready"; text: string } | { status: "error" }
@@ -104,14 +106,14 @@ export function MarkdownResourceDialog({ title, url, onClose }: { title: string;
             href={url}
             target="_blank"
             rel="noopener noreferrer"
-            title="Open the raw file"
+            title={t("openRawFile")}
             className="rounded-lg px-2 py-1 text-xs text-soft transition-colors hover:bg-hi hover:text-accent"
           >
-            Raw ↗
+            {t("raw")} ↗
           </a>
           <button
             onClick={() => ref.current?.close()}
-            aria-label="Close"
+            aria-label={t("close")}
             className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
           >
             ✕
@@ -119,12 +121,12 @@ export function MarkdownResourceDialog({ title, url, onClose }: { title: string;
         </div>
       </div>
       <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
-        {state.status === "loading" && <p className="text-sm text-soft">Loading…</p>}
+        {state.status === "loading" && <p className="text-sm text-soft">{t("loading")}</p>}
         {state.status === "error" && (
           <p className="text-sm text-soft">
-            Couldn’t load this file.{" "}
+            {t("loadFailed")}{" "}
             <a href={url} target="_blank" rel="noopener noreferrer" className="text-accent2 underline underline-offset-2">
-              Open it directly ↗
+              {t("openDirectly")} ↗
             </a>
           </p>
         )}

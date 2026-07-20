@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
+import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { api } from "../../../convex/_generated/api";
@@ -62,6 +63,7 @@ export function CourseIndex({ slug }: { slug: string }) {
 // the first one lands). A Viewer of a shared course with no lessons gets a calm
 // "nothing yet" instead.
 function CourseStatus({ variant }: { variant: "loading" | "opening" | "preparing" | "empty-viewer" }) {
+  const t = useTranslations("Reader");
   // Both resolve straight into a Lesson, so mimic the lesson reader (with its
   // question aside) rather than flashing a bare line of centred text.
   if (variant === "loading" || variant === "opening") return <ReaderSkeleton />;
@@ -72,8 +74,8 @@ function CourseStatus({ variant }: { variant: "loading" | "opening" | "preparing
         <span className="flex h-16 w-16 items-center justify-center rounded-2xl bg-hi text-3xl" aria-hidden>
           📚
         </span>
-        <h2 className="text-lg font-semibold text-accent">No lessons yet</h2>
-        <p className="max-w-sm text-sm text-soft">This course doesn’t have any published lessons yet. Check back soon.</p>
+        <h2 className="text-lg font-semibold text-accent">{t("noLessonsYet")}</h2>
+        <p className="max-w-sm text-sm text-soft">{t("noLessonsYetBody")}</p>
       </div>
     );
   }
@@ -87,11 +89,8 @@ function CourseStatus({ variant }: { variant: "loading" | "opening" | "preparing
         </span>
       </div>
       <div className="flex max-w-md flex-col items-center gap-2">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">Preparing your first lesson</h2>
-        <p className="text-sm leading-relaxed text-soft">
-          Your teacher is reading through your resources and drafting Lesson&nbsp;1. This usually takes about a minute — it’ll
-          appear here automatically.
-        </p>
+        <h2 className="text-xl font-semibold tracking-tight text-accent">{t("preparingFirstLessonTitle")}</h2>
+        <p className="text-sm leading-relaxed text-soft">{t("preparingFirstLessonBody")}</p>
       </div>
       <div className="flex items-center gap-1.5" aria-hidden>
         <span className="h-2 w-2 animate-bounce rounded-full bg-accent2/70 [animation-delay:0ms]" />

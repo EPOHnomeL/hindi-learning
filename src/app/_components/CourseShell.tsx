@@ -2,6 +2,7 @@
 
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useQuery } from "convex/react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
@@ -69,6 +70,8 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   // The Edition being read (course-translation): `?lang` from the URL, threaded
   // into every content query so the sidebar + nav follow the chosen language.
   // Progress is language-agnostic, so `myProgress` never takes `lang`.
+  const t = useTranslations("Reader");
+  const tc = useTranslations("Common");
   const lang = useEditionLang();
   const header = useQuery(api.content.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
   const canWrite = header?.role === "owner";
@@ -157,7 +160,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             navHidden ? "-translate-y-full" : "translate-y-0"
           }`}
         >
-          <button onClick={() => setMenuOpen(true)} aria-label="Open lessons" className="rounded-lg p-1.5 text-ink hover:bg-hi">
+          <button onClick={() => setMenuOpen(true)} aria-label={t("openLessons")} className="rounded-lg p-1.5 text-ink hover:bg-hi">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="3" y1="6" x2="21" y2="6" />
               <line x1="3" y1="12" x2="21" y2="12" />
@@ -178,9 +181,9 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             <Link
               href="/"
               className="-ml-1 flex items-center gap-1 rounded-lg px-1.5 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
-              aria-label="Back to courses"
+              aria-label={t("backToCoursesLabel")}
             >
-              <span aria-hidden>←</span> Courses
+              <span aria-hidden>←</span> {t("backToCourses")}
             </Link>
             <button
               onClick={() => {
@@ -189,7 +192,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               }}
               className="shrink-0 text-xs text-soft hover:text-accent"
             >
-              Sign out
+              {tc("signOut")}
             </button>
           </div>
           {/* The served Edition's title. Fixing it (and the mission) lives in
@@ -198,9 +201,9 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
           <h1 className="mb-4 truncate text-lg font-semibold tracking-tight text-accent">{header?.title ?? "…"}</h1>
 
           <nav className="flex flex-col gap-1">
-            <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">Lessons</p>
+            <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">{t("lessons")}</p>
             {lessons?.length === 0 && (
-              <p className="px-2 text-sm text-soft">{canWrite ? "Preparing your first lesson…" : "No lessons published yet."}</p>
+              <p className="px-2 text-sm text-soft">{canWrite ? t("preparingFirstLesson") : t("noLessonsPublished")}</p>
             )}
             {lessons?.map((l) => (
               <NavItem
@@ -215,7 +218,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               </NavItem>
             ))}
 
-            <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">References</p>
+            <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">{t("references")}</p>
             {references?.map((r) => (
               <NavItem
                 key={r.key}
@@ -277,6 +280,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
 // branch (ponytail: the sandbox-verified norm is seconds; support owns the freak
 // case).
 function ConfirmingBanner() {
+  const t = useTranslations("Reader");
   const params = useSearchParams();
   const mp = params.get("purchase") === "return" ? params.get("mp") : null;
   const status = useQuery(api.market.checkoutStatus, mp ? { mPaymentId: mp } : "skip");
@@ -288,8 +292,7 @@ function ConfirmingBanner() {
     >
       <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-gold" />
       <span>
-        <b className="font-semibold text-ink">Confirming your payment</b> — this usually takes a few seconds. Your
-        course unlocks here the moment it&rsquo;s confirmed.
+        <b className="font-semibold text-ink">{t("confirmingPaymentTitle")}</b> — {t("confirmingPaymentBody")}
       </span>
     </div>
   );
@@ -298,15 +301,16 @@ function ConfirmingBanner() {
 // Light/Dark toggle pinned (with the Edition switcher) to the bottom of the
 // sidebar (ADR 0011). The `mt-auto` that pins the group lives on the wrapper.
 function ThemeToggle() {
+  const tc = useTranslations("Common");
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
   return (
     <button
       onClick={toggle}
-      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={dark ? tc("themeToLight") : tc("themeToDark")}
       className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
     >
-      <span>{dark ? "Dark" : "Light"} mode</span>
+      <span>{dark ? tc("darkMode") : tc("lightMode")}</span>
       <Icon name={dark ? "moon" : "sun"} className="h-4 w-4" />
     </button>
   );
@@ -324,11 +328,12 @@ function LanguageSwitcher({
   editions: { lang: string; name: string; native: string; rtl: boolean }[];
   current: string;
 }) {
+  const t = useTranslations("Reader");
   const router = useRouter();
   const pathname = usePathname();
   return (
     <div className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft">
-      <label htmlFor="edition-lang" className="shrink-0">Language</label>
+      <label htmlFor="edition-lang" className="shrink-0">{t("language")}</label>
       <select
         id="edition-lang"
         value={current}
@@ -374,6 +379,7 @@ function CourseSettingsButton({
     editions: { lang: string; native: string }[];
   };
 }) {
+  const t = useTranslations("Reader");
   const [open, setOpen] = useState(false);
   const native = header.editions.find((e) => e.lang === header.lang)?.native ?? header.lang;
   return (
@@ -382,7 +388,7 @@ function CourseSettingsButton({
         onClick={() => setOpen(true)}
         className="mt-2 flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:border-transparent hover:bg-hi hover:text-accent"
       >
-        <Icon name="settings" className="h-4 w-4" /> Course settings
+        <Icon name="settings" className="h-4 w-4" /> {t("courseSettings")}
       </button>
       {open && (
         <CourseSettingsDialog
@@ -404,6 +410,7 @@ function CourseSettingsButton({
 // The active Topic's Resources — files (PDF or Markdown, uploaded) and links —
 // each opening in a new tab. Add more by uploading a file or pasting a link.
 function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite: boolean }) {
+  const t = useTranslations("Reader");
   const resources = useQuery(api.resources.listResources, { topicSlug });
   const { uploadFile, addLink } = useResourceUpload();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -424,7 +431,7 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
   return (
     <details className="group mt-1">
       <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 pt-4 pb-2 text-xs font-semibold uppercase tracking-wider text-accent2 hover:text-accent [&::-webkit-details-marker]:hidden">
-        Resources
+        {t("resources")}
         <svg
           aria-hidden
           className="mr-1 transition-transform duration-200 group-open:rotate-180"
@@ -441,7 +448,7 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
         </svg>
       </summary>
       <div className="flex flex-col gap-1">
-        {resources?.length === 0 && <p className="px-2 text-sm text-soft">No resources yet.</p>}
+        {resources?.length === 0 && <p className="px-2 text-sm text-soft">{t("noResources")}</p>}
         {resources?.map((r) => (
           <ResourceItem key={r.id} resource={r} />
         ))}
@@ -475,10 +482,10 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
                   autoFocus
                   value={linkDraft}
                   onChange={(e) => setLinkDraft(e.target.value)}
-                  placeholder="https://…"
+                  placeholder={t("linkPlaceholder")}
                   className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-sm focus:border-gold focus:outline-none"
                 />
-                <button type="submit" className="rounded-lg bg-accent2 px-2 py-1 text-xs text-white">Add</button>
+                <button type="submit" className="rounded-lg bg-accent2 px-2 py-1 text-xs text-white">{t("add")}</button>
               </form>
             ) : (
               <div className="mt-1 flex gap-2">
@@ -487,14 +494,14 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
                   disabled={busy}
                   className="flex-1 rounded-lg border border-dashed border-line px-2.5 py-2.5 text-left text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
                 >
-                  {busy ? "Working…" : "+ Upload file"}
+                  {busy ? t("working") : `+ ${t("uploadFile")}`}
                 </button>
                 <button
                   onClick={() => setAdding(true)}
                   disabled={busy}
                   className="rounded-lg border border-dashed border-line px-3 py-2.5 text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
                 >
-                  + Link
+                  + {t("addLink")}
                 </button>
               </div>
             )}

@@ -2,6 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { type FunctionReturnType } from "convex/server";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
@@ -62,6 +63,7 @@ function buyLink(slug: string, kind: "lessons" | "references", key: string, lang
 // The persistent sidebar + pane shell, fixed by the URL token. Fetches the
 // course bundle once; an unknown/revoked token renders a friendly dead-end.
 export function PublicCourseShell({ token, children }: { token: string; children: React.ReactNode }) {
+  const t = useTranslations("Reader");
   const course = useQuery(api.public.publicCourse, { token });
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -97,7 +99,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
   );
 
   if (course === undefined) return <CourseSkeleton />;
-  if (course === null) return <Centered>This link isn’t available — the owner may have turned it off.</Centered>;
+  if (course === null) return <Centered>{t("linkUnavailable")}</Centered>;
 
   const isRef = pathname.includes("/references/");
   const activeKey = decodeURIComponent(pathname.split("/").pop() ?? "");
@@ -118,7 +120,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
             navHidden ? "-translate-y-full" : "translate-y-0"
           }`}
         >
-          <button onClick={() => setMenuOpen(true)} aria-label="Open lessons" className="rounded-lg p-1.5 text-ink hover:bg-hi">
+          <button onClick={() => setMenuOpen(true)} aria-label={t("openLessons")} className="rounded-lg p-1.5 text-ink hover:bg-hi">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <line x1="3" y1="6" x2="21" y2="6" />
               <line x1="3" y1="12" x2="21" y2="12" />
@@ -135,7 +137,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
             menuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-accent2">Public course</p>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-accent2">{t("publicCourse")}</p>
           <div className="mb-4">
             <h1 className="truncate text-lg font-semibold tracking-tight text-accent">{course.title}</h1>
             {/* The Edition this token serves (course-translation). A Guest holds the
@@ -148,8 +150,8 @@ export function PublicCourseShell({ token, children }: { token: string; children
           </div>
 
           <nav className="flex flex-col gap-1">
-            <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">Lessons</p>
-            {course.lessons.length === 0 && <p className="px-2 text-sm text-soft">No lessons published yet.</p>}
+            <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">{t("lessons")}</p>
+            {course.lessons.length === 0 && <p className="px-2 text-sm text-soft">{t("noLessonsPublished")}</p>}
             {course.lessons.map((l) => (
               <NavItem
                 key={l.key}
@@ -164,7 +166,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
             ))}
 
             {course.references.length > 0 && (
-              <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">References</p>
+              <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">{t("references")}</p>
             )}
             {course.references.map((r) => (
               <NavItem key={r.key} href={`${base}/references/${r.key}`} active={isRef && activeKey === r.key} locked={preview}>
@@ -175,7 +177,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
             {course.resources.length > 0 && (
               <details className="group mt-1">
                 <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 pt-4 pb-2 text-xs font-semibold uppercase tracking-wider text-accent2 hover:text-accent [&::-webkit-details-marker]:hidden">
-                  Resources
+                  {t("resources")}
                   <svg
                     aria-hidden
                     className="mr-1 transition-transform duration-200 group-open:rotate-180"
@@ -210,15 +212,16 @@ export function PublicCourseShell({ token, children }: { token: string; children
 }
 
 function ThemeToggle() {
+  const tc = useTranslations("Common");
   const { theme, toggle } = useTheme();
   const dark = theme === "dark";
   return (
     <button
       onClick={toggle}
-      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={dark ? tc("themeToLight") : tc("themeToDark")}
       className="mt-auto flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
     >
-      <span>{dark ? "Dark" : "Light"} mode</span>
+      <span>{dark ? tc("darkMode") : tc("lightMode")}</span>
       <span aria-hidden className="text-base">{dark ? "☾" : "☀"}</span>
     </button>
   );
@@ -226,6 +229,7 @@ function ThemeToggle() {
 
 // `/share/[token]` — redirect to the first Lesson, mirroring CourseIndex.
 export function PublicCourseIndex({ token }: { token: string }) {
+  const t = useTranslations("Reader");
   const course = useQuery(api.public.publicCourse, { token });
   const router = useRouter();
   const first = course ? firstLessonKey(course.lessons) : null;
@@ -234,13 +238,14 @@ export function PublicCourseIndex({ token }: { token: string }) {
   }, [first, token, router]);
 
   if (course === undefined) return <ReaderSkeleton />;
-  if (course === null) return <Centered>This link isn’t available — the owner may have turned it off.</Centered>;
-  if (course.lessons.length === 0) return <Centered>No lessons published yet.</Centered>;
+  if (course === null) return <Centered>{t("linkUnavailable")}</Centered>;
+  if (course.lessons.length === 0) return <Centered>{t("noLessonsPublished")}</Centered>;
   // Redirecting straight into a Lesson — mimic the reader, not a bare line.
   return <ReaderSkeleton />;
 }
 
 export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKey: string }) {
+  const t = useTranslations("Reader");
   const { theme } = useTheme();
   const navHidden = useHideOnScroll();
   const { course, markComplete } = useGuestCourse();
@@ -250,8 +255,8 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
   const next = nextLessonKey(course.lessons, lessonKey);
 
   if (lesson === undefined || html === undefined) return <ReaderSkeleton />;
-  if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
-  if (html === null) return <p className="text-soft">Couldn’t load this lesson. Try refreshing.</p>;
+  if (lesson === null) return <p className="text-soft">{t("lessonNotFound")}</p>;
+  if (html === null) return <p className="text-soft">{t("loadLessonFailed")}</p>;
 
   // Paid marketplace: on a paid Edition's Public link a Guest gets the paygate for
   // every Lesson past the free Preview (the reader returns `locked`).
@@ -286,7 +291,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
               onClick={() => markComplete(lessonKey)}
               className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90"
             >
-              Next lesson →
+              {t("nextLesson")} →
             </Link>
           )}
         </div>
@@ -312,21 +317,22 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
 
 // The owner's Questions + Replies for this lesson, read-only (no ask form).
 function GuestQuestions({ qa }: { qa: GuestCourse["questions"] }) {
+  const t = useTranslations("Reader");
   return (
     <div className="rounded-xl border border-line bg-card p-4 md:flex md:h-full md:flex-col">
-      <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-accent2">Questions &amp; replies</h3>
-      {qa.length === 0 && <p className="text-sm text-soft">No questions on this lesson yet.</p>}
+      <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-accent2">{t("questionsAndReplies")}</h3>
+      {qa.length === 0 && <p className="text-sm text-soft">{t("noQuestions")}</p>}
       <ul className="mt-1 flex flex-col gap-3 md:min-h-0 md:flex-1 md:overflow-y-auto">
         {qa.map((q) => (
           <li key={q.id} className="text-sm">
             <p className="font-medium text-ink">{q.text}</p>
             {q.reply ? (
               <div className="mt-1.5 rounded-lg border-l-2 border-accent2 bg-hi px-3 py-2">
-                <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-accent2">Teacher</p>
+                <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-accent2">{t("teacher")}</p>
                 <Markdown source={q.reply} className="flex flex-col gap-2 text-sm leading-relaxed text-ink" />
               </div>
             ) : (
-              <p className="mt-1 text-xs text-soft">Not yet answered.</p>
+              <p className="mt-1 text-xs text-soft">{t("notYetAnswered")}</p>
             )}
           </li>
         ))}
@@ -336,6 +342,7 @@ function GuestQuestions({ qa }: { qa: GuestCourse["questions"] }) {
 }
 
 export function PublicReferencePane({ token, refKey }: { token: string; refKey: string }) {
+  const t = useTranslations("Reader");
   const { theme } = useTheme();
   const { course } = useGuestCourse();
   const navHidden = useHideOnScroll();
@@ -347,8 +354,8 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
   const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/share/${token}` : null;
   const share = shareUrl ? { courseTitle: course.title, url: shareUrl } : null;
   if (ref === undefined || html === undefined) return <ReaderSkeleton aside={false} />;
-  if (ref === null) return <p className="text-soft">Reference not found.</p>;
-  if (html === null) return <p className="text-soft">Couldn’t load this reference. Try refreshing.</p>;
+  if (ref === null) return <p className="text-soft">{t("referenceNotFound")}</p>;
+  if (html === null) return <p className="text-soft">{t("loadReferenceFailed")}</p>;
   // Paid marketplace: References sit past the free Preview — the paygate for a
   // Guest on a paid Edition (a locked body is served as html:"" so it reaches here).
   if (ref.locked) {
