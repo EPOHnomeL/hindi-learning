@@ -52,7 +52,15 @@ export function EditionsDialog({ topicSlug, title, onClose }: { topicSlug: strin
       {data === undefined ? (
         <EditionsDialogSkeleton />
       ) : data === null ? (
-        <p className="text-sm text-soft">Couldn’t load editions.</p>
+        <div className="flex flex-col items-center justify-center text-center p-8 rounded-xl border border-dashed border-line bg-card/30 min-h-[220px]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-bad/15 text-danger mb-3">
+            <Icon name="x" className="h-5 w-5" />
+          </div>
+          <h3 className="text-sm font-semibold text-ink">Couldn't Load Editions</h3>
+          <p className="mt-1.5 text-xs text-soft max-w-xs leading-relaxed">
+            There was a problem fetching this course's editions. Please check your connection or try again.
+          </p>
+        </div>
       ) : (
         <>
           <div role="tablist" aria-label="Editions" className="mb-5 flex flex-wrap gap-1 border-b border-line">
@@ -771,7 +779,7 @@ function AddLanguagePanel({
             l.native.toLowerCase().includes(needle) ||
             l.code.toLowerCase().includes(needle)),
       ).slice(0, 8)
-    : [];
+    : LANGUAGES.filter((l) => !present.has(l.code) && l.code !== "en").slice(0, 8);
 
   const add = (code: string) => {
     setBusy(true);
@@ -792,26 +800,32 @@ function AddLanguagePanel({
         placeholder="Search languages…"
         className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none disabled:opacity-60"
       />
-      {matches.length > 0 && (
-        <ul className="flex flex-col gap-1.5">
-          {matches.map((l) => (
-            <li key={l.code}>
-              <button
-                type="button"
-                onClick={() => add(l.code)}
-                className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-hi"
-              >
-                <span dir={l.rtl ? "rtl" : undefined}>{l.native}</span>
-                <span className="shrink-0 text-xs text-soft">
-                  {l.name}
-                  {l.rtl ? " · RTL" : ""}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {needle && matches.length === 0 && <p className="text-xs text-soft">No matching language.</p>}
+      <div className="min-h-[290px] max-h-[290px] h-[290px] overflow-y-auto pr-0.5">
+        {matches.length > 0 ? (
+          <ul className="flex flex-col gap-1.5">
+            {matches.map((l) => (
+              <li key={l.code}>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => add(l.code)}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-hi"
+                >
+                  <span dir={l.rtl ? "rtl" : undefined}>{l.native}</span>
+                  <span className="shrink-0 text-xs text-soft">
+                    {l.name}
+                    {l.rtl ? " · RTL" : ""}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : needle ? (
+          <p className="text-xs text-soft py-2">No matching language.</p>
+        ) : (
+          <p className="text-xs text-soft py-2">All languages already translated.</p>
+        )}
+      </div>
     </div>
   );
 }
