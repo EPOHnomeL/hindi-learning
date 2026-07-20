@@ -128,5 +128,16 @@
     "checkoutFailed": "No se pudo iniciar el pago — inténtalo de nuevo.",
     "payFastNoteShort": "Tarjeta o EFT instantáneo · paga una vez, consérvalo para siempre",
     "purchaseAgreement": "Al comprar aceptas los <terms>Términos</terms> y la <refund>Política de reembolsos</refund>."
+  },
+  "Settings": {
+    "title": "Ajustes",
+    "displayName": "Nombre visible",
+    "displayNameHint": "Aparece en tus certificados.",
+    "theme": "Tema",
+    "light": "Claro",
+    "dark": "Oscuro",
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "saved": "Guardado"
   }
 }

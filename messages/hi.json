@@ -128,5 +128,16 @@
     "checkoutFailed": "चेकआउट शुरू नहीं हो सका — कृपया फिर से प्रयास करें।",
     "payFastNoteShort": "कार्ड या Instant EFT · एक बार भुगतान करें, हमेशा के लिए रखें",
     "purchaseAgreement": "खरीदकर आप <terms>नियमों</terms> और <refund>रिफंड नीति</refund> से सहमत होते हैं।"
+  },
+  "Settings": {
+    "title": "सेटिंग्स",
+    "displayName": "प्रदर्शन नाम",
+    "displayNameHint": "आपके प्रमाणपत्रों पर दिखता है।",
+    "theme": "थीम",
+    "light": "लाइट",
+    "dark": "डार्क",
+    "save": "सहेजें",
+    "saving": "सहेजा जा रहा है…",
+    "saved": "सहेजा गया"
   }
 }

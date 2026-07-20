@@ -128,5 +128,16 @@
     "checkoutFailed": "Impossible de démarrer le paiement — veuillez réessayer.",
     "payFastNoteShort": "Carte ou EFT instantané · payez une fois, gardez à vie",
     "purchaseAgreement": "En achetant, vous acceptez les <terms>Conditions</terms> et la <refund>Politique de remboursement</refund>."
+  },
+  "Settings": {
+    "title": "Paramètres",
+    "displayName": "Nom affiché",
+    "displayNameHint": "Affiché sur vos certificats.",
+    "theme": "Thème",
+    "light": "Clair",
+    "dark": "Sombre",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "saved": "Enregistré"
   }
 }

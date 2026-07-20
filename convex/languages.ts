@@ -34,6 +34,7 @@ const RTL_CODES = new Set([
 // The picker menu: a broad set covering the world's major languages plus every
 // common RTL one. Not exhaustive by design — any code still works via langInfo.
 export const LANGUAGES: LanguageInfo[] = [
+  { code: "en", name: "English", native: "English" },
   { code: "es", name: "Spanish", native: "Español" },
   { code: "fr", name: "French", native: "Français" },
   { code: "hi", name: "Hindi", native: "हिन्दी" },

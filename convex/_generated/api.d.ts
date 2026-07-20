@@ -37,6 +37,7 @@ import type * as tenantBackfill from "../tenantBackfill.js";
 import type * as tenants from "../tenants.js";
 import type * as translate from "../translate.js";
 import type * as userPrefs from "../userPrefs.js";
+import type * as users from "../users.js";
 import type * as whitelist from "../whitelist.js";
 
 import type {
@@ -75,6 +76,7 @@ declare const fullApi: ApiFromModules<{
   tenants: typeof tenants;
   translate: typeof translate;
   userPrefs: typeof userPrefs;
+  users: typeof users;
   whitelist: typeof whitelist;
 }>;
 

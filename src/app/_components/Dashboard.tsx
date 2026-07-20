@@ -14,13 +14,12 @@ import { CourseSettingsDialog } from "./CourseSettings";
 import { EditionsDialog } from "./Editions";
 import { withLang } from "./editionUrl";
 import { Icon } from "./icons";
-import { LocalePicker } from "./LocalePicker";
 import { formatPrice } from "./Paygate";
 import { Logo } from "./Logo";
 import { Markdown } from "./MarkdownView";
 import { missionPreview } from "./markdown";
+import { SettingsDialog } from "./SettingsDialog";
 import { SiteFooter } from "./SiteFooter";
-import { useTheme } from "./ThemeContext";
 import { Dialog, IconButton, Menu, MenuItem } from "./ui";
 import { useResourceUpload } from "./useResourceUpload";
 
@@ -75,6 +74,8 @@ export function Dashboard() {
   const { signOut } = useAuthActions();
   const router = useRouter();
   const tc = useTranslations("Common");
+  const ts = useTranslations("Settings");
+  const [prefsOpen, setPrefsOpen] = useState(false);
 
   // A learner with nothing to their name who also can't author (open sign-up
   // admits everyone; the Allowlist gates creation, not existence — ADR 0021).
@@ -101,8 +102,14 @@ export function Dashboard() {
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
-            <LocalePicker />
-            <ThemeToggle />
+            <button
+              onClick={() => setPrefsOpen(true)}
+              aria-label={ts("title")}
+              title={ts("title")}
+              className="rounded-lg p-1.5 text-soft transition-colors hover:bg-hi hover:text-accent"
+            >
+              <Icon name="settings" className="h-4 w-4" />
+            </button>
             {amAdmin && (
               <Link href="/admin" className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
                 Admin
@@ -141,27 +148,8 @@ export function Dashboard() {
         <PurchasedSection />
       </div>
       <SiteFooter />
+      {prefsOpen && <SettingsDialog onClose={() => setPrefsOpen(false)} />}
     </>
-  );
-}
-
-// Icon-only light/dark toggle for the dashboard header (ADR 0011). A compact
-// sibling of the sidebar's labelled ThemeToggle — same tokens, sized to sit
-// among the header's text buttons. Sun in dark mode (tap for light), moon in
-// light mode (tap for dark).
-function ThemeToggle() {
-  const tc = useTranslations("Common");
-  const { theme, toggle } = useTheme();
-  const dark = theme === "dark";
-  return (
-    <button
-      onClick={toggle}
-      aria-label={dark ? tc("themeToLight") : tc("themeToDark")}
-      title={dark ? tc("lightMode") : tc("darkMode")}
-      className="rounded-lg p-1.5 text-soft transition-colors hover:bg-hi hover:text-accent"
-    >
-      <Icon name={dark ? "sun" : "moon"} className="h-4 w-4" />
-    </button>
   );
 }
 

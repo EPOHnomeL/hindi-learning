@@ -128,5 +128,16 @@
     "checkoutFailed": "Couldn’t start checkout — please try again.",
     "payFastNoteShort": "Card or Instant EFT · pay once, keep forever",
     "purchaseAgreement": "By purchasing you agree to the <terms>Terms</terms> and <refund>Refund Policy</refund>."
+  },
+  "Settings": {
+    "title": "Settings",
+    "displayName": "Display name",
+    "displayNameHint": "Shown on your certificates.",
+    "theme": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved"
   }
 }

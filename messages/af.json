@@ -128,5 +128,16 @@
     "checkoutFailed": "Kon nie afhandeling begin nie — probeer asseblief weer.",
     "payFastNoteShort": "Kaart of Kits-EFT · betaal een keer, hou dit vir altyd",
     "purchaseAgreement": "Deur aan te koop, stem jy in tot die <terms>Bepalings</terms> en <refund>Terugbetalingsbeleid</refund>."
+  },
+  "Settings": {
+    "title": "Instellings",
+    "displayName": "Vertoonnaam",
+    "displayNameHint": "Verskyn op jou sertifikate.",
+    "theme": "Tema",
+    "light": "Lig",
+    "dark": "Donker",
+    "save": "Stoor",
+    "saving": "Stoor tans…",
+    "saved": "Gestoor"
   }
 }
