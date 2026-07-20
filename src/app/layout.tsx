@@ -2,6 +2,8 @@ import "~/styles/globals.css";
 
 import { type Metadata } from "next";
 import { Spectral, Noto_Serif_Devanagari } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale } from "next-intl/server";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { getTenantSlug, getTenantView } from "~/lib/tenant-server";
@@ -46,9 +48,15 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   const tenant = await getTenantView();
   const themeCss = tenant ? buildTenantThemeCss(tenant.theme) : null;
 
+  // The active chrome locale, resolved from the cookie by getRequestConfig
+  // (ticket 04): `<html lang>` reflects it so the document announces the right
+  // language on first paint, and the locale seeds NextIntlClientProvider for
+  // every Client Component below. `dir` stays ltr — RTL is out of scope.
+  const locale = await getLocale();
+
   return (
     <ConvexAuthNextjsServerProvider>
-      <html lang="en" className={`${spectral.variable} ${notoDeva.variable}`}>
+      <html lang={locale} className={`${spectral.variable} ${notoDeva.variable}`}>
         <head>
           {/* Tenant palette, before paint: the injected --color-* overrides supply
               both light and (partial) dark values; the dark-mode script below only
@@ -65,7 +73,12 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           />
         </head>
         <body>
-          <ConvexClientProvider tenantSlug={slug}>{children}</ConvexClientProvider>
+          {/* Messages + locale flow to every Client Component from the request
+              config (getRequestConfig) — no props needed; the provider inherits
+              them server-side. Server Components use getTranslations directly. */}
+          <NextIntlClientProvider>
+            <ConvexClientProvider tenantSlug={slug}>{children}</ConvexClientProvider>
+          </NextIntlClientProvider>
         </body>
       </html>
     </ConvexAuthNextjsServerProvider>
