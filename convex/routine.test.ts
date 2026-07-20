@@ -397,6 +397,104 @@ test("the Admin bypasses the on-demand cooldown", async () => {
   expect(await asUser(t, admin).mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: true });
 });
 
+// ---- Generation Run log (generation-observability, issue 01) ----------------
+
+// The durable history the single-flight lock can't give: one immutable
+// generationRuns row per FINISHED run, written at each terminal exit.
+async function runRows(t: ReturnType<typeof convexTest>, topicId: Id<"topics">) {
+  return await t.run((ctx) =>
+    ctx.db.query("generationRuns").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect(),
+  );
+}
+
+test("a published report records a run stamped with the produced frontier lesson", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi");
+  const secret = "test-secret";
+  await t.run(async (ctx) => {
+    // The lesson the run just authored — the current Frontier at report time.
+    await ctx.db.insert("lessons", { topicId, key: "0002-next", seq: 2, title: "Next" });
+    // A live lock with a known startedAt, mid-run.
+    await ctx.db.insert("generation", { topicId, status: "generating", startedAt: 1000, frontierKey: "0001-prev" });
+  });
+
+  await t.mutation(api.routine.reportGeneration, { secret, topicSlug: "hindi", outcome: "published" });
+
+  const rows = await runRows(t, topicId);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({
+    outcome: "published",
+    startedAt: 1000,
+    producedLessonKey: "0002-next",
+    producedLessonTitle: "Next",
+  });
+  expect(rows[0]!.endedAt).toBeGreaterThan(0);
+  expect(rows[0]!.error).toBeUndefined();
+});
+
+test("a nothing report records a caught-up run with no produced lesson", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi");
+  await t.run((ctx) => ctx.db.insert("generation", { topicId, status: "generating", startedAt: 500 }));
+
+  await t.mutation(api.routine.reportGeneration, { secret: "test-secret", topicSlug: "hindi", outcome: "nothing" });
+
+  const rows = await runRows(t, topicId);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ outcome: "nothing", startedAt: 500 });
+  expect(rows[0]!.producedLessonKey).toBeUndefined();
+});
+
+test("a failed report records a failed run carrying the error", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi");
+  await t.run((ctx) => ctx.db.insert("generation", { topicId, status: "generating", startedAt: 700 }));
+
+  await t.mutation(api.routine.reportGeneration, {
+    secret: "test-secret",
+    topicSlug: "hindi",
+    outcome: "failed",
+    error: "boom",
+  });
+
+  const rows = await runRows(t, topicId);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ outcome: "failed", error: "boom", startedAt: 700 });
+});
+
+test("failGeneration records a failed run (the fire never landed)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi");
+  await t.run((ctx) => ctx.db.insert("generation", { topicId, status: "generating", startedAt: 900 }));
+
+  await t.mutation(internal.routine.failGeneration, { topicSlug: "hindi", error: "fire 500" });
+
+  const rows = await runRows(t, topicId);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ outcome: "failed", error: "fire 500" });
+});
+
+test("expireUnclaimedFinish records a failed run (the finish run never claimed)", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const topicId = await seedTopic(t, admin, "biz");
+  await asUser(t, admin).action(api.routine.finishGenerating, { topicSlug: "biz" });
+  const armed = await t.run((ctx) =>
+    ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique(),
+  );
+
+  await t.mutation(internal.routine.expireUnclaimedFinish, { topicSlug: "biz", startedAt: armed!.startedAt! });
+
+  const rows = await runRows(t, topicId);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ outcome: "failed" });
+  expect(rows[0]!.error).toContain("never claimed");
+});
+
 // ---- The `~N lessons` estimate (PRD: Estimated lesson count) ---------------
 
 test("reportGeneration folds an estimate onto the topic; a later report without one never wipes it", async () => {

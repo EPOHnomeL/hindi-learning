@@ -71,6 +71,36 @@ async function generationRow(ctx: QueryCtx, topicId: Id<"topics">): Promise<Doc<
     .unique();
 }
 
+// Append one immutable Generation Run row (generation-observability, issue 01).
+// The single write site for the run-history log, called at every terminal exit of
+// a run (reportGeneration / failGeneration / expireUnclaimedFinish). Insert-once,
+// like lessons/learningRecords — never patched or deleted. `startedAt` falls back
+// to `endedAt` when the lock never stamped one (e.g. a fire that failed before it
+// armed), so the row always has a bracket. The produced-Lesson fields are supplied
+// only for a `published` run (the Frontier the run advanced to).
+async function recordRun(
+  ctx: MutationCtx,
+  args: {
+    topicId: Id<"topics">;
+    outcome: "published" | "nothing" | "failed";
+    startedAt: number | undefined;
+    error?: string;
+    producedLessonKey?: string;
+    producedLessonTitle?: string;
+  },
+): Promise<void> {
+  const endedAt = Date.now();
+  await ctx.db.insert("generationRuns", {
+    topicId: args.topicId,
+    outcome: args.outcome,
+    startedAt: args.startedAt ?? endedAt,
+    endedAt,
+    ...(args.error !== undefined ? { error: args.error } : {}),
+    ...(args.producedLessonKey !== undefined ? { producedLessonKey: args.producedLessonKey } : {}),
+    ...(args.producedLessonTitle !== undefined ? { producedLessonTitle: args.producedLessonTitle } : {}),
+  });
+}
+
 // Has this user fired the on-demand button within the trailing DAY_MS, on ANY of
 // their Topics? Each Topic's lock row stamps `lastManualFireAt` on a manual fire
 // (retained across reports), so the per-user cap is just the max of those across
@@ -202,9 +232,12 @@ export const failGeneration = internalMutation({
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return;
     const gen = await generationRow(ctx, topic._id);
+    if (!gen) return;
     // Also end any fire-and-pray run — the fire never landed, so nothing will
     // report back to advance it; leaving the flags set would strand the lock.
-    if (gen) await ctx.db.patch(gen._id, { status: "failed", error, startedAt: undefined, finishRemaining: undefined, cancelRequested: undefined });
+    await ctx.db.patch(gen._id, { status: "failed", error, startedAt: undefined, finishRemaining: undefined, cancelRequested: undefined });
+    // A real run ended (failed to launch) — record it in the history (issue 01).
+    await recordRun(ctx, { topicId: topic._id, outcome: "failed", startedAt: gen.startedAt, error });
   },
 });
 
@@ -242,6 +275,19 @@ export const reportGeneration = mutation({
     } else {
       await ctx.db.patch(gen._id, { status: "failed", error: error ?? "run failed", ...clear });
     }
+
+    // Record the finished run for the operator's history (issue 01). On a
+    // `published` run, stamp the Lesson it advanced to — the current Frontier
+    // (highest-seq non-superseded), which is what this run just authored.
+    const produced = outcome === "published" ? await frontierLesson(ctx, topic._id) : null;
+    await recordRun(ctx, {
+      topicId: topic._id,
+      outcome,
+      startedAt: gen.startedAt,
+      error: outcome === "failed" ? (error ?? "run failed") : undefined,
+      producedLessonKey: produced?.key,
+      producedLessonTitle: produced?.title,
+    });
 
     // Fire-and-pray continuation (Admin). Only a `published` lesson on a live,
     // un-cancelled finish run advances; `nothing`/`failed` (course complete, caught
@@ -503,13 +549,17 @@ export const expireUnclaimedFinish = internalMutation({
     ) {
       return null;
     }
+    const error = "finish run never claimed the topic (fire lost or run crashed before starting)";
     await ctx.db.patch(gen._id, {
       status: "failed",
-      error: "finish run never claimed the topic (fire lost or run crashed before starting)",
+      error,
       startedAt: undefined,
       finishRemaining: undefined,
       cancelRequested: undefined,
     });
+    // Record the abandoned run so it's visible in the history (issue 01). `startedAt`
+    // matches the fire cycle we just expired.
+    await recordRun(ctx, { topicId: topic._id, outcome: "failed", startedAt, error });
     return null;
   },
 });

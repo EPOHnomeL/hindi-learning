@@ -280,6 +280,29 @@ export default defineSchema({
     cancelRequested: v.optional(v.boolean()),
   }).index("by_topic", ["topicId"]),
 
+  // The append-only Generation Run log (generation-observability PRD): one
+  // immutable row per FINISHED Routine run, so the operator has a durable history
+  // the single-flight `generation` lock (overwritten each run) can't give. Written
+  // at every terminal exit — `reportGeneration` (published/nothing/failed),
+  // `failGeneration` (fire never landed), `expireUnclaimedFinish` (finish run never
+  // claimed) — via one `recordRun` helper, never patched or deleted (insert-once,
+  // like lessons/learningRecords/certificates). `startedAt`/`endedAt` bracket the
+  // run; `producedLessonKey`/`Title` name the Frontier Lesson a `published` run
+  // advanced to (absent otherwise). No trigger/provider/token fields (kept lean;
+  // the token seam is internal-course-studio/03's). The live "busy now" view reads
+  // the lock, NOT this table — the hot acquire path is untouched. `by_topic`
+  // supports a future per-course view; the global history query reads the default
+  // `_creationTime` order (newest-first).
+  generationRuns: defineTable({
+    topicId: v.id("topics"),
+    outcome: v.union(v.literal("published"), v.literal("nothing"), v.literal("failed")),
+    startedAt: v.number(),
+    endedAt: v.number(),
+    error: v.optional(v.string()),
+    producedLessonKey: v.optional(v.string()),
+    producedLessonTitle: v.optional(v.string()),
+  }).index("by_topic", ["topicId"]),
+
   // A Share: grants one person access to one **Edition** — a (Topic, language)
   // pair (course-translation). `lang` is the granted edition's BCP-47 code; a
   // person may hold several Shares on one Topic (one per language). `lang` is
