@@ -113,7 +113,40 @@ Per-language scores, confidence, and defect quotes are in the scorecard.
    the guard doesn't catch. Recurring shared miss across **all three**: the
    fill-in-the-blank quiz Q4 stem and the "Check" button often left in English.
 
-### Caveats
+### Reasoning effort — the biggest confound
+
+The production translate path deliberately runs with **reasoning/thinking
+disabled** — OpenRouter `reasoning: { effort: "none" }` and native Gemini
+`thinkingLevel: "minimal"` (translation-cost 02/05). The rationale is cost:
+thinking tokens bill as *output*, and were judged to buy nothing for a constrained
+HTML transform.
+
+That creates an asymmetry this trial did **not** control for:
+
+- The shipped **Gemini** editions were produced with thinking pinned to minimal —
+  i.e. the cheap production setting.
+- The **Sonnet 5 / Opus 4.8** candidates were generated at their **default
+  reasoning effort**, *not* forced off.
+
+So part of the Claude models' edge — especially the careful Scripture handling and
+exact structural preservation — may come from reasoning the production path
+currently switches off to save money. Translation is mostly a mechanical,
+constrained transform (preserve structure, swap prose), where minimal reasoning is
+usually adequate; but the two places the frontier models actually separated —
+**published-verse substitution** and **single-script discipline** — are judgement
+calls, exactly where a little reasoning could be doing the work. That should be
+measured, not assumed. Two consequences:
+
+1. **The cost win and the quality result may be in tension.** If we adopt a Claude
+   model for translation, the cheap "reasoning off" configuration is *not* the one
+   measured here — so this ranking can't be read as a drop-in cost-neutral swap.
+2. **Follow-up before deciding:** re-run Sonnet 5 / Opus 4.8 with reasoning
+   disabled and re-grade. If quality holds, we get quality *and* cost; if it drops,
+   model choice and reasoning budget have to be decided together (possibly per
+   language — the low-resource and romanized editions are the likeliest to need the
+   extra thinking).
+
+### Other caveats
 
 - **One lesson, one run.** Directional, not definitive — extend to more lessons
   before treating the ranking as settled.
