@@ -309,7 +309,14 @@
     "addLanguageIntro": "इस कोर्स का दूसरी भाषा में अनुवाद करें — यह एक नया टैब बन जाता है जिसे तैयार होने पर आप साझा कर सकते हैं।",
     "searchLanguages": "भाषाएँ खोजें…",
     "rtlSuffix": " · RTL",
-    "noMatchingLanguage": "कोई मिलती-जुलती भाषा नहीं।"
+    "noMatchingLanguage": "कोई मिलती-जुलती भाषा नहीं।",
+    "engineLabel": "इंजन",
+    "engineFree": "मुफ़्त",
+    "engineGemini": "Gemini",
+    "engineFreeHint": "कोई टोकन लागत नहीं — धीमा। क्लाउड अनुवाद रूटीन पर चलता है।",
+    "engineGeminiWarn": "तेज़ और बेहतर गुणवत्ता — लेकिन हर बार टोकन (वास्तविक लागत) खर्च करता है।",
+    "retranslate": "फिर से अनुवाद करें",
+    "retranslating": "फिर से अनुवाद हो रहा है…"
   },
   "Certificate": {
     "eyebrow": "समापन प्रमाणपत्र",

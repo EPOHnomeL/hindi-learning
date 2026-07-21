@@ -12,6 +12,10 @@ import { Dialog } from "./ui";
 
 // One row of the owner's Editions panel, straight from api.translate.editions.
 type Edition = NonNullable<FunctionReturnType<typeof api.translate.editions>>["editions"][number];
+// The translation engine for one Edition (translation-engine-picker): `free` fires
+// the cloud translate Routine (no token cost, slower); `gemini` schedules the paid
+// in-Convex action (spends tokens, faster).
+type Engine = Edition["engine"];
 
 // The Topic's Editions & sharing dialog (UI redesign): the source English Edition
 // plus each translation is a tab (a trailing "+" tab adds a language). Sharing
@@ -182,6 +186,10 @@ function EditionPanel({
       <InviteByEmail topicSlug={topicSlug} lang={edition.lang} />
       <PublicLinkToggle topicSlug={topicSlug} lang={edition.lang} publicToken={edition.publicToken} />
       <SellEdition topicSlug={topicSlug} lang={edition.lang} native={edition.native} rtl={edition.rtl} completed={completed} />
+      {/* Only a translation can be re-translated — the English source has no engine. */}
+      {!edition.source && (
+        <RetranslateControls topicSlug={topicSlug} lang={edition.lang} currentEngine={edition.engine} />
+      )}
       <div className="flex flex-col items-start gap-2 border-t border-line pt-4">
         <AccessRoster topicSlug={topicSlug} lang={edition.lang} />
         {!edition.source && (
@@ -735,6 +743,63 @@ function RemoveEdition({ topicSlug, lang, label }: { topicSlug: string; lang: st
   );
 }
 
+// The Free / Gemini engine picker (translation-engine-picker): a segmented toggle
+// with a per-engine hint below. Gemini's hint warns it uses tokens — the label IS
+// the warning (no blocking confirm modal, per the PRD). Shared by the add-language
+// panel and the ready-edition re-translate control.
+function EngineToggle({ value, onChange, disabled }: { value: Engine; onChange: (e: Engine) => void; disabled?: boolean }) {
+  const t = useTranslations("Editions");
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{t("engineLabel")}</span>
+      <div className="inline-flex self-start overflow-hidden rounded-lg border border-line text-[12.5px]">
+        {(["free", "gemini"] as const).map((eng) => (
+          <button
+            key={eng}
+            type="button"
+            disabled={disabled}
+            aria-pressed={value === eng}
+            onClick={() => onChange(eng)}
+            className={`px-3 py-1.5 font-medium transition-colors disabled:opacity-60 ${
+              value === eng ? "bg-accent text-white" : "bg-card text-soft hover:bg-hi"
+            }`}
+          >
+            {eng === "free" ? t("engineFree") : t("engineGemini")}
+          </button>
+        ))}
+      </div>
+      <span className="text-[11.5px] text-soft">{value === "gemini" ? t("engineGeminiWarn") : t("engineFreeHint")}</span>
+    </div>
+  );
+}
+
+// Re-translate a ready edition (translation-engine-picker): an always-visible
+// engine toggle seeded from the engine that last produced it, plus a Re-translate
+// button. Switching to a different engine forces a full redo server-side; the same
+// engine is a cheap resume/repair. This is how a free edition is upgraded to Gemini.
+function RetranslateControls({ topicSlug, lang, currentEngine }: { topicSlug: string; lang: string; currentEngine: Engine }) {
+  const t = useTranslations("Editions");
+  const start = useAction(api.translate.startTranslation);
+  const [engine, setEngine] = useState<Engine>(currentEngine);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="flex flex-col items-start gap-3 border-t border-line pt-4">
+      <EngineToggle value={engine} onChange={setEngine} disabled={busy} />
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          void start({ topicSlug, lang, engine }).finally(() => setBusy(false));
+        }}
+        className="inline-flex items-center gap-2 rounded-lg border border-line px-3.5 py-2 text-sm font-medium text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
+      >
+        <Icon name="refresh" className="h-4 w-4" /> {busy ? t("retranslating") : t("retranslate")}
+      </button>
+    </div>
+  );
+}
+
 // Add a translation edition: a searchable pick from LANGUAGES (excluding editions
 // already present) that kicks off a bulk translation, then switches to the new
 // tab. Only a completed course is translatable (content frozen), so otherwise it
@@ -754,6 +819,8 @@ function AddLanguagePanel({
   const start = useAction(api.translate.startTranslation);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
+  // Defaults to Free (translate for free first; upgrade to Gemini later per edition).
+  const [engine, setEngine] = useState<Engine>("free");
 
   if (!completed) {
     return (
@@ -778,7 +845,7 @@ function AddLanguagePanel({
   const add = (code: string) => {
     setBusy(true);
     setQ("");
-    void start({ topicSlug, lang: code }).finally(() => setBusy(false));
+    void start({ topicSlug, lang: code, engine }).finally(() => setBusy(false));
     onAdded(code);
   };
 
@@ -787,6 +854,7 @@ function AddLanguagePanel({
       <p className="text-sm text-soft">
         {t("addLanguageIntro")}
       </p>
+      <EngineToggle value={engine} onChange={setEngine} disabled={busy} />
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}

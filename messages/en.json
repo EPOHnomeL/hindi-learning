@@ -309,7 +309,14 @@
     "addLanguageIntro": "Translate this course into another language — it becomes a new tab you can share once ready.",
     "searchLanguages": "Search languages…",
     "rtlSuffix": " · RTL",
-    "noMatchingLanguage": "No matching language."
+    "noMatchingLanguage": "No matching language.",
+    "engineLabel": "Engine",
+    "engineFree": "Free",
+    "engineGemini": "Gemini",
+    "engineFreeHint": "No token cost — slower. Runs on the cloud translate routine.",
+    "engineGeminiWarn": "Faster, higher quality — but spends tokens (real cost) on every run.",
+    "retranslate": "Re-translate",
+    "retranslating": "Re-translating…"
   },
   "Certificate": {
     "eyebrow": "Certificate of Completion",

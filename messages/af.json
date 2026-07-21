@@ -309,7 +309,14 @@
     "addLanguageIntro": "Vertaal hierdie kursus in ’n ander taal — dit word ’n nuwe oortjie wat jy kan deel sodra dit gereed is.",
     "searchLanguages": "Soek tale…",
     "rtlSuffix": " · RTL",
-    "noMatchingLanguage": "Geen ooreenstemmende taal nie."
+    "noMatchingLanguage": "Geen ooreenstemmende taal nie.",
+    "engineLabel": "Enjin",
+    "engineFree": "Gratis",
+    "engineGemini": "Gemini",
+    "engineFreeHint": "Geen tokenkoste nie — stadiger. Gebruik die wolk-vertaalroetine.",
+    "engineGeminiWarn": "Vinniger, hoër gehalte — maar gebruik tokens (werklike koste) met elke lopie.",
+    "retranslate": "Hervertaal",
+    "retranslating": "Besig om te hervertaal…"
   },
   "Certificate": {
     "eyebrow": "Sertifikaat van Voltooiing",

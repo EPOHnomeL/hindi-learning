@@ -309,7 +309,14 @@
     "addLanguageIntro": "Traduce este curso a otro idioma — se convierte en una nueva pestaña que puedes compartir cuando esté lista.",
     "searchLanguages": "Buscar idiomas…",
     "rtlSuffix": " · RTL",
-    "noMatchingLanguage": "Ningún idioma coincide."
+    "noMatchingLanguage": "Ningún idioma coincide.",
+    "engineLabel": "Motor",
+    "engineFree": "Gratis",
+    "engineGemini": "Gemini",
+    "engineFreeHint": "Sin coste de tokens — más lento. Usa la rutina de traducción en la nube.",
+    "engineGeminiWarn": "Más rápido y de mayor calidad, pero consume tokens (coste real) en cada ejecución.",
+    "retranslate": "Volver a traducir",
+    "retranslating": "Volviendo a traducir…"
   },
   "Certificate": {
     "eyebrow": "Certificado de finalización",
