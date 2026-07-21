@@ -27,6 +27,11 @@ const kindV = v.union(
 );
 type Kind = "lesson" | "reference" | "mission" | "title" | "question";
 
+// The translation engine of one job/edition (translation-engine-picker), hoisted
+// like `kindV` since it recurs across this file's validators. `free` fires the
+// cloud translate Routine; `gemini` schedules the in-Convex action.
+const engineV = v.union(v.literal("free"), v.literal("gemini"));
+
 // ---- Source enumeration + staleness hashing -------------------------------
 
 // The hash of a source item's content — stamped onto the translation so a later
@@ -130,8 +135,10 @@ async function readSource(
 
 // ---- Owner: fire a translate run -------------------------------------------
 
+type Engine = "free" | "gemini";
+
 type AcquireResult =
-  | { acquired: true; topicSlug: string; lang: string; total: number }
+  | { acquired: true; topicSlug: string; lang: string; total: number; engine: Engine; forced: boolean }
   | { acquired: false; reason: string };
 
 // Check the gate + grab the lock in one transaction (mirrors
@@ -140,12 +147,19 @@ type AcquireResult =
 // a re-run would double-fire the routine. Seeds/refreshes the job `translating`
 // with the item `total`. The ONLY place that decides to translate.
 export const tryAcquireTranslation = internalMutation({
-  args: { topicSlug: v.string(), lang: v.string() },
+  args: { topicSlug: v.string(), lang: v.string(), engine: v.optional(engineV) },
   returns: v.union(
-    v.object({ acquired: v.literal(true), topicSlug: v.string(), lang: v.string(), total: v.number() }),
+    v.object({
+      acquired: v.literal(true),
+      topicSlug: v.string(),
+      lang: v.string(),
+      total: v.number(),
+      engine: engineV,
+      forced: v.boolean(),
+    }),
     v.object({ acquired: v.literal(false), reason: v.string() }),
   ),
-  handler: async (ctx, { topicSlug, lang }): Promise<AcquireResult> => {
+  handler: async (ctx, { topicSlug, lang, engine }): Promise<AcquireResult> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return { acquired: false, reason: "unauthenticated" };
     if (lang === SOURCE_LANG) return { acquired: false, reason: "source-language" };
@@ -178,23 +192,36 @@ export const tryAcquireTranslation = internalMutation({
     )
       return { acquired: false, reason: "already-translating" };
 
+    // Resolve the engine (translation-engine-picker): use the arg when given
+    // (add-language / re-translate); otherwise reuse the job's stored engine
+    // (failed-retry). Absent stored engine reads as `gemini` — today's behaviour,
+    // so no migration. A requested engine that DIFFERS from the stored one is a
+    // deliberate engine switch, which must be a full redo — otherwise per-item
+    // freshness (`sourceHash`, engine-blind) would mistake the old engine's rows
+    // for "already done" and the switch would translate nothing.
+    const stored: Engine = job?.engine ?? "gemini";
+    const resolved: Engine = engine ?? stored;
+    const forced = engine !== undefined && engine !== stored;
+
     const items = await collectItems(ctx, topic);
+    // Forced (engine switch) ⇒ seed done: 0 (a full redo). Otherwise resume: fresh
+    // rows from a prior (dead) run are kept, so the count resumes, not restarts —
+    // the run itself skips them via `collectForTranslation`.
     let done = 0;
-    for (const it of items) if (await isFresh(ctx, topic._id, lang, it)) done++;
+    if (!forced) for (const it of items) if (await isFresh(ctx, topic._id, lang, it)) done++;
     const patch = {
       status: "translating" as const,
       total: items.length,
-      // Fresh rows from a prior (dead) run are kept, so the count resumes, not
-      // restarts — the run itself skips them via `collectForTranslation`.
       done,
       failed: 0,
       error: undefined,
+      engine: resolved,
       claimedAt: Date.now(), // the heartbeat — publishTranslation re-stamps it per item
       runId: undefined,
     };
     if (job) await ctx.db.patch(job._id, patch);
     else await ctx.db.insert("translationJobs", { topicId: topic._id, lang, ...patch });
-    return { acquired: true, topicSlug, lang, total: items.length };
+    return { acquired: true, topicSlug, lang, total: items.length, engine: resolved, forced };
   },
 });
 
@@ -217,20 +244,44 @@ export const failTranslation = internalMutation({
 
 type FireResult = { fired: boolean; reason?: string; error?: string };
 
-// Owner: translate a completed course into `lang`. ALL translation runs on Gemini
-// via the in-Convex translate action, regardless of the course's authoring Provider
-// — the claude.ai translate Routine is never fired (this branch supersedes the
-// PRD's "translation follows provider": a Claude-authored course still translates
-// through Gemini). Acquire the lock, then schedule the action; on a failed
-// schedule, release the lock. Idempotent re-translate is a re-fire once the prior
-// run is no longer `translating`. The action reads the key for the configured
-// TRANSLATE_PROVIDER: GOOGLE_AI_API_KEY (default, native Gemini) or
-// OPENROUTER_API_KEY (the rollback path).
+// POST the claude.ai translate Routine's Fire URL (translation-engine-picker;
+// restored from the Gemini cut-over `3620d0e`). Mirrors `routine.postRoutineFire`:
+// the run endpoint has a closed body schema, so we send `{}` — the fired run
+// claims a locked `free` job itself (`claimTranslation`). Throws on missing config
+// (a clear "free translation not configured" so the caller can surface it) or a
+// non-2xx, so `startTranslation` can release the lock.
+async function postTranslateFire(): Promise<void> {
+  const url = process.env.TRANSLATE_FIRE_URL;
+  const token = process.env.TRANSLATE_FIRE_TOKEN;
+  if (!url || !token) throw new Error("free translation not configured (TRANSLATE_FIRE_URL / TRANSLATE_FIRE_TOKEN not set)");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "anthropic-version": "2023-06-01",
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) throw new Error(`fire ${res.status}: ${await res.text()}`);
+}
+
+// Owner: translate a completed course into `lang` with a chosen engine
+// (translation-engine-picker). Acquire the lock (which resolves the effective
+// engine + whether this run is forced), then fire the resolved engine:
+//   - `free`   ⇒ POST the claude.ai translate Routine (no token cost, slower).
+//   - `gemini` ⇒ schedule the in-Convex `translateTopic` action (follows
+//     TRANSLATE_PROVIDER: GOOGLE_AI_API_KEY native Gemini by default, or
+//     OPENROUTER_API_KEY as the rollback), passing `forced` so an engine switch
+//     re-translates every item.
+// A failed fire releases the lock. `engine` omitted (failed-retry) reuses the
+// job's stored engine. Idempotent re-translate is a re-fire once the prior run is
+// no longer `translating`.
 export const startTranslation = action({
-  args: { topicSlug: v.string(), lang: v.string() },
+  args: { topicSlug: v.string(), lang: v.string(), engine: v.optional(engineV) },
   returns: v.object({ fired: v.boolean(), reason: v.optional(v.string()), error: v.optional(v.string()) }),
-  handler: async (ctx, { topicSlug, lang }): Promise<FireResult> => {
-    const acq: AcquireResult = await ctx.runMutation(internal.translate.tryAcquireTranslation, { topicSlug, lang });
+  handler: async (ctx, { topicSlug, lang, engine }): Promise<FireResult> => {
+    const acq: AcquireResult = await ctx.runMutation(internal.translate.tryAcquireTranslation, { topicSlug, lang, engine });
     if (!acq.acquired) {
       // The client surfaces these as errors (same messages as before the routine cut-over).
       if (acq.reason === "no-topic" || acq.reason === "unauthenticated") throw new Error("topic not found");
@@ -241,11 +292,25 @@ export const startTranslation = action({
       return { fired: false, reason: acq.reason };
     }
 
-    // Always schedule the Gemini translate action — no `claimTranslation`, no POST
-    // to the claude.ai translate Routine. The gate/lock + reportTranslation are
-    // reused unchanged; a failed schedule releases the lock.
+    // Free: POST the cloud translate Routine. A missing-env / failed POST releases
+    // the lock and surfaces a clear error (not a silent no-op) — the fire never
+    // landed, so nothing will ever report back to advance the job.
+    if (acq.engine === "free") {
+      try {
+        await postTranslateFire();
+        return { fired: true };
+      } catch (e) {
+        const error = e instanceof Error ? e.message : String(e);
+        await ctx.runMutation(internal.translate.failTranslation, { topicSlug, lang, error });
+        throw new Error(error);
+      }
+    }
+
+    // Gemini: schedule the in-Convex translate action (no `claimTranslation`). The
+    // gate/lock + reportTranslation are reused unchanged; a forced run re-translates
+    // every item. A failed schedule releases the lock.
     try {
-      await ctx.scheduler.runAfter(0, internal.translate.translateTopic, { topicSlug, lang });
+      await ctx.scheduler.runAfter(0, internal.translate.translateTopic, { topicSlug, lang, force: acq.forced });
       return { fired: true };
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
@@ -338,12 +403,14 @@ export const editEditionText = mutation({
 
 // ---- The run's seams (PUBLISH_SECRET-guarded) ------------------------------
 
-// Legacy/manual seam (the fired-Routine flow — `startTranslation` no longer
-// fires it): atomically grab one translation job whose run is DEAD — heartbeat
-// absent or silent past STALE_MS — and stamp a fresh heartbeat + runId. A live
-// job (the Gemini action ticking `claimedAt` via publishes) is never stealable.
-// Returns the claimed Topic slug, target language, and owner email (for the
-// owner-scoped materialise/publish), or null if none waiting.
+// The fired-Routine claim seam (translation-engine-picker): atomically grab one
+// **free** translation job whose run is DEAD — heartbeat absent or silent past
+// STALE_MS — and stamp a fresh heartbeat + runId. Restricted to `engine === "free"`
+// jobs: a freshly-scheduled Gemini job (or a legacy absent-engine one, read as
+// `gemini`) is never grabbed by the cloud routine. A live job (the engine ticking
+// `claimedAt` via publishes) is never stealable. Returns the claimed Topic slug,
+// target language, and owner email (for the owner-scoped materialise/publish), or
+// null if none waiting.
 export const claimTranslation = mutation({
   args: { secret: v.string(), runId: v.string() },
   returns: v.union(
@@ -363,6 +430,7 @@ export const claimTranslation = mutation({
       .filter(
         (j) =>
           j.status === "translating" &&
+          j.engine === "free" && // only the cloud routine's own jobs (absent = gemini, never claimed)
           (j.claimedAt === undefined || Date.now() - j.claimedAt >= STALE_MS),
       )
       .sort((a, b) => a._creationTime - b._creationTime)[0];
@@ -484,7 +552,7 @@ export const reportTranslation = mutation({
 // keyed by slug + lang), mirroring routine.materialiseForProvider on the authoring
 // side. Null if the Topic or owner is missing.
 export const collectForTranslation = internalQuery({
-  args: { topicSlug: v.string(), lang: v.string() },
+  args: { topicSlug: v.string(), lang: v.string(), force: v.optional(v.boolean()) },
   returns: v.union(
     v.null(),
     v.object({
@@ -501,7 +569,7 @@ export const collectForTranslation = internalQuery({
       ),
     }),
   ),
-  handler: async (ctx, { topicSlug, lang }) => {
+  handler: async (ctx, { topicSlug, lang, force }) => {
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic || !topic.ownerId) return null;
     const owner = await ctx.db.get(topic.ownerId);
@@ -510,7 +578,9 @@ export const collectForTranslation = internalQuery({
     for (const it of await collectItems(ctx, topic)) {
       // Already translated from this exact source → skip, so a re-fire after a
       // killed run resumes where it stopped instead of re-paying the whole course.
-      if (await isFresh(ctx, topic._id, lang, it)) continue;
+      // A `force` run (engine switch) bypasses this so every item is re-translated
+      // — the engine-blind `sourceHash` would otherwise skip the prior engine's rows.
+      if (!force && (await isFresh(ctx, topic._id, lang, it))) continue;
       const src = await readSource(ctx, topic._id, it.kind, it.key);
       // Lesson/reference bodies live in content blobs; hand the action the blob
       // id so it can read the bytes (a query can't) and translate the body.
@@ -577,13 +647,13 @@ const CHUNK = 5;
 // reportTranslation, so the lock never sticks and unpublished items fall back to
 // English in the reader.
 export const translateTopic = internalAction({
-  args: { topicSlug: v.string(), lang: v.string(), remaining: v.optional(v.array(v.string())) },
+  args: { topicSlug: v.string(), lang: v.string(), remaining: v.optional(v.array(v.string())), force: v.optional(v.boolean()) },
   returns: v.null(),
-  handler: async (ctx, { topicSlug, lang, remaining }): Promise<null> => {
+  handler: async (ctx, { topicSlug, lang, remaining, force }): Promise<null> => {
     const secret = process.env.PUBLISH_SECRET;
     if (!secret) throw new Error("PUBLISH_SECRET not set");
     try {
-      const info = await ctx.runQuery(internal.translate.collectForTranslation, { topicSlug, lang });
+      const info = await ctx.runQuery(internal.translate.collectForTranslation, { topicSlug, lang, force });
       if (!info || !info.ownerEmail) throw new Error("no translation context (missing topic or owner)");
       const ownerEmail = info.ownerEmail;
       const langName = langInfo(lang).name;
@@ -639,6 +709,7 @@ export const translateTopic = internalAction({
           topicSlug,
           lang,
           remaining: rest.map((it) => it.kind + ":" + it.key),
+          force, // continuations keep force so the whole redo bypasses freshness
         });
         return null;
       }
@@ -721,6 +792,11 @@ export const editions = query({
           rtl: v.boolean(),
           source: v.boolean(),
           status: v.union(v.literal("translating"), v.literal("ready"), v.literal("failed")),
+          // The engine that last produced (or is producing) this Edition
+          // (translation-engine-picker) — seeds the panel's Free/Gemini toggle.
+          // Absent job engine reads as `gemini`; the English source (never
+          // translated) reports `gemini` as a neutral constant.
+          engine: engineV,
           total: v.number(),
           done: v.number(),
           failed: v.number(),
@@ -757,6 +833,7 @@ export const editions = query({
         rtl: false,
         source: true,
         status: "ready" as const,
+        engine: "gemini" as const,
         total: 0,
         done: 0,
         failed: 0,
@@ -774,6 +851,7 @@ export const editions = query({
             rtl: !!li.rtl,
             source: false,
             status: j.status,
+            engine: j.engine ?? ("gemini" as const),
             total: j.total,
             done: j.done,
             failed: j.failed,

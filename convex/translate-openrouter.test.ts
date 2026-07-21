@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeAll, beforeEach, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { swapBackStatic, swapOutStatic } from "./translate";
+import { itemHash, swapBackStatic, swapOutStatic } from "./translate";
 import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -413,6 +413,102 @@ test("each published item bumps the job heartbeat, so a live run keeps its lock"
   });
   const job = await t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
   expect(Date.now() - (job?.claimedAt ?? 0)).toBeLessThan(60_000);
+});
+
+// ---- Engine picker: free fire, gemini schedule, forced redo -----------------
+
+test("collectForTranslation: force returns already-fresh items; unforced skips them", async () => {
+  const t = convexTest(schema, modules);
+  const { alice } = await seedCompleted(t, "openrouter");
+  // A hand-edit stamps the current source hash → the title reads fresh.
+  await asUser(t, alice).mutation(api.translate.editEditionText, { topicSlug: "greek", lang: "es", kind: "title", text: "Griego" });
+
+  const unforced = await t.query(internal.translate.collectForTranslation, { topicSlug: "greek", lang: "es" });
+  expect(unforced!.items.some((i) => i.kind === "title")).toBe(false); // fresh → skipped
+
+  const forced = await t.query(internal.translate.collectForTranslation, { topicSlug: "greek", lang: "es", force: true });
+  expect(forced!.items.some((i) => i.kind === "title")).toBe(true); // force → returned anyway
+});
+
+test("startTranslation free engine POSTs the translate Routine and does NOT schedule the action", async () => {
+  const t = convexTest(schema, modules);
+  const { alice, topicId } = await seedCompleted(t, "openrouter");
+  process.env.TRANSLATE_FIRE_URL = "https://routine.example/fire";
+  process.env.TRANSLATE_FIRE_TOKEN = "tok";
+  const posts: string[] = [];
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => { posts.push(url); return new Response("{}", { status: 200 }); }));
+  try {
+    const res = await asUser(t, alice).action(api.translate.startTranslation, { topicSlug: "greek", lang: "es", engine: "free" });
+    expect(res).toMatchObject({ fired: true });
+    expect(posts).toEqual(["https://routine.example/fire"]); // fired the routine, nothing else
+
+    const job = await t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
+    expect(job).toMatchObject({ status: "translating", engine: "free" }); // lock held for the cloud run to report
+  } finally {
+    delete process.env.TRANSLATE_FIRE_URL;
+    delete process.env.TRANSLATE_FIRE_TOKEN;
+  }
+});
+
+test("startTranslation free engine with unset TRANSLATE_FIRE env releases the lock and errors", async () => {
+  const t = convexTest(schema, modules);
+  const { alice, topicId } = await seedCompleted(t, "openrouter");
+  delete process.env.TRANSLATE_FIRE_URL;
+  delete process.env.TRANSLATE_FIRE_TOKEN;
+
+  await expect(
+    asUser(t, alice).action(api.translate.startTranslation, { topicSlug: "greek", lang: "es", engine: "free" }),
+  ).rejects.toThrow(/free translation not configured/);
+
+  const job = await t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
+  expect(job).toMatchObject({ status: "failed" }); // the fire never landed → lock released
+});
+
+test("a free-translated ready edition re-translated with gemini redoes every item (forced switch)", async () => {
+  vi.useFakeTimers();
+  try {
+    const t = convexTest(schema, modules);
+    const { alice, topicId } = await seedCompleted(t, "openrouter");
+    // A prior FREE run produced a fresh title (its sourceHash matches the source).
+    await t.run(async (ctx) => {
+      await ctx.db.insert("translationJobs", { topicId, lang: "es", status: "ready", total: 3, done: 3, failed: 0, engine: "free" });
+      await ctx.db.insert("translations", { topicId, lang: "es", kind: "title", key: "", text: "FREE title", sourceHash: itemHash("title", { text: "Koine Greek" }) });
+    });
+    stubEcho();
+
+    // free → gemini is an engine switch → forced: even the fresh title is redone.
+    await asUser(t, alice).action(api.translate.startTranslation, { topicSlug: "greek", lang: "es", engine: "gemini" });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const title = await titleRow(t, topicId, "title");
+    expect(title?.text).toBe("Koine Greek"); // echo overwrote the fresh free title
+    const job = await t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
+    expect(job).toMatchObject({ status: "ready", engine: "gemini", done: 3 });
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("gemini → gemini re-translate only redoes stale items (resume, not forced)", async () => {
+  vi.useFakeTimers();
+  try {
+    const t = convexTest(schema, modules);
+    const { alice, topicId } = await seedCompleted(t, "openrouter");
+    // A prior GEMINI run produced a fresh title.
+    await t.run(async (ctx) => {
+      await ctx.db.insert("translationJobs", { topicId, lang: "es", status: "ready", total: 3, done: 3, failed: 0, engine: "gemini" });
+      await ctx.db.insert("translations", { topicId, lang: "es", kind: "title", key: "", text: "kept title", sourceHash: itemHash("title", { text: "Koine Greek" }) });
+    });
+    stubEcho();
+
+    await asUser(t, alice).action(api.translate.startTranslation, { topicSlug: "greek", lang: "es", engine: "gemini" });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const title = await titleRow(t, topicId, "title");
+    expect(title?.text).toBe("kept title"); // same engine → fresh title skipped, not redone
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 test("a translation failure reports failed (retryable) and leaves English fallback", async () => {
