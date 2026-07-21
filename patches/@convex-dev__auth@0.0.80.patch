@@ -1,0 +1,59 @@
+diff --git a/dist/nextjs/server/cookies.js b/dist/nextjs/server/cookies.js
+index 637917f089984741d1e45961dc30cd339022c3b6..9aa8b0a83530c8fd8712d13986772035ac804c24 100644
+--- a/dist/nextjs/server/cookies.js
++++ b/dist/nextjs/server/cookies.js
+@@ -17,16 +17,33 @@ export async function getRequestCookiesInMiddleware(request) {
+ export async function getResponseCookies(response, cookieConfig) {
+     return getCookieStore(await headers(), response.cookies, cookieConfig);
+ }
++// PATCH (hindi-learning): scope the session cookies to a shared parent domain so
++// one sign-in spans every `*.my-course.app` tenant subdomain instead of being
++// locked to a single host. Driven by NEXT_PUBLIC_COOKIE_DOMAIN; unset → upstream
++// host-only behaviour (safe for localhost / *.vercel.app previews). Kept in sync
++// with src/lib/cookieDomain.ts. See docs/adr/0022-tenant-subdomain-model.md.
++function sharedCookieDomain(host) {
++    const base = process.env.NEXT_PUBLIC_COOKIE_DOMAIN || undefined;
++    if (!base) return null;
++    const h = (host ?? "").split(":")[0].trim().toLowerCase();
++    if (!h) return null;
++    return h === base || h.endsWith("." + base) ? base : null;
++}
+ function getCookieStore(requestHeaders, responseCookies, cookieConfig) {
+-    const isLocalhost = utils.isLocalHost(requestHeaders.get("Host") ?? "");
+-    const prefix = isLocalhost ? "" : "__Host-";
++    const host = requestHeaders.get("Host") ?? "";
++    const isLocalhost = utils.isLocalHost(host);
++    // A shared-domain cookie carries a `Domain` attribute, which the `__Host-`
++    // prefix forbids — use the `__Secure-` prefix in that case. Read and write both
++    // run through here, so the name stays consistent across the two.
++    const shareDomain = isLocalhost ? null : sharedCookieDomain(host);
++    const prefix = isLocalhost ? "" : shareDomain ? "__Secure-" : "__Host-";
+     const tokenName = prefix + "__convexAuthJWT";
+     const refreshTokenName = prefix + "__convexAuthRefreshToken";
+     const verifierName = prefix + "__convexAuthOAuthVerifier";
+     function getValue(name) {
+         return responseCookies.get(name)?.value ?? null;
+     }
+-    const cookieOptions = getCookieOptions(isLocalhost, cookieConfig);
++    const cookieOptions = getCookieOptions(isLocalhost, shareDomain, cookieConfig);
+     function setValue(name, value) {
+         if (value === null) {
+             // Only request cookies have a `size` property
+@@ -68,7 +85,7 @@ function getCookieStore(requestHeaders, responseCookies, cookieConfig) {
+         },
+     };
+ }
+-function getCookieOptions(isLocalhost, cookieConfig) {
++function getCookieOptions(isLocalhost, shareDomain, cookieConfig) {
+     // Safari does not send headers with `secure: true` on http:// domains including localhost,
+     // so set `secure: false` (https://codedamn.com/news/web-development/safari-cookie-is-not-being-set)
+     return {
+@@ -76,6 +93,8 @@ function getCookieOptions(isLocalhost, cookieConfig) {
+         httpOnly: true,
+         sameSite: "lax",
+         path: "/",
++        // PATCH (hindi-learning): share the cookie across `*.<domain>` subdomains.
++        ...(shareDomain ? { domain: shareDomain } : {}),
+         maxAge: cookieConfig.maxAge ?? undefined,
+     };
+ }

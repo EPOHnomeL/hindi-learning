@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@convex-dev/auth@0.0.80':
+    hash: 89d4327297c9839d6ab2ab9f23b8ff3f92cee2b250caabcd8e82e3369baa1165
+    path: patches/@convex-dev__auth@0.0.80.patch
+
 importers:
 
   .:
@@ -13,7 +18,7 @@ importers:
         version: 0.37.0
       '@convex-dev/auth':
         specifier: ^0.0.80
-        version: 0.0.80(@auth/core@0.37.0)(convex@1.41.0(react@19.2.7))(react@19.2.7)
+        version: 0.0.80(patch_hash=89d4327297c9839d6ab2ab9f23b8ff3f92cee2b250caabcd8e82e3369baa1165)(@auth/core@0.37.0)(convex@1.41.0(react@19.2.7))(react@19.2.7)
       '@t3-oss/env-core':
         specifier: ^0.11.1
         version: 0.11.1(typescript@5.9.3)(zod@3.25.76)
@@ -1825,7 +1830,7 @@ snapshots:
       preact: 10.11.3
       preact-render-to-string: 5.2.3(preact@10.11.3)
 
-  '@convex-dev/auth@0.0.80(@auth/core@0.37.0)(convex@1.41.0(react@19.2.7))(react@19.2.7)':
+  '@convex-dev/auth@0.0.80(patch_hash=89d4327297c9839d6ab2ab9f23b8ff3f92cee2b250caabcd8e82e3369baa1165)(@auth/core@0.37.0)(convex@1.41.0(react@19.2.7))(react@19.2.7)':
     dependencies:
       '@auth/core': 0.37.0
       arctic: 1.9.2
