@@ -22,7 +22,6 @@ describe("clearAccountLocalState", () => {
     const storage = fakeStorage({
       "hindi:lang": "xh",
       "hindi:answers-seen": "[\"a\",\"b\"]",
-      "hindi:cert-celebrated:prophetic-school": "1",
       "hindi:guest-done:tok": "[]",
     });
 
@@ -30,7 +29,6 @@ describe("clearAccountLocalState", () => {
 
     expect(storage.getItem("hindi:lang")).toBeNull();
     expect(storage.getItem("hindi:answers-seen")).toBeNull();
-    expect(storage.getItem("hindi:cert-celebrated:prophetic-school")).toBeNull();
     expect(storage.getItem("hindi:guest-done:tok")).toBeNull();
   });
 

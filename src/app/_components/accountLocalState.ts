@@ -1,7 +1,7 @@
 // The reader keeps a little state per person in localStorage — the last-used
 // Edition ("hindi:lang"), which answered questions they've already seen
-// ("hindi:answers-seen"), per-course certificate celebration flags, guest
-// progress — but the store is per *browser*, not per account. On the same
+// ("hindi:answers-seen"), guest progress — but the store is per *browser*, not
+// per account. On the same
 // browser, one account signing out and another signing in would otherwise
 // inherit the first person's state (most visibly: a course reopening in the
 // previous user's Edition language). So on sign-out we drop every "hindi:*" key.

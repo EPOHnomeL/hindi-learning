@@ -458,10 +458,6 @@ function CertificateDialog({
   );
 }
 
-// localStorage marker so the celebration fires once per Certificate, per device
-// — the same per-device pattern as the reader's seen-replies / Guest ticks.
-const CELEBRATED_KEY = "hindi:cert-celebrated";
-
 // One-shot confetti burst. Lazy-imported so it stays out of the public certificate
 // page bundle, and skipped entirely under `prefers-reduced-motion` (canvas-confetti
 // also honours it internally as a backstop).
@@ -473,17 +469,18 @@ function fireConfetti() {
   });
 }
 
-// The completion moment (ADR 0015): the first time a learner is eligible or
-// just-earned on a completed course — owner or Viewer, whenever they next load it,
-// not only at the instant of "Mark complete" — auto-mint the Certificate (blank
-// name → the account email's local-part) and open its standalone page in a new
-// tab, alongside a one-shot confetti burst. This replaces the old in-app claim
-// dialog: no name prompt, no modal. Fires once per device via a per-device
-// localStorage marker, so revisiting a completed lesson doesn't re-trigger it.
-// `window.open` from this (non-click) effect is popup-blocked by most browsers, so
-// when the tab doesn't open we fall back to a small, dismissible banner — a
-// one-click, never-blocked anchor. The persistent CertificateControl remains the
-// way to view it again later.
+// The completion moment (ADR 0015): auto-mint the Certificate (blank name → the
+// account email's local-part) and open its standalone page in a new tab, alongside
+// a one-shot confetti burst, at the instant the learner finishes — owner or Viewer.
+// It fires ONLY on the live transition into eligibility (their own "Mark complete"
+// on the last remaining lesson flipping `eligible` false → true within this
+// session), never merely because they loaded a course they'd already finished. That
+// on-load auto-open surprised learners — every already-finished Viewer got the card
+// flung open the moment the owner ended the course, or on any fresh device — so the
+// trigger is now the click itself; the persistent CertificateControl (View / Claim)
+// is the way to open it any other time. `window.open` from this (non-click) effect
+// is popup-blocked by some browsers, so when the tab doesn't open we fall back to a
+// small, dismissible banner — a one-click, never-blocked anchor.
 export function CompletionCelebration({ topicSlug }: { topicSlug: string }) {
   const t = useTranslations("Certificate");
   const data = useQuery(api.certificates.myCertificate, { topicSlug });
@@ -491,41 +488,38 @@ export function CompletionCelebration({ topicSlug }: { topicSlug: string }) {
   // The Edition being read (course-translation) — snapshot its title onto the
   // certificate, so finishing the Spanish edition earns a Spanish-titled one.
   const lang = useEditionLang();
+  // Previous eligibility, so we fire on the false → true transition only. `null`
+  // until the first observation, so an already-eligible first load never fires.
+  const wasEligibleRef = useRef<boolean | null>(null);
   const firedRef = useRef(false);
   // The earned token, surfaced only when the auto-opened tab was popup-blocked —
   // then this renders a one-click fallback link instead of nothing.
   const [blockedToken, setBlockedToken] = useState<string | null>(null);
 
   useEffect(() => {
-    if (firedRef.current || !data) return;
-    if (!data.certificate && !data.eligible) return; // not yet finished / no access
-    let seen = false;
-    try {
-      seen = localStorage.getItem(`${CELEBRATED_KEY}:${topicSlug}`) === "1";
-    } catch {
-      /* storage unavailable — celebrate anyway, just don't persist suppression */
-    }
-    if (seen) return;
+    if (!data) return;
+    // Eligible-and-unearned: the only state a "Mark complete" click can newly land
+    // us in. Once a certificate exists this is false, so re-mints never re-trigger.
+    const eligibleNow = data.eligible && !data.certificate;
+    const prev = wasEligibleRef.current;
+    wasEligibleRef.current = eligibleNow;
+    // Fire only on the observed false → true flip — i.e. the last lesson was just
+    // marked complete while this course was open. Not on the initial load (prev is
+    // null), and not for a course already finished on some earlier visit.
+    if (prev !== false || !eligibleNow || firedRef.current) return;
     firedRef.current = true; // guard against a double-fire within this mount
 
     void (async () => {
-      // Reuse an already-earned certificate; otherwise mint one now (blank name →
-      // the account email's local-part). Only mark the device as celebrated once we
-      // hold a token, so a transient claim failure retries on the next load rather
-      // than silently swallowing the moment.
-      let token = data.certificate?.token ?? null;
-      if (!token) {
-        try {
-          const cert = await claim({ topicSlug, name: "", lang: lang ?? undefined });
-          token = cert.token;
-        } catch {
-          return; // no longer eligible / raced — the persistent control still offers it
-        }
-      }
+      // Mint now (blank name → the account email's local-part). On failure, clear
+      // firedRef so a transient claim error can retry on the next eligibility signal
+      // rather than silently swallowing the moment.
+      let token: string;
       try {
-        localStorage.setItem(`${CELEBRATED_KEY}:${topicSlug}`, "1");
+        const cert = await claim({ topicSlug, name: "", lang: lang ?? undefined });
+        token = cert.token;
       } catch {
-        /* ignore */
+        firedRef.current = false;
+        return; // no longer eligible / raced — the persistent control still offers it
       }
       fireConfetti();
       const opened = window.open(`/certificate/${token}`, "_blank", "noopener,noreferrer");
