@@ -261,6 +261,23 @@ test("claimTranslation only grabs free jobs — a gemini (or absent-engine) job 
   expect(await t.mutation(api.translate.claimTranslation, { secret, runId: "r2" })).toMatchObject({ lang: "de" });
 });
 
+test("claimTranslation grabs a just-acquired free job immediately (regression: fresh heartbeat must not lock the routine out → 0/N stall)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  await addLesson(t, topicId, "0001", 1);
+  const secret = "test-secret";
+  // Owner adds a FREE edition: startTranslation acquires (fresh heartbeat, no runId)
+  // then fires the cloud routine. The routine MUST be able to claim it right away —
+  // before this fix a fresh acquire heartbeat made the job look live, so the claim
+  // returned null and the Edition sat at 0/N until STALE_MS elapsed.
+  await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "free" });
+  const claim = await t.mutation(api.translate.claimTranslation, { secret, runId: "r1" });
+  expect(claim).toMatchObject({ topicSlug: "hindi", lang: "es", ownerEmail: "alice@example.com" });
+  // Once claimed (runId stamped, fresh heartbeat) the run owns it — single-flight.
+  expect(await t.mutation(api.translate.claimTranslation, { secret, runId: "r2" })).toBeNull();
+});
+
 test("tryAcquireTranslation refuses to re-run while a job is still translating (single-flight)", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
@@ -288,13 +305,8 @@ test("claim → publish → report round-trips one Edition, and the reader serve
   await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "free" });
 
   const secret = "test-secret";
-  // The acquire's heartbeat marks the job live (the run owns it); the claim seam
-  // may only steal DEAD work, so age the heartbeat first.
-  await t.run(async (ctx) => {
-    const job = await ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique();
-    await ctx.db.patch(job!._id, { claimedAt: Date.now() - 11 * 60 * 1000 });
-  });
-  // The run claims the dead Edition — it learns the (Topic, language, owner).
+  // The fired run claims the just-acquired Edition immediately — no waiting for the
+  // acquire heartbeat to go stale — and learns the (Topic, language, owner).
   const claim = await t.mutation(api.translate.claimTranslation, { secret, runId: "r1" });
   expect(claim).toMatchObject({ topicSlug: "hindi", lang: "es", ownerEmail: "alice@example.com" });
   // A second claim finds nothing — the job is now claimed (single-flight).

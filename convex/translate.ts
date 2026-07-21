@@ -404,13 +404,18 @@ export const editEditionText = mutation({
 // ---- The run's seams (PUBLISH_SECRET-guarded) ------------------------------
 
 // The fired-Routine claim seam (translation-engine-picker): atomically grab one
-// **free** translation job whose run is DEAD — heartbeat absent or silent past
-// STALE_MS — and stamp a fresh heartbeat + runId. Restricted to `engine === "free"`
-// jobs: a freshly-scheduled Gemini job (or a legacy absent-engine one, read as
-// `gemini`) is never grabbed by the cloud routine. A live job (the engine ticking
-// `claimedAt` via publishes) is never stealable. Returns the claimed Topic slug,
-// target language, and owner email (for the owner-scoped materialise/publish), or
-// null if none waiting.
+// **free** translation job that no live run owns — and stamp a fresh heartbeat +
+// runId. Grabbable when EITHER it was just acquired and no run has claimed it yet
+// (`runId` unset — `startTranslation` acquires with a fresh heartbeat but no runId,
+// then fires this routine to pick it up) OR a prior run is DEAD (heartbeat absent
+// or silent past STALE_MS). `runId` is stamped only here, so `runId === undefined`
+// cleanly means "never claimed" — without it a fresh acquire's live heartbeat would
+// lock the routine out until STALE_MS elapsed (the job would sit at 0/N). Restricted
+// to `engine === "free"`: a Gemini job (or a legacy absent-engine one, read as
+// `gemini`) runs in-Convex and is never grabbed by the cloud routine. A live free
+// run (its own `runId` set, ticking `claimedAt` via publishes) is never stealable.
+// Returns the claimed Topic slug, target language, and owner email (for the
+// owner-scoped materialise/publish), or null if none waiting.
 export const claimTranslation = mutation({
   args: { secret: v.string(), runId: v.string() },
   returns: v.union(
@@ -431,7 +436,8 @@ export const claimTranslation = mutation({
         (j) =>
           j.status === "translating" &&
           j.engine === "free" && // only the cloud routine's own jobs (absent = gemini, never claimed)
-          (j.claimedAt === undefined || Date.now() - j.claimedAt >= STALE_MS),
+          // Never-claimed (just acquired, no run yet) OR dead (heartbeat absent/stale).
+          (j.runId === undefined || j.claimedAt === undefined || Date.now() - j.claimedAt >= STALE_MS),
       )
       .sort((a, b) => a._creationTime - b._creationTime)[0];
     if (!candidate) return null;
