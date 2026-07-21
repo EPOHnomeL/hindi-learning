@@ -596,6 +596,14 @@ async function normaliseEmblemImage(file: File): Promise<Blob> {
 // A section (heading + controls, no dialog chrome), folded into the course
 // settings dialog (UI redesign) rather than standing alone. Gated by `canWrite`
 // at the call site.
+// A small curated set of subject glyphs to pick from (capped at 20 for now).
+// Free-typing an arbitrary emoji is gone — the owner picks one of these, or
+// uploads an image below for anything else.
+const GLYPH_OPTIONS = [
+  "🪷", "🎓", "📚", "✏️", "🧠", "🔭", "🎯", "🏆", "🌟", "💡",
+  "🔬", "🎨", "🎵", "🌍", "📐", "🧮", "🗣️", "🧪", "📖", "⭐",
+] as const;
+
 export function EmblemSection({ topicSlug }: { topicSlug: string }) {
   const t = useTranslations("Certificate");
   const setEmblem = useMutation(api.emblem.setTopicEmblem);
@@ -664,22 +672,29 @@ export function EmblemSection({ topicSlug }: { topicSlug: string }) {
         </div>
         <div className="min-w-0 flex-1">
           <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-accent2">{t("glyphLabel")}</label>
-          <div className="flex gap-1.5">
-            <input
-              value={glyph}
-              onChange={(e) => setGlyph(e.target.value)}
-              placeholder="🪷"
-              className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-center text-lg focus:border-gold focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => void saveGlyph()}
-              disabled={busy || !glyph.trim()}
-              className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-            >
-              {t("save")}
-            </button>
+          <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10">
+            {GLYPH_OPTIONS.map((g) => (
+              <button
+                key={g}
+                type="button"
+                onClick={() => setGlyph(g)}
+                aria-pressed={glyph === g}
+                className={`flex aspect-square items-center justify-center rounded-lg border text-lg leading-none transition-colors hover:bg-hi ${
+                  glyph === g ? "border-gold bg-hi" : "border-line bg-card"
+                }`}
+              >
+                {g}
+              </button>
+            ))}
           </div>
+          <button
+            type="button"
+            onClick={() => void saveGlyph()}
+            disabled={busy || !glyph.trim()}
+            className="mt-2 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+          >
+            {t("save")}
+          </button>
           <label className="mb-1.5 mt-3 block text-[11px] font-bold uppercase tracking-wide text-accent2">
             {t("orUploadImage")}
           </label>
