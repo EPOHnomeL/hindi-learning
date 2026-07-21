@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "convex/react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 import { api } from "../../../convex/_generated/api";
@@ -18,6 +18,7 @@ import { courseIndexRedirect, firstLessonKey, frontierKey } from "./readerDerive
 // bouncing through here again.
 export function CourseIndex({ slug }: { slug: string }) {
   const lang = useEditionLang();
+  const locale = useLocale();
   const search = useSearchParams();
   const lessons = useQuery(api.content.listLessons, { topicSlug: slug, lang: lang ?? undefined });
   const header = useQuery(api.content.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
@@ -34,21 +35,27 @@ export function CourseIndex({ slug }: { slug: string }) {
 
   useEffect(() => {
     if (!target) return;
-    // Preserve the URL's Edition; failing that, reopen in the last-used one
-    // (per-device) when the caller still holds it — otherwise plain English.
+    // Preserve the URL's Edition; failing that, open in the active UI language
+    // when the course has that Edition; failing that, reopen in the last-used one
+    // (per-device, an explicit prior switch) when the caller still holds it —
+    // otherwise plain English.
     let effLang = lang;
     if (!effLang && header) {
-      let stored: string | null = null;
-      try {
-        stored = localStorage.getItem(LANG_KEY);
-      } catch {
-        /* storage unavailable — fall through to English */
+      if (locale !== "en" && header.editions.some((e) => e.lang === locale)) {
+        effLang = locale;
+      } else {
+        let stored: string | null = null;
+        try {
+          stored = localStorage.getItem(LANG_KEY);
+        } catch {
+          /* storage unavailable — fall through to English */
+        }
+        if (stored && stored !== "en" && header.editions.some((e) => e.lang === stored)) effLang = stored;
       }
-      if (stored && stored !== "en" && header.editions.some((e) => e.lang === stored)) effLang = stored;
     }
     // Carry the query string through (purchase/mp — the payment-return banner).
     router.replace(courseIndexRedirect(`/courses/${slug}/lessons/${target}`, search.toString(), effLang));
-  }, [target, slug, router, lang, header, search]);
+  }, [target, slug, router, lang, locale, header, search]);
 
   if (lessons === undefined) return <CourseStatus variant="loading" />;
   if (lessons.length === 0)
