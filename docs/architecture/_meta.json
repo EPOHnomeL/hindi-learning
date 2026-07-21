@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-13T15:08:51.758Z",
+  "generatedAt": "2026-07-21T13:17:05.048Z",
   "files": {
     "/docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md": {
       "title": "Asynchronous, hub-mediated teaching loop (no live tutor on the web)",
@@ -68,6 +68,10 @@
         {
           "path": "/docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md",
           "title": "Content source of truth moves to Convex; the Routine pulls per-Topic context (supersedes 0002; partially supersedes 0008)"
+        },
+        {
+          "path": "/docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md",
+          "title": "Paid course marketplace: Sellers sell, platform facilitates via Stripe Connect (not merchant of record)"
         },
         {
           "path": "/docs/architecture/contexts/03-teaching-routine.md",
@@ -145,8 +149,20 @@
     },
     "/docs/adr/0011-allowlist-in-convex-admin-portal.md": {
       "title": "The Allowlist lives in Convex and is managed by an in-app Admin, gating sign-up only",
-      "updated": "2026-06-27T15:38:45+02:00",
+      "updated": "2026-07-17T10:10:08+02:00",
       "backlinks": [
+        {
+          "path": "/docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md",
+          "title": "Paid course marketplace: Sellers sell, platform facilitates via Stripe Connect (not merchant of record)"
+        },
+        {
+          "path": "/docs/adr/0021-open-signup-allowlist-gates-course-creation.md",
+          "title": "Sign-up is open; the Allowlist gates course creation; checkout is auth-first"
+        },
+        {
+          "path": "/docs/adr/0022-tenant-subdomain-model.md",
+          "title": "Tenant & subdomain model (whitelabel v1)"
+        },
         {
           "path": "/docs/architecture/contexts/05-access-sharing.md",
           "title": "Access & Sharing"
@@ -182,6 +198,10 @@
       "updated": "2026-06-30T10:00:02+02:00",
       "backlinks": [
         {
+          "path": "/docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md",
+          "title": "Paid course marketplace: Sellers sell, platform facilitates via Stripe Connect (not merchant of record)"
+        },
+        {
           "path": "/docs/architecture/contexts/01-hub-content.md",
           "title": "Hub & Content Model"
         },
@@ -195,6 +215,10 @@
       "title": "Provider-agnostic teaching runtime with two compute lines: a managed Claude line (quality-guaranteed) and a BYOK gateway line (any OpenAI-compatible model)",
       "updated": "2026-06-30T11:43:49+02:00",
       "backlinks": [
+        {
+          "path": "/docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md",
+          "title": "Paid course marketplace: Sellers sell, platform facilitates via Stripe Connect (not merchant of record)"
+        },
         {
           "path": "/docs/architecture/contexts/01-hub-content.md",
           "title": "Hub & Content Model"
@@ -223,8 +247,12 @@
     },
     "/docs/adr/0015-course-completion-and-certificates.md": {
       "title": "Course completion & certificates",
-      "updated": "2026-07-03T11:04:16+02:00",
+      "updated": "2026-07-19T15:42:12+02:00",
       "backlinks": [
+        {
+          "path": "/docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md",
+          "title": "Paid course marketplace: Sellers sell, platform facilitates via Stripe Connect (not merchant of record)"
+        },
         {
           "path": "/docs/adr/0017-topic-emblem-on-certificates.md",
           "title": "Topic Emblem on Certificates"
@@ -241,6 +269,16 @@
           "path": "/docs/architecture/contexts/05-access-sharing.md",
           "title": "Access & Sharing"
         },
+        {
+          "path": "/CONTEXT.md",
+          "title": "My Course Glossary"
+        }
+      ]
+    },
+    "/docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md": {
+      "title": "Paid course marketplace: Sellers sell, platform facilitates via Stripe Connect (not merchant of record)",
+      "updated": "2026-07-06T12:45:47+02:00",
+      "backlinks": [
         {
           "path": "/CONTEXT.md",
           "title": "My Course Glossary"
@@ -307,15 +345,72 @@
         }
       ]
     },
+    "/docs/adr/0021-open-signup-allowlist-gates-course-creation.md": {
+      "title": "Sign-up is open; the Allowlist gates course creation; checkout is auth-first",
+      "updated": "2026-07-12T21:29:48+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/adr/0011-allowlist-in-convex-admin-portal.md",
+          "title": "The Allowlist lives in Convex and is managed by an in-app Admin, gating sign-up only"
+        },
+        {
+          "path": "/docs/adr/0022-tenant-subdomain-model.md",
+          "title": "Tenant & subdomain model (whitelabel v1)"
+        },
+        {
+          "path": "/CONTEXT.md",
+          "title": "My Course Glossary"
+        }
+      ]
+    },
+    "/docs/adr/0022-tenant-subdomain-model.md": {
+      "title": "Tenant & subdomain model (whitelabel v1)",
+      "updated": "2026-07-21T12:03:14+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/adr/0011-allowlist-in-convex-admin-portal.md",
+          "title": "The Allowlist lives in Convex and is managed by an in-app Admin, gating sign-up only"
+        },
+        {
+          "path": "/docs/agents/tenant-branding.md",
+          "title": "Producing tenant branding from a Claude design system"
+        }
+      ]
+    },
+    "/docs/adr/0023-self-enroll-access-primitive.md": {
+      "title": "Self-enroll as a first-class access primitive",
+      "updated": "2026-07-19T15:12:22+02:00",
+      "backlinks": []
+    },
     "/docs/agents/domain.md": {
       "title": "Domain Docs",
       "updated": "2026-06-09T19:18:22+02:00",
       "backlinks": []
     },
     "/docs/agents/issue-tracker.md": {
-      "title": "Issue tracker: GitHub Issues",
-      "updated": "2026-07-10T11:26:41+02:00",
+      "title": "Issue tracker: local markdown under .scratch/",
+      "updated": "2026-07-15T11:08:45+02:00",
       "backlinks": []
+    },
+    "/docs/agents/project-context.md": {
+      "title": "Project context",
+      "updated": "2026-07-21T12:03:14+02:00",
+      "backlinks": [
+        {
+          "path": "/CLAUDE.md",
+          "title": "/CLAUDE.md"
+        }
+      ]
+    },
+    "/docs/agents/tenant-branding.md": {
+      "title": "Producing tenant branding from a Claude design system",
+      "updated": "2026-07-17T10:33:38+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/agents/project-context.md",
+          "title": "Project context"
+        }
+      ]
     },
     "/docs/agents/triage-labels.md": {
       "title": "Triage Labels",
@@ -324,7 +419,7 @@
     },
     "/docs/architecture/contexts/01-hub-content.md": {
       "title": "Hub & Content Model",
-      "updated": "2026-07-03T10:08:24+02:00",
+      "updated": "2026-07-13T17:10:19+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/02-reader.md",
@@ -342,7 +437,7 @@
     },
     "/docs/architecture/contexts/02-reader.md": {
       "title": "Reader",
-      "updated": "2026-06-27T10:46:00+02:00",
+      "updated": "2026-07-13T17:10:19+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/01-hub-content.md",
@@ -364,7 +459,7 @@
     },
     "/docs/architecture/contexts/03-teaching-routine.md": {
       "title": "Teaching Routine",
-      "updated": "2026-06-30T11:25:34+02:00",
+      "updated": "2026-07-13T17:10:19+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/01-hub-content.md",
@@ -390,7 +485,7 @@
     },
     "/docs/architecture/contexts/04-publishing-workspace.md": {
       "title": "Publishing & Workspace",
-      "updated": "2026-06-30T11:25:34+02:00",
+      "updated": "2026-07-13T17:10:19+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/01-hub-content.md",
@@ -408,7 +503,7 @@
     },
     "/docs/architecture/contexts/05-access-sharing.md": {
       "title": "Access & Sharing",
-      "updated": "2026-07-03T10:08:24+02:00",
+      "updated": "2026-07-13T17:10:19+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/01-hub-content.md",
@@ -426,7 +521,7 @@
     },
     "/docs/architecture/contexts/06-ai-teaching.md": {
       "title": "Teaching Intelligence",
-      "updated": "2026-07-13T15:01:30.675Z",
+      "updated": "2026-07-21T13:00:18+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/03-teaching-routine.md",
@@ -444,12 +539,12 @@
     },
     "/docs/architecture/overview.md": {
       "title": "My Course — Technical Overview",
-      "updated": "2026-07-02T08:50:37+02:00",
+      "updated": "2026-07-13T17:09:36+02:00",
       "backlinks": []
     },
     "/docs/architecture/README.md": {
       "title": "Architecture / Technical Overview",
-      "updated": "2026-06-27T10:34:54+02:00",
+      "updated": "2026-07-13T17:09:10+02:00",
       "backlinks": []
     },
     "/docs/routine-prompt.md": {
@@ -488,14 +583,34 @@
         }
       ]
     },
+    "/docs/translation-model-trial.md": {
+      "title": "Translation model trial — which model to translate Editions with",
+      "updated": "2026-07-21T15:11:03+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/translation-models-by-region.md",
+          "title": "Best translation models by region — external evidence"
+        }
+      ]
+    },
+    "/docs/translation-models-by-region.md": {
+      "title": "Best translation models by region — external evidence",
+      "updated": "2026-07-21T15:12:20+02:00",
+      "backlinks": []
+    },
     "/docs/translation.md": {
       "title": "Course translation (Editions) — operational runbook",
-      "updated": "2026-07-12T21:47:56+02:00",
-      "backlinks": []
+      "updated": "2026-07-21T14:15:31+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/translation-model-trial.md",
+          "title": "Translation model trial — which model to translate Editions with"
+        }
+      ]
     },
     "/CONTEXT.md": {
       "title": "My Course Glossary",
-      "updated": "2026-07-10T10:27:12+02:00",
+      "updated": "2026-07-19T14:08:29+02:00",
       "backlinks": [
         {
           "path": "/docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md",
@@ -508,13 +623,21 @@
         {
           "path": "/docs/routine.md",
           "title": "The next-lesson Routine — operational runbook"
+        },
+        {
+          "path": "/CLAUDE.md",
+          "title": "/CLAUDE.md"
         }
       ]
     },
     "/CLAUDE.md": {
       "title": "/CLAUDE.md",
-      "updated": "2026-07-10T11:26:41+02:00",
+      "updated": "2026-07-17T08:40:09+02:00",
       "backlinks": [
+        {
+          "path": "/docs/agents/project-context.md",
+          "title": "Project context"
+        },
         {
           "path": "/docs/architecture/README.md",
           "title": "Architecture / Technical Overview"
