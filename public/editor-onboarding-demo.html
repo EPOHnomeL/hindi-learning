@@ -1,0 +1,928 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>My Course — Editor Onboarding Demo</title>
+<style>
+  :root {
+    --paper: #fbf7f0;
+    --card: #fffdf9;
+    --ink: #2b2622;
+    --soft: #6b6258;
+    --line: #e7ddd4;
+    --accent: #9c5b34;
+    --accent2: #3f6f5e;
+    --gold: #b88a2e;
+    --hi: #fbeecb;
+    --danger: #b4442f;
+    --good-b: #3f8f63;
+    --shadow: 0 1px 2px rgba(43,38,34,.06), 0 8px 24px rgba(43,38,34,.08);
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: var(--sans);
+    background:
+      radial-gradient(1200px 700px at 15% -10%, #f3e8d6 0%, transparent 55%),
+      radial-gradient(1000px 600px at 110% 120%, #efe3d0 0%, transparent 50%),
+      linear-gradient(135deg, #efe6d7, #e6dccb);
+    color: var(--ink);
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+    gap: 18px;
+  }
+
+  /* ---------- Header / intro ---------- */
+  .demo-head {
+    width: min(1080px, 96vw);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .demo-title { display: flex; align-items: center; gap: 12px; }
+  .logo-badge {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: linear-gradient(150deg, var(--accent), #7c4426);
+    color: #fff; display: grid; place-items: center;
+    box-shadow: var(--shadow);
+  }
+  .logo-badge svg { width: 22px; height: 22px; }
+  .demo-title h1 { margin: 0; font-size: 20px; letter-spacing: -.01em; color: var(--accent); }
+  .demo-title p { margin: 2px 0 0; font-size: 13px; color: var(--soft); }
+
+  .controls { display: flex; align-items: center; gap: 8px; }
+  .controls button {
+    font: inherit; font-size: 13px; font-weight: 600;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink);
+    border-radius: 10px; padding: 8px 14px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    box-shadow: var(--shadow); transition: background .15s, transform .1s;
+  }
+  .controls button:hover { background: var(--hi); }
+  .controls button:active { transform: translateY(1px); }
+  .controls button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+  .controls button.primary:hover { background: #8a4f2d; }
+  .controls svg { width: 15px; height: 15px; }
+
+  /* ---------- Mock browser ---------- */
+  .mock-browser {
+    position: relative;
+    width: min(1080px, 96vw);
+    height: min(680px, 78vh);
+    background: var(--card);
+    border-radius: 16px;
+    box-shadow: 0 30px 70px -20px rgba(43,38,34,.45), 0 4px 12px rgba(43,38,34,.15);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid rgba(255,255,255,.5);
+  }
+  .browser-bar {
+    height: 44px; flex: 0 0 44px;
+    background: linear-gradient(#f4ece0, #ece2d3);
+    border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 8px; padding: 0 14px;
+  }
+  .dots { display: flex; gap: 7px; }
+  .dots i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .dots i:nth-child(1){ background:#e6685b; }
+  .dots i:nth-child(2){ background:#f0bf4c; }
+  .dots i:nth-child(3){ background:#5fc267; }
+  .url {
+    flex: 1; height: 26px; background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; display: flex; align-items: center; gap: 7px;
+    padding: 0 12px; font-size: 12.5px; color: var(--soft); max-width: 520px; margin: 0 auto;
+  }
+  .url svg { width: 12px; height: 12px; color: var(--good-b); }
+
+  .viewport { position: relative; flex: 1; overflow: hidden; background: var(--paper); }
+
+  /* ---------- Screens ---------- */
+  .screen {
+    position: absolute; inset: 0;
+    opacity: 0; visibility: hidden;
+    transition: opacity .45s ease;
+    overflow: hidden;
+  }
+  .screen.active { opacity: 1; visibility: visible; }
+
+  /* --- Email client screen --- */
+  .mail { display: flex; height: 100%; }
+  .mail-list { width: 40%; border-right: 1px solid var(--line); background: var(--card); overflow: hidden; }
+  .mail-list .mh { padding: 16px 18px 10px; font-weight: 700; color: var(--accent); border-bottom: 1px solid var(--line); }
+  .mail-row { padding: 14px 18px; border-bottom: 1px solid var(--line); }
+  .mail-row.unread { background: var(--hi); }
+  .mail-row .from { font-weight: 700; font-size: 13.5px; }
+  .mail-row .subj { font-size: 12.5px; color: var(--ink); margin-top: 2px; }
+  .mail-row .prev { font-size: 12px; color: var(--soft); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mail-open { flex: 1; padding: 30px 40px; overflow: auto; }
+  .mail-open h2 { margin: 0 0 4px; color: var(--accent); font-size: 20px; }
+  .mail-open .meta { color: var(--soft); font-size: 12.5px; margin-bottom: 22px; }
+  .mail-card {
+    border: 1px solid var(--line); border-radius: 14px; padding: 28px; background: var(--card);
+    box-shadow: var(--shadow); text-align: center; max-width: 440px;
+  }
+  .mail-card .em { width: 46px; height: 46px; margin: 0 auto 12px; border-radius: 12px;
+    background: linear-gradient(150deg, var(--accent), #7c4426); color:#fff; display:grid; place-items:center; }
+  .mail-card .em svg { width: 24px; height: 24px; }
+  .mail-card h3 { margin: 0 0 8px; font-size: 17px; color: var(--ink); }
+  .mail-card p { margin: 0 0 20px; font-size: 13.5px; color: var(--soft); line-height: 1.55; }
+
+  .btn-accent {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    background: var(--accent); color: #fff; border: none; border-radius: 10px;
+    padding: 12px 22px; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+    box-shadow: var(--shadow);
+  }
+
+  /* --- Sign in screen --- */
+  .signin { height: 100%; display: grid; place-items: center; padding: 20px; }
+  .signin-inner { width: 100%; max-width: 360px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  .signin-brand { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; }
+  .signin-brand .logo-badge { width: 46px; height: 46px; }
+  .signin-brand h2 { margin: 0; font-size: 24px; color: var(--accent); letter-spacing: -.02em; }
+  .signin-brand span { font-size: 13px; color: var(--soft); }
+  .signin-form {
+    width: 100%; display: flex; flex-direction: column; gap: 13px;
+    border: 1px solid var(--line); background: var(--card); border-radius: 18px; padding: 26px;
+    box-shadow: var(--shadow);
+  }
+  .signin-form h3 { margin: 0; font-size: 19px; color: var(--accent); }
+  .field {
+    border: 1px solid var(--line); background: var(--card); border-radius: 10px;
+    padding: 11px 13px; font-size: 14px; color: var(--ink); display: flex; align-items: center; min-height: 44px;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .field.filled { color: var(--ink); }
+  .field.empty { color: #b6ab9c; }
+  .field.focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,138,46,.14); }
+  .field .caret { display: inline-block; width: 1px; height: 17px; background: var(--accent); margin-left: 1px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .signin-form .go { background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 12px; font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; }
+  .signin-form .toggle { background: none; border: none; color: var(--soft); font: inherit; font-size: 13px; cursor: pointer; }
+
+  /* --- Dashboard screen (matches the real "Shared with me" grid) --- */
+  .dash { height: 100%; display: flex; flex-direction: column; background: var(--paper); }
+  .dash-top { flex: 0 0 auto; padding: 22px 34px 0; display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  .dash-top .brand { display: flex; align-items: center; gap: 12px; }
+  .dash-top .brand .logo-badge { width: 38px; height: 38px; }
+  .dash-top .brand .logo-badge svg { width: 20px; height: 20px; }
+  .dash-top .brand h2 { margin: 0; font-size: 22px; color: var(--accent); letter-spacing: -.01em; }
+  .dash-top .brand p { margin: 1px 0 0; font-size: 12.5px; color: var(--soft); }
+  .dash-top .acts { display: flex; align-items: center; gap: 8px; color: var(--soft); font-size: 13px; }
+  .dash-top .acts .ic { padding: 6px; border-radius: 8px; display: inline-grid; place-items: center; }
+  .dash-top .acts .ic svg { width: 16px; height: 16px; }
+  .dash-body { flex: 1; overflow: auto; padding: 26px 34px 34px; }
+  .dash-sec-h { margin: 0 0 2px; font-size: 17px; color: var(--accent); font-weight: 600; letter-spacing: -.01em; }
+  .dash-sec-sub { margin: 0 0 16px; font-size: 13px; color: var(--soft); }
+  .course-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .course-card {
+    border: 1px solid var(--line); border-radius: 18px; background: var(--card);
+    box-shadow: var(--shadow); padding: 18px; display: flex; flex-direction: column;
+    transition: transform .18s, box-shadow .18s, border-color .18s;
+  }
+  .course-card .ctop { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+  .course-card h3 { margin: 0; font-size: 16px; line-height: 1.3; color: var(--ink); }
+  .badge-shared { flex: 0 0 auto; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; background: var(--hi); color: var(--accent); padding: 3px 8px; border-radius: 999px; white-space: nowrap; }
+  .course-card .mission { margin: 0; font-size: 13px; line-height: 1.45; color: var(--soft); }
+  .course-card .byline { margin: 8px 0 0; font-size: 11.5px; color: var(--soft); }
+  .course-card .byline b { color: var(--ink); font-weight: 600; }
+  .chips { margin-top: 12px; display: flex; gap: 6px; }
+  .chip { font-size: 11px; font-weight: 600; background: var(--hi); color: var(--accent2); padding: 3px 9px; border-radius: 999px; }
+  .prog { margin-top: 14px; }
+  .prog .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--soft); margin-bottom: 6px; }
+  .prog .row b { color: var(--ink); font-weight: 600; }
+  .prog .track { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+  .prog .fill { height: 100%; border-radius: 3px; background: var(--accent2); }
+  .course-card .open { margin-top: 16px; background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 10px; font: inherit; font-size: 13.5px; font-weight: 600; text-align: center; cursor: pointer; }
+  .course-card.target-glow { border-color: var(--accent2); box-shadow: 0 0 0 3px rgba(63,111,94,.18), var(--shadow); transform: translateY(-2px); }
+
+  /* --- Reader / course screen --- */
+  .reader { display: flex; height: 100%; position: relative; }
+  .sidebar {
+    width: 264px; flex: 0 0 264px; border-right: 1px solid var(--line); background: var(--paper);
+    display: flex; flex-direction: column; padding: 16px 14px; overflow: hidden; position: relative;
+  }
+  .sb-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .sb-top a { font-size: 12.5px; color: var(--soft); text-decoration: none; }
+  .sb-title { font-size: 17px; font-weight: 700; color: var(--accent); margin: 4px 0 14px; line-height: 1.25; }
+  .sb-scroll { flex: 1; overflow: hidden; position: relative; }
+  .sb-scroll-inner { transition: transform .6s cubic-bezier(.4,0,.2,1); }
+  .sb-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--accent2); padding: 6px 8px; }
+  .nav-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 9px; font-size: 13.5px; color: var(--ink); cursor: default; }
+  .nav-item.active { background: var(--hi); color: var(--accent); font-weight: 600; }
+  .nav-item .dot { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 7px; }
+  .nav-item .dot.done { background: var(--accent2); }
+  .nav-item .dot.open { border: 1.5px solid var(--line); }
+  .nav-item .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sb-bottom { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .sb-ctl { display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; font-size: 13px; color: var(--soft); background: var(--card); }
+  .sb-ctl.lang.hot { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(184,138,46,.16); }
+  .sb-ctl select { font: inherit; font-size: 13px; border: 1px solid var(--line); border-radius: 7px; background: var(--card); color: var(--ink); padding: 3px 6px; }
+  .sb-count { font-size: 11px; color: var(--soft); padding: 4px 8px 8px; }
+
+  .reader-main { flex: 1; display: flex; flex-direction: column; min-width: 0; padding: 16px; }
+  .lesson-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .lesson-head .crumb { font-size: 12px; color: var(--soft); }
+  .lesson-head .mark { border: 1px solid var(--accent); color: var(--accent); border-radius: 9px; padding: 6px 12px; font-size: 12.5px; }
+  .lesson-frame { position: relative; flex: 1; border: 1px solid var(--line); border-radius: 14px; background: var(--card); overflow: hidden; box-shadow: var(--shadow); }
+  .lesson-content { padding: 34px 40px; overflow: auto; height: 100%; }
+  .lesson-content h1 { font-family: var(--serif); font-size: 25px; color: var(--accent); margin: 0 0 6px; }
+  .lesson-content .seq { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--accent2); }
+  .lesson-content p { font-family: var(--serif); font-size: 15.5px; line-height: 1.72; color: var(--ink); margin: 14px 0; }
+  .lesson-content [dir="rtl"], .lesson-content.hindi p, .lesson-content.hindi h1 { font-family: "Nirmala UI", "Mangal", var(--serif); }
+  #lesson-body { transition: opacity .4s ease; }
+  .edit-modal .em-body.hindi p, .edit-modal .em-body.hindi h1 { font-family: "Nirmala UI", "Mangal", var(--serif); }
+  .edit-pencil {
+    position: absolute; right: 14px; top: 14px; z-index: 5;
+    border: 1px solid var(--line); background: rgba(255,253,249,.92); backdrop-filter: blur(4px);
+    color: var(--accent); border-radius: 10px; padding: 7px 13px; font: inherit; font-size: 13px; font-weight: 600;
+    box-shadow: var(--shadow); display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    opacity: 0; transition: opacity .3s, box-shadow .2s;
+  }
+  .edit-pencil.show { opacity: 1; }
+  .edit-pencil.hot { box-shadow: 0 0 0 3px rgba(184,138,46,.22), var(--shadow); }
+  .edit-pencil svg { width: 14px; height: 14px; }
+
+  /* Highlight of edited text */
+  .diff-old { background: rgba(180,68,47,.12); color: var(--soft); text-decoration: line-through; text-decoration-color: rgba(180,68,47,.5); border-radius: 3px; padding: 0 2px; }
+  .diff-new { background: rgba(63,143,99,.16); border-radius: 3px; padding: 0 2px; box-shadow: inset 0 -2px 0 rgba(63,143,99,.4); }
+
+  /* --- Edit modal --- */
+  .edit-overlay { position: absolute; inset: 0; background: rgba(30,26,22,.42); backdrop-filter: blur(2px); z-index: 20; display: grid; place-items: center; opacity: 0; visibility: hidden; transition: opacity .35s; }
+  .edit-overlay.show { opacity: 1; visibility: visible; }
+  .edit-modal { width: min(680px, 90%); max-height: 86%; background: var(--card); border-radius: 16px; box-shadow: 0 30px 60px -15px rgba(0,0,0,.5); display: flex; flex-direction: column; overflow: hidden; transform: translateY(10px) scale(.98); transition: transform .35s; }
+  .edit-overlay.show .edit-modal { transform: none; }
+  .edit-modal .em-head { display: flex; align-items: center; justify-content: space-between; padding: 15px 18px; border-bottom: 1px solid var(--line); }
+  .edit-modal .em-head h4 { margin: 0; font-size: 15px; color: var(--ink); }
+  .edit-modal .em-head .badge { font-size: 11px; color: var(--accent2); background: rgba(63,111,94,.12); padding: 3px 9px; border-radius: 999px; font-weight: 600; }
+  .edit-modal .em-body { padding: 26px 30px; overflow: auto; }
+  .edit-modal .em-body.editing { outline: 2px dashed rgba(184,138,46,.5); outline-offset: -10px; border-radius: 10px; }
+  .edit-modal h1 { font-family: var(--serif); font-size: 22px; color: var(--accent); margin: 0 0 12px; }
+  .edit-modal p { font-family: var(--serif); font-size: 15px; line-height: 1.7; color: var(--ink); margin: 12px 0; }
+  .edit-modal .em-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--line); }
+  .edit-modal .em-foot .cancel { border: 1px solid var(--line); background: var(--card); color: var(--soft); border-radius: 9px; padding: 9px 15px; font: inherit; font-size: 13px; cursor: pointer; }
+  .edit-modal .em-foot .save { border: none; background: var(--accent2); color: #fff; border-radius: 9px; padding: 9px 18px; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+  .edit-modal .em-foot .save.hot { box-shadow: 0 0 0 3px rgba(63,111,94,.25); }
+
+  /* saved toast */
+  .toast { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%) translateY(20px); background: var(--accent2); color: #fff; padding: 11px 20px; border-radius: 12px; font-size: 13.5px; font-weight: 600; box-shadow: var(--shadow); display: flex; align-items: center; gap: 9px; opacity: 0; transition: opacity .35s, transform .35s; z-index: 40; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast svg { width: 17px; height: 17px; }
+
+  /* mobile hamburger overlay drawer hint (three lines icon) */
+  .drawer-icon { display: inline-flex; }
+
+  /* ---------- Virtual cursor ---------- */
+  .cursor { position: absolute; z-index: 100; left: 0; top: 0; width: 26px; height: 26px; pointer-events: none; transition: transform .05s linear; will-change: transform; filter: drop-shadow(0 2px 3px rgba(0,0,0,.35)); }
+  .cursor svg { width: 100%; height: 100%; display: block; }
+  .cursor.click .ring { animation: ring .5s ease-out; }
+  .ripple { position: absolute; z-index: 99; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent); pointer-events: none; opacity: 0; }
+  .ripple.go { animation: ripple .55s ease-out; }
+  @keyframes ripple { 0% { opacity: .7; transform: scale(.4); } 100% { opacity: 0; transform: scale(3.2); } }
+
+  /* ---------- Commentary caption ---------- */
+  .caption {
+    width: min(1080px, 96vw);
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 16px 20px;
+    display: flex; align-items: center; gap: 16px;
+    min-height: 74px;
+  }
+  .caption .step-no {
+    flex: 0 0 auto; width: 40px; height: 40px; border-radius: 12px;
+    background: var(--accent); color: #fff; display: grid; place-items: center;
+    font-weight: 700; font-size: 17px;
+  }
+  .caption .step-text { min-width: 0; }
+  .caption .step-text b { display: block; font-size: 15px; color: var(--ink); margin-bottom: 2px; }
+  .caption .step-text span { font-size: 13px; color: var(--soft); line-height: 1.5; }
+
+  .progress { width: min(1080px, 96vw); display: flex; gap: 6px; }
+  .progress i { flex: 1; height: 4px; border-radius: 2px; background: var(--line); transition: background .3s; }
+  .progress i.done { background: var(--accent); }
+  .progress i.current { background: var(--gold); }
+
+  @media (max-width: 720px) {
+    .course-grid { grid-template-columns: 1fr; }
+    .caption .step-text span { font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="demo-head">
+    <div class="demo-title">
+      <span class="logo-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      </span>
+      <div>
+        <h1>Editor Onboarding — how to improve a translated course</h1>
+        <p>An auto-playing walkthrough of the editor invite → edit → save flow.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="btn-play" class="primary">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <span>Pause</span>
+      </button>
+      <button id="btn-restart">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        <span>Restart</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="progress" id="progress"></div>
+
+  <div class="mock-browser" id="browser">
+    <div class="browser-bar">
+      <div class="dots"><i></i><i></i><i></i></div>
+      <div class="url" id="url">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span id="url-text">mail.example.com</span>
+      </div>
+    </div>
+
+    <div class="viewport" id="viewport">
+
+      <!-- 1. EMAIL -->
+      <div class="screen active" id="screen-email">
+        <div class="mail">
+          <div class="mail-list">
+            <div class="mh">Inbox</div>
+            <div class="mail-row unread">
+              <div class="from">My Course</div>
+              <div class="subj">You've been invited to edit a course</div>
+              <div class="prev">Priya invited you to translate & refine…</div>
+            </div>
+            <div class="mail-row">
+              <div class="from">Newsletter</div>
+              <div class="subj">This week in the community</div>
+              <div class="prev">Highlights from around the world…</div>
+            </div>
+            <div class="mail-row">
+              <div class="from">Calendar</div>
+              <div class="subj">Reminder: Tuesday study group</div>
+              <div class="prev">Starts at 7pm your time…</div>
+            </div>
+          </div>
+          <div class="mail-open">
+            <h2>You've been invited to edit a course</h2>
+            <div class="meta">from My Course &lt;invites@mycourse.app&gt; · to you</div>
+            <div class="mail-card">
+              <div class="em">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+              </div>
+              <h3>Priya added you as an Editor</h3>
+              <p>You can now refine the Hindi edition of <b>“Growing in your relationship with the Holy Spirit.”</b> Tap below to set up your account and start editing.</p>
+              <button class="btn-accent" id="tgt-invite-link">Sign up as an editor →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. SIGN IN -->
+      <div class="screen" id="screen-signin">
+        <div class="signin">
+          <div class="signin-inner">
+            <div class="signin-brand">
+              <span class="logo-badge">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              </span>
+              <h2>My Course</h2>
+              <span>Learn deeply, at your own pace.</span>
+            </div>
+            <div class="signin-form">
+              <h3>Create account</h3>
+              <div class="field empty" id="tgt-email"><span id="email-text">Email</span></div>
+              <div class="field empty" id="tgt-password"><span id="pw-text">Password</span></div>
+              <button class="go" id="tgt-signup-go">Sign up</button>
+              <button class="toggle">Already have an account? Sign in</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. DASHBOARD -->
+      <div class="screen" id="screen-dashboard">
+        <div class="dash">
+          <div class="dash-top">
+            <div class="brand">
+              <span class="logo-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+              <div><h2>My Course</h2><p>Learn deeply, at your own pace.</p></div>
+            </div>
+            <div class="acts">
+              <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+              <span>Sign out</span>
+            </div>
+          </div>
+          <div class="dash-body">
+            <h3 class="dash-sec-h">Shared with me</h3>
+            <p class="dash-sec-sub">Courses another teacher has shared for you to read or edit.</p>
+            <div class="course-grid">
+              <div class="course-card" id="course-card">
+                <div class="ctop">
+                  <h3>Growing in your relationship with the Holy Spirit</h3>
+                  <span class="badge-shared">Shared</span>
+                </div>
+                <p class="mission">A 56-lesson journey into life with the Spirit — who he is, and how to walk with him daily.</p>
+                <p class="byline">Shared by <b>Priya</b></p>
+                <div class="chips"><span class="chip">हिन्दी</span></div>
+                <div class="prog">
+                  <div class="row"><span><b>0</b> / 56 lessons</span><span>0%</span></div>
+                  <div class="track"><div class="fill" style="width:0%"></div></div>
+                </div>
+                <button class="open" id="tgt-course">Open course</button>
+              </div>
+              <div class="course-card">
+                <div class="ctop">
+                  <h3>Foundations of Prayer</h3>
+                  <span class="badge-shared">Shared</span>
+                </div>
+                <p class="mission">A short, practical introduction to a life of prayer.</p>
+                <p class="byline">Shared by <b>Daniel</b></p>
+                <div class="chips"><span class="chip">English</span></div>
+                <div class="prog">
+                  <div class="row"><span><b>6</b> / 24 lessons</span><span>25%</span></div>
+                  <div class="track"><div class="fill" style="width:25%"></div></div>
+                </div>
+                <button class="open">Open course</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4/5/6. READER -->
+      <div class="screen" id="screen-reader">
+        <div class="reader">
+          <aside class="sidebar">
+            <div class="sb-top">
+              <a href="#">← Back to courses</a>
+              <a href="#">Sign out</a>
+            </div>
+            <div class="sb-title">Growing in your relationship with the Holy Spirit</div>
+            <div class="sb-scroll">
+              <div class="sb-scroll-inner" id="sb-inner">
+                <div class="sb-label">Lessons</div>
+                <div class="sb-count" id="lesson-count">56 lessons</div>
+                <div class="nav-item active"><span class="dot done"></span><span class="t">1. Who is the Holy Spirit?</span></div>
+                <div class="nav-item"><span class="dot done"></span><span class="t">2. The promise of the Spirit</span></div>
+                <div class="nav-item"><span class="dot done"></span><span class="t">3. Being filled</span></div>
+                <div class="nav-item"><span class="dot open"></span><span class="t">4. Fruit of the Spirit</span></div>
+                <div class="nav-item"><span class="dot open"></span><span class="t">5. Gifts of the Spirit</span></div>
+                <div class="nav-item"><span class="dot open"></span><span class="t">6. Walking daily with the Spirit</span></div>
+                <div class="nav-item"><span class="dot open"></span><span class="t">7. Listening for his voice</span></div>
+                <div class="nav-item"><span class="dot open"></span><span class="t">8. Praying in the Spirit</span></div>
+                <div class="nav-item"><span class="dot open"></span><span class="t">9. The Spirit and Scripture</span></div>
+                <div class="nav-item"><span class="dot open"></span><span class="t">10. Growing in intimacy</span></div>
+                <div class="sb-label">References</div>
+                <div class="nav-item"><span class="dot open"></span><span class="t">Key verses</span></div>
+                <div class="nav-item"><span class="dot open"></span><span class="t">Glossary</span></div>
+              </div>
+            </div>
+            <div class="sb-bottom">
+              <div class="sb-ctl lang" id="tgt-lang">
+                <label>Language</label>
+                <select id="lang-select" tabindex="-1">
+                  <option value="en" selected>English</option>
+                  <option value="hi">हिन्दी (Hindi)</option>
+                </select>
+              </div>
+              <div class="sb-ctl">
+                <span>Light mode</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+              </div>
+            </div>
+          </aside>
+
+          <main class="reader-main">
+            <div class="lesson-head">
+              <div class="crumb" id="lesson-crumb">Lesson 1 · Growing in your relationship with the Holy Spirit</div>
+              <div class="mark">Mark complete</div>
+            </div>
+            <div class="lesson-frame">
+              <button class="edit-pencil" id="tgt-edit">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+                Edit
+              </button>
+              <div class="lesson-content" id="lesson-body">
+                <div class="seq" id="lc-seq">LESSON 1</div>
+                <h1 id="lc-title">Who is the Holy Spirit?</h1>
+                <p id="lc-p1">The Holy Spirit is the third person of the Trinity. He is not a force or a feeling, but a person who lives with us.</p>
+                <p id="lc-p2">When we trust in Jesus, the Holy Spirit begins to live within us and guides us each day.</p>
+                <p id="lc-p3">He helps us understand the Scriptures and gives us peace in every season of life.</p>
+              </div>
+            </div>
+          </main>
+
+          <!-- edit modal -->
+          <div class="edit-overlay" id="edit-overlay">
+            <div class="edit-modal">
+              <div class="em-head">
+                <h4>Edit lesson</h4>
+                <span class="badge">हिन्दी edition</span>
+              </div>
+              <div class="em-body hindi" id="em-body">
+                <div class="seq">पाठ 1</div>
+                <h1>पवित्र आत्मा कौन है?</h1>
+                <p>पवित्र आत्मा त्रिएकता का तीसरा व्यक्ति है। वह कोई शक्ति या भावना नहीं, बल्कि एक व्यक्ति है जो हमारे साथ रहता है।</p>
+                <p id="em-edit-line">जब हम यीशु में विश्वास करते हैं, तब पवित्र आत्मा हमारे अंदर निवास करना आरंभ कर देता है और प्रतिदिन हमको मार्गदर्शित करता रहता है।</p>
+                <p>वह हमें पवित्रशास्त्र समझने में मदद करता है और जीवन के हर दौर में शांति देता है।</p>
+              </div>
+              <div class="em-foot">
+                <button class="cancel">Cancel</button>
+                <button class="save" id="tgt-save">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="toast" id="toast">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            Lesson saved
+          </div>
+        </div>
+      </div>
+
+      <!-- cursor + ripple -->
+      <div class="ripple" id="ripple"></div>
+      <div class="cursor" id="cursor">
+        <svg viewBox="0 0 24 24"><path class="ring" d="M5 2l14 11-6 1 3.5 7-3 1.4L10 15l-5 4z" fill="#fff" stroke="#2b2622" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="caption">
+    <div class="step-no" id="cap-no">1</div>
+    <div class="step-text">
+      <b id="cap-title">Getting started</b>
+      <span id="cap-body">Watch how an invited editor improves a translated course.</span>
+    </div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  var viewport = document.getElementById("viewport");
+  var browser  = document.getElementById("browser");
+  var cursor   = document.getElementById("cursor");
+  var ripple   = document.getElementById("ripple");
+  var urlText  = document.getElementById("url-text");
+  var capNo    = document.getElementById("cap-no");
+  var capTitle = document.getElementById("cap-title");
+  var capBody  = document.getElementById("cap-body");
+  var progress = document.getElementById("progress");
+  var playBtn  = document.getElementById("btn-play");
+
+  // ----- cursor math (resize-immune, per REFERENCE.md) -----
+  function coords(sel) {
+    var el = typeof sel === "string" ? document.querySelector(sel) : sel;
+    if (!el) return { x: 120, y: 120 };
+    var r = el.getBoundingClientRect();
+    var v = viewport.getBoundingClientRect();
+    return { x: r.left + r.width / 2 - v.left, y: r.top + r.height / 2 - v.top };
+  }
+  var curX = 120, curY = 120;
+  function placeCursor(x, y) { cursor.style.transform = "translate(" + x + "px," + y + "px)"; }
+  placeCursor(curX, curY);
+
+  function easeInOutCubic(t){ return t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2; }
+
+  var rafId = null;
+  function moveCursor(sel) {
+    return new Promise(function (resolve) {
+      var to = coords(sel);
+      var fromX = curX, fromY = curY;
+      var dist = Math.hypot(to.x - fromX, to.y - fromY);
+      var dur = Math.min(1100, Math.max(360, dist * 1.6));
+      var start = null;
+      cancelAnimationFrame(rafId);
+      function frame(ts) {
+        if (start === null) start = ts;
+        var p = Math.min(1, (ts - start) / dur);
+        var e = easeInOutCubic(p);
+        curX = fromX + (to.x - fromX) * e;
+        curY = fromY + (to.y - fromY) * e;
+        placeCursor(curX, curY);
+        if (p < 1) rafId = requestAnimationFrame(frame);
+        else resolve();
+      }
+      rafId = requestAnimationFrame(frame);
+    });
+  }
+
+  function clickFx() {
+    cursor.classList.remove("click"); void cursor.offsetWidth; cursor.classList.add("click");
+    ripple.style.left = (curX - 6) + "px";
+    ripple.style.top  = (curY - 6) + "px";
+    ripple.classList.remove("go"); void ripple.offsetWidth; ripple.classList.add("go");
+  }
+
+  // interruptible wait
+  var waiters = [];
+  var stopped = false;
+  function wait(ms) {
+    return new Promise(function (resolve) {
+      var w = { resolve: resolve, id: setTimeout(function () { done(); }, ms) };
+      function done() { clearTimeout(w.id); var i = waiters.indexOf(w); if (i>=0) waiters.splice(i,1); resolve(); }
+      w.cancel = done;
+      waiters.push(w);
+    });
+  }
+
+  function showScreen(id) {
+    var screens = viewport.querySelectorAll(".screen");
+    for (var i = 0; i < screens.length; i++) screens[i].classList.remove("active");
+    document.getElementById(id).classList.add("active");
+  }
+
+  function setCaption(no, title, body) {
+    capNo.textContent = no;
+    capTitle.textContent = title;
+    capBody.textContent = body;
+  }
+  function setUrl(u) { urlText.textContent = u; }
+
+  // typing helper for the sign-in fields
+  function typeInto(fieldId, textId, value, done) {
+    var field = document.getElementById(fieldId);
+    var textEl = document.getElementById(textId);
+    field.classList.add("focus"); field.classList.remove("empty");
+    textEl.innerHTML = '<span class="caret"></span>';
+    var i = 0;
+    return new Promise(function (resolve) {
+      function tick() {
+        if (stopped) { resolve(); return; }
+        i++;
+        textEl.innerHTML = value.slice(0, i) + '<span class="caret"></span>';
+        if (i < value.length) { waiters.push(wrap(setTimeout(tick, 55))); }
+        else { textEl.textContent = value; field.classList.remove("focus"); field.classList.add("filled"); resolve(); }
+      }
+      function wrap(id){ return { id:id, cancel:function(){ clearTimeout(id); } }; }
+      waiters.push(wrap(setTimeout(tick, 120)));
+    });
+  }
+
+  // ---------- build progress bar ----------
+  var STEPS = 7;
+  var bars = [];
+  for (var s = 0; s < STEPS; s++) { var b = document.createElement("i"); progress.appendChild(b); bars.push(b); }
+  function markProgress(n) {
+    for (var i = 0; i < bars.length; i++) {
+      bars[i].classList.remove("done","current");
+      if (i < n) bars[i].classList.add("done");
+      else if (i === n) bars[i].classList.add("current");
+    }
+  }
+
+  // ---------- lesson content: English source, then the Hindi edition ----------
+  // The awkward, over-literal machine translation the editor will improve…
+  var ORIGINAL_HI = "जब हम यीशु में विश्वास करते हैं, तब पवित्र आत्मा हमारे अंदर निवास करना आरंभ कर देता है और प्रतिदिन हमको मार्गदर्शित करता रहता है।";
+  // …rewritten into natural, easy-to-read Hindi (changed phrases highlighted).
+  var IMPROVED_HI = 'जब हम यीशु पर <span class="diff-new">भरोसा</span> करते हैं, तो पवित्र आत्मा हमारे <span class="diff-new">मन में रहने लगता है</span> और हर दिन हमें <span class="diff-new">राह दिखाता है।</span>';
+
+  var EN_LESSON = {
+    crumb: "Lesson 1 · Growing in your relationship with the Holy Spirit",
+    seq: "LESSON 1",
+    title: "Who is the Holy Spirit?",
+    p1: "The Holy Spirit is the third person of the Trinity. He is not a force or a feeling, but a person who lives with us.",
+    p2: "When we trust in Jesus, the Holy Spirit begins to live within us and guides us each day.",
+    p3: "He helps us understand the Scriptures and gives us peace in every season of life."
+  };
+  var HI_LESSON = {
+    crumb: "पाठ 1 · पवित्र आत्मा के साथ बढ़ना",
+    seq: "पाठ 1",
+    title: "पवित्र आत्मा कौन है?",
+    p1: "पवित्र आत्मा त्रिएकता का तीसरा व्यक्ति है। वह कोई शक्ति या भावना नहीं, बल्कि एक व्यक्ति है जो हमारे साथ रहता है।",
+    p2: ORIGINAL_HI,
+    p3: "वह हमें पवित्रशास्त्र समझने में मदद करता है और जीवन के हर दौर में शांति देता है।"
+  };
+  function renderLesson(d, hindi) {
+    document.getElementById("lesson-crumb").textContent = d.crumb;
+    document.getElementById("lc-seq").textContent = d.seq;
+    document.getElementById("lc-title").textContent = d.title;
+    document.getElementById("lc-p1").textContent = d.p1;
+    document.getElementById("lc-p2").innerHTML = d.p2;
+    document.getElementById("lc-p3").textContent = d.p3;
+    document.getElementById("lesson-body").classList.toggle("hindi", !!hindi);
+  }
+
+  // ---------- reset all mutable UI ----------
+  function resetUI() {
+    showScreen("screen-email");
+    setUrl("mail.example.com");
+    // sign-in fields
+    var ef = document.getElementById("tgt-email"); ef.className = "field empty"; document.getElementById("email-text").textContent = "Email";
+    var pf = document.getElementById("tgt-password"); pf.className = "field empty"; document.getElementById("pw-text").textContent = "Password";
+    // course glow
+    document.getElementById("course-card").classList.remove("target-glow");
+    // sidebar scroll + lang highlight + reader back to English
+    document.getElementById("sb-inner").style.transform = "translateY(0)";
+    document.getElementById("tgt-lang").classList.remove("hot");
+    document.getElementById("lang-select").value = "en";
+    document.getElementById("lesson-body").style.opacity = "1";
+    renderLesson(EN_LESSON, false);
+    // pencil / modal
+    document.getElementById("tgt-edit").classList.remove("show","hot");
+    document.getElementById("edit-overlay").classList.remove("show");
+    document.getElementById("em-body").classList.remove("editing");
+    document.getElementById("tgt-save").classList.remove("hot");
+    document.getElementById("toast").classList.remove("show");
+    // reset the modal's editable paragraph
+    document.getElementById("em-edit-line").innerHTML = ORIGINAL_HI;
+    markProgress(0);
+    curX = 120; curY = 120; placeCursor(curX, curY);
+  }
+
+  // ---------- the timeline ----------
+  function run() {
+    return chain([
+      // Step 1 — open the invite email link
+      function () {
+        markProgress(0);
+        setCaption("1", "Open your invite email", "We email invited editors a link. Tap “Sign up as an editor” to begin.");
+        showScreen("screen-email");
+        setUrl("mail.example.com");
+        return wait(1600)
+          .then(function(){ return moveCursor("#tgt-invite-link"); })
+          .then(function(){ clickFx(); return wait(500); });
+      },
+      // Step 2 — sign up: email + password
+      function () {
+        markProgress(1);
+        setCaption("2", "Set up your account", "Enter your email and a password at the top, then sign up.");
+        showScreen("screen-signin");
+        setUrl("mycourse.app/sign-in");
+        return wait(900)
+          .then(function(){ return moveCursor("#tgt-email"); })
+          .then(function(){ clickFx(); return wait(250); })
+          .then(function(){ return typeInto("tgt-email","email-text","editor@example.com"); })
+          .then(function(){ return moveCursor("#tgt-password"); })
+          .then(function(){ clickFx(); return wait(250); })
+          .then(function(){ return typeInto("tgt-password","pw-text","••••••••••"); })
+          .then(function(){ return moveCursor("#tgt-signup-go"); })
+          .then(function(){ clickFx(); return wait(600); });
+      },
+      // Step 3 — open the course
+      function () {
+        markProgress(2);
+        setCaption("3", "Open the course", "Go to “Growing in your relationship with the Holy Spirit” and tap it.");
+        showScreen("screen-dashboard");
+        setUrl("mycourse.app/courses");
+        return wait(1100)
+          .then(function(){ return moveCursor("#course-card"); })
+          .then(function(){ document.getElementById("course-card").classList.add("target-glow"); return wait(500); })
+          .then(function(){ return moveCursor("#tgt-course"); })
+          .then(function(){ clickFx(); return wait(500); });
+      },
+      // Step 4 — 56 lessons, scroll to language switcher & change language.
+      // The reader opens in English; switching flips the content to हिन्दी.
+      function () {
+        markProgress(3);
+        setCaption("4", "Pick the language to edit", "All 56 lessons open. Scroll to the bottom and switch from English to the edition you’re editing — हिन्दी.");
+        showScreen("screen-reader");
+        setUrl("mycourse.app/courses/holy-spirit");
+        var body = document.getElementById("lesson-body");
+        return wait(1400)
+          // scroll the lesson list to reveal the bottom controls
+          .then(function(){ document.getElementById("sb-inner").style.transform = "translateY(-120px)"; return wait(900); })
+          .then(function(){ return moveCursor("#tgt-lang"); })
+          .then(function(){ document.getElementById("tgt-lang").classList.add("hot"); clickFx(); document.getElementById("lang-select").value = "hi"; return wait(450); })
+          // fade the English content out, swap to the Hindi edition, fade in
+          .then(function(){ body.style.opacity = "0"; return wait(400); })
+          .then(function(){ renderLesson(HI_LESSON, true); return wait(80); })
+          .then(function(){ body.style.opacity = "1"; return wait(900); });
+      },
+      // Step 5 — press Edit
+      function () {
+        markProgress(4);
+        setCaption("5", "Press Edit", "The Edit button sits at the top of the lesson. Press it to make changes.");
+        document.getElementById("tgt-lang").classList.remove("hot");
+        var pencil = document.getElementById("tgt-edit");
+        pencil.classList.add("show");
+        return wait(700)
+          .then(function(){ return moveCursor("#tgt-edit"); })
+          .then(function(){ pencil.classList.add("hot"); return wait(500); })
+          .then(function(){ clickFx(); document.getElementById("edit-overlay").classList.add("show"); pencil.classList.remove("hot"); return wait(700); });
+      },
+      // Step 6 — improve the wording
+      function () {
+        markProgress(5);
+        setCaption("6", "Make it clearer", "Rewrite anything awkward so it reads naturally and is easier to understand.");
+        var body = document.getElementById("em-body");
+        var line = document.getElementById("em-edit-line");
+        return wait(700)
+          .then(function(){ body.classList.add("editing"); return moveCursor("#em-edit-line"); })
+          .then(function(){ clickFx(); return wait(500); })
+          // show the old text struck through, then the improved text
+          .then(function(){ line.innerHTML = '<span class="diff-old">' + ORIGINAL_HI + '</span>'; return wait(650); })
+          .then(function(){ line.innerHTML = IMPROVED_HI; return wait(1200); });
+      },
+      // Step 7 — save
+      function () {
+        markProgress(6);
+        setCaption("7", "Save your changes", "Press Save. Your improvements go live for every reader of this edition.");
+        var save = document.getElementById("tgt-save");
+        return wait(600)
+          .then(function(){ return moveCursor("#tgt-save"); })
+          .then(function(){ save.classList.add("hot"); return wait(400); })
+          .then(function(){ clickFx(); return wait(500); })
+          .then(function(){
+            // apply the edit to the live lesson, close modal, show toast
+            document.getElementById("lc-p2").innerHTML = IMPROVED_HI;
+            document.getElementById("em-body").classList.remove("editing");
+            document.getElementById("edit-overlay").classList.remove("show");
+            save.classList.remove("hot");
+            return wait(400);
+          })
+          .then(function(){ document.getElementById("toast").classList.add("show"); return wait(2600); })
+          .then(function(){ document.getElementById("toast").classList.remove("show"); markProgress(7); return wait(1200); });
+      }
+    ]);
+  }
+
+  // sequential runner that respects pause
+  function chain(fns) {
+    var p = Promise.resolve();
+    fns.forEach(function (fn) {
+      p = p.then(function () {
+        if (stopped) return;
+        return gate().then(fn);
+      });
+    });
+    return p;
+  }
+
+  // pause gate
+  var paused = false;
+  var resumeResolvers = [];
+  function gate() {
+    if (!paused) return Promise.resolve();
+    return new Promise(function (res) { resumeResolvers.push(res); });
+  }
+
+  // loop forever
+  var running = false;
+  function loop() {
+    if (running) return;
+    running = true;
+    stopped = false;
+    resetUI();
+    (function again() {
+      run().then(function () {
+        if (stopped) { running = false; return; }
+        running = false;
+        // small breath, then restart
+        wait(800).then(function(){ if (!stopped) { loop(); } });
+      });
+    })();
+  }
+
+  // controls
+  function setPlayLabel() {
+    playBtn.querySelector("span").textContent = paused ? "Play" : "Pause";
+    playBtn.querySelector("svg").innerHTML = paused
+      ? '<path d="M8 5v14l11-7z"/>'
+      : '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+  }
+  playBtn.addEventListener("click", function () {
+    paused = !paused;
+    if (!paused) { var r = resumeResolvers.slice(); resumeResolvers = []; r.forEach(function(f){ f(); }); }
+    setPlayLabel();
+  });
+  document.getElementById("btn-restart").addEventListener("click", function () {
+    stopped = true;
+    // cancel pending waits & animation
+    waiters.slice().forEach(function(w){ w.cancel && w.cancel(); });
+    waiters = [];
+    cancelAnimationFrame(rafId);
+    paused = false; setPlayLabel();
+    resumeResolvers = []; running = false;
+    setTimeout(loop, 60);
+  });
+
+  setPlayLabel();
+  // start
+  window.addEventListener("load", loop);
+  if (document.readyState === "complete") loop();
+})();
+</script>
+</body>
+</html>
