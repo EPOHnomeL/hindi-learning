@@ -9,29 +9,29 @@ import { ArtifactView } from "./ArtifactView";
 import { useCourse } from "./CourseShell";
 import { ReaderSkeleton } from "./ui";
 import { LANG_KEY, useEditionLang } from "./editionUrl";
-import { courseIndexRedirect, firstLessonKey, frontierKey } from "./readerDerive";
+import { courseIndexRedirect, resumeLessonKey } from "./readerDerive";
 
 // The course index (`/courses/[slug]`): redirect to a Lesson so the URL always
-// names what's shown (ADR 0012). An owner resumes at the newest lesson (the
-// Frontier); a Viewer of a shared course always starts at lesson 1. `replace`,
-// not `push`, so "back" from the lesson goes to the dashboard rather than
-// bouncing through here again.
+// names what's shown (ADR 0012). Everyone — owner or Viewer — resumes at the
+// lesson after their last completed one (open-to-last-completed), falling back
+// to lesson 1 when nothing is completed yet. `replace`, not `push`, so "back"
+// from the lesson goes to the dashboard rather than bouncing through here again.
 export function CourseIndex({ slug }: { slug: string }) {
   const lang = useEditionLang();
   const locale = useLocale();
   const search = useSearchParams();
   const lessons = useQuery(api.content.listLessons, { topicSlug: slug, lang: lang ?? undefined });
   const header = useQuery(api.content.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
+  const progress = useQuery(api.capture.myProgress, { topicSlug: slug });
   const router = useRouter();
 
-  // Wait for both the lessons and the caller's role before choosing a target,
-  // so an owner never flashes through lesson 1 before the role resolves.
+  // Wait for lessons, the header (for Edition resolution below), and progress
+  // before choosing a target, so the caller lands on their resume point in one
+  // hop rather than flashing through lesson 1 while progress loads.
   const target =
-    lessons === undefined || header === undefined
+    lessons === undefined || header === undefined || progress === undefined
       ? null
-      : header?.role === "owner"
-        ? frontierKey(lessons)
-        : firstLessonKey(lessons);
+      : resumeLessonKey(lessons, progress);
 
   useEffect(() => {
     if (!target) return;

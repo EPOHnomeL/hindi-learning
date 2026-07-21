@@ -10,6 +10,7 @@ import {
   nextLessonKey,
   resolveArtifactClick,
   resourceOpenMode,
+  resumeLessonKey,
   seenAfterOpening,
   unseenReplyKeys,
 } from "./readerDerive";
@@ -184,6 +185,48 @@ describe("completedKeys", () => {
     expect(done.has("0003-gamma")).toBe(true);
     expect(done.has("0002-beta")).toBe(false);
     expect(done.size).toBe(2);
+  });
+});
+
+describe("resumeLessonKey", () => {
+  const lessons = [
+    { key: "0001-alpha", seq: 1, title: "Alpha" },
+    { key: "0002-beta", seq: 2, title: "Beta" },
+    { key: "0003-gamma", seq: 3, title: "Gamma" },
+  ];
+
+  it("opens the lesson after the last completed one (resume where they left off)", () => {
+    const progress = [{ lessonKey: "0001-alpha", status: "completed" as const }];
+    expect(resumeLessonKey(lessons, progress)).toBe("0002-beta");
+  });
+
+  it("uses the highest-seq completed lesson, not merely the first found", () => {
+    // Completions arrive in any order; the *last* one in seq order is what matters.
+    const progress = [
+      { lessonKey: "0002-beta", status: "completed" as const },
+      { lessonKey: "0001-alpha", status: "completed" as const },
+    ];
+    expect(resumeLessonKey(lessons, progress)).toBe("0003-gamma");
+  });
+
+  it("lands on the final lesson itself when it's the last completed (no successor)", () => {
+    const progress = [{ lessonKey: "0003-gamma", status: "completed" as const }];
+    expect(resumeLessonKey(lessons, progress)).toBe("0003-gamma");
+  });
+
+  it("falls back to lesson 1 when nothing is completed yet", () => {
+    expect(resumeLessonKey(lessons, [])).toBe("0001-alpha");
+    expect(resumeLessonKey(lessons, [{ lessonKey: "0001-alpha", status: "opened" as const }])).toBe("0001-alpha");
+  });
+
+  it("ignores completed keys that aren't among the current lessons", () => {
+    // A completion for a superseded/other-edition lesson key must not derail resume.
+    const progress = [{ lessonKey: "9999-ghost", status: "completed" as const }];
+    expect(resumeLessonKey(lessons, progress)).toBe("0001-alpha");
+  });
+
+  it("returns null when there are no lessons", () => {
+    expect(resumeLessonKey([], [])).toBe(null);
   });
 });
 

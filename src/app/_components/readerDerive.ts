@@ -41,6 +41,24 @@ export function nextLessonKey(lessons: readonly LessonLite[], currentKey: string
   return lessons[i + 1]!.key;
 }
 
+// The course-index resume target (open-to-last-completed): the lesson *after*
+// the learner's last completed one — resume where they left off — for everyone,
+// owner and Viewer alike. "Last completed" is the highest-seq lesson marked
+// completed; `listLessons` is seq-ascending, so the last such entry wins. When
+// they've completed the final lesson there's no successor, so land on it; when
+// nothing is completed yet, start at lesson 1. Completed keys not among the
+// current lessons (a superseded or other-edition key) are ignored.
+export function resumeLessonKey(
+  lessons: readonly LessonLite[],
+  progress: readonly ProgressLite[],
+): string | null {
+  const done = completedKeys(progress);
+  let lastDoneKey: string | null = null;
+  for (const l of lessons) if (done.has(l.key)) lastDoneKey = l.key;
+  if (!lastDoneKey) return firstLessonKey(lessons);
+  return nextLessonKey(lessons, lastDoneKey) ?? lastDoneKey;
+}
+
 // The lessonKeys the learner has completed, for the sidebar's ✓ ticks. "opened"
 // is progress without completion, so it does not count as done.
 export function completedKeys(progress: readonly ProgressLite[]): Set<string> {
