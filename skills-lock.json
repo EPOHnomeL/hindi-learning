@@ -127,6 +127,12 @@
       "skillPath": "skills/productivity/handoff/SKILL.md",
       "computedHash": "3f7fad93a3841d5315de80405a18fac9d32ca0f2287c24c305353b0b8568b6c8"
     },
+    "html-demo-wizard": {
+      "source": "epohnomel/skills",
+      "sourceType": "github",
+      "skillPath": "skills/html-demo-wizard/SKILL.md",
+      "computedHash": "d8ab48d188bc15d32435345847cc2c5d25e9fa43874acd4a81ea7930f3c821ef"
+    },
     "implement": {
       "source": "mattpocock/skills",
       "sourceType": "github",
