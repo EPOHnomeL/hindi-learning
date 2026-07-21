@@ -6,6 +6,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { assertAdmin, assertTenantFlag, getEditableTopic, getOwnedTopic, hashString, SOURCE_LANG, shareLang, topicBySlug } from "./lib";
 import { isKnownLang, langInfo } from "./languages";
 import { chatComplete, translateModel, type ChatMessage } from "./openrouterClient";
+import { geminiComplete, geminiTranslateModel } from "./geminiClient";
 
 // Course translation (Editions), driven by the cloud **translate Routine** — the
 // sibling of the next-lesson Routine (routine.ts), reusing its lock → claim →
@@ -216,14 +217,15 @@ export const failTranslation = internalMutation({
 
 type FireResult = { fired: boolean; reason?: string; error?: string };
 
-// Owner: translate a completed course into `lang`. ALL translation now runs on
-// Gemini via the OpenRouter translate action, regardless of the course's authoring
-// Provider — the claude.ai translate Routine is never fired (this branch
-// supersedes the PRD's "translation follows provider": a Claude-authored course
-// still translates through Gemini). Acquire the lock, then schedule the action; on
-// a failed schedule, release the lock. Idempotent re-translate is a re-fire once
-// the prior run is no longer `translating`. Requires OPENROUTER_API_KEY on the
-// deployment (the action reads it).
+// Owner: translate a completed course into `lang`. ALL translation runs on Gemini
+// via the in-Convex translate action, regardless of the course's authoring Provider
+// — the claude.ai translate Routine is never fired (this branch supersedes the
+// PRD's "translation follows provider": a Claude-authored course still translates
+// through Gemini). Acquire the lock, then schedule the action; on a failed
+// schedule, release the lock. Idempotent re-translate is a re-fire once the prior
+// run is no longer `translating`. The action reads the key for the configured
+// TRANSLATE_PROVIDER: GOOGLE_AI_API_KEY (default, native Gemini) or
+// OPENROUTER_API_KEY (the rollback path).
 export const startTranslation = action({
   args: { topicSlug: v.string(), lang: v.string() },
   returns: v.object({ fired: v.boolean(), reason: v.optional(v.string()), error: v.optional(v.string()) }),
@@ -475,10 +477,10 @@ export const reportTranslation = mutation({
   },
 });
 
-// ---- OpenRouter translate path (Gemini) ------------------------------------
+// ---- Gemini translate path -------------------------------------------------
 
 // The source content for every translatable item + the owner email the publish
-// seam keys by, in one round-trip. The OpenRouter action's context seam (internal,
+// seam keys by, in one round-trip. The translate action's context seam (internal,
 // keyed by slug + lang), mirroring routine.materialiseForProvider on the authoring
 // side. Null if the Topic or owner is missing.
 export const collectForTranslation = internalQuery({
@@ -532,13 +534,26 @@ export function buildTranslateMessages(content: string, langName: string, mode: 
   ];
 }
 
-// Translate one item's field, single-pass on Gemini. Empty content is returned
-// as-is (nothing to translate) to avoid a wasted call.
-async function translateField(model: string, content: string, langName: string, mode: "html" | "text"): Promise<string> {
+// Which provider runs translation, per-deployment. Default `gemini` — the native
+// Google AI Studio API, where thinking is genuinely disabled (translation-cost 05);
+// `openrouter` keeps the legacy Gemini-via-OpenRouter path as a rollback. Case/space
+// tolerant; any other value falls back to `gemini`.
+function translateProvider(): "gemini" | "openrouter" {
+  return (process.env.TRANSLATE_PROVIDER ?? "").trim().toLowerCase() === "openrouter" ? "openrouter" : "gemini";
+}
+
+// Translate one item's field, single-pass. Empty content is returned as-is
+// (nothing to translate) to avoid a wasted call. Either provider runs with
+// thinking/reasoning OFF — thinking tokens are billed as output and buy nothing
+// for constrained translation (translation-cost 02/05) — but only the native
+// Gemini path actually honours the opt-out (the reason it's the default).
+async function translateField(content: string, langName: string, mode: "html" | "text"): Promise<string> {
   if (content.trim() === "") return content;
-  // Reasoning off: thinking tokens are billed as output and buy nothing for
-  // constrained translation (translation-cost 02).
-  return await chatComplete({ model, messages: buildTranslateMessages(content, langName, mode), reasoning: "none" });
+  const messages = buildTranslateMessages(content, langName, mode);
+  if (translateProvider() === "openrouter") {
+    return await chatComplete({ model: translateModel(), messages, reasoning: "none" });
+  }
+  return await geminiComplete({ model: geminiTranslateModel(), messages });
 }
 
 // Items translated per action invocation. A big course can't finish inside one
@@ -547,8 +562,9 @@ async function translateField(model: string, content: string, langName: string, 
 // itself for the rest. ~45s/item observed → a chunk stays a few minutes.
 const CHUNK = 5;
 
-// Translate a completed course into `lang` on Gemini 3.5 Flash, in chunks of
-// CHUNK items per invocation. Reads each source item, translates it single-pass,
+// Translate a completed course into `lang` via the configured translate provider
+// (default native Gemini), in chunks of CHUNK items per invocation. Reads each
+// source item, translates it single-pass,
 // and publishes through the existing publishTranslation (which stamps the source
 // hash + rejects quiz drift), ticking the job. `remaining` (absent on the first
 // invocation) pins the continuation's work-list, so an item that publish refuses
@@ -566,7 +582,6 @@ export const translateTopic = internalAction({
       if (!info || !info.ownerEmail) throw new Error("no translation context (missing topic or owner)");
       const ownerEmail = info.ownerEmail;
       const langName = langInfo(lang).name;
-      const model = translateModel();
 
       // Fresh items are already gone (collectForTranslation skips them); a
       // continuation additionally narrows to its handed-down work-list.
@@ -584,7 +599,7 @@ export const translateTopic = internalAction({
           const blob = item.htmlStorageId ? await ctx.storage.get(item.htmlStorageId) : null;
           const body = blob ? await blob.text() : "";
           const { stripped, blocks } = swapOutStatic(body);
-          const translated = stripFence(await translateField(model, stripped, langName, "html"));
+          const translated = stripFence(await translateField(stripped, langName, "html"));
           const html = swapBackStatic(translated, blocks);
           // A mangled placeholder or a dropped quiz marker means a corrupt body:
           // skip the item (English fallback; counted `failed` at report). The
@@ -597,7 +612,7 @@ export const translateTopic = internalAction({
             lang,
             kind: item.kind,
             key: item.key,
-            title: await translateField(model, item.title ?? "", langName, "text"),
+            title: await translateField(item.title ?? "", langName, "text"),
             html,
           });
         } else {
@@ -609,7 +624,7 @@ export const translateTopic = internalAction({
             lang,
             kind: item.kind,
             key: item.key,
-            text: await translateField(model, item.text ?? "", langName, "text"),
+            text: await translateField(item.text ?? "", langName, "text"),
           });
         }
       }

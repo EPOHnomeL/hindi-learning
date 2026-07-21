@@ -13,8 +13,16 @@ beforeAll(() => {
 });
 beforeEach(() => {
   process.env.OPENROUTER_API_KEY = "sk-test";
+  // This file exercises the OpenRouter (rollback) translate path — its stubs and
+  // assertions speak the OpenRouter chat-completions wire shape (messages[],
+  // reasoning, choices[]). The DEFAULT provider is now native Gemini
+  // (translate-gemini.test.ts); pin this suite to the fallback explicitly.
+  process.env.TRANSLATE_PROVIDER = "openrouter";
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  delete process.env.TRANSLATE_PROVIDER;
+  vi.unstubAllGlobals();
+});
 
 function asUser(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
   return t.withIdentity({ subject: `${userId}|session` });
