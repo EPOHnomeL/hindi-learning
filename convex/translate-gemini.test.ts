@@ -54,7 +54,7 @@ async function seedCompleted(t: ReturnType<typeof convexTest>, lessonDoc = '<div
   return { alice, topicId };
 }
 
-test("the default provider routes translation to the native Gemini API with thinking disabled", async () => {
+test("the default provider routes translation to the native Gemini API with thinking minimal", async () => {
   const t = convexTest(schema, modules);
   const { topicId } = await seedCompleted(t);
   await t.run((ctx) => ctx.db.insert("translationJobs", { topicId, lang: "es", status: "translating", total: 3, done: 0, failed: 0 }));
@@ -69,7 +69,7 @@ test("the default provider routes translation to the native Gemini API with thin
     expect(url).toContain(":generateContent");
   }
   for (const b of gemini.bodies) {
-    expect((b.generationConfig as { thinkingConfig: { thinkingBudget: number } }).thinkingConfig.thinkingBudget).toBe(0);
+    expect((b.generationConfig as { thinkingConfig: { thinkingLevel: string } }).thinkingConfig.thinkingLevel).toBe("minimal");
     expect(b.messages).toBeUndefined();
     expect(b.reasoning).toBeUndefined();
   }

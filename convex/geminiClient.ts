@@ -6,8 +6,12 @@
 // Why a second client at all: OpenRouter's unified `reasoning: { effort: "none" }`
 // is silently ignored for Gemini endpoints — the opt-out 400s and the OpenRouter
 // client retries with thinking back ON, so every translation still bills thinking
-// tokens as output (translation-cost 05). The native API honours
-// `thinkingConfig.thinkingBudget: 0`, so on this path thinking is genuinely off.
+// tokens as output (translation-cost 05). The native API exposes `thinkingConfig`,
+// so we can pin reasoning to the floor. NOTE: Gemini 3.x (the default 3.5-flash)
+// has NO "off" — the 2.5-era `thinkingBudget: 0` is deprecated and doesn't disable
+// thinking on 3.x; the least-reasoning option is `thinkingLevel: "minimal"`, which
+// is what we send. So thinking is minimised, not zero — expect some thought tokens
+// still billed (logged below via `usageMetadata.thoughtsTokenCount`).
 // Used ONLY by the translate path; authoring stays on OpenRouter/GLM.
 //
 // Live smoke: the test env has no key (tests mock `fetch`). To smoke-test for real,
@@ -18,8 +22,9 @@ const endpoint = (model: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
 // Env-overridable, defaulting to the same model the OpenRouter path ran — now on
-// the native API with thinking disabled. Swap via `GEMINI_TRANSLATE_MODEL` for a
-// cheaper tier (e.g. `gemini-2.5-flash-lite`) without a code change.
+// the native API with thinking pinned to `minimal`. Swap via `GEMINI_TRANSLATE_MODEL`
+// for a cheaper tier (e.g. `gemini-2.5-flash-lite`) without a code change; on a 2.5
+// model that rejects `thinkingLevel`, the retry below drops the control.
 export const geminiTranslateModel = (): string => process.env.GEMINI_TRANSLATE_MODEL ?? "gemini-3.5-flash";
 
 // Structurally identical to openrouterClient's ChatMessage, so a caller can pass
@@ -42,7 +47,7 @@ export async function geminiComplete({ model, messages }: { model: string; messa
 
   const body: Record<string, unknown> = {
     contents,
-    generationConfig: { thinkingConfig: { thinkingBudget: 0 } },
+    generationConfig: { thinkingConfig: { thinkingLevel: "minimal" } },
   };
   if (system) body.systemInstruction = { parts: [{ text: system }] };
 
@@ -54,9 +59,10 @@ export async function geminiComplete({ model, messages }: { model: string; messa
     });
 
   let res = await post();
-  // Some tiers clamp a minimum thinking budget and 400 the `thinkingBudget: 0`
-  // opt-out; retry once with the model's default thinking rather than fail every
-  // call of the run (mirrors openrouterClient's reasoning-mandatory retry).
+  // A model that doesn't accept our thinking control (e.g. a 2.5 tier rejecting
+  // `thinkingLevel`, or a tier clamping a minimum) 400s the opt-out; retry once
+  // with the model's default thinking rather than fail every call of the run
+  // (mirrors openrouterClient's reasoning-mandatory retry).
   if (res.status === 400) {
     const text = await res.text();
     if (!/think/i.test(text)) throw new Error(`gemini 400: ${text}`);
@@ -65,7 +71,15 @@ export async function geminiComplete({ model, messages }: { model: string; messa
   }
   if (!res.ok) throw new Error(`gemini ${res.status}: ${await res.text()}`);
 
-  const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: unknown }[] } }[] };
+  const json = (await res.json()) as {
+    candidates?: { content?: { parts?: { text?: unknown }[] } }[];
+    usageMetadata?: { thoughtsTokenCount?: number; candidatesTokenCount?: number; promptTokenCount?: number };
+  };
+  // The ground truth for "did minimal actually minimise reasoning": thought
+  // tokens are billed as output, so a non-zero count here is real spend. Logged
+  // (not thrown on) so `npx convex logs` answers the cost question per call.
+  const u = json.usageMetadata;
+  if (u) console.log(`gemini usage: thoughts=${u.thoughtsTokenCount ?? 0} out=${u.candidatesTokenCount ?? 0} in=${u.promptTokenCount ?? 0}`);
   const parts = json.candidates?.[0]?.content?.parts ?? [];
   const text = parts.map((p) => (typeof p.text === "string" ? p.text : "")).join("");
   if (text === "") throw new Error("gemini: no text content in response");

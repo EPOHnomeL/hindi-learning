@@ -25,7 +25,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-test("geminiComplete posts to the native generateContent endpoint with the key, system + user, thinking off", async () => {
+test("geminiComplete posts to the native generateContent endpoint with the key, system + user, thinking minimal", async () => {
   const { calls } = stubFetch(["bonjour"]);
   const out = await geminiComplete({
     model: "gemini-3.5-flash",
@@ -46,8 +46,9 @@ test("geminiComplete posts to the native generateContent endpoint with the key, 
   // System prompt rides in systemInstruction; the user turn in contents.
   expect(body.systemInstruction).toEqual({ parts: [{ text: "translate" }] });
   expect(body.contents).toEqual([{ role: "user", parts: [{ text: "hi" }] }]);
-  // The whole point of the native path: thinking genuinely off (not billed).
-  expect(body.generationConfig.thinkingConfig.thinkingBudget).toBe(0);
+  // The whole point of the native path: thinking pinned to the floor. Gemini 3.x
+  // has no "off" — `thinkingLevel: "minimal"` is the least reasoning payable.
+  expect(body.generationConfig.thinkingConfig.thinkingLevel).toBe("minimal");
 });
 
 test("geminiComplete concatenates every text part of the first candidate", async () => {
@@ -56,7 +57,7 @@ test("geminiComplete concatenates every text part of the first candidate", async
   expect(out).toBe("hola mundo");
 });
 
-test("geminiComplete retries once without thinkingConfig when the tier clamps a minimum thinking budget", async () => {
+test("geminiComplete retries once without thinkingConfig when a model rejects the thinking control", async () => {
   const bodies: string[] = [];
   vi.stubGlobal(
     "fetch",
@@ -64,7 +65,7 @@ test("geminiComplete retries once without thinkingConfig when the tier clamps a 
       bodies.push(init.body as string);
       if (bodies.length === 1)
         return new Response(
-          JSON.stringify({ error: { message: "thinkingBudget must be at least 128 for this model", code: 400 } }),
+          JSON.stringify({ error: { message: "thinking_level is not supported for this model", code: 400 } }),
           { status: 400 },
         );
       return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "traduit" }] } }] }), { status: 200 });
@@ -74,7 +75,7 @@ test("geminiComplete retries once without thinkingConfig when the tier clamps a 
   const out = await geminiComplete({ model: "gemini-x", messages: [{ role: "user", content: "hi" }] });
   expect(out).toBe("traduit");
   expect(bodies).toHaveLength(2);
-  expect(JSON.parse(bodies[0]!).generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+  expect(JSON.parse(bodies[0]!).generationConfig.thinkingConfig).toEqual({ thinkingLevel: "minimal" });
   expect(JSON.parse(bodies[1]!).generationConfig?.thinkingConfig).toBeUndefined();
 });
 
