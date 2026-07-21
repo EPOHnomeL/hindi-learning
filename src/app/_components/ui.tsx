@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "./icons";
 
@@ -74,6 +75,7 @@ export function Dialog({
   className?: string;
   bodyClassName?: string;
 }) {
+  const t = useTranslations("Common");
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => ref.current?.showModal(), []);
   return (
@@ -88,7 +90,7 @@ export function Dialog({
       {title !== undefined && (
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
           <h2 className="min-w-0 truncate text-sm font-semibold text-accent">{title}</h2>
-          <IconButton icon="x" label="Close" variant="ghost" onClick={() => ref.current?.close()} />
+          <IconButton icon="x" label={t("close")} variant="ghost" onClick={() => ref.current?.close()} />
         </div>
       )}
       <div className={bodyClassName ?? "max-h-[80vh] overflow-y-auto px-6 py-5"}>{children}</div>
@@ -309,6 +311,7 @@ export function ConfirmDialog({
   onConfirm: () => void;
   onClose: () => void;
 }) {
+  const t = useTranslations("Common");
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => ref.current?.showModal(), []);
   return (
@@ -325,7 +328,7 @@ export function ConfirmDialog({
         <p className="mt-2 text-sm leading-relaxed text-soft">{body}</p>
         <div className="mt-5 flex justify-end gap-2">
           <button onClick={() => ref.current?.close()} className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi">
-            Cancel
+            {t("cancel")}
           </button>
           <button
             onClick={onConfirm}

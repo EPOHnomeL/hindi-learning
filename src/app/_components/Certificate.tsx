@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { publicCourseUrl as buildPublicCourseUrl, useEditionLang } from "./editionUrl";
@@ -106,6 +107,7 @@ export function CertificateCard(props: CertificateData) {
 }
 
 function CertificateCompact({ learnerName, courseTitle, lessonCount, issuedAt, lang, emblem }: CertificateData) {
+  const t = useTranslations("Certificate");
   const date = new Date(issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
   return (
     <div
@@ -121,13 +123,13 @@ function CertificateCompact({ learnerName, courseTitle, lessonCount, issuedAt, l
         <div className="cert-medallion mx-auto mb-5 flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-gold/70">
           <EmblemMark emblem={emblem} />
         </div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent2">Certificate of Completion</p>
-        <p className="mt-6 text-sm text-soft">This certifies that</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent2">{t("eyebrow")}</p>
+        <p className="mt-6 text-sm text-soft">{t("certifies")}</p>
         <p className="mt-1 text-2xl font-semibold text-accent">{learnerName}</p>
-        <p className="mt-4 text-sm text-soft">has completed the course</p>
+        <p className="mt-4 text-sm text-soft">{t("hasCompleted")}</p>
         <p className="mt-1 text-xl font-semibold text-ink">{courseTitle}</p>
         <p className="mt-6 text-sm text-soft">
-          {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"} · {date}
+          {t("lessonCount", { count: lessonCount })} · {date}
         </p>
         <div className="mt-8">
           <CertIssuer className="text-[11px] font-semibold uppercase tracking-[0.2em] text-accent2" />
@@ -156,6 +158,7 @@ function CertCorner({ pos }: { pos: "tl" | "tr" | "bl" | "br" }) {
 }
 
 function CertificateShowcase({ learnerName, courseTitle, lessonCount, issuedAt, lang, emblem }: CertificateData) {
+  const t = useTranslations("Certificate");
   const date = new Date(issuedAt).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
   return (
     // The shell owns the container-query context (`container-type: inline-size`),
@@ -182,25 +185,25 @@ function CertificateShowcase({ learnerName, courseTitle, lessonCount, issuedAt, 
         <div className="cert-medallion flex items-center justify-center overflow-hidden rounded-full">
           <EmblemMark emblem={emblem} large />
         </div>
-        <p className="cert-doc-eyebrow">Certificate of Completion</p>
-        <p className="cert-doc-pre cert-doc-pre--lead">This certifies that</p>
+        <p className="cert-doc-eyebrow">{t("eyebrow")}</p>
+        <p className="cert-doc-pre cert-doc-pre--lead">{t("certifies")}</p>
         <p className="cert-doc-name">{learnerName}</p>
         <div className="cert-doc-rule" aria-hidden>
           <span className="cert-doc-rule-line" />
           <span className="cert-doc-diamond">✦</span>
           <span className="cert-doc-rule-line" />
         </div>
-        <p className="cert-doc-pre">has completed the course</p>
+        <p className="cert-doc-pre">{t("hasCompleted")}</p>
         <p className="cert-doc-title">{courseTitle}</p>
         <p className="cert-doc-meta">
-          Completed {lessonCount} {lessonCount === 1 ? "lesson" : "lessons"}
+          {t("completedLessons", { count: lessonCount })}
         </p>
 
         <div className="cert-doc-footer">
           <div className="cert-doc-sig">
             <CertIssuer className="cert-doc-sig-mark" />
             <span className="cert-doc-sig-line" />
-            <span className="cert-doc-sig-label">Issued by</span>
+            <span className="cert-doc-sig-label">{t("issuedBy")}</span>
           </div>
           <div className="cert-doc-seal" aria-hidden>
             <span className="cert-doc-seal-star">★</span>
@@ -208,7 +211,7 @@ function CertificateShowcase({ learnerName, courseTitle, lessonCount, issuedAt, 
           <div className="cert-doc-sig">
             <span className="cert-doc-sig-mark cert-doc-sig-mark--date">{date}</span>
             <span className="cert-doc-sig-line" />
-            <span className="cert-doc-sig-label">Date issued</span>
+            <span className="cert-doc-sig-label">{t("dateIssued")}</span>
           </div>
         </div>
       </div>
@@ -223,6 +226,7 @@ function CertificateShowcase({ learnerName, courseTitle, lessonCount, issuedAt, 
 // that either claims (name → mint) or displays the earned Certificate. Owner and
 // Viewer alike — myCertificate is owner-or-Viewer gated server-side.
 export function CertificateControl({ topicSlug, className }: { topicSlug: string; className?: string }) {
+  const t = useTranslations("Certificate");
   const data = useQuery(api.certificates.myCertificate, { topicSlug });
   const [open, setOpen] = useState(false);
   if (!data) return null;
@@ -249,14 +253,14 @@ export function CertificateControl({ topicSlug, className }: { topicSlug: string
         rel="noopener noreferrer"
         className={`inline-flex items-center justify-center gap-2 ${btnClass}`}
       >
-        <Icon name="award" className="h-4 w-4" /> View your certificate
+        <Icon name="award" className="h-4 w-4" /> {t("viewYours")}
       </a>
     );
   }
   return (
     <>
       <button onClick={() => setOpen(true)} className={`inline-flex items-center justify-center gap-2 ${btnClass}`}>
-        <Icon name="award" className="h-4 w-4" /> Claim your certificate
+        <Icon name="award" className="h-4 w-4" /> {t("claimYours")}
       </button>
       {open && <CertificateDialog topicSlug={topicSlug} certificate={null} onClose={() => setOpen(false)} />}
     </>
@@ -271,6 +275,7 @@ export function CertificateControl({ topicSlug, className }: { topicSlug: string
 // certificate to offer, so the card never shows an empty menu. Owner and Viewer
 // alike — myCertificate is owner-or-Viewer gated server-side.
 export function CourseCertMenu({ topicSlug }: { topicSlug: string }) {
+  const t = useTranslations("Certificate");
   const data = useQuery(api.certificates.myCertificate, { topicSlug });
   const [claiming, setClaiming] = useState(false);
   if (!data) return null;
@@ -280,7 +285,7 @@ export function CourseCertMenu({ topicSlug }: { topicSlug: string }) {
 
   return (
     <>
-      <Menu triggerLabel="Certificate" dot={unclaimed}>
+      <Menu triggerLabel={t("triggerLabel")} dot={unclaimed}>
         {(close) =>
           certificate ? (
             <MenuItem
@@ -292,7 +297,7 @@ export function CourseCertMenu({ topicSlug }: { topicSlug: string }) {
               rel="noopener noreferrer"
               onClick={close}
             >
-              View certificate
+              {t("view")}
             </MenuItem>
           ) : (
             <MenuItem
@@ -303,7 +308,7 @@ export function CourseCertMenu({ topicSlug }: { topicSlug: string }) {
                 setClaiming(true);
               }}
             >
-              Claim certificate
+              {t("claim")}
             </MenuItem>
           )
         }
@@ -318,12 +323,13 @@ export function CourseCertMenu({ topicSlug }: { topicSlug: string }) {
 // here — just copy and open. `rel="noreferrer"` keeps the token out of the
 // Referer header, matching the Public-link posture.
 function CertificateLinkActions({ token }: { token: string }) {
+  const t = useTranslations("Certificate");
   const [copied, setCopied] = useState(false);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const url = `${origin}/certificate/${token}`;
   return (
     <div className="flex flex-col gap-2">
-      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Share this certificate</label>
+      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">{t("shareThis")}</label>
       <div className="flex gap-1">
         <input
           readOnly
@@ -346,11 +352,11 @@ function CertificateLinkActions({ token }: { token: string }) {
           }}
           className="shrink-0 rounded-lg bg-accent2 px-3 py-1.5 text-xs font-medium text-white"
         >
-          {copied ? "Copied" : "Copy link"}
+          {copied ? t("copied") : t("copyLink")}
         </button>
       </div>
       <a href={url} target="_blank" rel="noreferrer" className="text-center text-xs text-soft transition-colors hover:text-accent">
-        Open the public page to download a PDF →
+        {t("openPublicPage")}
       </a>
     </div>
   );
@@ -361,6 +367,7 @@ function CertificateLinkActions({ token }: { token: string }) {
 // live from the caller's query, so the moment a claim lands this flips from form
 // to card — the in-app dialog and the celebration can't drift apart.
 function CertificateBody({ topicSlug, certificate }: { topicSlug: string; certificate: CertificateData | null }) {
+  const t = useTranslations("Certificate");
   const claim = useMutation(api.certificates.claimCertificate);
   // The Edition the learner is reading (course-translation) — snapshot its title
   // onto the certificate, so a Viewer reading Spanish earns a Spanish-titled one.
@@ -393,16 +400,16 @@ function CertificateBody({ topicSlug, certificate }: { topicSlug: string; certif
         autoFocus
         value={name}
         onChange={(e) => setName(e.target.value)}
-        placeholder="Your name"
+        placeholder={t("namePlaceholder")}
         className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
       />
-      <p className="text-xs text-soft">Leave blank to use your account name.</p>
+      <p className="text-xs text-soft">{t("leaveBlank")}</p>
       <button
         type="submit"
         disabled={busy}
         className="mt-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
       >
-        {busy ? "Creating…" : "Create certificate"}
+        {busy ? t("creating") : t("createCertificate")}
       </button>
     </form>
   );
@@ -421,6 +428,7 @@ function CertificateDialog({
   certificate: CertificateData | null;
   onClose: () => void;
 }) {
+  const t = useTranslations("Certificate");
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => ref.current?.showModal(), []);
 
@@ -434,10 +442,10 @@ function CertificateDialog({
       className="m-auto w-[92vw] max-w-lg rounded-2xl border border-line bg-paper p-0 text-ink shadow-xl backdrop:bg-black/40"
     >
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">
-        <h2 className="text-sm font-semibold text-accent">{certificate ? "Your certificate" : "Claim your certificate"}</h2>
+        <h2 className="text-sm font-semibold text-accent">{certificate ? t("yourCertificate") : t("claimYours")}</h2>
         <button
           onClick={() => ref.current?.close()}
-          aria-label="Close"
+          aria-label={t("close")}
           className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
         >
           ✕
@@ -477,6 +485,7 @@ function fireConfetti() {
 // one-click, never-blocked anchor. The persistent CertificateControl remains the
 // way to view it again later.
 export function CompletionCelebration({ topicSlug }: { topicSlug: string }) {
+  const t = useTranslations("Certificate");
   const data = useQuery(api.certificates.myCertificate, { topicSlug });
   const claim = useMutation(api.certificates.claimCertificate);
   // The Edition being read (course-translation) — snapshot its title onto the
@@ -528,7 +537,7 @@ export function CompletionCelebration({ topicSlug }: { topicSlug: string }) {
   return (
     <div className="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-[92vw] max-w-sm items-center justify-between gap-3 rounded-2xl border border-gold/50 bg-card px-4 py-3 text-sm shadow-xl">
       <span className="flex items-center gap-2 text-accent">
-        <span aria-hidden>🎉</span> Your certificate is ready.
+        <span aria-hidden>🎉</span> {t("ready")}
       </span>
       <a
         href={`/certificate/${blockedToken}`}
@@ -537,7 +546,7 @@ export function CompletionCelebration({ topicSlug }: { topicSlug: string }) {
         onClick={() => setBlockedToken(null)}
         className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/90"
       >
-        View →
+        {t("viewArrow")}
       </a>
     </div>
   );
@@ -588,6 +597,7 @@ async function normaliseEmblemImage(file: File): Promise<Blob> {
 // settings dialog (UI redesign) rather than standing alone. Gated by `canWrite`
 // at the call site.
 export function EmblemSection({ topicSlug }: { topicSlug: string }) {
+  const t = useTranslations("Certificate");
   const setEmblem = useMutation(api.emblem.setTopicEmblem);
   const generateUploadUrl = useMutation(api.resources.generateUploadUrl);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -614,7 +624,7 @@ export function EmblemSection({ topicSlug }: { topicSlug: string }) {
       await setEmblem({ topicSlug, emblem: { kind: "glyph", glyph } });
       setSaved({ kind: "glyph", glyph: glyph.trim() });
     } catch (e) {
-      setError(errorText(e, "Couldn’t set that glyph."));
+      setError(errorText(e, t("errSetGlyph")));
     } finally {
       setBusy(false);
     }
@@ -632,7 +642,7 @@ export function EmblemSection({ topicSlug }: { topicSlug: string }) {
       await setEmblem({ topicSlug, emblem: { kind: "image", storageId, contentType: "image/webp" } });
       setSaved({ kind: "image", url: URL.createObjectURL(blob) });
     } catch (e) {
-      setError(errorText(e, "Couldn’t upload that image."));
+      setError(errorText(e, t("errUploadImage")));
     } finally {
       setBusy(false);
     }
@@ -640,11 +650,8 @@ export function EmblemSection({ topicSlug }: { topicSlug: string }) {
 
   return (
     <div>
-      <h4 className="text-[13px] font-bold text-ink">Certificate emblem</h4>
-      <p className="mt-1 text-[12.5px] text-soft">
-        The mark of your subject on the certificate. Set an emoji or short character, or upload an image (resized to a
-        small square). Your choice overrides the automatic one.
-      </p>
+      <h4 className="text-[13px] font-bold text-ink">{t("emblemHeading")}</h4>
+      <p className="mt-1 text-[12.5px] text-soft">{t("emblemBody")}</p>
       <div className="mt-4 flex items-start gap-4">
         <div className="cert-medallion flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-gold/70">
           {saved?.kind === "image" ? (
@@ -656,7 +663,7 @@ export function EmblemSection({ topicSlug }: { topicSlug: string }) {
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-accent2">Glyph</label>
+          <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-wide text-accent2">{t("glyphLabel")}</label>
           <div className="flex gap-1.5">
             <input
               value={glyph}
@@ -670,11 +677,11 @@ export function EmblemSection({ topicSlug }: { topicSlug: string }) {
               disabled={busy || !glyph.trim()}
               className="shrink-0 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
             >
-              Save
+              {t("save")}
             </button>
           </div>
           <label className="mb-1.5 mt-3 block text-[11px] font-bold uppercase tracking-wide text-accent2">
-            Or upload an image
+            {t("orUploadImage")}
           </label>
           <input
             ref={fileRef}
@@ -694,13 +701,10 @@ export function EmblemSection({ topicSlug }: { topicSlug: string }) {
             disabled={busy}
             className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:border-transparent hover:bg-hi hover:text-accent disabled:opacity-60"
           >
-            <Icon name="upload" className="h-4 w-4" /> Choose image…
+            <Icon name="upload" className="h-4 w-4" /> {t("chooseImage")}
           </button>
           {saved && (
-            <p className="mt-3 text-xs font-medium text-accent">
-              Emblem updated — it appears on certificates earned from here on; ones already claimed keep their original
-              mark.
-            </p>
+            <p className="mt-3 text-xs font-medium text-accent">{t("emblemUpdated")}</p>
           )}
           {error && <p className="mt-2 text-xs text-danger">{error}</p>}
         </div>
@@ -729,16 +733,17 @@ function publicCourseUrl(course: PublicCourseLink): string | null {
 // no share sheet it copies the same links to the clipboard instead, so the button
 // always does something. Print-hidden — it's chrome, not part of the document.
 function CertificateShareButton({ courseTitle, course }: { courseTitle: string; course: PublicCourseLink | null }) {
+  const t = useTranslations("Certificate");
   const [copied, setCopied] = useState(false);
   async function share() {
     const certUrl = window.location.href;
     const courseUrl = course ? publicCourseUrl(course) : null;
     const text = courseUrl
-      ? `I completed “${courseTitle}”. Take the course: ${courseUrl}`
-      : `I completed “${courseTitle}”.`;
+      ? t("shareText", { courseTitle, courseUrl })
+      : t("shareTextNoCourse", { courseTitle });
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
-        await navigator.share({ title: `Certificate — ${courseTitle}`, text, url: certUrl });
+        await navigator.share({ title: t("shareTitle", { courseTitle }), text, url: certUrl });
       } catch {
         /* cancelled or the payload was rejected — nothing to do */
       }
@@ -759,7 +764,7 @@ function CertificateShareButton({ courseTitle, course }: { courseTitle: string; 
       onClick={() => void share()}
       className="no-print relative z-10 inline-flex items-center gap-2 rounded-xl border border-gold/50 bg-card px-5 py-2.5 text-sm font-semibold text-accent shadow-sm transition-colors hover:bg-hi"
     >
-      <Icon name="link" className="h-4 w-4" /> {copied ? "Link copied" : "Share certificate"}
+      <Icon name="link" className="h-4 w-4" /> {copied ? t("linkCopied") : t("shareCertificate")}
     </button>
   );
 }
@@ -771,9 +776,10 @@ function CertificateShareButton({ courseTitle, course }: { courseTitle: string; 
 // "Share" opens the share sheet (folding in the course link when it's public). A
 // missing/invalid token gets a uniform not-found — no existence signal.
 export function PublicCertificatePage({ token }: { token: string }) {
+  const t = useTranslations("Certificate");
   const cert = useQuery(api.certificates.publicCertificate, { token });
   if (cert === undefined) {
-    return <main className="flex min-h-dvh items-center justify-center p-8 text-sm text-soft">Loading…</main>;
+    return <main className="flex min-h-dvh items-center justify-center p-8 text-sm text-soft">{t("loading")}</main>;
   }
   if (cert === null) {
     return (
@@ -781,8 +787,8 @@ export function PublicCertificatePage({ token }: { token: string }) {
         <span className="text-3xl" aria-hidden>
           🎓
         </span>
-        <h1 className="text-lg font-semibold text-accent">Certificate not found</h1>
-        <p className="max-w-sm text-sm text-soft">This certificate link isn’t available.</p>
+        <h1 className="text-lg font-semibold text-accent">{t("notFound")}</h1>
+        <p className="max-w-sm text-sm text-soft">{t("notFoundBody")}</p>
       </main>
     );
   }
@@ -798,7 +804,7 @@ export function PublicCertificatePage({ token }: { token: string }) {
           onClick={() => window.print()}
           className="rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
         >
-          Download PDF
+          {t("downloadPdf")}
         </button>
         <CertificateShareButton courseTitle={cert.courseTitle} course={cert.course} />
       </div>

@@ -2,6 +2,7 @@
 
 import { useAction, useMutation, useQuery } from "convex/react";
 import { type FunctionReturnType } from "convex/server";
+import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { LANGUAGES } from "../../../convex/languages";
@@ -19,6 +20,7 @@ type Edition = NonNullable<FunctionReturnType<typeof api.translate.editions>>["e
 // *who* has access & their progress is deferred to a dedicated dashboard.
 // Reuses every existing query/mutation unchanged.
 export function EditionsDialog({ topicSlug, title, onClose }: { topicSlug: string; title: string; onClose: () => void }) {
+  const t = useTranslations("Editions");
   const data = useQuery(api.translate.editions, { topicSlug });
   const [tab, setTab] = useState<string>("en"); // a lang code, or "add"
   // A language we just kicked off translating — we hold this until it appears in
@@ -48,22 +50,22 @@ export function EditionsDialog({ topicSlug, title, onClose }: { topicSlug: strin
   const active = editions.find((e) => e.lang === tab) ?? null;
 
   return (
-    <Dialog title="Editions & sharing" onClose={onClose}>
+    <Dialog title={t("dialogTitle")} onClose={onClose}>
       {data === undefined ? (
-        <p className="text-sm text-soft">Loading…</p>
+        <p className="text-sm text-soft">{t("loading")}</p>
       ) : data === null ? (
-        <p className="text-sm text-soft">Couldn’t load editions.</p>
+        <p className="text-sm text-soft">{t("loadError")}</p>
       ) : (
         <>
-          <div role="tablist" aria-label="Editions" className="mb-5 flex flex-wrap gap-1 border-b border-line">
+          <div role="tablist" aria-label={t("tablistLabel")} className="mb-5 flex flex-wrap gap-1 border-b border-line">
             {editions.map((ed) => (
               <EditionTab key={ed.lang} edition={ed} active={tab === ed.lang} onSelect={() => setTab(ed.lang)} />
             ))}
             <button
               role="tab"
               aria-selected={tab === "add"}
-              aria-label="Add a language"
-              title="Add a language"
+              aria-label={t("addLanguage")}
+              title={t("addLanguage")}
               onClick={() => setTab("add")}
               className={`-mb-px inline-flex items-center rounded-t-lg border-b-2 px-3 py-2 transition-colors ${
                 tab === "add" ? "border-accent text-accent" : "border-transparent text-soft hover:bg-hi hover:text-accent"
@@ -92,6 +94,7 @@ export function EditionsDialog({ topicSlug, title, onClose }: { topicSlug: strin
 // One edition tab: its endonym, a "Source" badge for English, and a status dot
 // (amber pulse = translating, red = failed, none = ready).
 function EditionTab({ edition, active, onSelect }: { edition: Edition; active: boolean; onSelect: () => void }) {
+  const t = useTranslations("Editions");
   return (
     <button
       role="tab"
@@ -104,14 +107,14 @@ function EditionTab({ edition, active, onSelect }: { edition: Edition; active: b
       <span dir={edition.rtl ? "rtl" : undefined}>{edition.native}</span>
       {edition.source && (
         <span className="rounded-full bg-accent2/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-accent2">
-          Source
+          {t("sourceBadge")}
         </span>
       )}
       {edition.status === "translating" && (
-        <span className="h-1.75 w-1.75 shrink-0 animate-pulse rounded-full bg-gold" title="Translating" aria-hidden />
+        <span className="h-1.75 w-1.75 shrink-0 animate-pulse rounded-full bg-gold" title={t("translatingStatus")} aria-hidden />
       )}
       {edition.status === "failed" && (
-        <span className="h-1.75 w-1.75 shrink-0 rounded-full bg-danger" title="Failed" aria-hidden />
+        <span className="h-1.75 w-1.75 shrink-0 rounded-full bg-danger" title={t("failedStatus")} aria-hidden />
       )}
     </button>
   );
@@ -131,15 +134,22 @@ function EditionPanel({
   edition: Edition;
   completed: boolean;
 }) {
+  const t = useTranslations("Editions");
   if (edition.status === "translating") {
     const pct = edition.total > 0 ? Math.round((edition.done / edition.total) * 100) : 0;
     return (
       <div className="flex flex-col items-start gap-3.5 rounded-xl border border-dashed border-line p-4 text-sm leading-relaxed text-soft">
         <p className="m-0">
-          <b className="font-semibold text-ink" dir={edition.rtl ? "rtl" : undefined}>
-            {edition.native}
-          </b>{" "}
-          is still translating ({edition.done}/{edition.total}). Sharing opens the moment it’s ready.
+          {t.rich("translatingProgress", {
+            native: edition.native,
+            done: edition.done,
+            total: edition.total,
+            b: (chunks) => (
+              <b className="font-semibold text-ink" dir={edition.rtl ? "rtl" : undefined}>
+                {chunks}
+              </b>
+            ),
+          })}
         </p>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
           <div className="h-full rounded-full bg-accent2 transition-[width] duration-300" style={{ width: `${pct}%` }} />
@@ -153,8 +163,10 @@ function EditionPanel({
     return (
       <div className="flex flex-col items-start gap-3.5 rounded-xl border border-dashed border-line p-4 text-sm leading-relaxed text-soft">
         <p className="m-0">
-          Some items in <b className="font-semibold text-ink">{edition.native}</b> didn’t translate. Retry, then you can
-          share it.
+          {t.rich("failedMessage", {
+            native: edition.native,
+            b: (chunks) => <b className="font-semibold text-ink">{chunks}</b>,
+          })}
         </p>
         <div className="flex items-center gap-3">
           <RetryTranslation topicSlug={topicSlug} lang={edition.lang} />
@@ -173,7 +185,7 @@ function EditionPanel({
       <div className="flex flex-col items-start gap-2 border-t border-line pt-4">
         <AccessRoster topicSlug={topicSlug} lang={edition.lang} />
         {!edition.source && (
-          <RemoveEdition topicSlug={topicSlug} lang={edition.lang} label="Remove this edition" />
+          <RemoveEdition topicSlug={topicSlug} lang={edition.lang} label={t("removeThisEdition")} />
         )}
       </div>
     </div>
@@ -183,6 +195,7 @@ function EditionPanel({
 // Invite one person to this edition by email (read-only Viewer access). Scoped to
 // `lang` — a Viewer gets exactly the Edition(s) shared with them.
 function InviteByEmail({ topicSlug, lang }: { topicSlug: string; lang: string }) {
+  const t = useTranslations("Editions");
   const shareTopic = useMutation(api.shares.shareTopic);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -203,7 +216,7 @@ function InviteByEmail({ topicSlug, lang }: { topicSlug: string; lang: string })
           setDone({ email: addr, status });
           setEmail("");
         } catch {
-          setError("Couldn’t invite — please try again.");
+          setError(t("inviteError"));
         } finally {
           setBusy(false);
         }
@@ -218,7 +231,7 @@ function InviteByEmail({ topicSlug, lang }: { topicSlug: string; lang: string })
             setError(null);
             setDone(null);
           }}
-          placeholder="Invite by email"
+          placeholder={t("invitePlaceholder")}
           className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
         />
         <button
@@ -226,13 +239,13 @@ function InviteByEmail({ topicSlug, lang }: { topicSlug: string; lang: string })
           disabled={busy}
           className="shrink-0 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
         >
-          {busy ? "Inviting…" : "Invite"}
+          {busy ? t("inviting") : t("invite")}
         </button>
       </div>
-      <p className="text-xs text-soft">Read-only access to this edition. No account yet? They’re in the moment they sign up.</p>
+      <p className="text-xs text-soft">{t("inviteHelp")}</p>
       {error && <p className="text-xs text-danger">{error}</p>}
-      {done?.status === "shared" && <p className="text-xs text-accent2">Shared with {done.email}.</p>}
-      {done?.status === "pending" && <p className="text-xs text-accent2">Invited {done.email} — they’ll get access when they sign up.</p>}
+      {done?.status === "shared" && <p className="text-xs text-accent2">{t("shared", { email: done.email })}</p>}
+      {done?.status === "pending" && <p className="text-xs text-accent2">{t("invited", { email: done.email })}</p>}
     </form>
   );
 }
@@ -243,12 +256,13 @@ function InviteByEmail({ topicSlug, lang }: { topicSlug: string; lang: string })
 // (a live query), so promoting/revoking/inviting reflects immediately. "Can
 // edit" grants exactly the owner's in-place prose editing on this one Edition.
 function AccessRoster({ topicSlug, lang }: { topicSlug: string; lang: string }) {
+  const t = useTranslations("Editions");
   const roster = useQuery(api.shares.listEditionAccess, { topicSlug, lang });
-  if (roster === undefined) return <p className="text-xs text-soft">Loading access…</p>;
-  if (roster.length === 0) return <p className="text-xs text-soft">No one has access to this edition yet.</p>;
+  if (roster === undefined) return <p className="text-xs text-soft">{t("loadingAccess")}</p>;
+  if (roster.length === 0) return <p className="text-xs text-soft">{t("noAccess")}</p>;
   return (
     <div className="flex w-full flex-col gap-1.5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-soft">Who has access</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-soft">{t("whoHasAccess")}</p>
       <ul className="flex flex-col gap-1.5">
         {roster.map((entry) => (
           <AccessRow key={`${entry.status}:${entry.email}`} topicSlug={topicSlug} lang={lang} entry={entry} />
@@ -271,6 +285,7 @@ function AccessRow({
   lang: string;
   entry: { email: string; role: "viewer" | "editor"; status: "accepted" | "pending" };
 }) {
+  const t = useTranslations("Editions");
   const setShareRole = useMutation(api.shares.setShareRole);
   const revokeShare = useMutation(api.shares.revokeShare);
   const [busy, setBusy] = useState(false);
@@ -288,7 +303,7 @@ function AccessRow({
           {entry.email}
         </span>
         {entry.status === "pending" && (
-          <span className="text-[11px] text-soft">Pending — joins when they sign up</span>
+          <span className="text-[11px] text-soft">{t("pendingJoins")}</span>
         )}
       </div>
       <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-line text-[12px]">
@@ -303,15 +318,15 @@ function AccessRow({
               entry.role === role ? "bg-accent text-white" : "bg-card text-soft hover:bg-hi"
             }`}
           >
-            {role === "viewer" ? "Can view" : "Can edit"}
+            {role === "viewer" ? t("canView") : t("canEdit")}
           </button>
         ))}
       </div>
       <button
         type="button"
         disabled={busy}
-        aria-label={`Revoke access for ${entry.email}`}
-        title="Revoke access"
+        aria-label={t("revokeAccessFor", { email: entry.email })}
+        title={t("revokeAccess")}
         onClick={() => {
           setBusy(true);
           void revokeShare({ topicSlug, email: entry.email, lang }).finally(() => setBusy(false));
@@ -329,6 +344,7 @@ function AccessRow({
 // Both "on" and "Regenerate" mint a fresh token (the old link dies); the toggle
 // off revokes it. Token is read live from the reactive editions query.
 function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string; lang: string; publicToken: string | null }) {
+  const t = useTranslations("Editions");
   const setPublic = useMutation(api.shares.setEditionPublic);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -357,9 +373,9 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
             <Icon name={on ? "globe" : "lock"} className="h-4.5 w-4.5" />
           </span>
           <div className="min-w-0">
-            <b className="block text-[13.5px] font-semibold text-ink">Public link</b>
+            <b className="block text-[13.5px] font-semibold text-ink">{t("publicLink")}</b>
             <span className="text-[11.5px] text-soft">
-              {on ? "Anyone with the link can view — no account needed" : "Off — only you and people you invite can see this"}
+              {on ? t("publicOn") : t("publicOff")}
             </span>
           </div>
         </div>
@@ -399,7 +415,7 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
               }}
               className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent2 px-3 py-2 text-xs font-medium text-white"
             >
-              <Icon name="link" className="h-3.5 w-3.5" /> {copied ? "Copied" : "Copy"}
+              <Icon name="link" className="h-3.5 w-3.5" /> {copied ? t("copied") : t("copy")}
             </button>
           </div>
           <button
@@ -408,7 +424,7 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
             onClick={() => run(true)}
             className="inline-flex items-center gap-1.5 self-start text-[12.5px] text-soft transition-colors hover:text-accent disabled:opacity-60"
           >
-            <Icon name="refresh" className="h-3.75 w-3.75" /> Regenerate link
+            <Icon name="refresh" className="h-3.75 w-3.75" /> {t("regenerateLink")}
           </button>
         </div>
       )}
@@ -422,6 +438,7 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
 // into any non-admin UI, so the form always starts blank (re-submitting
 // overwrites). Rendered inside the SellEdition gate.
 function PayoutDetailsForm() {
+  const t = useTranslations("Editions");
   const save = useMutation(api.sellers.savePayoutDetails);
   const [form, setForm] = useState({ accountHolder: "", bank: "", accountNumber: "", branchCode: "" });
   const [busy, setBusy] = useState(false);
@@ -453,23 +470,23 @@ function PayoutDetailsForm() {
         try {
           await save(form);
         } catch {
-          setError("Couldn’t save — check every field (account number and branch code are digits).");
+          setError(t("payoutSaveError"));
           setBusy(false);
         }
       }}
     >
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        {field("accountHolder", "Account holder", "Full name on the account")}
-        {field("bank", "Bank", "e.g. FNB")}
-        {field("accountNumber", "Account number", "62…", "numeric")}
-        {field("branchCode", "Branch code", "Digits", "numeric")}
+        {field("accountHolder", t("accountHolder"), t("accountHolderPlaceholder"))}
+        {field("bank", t("bank"), t("bankPlaceholder"))}
+        {field("accountNumber", t("accountNumber"), t("accountNumberPlaceholder"), "numeric")}
+        {field("branchCode", t("branchCode"), t("branchCodePlaceholder"), "numeric")}
       </div>
       <button
         type="submit"
         disabled={busy}
         className="self-start rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
       >
-        {busy ? "Saving…" : "Save payout details"}
+        {busy ? t("saving") : t("savePayoutDetails")}
       </button>
       {error && <p className="text-xs text-danger">{error}</p>}
     </form>
@@ -495,6 +512,7 @@ function SellEdition({
   rtl: boolean;
   completed: boolean;
 }) {
+  const t = useTranslations("Editions");
   const status = useQuery(api.sellers.sellerStatus);
   const pricing = useQuery(api.market.editionPricing, { topicSlug });
   const setPrice = useMutation(api.market.setEditionPrice);
@@ -512,7 +530,7 @@ function SellEdition({
     return (
       <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-line px-3 py-2.5 text-[12.5px] text-soft">
         <Icon name="tag" className="h-4 w-4 shrink-0" />
-        <span>Selling opens once the course is marked complete.</span>
+        <span>{t("sellIncomplete")}</span>
       </div>
     );
   }
@@ -528,24 +546,21 @@ function SellEdition({
         </span>
         <div className="min-w-0 flex-1">
           {status === undefined ? (
-            <span>Checking your seller status…</span>
+            <span>{t("checkingSellerStatus")}</span>
           ) : status === "payments-unconfigured" ? (
             // The deployment's PayFast rail isn't provisioned (env vars absent) —
             // selling is off platform-wide and enables itself when they land.
             <span>
-              <b className="font-semibold text-ink">Selling isn&rsquo;t available yet.</b> Payments aren&rsquo;t
-              configured on this deployment — selling opens automatically once they are.
+              <b className="font-semibold text-ink">{t("paymentsUnconfiguredTitle")}</b> {t("paymentsUnconfiguredBody")}
             </span>
           ) : status === "not-granted" ? (
             <span>
-              <b className="font-semibold text-ink">Sell this course.</b> Selling is enabled by the workspace admin —
-              ask them to turn it on for your account.
+              <b className="font-semibold text-ink">{t("notGrantedTitle")}</b> {t("notGrantedBody")}
             </span>
           ) : (
             <>
               <span>
-                <b className="font-semibold text-ink">Add your payout details to sell.</b> Save the bank account your
-                earnings are paid to; then you can price this edition.
+                <b className="font-semibold text-ink">{t("addPayoutTitle")}</b> {t("addPayoutBody")}
               </span>
               <PayoutDetailsForm />
             </>
@@ -565,7 +580,7 @@ function SellEdition({
   const save = async () => {
     const minor = Math.round(parseFloat(amount) * 100);
     if (!Number.isFinite(minor) || minor <= 0) {
-      setError("Enter a price greater than zero.");
+      setError(t("priceGreaterThanZero"));
       return;
     }
     setBusy(true);
@@ -575,7 +590,7 @@ function SellEdition({
       await setPrice({ topicSlug, lang, amount: minor, currency: "ZAR" });
       setOpen(false);
     } catch {
-      setError("Couldn’t save the price — please try again.");
+      setError(t("savePriceError"));
     } finally {
       setBusy(false);
     }
@@ -587,7 +602,7 @@ function SellEdition({
       await clearPrice({ topicSlug, lang });
       setOpen(false);
     } catch {
-      setError("Couldn’t update — please try again.");
+      setError(t("updateError"));
     } finally {
       setBusy(false);
     }
@@ -605,18 +620,18 @@ function SellEdition({
             <Icon name="tag" className="h-4.5 w-4.5" />
           </span>
           <div className="min-w-0">
-            <b className="block text-[13.5px] font-semibold text-ink">Sell this edition</b>
+            <b className="block text-[13.5px] font-semibold text-ink">{t("sellThisEdition")}</b>
             <span className="text-[11.5px] text-soft">
               {current ? (
-                <>
-                  Paid · <span className="font-semibold text-gold">{formatPrice(current.amount, current.currency)}</span> ·
-                  first lesson free
-                </>
+                t.rich("paidState", {
+                  price: () => (
+                    <span className="font-semibold text-gold">{formatPrice(current.amount, current.currency)}</span>
+                  ),
+                })
               ) : (
-                <>
-                  Free — set a price to sell{" "}
-                  <span dir={rtl ? "rtl" : undefined}>{native}</span>
-                </>
+                t.rich("freeState", {
+                  native: () => <span dir={rtl ? "rtl" : undefined}>{native}</span>,
+                })
               )}
             </span>
           </div>
@@ -630,7 +645,7 @@ function SellEdition({
               : "bg-gold/20 text-accent hover:bg-gold/30"
           }`}
         >
-          {current ? "Edit price" : "Set a price"}
+          {current ? t("editPrice") : t("setAPrice")}
         </button>
       </div>
 
@@ -638,7 +653,7 @@ function SellEdition({
         <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
           <div className="flex flex-wrap items-end gap-2.5">
             <label className="flex flex-col gap-1">
-              <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">Price (ZAR)</span>
+              <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{t("priceZar")}</span>
               <input
                 value={amount}
                 inputMode="decimal"
@@ -646,7 +661,7 @@ function SellEdition({
                   setAmount(e.target.value);
                   setError(null);
                 }}
-                placeholder="0.00"
+                placeholder={t("pricePlaceholder")}
                 className="w-32 rounded-lg border border-line bg-card px-3 py-2 text-sm tabular-nums focus:border-gold focus:outline-none"
               />
             </label>
@@ -656,7 +671,7 @@ function SellEdition({
               onClick={() => void save()}
               className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
             >
-              {busy ? "Saving…" : "Save"}
+              {busy ? t("saving") : t("save")}
             </button>
           </div>
           {error && <p className="text-xs text-danger">{error}</p>}
@@ -667,10 +682,10 @@ function SellEdition({
               onClick={() => void stopSelling()}
               className="inline-flex items-center gap-1.5 self-start text-[12.5px] text-soft transition-colors hover:text-danger disabled:opacity-60"
             >
-              <Icon name="x" className="h-3.75 w-3.75" /> Stop selling — make this edition free
+              <Icon name="x" className="h-3.75 w-3.75" /> {t("stopSelling")}
             </button>
           ) : (
-            <p className="text-xs text-soft">Each language is priced on its own — sell some editions, keep others free.</p>
+            <p className="text-xs text-soft">{t("eachLanguagePriced")}</p>
           )}
         </div>
       )}
@@ -681,6 +696,7 @@ function SellEdition({
 // Retry a failed translation — re-runs startTranslation, which only reschedules
 // the items that changed/failed.
 function RetryTranslation({ topicSlug, lang }: { topicSlug: string; lang: string }) {
+  const t = useTranslations("Editions");
   const retry = useAction(api.translate.startTranslation);
   const [busy, setBusy] = useState(false);
   return (
@@ -693,14 +709,15 @@ function RetryTranslation({ topicSlug, lang }: { topicSlug: string; lang: string
       }}
       className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
     >
-      <Icon name="refresh" className="h-4 w-4" /> {busy ? "Retrying…" : "Retry"}
+      <Icon name="refresh" className="h-4 w-4" /> {busy ? t("retrying") : t("retry")}
     </button>
   );
 }
 
 // Remove a translation edition. A quiet danger text link by default; the failed/
 // translating panels pass a shorter label.
-function RemoveEdition({ topicSlug, lang, label = "Remove" }: { topicSlug: string; lang: string; label?: string }) {
+function RemoveEdition({ topicSlug, lang, label }: { topicSlug: string; lang: string; label?: string }) {
+  const t = useTranslations("Editions");
   const remove = useMutation(api.translate.removeEdition);
   const [busy, setBusy] = useState(false);
   return (
@@ -713,7 +730,7 @@ function RemoveEdition({ topicSlug, lang, label = "Remove" }: { topicSlug: strin
       }}
       className="inline-flex items-center gap-1.5 self-start text-[12.5px] text-soft transition-colors hover:text-danger disabled:opacity-60"
     >
-      <Icon name="trash" className="h-3.75 w-3.75" /> {label}
+      <Icon name="trash" className="h-3.75 w-3.75" /> {label ?? t("remove")}
     </button>
   );
 }
@@ -733,6 +750,7 @@ function AddLanguagePanel({
   completed: boolean;
   onAdded: (code: string) => void;
 }) {
+  const t = useTranslations("Editions");
   const start = useAction(api.translate.startTranslation);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
@@ -740,7 +758,7 @@ function AddLanguagePanel({
   if (!completed) {
     return (
       <p className="rounded-lg border border-dashed border-line px-3 py-2.5 text-sm text-soft">
-        Translation unlocks once the course is marked complete (its content is frozen first).
+        {t("translationLocked")}
       </p>
     );
   }
@@ -767,13 +785,13 @@ function AddLanguagePanel({
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-sm text-soft">
-        Translate this course into another language — it becomes a new tab you can share once ready.
+        {t("addLanguageIntro")}
       </p>
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
         disabled={busy}
-        placeholder="Search languages…"
+        placeholder={t("searchLanguages")}
         className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none disabled:opacity-60"
       />
       {matches.length > 0 && (
@@ -788,14 +806,14 @@ function AddLanguagePanel({
                 <span dir={l.rtl ? "rtl" : undefined}>{l.native}</span>
                 <span className="shrink-0 text-xs text-soft">
                   {l.name}
-                  {l.rtl ? " · RTL" : ""}
+                  {l.rtl ? t("rtlSuffix") : ""}
                 </span>
               </button>
             </li>
           ))}
         </ul>
       )}
-      {needle && matches.length === 0 && <p className="text-xs text-soft">No matching language.</p>}
+      {needle && matches.length === 0 && <p className="text-xs text-soft">{t("noMatchingLanguage")}</p>}
     </div>
   );
 }
