@@ -1,9 +1,9 @@
 import { headers } from "next/headers";
-import { redirect } from "next/navigation";
 import { fetchQuery } from "convex/nextjs";
 import { api } from "../../../../../convex/_generated/api";
 import { canonicalRedirect, type TenantSlug } from "~/lib/tenant";
 import { CourseShell } from "~/app/_components/CourseShell";
+import { CrossHostRedirect } from "~/app/_components/CrossHostRedirect";
 
 // `/courses/[slug]` and everything under it share this persistent sidebar.
 // CourseShell stays mounted across lesson navigation; only the page swaps.
@@ -34,7 +34,10 @@ export default async function CourseLayout({
       console.error(`CourseLayout: failed to resolve canonical host for "${slug}"`, err);
     }
     const target = canonicalRedirect(url, tenant);
-    if (target) redirect(target);
+    // Bounce via a client-side history replace (not a server redirect) so the
+    // back button returns to the previous subdomain, not this wrong-host URL that
+    // would immediately bounce forward again (issue 18 / ADR 0022 §3).
+    if (target) return <CrossHostRedirect to={target} />;
   }
 
   return <CourseShell slug={slug}>{children}</CourseShell>;
