@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Blind translation-quality comparison: Gemini 3.5 Flash vs Sonnet 5 vs Opus 4.8 across 9 languages, prophetic-school Lesson 1.">
+<title>Translation model trial — prophetic-school L1</title>
+<style>*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}img{max-width:100%;height:auto}
+  .theme-toggle{position:fixed;top:14px;right:14px;z-index:50;font:600 12px/1 var(--mono);
+    background:var(--surface);color:var(--soft);border:1px solid var(--line);border-radius:999px;
+    padding:8px 13px;cursor:pointer;letter-spacing:.05em}
+  .theme-toggle:hover{color:var(--ink);border-color:var(--accent)}
+  .theme-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:2px}</style>
+</head>
+<body>
+<button class="theme-toggle" onclick="(function(){var r=document.documentElement;var d=r.getAttribute('data-theme')==='dark'||(!r.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme:dark)').matches);r.setAttribute('data-theme',d?'light':'dark');})()" aria-label="Toggle light or dark theme">◐ theme</button>
+<style>
+  :root{
+    --bg:#f4f6f8; --surface:#ffffff; --surface2:#fbfcfd; --ink:#1a1e27; --soft:#5b6472;
+    --faint:#8791a0; --line:#e2e6eb; --line2:#eef1f4; --accent:#3a5a8c;
+    --gemini:#bf7433; --sonnet:#3f8a76; --opus:#6a5aa0;
+    --good:#3f8f6e; --warn:#cf9a34; --bad:#c25341;
+    --radius:14px;
+    --serif:"Iowan Old Style","Charter","Bitstream Charter",Georgia,"Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Code","Roboto Mono",Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#12151b; --surface:#1b1f27; --surface2:#20252e; --ink:#e9ebef; --soft:#a4adba;
+      --faint:#7b8595; --line:#2a303b; --line2:#232833; --accent:#7ea2d6;
+      --gemini:#d69350; --sonnet:#5fb39c; --opus:#9584c8; --good:#5cb08a; --warn:#e0b254; --bad:#e0705c;}
+  }
+  :root[data-theme="light"]{--bg:#f4f6f8; --surface:#ffffff; --surface2:#fbfcfd; --ink:#1a1e27; --soft:#5b6472;
+    --faint:#8791a0; --line:#e2e6eb; --line2:#eef1f4; --accent:#3a5a8c;
+    --gemini:#bf7433; --sonnet:#3f8a76; --opus:#6a5aa0; --good:#3f8f6e; --warn:#cf9a34; --bad:#c25341;}
+  :root[data-theme="dark"]{--bg:#12151b; --surface:#1b1f27; --surface2:#20252e; --ink:#e9ebef; --soft:#a4adba;
+    --faint:#7b8595; --line:#2a303b; --line2:#232833; --accent:#7ea2d6;
+    --gemini:#d69350; --sonnet:#5fb39c; --opus:#9584c8; --good:#5cb08a; --warn:#e0b254; --bad:#e0705c;}
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);
+    line-height:1.55;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1080px;margin:0 auto;padding:48px 24px 96px}
+  h1,h2,h3{font-family:var(--serif);font-weight:600;text-wrap:balance;letter-spacing:-.01em}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);font-weight:600}
+  header.top{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:34px}
+  header.top h1{font-size:38px;line-height:1.1;margin:.28em 0 .12em}
+  header.top p.sub{color:var(--soft);font-size:17px;margin:.2em 0 0;max-width:64ch}
+  .verdict{display:flex;flex-wrap:wrap;gap:10px 26px;align-items:center;margin-top:22px}
+  .tally{display:flex;gap:10px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:baseline;gap:7px;background:var(--surface);border:1px solid var(--line);
+    border-radius:999px;padding:7px 14px 7px 12px;font-size:14px;font-weight:600}
+  .chip .dot{width:9px;height:9px;border-radius:50%;align-self:center}
+  .chip .n{font-family:var(--mono);font-size:15px}
+  .chip .lbl{color:var(--soft);font-weight:500}
+  .dot.gemini{background:var(--gemini)} .dot.sonnet{background:var(--sonnet)} .dot.opus{background:var(--opus)}
+  .ink-gemini{color:var(--gemini)} .ink-sonnet{color:var(--sonnet)} .ink-opus{color:var(--opus)}
+
+  section{margin-top:52px}
+  .sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:6px}
+  h2{font-size:24px;margin:0}
+  .sec-note{color:var(--soft);font-size:14.5px;margin:.35em 0 20px;max-width:74ch}
+
+  /* Heatmap */
+  .grid-scroll{overflow-x:auto}
+  table.heat{border-collapse:separate;border-spacing:0;width:100%;min-width:640px}
+  table.heat th,table.heat td{padding:0}
+  table.heat thead th{font-family:var(--sans);font-weight:600;font-size:13px;text-align:center;
+    padding:0 0 12px;color:var(--soft);vertical-align:bottom}
+  table.heat thead th.lang-h{text-align:left;width:180px}
+  .modelhead{display:inline-flex;flex-direction:column;align-items:center;gap:4px}
+  .modelhead .swatch{width:26px;height:5px;border-radius:3px}
+  .modelhead .mname{font-size:14px;color:var(--ink);font-weight:600}
+  .modelhead .msub{font-size:11px;color:var(--faint);font-family:var(--mono)}
+  table.heat tbody tr td{border-top:1px solid var(--line2)}
+  .langcell{text-align:left;padding:14px 16px 14px 4px !important;vertical-align:middle}
+  .langcell .lname{font-family:var(--serif);font-size:18px;font-weight:600}
+  .langcell .lcode{font-family:var(--mono);font-size:12px;color:var(--faint);margin-left:7px}
+  .langcell .conf{display:block;font-size:11px;color:var(--faint);margin-top:2px;font-family:var(--mono);letter-spacing:.04em}
+  .cell{position:relative;margin:5px;border-radius:11px;padding:14px 10px 12px;text-align:center;
+    border:1px solid var(--line);background:var(--score-bg,var(--surface));min-height:74px;
+    display:flex;flex-direction:column;justify-content:center;gap:2px}
+  .cell .score{font-family:var(--mono);font-size:26px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;color:var(--score-ink)}
+  .cell .rk{font-size:11px;color:var(--soft);font-family:var(--mono)}
+  .cell.win{border-color:var(--accent);box-shadow:0 0 0 1.5px var(--accent) inset}
+  .cell .crown{position:absolute;top:-9px;left:50%;transform:translateX(-50%);
+    background:var(--accent);color:#fff;font-size:10px;font-weight:700;letter-spacing:.08em;
+    padding:2px 8px;border-radius:999px;font-family:var(--mono);white-space:nowrap}
+  :root[data-theme="dark"] .cell .crown, @media(prefers-color-scheme:dark){}
+  .legend{display:flex;gap:20px;flex-wrap:wrap;margin-top:16px;font-size:12.5px;color:var(--soft);align-items:center}
+  .heatbar{height:9px;width:120px;border-radius:5px;background:linear-gradient(90deg,var(--bad),var(--warn),var(--good))}
+
+  /* Mechanical cards */
+  .mech{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  @media(max-width:720px){.mech{grid-template-columns:1fr}.cards{grid-template-columns:1fr!important}}
+  .mcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 18px 16px;border-top:3px solid var(--mc)}
+  .mcard h3{font-family:var(--sans);font-size:16px;margin:0 0 2px;display:flex;align-items:center;gap:8px}
+  .mcard .tag{font-family:var(--mono);font-size:11px;color:var(--faint);margin-bottom:14px}
+  .metric{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:9px 0;border-top:1px solid var(--line2);font-size:13.5px}
+  .metric:first-of-type{border-top:none}
+  .metric .k{color:var(--soft)}
+  .metric .v{font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+  .v.good{color:var(--good)} .v.warn{color:var(--warn)} .v.bad{color:var(--bad)}
+
+  /* Per-language reading */
+  .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .lcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px}
+  .lcard .lhead{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:2px}
+  .lcard .ltitle{font-family:var(--serif);font-size:19px;font-weight:600}
+  .lcard .winner{font-family:var(--mono);font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px;color:#fff}
+  .winner.gemini{background:var(--gemini)} .winner.sonnet{background:var(--sonnet)} .winner.opus{background:var(--opus)}
+  .lcard .note{font-size:14px;color:var(--ink);margin:10px 0 14px}
+  .deflist{display:flex;flex-direction:column;gap:9px;border-top:1px solid var(--line2);padding-top:12px}
+  .defrow{font-size:12.5px;line-height:1.45}
+  .defrow .who{font-family:var(--mono);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;display:inline-block;min-width:60px}
+  .defrow .txt{color:var(--soft)}
+
+  footer{margin-top:60px;border-top:1px solid var(--line);padding-top:22px;color:var(--faint);font-size:12.5px;line-height:1.6}
+  footer b{color:var(--soft);font-weight:600}
+  .method{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 28px;margin-top:8px}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Machine-translation trial · Editions</div>
+    <h1>Which model translates best — and where each one breaks</h1>
+    <p class="sub">One lesson (<b>prophetic-school</b> · Lesson 1, “Learning to Listen”) rendered into all
+      <b>9 shipped edition languages</b> by three models, scored against the <code>translate</code>-skill
+      fidelity rules and a blind prose review. Gemini 3.5 Flash is the currently-shipped translation; Sonnet 5 and
+      Opus 4.8 were run through the identical production prompt + reassembly path.</p>
+    <div class="verdict">
+      <span class="eyebrow" style="color:var(--soft)">Prose wins (blind judge)</span>
+      <div class="tally" id="tally"></div>
+    </div>
+  </header>
+
+  <section id="heat-sec">
+    <div class="sec-head"><h2>Best model per language</h2></div>
+    <p class="sec-note">Blind prose quality — mean of accuracy, fluency and terminology (1–10), judged per language
+      without knowing which model produced which text. The outlined cell is the judge’s #1. Confidence is lower for
+      the low-resource languages (a machine judge’s ceiling), so read those as directional.</p>
+    <div class="grid-scroll">
+      <table class="heat">
+        <thead><tr>
+          <th class="lang-h">Language</th>
+          <th><span class="modelhead"><span class="swatch" style="background:var(--gemini)"></span><span class="mname">Gemini 3.5 Flash</span><span class="msub">shipped</span></span></th>
+          <th><span class="modelhead"><span class="swatch" style="background:var(--sonnet)"></span><span class="mname">Sonnet 5</span><span class="msub">candidate</span></span></th>
+          <th><span class="modelhead"><span class="swatch" style="background:var(--opus)"></span><span class="mname">Opus 4.8</span><span class="msub">candidate</span></span></th>
+        </tr></thead>
+        <tbody id="heatbody"></tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span>Prose score</span><span class="heatbar"></span>
+      <span style="font-family:var(--mono)">4 &nbsp;·&nbsp; 6.5 &nbsp;·&nbsp; 9</span>
+      <span style="margin-left:auto;color:var(--faint)">◻ outlined = judge’s #1 for that language</span>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>How each model fails — mechanically</h2></div>
+    <p class="sec-note">Deterministic checks across all 9 languages, run through the real production guards. Every model
+      cleared the hard quiz-scoring guard (markers + static blocks intact, 9/9) — so none would ship a broken quiz.
+      The differences are in everything the guard doesn’t catch.</p>
+    <div class="mech" id="mech"></div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>The three trends</h2></div>
+    <div class="cards" style="grid-template-columns:1fr">
+      <div class="lcard"><div class="ltitle" style="margin-bottom:6px">1 · Scripture handling is the real dividing line</div>
+        <div class="note" style="margin:0"><b class="ink-gemini">Gemini</b> always fills in Bible verses — but sometimes
+        <em>invents or scrambles</em> them (mangled references in Urdu, a coined “new covenant” inside a Hindi verse).
+        <b class="ink-sonnet">Sonnet</b> plays it safe and leaves verses in <em>English</em> for every harder language
+        (zu, xh, hi-Latn, bn-Latn) — safe but incomplete for a scripture-based lesson.
+        <b class="ink-opus">Opus</b> threads it: real published wording where it’s confident (correct romanized Hindi
+        John 3:16), English fallback only for Bengali. Best balance, and the rule the skill actually asks for.</div>
+      </div>
+      <div class="lcard"><div class="ltitle" style="margin-bottom:6px">2 · Gemini leaks native script into romanized editions</div>
+        <div class="note" style="margin:0">The mixed-script failure the fidelity rules explicitly warn about shows up
+        <em>only</em> in Gemini: Devanagari bleeding into Romanized Hindi (“par परिस्थिति”), Bengali/Devanagari into
+        Romanized Bengali. Sonnet and Opus kept every romanized edition in clean Latin script (0 leaks).</div>
+      </div>
+      <div class="lcard"><div class="ltitle" style="margin-bottom:6px">3 · Structural fidelity: Opus &gt; Sonnet &gt; Gemini</div>
+        <div class="note" style="margin:0">Opus preserved the HTML element count <em>exactly</em> in all 9 (0 dropped);
+        Sonnet dropped a handful; Gemini quietly dropped 3–6 elements per lesson (23 total) and, in Afrikaans,
+        fabricated whole steps that aren’t in the source. Recurring shared miss across <em>all three</em>: the fill-in
+        quiz Q4 stem and the “Check” button often left in English.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head"><h2>Language by language</h2></div>
+    <p class="sec-note">The blind judge’s verdict per language, with the headline defect found in each model’s output.</p>
+    <div class="cards" id="langcards"></div>
+  </section>
+
+  <footer>
+    <div><b>Method.</b> Source: prophetic-school Lesson 1 (26 KB, 3 quizzes, 3 Bible verses, a Sources footer).
+    Each model translated the same static-block-stripped source via the production <code>buildTranslateMessages</code>
+    prompt; Sonnet/Opus outputs were reassembled and checked with the real <code>swapBackStatic</code> +
+    <code>quizStructureMatches</code> guards. Prose scored blind by an Opus judge per language (candidates anonymized
+    A/B/C, order rotated per language to cancel position bias).</div>
+    <div class="method" style="margin-top:14px">
+      <span><b>Gemini column</b> = the currently-shipped edition (all shipped translations are Gemini 3.5).</span>
+      <span><b>“Verses in English”</b> counts the conservative fallback, not necessarily an error.</span>
+      <span><b>Low-confidence langs</b> (mg, zu, xh, hi-Latn, bn-Latn): machine-judge ceiling — directional.</span>
+      <span><b>Not measured</b>: cost/latency, and whether Gemini’s filled verses match a published Bible.</span>
+    </div>
+  </footer>
+</div>
+
+<script>
+const DATA = {
+  models:["gemini","sonnet","opus"],
+  mnames:{gemini:"Gemini 3.5 Flash",sonnet:"Sonnet 5",opus:"Opus 4.8"},
+  langs:[["es","Spanish"],["fr","French"],["af","Afrikaans"],["mg","Malagasy"],["ur","Urdu"],
+    ["zu","Zulu"],["xh","Xhosa"],["hi-Latn","Romanized Hindi"],["bn-Latn","Romanized Bengali"]],
+  wins:{gemini:1,sonnet:5,opus:3},
+  score:{es:{gemini:6.3,sonnet:8.7,opus:8},fr:{gemini:7.7,sonnet:8.7,opus:7},af:{gemini:5.3,sonnet:6.7,opus:7.7},
+    mg:{gemini:5.3,sonnet:8,opus:6.7},ur:{gemini:6.7,sonnet:8.3,opus:7.3},zu:{gemini:4.7,sonnet:6,opus:8},
+    xh:{gemini:7.7,sonnet:5.7,opus:7.3},"hi-Latn":{gemini:5.7,sonnet:7,opus:8},"bn-Latn":{gemini:4.3,sonnet:7.7,opus:7.3}},
+  rank:{es:{sonnet:1,opus:2,gemini:3},fr:{sonnet:1,gemini:2,opus:3},af:{opus:1,sonnet:2,gemini:3},
+    mg:{sonnet:1,opus:2,gemini:3},ur:{sonnet:1,opus:2,gemini:3},zu:{opus:1,sonnet:2,gemini:3},
+    xh:{gemini:1,opus:2,sonnet:3},"hi-Latn":{opus:1,sonnet:2,gemini:3},"bn-Latn":{sonnet:1,opus:2,gemini:3}},
+  conf:{es:"high",fr:"high",af:"high",mg:"medium",ur:"high",zu:"medium",xh:"medium","hi-Latn":"medium","bn-Latn":"medium"},
+  winner:{es:"sonnet",fr:"sonnet",af:"opus",mg:"sonnet",ur:"sonnet",zu:"opus",xh:"gemini","hi-Latn":"opus","bn-Latn":"sonnet"},
+  note:{
+    es:"Sonnet is cleanest and most faithful; Opus nearly as fluent but leaves Q4 and the Check button in English; Gemini omits John 3:16, invents phrasing, and has spelling/accent errors.",
+    fr:"Sonnet is complete, natural and defect-light; Gemini reads well but drops John 3:16 and coins a bogus acronym (JBAM); Opus leaves a quiz question and Check in English.",
+    af:"Opus is the most faithful and fluent with correct Afrikaans book names; Sonnet leaves all Bible book names in English; Gemini fabricates steps, drops John 3:16 and misspells ‘Maneere’.",
+    mg:"Sonnet is clearest and most complete with standard biblical terms; Opus fluent but leaves a quiz item and book names in English; Gemini corrupts core teaching and omits John 3:16.",
+    ur:"Sonnet is cleanest and complete (fully Urdu) though it uses the Islamic ‘عیسیٰ’ for Jesus; Opus keeps references in Latin script and a quiz in English; Gemini scrambles multiple verse references.",
+    zu:"Opus is the clear winner with scripture rendered in Zulu; Sonnet leaves all four quotations in English; Gemini translates verses but is marred by English words, typos and coined terms.",
+    xh:"Gemini is strongest — fully Xhosa with standard-Bible verses; Opus close with authentic verses but leaves the last quiz + Check in English; Sonnet leaves every scripture quotation in English.",
+    "hi-Latn":"Opus wins — natural formal Hindi with properly romanized verses and clean Latin; Sonnet leaves every scripture passage in English; Gemini leaks Devanagari and coins words.",
+    "bn-Latn":"Sonnet is most natural and cleanly romanized (leaves scripture in English); Opus a solid runner-up; Gemini renders verses but leaks Devanagari/Bengali script and invents words."
+  },
+  topDefect:{
+    es:{gemini:"Omits the John 3:16 verse entirely; invents a closing line; ‘escuchalo’, ‘fué’, ‘Verifíca’ misspellings.",
+        sonnet:"Leaves citation/section titles in English (‘Holy Spirit Course’, ‘Guidance of the Holy Spirit’).",
+        opus:"Q4 stem + ‘Check’ button left in English; citation titles in English."},
+    fr:{gemini:"Drops John 3:16; invents acronym ‘JBAM Potchefstroom’ for YWAM; ‘Vecteur’ for ‘Vehicle’.",
+        sonnet:"Section/chapter titles + course title left in English (‘Walking in Power’ kept, rest English).",
+        opus:"Q4 left in English; ‘Check’ untranslated (should be « Vérifier »)."},
+    af:{gemini:"Fabricates steps not in source; drops John 3:16; coins ‘Maneere’ (should be ‘Maniere’), twice.",
+        sonnet:"Bible book names left in English (John/Luke); Q4 + source titles in English.",
+        opus:"Q4 left in English; ‘Voertuig’ (car) over-literal for the ‘Vehicle’ label."},
+    mg:{gemini:"Reverses ‘rebuke all evil’; ‘get quiet’ rendered as ‘to laugh’; omits John 3:16.",
+        sonnet:"Wrong verb for ‘mistaking’ (to mock); leaves ‘Glossary’ untranslated.",
+        opus:"Q4 + Check in English; Bible book names in English (not Jaona/Lioka)."},
+    ur:{gemini:"Verse references scrambled (13:16 for 16:13…); omits John 3:16; leaks English answer into Q4.",
+        sonnet:"Uses Islamic ‘عیسیٰ’ for Jesus (not Christian ‘یسوع’); otherwise fully Urdu, no leaks.",
+        opus:"References left in Latin script; Q4 + source citations in English."},
+    zu:{gemini:"English pronoun + typo ‘futhi He ufuna’; ‘~10 min’/‘Source:’ untranslated; coined words.",
+        sonnet:"All four scriptures left in English; ‘Vehicle’ mistranslated as ‘picture’; typos.",
+        opus:"Q4 left in English; ‘Ways God can speak’ citation kept in English."},
+    xh:{gemini:"‘Konyathu’ coinage/typo for ‘all three’; over-expanded paraphrase drops the ‘demonic’ sense.",
+        sonnet:"All scripture left in English; opaque coinage ‘Isiphuma-mpikweni’; loanword ‘ikhosi’.",
+        opus:"Q4 + Check in English; ‘Isithuthi’ (transport) over-literal for ‘Vehicle’."},
+    "hi-Latn":{gemini:"Devanagari leak ‘par परिस्थिति’; coined ‘vachisth (new covenant)’; garbled Luke 11:13.",
+        sonnet:"All scripture blocks left in English; Q4 in English; register slips to informal tu-imperative.",
+        opus:"Q4 still carries English; reference section titles in English; one stray ‘So’ opening a verse."},
+    "bn-Latn":{gemini:"Devanagari (not even Bengali) leaks; garbled ‘strong emotion’; inconsistent romanization.",
+        sonnet:"All four scriptures in English; ‘presumption’ mistranslated (illogical); awkward coinages.",
+        opus:"All scripture left in English; Q4 stem in English; slightly stiff literal phrasing."}
+  },
+  // summed mechanical across 9 langs
+  mech:{
+    gemini:{struct:"9/9",tagDrop:23,scriptLeak:37,versesEn:"0 / 27",extra:"fabricates steps (af)"},
+    sonnet:{struct:"9/9",tagDrop:5,scriptLeak:0,versesEn:"12 / 27",extra:"safe verse fallback"},
+    opus:{struct:"9/9",tagDrop:0,scriptLeak:0,versesEn:"3 / 27",extra:"exact element parity"}
+  }
+};
+
+function heatColor(s){ // 4→bad, 6.5→warn, 9→good
+  const bad=[194,83,65],warn=[207,154,52],good=[63,143,110];
+  let c; if(s<=6.5){const t=Math.max(0,(s-4)/2.5);c=bad.map((b,i)=>Math.round(b+(warn[i]-b)*t));}
+  else{const t=Math.min(1,(s-6.5)/2.5);c=warn.map((w,i)=>Math.round(w+(good[i]-w)*t));}
+  return c;
+}
+const dark = matchMedia("(prefers-color-scheme:dark)").matches || document.documentElement.getAttribute("data-theme")==="dark";
+
+// Tally chips
+document.getElementById("tally").innerHTML = DATA.models.map(m=>
+  `<span class="chip"><span class="dot ${m}"></span><span class="n ink-${m}">${DATA.wins[m]}</span><span class="lbl">${DATA.mnames[m]}</span></span>`
+).join("");
+
+// Heatmap
+document.getElementById("heatbody").innerHTML = DATA.langs.map(([code,name])=>{
+  const cells = DATA.models.map(m=>{
+    const s=DATA.score[code][m], r=DATA.rank[code][m], win=r===1;
+    const c=heatColor(s); const bg=`rgba(${c[0]},${c[1]},${c[2]},${dark?0.26:0.15})`;
+    const ink=`rgb(${c.map(x=>dark?Math.min(255,x+55):Math.round(x*0.82)).join(",")})`;
+    return `<td><div class="cell ${win?'win':''}" style="--score-bg:${bg};--score-ink:${ink}">
+      ${win?'<span class="crown">BEST</span>':''}
+      <span class="score">${s.toFixed(1)}</span><span class="rk">#${r}</span></div></td>`;
+  }).join("");
+  return `<tr><td class="langcell"><span class="lname">${name}</span><span class="lcode">${code}</span>
+    <span class="conf">${DATA.conf[code]} confidence</span></td>${cells}</tr>`;
+}).join("");
+
+// Mechanical cards
+document.getElementById("mech").innerHTML = DATA.models.map(m=>{
+  const x=DATA.mech[m];
+  const cls=(v,g,b)=> v<=g?"good":(v>=b?"bad":"warn");
+  return `<div class="mcard" style="--mc:var(--${m})">
+    <h3><span class="dot ${m}" style="width:10px;height:10px;border-radius:50%"></span>${DATA.mnames[m]}</h3>
+    <div class="tag">summed across 9 languages</div>
+    <div class="metric"><span class="k">Quiz-guard pass</span><span class="v good">${x.struct}</span></div>
+    <div class="metric"><span class="k">HTML elements dropped</span><span class="v ${cls(x.tagDrop,0,20)}">${x.tagDrop}</span></div>
+    <div class="metric"><span class="k">Wrong-script leaks (chars)</span><span class="v ${cls(x.scriptLeak,0,20)}">${x.scriptLeak}</span></div>
+    <div class="metric"><span class="k">Verses left in English</span><span class="v ${m==='gemini'?'good':(m==='sonnet'?'warn':'good')}">${x.versesEn}</span></div>
+    <div class="metric"><span class="k">Signature trait</span><span class="v" style="color:var(--soft);font-weight:500">${x.extra}</span></div>
+  </div>`;
+}).join("");
+
+// Language cards
+document.getElementById("langcards").innerHTML = DATA.langs.map(([code,name])=>{
+  const w=DATA.winner[code];
+  const defs = DATA.models.map(m=>
+    `<div class="defrow"><span class="who ink-${m}">${m}</span> <span class="txt">${DATA.topDefect[code][m]}</span></div>`
+  ).join("");
+  return `<div class="lcard">
+    <div class="lhead"><span class="ltitle">${name} <span class="lcode" style="font-family:var(--mono);font-size:12px;color:var(--faint)">${code}</span></span>
+      <span class="winner ${w}">${DATA.mnames[w]}</span></div>
+    <div class="note">${DATA.note[code]}</div>
+    <div class="deflist">${defs}</div>
+  </div>`;
+}).join("");
+</script>
+
+</body>
+</html>
