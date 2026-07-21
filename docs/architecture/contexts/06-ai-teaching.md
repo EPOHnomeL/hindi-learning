@@ -130,11 +130,18 @@ model (Opus, 1M context).
 The provider-agnostic line ([ADR 0014](/docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md))
 runs the whole thing inside a Convex `internalAction` with no filesystem. Three modules matter:
 
-- **[`convex/openrouterClient.ts`](/convex/openrouterClient.ts#L20-L21)** — the model client. Defaults
-  (env-overridable): author `z-ai/glm-4.7`, translate `google/gemini-3.5-flash`. Notable params:
-  `webSearch` toggles OpenRouter's `web` plugin for grounded generation; `reasoning: "none"` disables
-  billed thinking on calls that don't benefit (translation). It retries once without `reasoning` if an
-  endpoint mandates it — a resilience guardrail.
+- **[`convex/openrouterClient.ts`](/convex/openrouterClient.ts#L20-L21)** — the OpenRouter model client
+  (authoring, and the translation *rollback* path). Defaults (env-overridable): author `z-ai/glm-4.7`,
+  translate `google/gemini-3.5-flash`. Notable params: `webSearch` toggles OpenRouter's `web` plugin for
+  grounded generation; `reasoning: "none"` *asks* to disable billed thinking. It retries once without
+  `reasoning` if an endpoint mandates it — a resilience guardrail, but for Gemini that retry silently
+  turns thinking back **on**, which is exactly why translation moved off it (see below).
+- **[`convex/geminiClient.ts`](/convex/geminiClient.ts)** — the native Google AI Studio client, used
+  **only** by the translate path. Same dependency-free `fetch` seam; hits the Gemini Developer API's
+  `:generateContent` with `GOOGLE_AI_API_KEY` and `thinkingConfig.thinkingBudget: 0`, which the native API
+  actually honours (unlike OpenRouter's unified toggle — translation-cost 05). Default model
+  `gemini-3.5-flash`, overridable via `GEMINI_TRANSLATE_MODEL`. Which client runs translation is the
+  per-deployment `TRANSLATE_PROVIDER` switch (`gemini` default | `openrouter` rollback).
 - **[`convex/authoring.ts`](/convex/authoring.ts#L203-L240)** — where the skill becomes a prompt. The
   system message is `TEACH_INSTRUCTIONS` (the bundled skill) **+** an `OUTPUT_CONTRACT`:
 
@@ -185,7 +192,8 @@ Rendering a completed course into another language is a sibling Routine with its
 The **in-Convex** translate prompt ([`convex/translate.ts`](/convex/translate.ts#L519-L536)) is the
 compressed version: *"You are a professional translator. … Preserve EVERY HTML tag, attribute, and value
 EXACTLY — especially quiz markers … Return ONLY the translated HTML, with no code fence and no
-commentary."* It runs with `reasoning: "none"` for cost and strips `<script>`/`<style>` before sending so
+commentary."* It runs with thinking disabled for cost — `thinkingBudget: 0` on the default native Gemini
+path (`reasoning: "none"` on the OpenRouter rollback) — and strips `<script>`/`<style>` before sending so
 the model only sees real content.
 
 ## Where each artifact lives
@@ -197,7 +205,8 @@ the model only sees real content.
 | Translation fidelity | [`translate/SKILL.md`](/.agents/skills/translate/SKILL.md) | inline page |
 | Claude-path system prompt | [`docs/routine-prompt.md`](/docs/routine-prompt.md) | inline page |
 | OpenRouter output contract | [`convex/authoring.ts`](/convex/authoring.ts#L203-L240) | code drawer |
-| Model client / params | [`convex/openrouterClient.ts`](/convex/openrouterClient.ts) | code drawer |
+| Model client / params (OpenRouter) | [`convex/openrouterClient.ts`](/convex/openrouterClient.ts) | code drawer |
+| Translate client (native Gemini) | [`convex/geminiClient.ts`](/convex/geminiClient.ts) | code drawer |
 | Translation prompt (in-app) | [`convex/translate.ts`](/convex/translate.ts#L519-L536) | code drawer |
 | Drift-proofing bundler | [`scripts/bundle-authoring-assets.ts`](/scripts/bundle-authoring-assets.ts) | code drawer |
 
@@ -217,5 +226,6 @@ All of these are also in the **AI Agent Context** group in the sidebar.
   Course", "The Lesson-Count Estimate") that currently live in PRDs/ADRs rather than the skill body —
   worth reconciling so the prompt's cross-references resolve.
 - **No model runs in the app on the Claude path.** ADR 0001/0010 hold: the cloud run owns Claude access.
-  Only the **OpenRouter** path calls a model from inside Convex, and only that path needs
-  `OPENROUTER_API_KEY` on the deployment.
+  Only the in-Convex **authoring/translate** actions call a model directly. Keys on the deployment:
+  `OPENROUTER_API_KEY` (authoring, always; translation when `TRANSLATE_PROVIDER=openrouter`) and
+  `GOOGLE_AI_API_KEY` (translation on the default native-Gemini path).
