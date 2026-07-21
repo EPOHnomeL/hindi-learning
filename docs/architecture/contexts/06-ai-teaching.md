@@ -138,10 +138,13 @@ runs the whole thing inside a Convex `internalAction` with no filesystem. Three 
   turns thinking back **on**, which is exactly why translation moved off it (see below).
 - **[`convex/geminiClient.ts`](/convex/geminiClient.ts)** — the native Google AI Studio client, used
   **only** by the translate path. Same dependency-free `fetch` seam; hits the Gemini Developer API's
-  `:generateContent` with `GOOGLE_AI_API_KEY` and `thinkingConfig.thinkingBudget: 0`, which the native API
-  actually honours (unlike OpenRouter's unified toggle — translation-cost 05). Default model
-  `gemini-3.5-flash`, overridable via `GEMINI_TRANSLATE_MODEL`. Which client runs translation is the
-  per-deployment `TRANSLATE_PROVIDER` switch (`gemini` default | `openrouter` rollback).
+  `:generateContent` with `GOOGLE_AI_API_KEY` and `thinkingConfig.thinkingLevel: "minimal"` — the least
+  reasoning payable on Gemini 3.x, which has **no "off"** (the 2.5-era `thinkingBudget: 0` is deprecated and
+  does *not* disable thinking on 3.5-flash; that misconception is what translation-cost 05 originally
+  shipped). So thinking is *minimised*, not zero — the client logs `usageMetadata.thoughtsTokenCount` per
+  call so real reasoning spend is visible in `npx convex logs`. Default model `gemini-3.5-flash`,
+  overridable via `GEMINI_TRANSLATE_MODEL`. Which client runs translation is the per-deployment
+  `TRANSLATE_PROVIDER` switch (`gemini` default | `openrouter` rollback).
 - **[`convex/authoring.ts`](/convex/authoring.ts#L203-L240)** — where the skill becomes a prompt. The
   system message is `TEACH_INSTRUCTIONS` (the bundled skill) **+** an `OUTPUT_CONTRACT`:
 
@@ -192,9 +195,9 @@ Rendering a completed course into another language is a sibling Routine with its
 The **in-Convex** translate prompt ([`convex/translate.ts`](/convex/translate.ts#L519-L536)) is the
 compressed version: *"You are a professional translator. … Preserve EVERY HTML tag, attribute, and value
 EXACTLY — especially quiz markers … Return ONLY the translated HTML, with no code fence and no
-commentary."* It runs with thinking disabled for cost — `thinkingBudget: 0` on the default native Gemini
-path (`reasoning: "none"` on the OpenRouter rollback) — and strips `<script>`/`<style>` before sending so
-the model only sees real content.
+commentary."* It runs with thinking held to the floor for cost — `thinkingLevel: "minimal"` on the default
+native Gemini path (Gemini 3.x has no "off"), `reasoning: "none"` on the OpenRouter rollback — and strips
+`<script>`/`<style>` before sending so the model only sees real content.
 
 ## Where each artifact lives
 
