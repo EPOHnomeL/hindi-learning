@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-21T13:17:05.048Z",
+  "generatedAt": "2026-07-21T13:30:36.339Z",
   "files": {
     "/docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md": {
       "title": "Asynchronous, hub-mediated teaching loop (no live tutor on the web)",
@@ -590,13 +590,36 @@
         {
           "path": "/docs/translation-models-by-region.md",
           "title": "Best translation models by region — external evidence"
+        },
+        {
+          "path": "/docs/translation-research.md",
+          "title": "Translation Model Research"
         }
       ]
     },
     "/docs/translation-models-by-region.md": {
       "title": "Best translation models by region — external evidence",
       "updated": "2026-07-21T15:12:20+02:00",
-      "backlinks": []
+      "backlinks": [
+        {
+          "path": "/docs/translation-research.md",
+          "title": "Translation Model Research"
+        }
+      ]
+    },
+    "/docs/translation-research.md": {
+      "title": "Translation Model Research",
+      "updated": "2026-07-21T13:28:13.456Z",
+      "backlinks": [
+        {
+          "path": "/docs/translation-model-trial.md",
+          "title": "Translation model trial — which model to translate Editions with"
+        },
+        {
+          "path": "/docs/translation-models-by-region.md",
+          "title": "Best translation models by region — external evidence"
+        }
+      ]
     },
     "/docs/translation.md": {
       "title": "Course translation (Editions) — operational runbook",

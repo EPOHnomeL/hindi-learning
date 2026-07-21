@@ -1,7 +1,8 @@
 # Best translation models by region — external evidence
 
-A short, sourced survey of which translation models lead **by region**, to sit
-alongside our own head-to-head ([translation-model-trial.md](translation-model-trial.md)).
+Part of the [Translation Model Research](/docs/translation-research.md) section — a
+short, sourced survey of which translation models lead **by region**, to sit
+alongside our own head-to-head ([translation-model-trial.md](/docs/translation-model-trial.md)).
 Our trial is one lesson, 9 languages, human-blind; this page is the wider public
 evidence it should be read against. Compiled 2026-07-21 (all sources accessed that
 day). Treat as **directional** — model tiers/versions differ across sources and

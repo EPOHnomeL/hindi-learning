@@ -3,19 +3,21 @@
 A head-to-head of three translation models on the **Editions** path, to answer a
 concrete operational question: *is the shipped translate model the right one, and
 does the answer change by language?* Sibling of the translation runbook
-([translation.md](translation.md)) — that doc is **how translation is plumbed**;
-this is **which model we should plumb it to**, with evidence.
+([translation.md](/docs/translation.md)) — that doc is **how translation is plumbed**;
+this is **which model we should plumb it to**, with evidence. Part of the
+[Translation Model Research](/docs/translation-research.md) section.
 
 > **TL;DR.** On one lesson across 9 languages, blind prose review ranked
 > **Sonnet 5 first in 5 languages, Opus 4.8 in 3, Gemini 3.5 Flash in 1**. The
 > shipped Gemini path has two systematic defects the others avoid — it **leaks
-> native script into romanized editions** and **drops//invents HTML structure** —
+> native script into romanized editions** and **drops/invents HTML structure** —
 > while the real differentiator between the frontier models is **how each handles
-> Scripture**. Full interactive scorecard: **[translation-model-trial.html](translation-model-trial.html)**
+> Scripture**. Full interactive scorecard:
+> <a href="/docs/translation-model-trial.html" target="_blank" rel="noopener">translation-model-trial.html</a>
 > (self-contained; open in any browser).
 
 Date: 2026-07-21. Run by the `translate`-skill fidelity rules
-([.agents/skills/translate/SKILL.md](../.agents/skills/translate/SKILL.md)).
+([the translate SKILL.md](/.agents/skills/translate/SKILL.md)).
 
 ---
 
@@ -152,10 +154,15 @@ measured, not assumed. Two consequences:
   before treating the ranking as settled.
 - **Low-resource languages are medium-confidence.** For mg/zu/xh/hi-Latn/bn-Latn the
   judge is an LLM near its own ceiling; read those rows as directional.
-- **The Gemini column is the shipped edition**, a mix of pre- and post-hardening
-  prompt output (and `ur` was hand-corrected on 2026-07-15 — see
-  [translation.md §8](translation.md)). It is *"what's live"*, not a clean
-  current-prompt Gemini baseline.
+- **The Gemini column is a _historical_ edition, not current-skill Gemini.** The
+  shipped translations were produced by an **earlier version of the `translate`
+  skill**, before its fidelity rules were hardened (commit `c341c2b`, "harden
+  fidelity rules from graded Hindi output"). Several defects charged to Gemini here
+  — native-script leaks, a coined word inside a verse, dropped structure — are
+  *precisely* what the newer rules target, so **current-prompt Gemini could score
+  higher**; a fair re-run must re-translate the Gemini column under today's skill.
+  (`ur` was also hand-corrected on 2026-07-15 — see [translation.md §8](/docs/translation.md).)
+  Read this column as *"what's live"*, not a clean current-prompt baseline.
 - **Not measured:** cost and latency, and whether Gemini's filled-in verses match an
   actual published Bible (only that it produced *something* in-language).
 

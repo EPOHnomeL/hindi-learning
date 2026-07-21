@@ -55,7 +55,7 @@ console.log(["model", "tagDropSum", "wrongScrSum", "versesEngSum", "bodyLeakSum"
 for (const model of MODELS) {
   let tagDrop = 0, wrongScr = 0, vEng = 0, bLeak = 0, structOk = 0;
   for (const lang of LANGS) {
-    const r = mechOf(model, lang) as Record<string, number & boolean>;
+    const r = mechOf(model, lang) as Record<string, unknown>;
     tagDrop += Math.max(0, -(r.tagDelta as number));
     wrongScr += r.wrongScript as number;
     vEng += r.versesEng as number;
