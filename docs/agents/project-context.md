@@ -71,6 +71,24 @@ Validated with `@t3-oss/env` (see [env-validation](#env-validation-t3-oss-env)
 below). PayFast rail vars live in `convex/env.ts`; the Next client var in
 `env.js`.
 
+### Cross-subdomain cookie scope (`NEXT_PUBLIC_COOKIE_DOMAIN`)
+
+- **One sign-in + one theme/language span every `*.my-course.app` subdomain.**
+  Set `NEXT_PUBLIC_COOKIE_DOMAIN=my-course.app` (prod, and the shared-dev Next
+  build if you want it there) so the auth-session, `hindi_theme`, and
+  `hindi_locale` cookies carry a parent `Domain`. Unset → cookies stay host-only
+  (the correct default for local dev and `*.vercel.app` previews, which reject a
+  `Domain` as a public suffix). Logic: `src/lib/cookieDomain.ts`. Design: ADR 0022
+  §4a.
+- **The auth cookies need a pnpm patch** (`patches/@convex-dev+auth@0.0.80.patch`,
+  registered in `pnpm-workspace.yaml`): Convex Auth hardcodes the `__Host-` cookie
+  prefix, which forbids `Domain`; the patch swaps it for `__Secure-` and sets
+  `Domain` when `NEXT_PUBLIC_COOKIE_DOMAIN` matches the host. **`pnpm install`
+  re-applies it**; if you bump `@convex-dev/auth` off `0.0.80` the patch must be
+  re-cut (`pnpm patch`). Keep it in sync with `src/lib/cookieDomain.ts`.
+- **Turning it on invalidates existing sessions once** (cookie name changes
+  `__Host-*`→`__Secure-*`): one re-sign-in on deploy, seamless thereafter.
+
 ### env validation (@t3-oss/env)
 
 Two registries, one per runtime — they can't share (different bundlers,
