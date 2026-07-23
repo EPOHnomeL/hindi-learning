@@ -107,8 +107,88 @@ function GenerationManager() {
         <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Generation</h1>
         <p className="mt-0.5 text-sm text-soft">What the routine is building, and what it has built</p>
       </div>
+      <GenerationUsageChart />
       <GeneratingNow />
       <RunHistory />
+    </div>
+  );
+}
+
+// The Generation-tab activity graph: daily generation + translation usage over
+// the last 30 days as vertical stacked bars (generation on the bottom,
+// translation on top), on one shared count axis. Colours are the shared viz
+// palette (slot 1 / slot 2). The 30-day window is floored to the UTC day so the
+// query args stay stable across renders (a raw Date.now() would resubscribe
+// forever — see salesRange).
+function GenerationUsageChart() {
+  const day = 86_400_000;
+  const to = Math.floor(Date.now() / day) * day + day; // start of tomorrow, UTC
+  const from = to - 30 * day;
+  const rows = useQuery(api.routine.usageByDay, { from, to });
+  return (
+    <figure className="viz-chart mb-12 rounded-xl border border-line bg-card p-4">
+      <figcaption className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <span className="text-xs font-medium tracking-wide text-soft uppercase">Activity · last 30 days</span>
+        <ul className="flex items-center gap-3">
+          <li className="flex items-center gap-1.5 text-xs text-soft">
+            <span className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--viz-1)" }} aria-hidden />
+            Generation
+          </li>
+          <li className="flex items-center gap-1.5 text-xs text-soft">
+            <span className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--viz-2)" }} aria-hidden />
+            Translation
+          </li>
+        </ul>
+      </figcaption>
+      {rows === undefined ? (
+        <div className="h-32 animate-pulse rounded-lg bg-hi/40" aria-busy />
+      ) : (
+        <GenerationUsageBars rows={rows} />
+      )}
+    </figure>
+  );
+}
+
+function GenerationUsageBars({ rows }: { rows: FunctionReturnType<typeof api.routine.usageByDay> }) {
+  const H = 128; // px plot height
+  const max = Math.max(...rows.map((r) => r.generation + r.translation), 1);
+  const total = rows.reduce((sum, r) => sum + r.generation + r.translation, 0);
+  const fmt = (ms: number) =>
+    new Date(ms).toLocaleDateString("en-ZA", { day: "numeric", month: "short", timeZone: "UTC" });
+  // A nonzero count always draws at least 2px so a single event stays visible.
+  const px = (n: number) => (n > 0 ? Math.max((n / max) * H, 2) : 0);
+
+  if (total === 0) {
+    return <p className="py-10 text-center text-sm text-soft">No generation or translation in the last 30 days.</p>;
+  }
+  return (
+    <div>
+      <div className="flex h-32 items-end gap-[2px]">
+        {rows.map((r) => {
+          const tr = px(r.translation);
+          const g = px(r.generation);
+          return (
+            <div
+              key={r.dayMs}
+              className="flex flex-1 flex-col justify-end gap-[2px]"
+              title={`${fmt(r.dayMs)} — ${r.generation} generation, ${r.translation} translation`}
+            >
+              {tr > 0 && <div className="w-full rounded-t-[3px]" style={{ height: `${tr}px`, background: "var(--viz-2)" }} />}
+              {g > 0 && (
+                <div
+                  className={`w-full ${tr > 0 ? "" : "rounded-t-[3px]"}`}
+                  style={{ height: `${g}px`, background: "var(--viz-1)" }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-soft">
+        <span>{fmt(rows[0]!.dayMs)}</span>
+        {rows.length > 2 && <span>{fmt(rows[Math.floor(rows.length / 2)]!.dayMs)}</span>}
+        <span>{fmt(rows[rows.length - 1]!.dayMs)}</span>
+      </div>
     </div>
   );
 }
@@ -380,7 +460,7 @@ function SalesChart({ report }: { report: FunctionReturnType<typeof api.sales.re
   const ranked = rankLanguages(report);
   const maxCount = Math.max(...report.map((c) => c.count), 1);
   return (
-    <figure className="sales-chart mb-4 rounded-xl border border-line bg-card p-4">
+    <figure className="viz-chart mb-4 rounded-xl border border-line bg-card p-4">
       <figcaption className="mb-3 flex items-center justify-between gap-3">
         <span className="text-xs font-medium tracking-wide text-soft uppercase">Sales by course</span>
         {ranked.length >= 2 && (
