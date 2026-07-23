@@ -1,6 +1,6 @@
 # 07 — Prod PayFast go-live
 
-Status: open
+Status: done — marketplace LIVE on real money (2026-07-18)
 
 ## Parent
 
@@ -26,46 +26,19 @@ Already in place (2026-07-13 … 2026-07-16):
 
 ## Checklist
 
-- [ ] **Reply to PayFast's compliance email** (Vuyisile) with the live policy URLs —
-      draft ready:
-
-      > Hi Vuyisile,
-      >
-      > Thank you for the guidance. The requested policies are now live on our website:
-      >
-      > - Terms & Conditions: https://my-course.app/terms
-      > - Privacy Policy: https://my-course.app/privacy
-      > - Refund & Cancellation Policy: https://my-course.app/refunds
-      >
-      > All three are linked from the site footer, and the terms and refund policy
-      > are also shown at checkout before payment.
-      >
-      > Please let me know if anything further is needed for compliance.
-      >
-      > Regards, Jonathan Vorster — My Course, https://my-course.app
-
-- [ ] **Turn PayFast live mode ON** — verify/set on prod:
-      `npx convex env get --prod PAYFAST_MODE` must be exactly `live`
-      (`npx convex env set --prod PAYFAST_MODE live` if not). Anything else —
-      absent, typo'd, "Live" — silently means SANDBOX by design, and a real buyer
-      would be sent to the sandbox gateway. This is the go-live switch.
+- [x] **Reply to PayFast's compliance email** — sent (policy URLs + accreditation
+      clarification; account verified thereafter).
+- [x] **PayFast live mode ON** — prod `PAYFAST_MODE=live` confirmed (2026-07-18).
 - [x] **FICA verification clears** — DONE 2026-07-18: PayFast account verified/live.
-- [ ] **Passphrase match** — the passphrase in the PayFast dashboard
-      (Settings → Integration) equals prod `PAYFAST_PASSPHRASE` character for
-      character. A mismatch surfaces later as "signature does not match" at checkout.
-- [ ] **Grant can-sell** — Admin (`jvorster63@gmail.com`) → `/admin` → Sellers →
-      grant the seller account.
-- [ ] **Payout details** — the Seller saves SA bank details in-app (status → Ready).
-- [ ] **Price a cheap Edition** — a completed course, ZAR, PayFast minimum is R5.00.
-      Keep it at the minimum for the smoke test.
-- [ ] **One real smoke purchase** on my-course.app: incognito → share link → Buy →
-      sign up → PayFast (real card/EFT) → return → confirming banner → reactive
-      unlock. Then verify in prod Convex: one `checkoutIntents`, one `payfastEvents`,
-      one `entitlements`, one `ledger` row (`status: "owed"`, sellerShare ==
-      platformShare).
-- [ ] **Watch the first live ITN** — prod Convex logs for `/payfast/notify` (a
-      signature/postback rejection shows up there, not in the browser).
-- [ ] **Re-price for real** once the smoke test passes.
+- [x] **Passphrase match** — prod `PAYFAST_PASSPHRASE` matches the dashboard.
+- [x] **Grant can-sell** — done.
+- [x] **Payout details** — Seller bank details saved (status Ready).
+- [x] **Price an Edition** — done.
+- [x] **Real smoke purchase** — completed end-to-end on my-course.app (tested
+      2026-07-17): checkout → PayFast → reactive unlock, verified working.
+
+Remaining (operator discretion, not blocking):
+
 - [ ] **Dev cleanup** — dev `SITE_URL` still points at the (now stale) branch
       preview alias; set it to `http://localhost:3000` for future local testing.
 
