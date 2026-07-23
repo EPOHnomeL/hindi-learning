@@ -9,6 +9,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import type { SellerStatus, TenantFlag } from "../../../convex/lib";
 import { TENANT_THEME_TOKENS, type Token } from "../../design/tokens";
 import { salesRange, type SalesPreset } from "./salesRange";
+import { colorVar, rankLanguages, worthCharting } from "./salesChart";
 
 // The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
 // dashboard is now scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
@@ -359,6 +360,7 @@ function SalesManager() {
             </span>
             <span className="font-semibold tabular-nums text-ink">{formatRand(totalGross)}</span>
           </div>
+          {worthCharting(report) && <SalesChart report={report} />}
           <ul className="flex flex-col gap-2">
             {report.map((c) => (
               <SalesCourseRow key={c.topicId} course={c} />
@@ -367,6 +369,60 @@ function SalesManager() {
         </>
       )}
     </div>
+  );
+}
+
+// The sales-by-course chart (dataviz skill): one horizontal bar per course,
+// length = its sale count on a shared scale, split into per-edition segments
+// coloured by language (consistent across courses). Number of sales is the
+// measure. The 2px gaps between segments are the card surface showing through.
+function SalesChart({ report }: { report: FunctionReturnType<typeof api.sales.report> }) {
+  const ranked = rankLanguages(report);
+  const maxCount = Math.max(...report.map((c) => c.count), 1);
+  return (
+    <figure className="sales-chart mb-4 rounded-xl border border-line bg-card p-4">
+      <figcaption className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-xs font-medium tracking-wide text-soft uppercase">Sales by course</span>
+        {ranked.length >= 2 && (
+          <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {ranked.slice(0, 8).map((lang) => (
+              <li key={lang} className="flex items-center gap-1.5 text-xs text-soft">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-[3px]"
+                  style={{ background: colorVar(lang, ranked) }}
+                  aria-hidden
+                />
+                <span className="uppercase">{lang}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </figcaption>
+      <ul className="flex flex-col gap-2.5">
+        {report.map((course) => (
+          <li key={course.topicId}>
+            <div className="mb-1 flex items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate text-sm text-ink">{course.courseTitle}</span>
+              <span className="shrink-0 text-xs tabular-nums text-soft">
+                {course.count} sale{course.count === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="h-5 w-full">
+              <div className="flex h-full gap-[2px]" style={{ width: `${(course.count / maxCount) * 100}%` }}>
+                {course.editions.map((e) => (
+                  <div
+                    key={e.lang}
+                    className="h-full min-w-[3px] first:rounded-l last:rounded-r"
+                    style={{ flexGrow: e.count, background: colorVar(e.lang, ranked) }}
+                    title={`${e.title} (${e.lang.toUpperCase()}) — ${e.count} sale${e.count === 1 ? "" : "s"}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </figure>
   );
 }
 
