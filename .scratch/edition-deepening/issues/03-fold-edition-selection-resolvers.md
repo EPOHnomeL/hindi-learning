@@ -1,6 +1,7 @@
 # edition-deepening/03: Fold the Edition-selection resolvers — one `resolveEdition` over a principal
 
 **Status:** open — now the sole frontier (02 landed in `7a2c5a3`)
+**Claimed:** jonathan (session 2026-07-22)
 **Labels:** wayfinder:grilling
 **Depends on:** 02 (DONE) — `resolveReaderEdition` already computes `grantsFor` once
 and threads it; the selection fold now composes over that resolver.
