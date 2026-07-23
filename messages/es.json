@@ -317,7 +317,17 @@
     "engineFreeHint": "Sin coste de tokens — más lento. Usa la rutina de traducción en la nube.",
     "engineGeminiWarn": "Más rápido y de mayor calidad, pero consume tokens (coste real) en cada ejecución.",
     "retranslate": "Volver a traducir",
-    "retranslating": "Volviendo a traducir…"
+    "retranslating": "Volviendo a traducir…",
+    "manageEdition": "Gestionar edición",
+    "confirmRegenerateTitle": "¿Regenerar el enlace público?",
+    "confirmRegenerateBody": "El enlace actual dejará de funcionar de inmediato. Cualquier persona con quien lo hayas compartido necesitará el nuevo.",
+    "regenerating": "Regenerando…",
+    "confirmRemoveTitle": "¿Eliminar esta edición?",
+    "confirmRemoveBody": "{native} y el acceso de todos a ella se eliminarán de forma permanente. Esto no se puede deshacer.",
+    "removing": "Eliminando…",
+    "confirmRetranslateTitle": "¿Volver a traducir esta edición?",
+    "confirmRetranslateBody": "Esto vuelve a traducir {native}. Cambiar de motor la rehace desde cero.",
+    "confirmRetranslate": "Volver a traducir"
   },
   "Certificate": {
     "eyebrow": "Certificado de finalización",

@@ -3,12 +3,12 @@
 import { useAction, useMutation, useQuery } from "convex/react";
 import { type FunctionReturnType } from "convex/server";
 import { useTranslations } from "next-intl";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { LANGUAGES } from "../../../convex/languages";
 import { Icon } from "./icons";
 import { formatPrice } from "./Paygate";
-import { Dialog } from "./ui";
+import { ConfirmDialog, Dialog, MenuItem } from "./ui";
 
 // One row of the owner's Editions panel, straight from api.translate.editions.
 type Edition = NonNullable<FunctionReturnType<typeof api.translate.editions>>["editions"][number];
@@ -186,15 +186,11 @@ function EditionPanel({
       <InviteByEmail topicSlug={topicSlug} lang={edition.lang} />
       <PublicLinkToggle topicSlug={topicSlug} lang={edition.lang} publicToken={edition.publicToken} />
       <SellEdition topicSlug={topicSlug} lang={edition.lang} native={edition.native} rtl={edition.rtl} completed={completed} />
-      {/* Only a translation can be re-translated — the English source has no engine. */}
-      {!edition.source && (
-        <RetranslateControls topicSlug={topicSlug} lang={edition.lang} currentEngine={edition.engine} />
-      )}
-      <div className="flex flex-col items-start gap-2 border-t border-line pt-4">
+      <div className="flex flex-col items-start gap-3 border-t border-line pt-4">
         <AccessRoster topicSlug={topicSlug} lang={edition.lang} />
-        {!edition.source && (
-          <RemoveEdition topicSlug={topicSlug} lang={edition.lang} label={t("removeThisEdition")} />
-        )}
+        {/* Destructive actions (regenerate link, re-translate, remove) live behind a
+            two-click danger menu with a confirm — see EditionDangerMenu. */}
+        <EditionDangerMenu topicSlug={topicSlug} edition={edition} />
       </div>
     </div>
   );
@@ -348,9 +344,10 @@ function AccessRow({
 }
 
 // The anonymous public link for one edition, presented as an on/off toggle. Off →
-// a lock; on → a globe, the URL revealed below with Copy + a quiet Regenerate.
-// Both "on" and "Regenerate" mint a fresh token (the old link dies); the toggle
-// off revokes it. Token is read live from the reactive editions query.
+// a lock; on → a globe, the URL revealed below with Copy. Turning it on mints a
+// fresh token; turning it off revokes it. Regenerating (minting a new token while
+// on) is a destructive action, so it lives in the edition's danger menu, not here.
+// Token is read live from the reactive editions query.
 function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string; lang: string; publicToken: string | null }) {
   const t = useTranslations("Editions");
   const setPublic = useMutation(api.shares.setEditionPublic);
@@ -400,39 +397,29 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
       </div>
 
       {on && url && (
-        <div className="mt-2.5 flex flex-col gap-2.5">
-          <div className="flex gap-1.5">
-            <input
-              readOnly
-              value={url}
-              onFocus={(e) => e.currentTarget.select()}
-              className="min-w-0 flex-1 rounded-lg border border-line bg-hi px-2.5 py-2 text-xs text-ink focus:outline-none"
-            />
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard?.writeText(url).then(
-                  () => {
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                  },
-                  () => {
-                    /* clipboard blocked — the field is selectable to copy by hand */
-                  },
-                );
-              }}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent2 px-3 py-2 text-xs font-medium text-white"
-            >
-              <Icon name="link" className="h-3.5 w-3.5" /> {copied ? t("copied") : t("copy")}
-            </button>
-          </div>
+        <div className="mt-2.5 flex gap-1.5">
+          <input
+            readOnly
+            value={url}
+            onFocus={(e) => e.currentTarget.select()}
+            className="min-w-0 flex-1 rounded-lg border border-line bg-hi px-2.5 py-2 text-xs text-ink focus:outline-none"
+          />
           <button
             type="button"
-            disabled={busy}
-            onClick={() => run(true)}
-            className="inline-flex items-center gap-1.5 self-start text-[12.5px] text-soft transition-colors hover:text-accent disabled:opacity-60"
+            onClick={() => {
+              navigator.clipboard?.writeText(url).then(
+                () => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1500);
+                },
+                () => {
+                  /* clipboard blocked — the field is selectable to copy by hand */
+                },
+              );
+            }}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent2 px-3 py-2 text-xs font-medium text-white"
           >
-            <Icon name="refresh" className="h-3.75 w-3.75" /> {t("regenerateLink")}
+            <Icon name="link" className="h-3.5 w-3.5" /> {copied ? t("copied") : t("copy")}
           </button>
         </div>
       )}
@@ -773,30 +760,203 @@ function EngineToggle({ value, onChange, disabled }: { value: Engine; onChange: 
   );
 }
 
-// Re-translate a ready edition (translation-engine-picker): an always-visible
-// engine toggle seeded from the engine that last produced it, plus a Re-translate
-// button. Switching to a different engine forces a full redo server-side; the same
-// engine is a cheap resume/repair. This is how a free edition is upgraded to Gemini.
-function RetranslateControls({ topicSlug, lang, currentEngine }: { topicSlug: string; lang: string; currentEngine: Engine }) {
+// The ready edition's destructive-action menu, at the foot of the panel. Every
+// action here either invalidates a shared link or throws work away, so each one
+// is two clicks deep (open the menu, pick the action) and then gated by an
+// "are you sure" confirm. A translation gets all three (regenerate the public
+// link, re-translate, remove); the English source can only regenerate its link —
+// it has no engine to re-run and can't be removed. Regenerate only appears while
+// the public link is on (there's no token to replace otherwise), so the source
+// with its link off shows no menu at all.
+function EditionDangerMenu({ topicSlug, edition }: { topicSlug: string; edition: Edition }) {
   const t = useTranslations("Editions");
-  const start = useAction(api.translate.startTranslation);
-  const [engine, setEngine] = useState<Engine>(currentEngine);
-  const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState<null | "regenerate" | "retranslate" | "remove">(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close the dropdown on click-outside / Esc (the confirm dialogs handle their
+  // own dismissal via the native <dialog>).
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const canRegenerate = edition.publicToken != null;
+  // Source: only ever the (conditional) regenerate. Translation: all three.
+  if (edition.source && !canRegenerate) return null;
+
+  const pick = (which: NonNullable<typeof confirm>) => {
+    setOpen(false);
+    setConfirm(which);
+  };
+
   return (
-    <div className="flex flex-col items-start gap-3 border-t border-line pt-4">
-      <EngineToggle value={engine} onChange={setEngine} disabled={busy} />
+    <div ref={ref} className="relative self-start">
       <button
         type="button"
-        disabled={busy}
-        onClick={() => {
-          setBusy(true);
-          void start({ topicSlug, lang, engine }).finally(() => setBusy(false));
-        }}
-        className="inline-flex items-center gap-2 rounded-lg border border-line px-3.5 py-2 text-sm font-medium text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-[13px] font-medium text-soft transition-colors hover:bg-hi hover:text-accent"
       >
-        <Icon name="refresh" className="h-4 w-4" /> {busy ? t("retranslating") : t("retranslate")}
+        <Icon name="settings" className="h-4 w-4" />
+        {t("manageEdition")}
+        <Icon name="chevron" className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
+      {open && (
+        <div
+          role="menu"
+          className="pop-in absolute bottom-[calc(100%+6px)] left-0 z-50 min-w-56 rounded-xl border border-line bg-card p-1.5 shadow-xl"
+        >
+          {canRegenerate && (
+            <MenuItem icon="refresh" onClick={() => pick("regenerate")}>
+              {t("regenerateLink")}
+            </MenuItem>
+          )}
+          {!edition.source && (
+            <MenuItem icon="refresh" onClick={() => pick("retranslate")}>
+              {t("retranslate")}
+            </MenuItem>
+          )}
+          {!edition.source && (
+            <MenuItem icon="trash" onClick={() => pick("remove")}>
+              {t("removeThisEdition")}
+            </MenuItem>
+          )}
+        </div>
+      )}
+
+      {confirm === "regenerate" && (
+        <RegenerateLinkConfirm topicSlug={topicSlug} lang={edition.lang} onClose={() => setConfirm(null)} />
+      )}
+      {confirm === "retranslate" && (
+        <RetranslateConfirm topicSlug={topicSlug} edition={edition} onClose={() => setConfirm(null)} />
+      )}
+      {confirm === "remove" && (
+        <RemoveEditionConfirm
+          topicSlug={topicSlug}
+          lang={edition.lang}
+          native={edition.native}
+          onClose={() => setConfirm(null)}
+        />
+      )}
     </div>
+  );
+}
+
+// "Are you sure?" for regenerating the public link: minting a fresh token kills
+// the link everyone already has. Reuses setEditionPublic (isPublic: true swaps
+// the token in place).
+function RegenerateLinkConfirm({ topicSlug, lang, onClose }: { topicSlug: string; lang: string; onClose: () => void }) {
+  const t = useTranslations("Editions");
+  const setPublic = useMutation(api.shares.setEditionPublic);
+  const [busy, setBusy] = useState(false);
+  return (
+    <ConfirmDialog
+      title={t("confirmRegenerateTitle")}
+      body={t("confirmRegenerateBody")}
+      confirmLabel={busy ? t("regenerating") : t("regenerateLink")}
+      confirmDisabled={busy}
+      onConfirm={() => {
+        setBusy(true);
+        void setPublic({ topicSlug, lang, isPublic: true }).then(onClose, () => setBusy(false));
+      }}
+      onClose={onClose}
+    />
+  );
+}
+
+// "Are you sure?" for removing a translation edition: it and everyone's access to
+// it go for good. Reuses removeEdition.
+function RemoveEditionConfirm({
+  topicSlug,
+  lang,
+  native,
+  onClose,
+}: {
+  topicSlug: string;
+  lang: string;
+  native: string;
+  onClose: () => void;
+}) {
+  const t = useTranslations("Editions");
+  const remove = useMutation(api.translate.removeEdition);
+  const [busy, setBusy] = useState(false);
+  return (
+    <ConfirmDialog
+      title={t("confirmRemoveTitle")}
+      body={t("confirmRemoveBody", { native })}
+      confirmLabel={busy ? t("removing") : t("removeThisEdition")}
+      confirmDisabled={busy}
+      onConfirm={() => {
+        setBusy(true);
+        void remove({ topicSlug, lang }).then(onClose, () => setBusy(false));
+      }}
+      onClose={onClose}
+    />
+  );
+}
+
+// "Are you sure?" for re-translating a ready edition (translation-engine-picker):
+// carries the engine picker inside the confirm, seeded from the engine that last
+// produced this edition. Switching engines forces a full redo server-side; the
+// same engine is a cheap resume/repair. This is how a free edition is upgraded to
+// Gemini. Its own <dialog> shell (not ConfirmDialog) so the engine toggle can sit
+// above the buttons.
+function RetranslateConfirm({ topicSlug, edition, onClose }: { topicSlug: string; edition: Edition; onClose: () => void }) {
+  const t = useTranslations("Common");
+  const te = useTranslations("Editions");
+  const start = useAction(api.translate.startTranslation);
+  const [engine, setEngine] = useState<Engine>(edition.engine);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => ref.current?.showModal(), []);
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === ref.current) ref.current?.close();
+      }}
+      className="m-auto w-[92vw] max-w-md rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/50"
+    >
+      <div className="px-6 py-5">
+        <h2 className="text-base font-semibold text-accent">{te("confirmRetranslateTitle")}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-soft">{te("confirmRetranslateBody", { native: edition.native })}</p>
+        <div className="mt-4">
+          <EngineToggle value={engine} onChange={setEngine} disabled={busy} />
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={() => ref.current?.close()}
+            className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi"
+          >
+            {t("cancel")}
+          </button>
+          <button
+            onClick={() => {
+              setBusy(true);
+              void start({ topicSlug, lang: edition.lang, engine }).then(onClose, () => setBusy(false));
+            }}
+            disabled={busy}
+            className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+          >
+            {busy ? te("retranslating") : te("confirmRetranslate")}
+          </button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 

@@ -317,7 +317,17 @@
     "engineFreeHint": "Sans coût de jetons — plus lent. Utilise la routine de traduction dans le cloud.",
     "engineGeminiWarn": "Plus rapide et de meilleure qualité, mais consomme des jetons (coût réel) à chaque exécution.",
     "retranslate": "Retraduire",
-    "retranslating": "Retraduction…"
+    "retranslating": "Retraduction…",
+    "manageEdition": "Gérer l’édition",
+    "confirmRegenerateTitle": "Régénérer le lien public ?",
+    "confirmRegenerateBody": "Le lien actuel cesse immédiatement de fonctionner. Toute personne à qui vous l’avez partagé aura besoin du nouveau.",
+    "regenerating": "Régénération…",
+    "confirmRemoveTitle": "Supprimer cette édition ?",
+    "confirmRemoveBody": "{native} et l’accès de chacun à celle-ci seront supprimés définitivement. Cette action est irréversible.",
+    "removing": "Suppression…",
+    "confirmRetranslateTitle": "Retraduire cette édition ?",
+    "confirmRetranslateBody": "Cela relance la traduction de {native}. Changer de moteur la refait de zéro.",
+    "confirmRetranslate": "Retraduire"
   },
   "Certificate": {
     "eyebrow": "Certificat de réussite",

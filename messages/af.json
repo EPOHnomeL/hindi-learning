@@ -317,7 +317,17 @@
     "engineFreeHint": "Geen tokenkoste nie — stadiger. Gebruik die wolk-vertaalroetine.",
     "engineGeminiWarn": "Vinniger, hoër gehalte — maar gebruik tokens (werklike koste) met elke lopie.",
     "retranslate": "Hervertaal",
-    "retranslating": "Besig om te hervertaal…"
+    "retranslating": "Besig om te hervertaal…",
+    "manageEdition": "Bestuur uitgawe",
+    "confirmRegenerateTitle": "Herskep die openbare skakel?",
+    "confirmRegenerateBody": "Die huidige skakel hou dadelik op werk. Almal met wie jy dit gedeel het, sal die nuwe een nodig hê.",
+    "regenerating": "Besig om te herskep…",
+    "confirmRemoveTitle": "Verwyder hierdie uitgawe?",
+    "confirmRemoveBody": "{native} en almal se toegang daartoe sal permanent verwyder word. Dit kan nie ongedaan gemaak word nie.",
+    "removing": "Besig om te verwyder…",
+    "confirmRetranslateTitle": "Hervertaal hierdie uitgawe?",
+    "confirmRetranslateBody": "Dit hervertaal {native}. As jy na ’n ander enjin oorskakel, word dit van voor af gedoen.",
+    "confirmRetranslate": "Hervertaal"
   },
   "Certificate": {
     "eyebrow": "Sertifikaat van Voltooiing",

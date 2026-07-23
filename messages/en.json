@@ -317,7 +317,17 @@
     "engineFreeHint": "No token cost — slower. Runs on the cloud translate routine.",
     "engineGeminiWarn": "Faster, higher quality — but spends tokens (real cost) on every run.",
     "retranslate": "Re-translate",
-    "retranslating": "Re-translating…"
+    "retranslating": "Re-translating…",
+    "manageEdition": "Manage edition",
+    "confirmRegenerateTitle": "Regenerate the public link?",
+    "confirmRegenerateBody": "The current link stops working right away. Anyone you’ve shared it with will need the new one.",
+    "regenerating": "Regenerating…",
+    "confirmRemoveTitle": "Remove this edition?",
+    "confirmRemoveBody": "{native} and everyone’s access to it will be permanently removed. This can’t be undone.",
+    "removing": "Removing…",
+    "confirmRetranslateTitle": "Re-translate this edition?",
+    "confirmRetranslateBody": "This re-runs the translation for {native}. Switching to a different engine redoes it from scratch.",
+    "confirmRetranslate": "Re-translate"
   },
   "Certificate": {
     "eyebrow": "Certificate of Completion",
