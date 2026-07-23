@@ -21,6 +21,8 @@ Already in place (2026-07-13 … 2026-07-16):
 - PR #3 merged to main (`bb237bb`, 2026-07-16) — marketplace live on prod, selling
   auto-disabled until the PayFast env vars are complete (`payfastConfigured()`).
 - Compliance pages live: /terms, /privacy, /refunds (privacy de-stacked in `3e7e66a`).
+- **PayFast live account VERIFIED (FICA cleared) — 2026-07-18.** The account can now
+  receive live payments; the remaining steps below are ours to run.
 
 ## Checklist
 
@@ -47,10 +49,7 @@ Already in place (2026-07-13 … 2026-07-16):
       (`npx convex env set --prod PAYFAST_MODE live` if not). Anything else —
       absent, typo'd, "Live" — silently means SANDBOX by design, and a real buyer
       would be sent to the sandbox gateway. This is the go-live switch.
-- [ ] **FICA verification clears** — the payfast.io dashboard's "Account pending
-      verification" banner disappears + PayFast emails. Confirm all three documents
-      are uploaded (SA ID, proof of address <3mo, bank letter) or it never resolves.
-      Until then the account can't properly receive live payments.
+- [x] **FICA verification clears** — DONE 2026-07-18: PayFast account verified/live.
 - [ ] **Passphrase match** — the passphrase in the PayFast dashboard
       (Settings → Integration) equals prod `PAYFAST_PASSPHRASE` character for
       character. A mismatch surfaces later as "signature does not match" at checkout.
@@ -73,4 +72,5 @@ Already in place (2026-07-13 … 2026-07-16):
 ## Blocked by
 
 - ~~PR #3 merged~~ done — `bb237bb`, 2026-07-16.
-- FICA verification (blocks the smoke purchase and real selling).
+- ~~FICA verification~~ done — account verified/live 2026-07-18. Nothing blocks the
+  go-live steps now.
