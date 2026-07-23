@@ -8,6 +8,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { SellerStatus, TenantFlag } from "../../../convex/lib";
 import { TENANT_THEME_TOKENS, type Token } from "../../design/tokens";
+import { salesRange, type SalesPreset } from "./salesRange";
 
 // The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
 // dashboard is now scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
@@ -286,40 +287,21 @@ function AllowlistManager() {
 // each expands to its editions. The period is chosen with quick presets or a
 // custom date range — both feed `sales.report` as ms bounds. Sys-admin gated
 // server-side, so the query is never answered for anyone else.
-const SALES_PRESETS = [
+const SALES_PRESETS: { key: SalesPreset; label: string }[] = [
   { key: "7d", label: "Last 7 days" },
   { key: "30d", label: "Last 30 days" },
   { key: "month", label: "This month" },
   { key: "all", label: "All time" },
   { key: "custom", label: "Custom" },
-] as const;
-type SalesPreset = (typeof SALES_PRESETS)[number]["key"];
-
-// The {from?, to?} ms window for a preset. `to` is exclusive (the query treats it
-// so), hence the +1 day on a custom end date to include the whole chosen day.
-function salesRange(preset: SalesPreset, from: string, to: string): { from?: number; to?: number } {
-  const day = 86_400_000;
-  const now = Date.now();
-  if (preset === "7d") return { from: now - 7 * day };
-  if (preset === "30d") return { from: now - 30 * day };
-  if (preset === "month") {
-    const d = new Date();
-    return { from: new Date(d.getFullYear(), d.getMonth(), 1).getTime() };
-  }
-  if (preset === "custom") {
-    return {
-      from: from ? new Date(`${from}T00:00:00`).getTime() : undefined,
-      to: to ? new Date(`${to}T00:00:00`).getTime() + day : undefined,
-    };
-  }
-  return {}; // all time
-}
+];
 
 function SalesManager() {
   const [preset, setPreset] = useState<SalesPreset>("30d");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const report = useQuery(api.sales.report, salesRange(preset, from, to));
+  // `salesRange` floors `now` to the day, so these args are stable across
+  // renders — a raw `Date.now()` here would make useQuery loop forever.
+  const report = useQuery(api.sales.report, salesRange(preset, from, to, Date.now()));
   const totalGross = report?.reduce((sum, c) => sum + c.gross, 0) ?? 0;
   const totalCount = report?.reduce((sum, c) => sum + c.count, 0) ?? 0;
 
