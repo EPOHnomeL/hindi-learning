@@ -55,13 +55,19 @@ export function AdminPanel() {
 // The sys-admin dashboard: a tab switcher between the platform Allowlist and the
 // per-tenant Tenants panel. Allowlist is the default tab (its historical landing).
 function SysAdminDashboard() {
-  const [tab, setTab] = useState<"allowlist" | "tenants" | "generation">("allowlist");
+  const [tab, setTab] = useState<"allowlist" | "sales" | "payouts" | "tenants" | "generation">("allowlist");
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
       <header className="mb-8 flex items-center justify-between gap-4">
-        <div className="flex gap-1 rounded-xl border border-line bg-card p-1">
+        <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-card p-1">
           <TabButton active={tab === "allowlist"} onClick={() => setTab("allowlist")}>
             Allowlist
+          </TabButton>
+          <TabButton active={tab === "sales"} onClick={() => setTab("sales")}>
+            Sales
+          </TabButton>
+          <TabButton active={tab === "payouts"} onClick={() => setTab("payouts")}>
+            Payouts
           </TabButton>
           <TabButton active={tab === "tenants"} onClick={() => setTab("tenants")}>
             Tenants
@@ -74,7 +80,17 @@ function SysAdminDashboard() {
           ← Courses
         </Link>
       </header>
-      {tab === "allowlist" ? <AllowlistManager /> : tab === "tenants" ? <TenantsManager /> : <GenerationManager />}
+      {tab === "allowlist" ? (
+        <AllowlistManager />
+      ) : tab === "sales" ? (
+        <SalesManager />
+      ) : tab === "payouts" ? (
+        <PayoutsManager />
+      ) : tab === "tenants" ? (
+        <TenantsManager />
+      ) : (
+        <GenerationManager />
+      )}
     </div>
   );
 }
@@ -261,21 +277,175 @@ function AllowlistManager() {
       )}
 
       <SellersManager />
-      <PayoutsManager />
     </div>
+  );
+}
+
+// The Sales tab (.scratch/admin-sales): which courses and which editions sold
+// how much over a chosen period. Courses are the rows (title, sale count, gross);
+// each expands to its editions. The period is chosen with quick presets or a
+// custom date range — both feed `sales.report` as ms bounds. Sys-admin gated
+// server-side, so the query is never answered for anyone else.
+const SALES_PRESETS = [
+  { key: "7d", label: "Last 7 days" },
+  { key: "30d", label: "Last 30 days" },
+  { key: "month", label: "This month" },
+  { key: "all", label: "All time" },
+  { key: "custom", label: "Custom" },
+] as const;
+type SalesPreset = (typeof SALES_PRESETS)[number]["key"];
+
+// The {from?, to?} ms window for a preset. `to` is exclusive (the query treats it
+// so), hence the +1 day on a custom end date to include the whole chosen day.
+function salesRange(preset: SalesPreset, from: string, to: string): { from?: number; to?: number } {
+  const day = 86_400_000;
+  const now = Date.now();
+  if (preset === "7d") return { from: now - 7 * day };
+  if (preset === "30d") return { from: now - 30 * day };
+  if (preset === "month") {
+    const d = new Date();
+    return { from: new Date(d.getFullYear(), d.getMonth(), 1).getTime() };
+  }
+  if (preset === "custom") {
+    return {
+      from: from ? new Date(`${from}T00:00:00`).getTime() : undefined,
+      to: to ? new Date(`${to}T00:00:00`).getTime() + day : undefined,
+    };
+  }
+  return {}; // all time
+}
+
+function SalesManager() {
+  const [preset, setPreset] = useState<SalesPreset>("30d");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const report = useQuery(api.sales.report, salesRange(preset, from, to));
+  const totalGross = report?.reduce((sum, c) => sum + c.gross, 0) ?? 0;
+  const totalCount = report?.reduce((sum, c) => sum + c.count, 0) ?? 0;
+
+  return (
+    <div className="mx-auto max-w-2xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Sales</h1>
+        <p className="mt-0.5 text-sm text-soft">What each course and edition sold in a period</p>
+      </div>
+
+      <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-card p-1">
+        {SALES_PRESETS.map((p) => (
+          <TabButton key={p.key} active={preset === p.key} onClick={() => setPreset(p.key)}>
+            {p.label}
+          </TabButton>
+        ))}
+      </div>
+      {preset === "custom" && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-soft">
+          <label className="flex items-center gap-1.5">
+            From
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-ink focus:border-accent focus:outline-none"
+            />
+          </label>
+          <label className="flex items-center gap-1.5">
+            To
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-ink focus:border-accent focus:outline-none"
+            />
+          </label>
+        </div>
+      )}
+
+      {report === undefined ? (
+        <ul className="mt-6 flex flex-col gap-2" aria-busy>
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="h-14 animate-pulse rounded-xl border border-line bg-card" />
+          ))}
+        </ul>
+      ) : report.length === 0 ? (
+        <p className="mt-6 text-sm text-soft">No sales in this period.</p>
+      ) : (
+        <>
+          <div className="mt-6 mb-3 flex items-center justify-between text-sm">
+            <span className="text-soft">
+              {totalCount} sale{totalCount === 1 ? "" : "s"} across {report.length} course
+              {report.length === 1 ? "" : "s"}
+            </span>
+            <span className="font-semibold tabular-nums text-ink">{formatRand(totalGross)}</span>
+          </div>
+          <ul className="flex flex-col gap-2">
+            {report.map((c) => (
+              <SalesCourseRow key={c.topicId} course={c} />
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+// One course in the sales report — a click expands its per-edition breakdown.
+function SalesCourseRow({ course }: { course: FunctionReturnType<typeof api.sales.report>[number] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="rounded-xl border border-line bg-card">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span className={`shrink-0 text-soft transition-transform ${open ? "rotate-90" : ""}`} aria-hidden>
+            ▸
+          </span>
+          <span className="truncate text-sm font-medium text-ink">{course.courseTitle}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-3 text-sm tabular-nums">
+          <span className="text-soft">
+            {course.count} sale{course.count === 1 ? "" : "s"}
+          </span>
+          <span className="font-semibold text-ink">{formatRand(course.gross)}</span>
+        </span>
+      </button>
+      {open && (
+        <ul className="border-t border-line px-4 py-1.5">
+          {course.editions.map((e) => (
+            <li key={e.lang} className="flex items-center justify-between gap-3 py-1.5 text-sm">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate text-soft">{e.title}</span>
+                <span className="shrink-0 rounded bg-hi px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-soft">
+                  {e.lang}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-3 tabular-nums text-soft">
+                <span>
+                  {e.count} sale{e.count === 1 ? "" : "s"}
+                </span>
+                <span className="font-medium text-ink">{formatRand(e.gross)}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
 
 // What the operator owes each Seller (.scratch/payfast-payments, ticket 06):
 // the `owed` Ledger rows summed per Seller, with the bank details to EFT to.
 // "Mark paid" flips the listed sales to `paid` with the typed EFT reference —
-// server-enforced Admin-only, never double-counted.
+// server-enforced Admin-only, never double-counted. Its own tab (admin-sales).
 function PayoutsManager() {
   const owed = useQuery(api.ledger.owedPayouts);
   return (
-    <section className="mt-12">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">Payouts</h2>
+    <div className="mx-auto max-w-2xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Payouts</h1>
         <p className="mt-0.5 text-sm text-soft">What you owe each seller, from the sales ledger</p>
       </div>
       {owed === undefined ? (
@@ -293,7 +463,7 @@ function PayoutsManager() {
           ))}
         </ul>
       )}
-    </section>
+    </div>
   );
 }
 
