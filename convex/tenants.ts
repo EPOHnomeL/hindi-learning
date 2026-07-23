@@ -260,6 +260,7 @@ export const getTheme = query({
     v.null(),
     v.object({
       displayName: v.string(),
+      motto: v.union(v.string(), v.null()),
       theme: v.object({
         light: v.record(v.string(), v.string()),
         dark: v.optional(v.record(v.string(), v.string())),
@@ -279,11 +280,36 @@ export const getTheme = query({
     const { light, dark, logo, favicon } = tenant.theme;
     return {
       displayName: tenant.displayName,
+      motto: tenant.motto ?? null,
       theme: dark ? { light, dark } : { light },
       logoUrl: logo ? await ctx.storage.getUrl(logo) : null,
       faviconUrl: favicon ? await ctx.storage.getUrl(favicon) : null,
       flags: tenant.flags,
     };
+  },
+});
+
+// Set a tenant's motto — the subtitle shown under its logo on the sign-in and
+// dashboard pages (whitelabel ADR draft §1), in place of the default site's
+// fixed "Your learning workspace" tagline. Identity-guarded like
+// `updateTenantTheme`: a sys admin sets any tenant's, a tenant admin only their
+// own. An empty string clears it back to no motto (the header falls back to
+// nothing rather than the default-site tagline, since a tenant page is never
+// the default site).
+export const updateTenantMotto = mutation({
+  args: { tenantSlug: v.string(), motto: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { tenantSlug, motto }) => {
+    if (!(await isCallerAdmin(ctx, tenantSlug))) throw new Error("forbidden");
+    const tenant = await ctx.db
+      .query("tenants")
+      .withIndex("by_slug", (q) => q.eq("slug", tenantSlug))
+      .unique();
+    if (!tenant) throw new Error("tenant not found");
+
+    const trimmed = motto.trim();
+    await ctx.db.patch(tenant._id, { motto: trimmed || undefined });
+    return null;
   },
 });
 

@@ -75,6 +75,7 @@ export default defineSchema({
   tenants: defineTable({
     slug: v.string(),
     displayName: v.string(),
+    motto: v.optional(v.string()),
     theme: tenantThemeValidator,
     flags: tenantFlagsValidator,
   }).index("by_slug", ["slug"]),

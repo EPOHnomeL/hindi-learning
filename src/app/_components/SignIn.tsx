@@ -6,11 +6,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { useBuyMarker } from "./editionUrl";
 import { Logo } from "./Logo";
+import { useTenant } from "./TenantContext";
 
 export function SignIn() {
   const { signIn } = useAuthActions();
   const t = useTranslations("Auth");
   const tc = useTranslations("Common");
+  const tenant = useTenant();
   // Arriving via a share reader's Buy CTA (`buy=1`, auth-first checkout): the
   // common path is a NEW buyer, so the form opens on "Create account" with
   // purchase-flavoured copy; the toggle still reaches sign-in. Without the
@@ -24,10 +26,17 @@ export function SignIn() {
     <div className="grid min-h-screen place-items-center px-4">
       <div className="flex w-full max-w-sm flex-col items-center gap-6">
         <div className="flex flex-col items-center gap-2 text-center">
-          <Logo className="h-11 w-11 text-accent" />
+          {tenant?.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Convex storage URL, not a static asset.
+            <img src={tenant.logoUrl} alt={tenant.displayName} className="h-16 w-auto max-w-64 object-contain" />
+          ) : (
+            <Logo className="h-11 w-11 text-accent" />
+          )}
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-accent">My Course</h1>
-            <p className="mt-0.5 text-sm text-soft">{tc("tagline")}</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-accent">{tenant?.displayName ?? "My Course"}</h1>
+            {(tenant ? tenant.motto : tc("tagline")) && (
+              <p className="mt-0.5 text-sm text-soft">{tenant ? tenant.motto : tc("tagline")}</p>
+            )}
           </div>
         </div>
         <form

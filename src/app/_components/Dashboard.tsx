@@ -20,6 +20,7 @@ import { Markdown } from "./MarkdownView";
 import { missionPreview } from "./markdown";
 import { SettingsDialog } from "./SettingsDialog";
 import { SiteFooter } from "./SiteFooter";
+import { useTenant } from "./TenantContext";
 import { Dialog, IconButton, Menu, MenuItem } from "./ui";
 import { useResourceUpload } from "./useResourceUpload";
 
@@ -75,6 +76,7 @@ export function Dashboard() {
   const router = useRouter();
   const tc = useTranslations("Common");
   const ts = useTranslations("Settings");
+  const tenant = useTenant();
   const [prefsOpen, setPrefsOpen] = useState(false);
 
   // A learner with nothing to their name who also can't author (open sign-up
@@ -95,10 +97,23 @@ export function Dashboard() {
       <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
         <header className="mb-8 flex items-end justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Logo className="h-9 w-9 shrink-0 text-accent md:h-10 md:w-10" />
+            {tenant?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Convex storage URL, not a static asset.
+              <img
+                src={tenant.logoUrl}
+                alt={tenant.displayName}
+                className="h-9 w-auto max-w-40 shrink-0 object-contain md:h-10 md:max-w-48"
+              />
+            ) : (
+              <Logo className="h-9 w-9 shrink-0 text-accent md:h-10 md:w-10" />
+            )}
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">My Course</h1>
-              <p className="mt-0.5 text-sm text-soft">{tc("tagline")}</p>
+              <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">
+                {tenant?.displayName ?? "My Course"}
+              </h1>
+              {(tenant ? tenant.motto : tc("tagline")) && (
+                <p className="mt-0.5 text-sm text-soft">{tenant ? tenant.motto : tc("tagline")}</p>
+              )}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">

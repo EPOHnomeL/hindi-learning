@@ -913,7 +913,7 @@ function TenantDetail({ slug, onRemoved }: { slug: string; onRemoved?: () => voi
         <p className="mt-0.5 text-sm text-soft">{slug}.my-course.app</p>
       </div>
 
-      <TenantSection title="Theme" hint="Brand palette, logo, and favicon.">
+      <TenantSection title="Theme" hint="Brand palette, logo, favicon, and motto.">
         {view === undefined ? (
           <span>Loading…</span>
         ) : view === null ? (
@@ -1595,6 +1595,7 @@ function ThemeEditor({ slug, view }: { slug: string; view: TenantThemeView }) {
       </div>
 
       <AssetUploads slug={slug} logoUrl={view.logoUrl} faviconUrl={view.faviconUrl} />
+      <MottoEditor slug={slug} motto={view.motto} />
     </div>
   );
 }
@@ -1671,6 +1672,61 @@ function TokenField({
           ×
         </button>
       )}
+    </div>
+  );
+}
+
+// The motto shown under the tenant's logo on sign-in and the dashboard, in
+// place of the default site's fixed "Your learning workspace" tagline. A
+// single text input + save, mirroring the theme editor's own save button
+// rather than autosaving on change.
+function MottoEditor({ slug, motto }: { slug: string; motto: string | null }) {
+  const save = useMutation(api.tenants.updateTenantMotto);
+  const [value, setValue] = useState(motto ?? "");
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSave() {
+    setError(null);
+    setSaved(false);
+    setBusy(true);
+    try {
+      await save({ tenantSlug: slug, motto: value });
+      setSaved(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save the motto.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-accent2">Motto</p>
+      <p className="mt-0.5 text-xs text-soft">The subtitle under the logo on sign-in and the dashboard.</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setSaved(false);
+          }}
+          placeholder="Your learning workspace"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={busy}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+        >
+          {busy ? "Saving…" : "Save motto"}
+        </button>
+        {saved && <span className="text-xs text-accent2">Saved.</span>}
+        {error && <span className="text-xs text-danger">{error}</span>}
+      </div>
     </div>
   );
 }
