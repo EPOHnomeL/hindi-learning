@@ -1,6 +1,8 @@
 # course-publishing/12: Tenant-domain link generation
 
-**Status:** ready-for-agent
+**Status:** done (2026-07-23) — `appUrl(path, tenantSlug?)` derives `<slug>.<base>`,
+routed through checkout return/cancel + invite deep-links; `APP_BASE_URL` retired
+onto `SITE_URL`. Guard preserved per-tenant; full convex suite + `tsc` green.
 **Depends on:** —
 **Labels:** ready-for-agent
 **Loop:** `/tdd` (test-first) + `/ponytail`

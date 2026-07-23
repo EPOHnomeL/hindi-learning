@@ -7,6 +7,9 @@ import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
 
+// scheduleInvite now builds links via appUrl, which requires SITE_URL (issue 12).
+process.env.SITE_URL = "https://app.example.com";
+
 // `userId|session` is the subject shape Convex Auth's getAuthUserId parses back.
 function asUser(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
   return t.withIdentity({ subject: `${userId}|session` });

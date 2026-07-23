@@ -96,7 +96,7 @@ async function scheduledInvites(t: ReturnType<typeof convexTest>) {
 }
 
 test("shareTopic to an existing user schedules a 'granted' email with the deep link", async () => {
-  process.env.APP_BASE_URL = "https://app.example.com";
+  process.env.SITE_URL = "https://app.example.com";
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
   await seedUser(t, "viewer@example.com");
@@ -118,7 +118,7 @@ test("shareTopic to an existing user schedules a 'granted' email with the deep l
 });
 
 test("shareTopic to a no-account email schedules an 'invited' email with the sign-up link", async () => {
-  process.env.APP_BASE_URL = "https://app.example.com";
+  process.env.SITE_URL = "https://app.example.com";
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
   await seedTopic(t, owner, "hindi", "Hindi");
@@ -135,7 +135,7 @@ test("shareTopic to a no-account email schedules an 'invited' email with the sig
 });
 
 test("a non-English Edition invite carries ?lang= and the language name", async () => {
-  process.env.APP_BASE_URL = "https://app.example.com";
+  process.env.SITE_URL = "https://app.example.com";
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
   await seedUser(t, "viewer@example.com");
@@ -153,8 +153,22 @@ test("a non-English Edition invite carries ?lang= and the language name", async 
   });
 });
 
+test("a tenant course's invite deep-links to its subdomain (issue 12)", async () => {
+  process.env.SITE_URL = "https://app.example.com";
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  await seedUser(t, "viewer@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi");
+  await t.run((ctx) => ctx.db.patch(topicId, { tenantSlug: "ywampotch" }));
+
+  await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "viewer@example.com" });
+
+  const invites = await scheduledInvites(t);
+  expect(invites[0]).toMatchObject({ link: "https://ywampotch.app.example.com/courses/hindi" });
+});
+
 test("promoting an accepted Share schedules a 'role-changed' email with the new role", async () => {
-  process.env.APP_BASE_URL = "https://app.example.com";
+  process.env.SITE_URL = "https://app.example.com";
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
   const viewer = await seedUser(t, "viewer@example.com");
@@ -180,7 +194,7 @@ test("promoting an accepted Share schedules a 'role-changed' email with the new 
 });
 
 test("a role change on a PENDING invite schedules no email", async () => {
-  process.env.APP_BASE_URL = "https://app.example.com";
+  process.env.SITE_URL = "https://app.example.com";
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
   const topicId = await seedTopic(t, owner, "hindi", "Hindi");
@@ -197,7 +211,7 @@ test("a role change on a PENDING invite schedules no email", async () => {
 });
 
 test("revokeShare schedules no email", async () => {
-  process.env.APP_BASE_URL = "https://app.example.com";
+  process.env.SITE_URL = "https://app.example.com";
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
   const viewer = await seedUser(t, "viewer@example.com");
@@ -315,7 +329,7 @@ test("sendInvite renders house branding when no brand is supplied", async () => 
 });
 
 test("shareTopic on a tenant-scoped course schedules an invite carrying the tenant brand", async () => {
-  process.env.APP_BASE_URL = "https://app.example.com";
+  process.env.SITE_URL = "https://app.example.com";
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
   await seedUser(t, "viewer@example.com");
@@ -341,7 +355,7 @@ test("shareTopic on a tenant-scoped course schedules an invite carrying the tena
 });
 
 test("shareTopic on a default-site course schedules an invite with no brand", async () => {
-  process.env.APP_BASE_URL = "https://app.example.com";
+  process.env.SITE_URL = "https://app.example.com";
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
   await seedUser(t, "viewer@example.com");

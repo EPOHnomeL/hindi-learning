@@ -57,7 +57,11 @@ Dates are absolute. `[[links]]` in older notes have been resolved to sections he
 
 - **`my-course.app`** is the project's domain, registered via **Cloudflare**
   (2026-07-13). It (and `www`) are attached to the Vercel `hindi-learning`
-  project and serve the app directly; `APP_BASE_URL` can be the apex.
+  project and serve the app directly; `SITE_URL` can be the apex. `SITE_URL` is
+  the single web-app origin for both PayFast return URLs and invite-email links —
+  a tenant course's server-built links ride its own subdomain, derived as
+  `<slug>.<base>` (base = `SITE_URL` host minus a leading `www`; `appUrl` in
+  `convex/payfast.ts`). The old `APP_BASE_URL` var was retired onto `SITE_URL`.
 - **Resend** sends invite email from an address on this domain
   (`INVITE_FROM_EMAIL`, e.g. `"Y-Knot Courses <invites@my-course.app>"`); the
   SPF/DKIM records live in Cloudflare.

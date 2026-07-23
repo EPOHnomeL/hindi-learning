@@ -9,6 +9,8 @@ import type { Id } from "./_generated/dataModel";
 // The translate Routine's publish seams are PUBLISH_SECRET-guarded (assertAdmin).
 beforeAll(() => {
   process.env.PUBLISH_SECRET = "test-secret";
+  // shareTopic → scheduleInvite → appUrl now requires SITE_URL (issue 12).
+  process.env.SITE_URL = "https://app.example.com";
 });
 
 // Course translation (Editions). An Edition = (Topic, language) is the unit of
