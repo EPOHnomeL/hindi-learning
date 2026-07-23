@@ -5,15 +5,15 @@ import { isCallerAdmin } from "./whitelist";
 import { translatedTitle } from "./lib";
 
 // The admin sales report (.scratch/admin-sales, issue 01): which courses and
-// which editions sold how much over a chosen period. Reads the whole sales
-// ledger (both `owed` and already-`paid` rows — this is history, not what's
-// still owed), keeps only rows whose sale timestamp falls in the window, and
-// rolls the survivors up by course then by edition. Amounts are `gross` in
-// cents, ZAR. Admin-only.
+// which editions sold how much over a chosen period. Reads the sales ledger
+// (both `owed` and already-`paid` rows — this is history, not what's still
+// owed) over the requested time window and rolls the rows up by course then by
+// edition. Amounts are `gross` in cents, ZAR. Admin-only.
 //
-// ponytail: `ledger` has no time-range index (only `by_status`), so this does a
-// bounded full `.collect()` and filters in JS. Fine at current scale; if the
-// ledger ever grows large, add a time index and range-scan instead.
+// The window is a range on the sale timestamp (`ledger._creationTime`), served
+// by Convex's built-in `by_creation_time` index — so a bounded period reads
+// only the rows in it, not the whole table. An unbounded ("all time") report
+// still walks every row, which is inherent to that request.
 export const report = query({
   args: {
     // Inclusive lower / exclusive upper bound on the sale time (ms). Either may
@@ -40,10 +40,18 @@ export const report = query({
   handler: async (ctx, { from, to }) => {
     if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
 
-    const rows = await ctx.db.query("ledger").collect();
-    const inWindow = rows.filter(
-      (r) => (from === undefined || r._creationTime >= from) && (to === undefined || r._creationTime < to),
-    );
+    // Range-scan the built-in creation-time index for the window: `from`
+    // inclusive, `to` exclusive, either open. An unbounded call reads the whole
+    // ledger (unavoidable for an all-time report).
+    const inWindow = await ctx.db
+      .query("ledger")
+      .withIndex("by_creation_time", (q) => {
+        if (from !== undefined && to !== undefined) return q.gte("_creationTime", from).lt("_creationTime", to);
+        if (from !== undefined) return q.gte("_creationTime", from);
+        if (to !== undefined) return q.lt("_creationTime", to);
+        return q;
+      })
+      .collect();
 
     // topicId -> lang -> running { gross, count }.
     const byCourse = new Map<Id<"topics">, Map<string, { gross: number; count: number }>>();

@@ -43,9 +43,10 @@ reporting), and it's buried at the bottom of the **Allowlist** tab.
 
 - No refunds metric (revoke doesn't touch the ledger — out of scope).
 - No platform/seller-share split in the report (gross + count only).
-- **ponytail:** `ledger` has no time-range index (only `by_status`). The report
-  does a bounded full `.collect()` and filters in JS. Fine at current scale;
-  if the ledger grows large, add a time index. Tracked as deferred.
+- **Time index:** the report range-scans Convex's built-in `by_creation_time`
+  index on `ledger._creationTime`, so a bounded period reads only its rows (no
+  full-table scan, no custom index to maintain). An "all time" report still
+  walks every row, which is inherent to that request.
 
 ## Tabs after this change
 Allowlist · Sales · Payouts · Tenants · Generation (Allowlist stays default).
