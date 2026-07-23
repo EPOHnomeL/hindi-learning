@@ -9,8 +9,9 @@ import { TENANT_SLUGS } from "../../lib/tenant";
 const Fake: ComponentType = () => null;
 
 test("landingFor: an unregistered slug falls through (null → page.tsx renders <Landing/>)", () => {
-  // The v1 registry is empty, so every real tenant must fall through.
+  // ywampotch now has a bespoke page (below); every other real tenant still falls through.
   for (const slug of TENANT_SLUGS) {
+    if (slug === "ywampotch") continue;
     expect(landingFor(slug)).toBeNull();
   }
 });
@@ -27,6 +28,6 @@ test("landingFor: a registered slug resolves to its component, others stay null"
   expect(landingFor("yknot", registry)).toBeNull();
 });
 
-test("LANDING_REGISTRY ships empty (v1: every tenant re-skins the default <Landing/>)", () => {
-  expect(Object.keys(LANDING_REGISTRY)).toHaveLength(0);
+test("LANDING_REGISTRY carries only the bespoke tenants that have shipped a page", () => {
+  expect(Object.keys(LANDING_REGISTRY)).toEqual(["ywampotch"]);
 });
