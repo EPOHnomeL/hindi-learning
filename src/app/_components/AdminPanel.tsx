@@ -9,7 +9,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import type { SellerStatus, TenantFlag } from "../../../convex/lib";
 import { TENANT_THEME_TOKENS, type Token } from "../../design/tokens";
 import { salesRange, type SalesPreset } from "./salesRange";
-import { colorVar, rankLanguages, worthCharting } from "./salesChart";
+import { colorVar, rankLanguages } from "./salesChart";
 
 // The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
 // dashboard is now scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
@@ -360,7 +360,7 @@ function SalesManager() {
             </span>
             <span className="font-semibold tabular-nums text-ink">{formatRand(totalGross)}</span>
           </div>
-          {worthCharting(report) && <SalesChart report={report} />}
+          <SalesChart report={report} />
           <ul className="flex flex-col gap-2">
             {report.map((c) => (
               <SalesCourseRow key={c.topicId} course={c} />

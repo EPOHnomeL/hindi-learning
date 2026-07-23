@@ -27,10 +27,3 @@ export function colorVar(lang: string, ranked: readonly string[]): string {
   const i = ranked.indexOf(lang);
   return i >= 0 && i < VIZ_SLOTS ? `var(--viz-${i + 1})` : "var(--viz-other)";
 }
-
-// Only chart when there's something to compare — two+ courses, or a course with
-// a real edition split. A lone course with one edition is a single bar of one
-// colour: noise, not a chart.
-export function worthCharting(report: readonly ChartCourse[]): boolean {
-  return report.length >= 2 || report.some((c) => c.editions.length >= 2);
-}
