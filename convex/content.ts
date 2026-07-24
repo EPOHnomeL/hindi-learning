@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { action, internalMutation, internalQuery, mutation, query, type ActionCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, assertTenantFlag, buildPaywall, getEditableTopic, getOwnedTopic, heldLangs, lessonLocked, loadEdition, resolveReaderEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import { assertAdmin, assertTenantFlag, buildPaywall, getEditableTopic, getOwnedTopic, heldLangs, lessonLocked, loadEdition, resolveEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import { itemHash, quizStructureMatches } from "./translate";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
@@ -632,7 +632,7 @@ export const courseHeader = query({
     if (!userId) return null;
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     // `level` is now narrowed to the five access roles (the returns validator's
     // union) — the "none" case is not-found above, so `role` is just `level`.
     if (level === "none") return null;
@@ -672,7 +672,7 @@ export const listLessons = query({
     // The table of contents is served in full even to a `preview` caller (only
     // the Lesson *bodies* past the Preview are locked, in getLesson); `none` is
     // not-found (a free Edition the caller holds no grant to).
-    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return [];
     const lessons = (
       await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
@@ -689,7 +689,7 @@ export const getLesson = query({
     if (!userId) return null;
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return null;
     const lesson = await ctx.db
       .query("lessons")
@@ -719,7 +719,7 @@ export const listReferences = query({
     // References are past the Preview, but their titles ride along in the table
     // of contents even for a `preview` caller (the bodies are locked in
     // getReference). `none` is not-found.
-    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return [];
     const refs = await ctx.db
       .query("references")
@@ -739,7 +739,7 @@ export const getReference = query({
     if (!userId) return null;
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return null;
     const ref = await ctx.db
       .query("references")

@@ -15,7 +15,10 @@ import { langInfo } from "./languages";
 // Guest is fixed to that Edition — content is served in its language, falling
 // back to the English source per item.
 
-async function resolveEdition(ctx: QueryCtx, token: string): Promise<{ topic: Doc<"topics">; lang: string } | null> {
+// The Guest's token → Edition lookup: a Public link fixes exactly one Edition
+// (there is no selection ladder Guest-side — cf. the authed `resolveEdition` seam
+// in lib.ts, which is a different, request-vs-held resolver).
+async function guestEditionFromToken(ctx: QueryCtx, token: string): Promise<{ topic: Doc<"topics">; lang: string } | null> {
   if (!token) return null;
   const link = await ctx.db
     .query("publicLinks")
@@ -42,7 +45,7 @@ async function resolveGuestEdition(
   ctx: QueryCtx,
   token: string,
 ): Promise<{ topic: Doc<"topics">; lang: string; level: EditionAccess } | null> {
-  const resolved = await resolveEdition(ctx, token);
+  const resolved = await guestEditionFromToken(ctx, token);
   if (!resolved) return null;
   const level = await editionAccessLevel(ctx, resolved.topic, resolved.lang, null, true);
   return { ...resolved, level };

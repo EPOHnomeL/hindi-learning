@@ -513,7 +513,7 @@ export async function editionAccessLevel(
 ): Promise<EditionAccess> {
   if (userId && topic.ownerId === userId) return "owner";
   if (userId) {
-    // One grant walk (reused when threaded by resolveReaderEdition — the map must
+    // One grant walk (reused when threaded by resolveEdition — the map must
     // be `grantsFor` for THIS topic+userId — else run once) yields the provenance
     // directly, precedence viewer > entitled > enrolled. A
     // self-enroll grant (ADR 0023) reads ≡ a Viewer; because the walk is consulted
@@ -584,8 +584,14 @@ export async function translatedTitle(
   return t?.text ?? sourceTitle;
 }
 
-// The authed reader's per-request resolution: which Edition to serve AND the
-// caller's access level to it — the single seam every authed reader query calls.
+// THE authed Edition-selection seam: which Edition to serve AND the caller's
+// access level to it, resolved once per request. Every authed reader query
+// (content.courseHeader / getMap / getLesson / getReference) calls this and
+// nothing else for selection+classification; the Guest reader is a separate thin
+// token adapter over the shared `editionAccessLevel` classifier (it has no
+// selection ladder — its token fixes the Edition), and `capture.myQuestions`
+// calls the lower-level `readableLang` primitive directly because it needs the
+// null-when-nothing-held signal this seam intentionally never returns.
 // Composes Edition selection (held-Edition switching, unchanged) with the paygate:
 //   - A non-owner's SPECIFIC request is classified as-is, so navigating to a paid
 //     Edition they don't hold shows THAT Edition's Preview (an `es` hold never
@@ -593,7 +599,7 @@ export async function translatedTitle(
 //     when the requested one is genuinely not-found (free + unheld).
 //   - The owner, and any request-less call, use the held-Edition selection
 //     (`readableLang`) unchanged, reaching the paygate only when nothing is held.
-export async function resolveReaderEdition(
+export async function resolveEdition(
   ctx: QueryCtx,
   topic: Doc<"topics">,
   userId: Id<"users">,
