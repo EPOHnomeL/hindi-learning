@@ -31,13 +31,13 @@ test("a Viewer reads the Lessons of a Topic shared with them", async () => {
   await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
 
   // Before the Share, the Viewer sees nothing.
-  expect(await asUser(t, viewer).query(api.content.listLessons, { topicSlug: "hindi" })).toEqual([]);
+  expect(await asUser(t, viewer).query(api.content.reader.listLessons, { topicSlug: "hindi" })).toEqual([]);
 
   // The owner shares the Topic to the Viewer's account email.
   await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "viewer@example.com" });
 
   // Now the Viewer reads the owner's Lessons.
-  const lessons = await asUser(t, viewer).query(api.content.listLessons, { topicSlug: "hindi" });
+  const lessons = await asUser(t, viewer).query(api.content.reader.listLessons, { topicSlug: "hindi" });
   expect(lessons.map((l) => l.key)).toEqual(["0001-a"]);
 });
 
@@ -56,9 +56,9 @@ test("a Viewer reads a single Lesson and the References of a shared Topic", asyn
   await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "viewer@example.com" });
 
   const as = asUser(t, viewer);
-  expect(await as.query(api.content.getLesson, { topicSlug: "hindi", key: "0001-a" })).toMatchObject({ key: "0001-a", contentUrl: expect.stringContaining(`/content?id=${lessonSid}`) });
-  expect(await as.query(api.content.listReferences, { topicSlug: "hindi" })).toMatchObject([{ key: "grammar", title: "Grammar" }]);
-  expect(await as.query(api.content.getReference, { topicSlug: "hindi", key: "grammar" })).toMatchObject({ key: "grammar", contentUrl: expect.stringContaining(`/content?id=${refSid}`) });
+  expect(await as.query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001-a" })).toMatchObject({ key: "0001-a", contentUrl: expect.stringContaining(`/content?id=${lessonSid}`) });
+  expect(await as.query(api.content.reader.listReferences, { topicSlug: "hindi" })).toMatchObject([{ key: "grammar", title: "Grammar" }]);
+  expect(await as.query(api.content.reader.getReference, { topicSlug: "hindi", key: "grammar" })).toMatchObject({ key: "grammar", contentUrl: expect.stringContaining(`/content?id=${refSid}`) });
 });
 
 test("a non-Viewer (no Share) still sees nothing of the Topic", async () => {
@@ -72,8 +72,8 @@ test("a non-Viewer (no Share) still sees nothing of the Topic", async () => {
   await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "viewer@example.com" });
 
   const asStranger = asUser(t, stranger);
-  expect(await asStranger.query(api.content.listLessons, { topicSlug: "hindi" })).toEqual([]);
-  expect(await asStranger.query(api.content.getLesson, { topicSlug: "hindi", key: "0001-a" })).toBeNull();
+  expect(await asStranger.query(api.content.reader.listLessons, { topicSlug: "hindi" })).toEqual([]);
+  expect(await asStranger.query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001-a" })).toBeNull();
 });
 
 test("the owner still reads their own Topic after sharing it", async () => {
@@ -84,7 +84,7 @@ test("the owner still reads their own Topic after sharing it", async () => {
   await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
   await asUser(t, owner).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "viewer@example.com" });
 
-  const lessons = await asUser(t, owner).query(api.content.listLessons, { topicSlug: "hindi" });
+  const lessons = await asUser(t, owner).query(api.content.reader.listLessons, { topicSlug: "hindi" });
   expect(lessons.map((l) => l.key)).toEqual(["0001-a"]);
 });
 

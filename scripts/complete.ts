@@ -81,5 +81,5 @@ if (imagePath || glyph) {
   if (glyph) emblem.glyph = glyph;
 }
 
-await client.mutation(api.content.completeCourse, { secret, topicSlug, ...(emblem ? { emblem } : {}) });
+await client.mutation(api.content.publish.completeCourse, { secret, topicSlug, ...(emblem ? { emblem } : {}) });
 console.log(`marked "${topicSlug}" completed${emblem ? " with emblem" : ""}.`);

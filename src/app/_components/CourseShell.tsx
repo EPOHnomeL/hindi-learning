@@ -73,7 +73,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const t = useTranslations("Reader");
   const tc = useTranslations("Common");
   const lang = useEditionLang();
-  const header = useQuery(api.content.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
+  const header = useQuery(api.content.reader.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
   const canWrite = header?.role === "owner";
   const canEdit = header?.canEdit ?? false;
   const courseCompleted = header?.status === "completed";
@@ -83,8 +83,8 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const [menuOpen, setMenuOpen] = useState(false);
   const navHidden = useHideOnScroll();
 
-  const lessons = useQuery(api.content.listLessons, { topicSlug: slug, lang: lang ?? undefined });
-  const references = useQuery(api.content.listReferences, { topicSlug: slug, lang: lang ?? undefined });
+  const lessons = useQuery(api.content.reader.listLessons, { topicSlug: slug, lang: lang ?? undefined });
+  const references = useQuery(api.content.reader.listReferences, { topicSlug: slug, lang: lang ?? undefined });
   const progress = useQuery(api.capture.myProgress, { topicSlug: slug });
   const questions = useQuery(api.capture.myQuestions, { topicSlug: slug, lang: lang ?? undefined });
 

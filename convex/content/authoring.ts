@@ -1,132 +1,15 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { action, internalMutation, internalQuery, mutation, query, type ActionCtx, type QueryCtx } from "./_generated/server";
-import { internal } from "./_generated/api";
-import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, assertTenantFlag, buildPaywall, getEditableTopic, getOwnedTopic, heldLangs, lessonsToc, loadEdition, readLesson, readReference, referencesToc, resolveEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
-import { langInfo } from "./languages";
-import { itemHash, quizStructureMatches } from "./translate";
-import { assertEmblemImage, normaliseGlyph } from "./emblem";
-import { isCallerAdmin, isEmailAdmitted } from "./whitelist";
+import { action, internalMutation, internalQuery, mutation, type ActionCtx } from "../_generated/server";
+import { internal } from "../_generated/api";
+import type { Id } from "../_generated/dataModel";
+import { assertTenantFlag, getEditableTopic, getOwnedTopic, SOURCE_LANG, topicBySlug } from "../lib";
+import { itemHash, quizStructureMatches } from "../translate";
+import { isCallerAdmin, isEmailAdmitted } from "../whitelist";
 
 // A learner may seed at most one new course per this window — an anti-abuse / cost
 // cap that mirrors the routine's per-user on-demand cap. Rolling 24h window.
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-// Lessons & references. Reader queries are auth-gated and owner-scoped: a Topic
-// is resolved by (owner = signed-in user, slug), so one learner never sees
-// another's content. Publish mutations are called by the teach CLI
-// (`pnpm run publish`) and guarded by PUBLISH_SECRET; they resolve the owner
-// from `ownerEmail` (the operator has no auth identity) and thread the resulting
-// topicId through.
-
-// `decodeEntities` now lives in lib.ts (so lib.loadEdition can decode without a
-// cycle); re-exported here for callers that import it from content.
-export { decodeEntities } from "./lib";
-
-// ---- Editions (course translation) ----------------------------------------
-
-// The Editions the caller may switch between on a Topic (owner: source + every
-// ready translation; Viewer: their granted languages), with display metadata.
-async function switcherEditions(ctx: QueryCtx, topic: Doc<"topics">, userId: Id<"users">) {
-  const held = await heldLangs(ctx, topic, userId);
-  return [...held].sort().map((l) => {
-    const i = langInfo(l);
-    return {
-      lang: l,
-      name: l === SOURCE_LANG ? "English" : i.name,
-      native: l === SOURCE_LANG ? "English" : i.native,
-      rtl: l === SOURCE_LANG ? false : !!i.rtl,
-    };
-  });
-}
-
-// The canonical tenant of a course, by its route slug — the one datum the
-// cross-host canonical redirect needs (issue 18 / ADR 0022 §3). Public and
-// unauthenticated by design: it exposes only which host a course belongs on (its
-// tenant label), never any content, and it runs before the reader's own auth-gated
-// queries. An unknown slug → `null`, i.e. treated as the default site, so a stale
-// or bogus link can never force a redirect toward a course that isn't there.
-export const topicTenant = query({
-  args: { slug: v.string() },
-  returns: v.union(v.string(), v.null()),
-  handler: async (ctx, { slug }): Promise<string | null> => {
-    const topic = await topicBySlug(ctx, slug);
-    return topic?.tenantSlug ?? null;
-  },
-});
-
-// ---- Reader (learner) ------------------------------------------------------
-
-// The signed-in user's Topics, ordered by `seq` (unsequenced last), then age.
-export const listTopics = query({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const topics = await ctx.db
-      .query("topics")
-      .withIndex("by_owner", (q) => q.eq("ownerId", userId))
-      .collect();
-    return topics
-      .sort((a, b) => (a.seq ?? Infinity) - (b.seq ?? Infinity) || a._creationTime - b._creationTime)
-      .map((t) => ({ slug: t.slug, title: t.title, seq: t.seq, status: t.status ?? "active", mission: t.mission ?? null }));
-  },
-});
-
-// The home dashboard: the signed-in user's Topics as cards, each with its live
-// lesson count + how many they've completed (for a progress indicator).
-export const dashboard = query({
-  args: {},
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const topics = await ctx.db
-      .query("topics")
-      .withIndex("by_owner", (q) => q.eq("ownerId", userId))
-      .collect();
-    const cards = await Promise.all(
-      topics.map(async (t) => {
-        const counts = await topicLessonCounts(ctx, t._id, userId);
-        // The soft `~N lessons` estimate (PRD: Estimated lesson count). Owner-only
-        // by construction — this query only returns the caller's OWN topics, so it
-        // never reaches a Viewer's shared card (listSharedTopics). Shown only while
-        // the course is being built (hidden while `seeded` / `completed`) and
-        // clamped up to the published count so it never reads below the real total.
-        const estimatedLessons =
-          t.estimatedLessons !== undefined && t.status !== "seeded" && t.status !== "completed"
-            ? Math.max(t.estimatedLessons, counts.lessonCount)
-            : null;
-        // Ready translation Editions, for the card's language chips (grouping the
-        // course's languages together in one place, per the design).
-        const jobs = await ctx.db
-          .query("translationJobs")
-          .withIndex("by_topic", (q) => q.eq("topicId", t._id))
-          .collect();
-        const editions = jobs
-          .filter((j) => j.status === "ready")
-          .map((j) => j.lang)
-          .sort();
-        return {
-          slug: t.slug,
-          title: t.title,
-          status: t.status ?? "active",
-          mission: t.mission ?? null,
-          // The owner's own Public link token (null when private) — drives the
-          // "Public" badge and the SharePanel's link controls. Owner-only query,
-          // so this is never exposed to anyone but the owner.
-          publicToken: t.publicToken ?? null,
-          estimatedLessons,
-          editions,
-          seq: t.seq,
-          creationTime: t._creationTime,
-          ...counts,
-        };
-      }),
-    );
-    return cards.sort((a, b) => (a.seq ?? Infinity) - (b.seq ?? Infinity) || a.creationTime - b.creationTime);
-  },
-});
 
 // Start a Topic from the dashboard: title + free-text "why" (the Seed). The
 // Routine turns the Seed into a Mission + first Lesson on its next run; no LLM
@@ -300,7 +183,7 @@ export const editLesson = action({
   args: { topicSlug: v.string(), key: v.string(), storageId: v.id("_storage") },
   returns: v.null(),
   handler: async (ctx, { topicSlug, key, storageId }): Promise<null> => {
-    const target = await ctx.runQuery(internal.content.lessonEditTarget, { topicSlug, key });
+    const target = await ctx.runQuery(internal.content.authoring.lessonEditTarget, { topicSlug, key });
     // Read the edited body up front. The swap must NEVER proceed on an unreadable
     // upload (a bogus/consumed storageId): that would patch the lesson to a dead
     // blob and then delete the good previous body — silent, unrecoverable loss.
@@ -324,7 +207,7 @@ export const editLesson = action({
     // Guard passed. If the swap itself fails (e.g. the lesson was superseded in the
     // window since lessonEditTarget resolved), delete the upload so it doesn't orphan.
     try {
-      await ctx.runMutation(internal.content.applyLessonEdit, { topicSlug, key, storageId });
+      await ctx.runMutation(internal.content.authoring.applyLessonEdit, { topicSlug, key, storageId });
     } catch (e) {
       await ctx.storage.delete(storageId);
       throw e;
@@ -516,7 +399,7 @@ export const editTranslatedLesson = action({
   args: { topicSlug: v.string(), key: v.string(), lang: v.string(), storageId: v.id("_storage") },
   returns: v.null(),
   handler: async (ctx, { topicSlug, key, lang, storageId }): Promise<null> => {
-    const target = await ctx.runQuery(internal.content.translatedLessonEditTarget, { topicSlug, key, lang });
+    const target = await ctx.runQuery(internal.content.authoring.translatedLessonEditTarget, { topicSlug, key, lang });
     const newHtml = await blobText(ctx, storageId);
     if (newHtml === null) throw new Error("The edited lesson couldn't be read back. Please try saving again.");
     if (target.sourceStorageId) {
@@ -531,7 +414,7 @@ export const editTranslatedLesson = action({
       }
     }
     try {
-      await ctx.runMutation(internal.content.applyTranslatedLessonEdit, { topicSlug, key, lang, storageId });
+      await ctx.runMutation(internal.content.authoring.applyTranslatedLessonEdit, { topicSlug, key, lang, storageId });
     } catch (e) {
       await ctx.storage.delete(storageId);
       throw e;
@@ -570,359 +453,5 @@ export const reopenCourse = mutation({
     const topic = await getOwnedTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
     await ctx.db.patch(topic._id, { status: "active" });
-  },
-});
-
-// The reader's per-course header: the Topic's title plus the caller's access
-// level ("owner" vs read-only "viewer"). Resolves through the owner-or-Viewer
-// gate, so a Viewer gets the title (their owner-only `listTopics` never carries
-// the shared Topic) and the UI learns whether to show write controls. `null`
-// when signed-out or with no access — the route then renders not-found.
-export const courseHeader = query({
-  args: { topicSlug: v.string(), lang: v.optional(v.string()) },
-  returns: v.union(
-    v.null(),
-    v.object({
-      title: v.string(),
-      // The caller's access level to the served Edition (paid marketplace). An
-      // `entitled` buyer and an `enrolled` self-joiner (ADR 0023) both read
-      // exactly like a `viewer`; a `preview` caller sees only the free first
-      // Lesson of a paid Edition (the rest is locked).
-      role: v.union(
-        v.literal("owner"),
-        v.literal("viewer"),
-        v.literal("entitled"),
-        v.literal("enrolled"),
-        v.literal("preview"),
-      ),
-      // Whether the caller may make the in-place prose edits on the SERVED
-      // Edition (ADR 0020): the owner, or an Editor of this `lang`. The reader
-      // gates its hover-pencil on this, NOT on `role` — a Viewer of one Edition
-      // may be an Editor of another, so edit rights are per-Edition, not per-role.
-      canEdit: v.boolean(),
-      // The reader reads `status` to switch affordances: `completed` (ADR 0015)
-      // hides "Generate next lesson" and shows the owner's Reopen control.
-      status: v.union(v.literal("seeded"), v.literal("active"), v.literal("completed")),
-      // The Edition actually being served (honours `lang` only if the caller
-      // holds it), its text direction, and the Editions they can switch to.
-      lang: v.string(),
-      dir: v.union(v.literal("ltr"), v.literal("rtl")),
-      editions: v.array(
-        v.object({ lang: v.string(), name: v.string(), native: v.string(), rtl: v.boolean() }),
-      ),
-      // The served Edition's mission (translated, English fallback) — pre-fills
-      // the edition title/mission edit dialog. Null when the course has none.
-      mission: v.union(v.string(), v.null()),
-      // Present only for a `preview` caller: the paid Edition's price and which
-      // Lesson is the free Preview, so the reader can render the paygate.
-      paywall: v.optional(
-        v.object({ amount: v.number(), currency: v.string(), previewKey: v.union(v.string(), v.null()) }),
-      ),
-      // The course's public `/share/<token>` link when it's publicly shared, else
-      // null (reference-cards/03). Drives the per-card share affordance in the reader
-      // — only offered when there's a public page a stranger can open. The token is
-      // the course identifier (not secret; it's what the Guest reader is keyed on),
-      // and `tenantSlug` mints the link on the course's canonical host. Mirrors the
-      // certificate's `course` field (certificates.ts).
-      publicLink: v.union(v.null(), v.object({ shareToken: v.string(), tenantSlug: v.union(v.null(), v.string()) })),
-    }),
-  ),
-  handler: async (ctx, { topicSlug, lang }) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    const topic = await topicBySlug(ctx, topicSlug);
-    if (!topic) return null;
-    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
-    // `level` is now narrowed to the five access roles (the returns validator's
-    // union) — the "none" case is not-found above, so `role` is just `level`.
-    if (level === "none") return null;
-    const role = level;
-    // Per-Edition edit capability (ADR 0020), same logic as the edit mutations'
-    // guard: owner, or an Editor of the served lang.
-    const canEdit = (await getEditableTopic(ctx, userId, topicSlug, effLang)) !== null;
-    const ed = loadEdition(ctx, topic, effLang);
-    const editions = await switcherEditions(ctx, topic, userId);
-    const paywall = level === "preview" ? await buildPaywall(ctx, topic._id, effLang) : undefined;
-    return {
-      title: await ed.title(),
-      mission: await ed.mission(),
-      role,
-      canEdit,
-      status: topic.status ?? "active",
-      lang: effLang,
-      dir: langInfo(effLang).rtl ? ("rtl" as const) : ("ltr" as const),
-      editions,
-      paywall,
-      // Public link when the course is publicly shared (the legacy per-Topic English
-      // Public link, ADR 0013) — same source the certificate share uses.
-      publicLink: topic.publicToken
-        ? { shareToken: topic.publicToken, tenantSlug: topic.tenantSlug ?? null }
-        : null,
-    };
-  },
-});
-
-export const listLessons = query({
-  args: { topicSlug: v.string(), lang: v.optional(v.string()) },
-  handler: async (ctx, { topicSlug, lang }) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const topic = await topicBySlug(ctx, topicSlug);
-    if (!topic) return [];
-    // The table of contents is served in full even to a `preview` caller (only
-    // the Lesson *bodies* past the Preview are locked, in getLesson); `none` is
-    // not-found (a free Edition the caller holds no grant to).
-    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
-    if (level === "none") return [];
-    return await lessonsToc(ctx, topic, await loadEdition(ctx, topic, effLang).map());
-  },
-});
-
-export const getLesson = query({
-  args: { topicSlug: v.string(), key: v.string(), lang: v.optional(v.string()) },
-  handler: async (ctx, { topicSlug, key, lang }) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    const topic = await topicBySlug(ctx, topicSlug);
-    if (!topic) return null;
-    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
-    if (level === "none") return null;
-    // The artifact fetch + paygate projection lives in the shared reader core
-    // (edition-deepening/04); this adapter only resolves the authed principal.
-    return await readLesson(ctx, topic, effLang, level, key);
-  },
-});
-
-export const listReferences = query({
-  args: { topicSlug: v.string(), lang: v.optional(v.string()) },
-  handler: async (ctx, { topicSlug, lang }) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return [];
-    const topic = await topicBySlug(ctx, topicSlug);
-    if (!topic) return [];
-    // References are past the Preview, but their titles ride along in the table
-    // of contents even for a `preview` caller (the bodies are locked in
-    // getReference). `none` is not-found.
-    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
-    if (level === "none") return [];
-    return await referencesToc(ctx, topic, await loadEdition(ctx, topic, effLang).map());
-  },
-});
-
-export const getReference = query({
-  args: { topicSlug: v.string(), key: v.string(), lang: v.optional(v.string()) },
-  handler: async (ctx, { topicSlug, key, lang }) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    const topic = await topicBySlug(ctx, topicSlug);
-    if (!topic) return null;
-    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
-    if (level === "none") return null;
-    return await readReference(ctx, topic, effLang, level, key);
-  },
-});
-
-// ---- Publish (teach CLI, PUBLISH_SECRET-guarded) ---------------------------
-
-// Mint an upload URL for a content blob (a Lesson / Reference body). The teach
-// CLI `PUT`s the HTML straight to storage and passes the resulting storageId to
-// the publish mutations, so the HTML never rides through a Convex function (see
-// .scratch/html-blob-storage). Secret-guarded like the other teach seams.
-export const generateContentUploadUrl = mutation({
-  args: { secret: v.string() },
-  returns: v.string(),
-  handler: async (ctx, { secret }) => {
-    assertAdmin(secret);
-    return await ctx.storage.generateUploadUrl();
-  },
-});
-
-// Resolve the Topic's owner from email, then create the owned Topic or backfill
-// `ownerId` on the pre-existing unowned row (the legacy Hindi topic). Returns
-// the topicId the rest of the publish run threads through.
-// ponytail: by_slug.unique() assumes one Topic per slug globally — true until
-// issue 05 owner-scopes the routine/publish path; multi-owner same-slug needs that.
-export const ensureTopic = mutation({
-  args: { secret: v.string(), ownerEmail: v.string(), slug: v.string(), title: v.string() },
-  handler: async (ctx, { secret, ownerEmail, slug, title }): Promise<Id<"topics">> => {
-    assertAdmin(secret);
-    const owner = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", ownerEmail))
-      .unique();
-    if (!owner) throw new Error(`no registered user with email ${ownerEmail} — register first`);
-
-    const existing = await ctx.db
-      .query("topics")
-      .withIndex("by_slug", (q) => q.eq("slug", slug))
-      .unique();
-    if (existing) {
-      if (!existing.ownerId) await ctx.db.patch(existing._id, { ownerId: owner._id });
-      return existing._id;
-    }
-    return await ctx.db.insert("topics", { slug, title, ownerId: owner._id });
-  },
-});
-
-// The Routine's Mission publish (issue 07): on a Seeded Topic's first run it
-// drafts the Mission from the Seed + Resources, publishes it here, and flips
-// `seeded` → `active`. Operator path (no auth), so owner is named by email.
-export const publishMission = mutation({
-  args: { secret: v.string(), ownerEmail: v.string(), topicSlug: v.string(), mission: v.string() },
-  handler: async (ctx, { secret, ownerEmail, topicSlug, mission }) => {
-    assertAdmin(secret);
-    const owner = await ctx.db
-      .query("users")
-      .withIndex("email", (q) => q.eq("email", ownerEmail))
-      .unique();
-    if (!owner) throw new Error(`no registered user with email ${ownerEmail}`);
-    const topic = await getOwnedTopic(ctx, owner._id, topicSlug);
-    if (!topic) throw new Error("topic not found");
-    await ctx.db.patch(topic._id, { mission, status: "active" });
-  },
-});
-
-// The teach skill's termination call (ADR 0015): when the Mission's "Success
-// looks like" outcomes are substantially met (see SKILL.md "Terminating a
-// course"), the run marks the Topic `completed` so the Routine's gate stops
-// authoring. Secret-guarded like the other teach write-backs; resolves by slug
-// (the run knows its Topic's slug), the twin of the owner's `endCourse`.
-//
-// The teach skill also supplies the default Emblem here (ADR 0017): an
-// already-uploaded image reference (via `generateProcessedUploadUrl`) and/or a
-// fallback glyph, normalised + uploaded skill-side. It is applied only when the
-// owner has not set their own (`ownerSet`) — so the fixed precedence (owner
-// override → AI image → AI glyph → generic default) holds regardless of which
-// path wrote first. An owner-ended course (no model in the loop) supplies none
-// and falls back to the generic default at read.
-export const completeCourse = mutation({
-  args: {
-    secret: v.string(),
-    topicSlug: v.string(),
-    emblem: v.optional(
-      v.object({
-        storageId: v.optional(v.id("_storage")),
-        contentType: v.optional(v.string()),
-        glyph: v.optional(v.string()),
-      }),
-    ),
-  },
-  handler: async (ctx, { secret, topicSlug, emblem }) => {
-    assertAdmin(secret);
-    const topic = await topicBySlug(ctx, topicSlug);
-    if (!topic) throw new Error("topic not found");
-    await ctx.db.patch(topic._id, { status: "completed" });
-
-    // The AI default never overwrites an owner override. Validate the image the
-    // same way the owner path does (raster, size-capped) — both feed the anonymous
-    // page. The AI emblem carries no `ownerSet`, so a later owner override still
-    // wins.
-    if (emblem && !topic.emblem?.ownerSet) {
-      const next: { imageId?: Id<"_storage">; glyph?: string } = {};
-      if (emblem.storageId) {
-        await assertEmblemImage(ctx, emblem.storageId, emblem.contentType ?? "");
-        next.imageId = emblem.storageId;
-      }
-      if (emblem.glyph) next.glyph = normaliseGlyph(emblem.glyph);
-      if (next.imageId || next.glyph) await ctx.db.patch(topic._id, { emblem: next });
-    }
-  },
-});
-
-// Lessons are immutable: insert if absent, otherwise no-op. If `supersedes` is
-// given, the named prior lesson is retired (its `supersededBy` points here).
-export const publishLesson = mutation({
-  args: {
-    secret: v.string(),
-    topicId: v.id("topics"),
-    key: v.string(),
-    seq: v.number(),
-    title: v.string(),
-    // The body is uploaded to storage by the CLI first (generateContentUploadUrl)
-    // and passed as a blob id — the HTML never rides through this function.
-    storageId: v.id("_storage"),
-    supersedes: v.optional(v.string()),
-  },
-  handler: async (ctx, { secret, topicId, key, seq, title, storageId, supersedes }) => {
-    assertAdmin(secret);
-
-    const existing = await ctx.db
-      .query("lessons")
-      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
-      .unique();
-    // Lessons are immutable: the freshly-uploaded blob is redundant, so drop it
-    // (mirrors resources' dedupe-delete) rather than orphan it in storage.
-    if (existing) {
-      await ctx.storage.delete(storageId);
-      return { status: "exists" as const };
-    }
-
-    await ctx.db.insert("lessons", { topicId, key, seq, title, htmlStorageId: storageId });
-    if (supersedes) {
-      const old = await ctx.db
-        .query("lessons")
-        .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", supersedes))
-        .unique();
-      if (old) await ctx.db.patch(old._id, { supersededBy: key });
-    }
-    return { status: "inserted" as const };
-  },
-});
-
-// Learning records are append-only history: insert if absent, otherwise no-op
-// (like Lessons). The Routine writes one per authored Lesson; they ground the
-// next run's ZPD decision and are pulled back at materialise.
-export const publishLearningRecord = mutation({
-  args: {
-    secret: v.string(),
-    topicId: v.id("topics"),
-    key: v.string(),
-    seq: v.number(),
-    markdown: v.string(),
-  },
-  handler: async (ctx, { secret, topicId, key, seq, markdown }) => {
-    assertAdmin(secret);
-    const existing = await ctx.db
-      .query("learningRecords")
-      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
-      .unique();
-    if (existing) return { status: "exists" as const };
-    await ctx.db.insert("learningRecords", { topicId, key, seq, markdown });
-    return { status: "inserted" as const };
-  },
-});
-
-// References are mutable: upsert, skipping unchanged content (by hash).
-export const upsertReference = mutation({
-  args: {
-    secret: v.string(),
-    topicId: v.id("topics"),
-    key: v.string(),
-    title: v.string(),
-    storageId: v.id("_storage"),
-    contentHash: v.string(),
-  },
-  handler: async (ctx, { secret, topicId, key, title, storageId, contentHash }) => {
-    assertAdmin(secret);
-
-    const existing = await ctx.db
-      .query("references")
-      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", key))
-      .unique();
-    if (existing) {
-      // Unchanged content → the new upload is redundant; drop it.
-      if (existing.contentHash === contentHash) {
-        await ctx.storage.delete(storageId);
-        return { status: "unchanged" as const };
-      }
-      // Changed → point at the new blob and delete the superseded one (a
-      // Reference is mutable, so its old body would otherwise orphan). Clear any
-      // legacy inline `html` so the row is blob-only going forward.
-      if (existing.htmlStorageId) await ctx.storage.delete(existing.htmlStorageId);
-      await ctx.db.patch(existing._id, { title, htmlStorageId: storageId, contentHash });
-      return { status: "updated" as const };
-    }
-    await ctx.db.insert("references", { topicId, key, title, htmlStorageId: storageId, contentHash });
-    return { status: "inserted" as const };
   },
 });

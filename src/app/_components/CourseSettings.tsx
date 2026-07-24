@@ -34,7 +34,7 @@ export function CourseSettingsDialog({
   const translated = lang != null && lang !== "en";
   // Self-resolve the served Edition (owner-deduped: the reader already holds this
   // exact query). Skipped entirely on the English source.
-  const header = useQuery(api.content.courseHeader, translated ? { topicSlug, lang } : "skip");
+  const header = useQuery(api.content.reader.courseHeader, translated ? { topicSlug, lang } : "skip");
   const edition =
     translated && header
       ? {
@@ -163,9 +163,9 @@ function EditionDetailsSection({
 // query.
 function DetailsSection({ topicSlug }: { topicSlug: string }) {
   const t = useTranslations("CourseSettings");
-  const topics = useQuery(api.content.listTopics);
-  const renameTopic = useMutation(api.content.renameTopic);
-  const editMission = useMutation(api.content.editMission);
+  const topics = useQuery(api.content.reader.listTopics);
+  const renameTopic = useMutation(api.content.authoring.renameTopic);
+  const editMission = useMutation(api.content.authoring.editMission);
   const topic = topics?.find((t) => t.slug === topicSlug) ?? null;
 
   const [title, setTitle] = useState<string | null>(null);
@@ -251,8 +251,8 @@ function DetailsSection({ topicSlug }: { topicSlug: string }) {
 // deleting the last lesson moves the Frontier back so authoring can resume there.
 function LessonsSection({ topicSlug }: { topicSlug: string }) {
   const t = useTranslations("CourseSettings");
-  const lessons = useQuery(api.content.listLessons, { topicSlug });
-  const deleteLesson = useMutation(api.content.deleteLesson);
+  const lessons = useQuery(api.content.reader.listLessons, { topicSlug });
+  const deleteLesson = useMutation(api.content.authoring.deleteLesson);
   const [pending, setPending] = useState<{ key: string; title: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const pendingName = pending ? pending.title.split("—")[0]!.trim() : "";
@@ -309,8 +309,8 @@ function LessonsSection({ topicSlug }: { topicSlug: string }) {
 // (it stops the Routine); "Reopen" returns a completed course to active.
 function CompletionSection({ topicSlug, status }: { topicSlug: string; status: "seeded" | "active" | "completed" }) {
   const t = useTranslations("CourseSettings");
-  const endCourse = useMutation(api.content.endCourse);
-  const reopenCourse = useMutation(api.content.reopenCourse);
+  const endCourse = useMutation(api.content.authoring.endCourse);
+  const reopenCourse = useMutation(api.content.authoring.reopenCourse);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
 

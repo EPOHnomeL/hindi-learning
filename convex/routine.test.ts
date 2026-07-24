@@ -272,10 +272,10 @@ test("publishLearningRecord is insert-once (append-only history)", async () => {
   const topicId = await seedTopic(t, alice, "hindi");
   const secret = "test-secret";
 
-  const first = await t.mutation(api.content.publishLearningRecord, { secret, topicId, key: "0001-x", seq: 1, markdown: "v1" });
+  const first = await t.mutation(api.content.publish.publishLearningRecord, { secret, topicId, key: "0001-x", seq: 1, markdown: "v1" });
   expect(first).toEqual({ status: "inserted" });
   // A second publish of the same key is a no-op — records are immutable history.
-  const again = await t.mutation(api.content.publishLearningRecord, { secret, topicId, key: "0001-x", seq: 1, markdown: "v2" });
+  const again = await t.mutation(api.content.publish.publishLearningRecord, { secret, topicId, key: "0001-x", seq: 1, markdown: "v2" });
   expect(again).toEqual({ status: "exists" });
 
   const stored = await t.run((ctx) =>

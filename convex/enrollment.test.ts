@@ -116,16 +116,16 @@ test("an enrollee reads the course through the reader: courseHeader role `enroll
   const topicId = await seedFreeTopic(t, owner, "hindi");
 
   // Before enrolling: a free course the learner holds nothing on → not-found.
-  expect(await asUser(t, learner).query(api.content.courseHeader, { topicSlug: "hindi" })).toBeNull();
-  expect(await asUser(t, learner).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" })).toBeNull();
+  expect(await asUser(t, learner).query(api.content.reader.courseHeader, { topicSlug: "hindi" })).toBeNull();
+  expect(await asUser(t, learner).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001" })).toBeNull();
 
   await enroll(t, learner, topicId, "en");
 
   // After: reads exactly like a Viewer — role distinguishes the "Joined" badge.
-  expect(await asUser(t, learner).query(api.content.courseHeader, { topicSlug: "hindi" })).toMatchObject({
+  expect(await asUser(t, learner).query(api.content.reader.courseHeader, { topicSlug: "hindi" })).toMatchObject({
     role: "enrolled",
   });
-  expect(await asUser(t, learner).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" })).toMatchObject({
+  expect(await asUser(t, learner).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001" })).toMatchObject({
     locked: false,
     contentUrl: expect.any(String),
   });
@@ -140,7 +140,7 @@ test("regression: the owner still reads their own course as `owner` (enrollment 
   await expect(
     t.run(async (ctx) => editionAccessLevel(ctx, (await ctx.db.get(topicId))!, "en", owner)),
   ).resolves.toBe("owner");
-  expect(await asUser(t, owner).query(api.content.courseHeader, { topicSlug: "hindi" })).toMatchObject({
+  expect(await asUser(t, owner).query(api.content.reader.courseHeader, { topicSlug: "hindi" })).toMatchObject({
     role: "owner",
   });
 });

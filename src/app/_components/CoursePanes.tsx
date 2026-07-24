@@ -20,8 +20,8 @@ export function CourseIndex({ slug }: { slug: string }) {
   const lang = useEditionLang();
   const locale = useLocale();
   const search = useSearchParams();
-  const lessons = useQuery(api.content.listLessons, { topicSlug: slug, lang: lang ?? undefined });
-  const header = useQuery(api.content.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
+  const lessons = useQuery(api.content.reader.listLessons, { topicSlug: slug, lang: lang ?? undefined });
+  const header = useQuery(api.content.reader.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
   const progress = useQuery(api.capture.myProgress, { topicSlug: slug });
   const router = useRouter();
 

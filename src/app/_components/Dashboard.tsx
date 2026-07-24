@@ -62,7 +62,7 @@ type PurchasedCourse = Omit<SharedCourse, "ownerEmail">;
 // "Shared with me" section. Opening a course is a real navigation to
 // /courses/[slug] (ADR 0012), not a local view toggle.
 export function Dashboard() {
-  const courses = useQuery(api.content.dashboard);
+  const courses = useQuery(api.content.reader.dashboard);
   const amAdmin = useQuery(api.whitelist.amIAdmin);
   // Course creation is Allowlist-gated (ADR 0021): non-members get a clean
   // library with no "New course" card (UX only — seedTopic enforces server-side).
@@ -669,7 +669,7 @@ function EmptyLibrary() {
 // first Lesson on its next run. On create, open it so they can upload Resources.
 function NewCourseCard() {
   const t = useTranslations("Dashboard");
-  const seedTopic = useMutation(api.content.seedTopic);
+  const seedTopic = useMutation(api.content.authoring.seedTopic);
   const requestSetup = useAction(api.routine.requestSetup);
   const { uploadFile, addLink } = useResourceUpload();
   const router = useRouter();

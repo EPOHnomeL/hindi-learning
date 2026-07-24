@@ -79,19 +79,19 @@ test("owner reads a translated Edition; unheld languages fall back to English", 
   const a = asUser(t, alice);
   // Spanish edition (the owner holds it — a ready job exists). The translated body
   // is still inline `html` (the translation write-path isn't blob-backed yet).
-  expect(await a.query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "es" })).toMatchObject({
+  expect(await a.query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001", lang: "es" })).toMatchObject({
     title: "Lección 0001",
     html: "<p>es 0001</p>",
   });
-  expect(await a.query(api.content.listLessons, { topicSlug: "hindi", lang: "es" })).toEqual([
+  expect(await a.query(api.content.reader.listLessons, { topicSlug: "hindi", lang: "es" })).toEqual([
     { key: "0001", seq: 1, title: "Lección 0001" },
   ]);
   // English (source) is always available; its blob body is served as a content URL.
-  expect(await a.query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "en" })).toMatchObject({
+  expect(await a.query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001", lang: "en" })).toMatchObject({
     contentUrl: expect.stringContaining(`/content?id=${sid}`),
   });
   // A language with no Edition (fr) isn't held → falls back to English, never 403s.
-  expect(await a.query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "fr" })).toMatchObject({
+  expect(await a.query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001", lang: "fr" })).toMatchObject({
     contentUrl: expect.stringContaining(`/content?id=${sid}`),
   });
 });
@@ -105,7 +105,7 @@ test("a per-item missing translation falls back to the English source", async ()
   await addReadyJob(t, topicId, "es");
   await addTranslation(t, topicId, "es", "lesson", "0001", { title: "Lección 0001", html: "<p>es 0001</p>" });
   // 0002 has no Spanish row → English fallback (the source blob's content URL).
-  expect(await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0002", lang: "es" })).toMatchObject({
+  expect(await asUser(t, alice).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002", lang: "es" })).toMatchObject({
     contentUrl: expect.stringContaining(`/content?id=${sid2}`),
   });
 });
@@ -119,18 +119,18 @@ test("courseHeader exposes only the Editions the caller holds", async () => {
   await addReadyJob(t, topicId, "ur");
 
   // Owner holds English + every ready translation.
-  const ownerHdr = await asUser(t, alice).query(api.content.courseHeader, { topicSlug: "hindi" });
+  const ownerHdr = await asUser(t, alice).query(api.content.reader.courseHeader, { topicSlug: "hindi" });
   expect(ownerHdr!.editions.map((e) => e.lang).sort()).toEqual(["en", "es", "ur"]);
 
   // A Viewer shared only Urdu holds ONLY Urdu — and Urdu is RTL.
   await share(t, topicId, bob, "ur");
-  const bobHdr = await asUser(t, bob).query(api.content.courseHeader, { topicSlug: "hindi", lang: "ur" });
+  const bobHdr = await asUser(t, bob).query(api.content.reader.courseHeader, { topicSlug: "hindi", lang: "ur" });
   expect(bobHdr!.editions.map((e) => e.lang)).toEqual(["ur"]);
   expect(bobHdr!.lang).toBe("ur");
   expect(bobHdr!.dir).toBe("rtl");
   // Bob asking for Spanish (not shared to him) can't self-serve it — he gets the
   // only Edition he holds, Urdu.
-  const bobEn = await asUser(t, bob).query(api.content.courseHeader, { topicSlug: "hindi", lang: "es" });
+  const bobEn = await asUser(t, bob).query(api.content.reader.courseHeader, { topicSlug: "hindi", lang: "es" });
   expect(bobEn!.lang).toBe("ur");
 });
 
@@ -143,13 +143,13 @@ test("courseHeader carries the served edition's mission — translated, falling 
   await addTranslation(t, topicId, "es", "mission", "", { text: "Lee la Biblia hindi." });
 
   const a = asUser(t, alice);
-  expect((await a.query(api.content.courseHeader, { topicSlug: "hindi", lang: "es" }))?.mission).toBe("Lee la Biblia hindi.");
-  expect((await a.query(api.content.courseHeader, { topicSlug: "hindi" }))?.mission).toBe("Read the Hindi Bible.");
+  expect((await a.query(api.content.reader.courseHeader, { topicSlug: "hindi", lang: "es" }))?.mission).toBe("Lee la Biblia hindi.");
+  expect((await a.query(api.content.reader.courseHeader, { topicSlug: "hindi" }))?.mission).toBe("Read the Hindi Bible.");
 
   // A mission-less course carries null.
   const bare = await seedTopic(t, alice, "bare", "Bare");
   void bare;
-  expect((await a.query(api.content.courseHeader, { topicSlug: "bare" }))?.mission).toBeNull();
+  expect((await a.query(api.content.reader.courseHeader, { topicSlug: "bare" }))?.mission).toBeNull();
 });
 
 // ---- tryAcquireTranslation: the gate + lock that fires the run --------------
@@ -329,7 +329,7 @@ test("claim → publish → report round-trips one Edition, and the reader serve
   );
   expect(job).toMatchObject({ status: "ready", done: 2, failed: 0 });
   // The owner now reads the Spanish edition (they hold every ready Edition).
-  expect(await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "es" })).toMatchObject({
+  expect(await asUser(t, alice).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001", lang: "es" })).toMatchObject({
     html: "<p>es</p>",
     title: "Lección",
   });
@@ -412,7 +412,7 @@ test("shareTopic grants one Edition; a Viewer of a non-ready language is refused
   expect(
     await asUser(t, alice).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "bob@example.com", lang: "es" }),
   ).toBe("shared");
-  expect(await asUser(t, bob).query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "es" })).toMatchObject({
+  expect(await asUser(t, bob).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001", lang: "es" })).toMatchObject({
     html: "<p>es</p>",
   });
   // Bob shows up in "Shared with me" holding the Spanish Edition.

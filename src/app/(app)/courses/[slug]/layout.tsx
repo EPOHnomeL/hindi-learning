@@ -27,7 +27,7 @@ export default async function CourseLayout({
   if (url) {
     let tenant: TenantSlug | null = null;
     try {
-      tenant = (await fetchQuery(api.content.topicTenant, { slug })) as TenantSlug | null;
+      tenant = (await fetchQuery(api.content.reader.topicTenant, { slug })) as TenantSlug | null;
     } catch (err) {
       // Best-effort safety net: a transient Convex error must not block the page.
       // Degrade to no redirect and let the request render on the host it landed on.

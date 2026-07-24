@@ -404,7 +404,7 @@ function LessonView({
   const lang = useEditionLang();
   const buyMarker = useBuyMarker();
   const navHidden = useHideOnScroll();
-  const lesson = useQuery(api.content.getLesson, { topicSlug, key: lessonKey, lang: lang ?? undefined });
+  const lesson = useQuery(api.content.reader.getLesson, { topicSlug, key: lessonKey, lang: lang ?? undefined });
   // The Topic's Resources, so a Resource link in the lesson opens with sidebar
   // parity (rich-media/11). Same query the sidebar holds — deduped by Convex.
   const resources = useQuery(api.resources.listResources, { topicSlug });
@@ -412,14 +412,14 @@ function LessonView({
   // access level + the Edition's price. A `preview` caller (paid marketplace, ADR
   // 0016) holds no access: locked Lessons show the paygate, and they track no
   // Progress — so the open/complete writes below are gated off for them.
-  const header = useQuery(api.content.courseHeader, { topicSlug, lang: lang ?? undefined });
+  const header = useQuery(api.content.reader.courseHeader, { topicSlug, lang: lang ?? undefined });
   const preview = header?.role === "preview";
   const html = useContentHtml(lesson);
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
   const setProgress = useMutation(api.capture.setProgress);
-  const editLesson = useAction(api.content.editLesson);
-  const editTranslatedLesson = useAction(api.content.editTranslatedLesson);
+  const editLesson = useAction(api.content.authoring.editLesson);
+  const editTranslatedLesson = useAction(api.content.authoring.editTranslatedLesson);
   const [editing, setEditing] = useState(false);
 
   // The caller's own completion — an owner's, or a Viewer's own on a shared course.
@@ -613,7 +613,7 @@ function ContentEditor({
   const t = useTranslations("Artifact");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const generateUploadUrl = useMutation(api.content.generateEditUploadUrl);
+  const generateUploadUrl = useMutation(api.content.authoring.generateEditUploadUrl);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -792,12 +792,12 @@ function ReferenceView({
   const lang = useEditionLang();
   const buyMarker = useBuyMarker();
   const navHidden = useHideOnScroll();
-  const ref = useQuery(api.content.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
-  const header = useQuery(api.content.courseHeader, { topicSlug, lang: lang ?? undefined });
+  const ref = useQuery(api.content.reader.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
+  const header = useQuery(api.content.reader.courseHeader, { topicSlug, lang: lang ?? undefined });
   const html = useContentHtml(ref);
   // Resource links work inside a Reference body too (rich-media/11).
   const resources = useQuery(api.resources.listResources, { topicSlug });
-  const editReference = useMutation(api.content.editReference);
+  const editReference = useMutation(api.content.authoring.editReference);
   const [editing, setEditing] = useState(false);
   const cardTarget = useCardTarget(refKey);
   // Per-card share (reference-cards/03), only when the course has a public link. The

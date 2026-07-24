@@ -200,10 +200,10 @@ test("a certificate survives reopen + extend + re-complete unchanged (not re-min
   expect(cert.lessonCount).toBe(1);
 
   // Reopen, add + complete a new lesson, then re-complete the course.
-  await asUser(t, alice).mutation(api.content.reopenCourse, { topicSlug: "hindi" });
+  await asUser(t, alice).mutation(api.content.authoring.reopenCourse, { topicSlug: "hindi" });
   await addLesson(t, topicId, "0002", 2);
   await complete(t, alice, topicId, "0002");
-  await asUser(t, alice).mutation(api.content.endCourse, { topicSlug: "hindi" });
+  await asUser(t, alice).mutation(api.content.authoring.endCourse, { topicSlug: "hindi" });
 
   // Unchanged: same token + original lessonCount, still a single row.
   const after = await asUser(t, alice).query(api.certificates.myCertificate, { topicSlug: "hindi" });
@@ -276,7 +276,7 @@ test("a course rename shows on an already-issued certificate (live title, not th
 
   // The owner renames the course after the certificate was issued (the slug is
   // immutable, so it stays `prophetic-school`).
-  await asUser(t, alice).mutation(api.content.renameTopic, {
+  await asUser(t, alice).mutation(api.content.authoring.renameTopic, {
     topicSlug: "prophetic-school",
     title: "Growing in your relationship with the Holy Spirit",
   });
@@ -468,7 +468,7 @@ test("completeCourse records the AI default Emblem (image + glyph), stays secret
 
   // Wrong secret is refused — and (transactional) leaves the Topic untouched.
   await expect(
-    t.mutation(api.content.completeCourse, {
+    t.mutation(api.content.publish.completeCourse, {
       secret: "wrong",
       topicSlug: "hindi",
       emblem: { storageId: sid, contentType: "image/png", glyph: "🪷" },
@@ -476,7 +476,7 @@ test("completeCourse records the AI default Emblem (image + glyph), stays secret
   ).rejects.toThrow();
   expect((await topicRow(t, topicId)).status).toBe("active");
 
-  await t.mutation(api.content.completeCourse, {
+  await t.mutation(api.content.publish.completeCourse, {
     secret: "test-secret",
     topicSlug: "hindi",
     emblem: { storageId: sid, contentType: "image/png", glyph: "🪷" },
@@ -496,7 +496,7 @@ test("completeCourse never overwrites an owner override, regardless of write ord
   // owner's choice is preserved (owner → AI precedence, order-independent).
   await asUser(t, alice).mutation(api.emblem.setTopicEmblem, { topicSlug: "hindi", emblem: { kind: "glyph", glyph: "🦉" } });
   const sid = await storeImage(t, "image/png");
-  await t.mutation(api.content.completeCourse, {
+  await t.mutation(api.content.publish.completeCourse, {
     secret: "test-secret",
     topicSlug: "hindi",
     emblem: { storageId: sid, contentType: "image/png", glyph: "🤖" },
@@ -512,7 +512,7 @@ test("an owner-ended completion with no Emblem falls back to the generic default
   await complete(t, alice, topicId, "0001");
 
   // The owner ends the course from the app (no model, no Emblem supplied).
-  await asUser(t, alice).mutation(api.content.endCourse, { topicSlug: "hindi" });
+  await asUser(t, alice).mutation(api.content.authoring.endCourse, { topicSlug: "hindi" });
   const cert = await asUser(t, alice).mutation(api.certificates.claimCertificate, { topicSlug: "hindi", name: "Alice" });
   expect(cert.emblem).toEqual({ kind: "glyph", glyph: "🎓" });
 });

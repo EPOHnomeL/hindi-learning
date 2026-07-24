@@ -86,7 +86,7 @@ test("fulfillPurchase (account exists) unlocks the Edition + writes the Ledger; 
   const buyer = await seedUser(t, "buyer@example.com");
 
   // Before: unentitled → the paygate (locked past the free Preview).
-  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, buyer).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     locked: true,
   });
 
@@ -99,7 +99,7 @@ test("fulfillPurchase (account exists) unlocks the Edition + writes the Ledger; 
   });
 
   // After: full read.
-  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, buyer).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     contentUrl: expect.any(String),
     locked: false,
   });
@@ -163,10 +163,10 @@ test("a minted Entitlement is language-scoped — buying es doesn't unlock ur", 
     ...MONEY,
   });
 
-  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002", lang: "es" })).toMatchObject({
+  expect(await asUser(t, buyer).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002", lang: "es" })).toMatchObject({
     locked: false,
   });
-  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002", lang: "ur" })).toMatchObject({
+  expect(await asUser(t, buyer).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002", lang: "ur" })).toMatchObject({
     locked: true,
   });
 });
@@ -470,7 +470,7 @@ test("ITN: a genuine COMPLETE notification grants once + writes the Ledger; repl
   expect(capture.body).not.toContain("signature=");
 
   // Access granted at the reader seam + the Ledger row in the same transaction.
-  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, buyer).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     locked: false,
   });
   expect(await ledgerRows(t)).toMatchObject([
@@ -509,7 +509,7 @@ test("ITN: re-pricing or clearing the listing after Buy never strands a genuine 
   expect(
     (await postItn(t, itnFields(topicId, { m_payment_id: mp, email_address: "payfast-account@example.com" }))).status,
   ).toBe(200);
-  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, buyer).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     locked: false,
   });
   expect(await ledgerRows(t)).toMatchObject([{ buyerEmail: "buyer@example.com", gross: 120000, status: "owed" }]);
@@ -563,7 +563,7 @@ test("a purchase grants no selling/authoring capability", async () => {
   ))!._id;
 
   // They can read what they bought — and nothing more: no selling capability.
-  expect(await asUser(t, buyer).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, buyer).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     locked: false,
   });
   expect(await asUser(t, buyer).query(api.sellers.sellerStatus, {})).toBe("not-granted");
