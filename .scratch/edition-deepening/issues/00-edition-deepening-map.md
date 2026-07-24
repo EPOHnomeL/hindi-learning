@@ -1,6 +1,6 @@
 # edition-deepening/00: Edition surface deepening — map
 
-**Status:** **destination reached** (2026-07-22) — all four legs landed as tested code (tickets
+**Status:** **CLOSED — destination reached** (2026-07-22) — all four legs landed as tested code (tickets
 01–04, commits `be164c5`/`69f845f`/`7a2c5a3`/`a1e4357`/`c89fb03`). The Edition read surface is now
 one reader (`loadEdition`), one grant resolver (`grantsFor`), one authed selection seam
 (`resolveEdition`) + a thin Guest token adapter, and one shared per-artifact reader core
