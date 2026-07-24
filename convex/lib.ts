@@ -425,6 +425,94 @@ export function loadEdition(ctx: QueryCtx, topic: Doc<"topics">, lang: string): 
   };
 }
 
+// ---- The per-artifact reader core (edition-deepening/04) --------------------
+//
+// The artifact-fetch + paygate projection shared by BOTH readers. Each reader
+// resolves its principal its own way — the authed reader via `resolveEdition`
+// (signed-in userId + the `none`→not-found gate), the Guest reader via its
+// Public-link token — then hands the already-resolved (topic, lang, level) here.
+// Selection/classification stays upstream (one seam per reader); the artifact
+// projection lives here, once, so content.ts and public.ts are thin adapters over
+// this core rather than parallel re-implementations of the same body.
+
+type ArtifactBody = { locked: boolean; contentUrl?: string; html?: string };
+export type LessonPayload = { key: string; seq: number; title: string } & ArtifactBody;
+export type ReferencePayload = { key: string; title: string } & ArtifactBody;
+
+// One Lesson's payload for an already-resolved Edition: null when the Lesson is
+// missing or superseded; a locked marker on a paid Edition past the Preview
+// (`lessonLocked`); else the translated-else-source title + body. Shared by
+// content.getLesson and public.publicLesson.
+export async function readLesson(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  lang: string,
+  level: EditionAccess,
+  key: string,
+): Promise<LessonPayload | null> {
+  const lesson = await ctx.db
+    .query("lessons")
+    .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+    .unique();
+  if (!lesson || lesson.supersededBy) return null;
+  const { title, body } = await loadEdition(ctx, topic, lang).lesson(lesson);
+  if (await lessonLocked(ctx, topic._id, level, key)) {
+    return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
+  }
+  return { key: lesson.key, seq: lesson.seq, title, locked: false, ...body };
+}
+
+// One Reference's payload for an already-resolved Edition: null when the
+// Reference is unknown; a locked marker on a paid Edition (References sit
+// entirely past the Preview, so `preview` locks them wholesale); else the
+// translated-else-source title + body. Shared by content.getReference and
+// public.publicReference.
+export async function readReference(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  lang: string,
+  level: EditionAccess,
+  key: string,
+): Promise<ReferencePayload | null> {
+  const ref = await ctx.db
+    .query("references")
+    .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+    .unique();
+  if (!ref) return null;
+  const { title, body } = await loadEdition(ctx, topic, lang).reference(ref);
+  if (level === "preview") return { key: ref.key, title, html: "", locked: true };
+  return { key: ref.key, title, locked: false, ...body };
+}
+
+// The table-of-contents projections shared by the list queries and the Guest's
+// full-mirror bundle. The caller passes the Edition snapshot it already holds
+// (`loadEdition(...).map()`) so the collect is reused, not repeated. Lessons in
+// `by_topic_seq` order, non-superseded; References alphabetised by key — the TOC
+// still renders in full even to a `preview` caller (only the bodies are locked).
+export async function lessonsToc(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  snap: EditionSnapshot,
+): Promise<Array<{ key: string; seq: number; title: string }>> {
+  const lessons = await ctx.db
+    .query("lessons")
+    .withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id))
+    .collect();
+  return lessons.filter((l) => !l.supersededBy).map((l) => ({ key: l.key, seq: l.seq, title: snap.lessonTitle(l) }));
+}
+
+export async function referencesToc(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  snap: EditionSnapshot,
+): Promise<Array<{ key: string; title: string }>> {
+  const refs = await ctx.db
+    .query("references")
+    .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
+    .collect();
+  return refs.sort((a, b) => a.key.localeCompare(b.key)).map((r) => ({ key: r.key, title: snap.referenceTitle(r) }));
+}
+
 // ---- Paid marketplace: Sellers (ADR 0016) -----------------------------------
 
 // A Seller's readiness stage, derived from their `sellers` row (see schema):

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { buildPaywall, editionAccessLevel, lessonLocked, loadEdition, SOURCE_LANG, type EditionAccess } from "./lib";
+import { buildPaywall, editionAccessLevel, lessonsToc, loadEdition, readLesson, readReference, referencesToc, SOURCE_LANG, type EditionAccess } from "./lib";
 import { langInfo } from "./languages";
 
 // The Guest read seam (issue 07 / ADR 0013). Every function here authorizes by
@@ -115,17 +115,11 @@ export const publicCourse = query({
     const preview = level === "preview";
     const m = await loadEdition(ctx, topic, lang).map();
 
-    const lessons = (
-      await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
-    )
-      .filter((l) => !l.supersededBy)
-      .map((l) => ({ key: l.key, seq: l.seq, title: m.lessonTitle(l) }));
-
-    const references = (
-      await ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()
-    )
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .map((r) => ({ key: r.key, title: m.referenceTitle(r) }));
+    // The table of contents uses the shared TOC projections (edition-deepening/04);
+    // the resources/progress/questions full-mirror below stays Guest-only, behind
+    // the explicit output allowlist (anonymous, public-internet-facing).
+    const lessons = await lessonsToc(ctx, topic, m);
+    const references = await referencesToc(ctx, topic, m);
 
     const resources = await Promise.all(
       (await ctx.db.query("resources").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()).map(
@@ -202,19 +196,9 @@ export const publicLesson = query({
   handler: async (ctx, { token, key }) => {
     const resolved = await resolveGuestEdition(ctx, token);
     if (!resolved) return null;
-    const { topic, lang, level } = resolved;
-    const lesson = await ctx.db
-      .query("lessons")
-      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
-      .unique();
-    if (!lesson || lesson.supersededBy) return null;
-    const { title, body } = await loadEdition(ctx, topic, lang).lesson(lesson);
-    // Paygate: on a paid Edition (`preview`) only the Preview Lesson's body is
-    // served; every other Lesson is a locked marker (never a bare null 404).
-    if (await lessonLocked(ctx, topic._id, level, key)) {
-      return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
-    }
-    return { key: lesson.key, seq: lesson.seq, title, locked: false, ...body };
+    // Same shared reader core as the authed getLesson (edition-deepening/04); this
+    // adapter only resolves the Guest principal via its Public-link token.
+    return await readLesson(ctx, resolved.topic, resolved.lang, resolved.level, key);
   },
 });
 
@@ -234,15 +218,6 @@ export const publicReference = query({
   handler: async (ctx, { token, key }) => {
     const resolved = await resolveGuestEdition(ctx, token);
     if (!resolved) return null;
-    const { topic, lang, level } = resolved;
-    const ref = await ctx.db
-      .query("references")
-      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
-      .unique();
-    if (!ref) return null;
-    const { title, body } = await loadEdition(ctx, topic, lang).reference(ref);
-    // References sit entirely past the Preview — locked for a `preview` Guest.
-    if (level === "preview") return { key: ref.key, title, html: "", locked: true };
-    return { key: ref.key, title, locked: false, ...body };
+    return await readReference(ctx, resolved.topic, resolved.lang, resolved.level, key);
   },
 });

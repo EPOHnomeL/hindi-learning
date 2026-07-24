@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { action, internalMutation, internalQuery, mutation, query, type ActionCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, assertTenantFlag, buildPaywall, getEditableTopic, getOwnedTopic, heldLangs, lessonLocked, loadEdition, resolveEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import { assertAdmin, assertTenantFlag, buildPaywall, getEditableTopic, getOwnedTopic, heldLangs, lessonsToc, loadEdition, readLesson, readReference, referencesToc, resolveEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import { itemHash, quizStructureMatches } from "./translate";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
@@ -674,11 +674,7 @@ export const listLessons = query({
     // not-found (a free Edition the caller holds no grant to).
     const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return [];
-    const lessons = (
-      await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
-    ).filter((l) => !l.supersededBy);
-    const m = await loadEdition(ctx, topic, effLang).map();
-    return lessons.map((l) => ({ key: l.key, seq: l.seq, title: m.lessonTitle(l) }));
+    return await lessonsToc(ctx, topic, await loadEdition(ctx, topic, effLang).map());
   },
 });
 
@@ -691,21 +687,9 @@ export const getLesson = query({
     if (!topic) return null;
     const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return null;
-    const lesson = await ctx.db
-      .query("lessons")
-      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
-      .unique();
-    if (!lesson || lesson.supersededBy) return null;
-    const { title, body } = await loadEdition(ctx, topic, effLang).lesson(lesson);
-    // Paygate: on a paid Edition the caller doesn't hold (`preview`), only the
-    // Preview — the lowest-ordered non-superseded Lesson — is served; every other
-    // Lesson returns an explicit `locked` marker, distinct from a not-found null.
-    if (await lessonLocked(ctx, topic._id, level, key)) {
-      return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
-    }
-    // The body is served as a content URL (content blob) or, on transition rows,
-    // inline html — from the translated row if it has one, else source.
-    return { key: lesson.key, seq: lesson.seq, title, locked: false, ...body };
+    // The artifact fetch + paygate projection lives in the shared reader core
+    // (edition-deepening/04); this adapter only resolves the authed principal.
+    return await readLesson(ctx, topic, effLang, level, key);
   },
 });
 
@@ -721,14 +705,7 @@ export const listReferences = query({
     // getReference). `none` is not-found.
     const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return [];
-    const refs = await ctx.db
-      .query("references")
-      .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
-      .collect();
-    const m = await loadEdition(ctx, topic, effLang).map();
-    return refs
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .map((r) => ({ key: r.key, title: m.referenceTitle(r) }));
+    return await referencesToc(ctx, topic, await loadEdition(ctx, topic, effLang).map());
   },
 });
 
@@ -741,15 +718,7 @@ export const getReference = query({
     if (!topic) return null;
     const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return null;
-    const ref = await ctx.db
-      .query("references")
-      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
-      .unique();
-    if (!ref) return null;
-    const { title, body } = await loadEdition(ctx, topic, effLang).reference(ref);
-    // References sit entirely past the Preview — locked for a `preview` caller.
-    if (level === "preview") return { key: ref.key, title, html: "", locked: true };
-    return { key: ref.key, title, locked: false, ...body };
+    return await readReference(ctx, topic, effLang, level, key);
   },
 });
 
