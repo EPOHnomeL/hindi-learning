@@ -1,22 +1,19 @@
 # lesson-estimate/02: Teach SKILL.md estimate note (routine-prompt + ADR 0018 shipped)
 
-**Status:** open
+**Status:** open — routine-prompt + teach SKILL note + ADR 0018 not written
+**Depends on:** [01 — `~N lessons` estimate, end-to-end](./01-estimate-end-to-end.md)
 **Imported:** from GitHub #30 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/lesson-estimate/issues/02-teacher-emits-estimate-and-adr.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/lesson-estimate/issues/02-teacher-emits-estimate-and-adr.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# 02 — Teacher emits the estimate + advisory ADR
+## Why
 
-Status: open — routine-prompt + teach SKILL note + ADR 0018 not written
-
-## Parent
-
-[PRD: Estimated lesson count](../PRD.md)
-
-## What to build
+Parent: [PRD: Estimated lesson count](../PRD.md)
 
 Wire the *producer* of the estimate and record the decision, so the plumbing
 from Slice 01 actually fires in production.
+
+## Scope
 
 - The canonical Routine instructions (`docs/routine-prompt.md`) tell the Routine
   to emit its best-guess **total** Lesson count for the course at the end of each
@@ -39,10 +36,6 @@ No code and no tests — this is the agent contract plus one decision record.
 - [ ] ADR 0018 exists, states the estimate is advisory / display-only and must never become a quota, and cross-links ADR 0015.
 - [ ] ADR 0015 is left unchanged.
 - [ ] Wording is consistent with Slice 01's flag name and semantics (a whole-number total).
-
-## Blocked by
-
-- [01 — `~N lessons` estimate, end-to-end](./01-estimate-end-to-end.md)
 
 ## Comments
 

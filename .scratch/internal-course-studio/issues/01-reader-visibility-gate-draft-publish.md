@@ -1,19 +1,18 @@
 # internal-course-studio/01: Reader-visibility gate (draft → publish)
 
-**Status:** open
+**Status:** open — no reader-visibility/draft state or publish/unpublish; lessons go live as authored
+**Depends on:** — (none, can start immediately)
 **Imported:** from GitHub #23 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/internal-course-studio/issues/01-reader-visibility-gate.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/internal-course-studio/issues/01-reader-visibility-gate.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# 01 — Reader-visibility gate (draft → publish)
-
-Status: open — no reader-visibility/draft state or publish/unpublish; lessons go live as authored
+## Why
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Topic, Lesson, Reference, Owner, Viewer, Guest, Public link, Share). Spec: [`../PRD.md`](../PRD.md). Respects [ADR 0003](../../../docs/adr/0003-immutable-lessons-mutable-references.md) (immutable Lessons) and [ADR 0013](../../../docs/adr/0013-public-link-shares.md) (Public link).
 
-## What to build
-
 A Topic gains a **reader-visibility** state — `draft` (default) vs `published-to-readers` — separate from its `seeded | active` authoring lifecycle. The owner always sees their own draft course; **Viewers (Share) and Guests (Public link) see a Topic's Lessons and References only once it is published to readers.** The owner gets explicit "Publish to readers" and "Unpublish" actions and a clear draft/published indicator.
+
+## Scope
 
 Prefactor first: route all Viewer/Guest content reads through a **single** query path so the visibility filter is applied in exactly one place, not scattered per surface. This is visibility only — Lessons are never edited (ADR 0003).
 
@@ -27,10 +26,6 @@ Prefactor first: route all Viewer/Guest content reads through a **single** query
 - [ ] Publish/unpublish mutations reject non-owners (owned-topic guard).
 - [ ] The owner sees a draft/published indicator on the course.
 - [ ] Read-seam tests: draft hidden from Guest + Viewer but visible to owner; published visible to all; unpublish hides again; non-owner mutation rejected.
-
-## Blocked by
-
-None - can start immediately.
 
 ## Comments
 

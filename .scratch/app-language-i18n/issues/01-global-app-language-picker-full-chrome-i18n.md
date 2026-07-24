@@ -1,6 +1,7 @@
 # app-language-i18n/01: Global app-language picker (full chrome i18n)
 
 **Status:** prior-art — folded into [00 — Chrome i18n map](00-app-language-i18n-map.md) (2026-07-19)
+**Depends on:** the course-translation feature (Editions + content translation)
 **Imported:** from GitHub #14 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > **Prior art, not a live ticket.** As of 2026-07-19 this is superseded by the wayfinder map
@@ -11,17 +12,12 @@
 
 > Migrated from [`.scratch/app-language-i18n/issues/01-global-app-language-picker.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/app-language-i18n/issues/01-global-app-language-picker.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# Global app-language picker (full chrome i18n)
+## Why
 
-Status: open — chrome i18n not started; the existing pickers switch course/Edition content, not the UI locale
-
-> Blocked-by: the **course-translation** feature (Editions + content translation).
-> This issue localises the app *chrome*; that feature localises the course
-> *content*. Vocabulary: an **Edition** = a `(Topic, language)` pair (the unit of
-> content access); **App language** = the reader's global UI-locale preference,
-> distinct from which Editions they can access.
-
-## Problem
+This issue localises the app *chrome*; the course-translation feature localises the course
+*content*. Vocabulary: an **Edition** = a `(Topic, language)` pair (the unit of
+content access); **App language** = the reader's global UI-locale preference,
+distinct from which Editions they can access.
 
 The course-translation feature translates authored **content** (lessons,
 references, mission/title, Q&A) into other languages, gated per **Edition**. But
@@ -30,7 +26,7 @@ question"), progress labels, the dashboard, empty states — stays English. A
 learner reading a Spanish edition still sees an English frame around it. To
 "completely translate the course" the whole reader must be localisable.
 
-## Decision (from the 2026-07-06 grilling session)
+### Decision (from the 2026-07-06 grilling session)
 
 - **App language is a separate, global preference** — sticky across every page,
   independent of which Editions the reader can access. Content stays
@@ -40,7 +36,7 @@ learner reading a Spanish edition still sees an English frame around it. To
   Arabic, …) the whole layout flips (`dir="rtl"` on the document), not just the
   content iframe.
 
-## Solution shape
+## Scope
 
 1. **App-language preference storage.**
    - Signed-in users: a locale field (on `users`, or a small `userPrefs` row).
@@ -66,7 +62,7 @@ learner reading a Spanish edition still sees an English frame around it. To
    - Extract the reader/dashboard hard-coded strings into keys behind a `t(key)`
      lookup fed by the active locale's dictionary.
 
-## Out of scope (for this issue)
+## Out of scope
 
 - Content translation and Edition access — that is the course-translation
   feature this depends on.
@@ -74,8 +70,11 @@ learner reading a Spanish edition still sees an English frame around it. To
 - Translating Guest-authored content or the operator/admin surfaces beyond the
   learner reader + dashboard, unless trivially covered by the same catalog.
 
-## Notes / risks
+## Notes
 
+- Original ticket status (superseded by the front-matter status above): open —
+  chrome i18n not started; the existing pickers switch course/Edition content,
+  not the UI locale.
 - The reader chrome renders around a **sandboxed lesson iframe** (ADR 0011);
   the iframe already gets its own `dir`/`lang` from the content Edition, so the
   chrome `dir` and the iframe `dir` can differ (Spanish chrome, Urdu content) —

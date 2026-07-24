@@ -1,20 +1,17 @@
 # knowledge-grilling/01: Knowledge grilling: a diagnostic mode that maps what a learner doesn't know
 
-**Status:** open
+**Status:** open (deferred tracker) — the grill-my-knowledge skill exists (df330ef); the in-app diagnostic mode (schema/route + ADR decision) is not built
+**Depends on:** the `grill-my-knowledge` and `teach` skills (the behaviour being productised); the **Routine** authoring loop (ADR-0009), the consumer of the gap map; productisation lines (ADR-0014) — if the live-model path is chosen, grilling inference is metered like other teaching compute
 **Imported:** from GitHub #27 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/knowledge-grilling/issues/01-grill-diagnostic-mode.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/knowledge-grilling/issues/01-grill-diagnostic-mode.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# 01 — Knowledge grilling: a diagnostic mode that maps what a learner doesn't know
-
-Status: open (deferred tracker) — the grill-my-knowledge skill exists (df330ef); the in-app diagnostic mode (schema/route + ADR decision) is not built
+## Why
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Topic**, **Mission**, **Lesson**, **Response**, **Question**, **Progress**, **Frontier**, **Routine**, **Reference**).
 Related specs: [`../../served-teach-app/PRD.md`](../../served-teach-app/PRD.md), [`../../course-authoring/`](../../course-authoring/), [`../../product-direction/ROADMAP.md`](../../product-direction/ROADMAP.md).
 Related ADRs: [0001 — asynchronous hub-mediated teaching loop](../../../docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md), [0009 — content source of truth in Convex](../../../docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md), [0014 — provider-agnostic teaching runtime](../../../docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md).
 Prior art (the skill this is drawn from): `grill-my-knowledge` (examiner-style diagnostic) and `teach` (the authoring loop it hands off to), both Claude Code skills today.
-
-## Context / why
 
 Today the loop only learns what a learner *doesn't* know **indirectly** — by watching **Responses** to quiz prompts a **Lesson** happened to include, or a **Question** they thought to ask. There is no deliberate act of *finding the edge* of someone's understanding before teaching them.
 
@@ -22,9 +19,7 @@ The `grill-my-knowledge` skill already does exactly this in a Claude Code termin
 
 That is a strong fit for this product: it is the placement diagnostic the **Routine** currently lacks. A grill run would let the teacher start a **Mission** at the learner's real zone of proximal development instead of guessing, and re-grill later to verify mastery rather than infer it from clicks. This issue scopes bringing that skill into the app as a first-class **diagnostic mode**.
 
-## Want
-
-A learner-facing **grilling** mode on a Topic that:
+We want a learner-facing **grilling** mode on a Topic that:
 
 - Interviews the learner **one question at a time**, adapting each follow-up to the previous answer, pushing a branch until it finds the edge — never revealing answers mid-session.
 - Grades each branch **solid / shaky / missing** and produces a **gap map**: the shaky+missing items ordered by leverage (foundational blockers first), plus the solid items flagged as demonstrated so the teacher skips re-teaching them.
@@ -34,7 +29,7 @@ Two natural entry points to settle at triage:
 - **Placement** — grill at Topic **Seed** / early Mission so the first Lessons land at the right level.
 - **Checkpoint** — grill at a **Frontier** or on **Completion** to confirm mastery before advancing or certifying.
 
-## The central design question (must resolve at triage before anything is built)
+### The central design question (must resolve at triage before anything is built)
 
 **Grilling is inherently a live, adaptive, model-in-the-loop interview. The web app deliberately has no LLM in it (ADR-0001) — all teaching intelligence lives in Claude Code / the Routine.** These two facts collide. Three candidate resolutions, in rough order of least-to-most architectural disruption:
 
@@ -46,7 +41,15 @@ Two natural entry points to settle at triage:
 
 **Recommendation to weigh:** grilling may be the forcing function that revisits ADR-0001. Decide *this* first; the rest of the acceptance criteria depend on which path wins.
 
-## Acceptance (to refine at triage, path-dependent)
+### Backend gaps (net-new — why this is a feature, not a tweak)
+
+- No entity for a diagnostic session or a gap map; Responses are answers to *Lesson* prompts, not to an adaptive interview with no Lesson.
+- No way for the Routine to be told "the learner already knows X — do not teach it," only what they got wrong on a quiz.
+- No inference path in the serving layer at all (ADR-0001) — path 2/3 would introduce one.
+
+## Acceptance criteria
+
+To refine at triage, path-dependent.
 
 - A new domain term for the diagnostic session and its output (**gap map** is the skill's word; coin a canonical CONTEXT term via `domain-modeling` — candidates: *Diagnostic*, *Assessment*, *Grill*). Decide its relationship to **Response** (a grill answer is diagnostic, not a Lesson-prompt Response) and to **Progress**.
 - Hub schema for a grilling session: the branches probed, per-branch grade, the ordered gap list, and the demonstrated (solid) items — all `user_id`-scoped, keyed to a Topic.
@@ -54,26 +57,12 @@ Two natural entry points to settle at triage:
 - A surface/route for the grill mode (e.g. a Topic action "Test what I know →"), owner-only.
 - Whichever interview mechanism the design question selects (async Routine turns / branching artifact / live model), specified concretely.
 
-## Depends on / relates to
-
-- The `grill-my-knowledge` and `teach` skills — the behaviour being productised; keep the served version faithful to the examiner discipline (withhold answers, grade at the end, hand off an ordered agenda).
-- **Routine** authoring loop (ADR-0009) — the consumer of the gap map.
-- Productisation lines (ADR-0014) — if path 3, grilling inference is metered like other teaching compute.
-
-## Backend gaps (net-new — why this is a feature, not a tweak)
-
-- No entity for a diagnostic session or a gap map; Responses are answers to *Lesson* prompts, not to an adaptive interview with no Lesson.
-- No way for the Routine to be told "the learner already knows X — do not teach it," only what they got wrong on a quiz.
-- No inference path in the serving layer at all (ADR-0001) — path 2/3 would introduce one.
-
-## Notes / open questions (triage)
+## Notes
 
 - **Owner-only.** A **Viewer** writes nothing (CONTEXT: Viewer) and a **Guest** has no server-side state — grilling is a self-directed act on one's own Topic. Confirm it never surfaces to Viewers.
 - **Faithfulness risk.** The value is in *withholding* answers and pushing to the real edge. A watered-down "quiz that tells you the answer" is not this feature — guard that in the spec.
 - **Grading free-text.** Solid/shaky/missing on prose answers is a model judgement; note this pushes toward path 2/3 and away from a purely dumb browser.
 - **Scope guard.** This is diagnosis feeding the existing teach loop, not a second teaching engine. The gap map's only job is to steer the Routine.
-
-## Comments
 
 ## Comments
 

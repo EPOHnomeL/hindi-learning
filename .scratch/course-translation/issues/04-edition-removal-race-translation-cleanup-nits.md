@@ -1,19 +1,18 @@
 # course-translation/04: Edition-removal race + translation cleanup nits
 
-**Status:** open
+**Status:** partial — removal race + error-clear shipped (a255df8); remaining: drop the dead by_topic_email_lang index and record the setTopicPublic decision
+**Depends on:** — (none, can start immediately)
 **Imported:** from GitHub #21 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/course-translation/issues/04-edition-removal-race-and-cleanup-nits.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/course-translation/issues/04-edition-removal-race-and-cleanup-nits.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# Edition-removal race + translation cleanup nits
-
-Status: partial — removal race + error-clear shipped (a255df8); remaining: drop the dead by_topic_email_lang index and record the setTopicPublic decision
+## Why
 
 > Deferred follow-up from the PR #4 review. One narrow correctness race plus a
 > few low-risk cleanups, grouped because they all concern the Edition/job
 > lifecycle.
 
-## What to build
+## Scope
 
 1. **Don't orphan translation rows when an Edition is removed mid-flight.**
    `removeEdition` deletes an Edition's `translations` rows and its job, but does
@@ -45,10 +44,6 @@ Status: partial — removal race + error-clear shipped (a255df8); remaining: dro
 - [ ] The dead `by_topic_email_lang` index is gone and the suite still passes.
 - [ ] A job that reaches `ready` carries no leftover `error`.
 - [ ] `setTopicPublic`'s fate (keep vs. remove) decided and reflected.
-
-## Blocked by
-
-- None — can start immediately.
 
 ## Comments
 

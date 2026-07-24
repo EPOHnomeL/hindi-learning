@@ -1,21 +1,20 @@
 # landing-page/01: Awesome marketing landing page (public front door)
 
 **Status:** done
+**Depends on:** a routing decision for a public home (root `/` public vs the current `AppGate` behaviour); optional: the `motion` (motion.dev) dependency
 **Imported:** from GitHub #28 on 2026-07-15 (created 2026-07-10, closed 2026-07-12; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/landing-page/issues/01-marketing-landing-page.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/landing-page/issues/01-marketing-landing-page.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# 01 — Awesome marketing landing page (public front door)
-
-Status: needs-triage (to-scope — captured 2026-07-08; not built)
+## Why
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Topic, Lesson, Reference, Mission, Resource, Edition, Share, Public link, Certificate, Seller, Entitlement). Relates to [ADR 0012](../../../docs/adr/0012-app-router-url-addressable-navigation.md) (URL-addressable routes / auth gate) and the [roadmap](../../product-direction/ROADMAP.md) Phase 1 item 6 (**marketing/landing page — deferred from Phase 0 because internal-first**).
 
-## Want
-
 An **awesome public landing page** — the front door a logged-out visitor sees, marketing the AI course studio ("seed a topic, an AI authors a grounded interactive course, learn and earn a certificate"). Modern, polished, with tasteful motion: 21st.dev-style components, [motion.dev](https://motion.dev) scroll/entrance animations, and an atmospheric background that reuses the certificate stage's aurora + gold-fleck motifs so it reads as the same product.
 
-## Acceptance (to refine at triage)
+## Acceptance criteria
+
+To refine at triage.
 
 - **Routing.** Public, ungated route: logged-out `/` shows the landing; logged-in `/` shows the existing Dashboard; a primary "Get started / Sign in" CTA leads into the existing sign-in flow ([`SignIn`](../../../src/app/_components/SignIn.tsx)). Today `/` is inside the `(app)` group and `AppGate` shows `SignIn` to logged-out users — this needs a public home route.
 - **Sections that market the real product** (accurate to the glossary):
@@ -31,16 +30,11 @@ An **awesome public landing page** — the front door a logged-out visitor sees,
 - **Motion.** Respect `prefers-reduced-motion` (as the certificate + `pop-in` already do). If `motion.dev` is adopted, add the `motion` dependency (pnpm); otherwise the atmospheric effects can be pure CSS in the existing tradition.
 - A Devanagari heritage nod (the app's origin) **without** implying it's Hindi-only — the product is "teach me anything."
 
-## Depends on
-
-- A routing decision for a public home (root `/` public vs the current `AppGate` behaviour).
-- Optional: the `motion` (motion.dev) dependency.
-
 ## Notes
 
 - Roadmap deferred this to **Phase 1** (external productisation) — internal-first, so it was never built for the Phase 0 demo.
 - Copy must respect `CONTEXT.md` vocabulary: user-facing "course" maps to a **Topic**; the URL is `/courses/[slug]` (ADR 0012). Prefer Lesson / Reference / Edition / Certificate / Seller / Entitlement.
-- To-scope only — nothing in this ticket is built yet.
+- Original ticket status before shipping (superseded by the front-matter status above): needs-triage (to-scope — captured 2026-07-08; not built).
 
 ## Comments
 

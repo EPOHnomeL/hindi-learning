@@ -13,11 +13,16 @@ the only tracker. (History: local → GitHub #12–#36 on 2026-07-10 → local a
 - The file's H1 is `<feature-slug>/<NN>: <title>`, numbered from `01` within a feature
 - Front lines: `**Status:** open | done` (plus optional `**Depends on:**`, `**Labels:**`)
 - Triage roles (see `triage-labels.md`) go on the `**Labels:**` line
-- Conversation/history goes in the file body (append sections), or git history
+- Body sections, in order, using only the ones that apply: `Why`, `Scope`, `Out of scope`,
+  `Acceptance criteria`, `Tests`, `Notes`, `Comments`
+- Conversation/history goes in the `Comments` section (append-only — never edit or delete a
+  prior entry), or git history
+- See [issue-template.md](issue-template.md) for a fillable copy of this shape
 
 ## When a skill says "publish to the issue tracker"
 
-Create a local file at `.scratch/<feature-slug>/issues/<NN>-<title>.md` in the format above.
+Create a local file at `.scratch/<feature-slug>/issues/<NN>-<title>.md` following
+[issue-template.md](issue-template.md).
 
 ## When a skill says "fetch the relevant ticket"
 

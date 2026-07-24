@@ -1,24 +1,23 @@
 # admin-allowlist/01: Ops follow-up: run whitelist:migrateFromEnv in prod, then unset AUTH_ALLOWED_EMAILS
 
 **Status:** open
+**Depends on:** — (none, can start immediately)
 **Labels:** ready-for-human
 **Imported:** from GitHub #13 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/admin-allowlist/issues/01-admission-gate-allowlist-table.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/admin-allowlist/issues/01-admission-gate-allowlist-table.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# 01 — Admission gate backed by the Allowlist table
+## Why
+
+Parent: [`../PRD.md`](../PRD.md). Decision:
+[ADR 0011](../../../docs/adr/0011-allowlist-in-convex-admin-portal.md).
+Vocabulary: **Allowlist**, **Admin** in [`CONTEXT.md`](../../../CONTEXT.md).
 
 Status: done (commits 78780d1 backend, 455d2e3 auth gate). Ops follow-up
 outstanding: run `npx convex run whitelist:migrateFromEnv --prod`, then unset
 `AUTH_ALLOWED_EMAILS`. Unblocks issue 02.
 
-## Parent
-
-[`../PRD.md`](../PRD.md). Decision:
-[ADR 0011](../../../docs/adr/0011-allowlist-in-convex-admin-portal.md).
-Vocabulary: **Allowlist**, **Admin** in [`CONTEXT.md`](../../../CONTEXT.md).
-
-## What to build
+## Scope
 
 Move the **Allowlist** from the `AUTH_ALLOWED_EMAILS` env var into a Convex
 table, and make sign-up gate on that table instead of the env var. This is the
@@ -63,10 +62,6 @@ needs `seedEmail` / the migration to put rows in.
       (accepted) and one non-admitted (rejected) email. Prior art:
       [`convex/content.test.ts`](../../../convex/content.test.ts),
       [`convex/shares.test.ts`](../../../convex/shares.test.ts).
-
-## Blocked by
-
-None - can start immediately.
 
 ## Notes
 

@@ -1,17 +1,14 @@
 # course-translation/02: The course mission is translated + billed on every Edition but never read
 
-**Status:** open
+**Status:** open — no product decision taken; the Mission is still translated but every surface still renders English
+**Depends on:** — (none, can start immediately)
 **Imported:** from GitHub #19 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/course-translation/issues/02-course-mission-translated-but-unread.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/course-translation/issues/02-course-mission-translated-but-unread.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# The course mission is translated + billed on every Edition but never read
-
-Status: open — no product decision taken; the Mission is still translated but every surface still renders English
+## Why
 
 > Deferred follow-up from the PR #4 review (product decision needed).
-
-## What to build
 
 Resolve the mismatch where a course's **mission** is enumerated as a translatable
 item — so it's translated and billed a Claude call for every language, and
@@ -19,6 +16,8 @@ counted into the job's `total`/`done` — yet **no read seam ever serves the
 translated mission**. The "Shared with me" feed and the dashboard both render the
 raw English `topic.mission`, so a non-English Viewer sees the English mission and
 every added language spends a wasted call.
+
+## Scope
 
 Pick one direction (this is a product call):
 
@@ -37,10 +36,6 @@ Pick one direction (this is a product call):
 - [ ] If wired: a Viewer holding only a non-English Edition sees the mission in
       that language on every surface that shows it, with English fallback when a
       mission translation is missing.
-
-## Blocked by
-
-- None — can start immediately.
 
 ## Comments
 

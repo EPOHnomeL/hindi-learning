@@ -1,20 +1,19 @@
 # url-routing/02: Not-found & deep-link edge cases
 
-**Status:** open
+**Status:** partial — loading guard + inline 'not found' only; no not-found.tsx / uniform 404
+**Depends on:** 01 — Routing spine
 **Imported:** from GitHub #36 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/url-routing/issues/02-not-found-edge-cases.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/url-routing/issues/02-not-found-edge-cases.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# 02 — Not-found & deep-link edge cases
-
-Status: partial — loading guard + inline 'not found' only; no not-found.tsx / uniform 404
+## Why
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Topic**/course, **Lesson**, **Reference**, **Viewer**). Spec: [`../PRD.md`](../PRD.md). Decisions: [ADR 0012](../../../docs/adr/0012-app-router-url-addressable-navigation.md).
 
-## What to build
-
 Make bad and inaccessible deep links fail clearly, now that any URL can be typed,
 bookmarked, or shared. Build on the routing spine (**01**).
+
+## Scope
 
 - An unknown course slug, a course the caller can't access (not owner, no
   **Share**), and an unknown Lesson/Reference `key` within a valid course all
@@ -34,10 +33,6 @@ bookmarked, or shared. Build on the routing spine (**01**).
 - [ ] A course owned by someone else and not shared with the caller renders the same not-found page — indistinguishable from a nonexistent one.
 - [ ] `/courses/[slug]/lessons/<bad-key>` (and the reference equivalent) renders not-found rather than redirecting anywhere.
 - [ ] While the underlying query is in flight, the route shows a loading state, not a flash of not-found.
-
-## Blocked by
-
-- 01 — Routing spine.
 
 ## Notes
 

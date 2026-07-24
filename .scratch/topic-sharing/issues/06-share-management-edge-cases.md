@@ -1,23 +1,20 @@
 # topic-sharing/06: Share management & edge cases
 
-**Status:** open
+**Status:** partial — pending-shares + idempotent multi-Viewer shareTopic shipped; listShares, unshareTopic, revoke/recipient-list UI, self-share refusal, and topic-delete cascade are NOT built
+**Depends on:** **01** (needs the `shares` relation and `shareTopic`)
 **Imported:** from GitHub #34 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/topic-sharing/issues/06-share-management.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/topic-sharing/issues/06-share-management.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# 06 — Share management & edge cases
-
-Status: partial — pending-shares + idempotent multi-Viewer shareTopic shipped; listShares, unshareTopic, revoke/recipient-list UI, self-share refusal, and topic-delete cascade are NOT built
+## Why
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Share**, **Viewer**). Spec: [`../PRD.md`](../PRD.md).
-
-## Want
 
 The owner fully manages a Topic's Shares — see who it's shared with, add more,
 revoke — and the sharing edge cases all behave. Rounds out the owner-facing
 panel from **01**.
 
-## Acceptance
+## Acceptance criteria
 
 - `listShares` returns a Topic's current Viewers; the Share panel lists them,
   each with a remove control.
@@ -32,10 +29,6 @@ panel from **01**.
   - **deleting a Topic** removes its Shares (no dangling Viewer references).
 - Tests (Convex seam) cover the lifecycle (share / list / revoke / many Viewers)
   and each edge case.
-
-## Depends on
-
-- **01** (needs the `shares` relation and `shareTopic`).
 
 ## Notes
 
