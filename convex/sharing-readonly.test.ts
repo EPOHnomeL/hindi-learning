@@ -54,7 +54,7 @@ test("courseHeader reports the role: owner, viewer, or null for a stranger", asy
   // Editions metadata (course-translation): with no translations, both the owner
   // and a legacy (English) Viewer see just the source English edition.
   const enEdition = { lang: "en", dir: "ltr" as const, editions: [{ lang: "en", name: "English", native: "English", rtl: false }] };
-  expect(await asUser(t, owner).query(api.content.courseHeader, { topicSlug: "hindi" })).toEqual({
+  expect(await asUser(t, owner).query(api.content.reader.courseHeader, { topicSlug: "hindi" })).toEqual({
     title: "Hindi",
     mission: null,
     role: "owner",
@@ -63,7 +63,7 @@ test("courseHeader reports the role: owner, viewer, or null for a stranger", asy
     publicLink: null,
     ...enEdition,
   });
-  expect(await asUser(t, viewer).query(api.content.courseHeader, { topicSlug: "hindi" })).toEqual({
+  expect(await asUser(t, viewer).query(api.content.reader.courseHeader, { topicSlug: "hindi" })).toEqual({
     title: "Hindi",
     mission: null,
     role: "viewer",
@@ -73,7 +73,7 @@ test("courseHeader reports the role: owner, viewer, or null for a stranger", asy
     ...enEdition,
   });
   // A non-Viewer can't even learn the Topic's title (private Topics don't leak).
-  expect(await asUser(t, stranger).query(api.content.courseHeader, { topicSlug: "hindi" })).toBeNull();
+  expect(await asUser(t, stranger).query(api.content.reader.courseHeader, { topicSlug: "hindi" })).toBeNull();
 });
 
 // ---- 02: Resources, read-only for Viewers ----------------------------------
@@ -127,10 +127,10 @@ test("a Viewer sees the owner's Mission on the shared card but cannot edit or re
 
   // Write: editing the Mission and renaming the Topic are refused.
   await expect(
-    asUser(t, viewer).mutation(api.content.editMission, { topicSlug: "hindi", mission: "hacked" }),
+    asUser(t, viewer).mutation(api.content.authoring.editMission, { topicSlug: "hindi", mission: "hacked" }),
   ).rejects.toThrow();
   await expect(
-    asUser(t, viewer).mutation(api.content.renameTopic, { topicSlug: "hindi", title: "Hacked" }),
+    asUser(t, viewer).mutation(api.content.authoring.renameTopic, { topicSlug: "hindi", title: "Hacked" }),
   ).rejects.toThrow();
 });
 

@@ -42,7 +42,7 @@ const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 // immutable lesson that already exists, or an unchanged reference) is dropped
 // server-side by the publish mutation, so uploading unconditionally is safe.
 const uploadHtml = async (html: string): Promise<Id<"_storage">> => {
-  const url = await client.mutation(api.content.generateContentUploadUrl, { secret });
+  const url = await client.mutation(api.content.publish.generateContentUploadUrl, { secret });
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/html" }, body: html });
   if (!res.ok) throw new Error(`content upload failed: ${res.status}`);
   const { storageId } = (await res.json()) as { storageId: Id<"_storage"> };
@@ -97,14 +97,14 @@ ${FOOT}
 // its own title (ensureTopic just backfills the owner). Real Topics are Seeded
 // from the dashboard with a title, so this fallback rarely bites.
 const title = slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-const topicId = await client.mutation(api.content.ensureTopic, { secret, ownerEmail: owner, slug, title });
+const topicId = await client.mutation(api.content.publish.ensureTopic, { secret, ownerEmail: owner, slug, title });
 
 // The Mission, if drafted (materialise writes MISSION.md only once it exists;
 // a still-seeded Topic has SEED.md instead). Publishing it flips seeded → active.
 if (existsSync(`${base}/MISSION.md`)) {
   const mission = readFileSync(`${base}/MISSION.md`, "utf8").trim();
   if (mission) {
-    await client.mutation(api.content.publishMission, { secret, ownerEmail: owner, topicSlug: slug, mission });
+    await client.mutation(api.content.publish.publishMission, { secret, ownerEmail: owner, topicSlug: slug, mission });
     console.log("mission    published");
   }
 }
@@ -114,7 +114,7 @@ for (const f of filesIn(`${base}/lessons`, ".html")) {
   const key = f.replace(/\.html$/, "");
   const seq = Number(key.match(/^(\d+)/)?.[1] ?? 0);
   const storageId = await uploadHtml(html);
-  const result = await client.mutation(api.content.publishLesson, {
+  const result = await client.mutation(api.content.publish.publishLesson, {
     secret,
     topicId,
     key,
@@ -129,7 +129,7 @@ for (const f of filesIn(`${base}/lessons`, ".html")) {
 for (const f of filesIn(`${base}/learning-records`, ".md")) {
   const key = f.replace(/\.md$/, "");
   const seq = Number(key.match(/^(\d+)/)?.[1] ?? 0);
-  const result = await client.mutation(api.content.publishLearningRecord, {
+  const result = await client.mutation(api.content.publish.publishLearningRecord, {
     secret,
     topicId,
     key,
@@ -143,7 +143,7 @@ for (const f of filesIn(`${base}/references`, ".html")) {
   const html = readFileSync(`${base}/references/${f}`, "utf8");
   const key = f.replace(/\.html$/, "");
   const storageId = await uploadHtml(html);
-  const result = await client.mutation(api.content.upsertReference, {
+  const result = await client.mutation(api.content.publish.upsertReference, {
     secret,
     topicId,
     key,

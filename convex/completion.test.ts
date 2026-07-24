@@ -36,11 +36,11 @@ test("completeCourse (secret-guarded) marks a Topic completed; a bad secret is r
   const topicId = await seedTopic(t, alice, "hindi");
 
   await expect(
-    t.mutation(api.content.completeCourse, { secret: "wrong", topicSlug: "hindi" }),
+    t.mutation(api.content.publish.completeCourse, { secret: "wrong", topicSlug: "hindi" }),
   ).rejects.toThrow();
   expect(await statusOf(t, topicId)).toBe("active");
 
-  await t.mutation(api.content.completeCourse, { secret: "test-secret", topicSlug: "hindi" });
+  await t.mutation(api.content.publish.completeCourse, { secret: "test-secret", topicSlug: "hindi" });
   expect(await statusOf(t, topicId)).toBe("completed");
 });
 
@@ -53,11 +53,11 @@ test("endCourse is owner-only: the owner completes their Topic, a Viewer/non-own
   // The Viewer has a Share (read access) but must still be refused a write.
   await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: viewer }));
 
-  await expect(asUser(t, viewer).mutation(api.content.endCourse, { topicSlug: "hindi" })).rejects.toThrow();
-  await expect(asUser(t, stranger).mutation(api.content.endCourse, { topicSlug: "hindi" })).rejects.toThrow();
+  await expect(asUser(t, viewer).mutation(api.content.authoring.endCourse, { topicSlug: "hindi" })).rejects.toThrow();
+  await expect(asUser(t, stranger).mutation(api.content.authoring.endCourse, { topicSlug: "hindi" })).rejects.toThrow();
   expect(await statusOf(t, topicId)).toBe("active");
 
-  await asUser(t, owner).mutation(api.content.endCourse, { topicSlug: "hindi" });
+  await asUser(t, owner).mutation(api.content.authoring.endCourse, { topicSlug: "hindi" });
   expect(await statusOf(t, topicId)).toBe("completed");
 });
 
@@ -66,13 +66,13 @@ test("reopenCourse (owner-only) returns a completed Topic to active", async () =
   const owner = await seedUser(t, "owner@example.com");
   const stranger = await seedUser(t, "stranger@example.com");
   const topicId = await seedTopic(t, owner, "hindi");
-  await asUser(t, owner).mutation(api.content.endCourse, { topicSlug: "hindi" });
+  await asUser(t, owner).mutation(api.content.authoring.endCourse, { topicSlug: "hindi" });
   expect(await statusOf(t, topicId)).toBe("completed");
 
-  await expect(asUser(t, stranger).mutation(api.content.reopenCourse, { topicSlug: "hindi" })).rejects.toThrow();
+  await expect(asUser(t, stranger).mutation(api.content.authoring.reopenCourse, { topicSlug: "hindi" })).rejects.toThrow();
   expect(await statusOf(t, topicId)).toBe("completed");
 
-  await asUser(t, owner).mutation(api.content.reopenCourse, { topicSlug: "hindi" });
+  await asUser(t, owner).mutation(api.content.authoring.reopenCourse, { topicSlug: "hindi" });
   expect(await statusOf(t, topicId)).toBe("active");
 });
 
@@ -84,7 +84,7 @@ test("endCourse refuses a seeded course — a course that hasn't started can't b
     ctx.db.insert("topics", { ownerId: alice, slug: "greek", title: "Greek", status: "seeded" }),
   );
 
-  await expect(asUser(t, alice).mutation(api.content.endCourse, { topicSlug: "greek" })).rejects.toThrow();
+  await expect(asUser(t, alice).mutation(api.content.authoring.endCourse, { topicSlug: "greek" })).rejects.toThrow();
   // Still seeded → the Routine's bootstrap can still fire it (would be stranded if
   // it had flipped to completed and then reopened to active).
   expect(await statusOf(t, topicId)).toBe("seeded");
@@ -115,14 +115,14 @@ test("the gate refuses a completed Topic and resumes after reopen", async () => 
   });
 
   // Complete the course → the gate hard-refuses before the Frontier check.
-  await t.mutation(api.content.completeCourse, { secret: "test-secret", topicSlug: "hindi" });
+  await t.mutation(api.content.publish.completeCourse, { secret: "test-secret", topicSlug: "hindi" });
   expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi" })).toMatchObject({
     acquired: false,
     reason: "completed",
   });
 
   // Reopen → authoring resumes.
-  await asUser(t, alice).mutation(api.content.reopenCourse, { topicSlug: "hindi" });
+  await asUser(t, alice).mutation(api.content.authoring.reopenCourse, { topicSlug: "hindi" });
   expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi" })).toMatchObject({
     acquired: true,
   });

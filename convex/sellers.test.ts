@@ -280,7 +280,7 @@ test("only a ready Seller who owns a completed course can price a held Edition",
   ]);
 
   // Tied to the reader seam: an unentitled caller now sees the paygate (locked past Preview).
-  expect(await asUser(t, other).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, other).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     locked: true,
   });
 

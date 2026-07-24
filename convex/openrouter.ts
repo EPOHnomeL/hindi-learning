@@ -52,7 +52,7 @@ async function publishAuthoredLesson(
   // skipping the CLI's generateContentUploadUrl → PUT dance. publishLesson takes
   // ownership of the blob (drops it if the Lesson already exists).
   const storageId = await ctx.storage.store(new Blob([html], { type: "text/html" }));
-  await ctx.runMutation(api.content.publishLesson, {
+  await ctx.runMutation(api.content.publish.publishLesson, {
     secret,
     topicId,
     key,
@@ -61,7 +61,7 @@ async function publishAuthoredLesson(
     storageId,
     supersedes: supersedesFrom(html),
   });
-  await ctx.runMutation(api.content.publishLearningRecord, { secret, topicId, key, seq, markdown: result.learningRecord! });
+  await ctx.runMutation(api.content.publish.publishLearningRecord, { secret, topicId, key, seq, markdown: result.learningRecord! });
   // Upsert any references the lesson relies on / cross-links to, so a
   // /references/<key> link never dangles (AUTHORING.md §7). Stored as-authored.
   for (const ref of result.references) {
@@ -71,7 +71,7 @@ async function publishAuthoredLesson(
     // AUTHORING.md §7's "stored as-authored").
     const refHtml = assembleReference(ref.html, ref.title);
     const refStorageId = await ctx.storage.store(new Blob([refHtml], { type: "text/html" }));
-    await ctx.runMutation(api.content.upsertReference, {
+    await ctx.runMutation(api.content.publish.upsertReference, {
       secret,
       topicId,
       key: ref.key,
@@ -158,7 +158,7 @@ export const authorTopic = internalAction({
         // then the Mission LAST (flips seeded → active), so the course only leaves
         // `seeded` once it has a Frontier.
         await publishAuthoredLesson(ctx, secret, context.topicId, 1, result);
-        await ctx.runMutation(api.content.publishMission, { secret, ownerEmail: context.ownerEmail, topicSlug, mission });
+        await ctx.runMutation(api.content.publish.publishMission, { secret, ownerEmail: context.ownerEmail, topicSlug, mission });
         await ctx.runMutation(api.routine.reportGeneration, {
           secret,
           topicSlug,
@@ -180,7 +180,7 @@ export const authorTopic = internalAction({
         // Terminate (ADR 0015): complete with NO emblem — a finished OpenRouter
         // course falls back to the generic 🎓 (the owner may set one). Report
         // `nothing` so the reader stops offering "Generate next lesson".
-        await ctx.runMutation(api.content.completeCourse, { secret, topicSlug });
+        await ctx.runMutation(api.content.publish.completeCourse, { secret, topicSlug });
         await ctx.runMutation(api.routine.reportGeneration, {
           secret,
           topicSlug,

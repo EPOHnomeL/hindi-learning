@@ -70,24 +70,24 @@ test("free Edition — owner & Viewer read everything; a stranger is not-found",
   await share(t, topicId, bob); // legacy Share → English edition
 
   // owner: full, role owner, no paywall.
-  const ownerHdr = await asUser(t, alice).query(api.content.courseHeader, { topicSlug: "hindi" });
+  const ownerHdr = await asUser(t, alice).query(api.content.reader.courseHeader, { topicSlug: "hindi" });
   expect(ownerHdr).toMatchObject({ role: "owner", lang: "en" });
   expect(ownerHdr!.paywall).toBeUndefined();
-  expect(await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, alice).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     contentUrl: expect.any(String),
     locked: false,
   });
 
   // Viewer: full, role viewer.
-  expect(await asUser(t, bob).query(api.content.courseHeader, { topicSlug: "hindi" })).toMatchObject({ role: "viewer" });
-  expect(await asUser(t, bob).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, bob).query(api.content.reader.courseHeader, { topicSlug: "hindi" })).toMatchObject({ role: "viewer" });
+  expect(await asUser(t, bob).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     locked: false,
   });
 
   // Stranger on a FREE Edition: not-found (null), never a Preview.
-  expect(await asUser(t, carol).query(api.content.courseHeader, { topicSlug: "hindi" })).toBeNull();
-  expect(await asUser(t, carol).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" })).toBeNull();
-  expect(await asUser(t, carol).query(api.content.listLessons, { topicSlug: "hindi" })).toEqual([]);
+  expect(await asUser(t, carol).query(api.content.reader.courseHeader, { topicSlug: "hindi" })).toBeNull();
+  expect(await asUser(t, carol).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001" })).toBeNull();
+  expect(await asUser(t, carol).query(api.content.reader.listLessons, { topicSlug: "hindi" })).toEqual([]);
 });
 
 // ---- paid Edition: the paygate ----------------------------------------------
@@ -102,22 +102,22 @@ test("paid Edition — owner, Viewer, and entitled buyer read everything", async
   await entitle(t, topicId, dave, "en");
 
   // owner is never paywalled on their own course.
-  expect(await asUser(t, alice).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, alice).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     contentUrl: expect.any(String),
     locked: false,
   });
-  expect((await asUser(t, alice).query(api.content.courseHeader, { topicSlug: "hindi" }))!.paywall).toBeUndefined();
+  expect((await asUser(t, alice).query(api.content.reader.courseHeader, { topicSlug: "hindi" }))!.paywall).toBeUndefined();
 
   // language-scoped Viewer reads the whole Edition.
-  expect(await asUser(t, bob).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, bob).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     locked: false,
   });
 
   // entitled buyer ≡ Viewer: full read, reported as its own role.
-  expect(await asUser(t, dave).query(api.content.courseHeader, { topicSlug: "hindi" })).toMatchObject({
+  expect(await asUser(t, dave).query(api.content.reader.courseHeader, { topicSlug: "hindi" })).toMatchObject({
     role: "entitled",
   });
-  expect(await asUser(t, dave).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, dave).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     contentUrl: expect.any(String),
     locked: false,
   });
@@ -131,19 +131,19 @@ test("paid Edition — an unentitled caller (signed-in or Guest) gets only the P
   await publicLink(t, topicId, "en", "tok-en");
 
   // Signed-in non-holder: role preview + the paygate (price + which Lesson is free).
-  const hdr = await asUser(t, carol).query(api.content.courseHeader, { topicSlug: "hindi" });
+  const hdr = await asUser(t, carol).query(api.content.reader.courseHeader, { topicSlug: "hindi" });
   expect(hdr).toMatchObject({ role: "preview", lang: "en", paywall: { amount: 500, currency: "zar", previewKey: "0001" } });
   // The whole table of contents still renders (the paygate has structure).
-  expect((await asUser(t, carol).query(api.content.listLessons, { topicSlug: "hindi" })).map((l) => l.key)).toEqual([
+  expect((await asUser(t, carol).query(api.content.reader.listLessons, { topicSlug: "hindi" })).map((l) => l.key)).toEqual([
     "0001",
     "0002",
   ]);
   // The Preview Lesson's body is served; every other Lesson is locked (not null).
-  expect(await asUser(t, carol).query(api.content.getLesson, { topicSlug: "hindi", key: "0001" })).toMatchObject({
+  expect(await asUser(t, carol).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001" })).toMatchObject({
     contentUrl: expect.any(String),
     locked: false,
   });
-  expect(await asUser(t, carol).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, carol).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     html: "",
     locked: true,
   });
@@ -185,16 +185,16 @@ test("an Entitlement is Edition-scoped — `es` does not unlock `ur`", async () 
   await entitle(t, topicId, dave, "es"); // dave bought Spanish only
 
   // Spanish: entitled → full (English fallback content, no `es` rows seeded).
-  expect(await asUser(t, dave).query(api.content.getLesson, { topicSlug: "hindi", key: "0002", lang: "es" })).toMatchObject({
+  expect(await asUser(t, dave).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002", lang: "es" })).toMatchObject({
     locked: false,
   });
   // Urdu: NOT unlocked by the Spanish Entitlement → Preview only.
-  const urHdr = await asUser(t, dave).query(api.content.courseHeader, { topicSlug: "hindi", lang: "ur" });
+  const urHdr = await asUser(t, dave).query(api.content.reader.courseHeader, { topicSlug: "hindi", lang: "ur" });
   expect(urHdr).toMatchObject({ role: "preview", lang: "ur" });
-  expect(await asUser(t, dave).query(api.content.getLesson, { topicSlug: "hindi", key: "0002", lang: "ur" })).toMatchObject({
+  expect(await asUser(t, dave).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002", lang: "ur" })).toMatchObject({
     locked: true,
   });
-  expect(await asUser(t, dave).query(api.content.getLesson, { topicSlug: "hindi", key: "0001", lang: "ur" })).toMatchObject({
+  expect(await asUser(t, dave).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001", lang: "ur" })).toMatchObject({
     locked: false, // the Preview is readable in any language
   });
 });
@@ -209,13 +209,13 @@ test("Admin grant flips a caller from Preview to full; revoke flips it back", as
   await price(t, topicId, "en", 500, "zar");
 
   // Before: Preview only.
-  expect(await asUser(t, carol).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, carol).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     locked: true,
   });
 
   // Admin grants — carol now reads everything.
   await asUser(t, admin).mutation(api.market.grantEntitlement, { email: "carol@example.com", topicSlug: "hindi", lang: "en" });
-  expect(await asUser(t, carol).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, carol).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     contentUrl: expect.any(String),
     locked: false,
   });
@@ -229,7 +229,7 @@ test("Admin grant flips a caller from Preview to full; revoke flips it back", as
 
   // Revoke — back to the paygate.
   await asUser(t, admin).mutation(api.market.revokeEntitlement, { email: "carol@example.com", topicSlug: "hindi", lang: "en" });
-  expect(await asUser(t, carol).query(api.content.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
+  expect(await asUser(t, carol).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0002" })).toMatchObject({
     locked: true,
   });
 });
