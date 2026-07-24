@@ -1,6 +1,11 @@
 # edition-deepening/00: Edition surface deepening — map
 
-**Status:** open
+**Status:** **destination reached** (2026-07-22) — all four legs landed as tested code (tickets
+01–04, commits `be164c5`/`69f845f`/`7a2c5a3`/`a1e4357`/`c89fb03`). The Edition read surface is now
+one reader (`loadEdition`), one grant resolver (`grantsFor`), one authed selection seam
+(`resolveEdition`) + a thin Guest token adapter, and one shared per-artifact reader core
+(`readLesson`/`readReference`/`lessonsToc`/`referencesToc`) with content.ts / public.ts as adapters
+over it. No fog remains. Full convex suite (459 tests) green.
 **Labels:** wayfinder:map
 
 <!-- The canonical wayfinder map for deepening the Edition read surface. An INDEX,
@@ -76,16 +81,22 @@ place, and the two readers are adapters, not parallel re-implementations.
   name, documents the Guest-has-no-ladder distinction). Pure rename; `tsc` clean, **102 tests green**.
   Commit `a1e4357`. **Unblocks the content/public collapse → [ticket 04](04-collapse-content-public-adapters.md).**
 
+- [Collapse content.ts / public.ts onto a shared reader core](04-collapse-content-public-adapters.md) —
+  **the destination's final leg, landed.** Grilling settled the open question empirically: a real core
+  remained but a **per-artifact** one, not a whole-course core. The `getLesson`/`publicLesson` and
+  `getReference`/`publicReference` bodies were byte-for-byte identical after resolution → extracted as
+  **`readLesson`/`readReference`** in `lib.ts`; the shared TOC mappings → **`lessonsToc`/`referencesToc`**
+  (now used by both the list queries and the Guest `publicCourse`). Both readers are now **thin
+  adapters** (resolve principal → call core). The Guest `publicCourse` full-mirror has no authed twin
+  and its output allowlist is a security boundary, so it was **deliberately not collapsed** (kept
+  adapter-side). Pure extraction, no behavior change; content.ts/public.ts each −45 lines into one core.
+  `tsc` clean, **full convex suite 459 tests green**. Commit `c89fb03`. **Destination reached.**
+
 ## Not yet specified
 
 <!-- in-scope fog: real but not yet sharp enough to ticket; graduates as the frontier advances -->
 
-- ~~**Collapse content.ts / public.ts into one reader + two adapters.**~~ **Graduated 2026-07-22** when
-  [ticket 03](03-fold-edition-selection-resolvers.md) closed — now a live frontier ticket,
-  [Collapse content.ts / public.ts into one reader core + two adapters](04-collapse-content-public-adapters.md).
-  Carries forward 03's open question of whether a real reader core remains after 01–03 already shared
-  `loadEdition` / `grantsFor` / `editionAccessLevel` / `resolveEdition`, or whether the adapters are already
-  thin. No longer fog.
+- _(empty — all fog graduated and resolved; the destination is reached.)_
 
 ## Out of scope
 

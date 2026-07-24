@@ -1,6 +1,7 @@
 # edition-deepening/04: Collapse content.ts / public.ts into one reader core + two adapters
 
-**Status:** open — frontier (graduated from fog 2026-07-22 when [03](03-fold-edition-selection-resolvers.md) closed)
+**Status:** done (commit `c89fb03`) — reader core extracted; both readers now thin adapters
+**Claimed:** jonathan (session 2026-07-22)
 **Labels:** wayfinder:grilling
 **Depends on:** 01 (DONE — `loadEdition` projection), 02 (DONE — `grantsFor`), 03 (DONE — `resolveEdition` seam named)
 **Parent:** [00 — Edition surface deepening map](00-edition-deepening-map.md)
@@ -44,3 +45,31 @@ worth it or whether 01–03 already captured the real leverage and this leg clos
 already thin."
 
 Blocked by 01/02/03 (all DONE) — on the frontier now.
+
+---
+
+## Resolution (2026-07-22, commit `c89fb03`)
+
+**Finding: a real reader core remained, but a modest, per-artifact one — not a whole-course core.**
+Reading both readers' query bodies side by side settled the ticket's own first question empirically:
+
+- The parallel **`getLesson`/`publicLesson`** and **`getReference`/`publicReference`** bodies were
+  **byte-for-byte identical after resolution** — same `loadEdition(...).lesson()`/`.reference()`, same
+  lock gate, same locked-marker-vs-body return. The only difference was the resolution preamble
+  (authed `resolveEdition` + `none`→not-found gate vs Guest token).
+- The Guest's **`publicCourse`** full-mirror has **no authed twin** (the authed side splits that across
+  `listLessons`/`listReferences`/a resources query/`capture.myQuestions`) and carries a deliberate
+  **output allowlist** (anonymous safety). Collapsing across that security boundary would cost clarity
+  for no dedup — **ruled out** (option C rejected).
+
+**What landed (option A, behavior-preserving):**
+1. **`readLesson(ctx, topic, lang, level, key)`** and **`readReference(...)`** in `lib.ts` — the
+   null/locked/body payload for an already-resolved Edition. `getLesson`/`publicLesson` and
+   `getReference`/`publicReference` are now **thin adapters**: resolve principal → call the core.
+2. **`lessonsToc` / `referencesToc`** in `lib.ts` — the shared TOC mappings, used by
+   `listLessons`/`listReferences` **and** the Guest's `publicCourse` (which stops inlining them).
+3. The Guest allowlist + resources/progress/questions full-mirror stay **adapter-side, untouched**.
+
+Pure extraction — content.ts −45 / public.ts −45 lines of parallel body absorbed into one core
+(lib.ts +88). `tsc -p convex` clean; **full convex suite 459 tests green**. The two readers are now
+adapters over a shared core, not parallel re-implementations — **the map's destination is reached.**
