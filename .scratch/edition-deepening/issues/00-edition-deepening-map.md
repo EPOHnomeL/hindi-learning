@@ -58,22 +58,34 @@ place, and the two readers are adapters, not parallel re-implementations.
   `enrolled` fan-out now resolves in one table-walk: `grantsFor(ctx, topicId, userId) → Map<lang,
   Grant>` (provenance kept, precedence viewer > entitled > enrolled) replaces `viewerLangs`/
   `entitledLangs`/`enrolledLangs`. `heldLangs`/`editionAccessLevel`/`readableLang` take an optional
-  precomputed map; `resolveReaderEdition` walks once per request and threads it. Owner stays a
-  caller-resolved special case (source + ready translationJobs), not a grant. Adding a grant type is
-  now one block + one union member. Commit `7a2c5a3`.
+  precomputed map; `resolveEdition` (then `resolveReaderEdition`) walks once per request and threads
+  it. Owner stays a caller-resolved special case (source + ready translationJobs), not a grant. Adding
+  a grant type is now one block + one union member. Commit `7a2c5a3`.
+
+- [Fold the Edition-selection resolvers — `resolveEdition`](03-fold-edition-selection-resolvers.md) —
+  **resolved as "already folded by 01+02; ratified + named."** Grilling the interface killed the
+  ticket's `principal`-union premise: the Guest reader does **no selection** (its token fixes topic+lang
+  via `guestEditionFromToken`, then classifies with the already-shared `editionAccessLevel`), so routing
+  it through one `resolveEdition(topic, principal, requested)` would invent a never-firing fallback
+  ladder — a hypothetical seam, **rejected**. `capture.myQuestions` stays on `readableLang` (it needs
+  the null-when-nothing-held signal the reader seam never returns). The "four functions with different
+  fallback rules" turned out **not duplicated** — request-vs-held (`resolveEdition`) and held-fallback
+  (`readableLang`) are distinct concerns, each already in one place after 02. **Landed
+  (behavior-preserving):** `resolveReaderEdition` → **`resolveEdition`** (THE authed selection seam,
+  doc'd) and `public.ts`'s private `resolveEdition(token)` → **`guestEditionFromToken`** (frees the
+  name, documents the Guest-has-no-ladder distinction). Pure rename; `tsc` clean, **102 tests green**.
+  Commit `a1e4357`. **Unblocks the content/public collapse → [ticket 04](04-collapse-content-public-adapters.md).**
 
 ## Not yet specified
 
 <!-- in-scope fog: real but not yet sharp enough to ticket; graduates as the frontier advances -->
 
-- **Collapse content.ts / public.ts into one reader + two adapters.** The destination's final leg (review candidate 04):
-  make the authed reader and the Guest reader thin adapters over one shared reader core, deleting the parallel query
-  stacks. Blocked in spirit by **the Edition reader** (the projection must be deep first) and **fold the
-  Edition-selection resolvers** (selection/classification unified across authed + Guest). Its exact slicing — one
-  ticket or several (reader core, authed adapter, Guest adapter, delete-old-queries, migrate tests) — hangs on how
-  those two land, so it stays fog until they do. **The Edition reader (01) is now closed** — the
-  reader core is deep, so the authed/Guest adapters have something to sit over; this now waits only
-  on **fold the Edition-selection resolvers (03)**. Graduates once 03 is closed.
+- ~~**Collapse content.ts / public.ts into one reader + two adapters.**~~ **Graduated 2026-07-22** when
+  [ticket 03](03-fold-edition-selection-resolvers.md) closed — now a live frontier ticket,
+  [Collapse content.ts / public.ts into one reader core + two adapters](04-collapse-content-public-adapters.md).
+  Carries forward 03's open question of whether a real reader core remains after 01–03 already shared
+  `loadEdition` / `grantsFor` / `editionAccessLevel` / `resolveEdition`, or whether the adapters are already
+  thin. No longer fog.
 
 ## Out of scope
 

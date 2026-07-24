@@ -1,6 +1,6 @@
 # edition-deepening/03: Fold the Edition-selection resolvers — one `resolveEdition` over a principal
 
-**Status:** open — now the sole frontier (02 landed in `7a2c5a3`)
+**Status:** done (commit `a1e4357`) — resolved as "already folded by 01+02; ratified + named"
 **Claimed:** jonathan (session 2026-07-22)
 **Labels:** wayfinder:grilling
 **Depends on:** 02 (DONE) — `resolveReaderEdition` already computes `grantsFor` once
@@ -34,3 +34,39 @@ Interface questions to grill:
 Guest path stops duplicating the shape.
 
 Blocked by ticket 02. Together with ticket 01 it unblocks the fogged content/public collapse (map Not yet specified).
+
+---
+
+## Resolution (2026-07-22, commit `a1e4357`)
+
+**Finding: the fold this ticket set out to do was already achieved by tickets 01 and 02.**
+Grilling the interface against the actual code (design-in-ticket) collapsed the premise:
+
+- **The `principal` union is a hypothetical seam, not a real one — rejected.** The Guest reader
+  does **no Edition selection**: its Public-link token fixes *both* topic and lang in one lookup
+  (`guestEditionFromToken`, formerly the private `resolveEdition(token)`), then classifies via the
+  **already-shared** `editionAccessLevel`. Routing the Guest through `resolveEdition(topic, principal,
+  requested)` would invent a `requested` that is always the token-lang and a fallback ladder that can
+  never fire — the exact "hypothetical seam" the ticket warned against. So the Guest stays a thin
+  token adapter over the shared classifier; it is **not** dragged through a `principal` abstraction.
+- **`capture.myQuestions` stays on `readableLang`.** It needs the **null-when-nothing-held** signal
+  (→ returns `[]`); the reader seam deliberately never returns null (unheld-paid → `preview`). These
+  are two different needs, so `readableLang` remains the exported selection *primitive* that the seam
+  is built on — capture calls it directly rather than re-deriving "no access" from `level === "none"`.
+- **The "four functions with subtly different fallback rules" turned out not to be duplicated.**
+  `resolveEdition`'s request-vs-held ladder and `readableLang`'s held→English→deterministic fallback
+  are two *distinct* concerns, each already living in exactly one place after ticket 02 threaded
+  `grantsFor` once. There was no repeated fallback logic left to unify.
+
+**What actually landed (behavior-preserving, per the user's "don't break anything" constraint):**
+1. `resolveReaderEdition` → **`resolveEdition`** (the map's canonical seam name), with a doc comment
+   naming it as THE authed selection+classification seam and pointing at the two intentional
+   exceptions (Guest token adapter; capture's `readableLang`).
+2. `public.ts`'s private `resolveEdition(token)` → **`guestEditionFromToken`** (frees the name, kills
+   the collision, documents the Guest-has-no-ladder distinction).
+
+Pure rename + comments — **zero behavior change**. `tsc -p convex` clean; **102 reader/access tests
+green** (content / public / edition-reader / enrollment / market / translate / sharing-readonly).
+
+Leg 3 of the map's destination is satisfied. The fogged **content/public collapse** (map *Not yet
+specified*) is now unblocked → graduated to **[ticket 04](04-collapse-content-public-adapters.md)**.
