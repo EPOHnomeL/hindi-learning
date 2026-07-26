@@ -356,6 +356,98 @@ export const removeEdition = mutation({
   },
 });
 
+// Clone one ready Edition's translated content + owner-granted access into a
+// brand-new language code, in place — a one-off admin seam (not exposed in the
+// UI) for standing up a new Edition from a linguistically-close existing one
+// (e.g. seeding Northern Ndebele from the closer Zulu translation, rather than
+// firing a fresh translate run) without losing who already holds the source
+// Edition. Copies `translations` rows verbatim (same `sourceHash` — they were
+// translated from the same English source, just relabelled) and a `ready`
+// `translationJobs` row; copies `shares`/`pendingShares` (viewer AND editor
+// roles) from `fromLang` to `toLang`, skipping any viewer/invite that already
+// holds `toLang`. Deliberately leaves `publicLinks`/`enrollments`/`entitlements`/
+// `listings` untouched — those are per-Edition capabilities (a link token, a
+// purchase) that don't make sense to blindly duplicate. Refuses if `toLang`
+// already has a job (never overwrites an existing Edition) or `fromLang` isn't
+// `ready`.
+export const cloneEdition = mutation({
+  args: { secret: v.string(), topicSlug: v.string(), fromLang: v.string(), toLang: v.string() },
+  returns: v.object({ translations: v.number(), shares: v.number(), pendingShares: v.number() }),
+  handler: async (ctx, { secret, topicSlug, fromLang, toLang }) => {
+    assertAdmin(secret);
+    if (!isKnownLang(toLang)) throw new Error("unsupported target language");
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) throw new Error("topic not found");
+
+    const fromJob = await ctx.db
+      .query("translationJobs")
+      .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", fromLang))
+      .unique();
+    if (!fromJob || fromJob.status !== "ready") throw new Error("source edition not ready");
+    const existingToJob = await ctx.db
+      .query("translationJobs")
+      .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", toLang))
+      .unique();
+    if (existingToJob) throw new Error("target edition already exists");
+
+    const rows = await ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", fromLang))
+      .collect();
+    for (const r of rows) {
+      await ctx.db.insert("translations", {
+        topicId: topic._id,
+        lang: toLang,
+        kind: r.kind,
+        key: r.key,
+        title: r.title,
+        html: r.html,
+        htmlStorageId: r.htmlStorageId,
+        text: r.text,
+        reply: r.reply,
+        sourceHash: r.sourceHash,
+      });
+    }
+    await ctx.db.insert("translationJobs", {
+      topicId: topic._id,
+      lang: toLang,
+      status: "ready",
+      total: fromJob.total,
+      done: fromJob.done,
+      failed: fromJob.failed,
+      engine: fromJob.engine,
+    });
+
+    const shares = await ctx.db.query("shares").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect();
+    let sharesCopied = 0;
+    for (const s of shares) {
+      if (shareLang(s) !== fromLang) continue;
+      const already = await ctx.db
+        .query("shares")
+        .withIndex("by_topic_viewer", (q) => q.eq("topicId", topic._id).eq("viewerId", s.viewerId))
+        .collect();
+      if (already.some((x) => shareLang(x) === toLang)) continue;
+      await ctx.db.insert("shares", { topicId: topic._id, viewerId: s.viewerId, lang: toLang, role: s.role });
+      sharesCopied++;
+    }
+
+    const pending = await ctx.db.query("pendingShares").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect();
+    let pendingCopied = 0;
+    for (const p of pending) {
+      if ((p.lang ?? SOURCE_LANG) !== fromLang) continue;
+      const already = await ctx.db
+        .query("pendingShares")
+        .withIndex("by_topic_email_lang", (q) => q.eq("topicId", topic._id).eq("email", p.email).eq("lang", toLang))
+        .unique();
+      if (already) continue;
+      await ctx.db.insert("pendingShares", { topicId: topic._id, email: p.email, lang: toLang, role: p.role });
+      pendingCopied++;
+    }
+
+    return { translations: rows.length, shares: sharesCopied, pendingShares: pendingCopied };
+  },
+});
+
 // ---- Owner/Editor: edition title & mission edit (edition-title-edit 01) -----
 
 // Fix an Edition's translated title or mission in place — the topic-level
