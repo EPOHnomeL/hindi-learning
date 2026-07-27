@@ -154,7 +154,7 @@
     "continueToPayFast": "Continuer vers PayFast",
     "checkoutFailed": "Impossible de démarrer le paiement — veuillez réessayer.",
     "payFastNoteShort": "Paiement sécurisé · payez une fois, gardez à vie",
-    "bankGuidance": "<b>Votre banque n'apparaît pas sous Instant EFT ?</b> Payez par carte — cela fonctionne avec toutes les banques sud-africaines.",
+    "bankGuidance": "<b>Votre banque n'apparaît pas sous Instant EFT ?</b> Choisissez Credit & Cheque card — cela fonctionne avec toutes les banques.",
     "purchaseAgreement": "En achetant, vous acceptez les <terms>Conditions</terms> et la <refund>Politique de remboursement</refund>."
   },
   "Settings": {

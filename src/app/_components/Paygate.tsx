@@ -201,8 +201,10 @@ function BuyDialog({
           picker, which is theirs to word. PayFast advertises 9 Instant EFT banks
           but renders only 5 on this account (Absa, Standard Bank, Capitec and
           African Bank are absent), so a buyer at one of those banks picks the
-          tile that sounds right, finds no bank, and abandons. Card is the answer
-          for all of them, so that's all this says.
+          tile that sounds right, finds no bank, and abandons. "Credit & Cheque
+          card" is the answer for all of them, so that's all this says. Both tile
+          names are quoted VERBATIM from PayFast's picker and stay English in every
+          locale — a translated label is one the buyer can't find on screen.
           ponytail: hardcodes PayFast's CURRENT coverage. If they restore the four
           banks, delete this note and the `bankGuidance` key rather than editing it. */}
       <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">
