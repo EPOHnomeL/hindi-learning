@@ -1,6 +1,6 @@
 # PRD: Bank transfer payments — regional **Collection accounts** + manual approval
 
-Status: in progress
+Status: done
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — **Entitlement**, **Edition**,
 > **Ledger**, **Seller**, **Preview**, **Admin**, plus the two terms this PRD adds:
