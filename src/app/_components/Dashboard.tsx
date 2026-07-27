@@ -9,6 +9,7 @@ import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
+import { BankTransfersSection } from "./BankTransfers";
 import { CourseCertMenu } from "./Certificate";
 import { CourseSettingsDialog } from "./CourseSettings";
 import { EditionsDialog } from "./Editions";
@@ -161,6 +162,10 @@ export function Dashboard() {
 
         <SharedSection />
         <PurchasedSection />
+        {/* Bank transfer payments waiting on the owner's approval, plus the
+            regional Collection accounts buyers pay into. Renders nothing for a
+            reader who can't take one. */}
+        <BankTransfersSection />
       </div>
       <SiteFooter />
       {prefsOpen && <SettingsDialog onClose={() => setPrefsOpen(false)} />}

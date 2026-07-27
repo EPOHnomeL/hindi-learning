@@ -1,10 +1,11 @@
 "use client";
 
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
+import type { Id } from "../../../convex/_generated/dataModel";
 import { Icon } from "./icons";
 import { Dialog } from "./ui";
 
@@ -148,6 +149,17 @@ function BuyDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canBuy = !!topicSlug && !!lang;
+  // Bank transfer (.scratch/bank-transfer-payments) — the manual money path for
+  // buyers PayFast can't serve. Offered only when the course owner keeps a
+  // Collection account; the buyer's own in-flight transfer (if any) takes over the
+  // dialog, since a reference already quoted to a bank is the thing they came back
+  // for. Both queries are cheap and skip entirely when the Edition is unknown.
+  const editionArgs = canBuy ? { topicSlug: topicSlug!, lang: lang! } : "skip";
+  const bankOptions = useQuery(api.bankTransfer.bankOptions, editionArgs);
+  const myTransfer = useQuery(api.bankTransfer.myBankTransfer, editionArgs);
+  const [payingByBank, setPayingByBank] = useState(false);
+  const inFlight = myTransfer && myTransfer.status !== "declined" ? myTransfer : null;
+  const showBank = payingByBank || !!inFlight;
 
   const checkout = async () => {
     if (!canBuy) return;
@@ -197,48 +209,215 @@ function BuyDialog({
         <span>{t("unlockDialogBody", { edition: editionName ?? t("thisLanguage") })}</span>
       </div>
 
-      {/* Bank-to-method guidance — the last surface we own before PayFast's hosted
-          picker, which is theirs to word. PayFast advertises 9 Instant EFT banks
-          but renders only 5 on this account (Absa, Standard Bank, Capitec and
-          African Bank are absent), so a buyer at one of those banks picks the
-          tile that sounds right, finds no bank, and abandons. "Credit & Cheque
-          card" is the answer for all of them, so that's all this says. Both tile
-          names are quoted VERBATIM from PayFast's picker and stay English in every
-          locale — a translated label is one the buyer can't find on screen.
-          ponytail: hardcodes PayFast's CURRENT coverage. If they restore the four
-          banks, delete this note and the `bankGuidance` key rather than editing it. */}
-      <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">
-        {t.rich("bankGuidance", { b: (c) => <b className="font-semibold text-ink">{c}</b> })}
-      </p>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void checkout();
-        }}
-      >
-        <button
-          type="submit"
-          disabled={!canBuy || busy}
-          className="mt-4 w-full rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          {busy ? t("redirecting") : price ? `${t("continueToPayFast")} · ${price}` : t("continueToPayFast")}
-        </button>
-      </form>
-      {error ? (
-        <p className="mt-2.5 text-center text-xs text-danger">{error}</p>
+      {showBank ? (
+        <BankTransferPanel
+          topicSlug={topicSlug!}
+          lang={lang!}
+          options={bankOptions ?? []}
+          transfer={inFlight}
+          declined={myTransfer?.status === "declined" ? myTransfer : null}
+          onBack={() => setPayingByBank(false)}
+        />
       ) : (
-        <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-xs text-soft">
-          <Icon name="globe" className="h-3.5 w-3.5 text-accent2" /> {t("payFastNoteShort")}
+        <>
+          {/* Bank-to-method guidance — the last surface we own before PayFast's hosted
+              picker, which is theirs to word. PayFast advertises 9 Instant EFT banks
+              but renders only 5 on this account (Absa, Standard Bank, Capitec and
+              African Bank are absent), so a buyer at one of those banks picks the
+              tile that sounds right, finds no bank, and abandons. "Credit & Cheque
+              card" is the answer for all of them, so that's all this says. Both tile
+              names are quoted VERBATIM from PayFast's picker and stay English in every
+              locale — a translated label is one the buyer can't find on screen.
+              ponytail: hardcodes PayFast's CURRENT coverage. If they restore the four
+              banks, delete this note and the `bankGuidance` key rather than editing it. */}
+          <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">
+            {t.rich("bankGuidance", { b: (c) => <b className="font-semibold text-ink">{c}</b> })}
+          </p>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void checkout();
+            }}
+          >
+            <button
+              type="submit"
+              disabled={!canBuy || busy}
+              className="mt-4 w-full rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {busy ? t("redirecting") : price ? `${t("continueToPayFast")} · ${price}` : t("continueToPayFast")}
+            </button>
+          </form>
+          {error ? (
+            <p className="mt-2.5 text-center text-xs text-danger">{error}</p>
+          ) : (
+            <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-xs text-soft">
+              <Icon name="globe" className="h-3.5 w-3.5 text-accent2" /> {t("payFastNoteShort")}
+            </p>
+          )}
+          {/* Point-of-sale compliance: the refund policy (all sales final) linked where the buyer commits. */}
+          <p className="mt-1 text-center text-xs text-soft">
+            {t.rich("purchaseAgreement", {
+              terms: (c) => <Link href="/terms" className="text-accent2 underline-offset-2 hover:underline">{c}</Link>,
+              refund: (c) => <Link href="/refunds" className="text-accent2 underline-offset-2 hover:underline">{c}</Link>,
+            })}
+          </p>
+          {/* The manual money path, offered only when the course owner keeps a
+              Collection account to receive it (.scratch/bank-transfer-payments). */}
+          {!!bankOptions?.length && (
+            <button
+              type="button"
+              onClick={() => setPayingByBank(true)}
+              className="mt-3 w-full text-center text-xs text-accent2 underline-offset-2 hover:underline"
+            >
+              {t("payByBankInstead")}
+            </button>
+          )}
+        </>
+      )}
+    </Dialog>
+  );
+}
+
+// Pay by bank transfer (.scratch/bank-transfer-payments) — the manual path, for a
+// buyer PayFast can't serve (a cross-border card on a ZAR merchant account). Three
+// states in one panel:
+//   pick a region  → the owner's Collection accounts, label/currency only
+//   awaiting       → the account's full details + the REFERENCE to quote, which is
+//                    the whole mechanism: the owner matches it on their statement
+//                    and approves, and this query is reactive so the screen flips
+//                    the moment they do
+//   approved       → paid; the reader unlocks behind this dialog
+// Requesting grants nothing — only the owner's approval does.
+function BankTransferPanel({
+  topicSlug,
+  lang,
+  options,
+  transfer,
+  declined,
+  onBack,
+}: {
+  topicSlug: string;
+  lang: string;
+  options: { id: Id<"bankAccounts">; label: string; country: string; currency: string }[];
+  transfer: {
+    reference: string;
+    status: "awaiting" | "approved" | "declined";
+    amount: number;
+    currency: string;
+    note: string | null;
+    account: {
+      label: string;
+      country: string;
+      currency: string;
+      accountHolder: string;
+      bankName: string;
+      accountNumber: string;
+      routingCode?: string;
+      swift?: string;
+      instructions?: string;
+    } | null;
+  } | null;
+  declined: { note: string | null } | null;
+  onBack: () => void;
+}) {
+  const t = useTranslations("Checkout");
+  const request = useMutation(api.bankTransfer.requestBankTransfer);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  const choose = (bankAccountId: Id<"bankAccounts">) => {
+    setBusy(true);
+    setFailed(false);
+    void request({ topicSlug, lang, bankAccountId })
+      .catch(() => setFailed(true))
+      .finally(() => setBusy(false));
+  };
+
+  if (transfer?.status === "approved") {
+    return (
+      <div className="mt-4 rounded-xl border border-accent2/40 bg-accent2/10 p-3.5 text-sm leading-relaxed text-ink">
+        <Icon name="check" className="mr-1.5 inline h-4 w-4 text-accent2" />
+        {t("bankApproved")}
+      </div>
+    );
+  }
+
+  if (transfer?.status === "awaiting") {
+    const a = transfer.account;
+    return (
+      <div className="mt-4 flex flex-col gap-3">
+        <div className="rounded-xl border border-gold/40 bg-gold/10 p-3.5">
+          <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{t("yourReference")}</span>
+          <b className="mt-0.5 block font-mono text-lg font-semibold tracking-wider text-ink">{transfer.reference}</b>
+          <p className="mt-1.5 text-xs leading-relaxed text-soft">{t("referenceHint")}</p>
+        </div>
+        {a && (
+          <dl className="rounded-xl border border-line bg-card p-3.5 text-sm">
+            <Detail label={t("bankAmount")} value={formatPrice(transfer.amount, transfer.currency)} />
+            <Detail label={t("bankHolder")} value={a.accountHolder} />
+            <Detail label={t("bankName")} value={a.bankName} />
+            <Detail label={t("bankAccountNumber")} value={a.accountNumber} mono />
+            {a.routingCode && <Detail label={t("bankRoutingCode")} value={a.routingCode} mono />}
+            {a.swift && <Detail label={t("bankSwift")} value={a.swift} mono />}
+            <Detail label={t("bankCountry")} value={`${a.country} · ${a.currency.toUpperCase()}`} />
+            {a.currency !== transfer.currency && (
+              <p className="mt-2 text-xs leading-relaxed text-soft">{t("bankCurrencyNote")}</p>
+            )}
+            {a.instructions && <p className="mt-2 text-xs leading-relaxed text-soft">{a.instructions}</p>}
+          </dl>
+        )}
+        <p className="flex items-start gap-2 text-xs leading-relaxed text-soft">
+          <Icon name="lock" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent2" /> {t("bankAwaitingNote")}
+        </p>
+        {options.length > 1 && (
+          <button type="button" onClick={onBack} className="text-center text-xs text-accent2 underline-offset-2 hover:underline">
+            {t("bankChangeRegion")}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // No transfer in flight: pick a region. A declined attempt shows its reason
+  // above the picker, so the buyer knows what went wrong before trying again.
+  return (
+    <div className="mt-4 flex flex-col gap-2.5">
+      {declined && (
+        <p className="rounded-xl border border-danger/40 bg-danger/10 p-3 text-xs leading-relaxed text-ink">
+          {t("bankDeclined")}
+          {declined.note ? ` — ${declined.note}` : ""}
         </p>
       )}
-      {/* Point-of-sale compliance: the refund policy (all sales final) linked where the buyer commits. */}
-      <p className="mt-1 text-center text-xs text-soft">
-        {t.rich("purchaseAgreement", {
-          terms: (c) => <Link href="/terms" className="text-accent2 underline-offset-2 hover:underline">{c}</Link>,
-          refund: (c) => <Link href="/refunds" className="text-accent2 underline-offset-2 hover:underline">{c}</Link>,
-        })}
-      </p>
-    </Dialog>
+      <p className="text-sm leading-relaxed text-soft">{t("bankPickRegion")}</p>
+      {options.map((o) => (
+        <button
+          key={o.id}
+          type="button"
+          disabled={busy}
+          onClick={() => choose(o.id)}
+          className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-3.5 py-3 text-left text-sm transition-colors hover:border-gold/60 hover:bg-hi disabled:opacity-60"
+        >
+          <b className="font-medium text-ink">{o.label}</b>
+          <span className="shrink-0 text-xs text-soft">
+            {o.country} · {o.currency.toUpperCase()}
+          </span>
+        </button>
+      ))}
+      {failed && <p className="text-xs text-danger">{t("checkoutFailed")}</p>}
+      <button type="button" onClick={onBack} className="text-center text-xs text-accent2 underline-offset-2 hover:underline">
+        {t("payByCardInstead")}
+      </button>
+    </div>
+  );
+}
+
+// One label/value line of the bank details a buyer copies into their banking app.
+function Detail({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line py-1.5 last:border-0">
+      <dt className="text-[11px] font-bold uppercase tracking-wide text-accent2">{label}</dt>
+      <dd className={`min-w-0 break-all text-right text-[13px] text-ink ${mono ? "font-mono" : ""}`}>{value}</dd>
+    </div>
   );
 }

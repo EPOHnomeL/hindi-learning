@@ -8,6 +8,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { SellerStatus, TenantFlag } from "../../../convex/lib";
 import { TENANT_THEME_TOKENS, type Token } from "../../design/tokens";
+import { TransferQueue } from "./BankTransfers";
 import { salesRange, type SalesPreset } from "./salesRange";
 import { colorVar, rankLanguages } from "./salesChart";
 
@@ -57,7 +58,9 @@ export function AdminPanel() {
 // The sys-admin dashboard: a tab switcher between the platform Allowlist and the
 // per-tenant Tenants panel. Allowlist is the default tab (its historical landing).
 function SysAdminDashboard() {
-  const [tab, setTab] = useState<"allowlist" | "sales" | "payouts" | "tenants" | "generation">("allowlist");
+  const [tab, setTab] = useState<"allowlist" | "sales" | "payouts" | "transfers" | "tenants" | "generation">(
+    "allowlist",
+  );
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
       <header className="mb-8 flex items-center justify-between gap-4">
@@ -70,6 +73,9 @@ function SysAdminDashboard() {
           </TabButton>
           <TabButton active={tab === "payouts"} onClick={() => setTab("payouts")}>
             Payouts
+          </TabButton>
+          <TabButton active={tab === "transfers"} onClick={() => setTab("transfers")}>
+            Transfers
           </TabButton>
           <TabButton active={tab === "tenants"} onClick={() => setTab("tenants")}>
             Tenants
@@ -88,6 +94,8 @@ function SysAdminDashboard() {
         <SalesManager />
       ) : tab === "payouts" ? (
         <PayoutsManager />
+      ) : tab === "transfers" ? (
+        <TransfersManager />
       ) : tab === "tenants" ? (
         <TenantsManager />
       ) : (
@@ -647,6 +655,25 @@ function PayoutRow({ owed }: { owed: FunctionReturnType<typeof api.ledger.owedPa
         {error && <span className="text-xs text-danger">Failed — retry</span>}
       </form>
     </li>
+  );
+}
+
+// Bank transfers awaiting approval, across EVERY course
+// (.scratch/bank-transfer-payments). Course owners approve their own from the
+// dashboard; this is the Admin's view of all of them, for when an owner can't act.
+// The queue component is the owner's, passed `all` — the server derives the scope
+// from the caller either way, so an owner opening this would still see only theirs.
+function TransfersManager() {
+  return (
+    <div className="mx-auto max-w-2xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Transfers</h1>
+        <p className="mt-0.5 text-sm text-soft">
+          Bank transfers awaiting approval — approving a reference grants the buyer access
+        </p>
+      </div>
+      <TransferQueue all />
+    </div>
   );
 }
 

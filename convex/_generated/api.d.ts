@@ -11,6 +11,7 @@
 import type * as auth from "../auth.js";
 import type * as authoring from "../authoring.js";
 import type * as backfill from "../backfill.js";
+import type * as bankTransfer from "../bankTransfer.js";
 import type * as capture from "../capture.js";
 import type * as certificates from "../certificates.js";
 import type * as content from "../content.js";
@@ -52,6 +53,7 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   authoring: typeof authoring;
   backfill: typeof backfill;
+  bankTransfer: typeof bankTransfer;
   capture: typeof capture;
   certificates: typeof certificates;
   content: typeof content;
