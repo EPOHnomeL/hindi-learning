@@ -142,7 +142,7 @@
     "thisEdition": "यह संस्करण",
     "namedEdition": "{name} संस्करण",
     "unlockFullCourse": "पूरा कोर्स अनलॉक करें",
-    "payFastNote": "PayFast के ज़रिए कार्ड या Instant EFT · एक बार भुगतान करें, हमेशा के लिए रखें",
+    "payFastNote": "PayFast के ज़रिए सुरक्षित भुगतान · एक बार भुगतान करें, हमेशा के लिए रखें",
     "unlockThisCourse": "इस कोर्स को अनलॉक करें",
     "thisCourse": "यह कोर्स",
     "editionLifetime": "{edition} · जीवन भर की पहुंच",
@@ -153,7 +153,8 @@
     "redirecting": "PayFast पर रीडायरेक्ट किया जा रहा है…",
     "continueToPayFast": "PayFast पर जारी रखें",
     "checkoutFailed": "चेकआउट शुरू नहीं हो सका — कृपया फिर से प्रयास करें।",
-    "payFastNoteShort": "कार्ड या Instant EFT · एक बार भुगतान करें, हमेशा के लिए रखें",
+    "payFastNoteShort": "सुरक्षित भुगतान · एक बार भुगतान करें, हमेशा के लिए रखें",
+    "bankGuidance": "<b>Instant EFT में आपका बैंक नहीं दिख रहा?</b> कार्ड से भुगतान करें — यह हर दक्षिण अफ़्रीकी बैंक के साथ काम करता है। अगर आपके डेबिट कार्ड पर CVV नंबर नहीं है, तो Debit Card चुनें और अपने फ़ोन पर भुगतान मंज़ूर करें।",
     "purchaseAgreement": "खरीदकर आप <terms>नियमों</terms> और <refund>रिफंड नीति</refund> से सहमत होते हैं।"
   },
   "Settings": {

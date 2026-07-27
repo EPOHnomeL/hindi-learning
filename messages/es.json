@@ -142,7 +142,7 @@
     "thisEdition": "esta edición",
     "namedEdition": "la edición {name}",
     "unlockFullCourse": "Desbloquear el curso completo",
-    "payFastNote": "Tarjeta o EFT instantáneo mediante PayFast · paga una vez, consérvalo para siempre",
+    "payFastNote": "Pago seguro mediante PayFast · paga una vez, consérvalo para siempre",
     "unlockThisCourse": "Desbloquear este curso",
     "thisCourse": "Este curso",
     "editionLifetime": "{edition} · acceso de por vida",
@@ -153,7 +153,8 @@
     "redirecting": "Redirigiendo a PayFast…",
     "continueToPayFast": "Continuar a PayFast",
     "checkoutFailed": "No se pudo iniciar el pago — inténtalo de nuevo.",
-    "payFastNoteShort": "Tarjeta o EFT instantáneo · paga una vez, consérvalo para siempre",
+    "payFastNoteShort": "Pago seguro · paga una vez, consérvalo para siempre",
+    "bankGuidance": "<b>¿Tu banco no aparece en Instant EFT?</b> Paga con tarjeta: funciona con todos los bancos sudafricanos. Si tu tarjeta de débito no tiene número CVV, elige Debit Card y autoriza el pago en tu teléfono.",
     "purchaseAgreement": "Al comprar aceptas los <terms>Términos</terms> y la <refund>Política de reembolsos</refund>."
   },
   "Settings": {

@@ -174,7 +174,7 @@
     "thisEdition": "this edition",
     "namedEdition": "the {name} edition",
     "unlockFullCourse": "Unlock the full course",
-    "payFastNote": "Card or Instant EFT via PayFast · pay once, keep forever",
+    "payFastNote": "Secure payment via PayFast · pay once, keep forever",
     "unlockThisCourse": "Unlock this course",
     "thisCourse": "This course",
     "editionLifetime": "{edition} · lifetime access",
@@ -185,7 +185,8 @@
     "redirecting": "Redirecting to PayFast…",
     "continueToPayFast": "Continue to PayFast",
     "checkoutFailed": "Couldn’t start checkout — please try again.",
-    "payFastNoteShort": "Card or Instant EFT · pay once, keep forever",
+    "payFastNoteShort": "Secure payment · pay once, keep forever",
+    "bankGuidance": "<b>Bank not listed under Instant EFT?</b> Pay by card — it works with every South African bank. If your debit card has no CVV number, choose Debit Card and approve the payment on your phone.",
     "purchaseAgreement": "By purchasing you agree to the <terms>Terms</terms> and <refund>Refund Policy</refund>."
   },
   "Settings": {
