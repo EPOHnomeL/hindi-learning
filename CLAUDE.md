@@ -24,8 +24,9 @@ file above instead. Context must travel with the repo, not the computer.
   (amend swallows another session's staged files). Push only when asked.
 - **`.env` is the user's** — never edit/`sed`/`cp` it; tell the user the exact
   line to change. Reading config at runtime is fine.
-- **Issues are local-first:** local markdown under `.scratch/<feature>/` is the
-  only tracker (GitHub Issues retired 2026-07-15). Don't create GitHub issues.
+- **Issues live on GitHub** (reenabled 2026-07-24, after a brief 2026-07-15
+  local-only retirement). Use `gh issue` for tracking; `.scratch/<feature>/`
+  still holds PRDs and any scoping notes that don't belong as an issue body.
 
 ## Feature workflow
 
@@ -33,14 +34,14 @@ For any non-trivial feature or change, do **not** use plan mode. Follow this pip
 
 1. **Grill** — run the `grilling` skill to stress-test the idea and pin down requirements.
 2. **PRD** — capture the agreed scope as a PRD under `.scratch/<feature>/` (see Issue tracker).
-3. **Issues** — break the PRD into local issue files `.scratch/<feature-slug>/issues/<NN>-<title>.md`.
+3. **Issues** — break the PRD into GitHub issues (`gh issue create`), one per unit of work.
 4. **Implement** — build each issue with the `tdd` skill (test-first) and the `ponytail` skill (laziest solution that works).
 
 ## Agent skills
 
 ### Issue tracker
 
-Issues live as local markdown under `.scratch/<feature>/issues/`; PRDs alongside them as `.scratch/<feature>/PRD.md`. GitHub Issues retired 2026-07-15. See `docs/agents/issue-tracker.md`.
+Issues live on GitHub (reenabled 2026-07-24); PRDs live locally as `.scratch/<feature>/PRD.md`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

@@ -26,6 +26,8 @@ before any build. No PRD exists yet by design.
 | 09 | [Editions × embedded media](issues/09-scope-editions-embedded-media.md) | Translate pipeline |
 | 10 | [AI linking into Resources](issues/10-scope-resource-deep-linking.md) — **resolved** | Citations → owned Resources (whole-resource; anchors deferred) |
 | 11 | [Implement Resource links](issues/11-implement-resource-links.md) — **ready-for-agent** | materialise + reader interceptor + skill guidance |
+| 12 | [Book screenshots + direct references](https://github.com/EPOHnomeL/hindi-learning/issues/108) — **GitHub #108** | Screenshot-derived images (01/02) + page-level book references (extends 10) |
 
 Rough dependency order: 01–03 are independent; 04 → 05, 07, 10; 03 → 07, 09; 02 → 09.
-06 and 08 are decisions that shape everything downstream but can be scoped in parallel.
+06 and 08 are decisions that shape everything downstream but can be scoped in parallel. 12 depends
+on 01, 02, and 10.
