@@ -186,7 +186,7 @@
     "continueToPayFast": "Continue to PayFast",
     "checkoutFailed": "Couldn’t start checkout — please try again.",
     "payFastNoteShort": "Secure payment · pay once, keep forever",
-    "bankGuidance": "<b>Bank not listed under Instant EFT?</b> Pay by card — it works with every South African bank. If your debit card has no CVV number, choose Debit Card and approve the payment on your phone.",
+    "bankGuidance": "<b>Bank not listed under Instant EFT?</b> Pay by card — it works with every South African bank.",
     "purchaseAgreement": "By purchasing you agree to the <terms>Terms</terms> and <refund>Refund Policy</refund>."
   },
   "Settings": {

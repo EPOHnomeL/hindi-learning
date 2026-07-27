@@ -201,9 +201,8 @@ function BuyDialog({
           picker, which is theirs to word. PayFast advertises 9 Instant EFT banks
           but renders only 5 on this account (Absa, Standard Bank, Capitec and
           African Bank are absent), so a buyer at one of those banks picks the
-          tile that sounds right, finds no bank, and abandons. Card covers every
-          SA bank; the Debit Card method is the narrow fallback for the no-CVV
-          Visa Electron/Maestro cards that can't be typed into a web form at all.
+          tile that sounds right, finds no bank, and abandons. Card is the answer
+          for all of them, so that's all this says.
           ponytail: hardcodes PayFast's CURRENT coverage. If they restore the four
           banks, delete this note and the `bankGuidance` key rather than editing it. */}
       <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">

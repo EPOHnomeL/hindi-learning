@@ -154,7 +154,7 @@
     "continueToPayFast": "Continuer vers PayFast",
     "checkoutFailed": "Impossible de démarrer le paiement — veuillez réessayer.",
     "payFastNoteShort": "Paiement sécurisé · payez une fois, gardez à vie",
-    "bankGuidance": "<b>Votre banque n'apparaît pas sous Instant EFT ?</b> Payez par carte — cela fonctionne avec toutes les banques sud-africaines. Si votre carte de débit n'a pas de numéro CVV, choisissez Debit Card et validez le paiement sur votre téléphone.",
+    "bankGuidance": "<b>Votre banque n'apparaît pas sous Instant EFT ?</b> Payez par carte — cela fonctionne avec toutes les banques sud-africaines.",
     "purchaseAgreement": "En achetant, vous acceptez les <terms>Conditions</terms> et la <refund>Politique de remboursement</refund>."
   },
   "Settings": {

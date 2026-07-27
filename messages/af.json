@@ -154,7 +154,7 @@
     "continueToPayFast": "Gaan voort na PayFast",
     "checkoutFailed": "Kon nie afhandeling begin nie — probeer asseblief weer.",
     "payFastNoteShort": "Veilige betaling · betaal een keer, hou dit vir altyd",
-    "bankGuidance": "<b>Word jou bank nie onder Instant EFT gelys nie?</b> Betaal met kaart — dit werk met elke Suid-Afrikaanse bank. As jou debietkaart geen CVV-nommer het nie, kies Debit Card en keur die betaling op jou foon goed.",
+    "bankGuidance": "<b>Word jou bank nie onder Instant EFT gelys nie?</b> Betaal met kaart — dit werk met elke Suid-Afrikaanse bank.",
     "purchaseAgreement": "Deur aan te koop, stem jy in tot die <terms>Bepalings</terms> en <refund>Terugbetalingsbeleid</refund>."
   },
   "Settings": {
