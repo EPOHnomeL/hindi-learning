@@ -1,19 +1,18 @@
 # course-translation/03: RTL reader chrome + a re-translate affordance for partially-ready Editions
 
-**Status:** open
+**Status:** open — reader-chrome RTL flip not built; retry not surfaced for ready-with-failures editions (re-entrancy guard is done)
+**Depends on:** — (none to start; RTL-chrome scope should be reconciled with app-language-i18n so direction handling isn't implemented twice)
 **Imported:** from GitHub #20 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/course-translation/issues/03-rtl-chrome-and-failed-item-retry-ux.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/course-translation/issues/03-rtl-chrome-and-failed-item-retry-ux.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# RTL reader chrome + a re-translate affordance for partially-ready Editions
-
-Status: open — reader-chrome RTL flip not built; retry not surfaced for ready-with-failures editions (re-entrancy guard is done)
+## Why
 
 > Deferred follow-up from the PR #4 review. Two reader/dashboard UX gaps around
 > Editions. The RTL-chrome half overlaps the deferred **app-language-i18n** work
 > (`.scratch/app-language-i18n/issues/01-global-app-language-picker.md`).
 
-## What to build
+## Scope
 
 Two related polish items for the Editions reader experience:
 
@@ -43,12 +42,6 @@ Two related polish items for the Editions reader experience:
       the translation (only failed/stale items re-billed).
 - [ ] The retry path respects the new re-entrancy guard (no action while a job is
       already `translating`).
-
-## Blocked by
-
-- None to start. RTL-chrome scope should be reconciled with app-language-i18n
-  (`.scratch/app-language-i18n/issues/01-global-app-language-picker.md`) so the
-  direction handling isn't implemented twice.
 
 ## Comments
 

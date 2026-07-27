@@ -1,13 +1,16 @@
 // The reader keeps a little state per person in localStorage — the last-used
 // Edition ("hindi:lang"), which answered questions they've already seen
-// ("hindi:answers-seen"), per-course certificate celebration flags, guest
-// progress — but the store is per *browser*, not per account. On the same
+// ("hindi:answers-seen"), guest progress — but the store is per *browser*, not
+// per account. On the same
 // browser, one account signing out and another signing in would otherwise
 // inherit the first person's state (most visibly: a course reopening in the
 // previous user's Edition language). So on sign-out we drop every "hindi:*" key.
 //
-// The one exception is "hindi:theme": light/dark is a deliberate device
-// preference (chosen even while signed out, on the landing page), so it stays.
+// Light/dark now lives in the parent-domain `hindi_theme` cookie (a deliberate
+// device preference, shared across subdomains — see ThemeContext), not in
+// localStorage, so it's untouched by this sweep. The legacy "hindi:theme" key is
+// kept so a not-yet-migrated user's dark mode survives sign-out until ThemeContext
+// migrates it to the cookie.
 const KEEP = new Set(["hindi:theme"]);
 const PREFIX = "hindi:";
 

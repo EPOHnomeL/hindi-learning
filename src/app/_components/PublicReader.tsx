@@ -161,7 +161,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
         >
           {/* Drawer handle for mobile */}
           <div className="mx-auto mb-3.5 h-1.5 w-12 shrink-0 rounded-full bg-line md:hidden" />
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-accent2">{t("publicCourse")}</p>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-accent2">{t(preview ? "course" : "publicCourse")}</p>
           <div className="mb-4">
             <h1 className="truncate text-lg font-semibold tracking-tight text-accent">{course.title}</h1>
             {/* The Edition this token serves (course-translation). A Guest holds the
@@ -199,7 +199,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
             ))}
 
             {course.resources.length > 0 && (
-              <details className="group mt-1">
+              <details className="group mt-1" open={preview}>
                 <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 pt-4 pb-2 text-xs font-semibold uppercase tracking-wider text-accent2 hover:text-accent [&::-webkit-details-marker]:hidden">
                   {t("resources")}
                   <svg
@@ -219,7 +219,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
                 </summary>
                 <div className="flex flex-col gap-1">
                   {course.resources.map((r) => (
-                    <ResourceItem key={r.id} resource={r} />
+                    <ResourceItem key={r.id} resource={r} locked={preview} />
                   ))}
                 </div>
               </details>

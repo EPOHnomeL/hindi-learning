@@ -1,22 +1,21 @@
 # course-modules/01: Course modules + per-module unlocking
 
-**Status:** open
+**Status:** needs-triage (to-scope — captured 2026-07-08; not built)
+**Depends on:** a domain/ADR decision on the **"Module"** term (glossary conflict, see Notes); if modules become purchasable, the paid marketplace ([ADR 0016](../../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md), `feat/paid-marketplace`)
 **Labels:** needs-triage
 **Imported:** from GitHub #18 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/course-modules/issues/01-modules-and-per-module-unlocking.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/course-modules/issues/01-modules-and-per-module-unlocking.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# 01 — Course modules + per-module unlocking
-
-Status: needs-triage (to-scope — captured 2026-07-08; not built)
+## Why
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Topic, Lesson, Frontier, Edition, Entitlement, Completion). ⚠️ **Vocabulary tension:** the glossary today explicitly lists **"module"** under Lesson's _Avoid_. Relates to [ADR 0003](../../../docs/adr/0003-immutable-lessons-mutable-references.md) (immutable Lessons), [ADR 0016](../../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md) (paid marketplace / per-Edition Entitlement), and the course-completion feature.
 
-## Want
-
 Group a Topic's Lessons into **Modules** — named, ordered sections — and support **per-module unlocking**: a learner unlocks (and potentially pays for) individual modules rather than the whole course at once. Today a course is a single flat, linear sequence of Lessons and access is all-or-nothing (ownership, Share, Public link, or — on the paid branch — a per-Edition Entitlement).
 
-## Acceptance (to refine at triage)
+## Acceptance criteria
+
+To refine at triage.
 
 - A Topic's Lessons can be organised into **ordered Modules** (a module = a titled group of Lessons).
 - The reader + dashboard show module structure and **per-module progress** (not just the course-wide count).
@@ -24,20 +23,15 @@ Group a Topic's Lessons into **Modules** — named, ordered sections — and sup
 - The **Routine's** authoring still works with modules — decide how module boundaries interact with the single linear **Frontier** (buffer-of-one) gate.
 - Lessons stay **immutable** (ADR 0003): reorganising into modules is a grouping/ordering concern, not a rewrite.
 
-## Open decisions
+## Notes
+
+- To-scope only; not built.
+
+### Open decisions
 
 - **Vocabulary.** `CONTEXT.md` deliberately avoids "module". Introducing it needs a glossary term (and likely an ADR), or a different name — resolve at triage / with the domain-modeling skill.
 - **Monetisation grain.** Is a **Module** the new purchasable unit, or does it sit *under* an **Edition** (e.g. buy a specific module within a paid Edition)? This is the crux of "per-module unlocking" and depends on the paid-marketplace shape ([ADR 0016](../../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md)).
 - **Editions × Modules.** How modules compose with per-language Editions and per-Edition Entitlements.
-
-## Depends on
-
-- A domain/ADR decision on the **"Module"** term (glossary conflict above).
-- If modules become purchasable: the paid marketplace ([ADR 0016](../../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md), `feat/paid-marketplace`).
-
-## Notes
-
-- To-scope only; not built.
 
 ## Comments
 

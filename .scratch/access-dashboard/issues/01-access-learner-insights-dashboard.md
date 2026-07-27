@@ -1,18 +1,15 @@
 # access-dashboard/01: Access & learner-insights dashboard
 
 **Status:** open
+**Depends on:** `topic-sharing` (the Shares relation, `shareTopic`, `listSharedTopics`); `course-translation` (per-Edition sharing, `setEditionPublic`); `ui-redesign` (the popup this was factored out of)
 **Imported:** from GitHub #12 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/access-dashboard/issues/01-access-and-learner-insights-dashboard.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/access-dashboard/issues/01-access-and-learner-insights-dashboard.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# 01 — Access & learner-insights dashboard
-
-Status: open (deferred tracker) — no revoke mutation, owner-side 'who has access' query, or dashboard route
+## Why
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Share**, **Viewer**, **Edition**, **Progress**, **Question**).
 Related specs: [`../../topic-sharing/PRD.md`](../../topic-sharing/PRD.md), [`../../course-translation/`](../../course-translation/), [`../../ui-redesign/`](../../ui-redesign/).
-
-## Context / why
 
 The redesigned **Editions & sharing** popup (see [`../../ui-redesign/`](../../ui-redesign/))
 deliberately keeps only the two lightweight sharing actions — invite-by-email and
@@ -20,15 +17,12 @@ the public-link on/off toggle. It **drops the inline "who has access" list**.
 
 Seeing *and managing* the people an owner has shared a course with — and how each
 of them is doing — is a bigger surface than a popup should carry, and it needs
-backend that doesn't exist yet (see Backend gaps). This issue scopes that as its
+backend that doesn't exist yet (see Backend gaps below). This issue scopes that as its
 own **owner-facing dashboard**, filed so the popup can ship lean now.
 
-## Want
+We want a per-course, per-Edition **owner dashboard** of everyone the course is shared
+with and each Viewer's engagement, plus access management. Per Viewer:
 
-A per-course, per-Edition **owner dashboard** of everyone the course is shared
-with and each Viewer's engagement, plus access management.
-
-Per Viewer:
 - **Identity** — email / name, which Edition(s) they hold, when access was
   granted, and whether the invite is still **Pending** (shared to an email with
   no account yet).
@@ -40,7 +34,17 @@ Per Viewer:
 Plus a public-link overview: for each Edition, whether the public link is on
 (and, later, anonymous/guest usage counts).
 
-## Acceptance (to refine at triage)
+### Backend gaps (net-new, why this is a feature not a tweak)
+
+- No owner-side "who can view this Topic" query — only the Viewer-side
+  `listSharedTopics`.
+- No **revoke** mutation on `shares`.
+- `capture.myProgress` / `capture.myQuestions` are **caller-scoped**; showing a
+  Viewer's data to the owner needs owner-gated variants keyed by the Viewer.
+
+## Acceptance criteria
+
+To refine at triage.
 
 - New **owner-scoped** read queries — siblings to the caller-scoped ones in
   [`convex/capture.ts`](../../../convex/capture.ts) — all owner-gated:
@@ -56,21 +60,7 @@ Plus a public-link overview: for each Edition, whether the public link is on
   view groups or filters by Edition.
 - Read-only Viewers never see this (owner-only, mirrors the PRD story-9 posture).
 
-## Depends on
-
-- `topic-sharing` — the Shares relation, `shareTopic`, `listSharedTopics`.
-- `course-translation` — per-Edition sharing, `setEditionPublic`.
-- `ui-redesign` — the popup this was factored out of.
-
-## Backend gaps (net-new, why this is a feature not a tweak)
-
-- No owner-side "who can view this Topic" query — only the Viewer-side
-  `listSharedTopics`.
-- No **revoke** mutation on `shares`.
-- `capture.myProgress` / `capture.myQuestions` are **caller-scoped**; showing a
-  Viewer's data to the owner needs owner-gated variants keyed by the Viewer.
-
-## Notes / open questions (triage)
+## Notes
 
 - **Privacy**: surfacing a Viewer's Questions & Progress to the course owner is
   expected (owner is the teacher), but confirm and record it in `CONTEXT.md` if
@@ -81,8 +71,6 @@ Plus a public-link overview: for each Edition, whether the public link is on
   this dashboard is the "manage & insight" layer, not the sharing entry point.
 - The **Viewer's own** experience (what a shared recipient sees) already ships
   via `topic-sharing`; this issue is only the owner-facing complement.
-
-## Comments
 
 ## Comments
 

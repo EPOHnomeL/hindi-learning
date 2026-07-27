@@ -12,6 +12,10 @@ import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
 
+// scheduleInvite (on shareTopic/setShareRole) now builds links via appUrl, which
+// requires SITE_URL (issue 12).
+process.env.SITE_URL = "https://app.example.com";
+
 function asUser(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
   return t.withIdentity({ subject: `${userId}|session` });
 }

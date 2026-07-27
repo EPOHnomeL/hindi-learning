@@ -1,17 +1,14 @@
 # internal-course-studio/03: Cost instrumentation (tokens per Routine run)
 
-**Status:** open
+**Status:** open — no token/usage recording or per-Topic aggregate
+**Depends on:** — (none, can start immediately)
 **Imported:** from GitHub #25 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/internal-course-studio/issues/03-cost-instrumentation.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/internal-course-studio/issues/03-cost-instrumentation.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# 03 — Cost instrumentation (tokens per Routine run)
-
-Status: open — no token/usage recording or per-Topic aggregate
+## Why
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (Routine, Topic, Generation). Spec: [`../PRD.md`](../PRD.md). Respects [ADR 0008](../../../docs/adr/0008-next-lesson-routine-gate-in-convex.md) / [ADR 0009](../../../docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md) (the gate + report path).
-
-## What to build
 
 Record **token usage per Routine run** on the existing report path, and expose a **per-Topic usage aggregate** to the operator. Measurement only — no billing, no metering enforcement. This converts the roadmap's costing *formula* into a real per-course number.
 
@@ -22,10 +19,6 @@ Record **token usage per Routine run** on the existing report path, and expose a
 - [ ] The aggregate is surfaced minimally to the operator only (operator view/field) — never to end users.
 - [ ] No metering enforcement or billing logic is introduced.
 - [ ] Tests: a completed run persists a usage record tied to the correct Topic; the aggregate sums multiple runs.
-
-## Blocked by
-
-None - can start immediately.
 
 ## Notes
 

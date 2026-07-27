@@ -1003,6 +1003,9 @@
         <div class="nav-group">AI Agent Context</div>
         <div id="nav-agent-context"></div>
 
+        <div class="nav-group">Translation Model Research</div>
+        <div id="nav-translation-research"></div>
+
         <div class="nav-group">Reference</div>
         <div id="nav-references"></div>
       </aside>
@@ -1224,6 +1227,11 @@
         { slug: "ref-translate-skill",group: "agent-context", name: "▸ translate — SKILL.md (fidelity)",     file: "/.agents/skills/translate/SKILL.md" },
         { slug: "ref-routine-runbook",group: "agent-context", name: "▸ Routine runbook",                     file: "/docs/routine.md" },
         { slug: "ref-translation-runbook", group: "agent-context", name: "▸ Translation runbook",            file: "/docs/translation.md" },
+
+        // Translation Model Research — the model bake-off + external survey.
+        { slug: "ref-translation-research",      group: "translation-research", name: "Overview & scorecard",       file: "/docs/translation-research.md" },
+        { slug: "ref-translation-model-trial",   group: "translation-research", name: "The trial (method & results)", file: "/docs/translation-model-trial.md" },
+        { slug: "ref-translation-models-region", group: "translation-research", name: "Best models by region",       file: "/docs/translation-models-by-region.md" },
 
         { slug: "ref-adrs",     group: "reference",     name: "ADRs",       route: "_adrs" },
       ];
@@ -3008,7 +3016,8 @@
           };
         }
         if (ref) {
-          const groupLabel = ref.group === "agent-context" ? "AI Agent Context" : "Reference";
+          const groupLabel = ref.group === "agent-context" ? "AI Agent Context"
+            : ref.group === "translation-research" ? "Translation Model Research" : "Reference";
           return { routeKey: ref.slug, crumbs: [overview, { label: groupLabel }, { label: ref.name, current: true }] };
         }
         if (routeFile.startsWith("/") && routeFile.endsWith(".md")) {
@@ -3166,6 +3175,8 @@
 
         document.getElementById("nav-agent-context").innerHTML =
           refsByGroup("agent-context").map(renderRefRow).join("");
+        document.getElementById("nav-translation-research").innerHTML =
+          refsByGroup("translation-research").map(renderRefRow).join("");
         document.getElementById("nav-references").innerHTML =
           refsByGroup("reference").map(renderRefRow).join("");
 

@@ -53,6 +53,35 @@ body {
   overflow-x: hidden;
 }
 
+/* Admin chart categorical palette (dataviz skill), shared by the Sales and
+   Generation graphs. The eight validated hues in fixed slot order — swapped for
+   the dark surface under the theme selector, same as the app tokens above.
+   Validated against the app's card surfaces (light #fffdf9 / dark #241f1a): all
+   hard gates pass; light mode has a sub-3:1 contrast warning on three slots,
+   whose relief is the on-screen labels/tooltips + table. Scoped to `.viz-chart`
+   so it pollutes nothing else. */
+.viz-chart {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-6: #008300;
+  --viz-7: #4a3aa7;
+  --viz-8: #e34948;
+  --viz-other: #898781;
+}
+html[data-theme="dark"] .viz-chart {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-5: #d55181;
+  --viz-6: #008300;
+  --viz-7: #9085e9;
+  --viz-8: #e66767;
+}
+
 body {
   background: var(--color-paper);
   color: var(--color-ink);

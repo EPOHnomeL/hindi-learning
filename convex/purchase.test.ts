@@ -258,6 +258,22 @@ test("startCheckout returns the full signed field set for a priced Edition of a 
   expect(intent).toMatchObject({ email: "buyer@example.com", topicId, lang: "en" });
 });
 
+test("startCheckout routes return/cancel to the course's tenant subdomain (issue 12)", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await sellableTopic(t);
+  await t.run((ctx) => ctx.db.patch(topicId, { tenantSlug: "ywampotch" }));
+  const buyer = await seedUser(t, "buyer@example.com");
+
+  const { fields: pairs } = await asUser(t, buyer).mutation(api.market.startCheckout, { topicSlug: "hindi", lang: "en" });
+  const fields = Object.fromEntries(pairs.map((p) => [p.name, p.value]));
+
+  // The buyer is returned to the branded subdomain, not the apex SITE_URL.
+  expect(fields.return_url).toMatch(/^https:\/\/ywampotch\.app\.example\.com\//);
+  expect(fields.cancel_url).toMatch(/^https:\/\/ywampotch\.app\.example\.com\//);
+  // The ITN notify URL stays deployment-wide (tenant-agnostic).
+  expect(fields.notify_url).toBe("https://example.convex.site/payfast/notify");
+});
+
 test("startCheckout refuses an anonymous caller — no payment can attach to a free-typed email", async () => {
   const t = convexTest(schema, modules);
   await sellableTopic(t);

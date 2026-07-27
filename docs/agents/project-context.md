@@ -57,7 +57,11 @@ Dates are absolute. `[[links]]` in older notes have been resolved to sections he
 
 - **`my-course.app`** is the project's domain, registered via **Cloudflare**
   (2026-07-13). It (and `www`) are attached to the Vercel `hindi-learning`
-  project and serve the app directly; `APP_BASE_URL` can be the apex.
+  project and serve the app directly; `SITE_URL` can be the apex. `SITE_URL` is
+  the single web-app origin for both PayFast return URLs and invite-email links —
+  a tenant course's server-built links ride its own subdomain, derived as
+  `<slug>.<base>` (base = `SITE_URL` host minus a leading `www`; `appUrl` in
+  `convex/payfast.ts`). The old `APP_BASE_URL` var was retired onto `SITE_URL`.
 - **Resend** sends invite email from an address on this domain
   (`INVITE_FROM_EMAIL`, e.g. `"Y-Knot Courses <invites@my-course.app>"`); the
   SPF/DKIM records live in Cloudflare.
@@ -70,6 +74,24 @@ Dates are absolute. `[[links]]` in older notes have been resolved to sections he
 Validated with `@t3-oss/env` (see [env-validation](#env-validation-t3-oss-env)
 below). PayFast rail vars live in `convex/env.ts`; the Next client var in
 `env.js`.
+
+### Cross-subdomain cookie scope (`NEXT_PUBLIC_COOKIE_DOMAIN`)
+
+- **One sign-in + one theme/language span every `*.my-course.app` subdomain.**
+  Set `NEXT_PUBLIC_COOKIE_DOMAIN=my-course.app` (prod, and the shared-dev Next
+  build if you want it there) so the auth-session, `hindi_theme`, and
+  `hindi_locale` cookies carry a parent `Domain`. Unset → cookies stay host-only
+  (the correct default for local dev and `*.vercel.app` previews, which reject a
+  `Domain` as a public suffix). Logic: `src/lib/cookieDomain.ts`. Design: ADR 0022
+  §4a.
+- **The auth cookies need a pnpm patch** (`patches/@convex-dev+auth@0.0.80.patch`,
+  registered in `pnpm-workspace.yaml`): Convex Auth hardcodes the `__Host-` cookie
+  prefix, which forbids `Domain`; the patch swaps it for `__Secure-` and sets
+  `Domain` when `NEXT_PUBLIC_COOKIE_DOMAIN` matches the host. **`pnpm install`
+  re-applies it**; if you bump `@convex-dev/auth` off `0.0.80` the patch must be
+  re-cut (`pnpm patch`). Keep it in sync with `src/lib/cookieDomain.ts`.
+- **Turning it on invalidates existing sessions once** (cookie name changes
+  `__Host-*`→`__Secure-*`): one re-sign-in on deploy, seamless thereafter.
 
 ### env validation (@t3-oss/env)
 

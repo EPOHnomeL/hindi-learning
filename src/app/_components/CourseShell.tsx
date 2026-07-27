@@ -406,7 +406,6 @@ function CourseSettingsButton({
 }) {
   const t = useTranslations("Reader");
   const [open, setOpen] = useState(false);
-  const native = header.editions.find((e) => e.lang === header.lang)?.native ?? header.lang;
   return (
     <>
       <button
@@ -420,11 +419,7 @@ function CourseSettingsButton({
           topicSlug={slug}
           status={header.status}
           owner={owner}
-          edition={
-            header.lang !== "en"
-              ? { lang: header.lang, native, title: header.title, mission: header.mission }
-              : null
-          }
+          lang={header.lang}
           onClose={() => setOpen(false)}
         />
       )}

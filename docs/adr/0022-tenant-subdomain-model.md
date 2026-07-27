@@ -115,6 +115,48 @@ Roles encoded on the `whitelist` row by scope — reuse `isAdmin`, add `tenantSl
 > current gate depends on them, and the auth-callback host plumbing is its own
 > piece. Tenant-admin rows are creatable today via `seedEmail`.
 
+### 4a. One session (and device settings) across subdomains — cookie scope
+
+> Added 2026-07-21. Clarifies §3/§4 after the host-locked session was found to
+> contradict them in practice.
+
+"One account → one tenant" (§4) governs *admission and home catalogue*, not where
+a session is valid. §3 already says a user may open a course shared to them on
+another tenant's subdomain (skin follows host, no per-tenant partition). So a
+**single session spans every `*.my-course.app` subdomain** — switching subdomains
+must **not** force a re-sign-in.
+
+The earlier re-sign-in was an unintended artifact: Convex Auth's Next.js
+integration writes its session cookies with the `__Host-` prefix, which forbids a
+`Domain` attribute and so locks them to one exact host. The same applied to the
+chosen theme (localStorage, per-origin) and UI language (host-only cookie) — all
+reset on a subdomain switch.
+
+**Decision:** scope the session, theme, and locale cookies to the registrable
+parent domain (`Domain=my-course.app`) so one sign-in and the device's
+theme/language carry across subdomains. Mechanics:
+
+- A single knob, `NEXT_PUBLIC_COOKIE_DOMAIN` (e.g. `my-course.app`), drives it.
+  Unset → cookies stay host-only (the safe default for local dev and Vercel
+  preview hosts — `*.vercel.app` is a public suffix and rejects a `Domain`).
+  Resolved by `src/lib/cookieDomain.ts` (`cookieDomainFor(host)`), which only
+  attaches the domain when the request host actually belongs to it.
+- The auth cookies need a `patches/@convex-dev+auth` patch (`getCookieStore`):
+  when a parent domain applies it swaps the `__Host-` prefix for `__Secure-`
+  (which permits `Domain`) and sets `Domain`. Both the read and write paths run
+  through that one function, so the cookie name stays consistent.
+- Theme moves from localStorage to a parent-domain `hindi_theme` cookie (with a
+  one-time localStorage→cookie migration); the locale cookie gains the `Domain`.
+- The catalogue still filters by the **host** slug and every write is still
+  guarded by identity — a caller whose home `tenantSlug` differs from the host is
+  never rejected, they just see the host's catalogue (§3 unchanged).
+- The cross-host canonical bounce (§3) is a **client-side history replace**
+  (`CrossHostRedirect`), not a server redirect, so the back button returns to the
+  previous subdomain instead of re-bouncing to the current one.
+- **Rollout cost:** the cookie name changes (`__Host-*` → `__Secure-*`), so
+  existing sessions are invalidated once on deploy — a single re-sign-in, after
+  which switching subdomains is seamless.
+
 ### 5. Cross-cutting singletons — disposition
 
 - **Invite/notification email → tenant-aware at v1** (brand name + canonical-host

@@ -1,19 +1,15 @@
 # topic-sharing/08: Public link content privacy controls (exclude Q&A etc.)
 
-**Status:** open
+**Status:** needs-triage — future. Filed during the issue-07 grill (2026-06-30); not for now.
+**Depends on:** **07** (the Public link, the Guest, and the token-authorized read seam)
 **Labels:** needs-triage
 **Imported:** from GitHub #35 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/topic-sharing/issues/08-public-link-content-privacy-controls.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/topic-sharing/issues/08-public-link-content-privacy-controls.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# 08 — Public link content privacy controls (exclude Q&A etc.)
-
-Status: needs-triage — future. Filed during the issue-07 grill (2026-06-30); not
-for now.
+## Why
 
 Vocabulary: [`CONTEXT.md`](../../../CONTEXT.md) (**Public link**, **Guest**). Builds on [`07-public-link-shares.md`](./07-public-link-shares.md).
-
-## Want
 
 A **Public link** exposes the *full mirror* by default (Lessons, References,
 Resources, and the owner's Questions/Replies/Progress) — decided in 07 because a
@@ -24,7 +20,9 @@ a Public link reveals — e.g. a "don't share my questions" / "don't share my
 progress" toggle — without touching the in-app **Share** path (Viewers always
 see everything).
 
-## Open questions (needs a design pass before building)
+## Notes
+
+### Open questions (needs a design pass before building)
 
 - **Granularity of the control.** One "hide my Q&A + Progress" switch, or
   independent toggles per facet (Q&A, Progress, Resources)?
@@ -34,10 +32,6 @@ see everything).
   confirm we don't want privacy-by-default for public links.
 - **Read seam.** The token-authorized public reads (from 07) gate each facet on
   the control, so excluded facets are never served to a Guest.
-
-## Depends on
-
-- **07** (the Public link, the Guest, and the token-authorized read seam).
 
 ## Comments
 

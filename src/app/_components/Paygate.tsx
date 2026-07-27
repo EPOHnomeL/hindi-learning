@@ -197,6 +197,20 @@ function BuyDialog({
         <span>{t("unlockDialogBody", { edition: editionName ?? t("thisLanguage") })}</span>
       </div>
 
+      {/* Bank-to-method guidance — the last surface we own before PayFast's hosted
+          picker, which is theirs to word. PayFast advertises 9 Instant EFT banks
+          but renders only 5 on this account (Absa, Standard Bank, Capitec and
+          African Bank are absent), so a buyer at one of those banks picks the
+          tile that sounds right, finds no bank, and abandons. "Credit & Cheque
+          card" is the answer for all of them, so that's all this says. Both tile
+          names are quoted VERBATIM from PayFast's picker and stay English in every
+          locale — a translated label is one the buyer can't find on screen.
+          ponytail: hardcodes PayFast's CURRENT coverage. If they restore the four
+          banks, delete this note and the `bankGuidance` key rather than editing it. */}
+      <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">
+        {t.rich("bankGuidance", { b: (c) => <b className="font-semibold text-ink">{c}</b> })}
+      </p>
+
       <form
         onSubmit={(e) => {
           e.preventDefault();

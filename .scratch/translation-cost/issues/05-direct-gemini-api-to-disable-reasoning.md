@@ -1,10 +1,46 @@
 # translation-cost/05: Direct Gemini (AI Studio) seam to actually disable reasoning
 
-**Status:** open
-**Labels:** needs-info (spike: confirm cost win before building the seam)
+**Status:** done (2026-07-21) — shipped the direct-Gemini seam; **corrected same day**
+(the `thinkingBudget: 0` opt-out doesn't disable thinking on Gemini 3.x — now `thinkingLevel: "minimal"`).
+**Labels:** ready-for-human (smoke + $ measurement per issue 04 §Protocol)
 **Depends on:** informs / competes with
 [04-test-translation-models.md](04-test-translation-models.md) — pick whichever
 is cheaper for acceptable fidelity.
+
+## Outcome
+
+- New **[`convex/geminiClient.ts`](../../../convex/geminiClient.ts)** — native
+  Google AI Studio `:generateContent`, `GOOGLE_AI_API_KEY`,
+  `thinkingConfig.thinkingLevel: "minimal"` (retries once without the control if a
+  model rejects it). Mirrors `openrouterClient`'s dependency-free `fetch` seam.
+  Also logs `usageMetadata.thoughtsTokenCount` per call so real reasoning spend is
+  visible in `npx convex logs`.
+
+## Correction (2026-07-21) — `thinkingBudget: 0` is not an off switch on 3.x
+
+The original ship sent the **Gemini 2.5-era** `thinkingConfig.thinkingBudget: 0`.
+On **Gemini 3.x** (the default `gemini-3.5-flash`) that knob is deprecated and does
+**not** disable thinking: the 3.x thinking control is the categorical
+`thinkingLevel` enum (`minimal | low | medium | high`), and there is **no "off"** —
+`"minimal"` is the floor and still bills some thought tokens. So the seam never ran
+reasoning-free; the observed cost drop (~R90 → R70) was OpenRouter's markup coming
+off as we moved to native pricing, not thinking going away. Fix: send
+`thinkingLevel: "minimal"` and log `thoughtsTokenCount` to make the real number
+observable. If genuine zero-reasoning is wanted, that needs a model that supports it
+(e.g. `gemini-2.5-flash-lite` via `GEMINI_TRANSLATE_MODEL`) — see issue 04.
+Refs: [Gemini thinking docs](https://ai.google.dev/gemini-api/docs/thinking),
+[What's new in 3.5 Flash](https://ai.google.dev/gemini-api/docs/whats-new-gemini-3.5).
+- **[`convex/translate.ts`](../../../convex/translate.ts)** `translateField` now
+  routes by `TRANSLATE_PROVIDER` (`gemini` default | `openrouter` rollback);
+  authoring untouched (still OpenRouter/GLM).
+- Env: `GOOGLE_AI_API_KEY` (+ optional `GEMINI_TRANSLATE_MODEL`, default
+  `gemini-3.5-flash`). `TRANSLATE_PROVIDER` selects the path. See Correction below —
+  `minimal` is not `off` on 3.x.
+- Tests: `geminiClient.test.ts` (wire format + thinking-off + retry) and
+  `translate-gemini.test.ts` (default-path end-to-end); the OpenRouter suite is
+  pinned to `TRANSLATE_PROVIDER=openrouter`.
+- **Still open (needs-human):** set `GOOGLE_AI_API_KEY --prod`, run the issue-04
+  Test-Course smoke + one full-course $ measurement, record it in the PRD.
 
 Child of [.scratch/translation-cost/PRD.md](../PRD.md).
 
@@ -18,11 +54,12 @@ So every 3.5-Flash translation call still bills thinking tokens as output — th
 suspected main driver of the "sooo expensive" per-course cost, on top of the
 frontier base rate (issue 04).
 
-Google's **native** Gemini API (AI Studio key) exposes `thinkingConfig.thinkingBudget: 0`,
-which genuinely turns thinking off on the 2.5/3.x Flash tiers. OpenRouter's
-unified toggle doesn't reach it. So if we want to keep a Gemini Flash model
-*and* pay nothing for reasoning, the fix is a direct-Gemini call path, not a
-model swap.
+Google's **native** Gemini API (AI Studio key) exposes `thinkingConfig`, which
+OpenRouter's unified toggle doesn't reach. **[Corrected]** the original plan assumed
+`thinkingBudget: 0` turns thinking off on the Flash tiers — true for **2.5**, but on
+**3.x** that knob is deprecated and thinking can only be pushed to `thinkingLevel:
+"minimal"`, never off (see Correction above). So the direct-Gemini path *minimises*
+reasoning on 3.5-flash; paying nothing for reasoning needs a 2.5-lite model swap.
 
 ## Open questions (spike first — don't build yet)
 

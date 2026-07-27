@@ -3,11 +3,14 @@ import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
+import { itemHash } from "./translate";
 import type { Id } from "./_generated/dataModel";
 
 // The translate Routine's publish seams are PUBLISH_SECRET-guarded (assertAdmin).
 beforeAll(() => {
   process.env.PUBLISH_SECRET = "test-secret";
+  // shareTopic → scheduleInvite → appUrl now requires SITE_URL (issue 12).
+  process.env.SITE_URL = "https://app.example.com";
 });
 
 // Course translation (Editions). An Edition = (Topic, language) is the unit of
@@ -205,6 +208,78 @@ test("tryAcquireTranslation refuses an unsupported language (bounds Edition fan-
   expect(job).toBeNull();
 });
 
+// ---- Engine picker (translation-engine-picker) ------------------------------
+
+test("engine defaults to gemini; a different engine flips it and forces done:0; the same engine resumes", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  await addLesson(t, topicId, "0001", 1); // items = title + lesson = 2
+  const a = asUser(t, alice);
+  const jobRow = () =>
+    t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
+
+  // No engine arg on a fresh job → stored engine defaults to gemini, not forced.
+  const first = await a.mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" });
+  expect(first).toMatchObject({ acquired: true, engine: "gemini", forced: false });
+  expect(await jobRow()).toMatchObject({ engine: "gemini" });
+
+  // Mark both items fresh (a completed gemini run), then re-acquire.
+  await t.run(async (ctx) => {
+    const job = await ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique();
+    await ctx.db.insert("translations", { topicId, lang: "es", kind: "title", key: "", text: "Hindi (es)", sourceHash: itemHash("title", { text: "Hindi" }) });
+    await ctx.db.patch(job!._id, { status: "ready", done: 2, failed: 0, claimedAt: undefined });
+  });
+
+  // Same engine (gemini) → resume: freshness counted, NOT forced.
+  const same = await a.mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "gemini" });
+  expect(same).toMatchObject({ acquired: true, engine: "gemini", forced: false });
+  expect((await jobRow())!.done).toBeGreaterThan(0); // the fresh title survives as progress
+
+  // Different engine (free) → forced full redo: stored engine flips, done reset to 0.
+  await t.run(async (ctx) => {
+    const job = await ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique();
+    await ctx.db.patch(job!._id, { status: "ready", claimedAt: undefined });
+  });
+  const switched = await a.mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "free" });
+  expect(switched).toMatchObject({ acquired: true, engine: "free", forced: true });
+  expect(await jobRow()).toMatchObject({ engine: "free", done: 0 });
+});
+
+test("claimTranslation only grabs free jobs — a gemini (or absent-engine) job is never claimed", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  const secret = "test-secret";
+  const dead = Date.now() - 11 * 60 * 1000; // heartbeat aged past STALE_MS
+
+  // A dead gemini job and a dead absent-engine job — neither belongs to the cloud routine.
+  await t.run((ctx) => ctx.db.insert("translationJobs", { topicId, lang: "es", status: "translating", total: 1, done: 0, failed: 0, engine: "gemini", claimedAt: dead }));
+  await t.run((ctx) => ctx.db.insert("translationJobs", { topicId, lang: "fr", status: "translating", total: 1, done: 0, failed: 0, claimedAt: dead }));
+  expect(await t.mutation(api.translate.claimTranslation, { secret, runId: "r1" })).toBeNull();
+
+  // A dead free job IS claimable.
+  await t.run((ctx) => ctx.db.insert("translationJobs", { topicId, lang: "de", status: "translating", total: 1, done: 0, failed: 0, engine: "free", claimedAt: dead }));
+  expect(await t.mutation(api.translate.claimTranslation, { secret, runId: "r2" })).toMatchObject({ lang: "de" });
+});
+
+test("claimTranslation grabs a just-acquired free job immediately (regression: fresh heartbeat must not lock the routine out → 0/N stall)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  await addLesson(t, topicId, "0001", 1);
+  const secret = "test-secret";
+  // Owner adds a FREE edition: startTranslation acquires (fresh heartbeat, no runId)
+  // then fires the cloud routine. The routine MUST be able to claim it right away —
+  // before this fix a fresh acquire heartbeat made the job look live, so the claim
+  // returned null and the Edition sat at 0/N until STALE_MS elapsed.
+  await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "free" });
+  const claim = await t.mutation(api.translate.claimTranslation, { secret, runId: "r1" });
+  expect(claim).toMatchObject({ topicSlug: "hindi", lang: "es", ownerEmail: "alice@example.com" });
+  // Once claimed (runId stamped, fresh heartbeat) the run owns it — single-flight.
+  expect(await t.mutation(api.translate.claimTranslation, { secret, runId: "r2" })).toBeNull();
+});
+
 test("tryAcquireTranslation refuses to re-run while a job is still translating (single-flight)", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
@@ -227,17 +302,13 @@ test("claim → publish → report round-trips one Edition, and the reader serve
   const alice = await seedUser(t, "alice@example.com");
   const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
   await addLesson(t, topicId, "0001", 1);
-  // Owner fires: seeds the job "translating" (total = title + the one lesson = 2).
-  await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" });
+  // Owner fires the FREE engine: seeds the job "translating" (total = title + the
+  // one lesson = 2). The claim seam only ever grabs `free` jobs (the cloud routine).
+  await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "free" });
 
   const secret = "test-secret";
-  // The acquire's heartbeat marks the job live (the Gemini action owns it); the
-  // legacy claim seam may only steal DEAD work, so age the heartbeat first.
-  await t.run(async (ctx) => {
-    const job = await ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique();
-    await ctx.db.patch(job!._id, { claimedAt: Date.now() - 11 * 60 * 1000 });
-  });
-  // The run claims the dead Edition — it learns the (Topic, language, owner).
+  // The fired run claims the just-acquired Edition immediately — no waiting for the
+  // acquire heartbeat to go stale — and learns the (Topic, language, owner).
   const claim = await t.mutation(api.translate.claimTranslation, { secret, runId: "r1" });
   expect(claim).toMatchObject({ topicSlug: "hindi", lang: "es", ownerEmail: "alice@example.com" });
   // A second claim finds nothing — the job is now claimed (single-flight).
@@ -313,9 +384,10 @@ test("editions lists English + each job with share counts", async () => {
   const eds = await asUser(t, alice).query(api.translate.editions, { topicSlug: "hindi" });
   expect(eds!.completed).toBe(true);
   const en = eds!.editions.find((e) => e.lang === "en")!;
-  expect(en).toMatchObject({ source: true, status: "ready" });
+  expect(en).toMatchObject({ source: true, status: "ready", engine: "gemini" });
   const es = eds!.editions.find((e) => e.lang === "es")!;
-  expect(es).toMatchObject({ source: false, status: "ready", shareCount: 1 });
+  // The seeded job carries no engine → surfaced as gemini (today's behaviour).
+  expect(es).toMatchObject({ source: false, status: "ready", shareCount: 1, engine: "gemini" });
   // A Viewer isn't the owner → no Editions panel.
   expect(await asUser(t, bob).query(api.translate.editions, { topicSlug: "hindi" })).toBeNull();
 });

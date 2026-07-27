@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "./icons";
 import { Markdown } from "./MarkdownView";
 import { resourceOpenMode } from "./readerDerive";
 
@@ -27,9 +28,20 @@ function StatusTag({ status }: { status?: string }) {
   return <span className="shrink-0 text-xs text-soft">{status}</span>;
 }
 
-export function ResourceItem({ resource }: { resource: Resource }) {
+export function ResourceItem({ resource, locked = false }: { resource: Resource; locked?: boolean }) {
   const [open, setOpen] = useState(false);
   const { filename, kind, url, status } = resource;
+
+  // Paid marketplace: a Resource past the free Preview is locked — a muted,
+  // non-clickable row with a lock, so the file/link itself never opens.
+  if (locked) {
+    return (
+      <div className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-sm text-soft md:py-1.5">
+        <span className="min-w-0 truncate">{filename}</span>
+        <Icon name="lock" className="h-3.5 w-3.5 shrink-0 text-soft" />
+      </div>
+    );
+  }
 
   // No URL yet (blob still landing) — a static, non-clickable row.
   if (!url) {

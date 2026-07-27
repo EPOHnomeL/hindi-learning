@@ -102,13 +102,26 @@ of study — keep its sentence in the source language.
 > or a reordered option. Getting those right is your job, not the guard's.
 
 **Scripture uses an existing translation, not yours.** When the prose quotes the
-Bible — a `.verse` block, a cited passage, an epigraph — do not render it by
-translating the English yourself. Quote the wording of a widely-used published
-Bible translation in the target language (e.g. the Afrikaanse Bybel for Afrikaans),
-and leave the reference/citation as-is. A learner should meet Scripture in the
-familiar published form, not a back-translation. If you cannot obtain a reliable
-published rendering for a passage, leave that quotation in the source language
-rather than invent one.
+Bible — a `.verse` block, a cited passage, an epigraph — do not translate the
+English yourself. Substitute the wording of a widely-used published Bible in the
+target language **verbatim** (e.g. the Afrikaanse Bybel for Afrikaans; the Bible
+Society of India / HHBD Devanagari text for Hindi) and leave the reference as-is, so
+the learner meets Scripture in its familiar published form, not a back-translation.
+If you cannot reproduce a reliable published rendering, leave that quotation in the
+source language rather than invent one. When the source has already pasted the
+canonical verse in, treat it as object of study and leave it byte-for-byte.
+
+**Never coin a word** — anywhere, but a coined word *inside a verse* is the worst
+place to hallucinate. Use only real, standard, correctly-spelled words of the target
+language. If you catch yourself appending an English gloss after a term you produced
+— "*vachisth* (new covenant)" — that gloss confesses the term is invented; drop both
+and use the real standard term (नई वाचा / *nayi vaacha*).
+
+**One script per Edition, no leaks.** Write the whole file in the target Edition's
+script: a Devanagari Edition (`hi`, `mr`, `ne`, …) is pure Devanagari; a `-Latn`
+Edition is pure Latin. Never let the other script leak in mid-sentence ("par
+परिस्थिति (circumstances)"), and translate everyday vocabulary consistently rather
+than leaving some source-language words among their translated neighbours.
 
 For **plain-text files** (`title.txt`, `mission.txt`): translate the
 natural-language prose only; leave any HTML tags, markdown, code, proper nouns, and

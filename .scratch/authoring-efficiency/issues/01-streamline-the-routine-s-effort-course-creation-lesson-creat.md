@@ -1,16 +1,12 @@
 # authoring-efficiency/01: Streamline the routine's effort: course creation, lesson creation, Q&A
 
-**Status:** open
+**Status:** partial — AUTHORING contract + CAPTURE.json + deterministic setup shipped (df62360, a6c8c75); lean materialiseTopic digest, source-cache reuse, and curriculum outline remain
+**Depends on:** —
 **Imported:** from GitHub #15 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
 > Migrated from [`.scratch/authoring-efficiency/issues/01-streamline-routine-effort.md`](https://github.com/EPOHnomeL/hindi-learning/blob/93ad1e399b426e882c40d9422d8691e1dfb3a46b/.scratch/authoring-efficiency/issues/01-streamline-routine-effort.md) on 2026-07-10. Relative links in the text resolve against that file's location.
 
-# 01 — Streamline the routine's effort: course creation, lesson creation, Q&A
-
-Status: partial — AUTHORING contract + CAPTURE.json + deterministic setup shipped (df62360, a6c8c75); lean materialiseTopic digest, source-cache reuse, and curriculum outline remain
-Priority: **high** — sits **above** the remaining `topic-sharing` / backlog
-`ready-for-agent` items. Every run pays this tax; it compounds as Topics and
-lessons grow, and it directly bounds Claude spend (issue 08's concern).
+## Why
 
 Context: [routine-prompt.md](../../../docs/routine-prompt.md),
 [routine.md](../../../docs/routine.md),
@@ -22,7 +18,9 @@ Context: [routine-prompt.md](../../../docs/routine-prompt.md),
 ingestion), [issue 07](../../multi-topic/issues/07-seed-mission-bootstrap-gate.md)
 (seed → mission bootstrap).
 
-## Want
+Priority: **high** — sits **above** the remaining `topic-sharing` / backlog
+`ready-for-agent` items. Every run pays this tax; it compounds as Topics and
+lessons grow, and it directly bounds Claude spend (issue 08's concern).
 
 Cut the effort (tokens + wall-clock + round-trips) a single `teacher-next-lesson`
 run spends, without lowering grounding/quality. The run should spend its budget
@@ -33,7 +31,7 @@ The owner-discovery fix (commits `5c5b6be` / `47349c7`) is the template: hand th
 agent authoritative state up front instead of making it derive or hunt for it.
 This issue generalises that across the three hot paths.
 
-## Evidence (one real bootstrap run)
+### Evidence (one real bootstrap run)
 
 From the `cyber-security-course` first run, the agent spent most of its turns on
 overhead, not authoring:
@@ -56,7 +54,9 @@ overhead, not authoring:
 6. **Redundant Q&A round-trip** — `review:prod` ran even though `CAPTURE.json`
    (already materialised) showed no open questions and no activity.
 
-## Plan (three hot paths)
+## Scope
+
+Three hot paths.
 
 ### A. Course creation — make the expensive first run a real "course bootstrap"
 Split **course creation** (one-time, expensive) from **lesson creation**
@@ -105,7 +105,7 @@ later run is cheap and consistent:
 - Anywhere the agent currently *derives* state it could be *given*, give it
   (the owner-fix pattern).
 
-## Acceptance
+## Acceptance criteria
 
 - [ ] A representative run's overhead (turns/tokens spent before the first
   authoring action) drops measurably vs. a current baseline — capture a
@@ -123,7 +123,7 @@ later run is cheap and consistent:
 - [ ] No regression in grounding/quality: lessons still cite verified sources and
   follow the captured-quiz markup; `pnpm run typecheck` + `pnpm test` green.
 
-## Notes / decisions needed
+## Notes
 
 - **Split bootstrap into its own run vs. keep mission+lesson-1 in one run?** A
   separate course-creation fire is cleaner but adds a gate state; folding the
@@ -137,8 +137,6 @@ later run is cheap and consistent:
 - This issue is deliberately broad (one issue, as requested). If you'd rather
   track it as an epic, it splits cleanly into A / B / C + cross-cutting; say the
   word and I'll promote it to a PRD with sub-issues.
-
-## Comments
 
 ## Comments
 

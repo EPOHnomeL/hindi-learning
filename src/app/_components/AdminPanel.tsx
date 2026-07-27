@@ -8,6 +8,8 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { SellerStatus, TenantFlag } from "../../../convex/lib";
 import { TENANT_THEME_TOKENS, type Token } from "../../design/tokens";
+import { salesRange, type SalesPreset } from "./salesRange";
+import { colorVar, rankLanguages } from "./salesChart";
 
 // The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
 // dashboard is now scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
@@ -55,13 +57,19 @@ export function AdminPanel() {
 // The sys-admin dashboard: a tab switcher between the platform Allowlist and the
 // per-tenant Tenants panel. Allowlist is the default tab (its historical landing).
 function SysAdminDashboard() {
-  const [tab, setTab] = useState<"allowlist" | "tenants" | "generation">("allowlist");
+  const [tab, setTab] = useState<"allowlist" | "sales" | "payouts" | "tenants" | "generation">("allowlist");
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
       <header className="mb-8 flex items-center justify-between gap-4">
-        <div className="flex gap-1 rounded-xl border border-line bg-card p-1">
+        <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-card p-1">
           <TabButton active={tab === "allowlist"} onClick={() => setTab("allowlist")}>
             Allowlist
+          </TabButton>
+          <TabButton active={tab === "sales"} onClick={() => setTab("sales")}>
+            Sales
+          </TabButton>
+          <TabButton active={tab === "payouts"} onClick={() => setTab("payouts")}>
+            Payouts
           </TabButton>
           <TabButton active={tab === "tenants"} onClick={() => setTab("tenants")}>
             Tenants
@@ -74,7 +82,17 @@ function SysAdminDashboard() {
           ← Courses
         </Link>
       </header>
-      {tab === "allowlist" ? <AllowlistManager /> : tab === "tenants" ? <TenantsManager /> : <GenerationManager />}
+      {tab === "allowlist" ? (
+        <AllowlistManager />
+      ) : tab === "sales" ? (
+        <SalesManager />
+      ) : tab === "payouts" ? (
+        <PayoutsManager />
+      ) : tab === "tenants" ? (
+        <TenantsManager />
+      ) : (
+        <GenerationManager />
+      )}
     </div>
   );
 }
@@ -89,8 +107,88 @@ function GenerationManager() {
         <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Generation</h1>
         <p className="mt-0.5 text-sm text-soft">What the routine is building, and what it has built</p>
       </div>
+      <GenerationUsageChart />
       <GeneratingNow />
       <RunHistory />
+    </div>
+  );
+}
+
+// The Generation-tab activity graph: daily generation + translation usage over
+// the last 30 days as vertical stacked bars (generation on the bottom,
+// translation on top), on one shared count axis. Colours are the shared viz
+// palette (slot 1 / slot 2). The 30-day window is floored to the UTC day so the
+// query args stay stable across renders (a raw Date.now() would resubscribe
+// forever — see salesRange).
+function GenerationUsageChart() {
+  const day = 86_400_000;
+  const to = Math.floor(Date.now() / day) * day + day; // start of tomorrow, UTC
+  const from = to - 30 * day;
+  const rows = useQuery(api.routine.usageByDay, { from, to });
+  return (
+    <figure className="viz-chart mb-12 rounded-xl border border-line bg-card p-4">
+      <figcaption className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+        <span className="text-xs font-medium tracking-wide text-soft uppercase">Activity · last 30 days</span>
+        <ul className="flex items-center gap-3">
+          <li className="flex items-center gap-1.5 text-xs text-soft">
+            <span className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--viz-1)" }} aria-hidden />
+            Generation
+          </li>
+          <li className="flex items-center gap-1.5 text-xs text-soft">
+            <span className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--viz-2)" }} aria-hidden />
+            Translation
+          </li>
+        </ul>
+      </figcaption>
+      {rows === undefined ? (
+        <div className="h-32 animate-pulse rounded-lg bg-hi/40" aria-busy />
+      ) : (
+        <GenerationUsageBars rows={rows} />
+      )}
+    </figure>
+  );
+}
+
+function GenerationUsageBars({ rows }: { rows: FunctionReturnType<typeof api.routine.usageByDay> }) {
+  const H = 128; // px plot height
+  const max = Math.max(...rows.map((r) => r.generation + r.translation), 1);
+  const total = rows.reduce((sum, r) => sum + r.generation + r.translation, 0);
+  const fmt = (ms: number) =>
+    new Date(ms).toLocaleDateString("en-ZA", { day: "numeric", month: "short", timeZone: "UTC" });
+  // A nonzero count always draws at least 2px so a single event stays visible.
+  const px = (n: number) => (n > 0 ? Math.max((n / max) * H, 2) : 0);
+
+  if (total === 0) {
+    return <p className="py-10 text-center text-sm text-soft">No generation or translation in the last 30 days.</p>;
+  }
+  return (
+    <div>
+      <div className="flex h-32 items-end gap-[2px]">
+        {rows.map((r) => {
+          const tr = px(r.translation);
+          const g = px(r.generation);
+          return (
+            <div
+              key={r.dayMs}
+              className="flex flex-1 flex-col justify-end gap-[2px]"
+              title={`${fmt(r.dayMs)} — ${r.generation} generation, ${r.translation} translation`}
+            >
+              {tr > 0 && <div className="w-full rounded-t-[3px]" style={{ height: `${tr}px`, background: "var(--viz-2)" }} />}
+              {g > 0 && (
+                <div
+                  className={`w-full ${tr > 0 ? "" : "rounded-t-[3px]"}`}
+                  style={{ height: `${g}px`, background: "var(--viz-1)" }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-soft">
+        <span>{fmt(rows[0]!.dayMs)}</span>
+        {rows.length > 2 && <span>{fmt(rows[Math.floor(rows.length / 2)]!.dayMs)}</span>}
+        <span>{fmt(rows[rows.length - 1]!.dayMs)}</span>
+      </div>
     </div>
   );
 }
@@ -261,21 +359,211 @@ function AllowlistManager() {
       )}
 
       <SellersManager />
-      <PayoutsManager />
     </div>
+  );
+}
+
+// The Sales tab (.scratch/admin-sales): which courses and which editions sold
+// how much over a chosen period. Courses are the rows (title, sale count, gross);
+// each expands to its editions. The period is chosen with quick presets or a
+// custom date range — both feed `sales.report` as ms bounds. Sys-admin gated
+// server-side, so the query is never answered for anyone else.
+const SALES_PRESETS: { key: SalesPreset; label: string }[] = [
+  { key: "7d", label: "Last 7 days" },
+  { key: "30d", label: "Last 30 days" },
+  { key: "month", label: "This month" },
+  { key: "all", label: "All time" },
+  { key: "custom", label: "Custom" },
+];
+
+function SalesManager() {
+  const [preset, setPreset] = useState<SalesPreset>("30d");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  // `salesRange` floors `now` to the day, so these args are stable across
+  // renders — a raw `Date.now()` here would make useQuery loop forever.
+  const report = useQuery(api.sales.report, salesRange(preset, from, to, Date.now()));
+  const totalGross = report?.reduce((sum, c) => sum + c.gross, 0) ?? 0;
+  const totalCount = report?.reduce((sum, c) => sum + c.count, 0) ?? 0;
+
+  return (
+    <div className="mx-auto max-w-2xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Sales</h1>
+        <p className="mt-0.5 text-sm text-soft">What each course and edition sold in a period</p>
+      </div>
+
+      <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-card p-1">
+        {SALES_PRESETS.map((p) => (
+          <TabButton key={p.key} active={preset === p.key} onClick={() => setPreset(p.key)}>
+            {p.label}
+          </TabButton>
+        ))}
+      </div>
+      {preset === "custom" && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-soft">
+          <label className="flex items-center gap-1.5">
+            From
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-ink focus:border-accent focus:outline-none"
+            />
+          </label>
+          <label className="flex items-center gap-1.5">
+            To
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-ink focus:border-accent focus:outline-none"
+            />
+          </label>
+        </div>
+      )}
+
+      {report === undefined ? (
+        <ul className="mt-6 flex flex-col gap-2" aria-busy>
+          {[0, 1, 2].map((i) => (
+            <li key={i} className="h-14 animate-pulse rounded-xl border border-line bg-card" />
+          ))}
+        </ul>
+      ) : report.length === 0 ? (
+        <p className="mt-6 text-sm text-soft">No sales in this period.</p>
+      ) : (
+        <>
+          <div className="mt-6 mb-3 flex items-center justify-between text-sm">
+            <span className="text-soft">
+              {totalCount} sale{totalCount === 1 ? "" : "s"} across {report.length} course
+              {report.length === 1 ? "" : "s"}
+            </span>
+            <span className="font-semibold tabular-nums text-ink">{formatRand(totalGross)}</span>
+          </div>
+          <SalesChart report={report} />
+          <ul className="flex flex-col gap-2">
+            {report.map((c) => (
+              <SalesCourseRow key={c.topicId} course={c} />
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+// The sales-by-course chart (dataviz skill): one horizontal bar per course,
+// length = its sale count on a shared scale, split into per-edition segments
+// coloured by language (consistent across courses). Number of sales is the
+// measure. The 2px gaps between segments are the card surface showing through.
+function SalesChart({ report }: { report: FunctionReturnType<typeof api.sales.report> }) {
+  const ranked = rankLanguages(report);
+  const maxCount = Math.max(...report.map((c) => c.count), 1);
+  return (
+    <figure className="viz-chart mb-4 rounded-xl border border-line bg-card p-4">
+      <figcaption className="mb-3 flex items-center justify-between gap-3">
+        <span className="text-xs font-medium tracking-wide text-soft uppercase">Sales by course</span>
+        {ranked.length >= 2 && (
+          <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {ranked.slice(0, 8).map((lang) => (
+              <li key={lang} className="flex items-center gap-1.5 text-xs text-soft">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-[3px]"
+                  style={{ background: colorVar(lang, ranked) }}
+                  aria-hidden
+                />
+                <span className="uppercase">{lang}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </figcaption>
+      <ul className="flex flex-col gap-2.5">
+        {report.map((course) => (
+          <li key={course.topicId}>
+            <div className="mb-1 flex items-baseline justify-between gap-3">
+              <span className="min-w-0 truncate text-sm text-ink">{course.courseTitle}</span>
+              <span className="shrink-0 text-xs tabular-nums text-soft">
+                {course.count} sale{course.count === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="h-5 w-full">
+              <div className="flex h-full gap-[2px]" style={{ width: `${(course.count / maxCount) * 100}%` }}>
+                {course.editions.map((e) => (
+                  <div
+                    key={e.lang}
+                    className="h-full min-w-[3px] first:rounded-l last:rounded-r"
+                    style={{ flexGrow: e.count, background: colorVar(e.lang, ranked) }}
+                    title={`${e.title} (${e.lang.toUpperCase()}) — ${e.count} sale${e.count === 1 ? "" : "s"}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </figure>
+  );
+}
+
+// One course in the sales report — a click expands its per-edition breakdown.
+function SalesCourseRow({ course }: { course: FunctionReturnType<typeof api.sales.report>[number] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <li className="rounded-xl border border-line bg-card">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span className={`shrink-0 text-soft transition-transform ${open ? "rotate-90" : ""}`} aria-hidden>
+            ▸
+          </span>
+          <span className="truncate text-sm font-medium text-ink">{course.courseTitle}</span>
+        </span>
+        <span className="flex shrink-0 items-center gap-3 text-sm tabular-nums">
+          <span className="text-soft">
+            {course.count} sale{course.count === 1 ? "" : "s"}
+          </span>
+          <span className="font-semibold text-ink">{formatRand(course.gross)}</span>
+        </span>
+      </button>
+      {open && (
+        <ul className="border-t border-line px-4 py-1.5">
+          {course.editions.map((e) => (
+            <li key={e.lang} className="flex items-center justify-between gap-3 py-1.5 text-sm">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="truncate text-soft">{e.title}</span>
+                <span className="shrink-0 rounded bg-hi px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-soft">
+                  {e.lang}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-3 tabular-nums text-soft">
+                <span>
+                  {e.count} sale{e.count === 1 ? "" : "s"}
+                </span>
+                <span className="font-medium text-ink">{formatRand(e.gross)}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }
 
 // What the operator owes each Seller (.scratch/payfast-payments, ticket 06):
 // the `owed` Ledger rows summed per Seller, with the bank details to EFT to.
 // "Mark paid" flips the listed sales to `paid` with the typed EFT reference —
-// server-enforced Admin-only, never double-counted.
+// server-enforced Admin-only, never double-counted. Its own tab (admin-sales).
 function PayoutsManager() {
   const owed = useQuery(api.ledger.owedPayouts);
   return (
-    <section className="mt-12">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">Payouts</h2>
+    <div className="mx-auto max-w-2xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Payouts</h1>
         <p className="mt-0.5 text-sm text-soft">What you owe each seller, from the sales ledger</p>
       </div>
       {owed === undefined ? (
@@ -293,7 +581,7 @@ function PayoutsManager() {
           ))}
         </ul>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -625,7 +913,7 @@ function TenantDetail({ slug, onRemoved }: { slug: string; onRemoved?: () => voi
         <p className="mt-0.5 text-sm text-soft">{slug}.my-course.app</p>
       </div>
 
-      <TenantSection title="Theme" hint="Brand palette, logo, and favicon.">
+      <TenantSection title="Theme" hint="Brand palette, logo, favicon, and motto.">
         {view === undefined ? (
           <span>Loading…</span>
         ) : view === null ? (
@@ -1307,6 +1595,7 @@ function ThemeEditor({ slug, view }: { slug: string; view: TenantThemeView }) {
       </div>
 
       <AssetUploads slug={slug} logoUrl={view.logoUrl} faviconUrl={view.faviconUrl} />
+      <MottoEditor slug={slug} motto={view.motto} />
     </div>
   );
 }
@@ -1383,6 +1672,61 @@ function TokenField({
           ×
         </button>
       )}
+    </div>
+  );
+}
+
+// The motto shown under the tenant's logo on sign-in and the dashboard, in
+// place of the default site's fixed "Your learning workspace" tagline. A
+// single text input + save, mirroring the theme editor's own save button
+// rather than autosaving on change.
+function MottoEditor({ slug, motto }: { slug: string; motto: string | null }) {
+  const save = useMutation(api.tenants.updateTenantMotto);
+  const [value, setValue] = useState(motto ?? "");
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSave() {
+    setError(null);
+    setSaved(false);
+    setBusy(true);
+    try {
+      await save({ tenantSlug: slug, motto: value });
+      setSaved(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save the motto.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-accent2">Motto</p>
+      <p className="mt-0.5 text-xs text-soft">The subtitle under the logo on sign-in and the dashboard.</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            setSaved(false);
+          }}
+          placeholder="Your learning workspace"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+        />
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={busy}
+          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+        >
+          {busy ? "Saving…" : "Save motto"}
+        </button>
+        {saved && <span className="text-xs text-accent2">Saved.</span>}
+        {error && <span className="text-xs text-danger">{error}</span>}
+      </div>
     </div>
   );
 }

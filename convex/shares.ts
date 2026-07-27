@@ -4,27 +4,29 @@ import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { assertTenantFlag, getOwnedTopic, mintToken, normaliseEmail, shareLang, shareRole, SOURCE_LANG, topicLessonCounts } from "./lib";
+import { assertTenantFlag, getOwnedTopic, loadEdition, mintToken, normaliseEmail, shareLang, shareRole, SOURCE_LANG, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
+import { appUrl } from "./payfast";
 import type { InviteKind } from "./inviteEmail";
 
 // Schedule a best-effort invite email (see .scratch/invite-emails) after the
 // mutation commits, so a slow/failing send never blocks the invite. `granted` /
 // `role-changed` deep-link into the Edition; `invited` links to sign-up (the
-// recipient has no account yet). `APP_BASE_URL` is the web-app origin (Convex
-// can't read Vercel's env), absent in tests → a relative link.
+// recipient has no account yet). The link rides the course's canonical host via
+// `appUrl` — the tenant subdomain when the course is tenanted (issue 12), else
+// SITE_URL (which appUrl requires — provision it in tests that hit this path).
 async function scheduleInvite(
   ctx: MutationCtx,
   opts: { to: string; kind: InviteKind; topic: Doc<"topics">; editionLang: string; inviterEmail: string; role: "viewer" | "editor" },
 ): Promise<void> {
   const { to, kind, topic, editionLang, inviterEmail, role } = opts;
-  const base = process.env.APP_BASE_URL ?? "";
-  const link =
+  const path =
     kind === "invited"
-      ? `${base}/`
+      ? "/"
       : editionLang === SOURCE_LANG
-        ? `${base}/courses/${topic.slug}`
-        : `${base}/courses/${topic.slug}?lang=${encodeURIComponent(editionLang)}`;
+        ? `/courses/${topic.slug}`
+        : `/courses/${topic.slug}?lang=${encodeURIComponent(editionLang)}`;
+  const link = appUrl(path, topic.tenantSlug);
   await ctx.scheduler.runAfter(0, internal.email.sendInvite, {
     to,
     kind,
@@ -357,16 +359,9 @@ export const listSharedTopics = query({
         // they hold it, else their first Edition) — an English-only Viewer of a
         // Spanish-only share shouldn't see an English title they can't read.
         const preferred = langList.includes(SOURCE_LANG) ? SOURCE_LANG : langList[0]!;
-        let title = topic.title;
-        if (preferred !== SOURCE_LANG) {
-          const t = await ctx.db
-            .query("translations")
-            .withIndex("by_topic_lang_kind_key", (q) =>
-              q.eq("topicId", topic._id).eq("lang", preferred).eq("kind", "title").eq("key", ""),
-            )
-            .unique();
-          if (t?.text) title = t.text;
-        }
+        // The card title in the Viewer's preferred Edition (translated else source),
+        // via the shared Edition reader — decoded, unlike the old inline lookup.
+        const title = await loadEdition(ctx, topic, preferred).title();
         return {
           slug: topic.slug,
           title,

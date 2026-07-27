@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useEffect, useState, type CSSProperties } from "react";
 import { CertificateCard, type CertificateData } from "./Certificate";
 import { Icon, type IconName } from "./icons";
@@ -14,52 +15,18 @@ import { useTheme } from "./ThemeContext";
 // `.cert-stage`) so it reads as the same product. All motion is CSS (`.land-*`),
 // suppressed under prefers-reduced-motion; no motion.dev dependency.
 
-const STEPS = [
-  {
-    title: "Seed a course",
-    body: "Give it a title, say why you're learning, and upload the reading you trust — a handbook, a scripture, your own notes.",
-  },
-  {
-    title: "An AI author gets writing",
-    body: "It studies your sources and publishes your first lesson — an interactive page written from your reading, never over it.",
-  },
-  {
-    title: "Learn, ask, advance",
-    body: "Finish a lesson and the next one is written for you. The course unfolds at your pace, all the way to a certificate.",
-  },
-];
+// Display copy lives in the "Landing" namespace; the constants hold only the
+// stable per-item keys (step index, feature icon) and copy is resolved with
+// t(...) inside the component at render.
+const STEP_KEYS = ["seed", "author", "advance"] as const;
 
-const FEATURES: { icon: IconName; title: string; body: string }[] = [
-  {
-    icon: "book",
-    title: "Grounded in your reading",
-    body: "Your uploaded resources are the syllabus. Lessons are written from them and never trust ungrounded knowledge over them.",
-  },
-  {
-    icon: "edit",
-    title: "Interactive lessons",
-    body: "Every lesson is a self-contained interactive page — reading, worked examples, and quizzes that check you actually got it.",
-  },
-  {
-    icon: "chat",
-    title: "Ask anything",
-    body: "Stuck mid-lesson? Ask right there. The author reads your question and replies inline, in the lesson where you asked it.",
-  },
-  {
-    icon: "refresh",
-    title: "References that stay current",
-    body: "Alongside lessons you get living cheat-sheets — glossaries and key facts the author revises as your understanding deepens.",
-  },
-  {
-    icon: "globe",
-    title: "In any language",
-    body: "Turn a course into a full edition in another language — the same lessons, re-authored, not machine-glossed. Switch any time.",
-  },
-  {
-    icon: "link",
-    title: "Share & public links",
-    body: "Share a course with someone by email — read-only or with editing rights — or mint an anonymous public link anyone can open.",
-  },
+const FEATURE_KEYS: { icon: IconName; key: string }[] = [
+  { icon: "book", key: "grounded" },
+  { icon: "edit", key: "interactive" },
+  { icon: "chat", key: "ask" },
+  { icon: "refresh", key: "references" },
+  { icon: "globe", key: "language" },
+  { icon: "link", key: "share" },
 ];
 
 // A finished-course certificate with demo data, so the landing shows the real
@@ -88,12 +55,13 @@ function DemoCertificate() {
 // per-surface copy the Dashboard, CourseShell and PublicReader headers carry.
 function ThemeToggle() {
   const { theme, toggle } = useTheme();
+  const tc = useTranslations("Common");
   const dark = theme === "dark";
   return (
     <button
       onClick={toggle}
-      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
-      title={dark ? "Light mode" : "Dark mode"}
+      aria-label={dark ? tc("themeToLight") : tc("themeToDark")}
+      title={dark ? tc("lightMode") : tc("darkMode")}
       className="rounded-lg p-1.5 text-soft transition-colors hover:bg-hi hover:text-accent"
     >
       <Icon name={dark ? "sun" : "moon"} className="h-4 w-4" />
@@ -102,6 +70,18 @@ function ThemeToggle() {
 }
 
 export function Landing() {
+  const t = useTranslations("Landing");
+  const steps = STEP_KEYS.map((key) => ({
+    key,
+    title: t(`steps.${key}.title`),
+    body: t(`steps.${key}.body`),
+  }));
+  const features = FEATURE_KEYS.map(({ icon, key }) => ({
+    icon,
+    key,
+    title: t(`features.${key}.title`),
+    body: t(`features.${key}.body`),
+  }));
   return (
     <div className="min-h-screen">
       {/* ── Hero — the certificate stage's aurora + gold flecks as atmosphere ── */}
@@ -114,27 +94,26 @@ export function Landing() {
               href="#get-started"
               className="rounded-lg border border-line bg-card/60 px-4 py-1.5 text-sm font-medium text-ink transition-colors hover:border-gold hover:text-accent"
             >
-              Sign in
+              {t("nav.signIn")}
             </a>
           </span>
         </nav>
 
         <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center px-6 pb-24 pt-16 text-center sm:pb-32 sm:pt-24">
           <p className="land-rise text-xs font-semibold uppercase tracking-[0.35em] text-accent2">
-            An AI course studio
+            {t("hero.eyebrow")}
           </p>
           <h1
             className="land-rise mt-4 text-4xl font-semibold leading-tight tracking-tight text-ink sm:text-6xl"
             style={{ "--d": "80ms" } as CSSProperties}
           >
-            Learn anything, grounded in <em className="text-accent">your</em> reading.
+            {t.rich("hero.headline", { em: (chunks) => <em className="text-accent">{chunks}</em> })}
           </h1>
           <p
             className="land-rise mt-6 max-w-xl text-base text-soft sm:text-lg"
             style={{ "--d": "160ms" } as CSSProperties}
           >
-            Seed a topic with the sources you trust, and an AI author writes you an interactive course — lesson by
-            lesson, as you learn — all the way to a certificate.
+            {t("hero.subhead")}
           </p>
           <div
             className="land-rise mt-10 flex flex-wrap items-center justify-center gap-3"
@@ -144,13 +123,13 @@ export function Landing() {
               href="#get-started"
               className="rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
             >
-              Get started
+              {t("hero.getStarted")}
             </a>
             <a
               href="#how"
               className="rounded-xl border border-line bg-card px-6 py-3 text-sm font-semibold text-ink transition-colors hover:border-gold hover:text-accent"
             >
-              See how it works
+              {t("hero.seeHow")}
             </a>
           </div>
         </div>
@@ -159,11 +138,11 @@ export function Landing() {
       {/* ── How it works ── */}
       <section id="how" className="mx-auto w-full max-w-5xl scroll-mt-8 px-6 py-20">
         <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-          A course that's written as you learn it
+          {t("how.heading")}
         </h2>
         <div className="mt-12 grid gap-8 sm:grid-cols-3">
-          {STEPS.map((step, i) => (
-            <div key={step.title} className="land-reveal flex flex-col items-center text-center">
+          {steps.map((step, i) => (
+            <div key={step.key} className="land-reveal flex flex-col items-center text-center">
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gold/20 text-base font-semibold text-accent">
                 {i + 1}
               </span>
@@ -178,12 +157,12 @@ export function Landing() {
       <section className="border-y border-line bg-card/60">
         <div className="mx-auto w-full max-w-5xl px-6 py-20">
           <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-            Built for real study, not a feed of videos
+            {t("features.heading")}
           </h2>
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((f) => (
+            {features.map((f) => (
               <div
-                key={f.title}
+                key={f.key}
                 className="land-reveal rounded-2xl border border-line bg-card p-6 shadow-sm transition-colors hover:border-gold/60"
               >
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gold/15 text-accent">
@@ -200,15 +179,14 @@ export function Landing() {
       {/* ── Certificate showcase — the real card, demo data ── */}
       <section className="mx-auto grid w-full max-w-5xl items-center gap-12 px-6 py-20 lg:grid-cols-2">
         <div className="land-reveal">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-accent2">Certificates</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-accent2">{t("certificates.eyebrow")}</p>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-            Finish the course. Keep the proof.
+            {t("certificates.heading")}
           </h2>
           <p className="mt-4 leading-relaxed text-soft">
-            Every completed course ends in a certificate — a printable, shareable document with your name on it, at a
-            link you can hand to anyone. No account needed to admire it.
+            {t("certificates.body")}
           </p>
-          <p className="mt-3 text-sm italic text-soft">Go on — run your pointer over it.</p>
+          <p className="mt-3 text-sm italic text-soft">{t("certificates.hint")}</p>
         </div>
         <div className="land-reveal mx-auto w-full max-w-md">
           <DemoCertificate />

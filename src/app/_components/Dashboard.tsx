@@ -2,7 +2,7 @@
 
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -20,6 +20,7 @@ import { Markdown } from "./MarkdownView";
 import { missionPreview } from "./markdown";
 import { SettingsDialog } from "./SettingsDialog";
 import { SiteFooter } from "./SiteFooter";
+import { useTenant } from "./TenantContext";
 import { Dialog, IconButton, Menu, MenuItem } from "./ui";
 import { useResourceUpload } from "./useResourceUpload";
 
@@ -75,6 +76,7 @@ export function Dashboard() {
   const router = useRouter();
   const tc = useTranslations("Common");
   const ts = useTranslations("Settings");
+  const tenant = useTenant();
   const [prefsOpen, setPrefsOpen] = useState(false);
 
   // A learner with nothing to their name who also can't author (open sign-up
@@ -95,10 +97,23 @@ export function Dashboard() {
       <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
         <header className="mb-8 flex items-end justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Logo className="h-9 w-9 shrink-0 text-accent md:h-10 md:w-10" />
+            {tenant?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Convex storage URL, not a static asset.
+              <img
+                src={tenant.logoUrl}
+                alt={tenant.displayName}
+                className="h-9 w-auto max-w-40 shrink-0 object-contain md:h-10 md:max-w-48"
+              />
+            ) : (
+              <Logo className="h-9 w-9 shrink-0 text-accent md:h-10 md:w-10" />
+            )}
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">My Course</h1>
-              <p className="mt-0.5 text-sm text-soft">{tc("tagline")}</p>
+              <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">
+                {tenant?.displayName ?? "My Course"}
+              </h1>
+              {(tenant ? tenant.motto : tc("tagline")) && (
+                <p className="mt-0.5 text-sm text-soft">{tenant ? tenant.motto : tc("tagline")}</p>
+              )}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
@@ -229,6 +244,11 @@ function CourseCard({ course }: { course: Course }) {
   const [showMission, setShowMission] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editionsOpen, setEditionsOpen] = useState(false);
+  // Course settings follows the UI language: when the course has an Edition in
+  // the active locale, Details edits that translated Edition (else the English
+  // source). Mirrors the reader, which follows the Edition being read.
+  const locale = useLocale();
+  const settingsLang = locale !== "en" && course.editions.includes(locale) ? locale : "en";
   const requestSetup = useAction(api.routine.requestSetup);
   const [setup, setSetup] = useState<"idle" | "starting" | "started" | "error">("idle");
 
@@ -297,7 +317,7 @@ function CourseCard({ course }: { course: Course }) {
             )}
             {/* Soft estimate of the eventual total (owner-only; server-gated). */}
             {course.estimatedLessons != null && (
-              <span title="Your teacher's estimate of the course's eventual size — a rough guide, not a promise.">
+              <span title={t("estimatedTotalTitle")}>
                 {t("estimatedTotal", { count: course.estimatedLessons })}
               </span>
             )}
@@ -360,7 +380,7 @@ function CourseCard({ course }: { course: Course }) {
         <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />
       )}
       {settingsOpen && (
-        <CourseSettingsDialog topicSlug={course.slug} status={course.status} onClose={() => setSettingsOpen(false)} />
+        <CourseSettingsDialog topicSlug={course.slug} status={course.status} lang={settingsLang} onClose={() => setSettingsOpen(false)} />
       )}
       {editionsOpen && (
         <EditionsDialog topicSlug={course.slug} title={course.title} onClose={() => setEditionsOpen(false)} />
@@ -374,6 +394,7 @@ function CourseCard({ course }: { course: Course }) {
 // off the back-to-back authoring loop; while it runs, the live generation status
 // relabels the item ("Generating…") and flags a failed run with a dot on the ⋯.
 function AdminCourseMenu({ slug, title }: { slug: string; title: string }) {
+  const t = useTranslations("Dashboard");
   const amAdmin = useQuery(api.whitelist.amIAdmin);
   const status = useQuery(api.routine.generationStatus, { topicSlug: slug });
   const finish = useAction(api.routine.finishGenerating);
@@ -386,7 +407,7 @@ function AdminCourseMenu({ slug, title }: { slug: string; title: string }) {
   const failed = status?.status === "failed";
 
   return (
-    <Menu triggerLabel={`Admin actions for ${title}`} dot={failed}>
+    <Menu triggerLabel={t("adminActionsFor", { title })} dot={failed}>
       {(close) =>
         generating ? (
           // A run is in flight — offer to stop it (fire-and-pray can loop).
@@ -398,7 +419,7 @@ function AdminCourseMenu({ slug, title }: { slug: string; title: string }) {
               void cancel({ topicSlug: slug });
             }}
           >
-            {cancelling ? "Cancelling…" : "Cancel generation"}
+            {cancelling ? t("cancelling") : t("cancelGeneration")}
           </MenuItem>
         ) : (
           <MenuItem
@@ -409,7 +430,7 @@ function AdminCourseMenu({ slug, title }: { slug: string; title: string }) {
               void finish({ topicSlug: slug }).finally(() => setBusy(false));
             }}
           >
-            {failed ? "Finish generating — retry" : "Finish generating course"}
+            {failed ? t("finishGeneratingRetry") : t("finishGenerating")}
           </MenuItem>
         )
       }
@@ -444,9 +465,15 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
   const [showMission, setShowMission] = useState(false);
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
   const allDone = course.lessonCount > 0 && course.completedCount === course.lessonCount;
-  // Open in the Edition the card's title is shown in — English if the Viewer holds
-  // it, else their first Edition (mirrors listSharedTopics' `preferred`).
-  const openLang = course.langs.some((l) => l.lang === "en") ? "en" : course.langs[0]?.lang;
+  // Open in the active UI language when the Viewer holds that Edition; else the
+  // Edition the card's title is shown in — English if held, else their first
+  // Edition (mirrors listSharedTopics' `preferred`).
+  const locale = useLocale();
+  const openLang = course.langs.some((l) => l.lang === locale)
+    ? locale
+    : course.langs.some((l) => l.lang === "en")
+      ? "en"
+      : course.langs[0]?.lang;
 
   return (
     <article className="flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
@@ -542,7 +569,12 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
   const [showMission, setShowMission] = useState(false);
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
   const allDone = course.lessonCount > 0 && course.completedCount === course.lessonCount;
-  const openLang = course.langs.some((l) => l.lang === "en") ? "en" : course.langs[0]?.lang;
+  const locale = useLocale();
+  const openLang = course.langs.some((l) => l.lang === locale)
+    ? locale
+    : course.langs.some((l) => l.lang === "en")
+      ? "en"
+      : course.langs[0]?.lang;
 
   return (
     <article className="flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
@@ -636,6 +668,7 @@ function EmptyLibrary() {
 // Seed a new course (title + free-text "why"); the Routine drafts the Mission +
 // first Lesson on its next run. On create, open it so they can upload Resources.
 function NewCourseCard() {
+  const t = useTranslations("Dashboard");
   const seedTopic = useMutation(api.content.seedTopic);
   const requestSetup = useAction(api.routine.requestSetup);
   const { uploadFile, addLink } = useResourceUpload();
@@ -667,7 +700,7 @@ function NewCourseCard() {
         <span className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-hi text-accent">
           <Icon name="plus" className="h-5 w-5" />
         </span>
-        <span className="text-sm font-medium">New course</span>
+        <span className="text-sm font-medium">{t("newCourse")}</span>
       </button>
     );
   }
@@ -676,15 +709,15 @@ function NewCourseCard() {
       className="flex flex-col gap-2 rounded-2xl border border-gold/50 bg-card p-5 shadow-sm"
       onSubmit={async (e) => {
         e.preventDefault();
-        const t = title.trim();
-        if (!t) return;
+        const trimmed = title.trim();
+        if (!trimmed) return;
         setBusy(true);
         setError(null);
         // Snapshot the chosen Resources before we reset the form and navigate away.
         const chosenLinks = links;
         const chosenFiles = files;
         try {
-          const { slug } = await seedTopic({ title: t, why: why.trim(), provider });
+          const { slug } = await seedTopic({ title: trimmed, why: why.trim(), provider });
           // Land on the new course immediately so the learner sees its "setting up"
           // page right away — instead of watching this form sit in "Creating…"
           // (next to the card the reactive dashboard has already rendered) for the
@@ -719,42 +752,42 @@ function NewCourseCard() {
         } catch {
           // The server caps new courses to one per day; surface that (the most
           // likely reason a valid title fails) rather than leaving the form stuck.
-          setError("You can create one new course per day. Please try again tomorrow.");
+          setError(t("oneCoursePerDay"));
         } finally {
           setBusy(false);
         }
       }}
     >
-      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">New course</label>
+      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">{t("newCourse")}</label>
       <input
         autoFocus
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Course title"
+        placeholder={t("courseTitlePlaceholder")}
         className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
       />
       <textarea
         value={why}
         onChange={(e) => setWhy(e.target.value)}
         rows={3}
-        placeholder="Why are you learning this?"
+        placeholder={t("whyPlaceholder")}
         className="resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
       />
 
-      <label className="mt-1 text-xs font-semibold uppercase tracking-wide text-accent2">Teacher</label>
+      <label className="mt-1 text-xs font-semibold uppercase tracking-wide text-accent2">{t("teacher")}</label>
       <select
         value={provider}
         onChange={(e) => setProvider(e.target.value as "claude" | "openrouter")}
         className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
       >
-        <option value="claude">Claude (recommended)</option>
-        <option value="openrouter">OpenRouter</option>
+        <option value="claude">{t("providerClaude")}</option>
+        <option value="openrouter">{t("providerOpenRouter")}</option>
       </select>
       {provider === "openrouter" && (
-        <p className="text-xs text-soft">Experimental: quality isn&apos;t guaranteed on this teacher.</p>
+        <p className="text-xs text-soft">{t("providerExperimental")}</p>
       )}
 
-      <label className="mt-1 text-xs font-semibold uppercase tracking-wide text-accent2">Resources (optional)</label>
+      <label className="mt-1 text-xs font-semibold uppercase tracking-wide text-accent2">{t("resourcesOptional")}</label>
       {(links.length > 0 || files.length > 0) && (
         <ul className="flex flex-col gap-1">
           {links.map((l, i) => (
@@ -762,7 +795,7 @@ function NewCourseCard() {
               <span className="flex min-w-0 items-center gap-1.5 truncate">
                 <Icon name="link" className="h-3.5 w-3.5 shrink-0 text-soft" /> {l}
               </span>
-              <button type="button" onClick={() => setLinks((xs) => xs.filter((_, j) => j !== i))} className="shrink-0 text-soft hover:text-accent" aria-label="Remove link">
+              <button type="button" onClick={() => setLinks((xs) => xs.filter((_, j) => j !== i))} className="shrink-0 text-soft hover:text-accent" aria-label={t("removeLink")}>
                 <Icon name="x" className="h-3.5 w-3.5" />
               </button>
             </li>
@@ -772,7 +805,7 @@ function NewCourseCard() {
               <span className="flex min-w-0 items-center gap-1.5 truncate">
                 <Icon name="book" className="h-3.5 w-3.5 shrink-0 text-soft" /> {f.name}
               </span>
-              <button type="button" onClick={() => setFiles((xs) => xs.filter((_, j) => j !== i))} className="shrink-0 text-soft hover:text-accent" aria-label="Remove file">
+              <button type="button" onClick={() => setFiles((xs) => xs.filter((_, j) => j !== i))} className="shrink-0 text-soft hover:text-accent" aria-label={t("removeFile")}>
                 <Icon name="x" className="h-3.5 w-3.5" />
               </button>
             </li>
@@ -789,15 +822,15 @@ function NewCourseCard() {
               addDraftLink();
             }
           }}
-          placeholder="Paste a link…"
+          placeholder={t("pasteLinkPlaceholder")}
           className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1.5 text-sm focus:border-gold focus:outline-none"
         />
         <button type="button" onClick={addDraftLink} className="rounded-lg border border-line px-2 py-1.5 text-sm text-soft hover:bg-hi">
-          Add link
+          {t("addLink")}
         </button>
       </div>
       <label className="cursor-pointer rounded-lg border border-dashed border-line px-2 py-1.5 text-center text-sm text-soft hover:bg-hi">
-        + Attach file{files.length > 0 ? "s" : ""} (PDF or Markdown)
+        {files.length > 0 ? t("attachFiles") : t("attachFile")}
         <input
           type="file"
           multiple
@@ -815,10 +848,10 @@ function NewCourseCard() {
 
       <div className="mt-1 flex gap-2">
         <button type="submit" disabled={busy} className="flex-1 rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white disabled:opacity-60">
-          {busy ? "Creating…" : "Create"}
+          {busy ? t("creating") : t("create")}
         </button>
         <button type="button" onClick={() => setOpen(false)} className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi">
-          Cancel
+          {t("cancel")}
         </button>
       </div>
     </form>

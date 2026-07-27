@@ -429,8 +429,8 @@ export const startCheckout = mutation({
     const fields = buildCheckoutFields({
       merchantId,
       merchantKey,
-      returnUrl: appUrl(`${back}${back.includes("?") ? "&" : "?"}purchase=return&mp=${mPaymentId}`),
-      cancelUrl: appUrl(back),
+      returnUrl: appUrl(`${back}${back.includes("?") ? "&" : "?"}purchase=return&mp=${mPaymentId}`, topic.tenantSlug),
+      cancelUrl: appUrl(back, topic.tenantSlug),
       notifyUrl: `${process.env.CONVEX_SITE_URL}/payfast/notify`,
       mPaymentId,
       amountCents: listing.amount,

@@ -227,34 +227,47 @@ export async function getEditableTopic(
 
 // ---- Editions (course-translation) -----------------------------------------
 
-// The Edition languages a Viewer holds on a Topic (from their Shares).
-export async function viewerLangs(ctx: QueryCtx, topicId: Id<"topics">, userId: Id<"users">): Promise<Set<string>> {
+// A caller's provenance on one Edition — which grant kind admits them. All three
+// read ≡ a Viewer (full access); the kind only labels the badge ("Shared with me"
+// / "Purchases" / "Joined"). `owner` is NOT a Grant: an owner holds the source +
+// every ready translation from `translationJobs`, not a table-row grant, so it is
+// resolved by the callers (`heldLangs`/`editionAccessLevel`), never here.
+export type Grant = "viewer" | "entitled" | "enrolled";
+
+// THE grant walk (edition-deepening/02): the one place shares/entitlements/
+// enrollments are read for a caller, each held lang mapped to its provenance.
+// Precedence is viewer > entitled > enrolled — encoded in walk order (Shares set
+// unconditionally; the paid/self-serve twins fill only langs still unclaimed) so
+// a lang held by more than one grant keeps the same badge `editionAccessLevel`
+// showed before the collapse. Adding a grant type is one more block here plus one
+// member on `Grant` — nothing else across the file moves.
+export async function grantsFor(
+  ctx: QueryCtx,
+  topicId: Id<"topics">,
+  userId: Id<"users">,
+): Promise<Map<string, Grant>> {
+  const grants = new Map<string, Grant>();
+  // Viewer (Shares) — highest precedence. Legacy rows carry no `lang`; `shareLang`
+  // reads them as the English edition, consistent with `getEditableTopic`.
   const shares = await ctx.db
     .query("shares")
     .withIndex("by_topic_viewer", (q) => q.eq("topicId", topicId).eq("viewerId", userId))
     .collect();
-  return new Set(shares.map(shareLang));
-}
-
-// The Edition languages a buyer holds on a Topic (from their Entitlements). The
-// paid twin of `viewerLangs` (ADR 0016). Entitlements always carry a `lang`.
-export async function entitledLangs(ctx: QueryCtx, topicId: Id<"topics">, userId: Id<"users">): Promise<Set<string>> {
-  const rows = await ctx.db
+  for (const s of shares) grants.set(shareLang(s), "viewer");
+  // Entitled (paid, ADR 0016) — an entitled buyer reads ≡ a Viewer. Fills only
+  // langs a Share has not already claimed.
+  const entitlements = await ctx.db
     .query("entitlements")
     .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
     .collect();
-  return new Set(rows.map((e) => e.lang));
-}
-
-// The Edition languages a learner holds on a Topic from their self-enroll grants
-// (ADR 0023). The self-service twin of `viewerLangs`/`entitledLangs`; enrollments
-// always carry a `lang`.
-export async function enrolledLangs(ctx: QueryCtx, topicId: Id<"topics">, userId: Id<"users">): Promise<Set<string>> {
-  const rows = await ctx.db
+  for (const e of entitlements) if (!grants.has(e.lang)) grants.set(e.lang, "entitled");
+  // Enrolled (self-serve, ADR 0023) — lowest precedence twin of the two above.
+  const enrollments = await ctx.db
     .query("enrollments")
     .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
     .collect();
-  return new Set(rows.map((e) => e.lang));
+  for (const e of enrollments) if (!grants.has(e.lang)) grants.set(e.lang, "enrolled");
+  return grants;
 }
 
 // The set of Editions the caller may read on a Topic. The owner holds the source
@@ -262,7 +275,12 @@ export async function enrolledLangs(ctx: QueryCtx, topicId: Id<"topics">, userId
 // Edition); a non-owner holds the languages their Shares grant PLUS the languages
 // they have an Entitlement for (an entitled buyer reads their Edition exactly like
 // a Viewer, ADR 0016); anyone else nothing.
-export async function heldLangs(ctx: QueryCtx, topic: Doc<"topics">, userId: Id<"users">): Promise<Set<string>> {
+export async function heldLangs(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  userId: Id<"users">,
+  grants?: Map<string, Grant>,
+): Promise<Set<string>> {
   if (topic.ownerId === userId) {
     const jobs = await ctx.db
       .query("translationJobs")
@@ -272,10 +290,10 @@ export async function heldLangs(ctx: QueryCtx, topic: Doc<"topics">, userId: Id<
     for (const j of jobs) if (j.status === "ready") langs.add(j.lang);
     return langs;
   }
-  const shared = await viewerLangs(ctx, topic._id, userId);
-  for (const l of await entitledLangs(ctx, topic._id, userId)) shared.add(l);
-  for (const l of await enrolledLangs(ctx, topic._id, userId)) shared.add(l);
-  return shared;
+  // A non-owner's held set is exactly the keys of their grant walk. Reuse the
+  // caller's precomputed walk when threaded (must be `grantsFor` for THIS
+  // topic+userId), else do it once.
+  return new Set((grants ?? (await grantsFor(ctx, topic._id, userId))).keys());
 }
 
 // Which Edition to actually serve, given the caller's request. Honours
@@ -288,12 +306,211 @@ export async function readableLang(
   topic: Doc<"topics">,
   userId: Id<"users">,
   requested?: string | null,
+  grants?: Map<string, Grant>,
 ): Promise<string | null> {
-  const held = await heldLangs(ctx, topic, userId);
+  const held = await heldLangs(ctx, topic, userId, grants);
   if (held.size === 0) return null;
   if (requested && held.has(requested)) return requested;
   if (held.has(SOURCE_LANG)) return SOURCE_LANG;
   return [...held].sort()[0]!;
+}
+
+// Titles are authored upstream from generated HTML and can arrive entity-encoded
+// (e.g. "Maps &amp; List"). Decode the handful of named/numeric entities that
+// show up in plain-text titles so the UI never renders a raw "&amp;".
+// ponytail: covers the common entities; extend the map if a new one appears.
+// (Lives here, not content.ts, so lib.loadEdition can decode without a cycle;
+// re-exported from content.ts for its existing importers.)
+export function decodeEntities(s: string): string {
+  return s.replace(/&(amp|lt|gt|quot|#39|apos);/g, (_, e) =>
+    ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'" })[e as string] ?? _,
+  );
+}
+
+// ---- The Edition reader (edition-deepening/01) ------------------------------
+
+// The "translated row else English source" projection — the ONE place it lives.
+// Every reader (authed content.ts, Guest public.ts, capture/shares/certificates)
+// binds an Edition to (topic, lang) here and reads through the accessors below,
+// so the fallback ladder and the title-decode rule are defined exactly once.
+//
+// Read profile (deliberate): single-item accessors (`title`/`mission`/`lesson`/
+// `reference`) point-read one translation row — the hot getLesson path never
+// collects the whole Edition. `map()` collects the Edition once (memoised) to
+// back list queries. Both paths delegate to the same fallback helpers, so the
+// rule stays single-sourced even though the two read profiles differ.
+
+// The translated-item title (lesson/reference use the `title` field), decoded,
+// else the source row's title. Distinct from the course title, which uses `text`.
+function itemTitle(row: { title?: string } | null | undefined, sourceTitle: string): string {
+  return decodeEntities(row?.title ?? sourceTitle);
+}
+
+// A loaded snapshot of one Edition's translated rows (`${kind}:${key}` → row),
+// with sync accessors for the list queries. Titles decode; question text/reply
+// stay raw (learner-typed, never generated-HTML-derived).
+export type EditionSnapshot = {
+  title(topic: { title: string }): string;
+  lessonTitle(lesson: Doc<"lessons">): string;
+  referenceTitle(reference: Doc<"references">): string;
+  question(q: Doc<"questions">): { text: string; reply: string | null };
+};
+
+export type EditionReader = {
+  title(): Promise<string>;
+  mission(): Promise<string | null>;
+  lesson(lesson: Doc<"lessons">): Promise<{ title: string; body: ContentBody }>;
+  reference(reference: Doc<"references">): Promise<{ title: string; body: ContentBody }>;
+  map(): Promise<EditionSnapshot>;
+};
+
+export function loadEdition(ctx: QueryCtx, topic: Doc<"topics">, lang: string): EditionReader {
+  const source = lang === SOURCE_LANG;
+
+  // One point-read of a single translated row (skipped for the source language).
+  const one = async (
+    kind: "lesson" | "reference" | "mission" | "title" | "question",
+    key: string,
+  ): Promise<Doc<"translations"> | null> => {
+    if (source) return null;
+    return await ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) =>
+        q.eq("topicId", topic._id).eq("lang", lang).eq("kind", kind).eq("key", key),
+      )
+      .unique();
+  };
+
+  let snapshot: Promise<EditionSnapshot> | null = null;
+
+  return {
+    // Course title uses the shared `translatedTitle` primitive (the `text` field),
+    // then decodes — folding in the lookup shares.ts/certificates.ts hand-inlined.
+    title: async () => decodeEntities(await translatedTitle(ctx, topic._id, lang, topic.title)),
+    mission: async () => {
+      if (!topic.mission) return null;
+      const row = await one("mission", "");
+      return decodeEntities(row?.text ?? topic.mission);
+    },
+    lesson: async (lesson) => {
+      const row = await one("lesson", lesson.key);
+      return { title: itemTitle(row, lesson.title), body: pickContentBody(row, lesson) };
+    },
+    reference: async (reference) => {
+      const row = await one("reference", reference.key);
+      return { title: itemTitle(row, reference.title), body: pickContentBody(row, reference) };
+    },
+    map: () => {
+      // Memoise the single collect: list queries may touch it many times.
+      snapshot ??= (async () => {
+        const rows = source
+          ? []
+          : await ctx.db
+              .query("translations")
+              .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", lang))
+              .collect();
+        const byKey = new Map(rows.map((r) => [`${r.kind}:${r.key}`, r]));
+        return {
+          title: (tp) => decodeEntities(byKey.get("title:")?.text ?? tp.title),
+          lessonTitle: (lesson) => itemTitle(byKey.get(`lesson:${lesson.key}`), lesson.title),
+          referenceTitle: (reference) => itemTitle(byKey.get(`reference:${reference.key}`), reference.title),
+          question: (q) => {
+            const row = byKey.get(`question:${q._id}`);
+            return { text: row?.text ?? q.text, reply: (q.reply ? (row?.reply ?? q.reply) : null) ?? null };
+          },
+        };
+      })();
+      return snapshot;
+    },
+  };
+}
+
+// ---- The per-artifact reader core (edition-deepening/04) --------------------
+//
+// The artifact-fetch + paygate projection shared by BOTH readers. Each reader
+// resolves its principal its own way — the authed reader via `resolveEdition`
+// (signed-in userId + the `none`→not-found gate), the Guest reader via its
+// Public-link token — then hands the already-resolved (topic, lang, level) here.
+// Selection/classification stays upstream (one seam per reader); the artifact
+// projection lives here, once, so content.ts and public.ts are thin adapters over
+// this core rather than parallel re-implementations of the same body.
+
+type ArtifactBody = { locked: boolean; contentUrl?: string; html?: string };
+export type LessonPayload = { key: string; seq: number; title: string } & ArtifactBody;
+export type ReferencePayload = { key: string; title: string } & ArtifactBody;
+
+// One Lesson's payload for an already-resolved Edition: null when the Lesson is
+// missing or superseded; a locked marker on a paid Edition past the Preview
+// (`lessonLocked`); else the translated-else-source title + body. Shared by
+// content.getLesson and public.publicLesson.
+export async function readLesson(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  lang: string,
+  level: EditionAccess,
+  key: string,
+): Promise<LessonPayload | null> {
+  const lesson = await ctx.db
+    .query("lessons")
+    .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+    .unique();
+  if (!lesson || lesson.supersededBy) return null;
+  const { title, body } = await loadEdition(ctx, topic, lang).lesson(lesson);
+  if (await lessonLocked(ctx, topic._id, level, key)) {
+    return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
+  }
+  return { key: lesson.key, seq: lesson.seq, title, locked: false, ...body };
+}
+
+// One Reference's payload for an already-resolved Edition: null when the
+// Reference is unknown; a locked marker on a paid Edition (References sit
+// entirely past the Preview, so `preview` locks them wholesale); else the
+// translated-else-source title + body. Shared by content.getReference and
+// public.publicReference.
+export async function readReference(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  lang: string,
+  level: EditionAccess,
+  key: string,
+): Promise<ReferencePayload | null> {
+  const ref = await ctx.db
+    .query("references")
+    .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+    .unique();
+  if (!ref) return null;
+  const { title, body } = await loadEdition(ctx, topic, lang).reference(ref);
+  if (level === "preview") return { key: ref.key, title, html: "", locked: true };
+  return { key: ref.key, title, locked: false, ...body };
+}
+
+// The table-of-contents projections shared by the list queries and the Guest's
+// full-mirror bundle. The caller passes the Edition snapshot it already holds
+// (`loadEdition(...).map()`) so the collect is reused, not repeated. Lessons in
+// `by_topic_seq` order, non-superseded; References alphabetised by key — the TOC
+// still renders in full even to a `preview` caller (only the bodies are locked).
+export async function lessonsToc(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  snap: EditionSnapshot,
+): Promise<Array<{ key: string; seq: number; title: string }>> {
+  const lessons = await ctx.db
+    .query("lessons")
+    .withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id))
+    .collect();
+  return lessons.filter((l) => !l.supersededBy).map((l) => ({ key: l.key, seq: l.seq, title: snap.lessonTitle(l) }));
+}
+
+export async function referencesToc(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  snap: EditionSnapshot,
+): Promise<Array<{ key: string; title: string }>> {
+  const refs = await ctx.db
+    .query("references")
+    .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
+    .collect();
+  return refs.sort((a, b) => a.key.localeCompare(b.key)).map((r) => ({ key: r.key, title: snap.referenceTitle(r) }));
 }
 
 // ---- Paid marketplace: Sellers (ADR 0016) -----------------------------------
@@ -380,15 +597,18 @@ export async function editionAccessLevel(
   lang: string,
   userId: Id<"users"> | null,
   publicGrant = false,
+  grants?: Map<string, Grant>,
 ): Promise<EditionAccess> {
   if (userId && topic.ownerId === userId) return "owner";
   if (userId) {
-    if ((await viewerLangs(ctx, topic._id, userId)).has(lang)) return "viewer";
-    if ((await entitledLangs(ctx, topic._id, userId)).has(lang)) return "entitled";
-    // A self-enroll grant (ADR 0023) reads ≡ a Viewer. Checked before the price
-    // fallback and never re-checking the price, so a grandfathered enrollee keeps
-    // full access even after their formerly-free Edition is later priced.
-    if ((await enrolledLangs(ctx, topic._id, userId)).has(lang)) return "enrolled";
+    // One grant walk (reused when threaded by resolveEdition — the map must
+    // be `grantsFor` for THIS topic+userId — else run once) yields the provenance
+    // directly, precedence viewer > entitled > enrolled. A
+    // self-enroll grant (ADR 0023) reads ≡ a Viewer; because the walk is consulted
+    // before the price fallback and never re-checks the price, a grandfathered
+    // enrollee keeps full access even after their formerly-free Edition is priced.
+    const held = (grants ?? (await grantsFor(ctx, topic._id, userId))).get(lang);
+    if (held) return held;
   }
   const paid = (await editionPrice(ctx, topic._id, lang)) !== null;
   if (publicGrant) return paid ? "preview" : "viewer";
@@ -452,8 +672,14 @@ export async function translatedTitle(
   return t?.text ?? sourceTitle;
 }
 
-// The authed reader's per-request resolution: which Edition to serve AND the
-// caller's access level to it — the single seam every authed reader query calls.
+// THE authed Edition-selection seam: which Edition to serve AND the caller's
+// access level to it, resolved once per request. Every authed reader query
+// (content.courseHeader / getMap / getLesson / getReference) calls this and
+// nothing else for selection+classification; the Guest reader is a separate thin
+// token adapter over the shared `editionAccessLevel` classifier (it has no
+// selection ladder — its token fixes the Edition), and `capture.myQuestions`
+// calls the lower-level `readableLang` primitive directly because it needs the
+// null-when-nothing-held signal this seam intentionally never returns.
 // Composes Edition selection (held-Edition switching, unchanged) with the paygate:
 //   - A non-owner's SPECIFIC request is classified as-is, so navigating to a paid
 //     Edition they don't hold shows THAT Edition's Preview (an `es` hold never
@@ -461,23 +687,28 @@ export async function translatedTitle(
 //     when the requested one is genuinely not-found (free + unheld).
 //   - The owner, and any request-less call, use the held-Edition selection
 //     (`readableLang`) unchanged, reaching the paygate only when nothing is held.
-export async function resolveReaderEdition(
+export async function resolveEdition(
   ctx: QueryCtx,
   topic: Doc<"topics">,
   userId: Id<"users">,
   requested?: string | null,
 ): Promise<{ lang: string; level: EditionAccess }> {
+  // The caller's grant walk, computed ONCE and threaded through every selection +
+  // classification call below (each would otherwise re-walk the three tables). The
+  // owner never consults it — their selection reads translationJobs and their level
+  // short-circuits to "owner" — so skip the read entirely for them.
+  const grants = topic.ownerId === userId ? undefined : await grantsFor(ctx, topic._id, userId);
   if (requested && topic.ownerId !== userId) {
-    const level = await editionAccessLevel(ctx, topic, requested, userId);
+    const level = await editionAccessLevel(ctx, topic, requested, userId, false, grants);
     if (level !== "none") return { lang: requested, level };
-    const held = await readableLang(ctx, topic, userId, null);
-    if (held) return { lang: held, level: await editionAccessLevel(ctx, topic, held, userId) };
+    const held = await readableLang(ctx, topic, userId, null, grants);
+    if (held) return { lang: held, level: await editionAccessLevel(ctx, topic, held, userId, false, grants) };
     return { lang: requested, level: "none" };
   }
-  const effLang = await readableLang(ctx, topic, userId, requested ?? null);
-  if (effLang !== null) return { lang: effLang, level: await editionAccessLevel(ctx, topic, effLang, userId) };
+  const effLang = await readableLang(ctx, topic, userId, requested ?? null, grants);
+  if (effLang !== null) return { lang: effLang, level: await editionAccessLevel(ctx, topic, effLang, userId, false, grants) };
   const lang = requested ?? SOURCE_LANG;
-  return { lang, level: await editionAccessLevel(ctx, topic, lang, userId) };
+  return { lang, level: await editionAccessLevel(ctx, topic, lang, userId, false, grants) };
 }
 
 // A Topic's live progress counts for a dashboard/Shared-with-me card: how many

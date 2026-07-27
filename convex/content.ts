@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { action, internalMutation, internalQuery, mutation, query, type ActionCtx, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, assertTenantFlag, buildPaywall, getEditableTopic, getOwnedTopic, heldLangs, lessonLocked, pickContentBody, resolveReaderEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
+import { assertAdmin, assertTenantFlag, buildPaywall, getEditableTopic, getOwnedTopic, heldLangs, lessonsToc, loadEdition, readLesson, readReference, referencesToc, resolveEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "./lib";
 import { langInfo } from "./languages";
 import { itemHash, quizStructureMatches } from "./translate";
 import { assertEmblemImage, normaliseGlyph } from "./emblem";
@@ -20,46 +20,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 // from `ownerEmail` (the operator has no auth identity) and thread the resulting
 // topicId through.
 
-// Titles are authored upstream from generated HTML and can arrive entity-encoded
-// (e.g. "Maps &amp; List"). Decode the handful of named/numeric entities that
-// show up in plain-text titles so the UI never renders a raw "&amp;".
-// ponytail: covers the common entities; extend the map if a new one appears.
-export function decodeEntities(s: string): string {
-  return s.replace(/&(amp|lt|gt|quot|#39|apos);/g, (_, e) =>
-    ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'" })[e as string] ?? _,
-  );
-}
+// `decodeEntities` now lives in lib.ts (so lib.loadEdition can decode without a
+// cycle); re-exported here for callers that import it from content.
+export { decodeEntities } from "./lib";
 
 // ---- Editions (course translation) ----------------------------------------
-
-// One translated item for an Edition, or null (source language, or not yet
-// translated — the caller then falls back to the English source row).
-async function trOne(
-  ctx: QueryCtx,
-  topicId: Id<"topics">,
-  lang: string,
-  kind: "lesson" | "reference" | "mission" | "title" | "question",
-  key: string,
-): Promise<Doc<"translations"> | null> {
-  if (lang === SOURCE_LANG) return null;
-  return await ctx.db
-    .query("translations")
-    .withIndex("by_topic_lang_kind_key", (q) =>
-      q.eq("topicId", topicId).eq("lang", lang).eq("kind", kind).eq("key", key),
-    )
-    .unique();
-}
-
-// All of one Edition's translated rows for a Topic, keyed `${kind}:${key}` — a
-// single read for list queries. Empty for the source language.
-async function editionMap(ctx: QueryCtx, topicId: Id<"topics">, lang: string): Promise<Map<string, Doc<"translations">>> {
-  if (lang === SOURCE_LANG) return new Map();
-  const rows = await ctx.db
-    .query("translations")
-    .withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", lang))
-    .collect();
-  return new Map(rows.map((r) => [`${r.kind}:${r.key}`, r]));
-}
 
 // The Editions the caller may switch between on a Topic (owner: source + every
 // ready translation; Viewer: their granted languages), with display metadata.
@@ -667,7 +632,7 @@ export const courseHeader = query({
     if (!userId) return null;
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     // `level` is now narrowed to the five access roles (the returns validator's
     // union) — the "none" case is not-found above, so `role` is just `level`.
     if (level === "none") return null;
@@ -675,13 +640,12 @@ export const courseHeader = query({
     // Per-Edition edit capability (ADR 0020), same logic as the edit mutations'
     // guard: owner, or an Editor of the served lang.
     const canEdit = (await getEditableTopic(ctx, userId, topicSlug, effLang)) !== null;
-    const t = await trOne(ctx, topic._id, effLang, "title", "");
-    const m = topic.mission ? await trOne(ctx, topic._id, effLang, "mission", "") : null;
+    const ed = loadEdition(ctx, topic, effLang);
     const editions = await switcherEditions(ctx, topic, userId);
     const paywall = level === "preview" ? await buildPaywall(ctx, topic._id, effLang) : undefined;
     return {
-      title: decodeEntities(t?.text ?? topic.title),
-      mission: topic.mission ? decodeEntities(m?.text ?? topic.mission) : null,
+      title: await ed.title(),
+      mission: await ed.mission(),
       role,
       canEdit,
       status: topic.status ?? "active",
@@ -708,17 +672,9 @@ export const listLessons = query({
     // The table of contents is served in full even to a `preview` caller (only
     // the Lesson *bodies* past the Preview are locked, in getLesson); `none` is
     // not-found (a free Edition the caller holds no grant to).
-    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return [];
-    const lessons = (
-      await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
-    ).filter((l) => !l.supersededBy);
-    const tmap = await editionMap(ctx, topic._id, effLang);
-    return lessons.map((l) => ({
-      key: l.key,
-      seq: l.seq,
-      title: decodeEntities(tmap.get(`lesson:${l.key}`)?.title ?? l.title),
-    }));
+    return await lessonsToc(ctx, topic, await loadEdition(ctx, topic, effLang).map());
   },
 });
 
@@ -729,30 +685,11 @@ export const getLesson = query({
     if (!userId) return null;
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return null;
-    const lesson = await ctx.db
-      .query("lessons")
-      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
-      .unique();
-    if (!lesson || lesson.supersededBy) return null;
-    const t = await trOne(ctx, topic._id, effLang, "lesson", key);
-    const title = decodeEntities(t?.title ?? lesson.title);
-    // Paygate: on a paid Edition the caller doesn't hold (`preview`), only the
-    // Preview — the lowest-ordered non-superseded Lesson — is served; every other
-    // Lesson returns an explicit `locked` marker, distinct from a not-found null.
-    if (await lessonLocked(ctx, topic._id, level, key)) {
-      return { key: lesson.key, seq: lesson.seq, title, html: "", locked: true };
-    }
-    return {
-      key: lesson.key,
-      seq: lesson.seq,
-      title,
-      locked: false,
-      // The body is served as a content URL (content blob) or, on transition
-      // rows, inline html — from the translated row if it has one, else source.
-      ...pickContentBody(t, lesson),
-    };
+    // The artifact fetch + paygate projection lives in the shared reader core
+    // (edition-deepening/04); this adapter only resolves the authed principal.
+    return await readLesson(ctx, topic, effLang, level, key);
   },
 });
 
@@ -766,16 +703,9 @@ export const listReferences = query({
     // References are past the Preview, but their titles ride along in the table
     // of contents even for a `preview` caller (the bodies are locked in
     // getReference). `none` is not-found.
-    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return [];
-    const refs = await ctx.db
-      .query("references")
-      .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
-      .collect();
-    const tmap = await editionMap(ctx, topic._id, effLang);
-    return refs
-      .sort((a, b) => a.key.localeCompare(b.key))
-      .map((r) => ({ key: r.key, title: decodeEntities(tmap.get(`reference:${r.key}`)?.title ?? r.title) }));
+    return await referencesToc(ctx, topic, await loadEdition(ctx, topic, effLang).map());
   },
 });
 
@@ -786,18 +716,9 @@ export const getReference = query({
     if (!userId) return null;
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    const { lang: effLang, level } = await resolveReaderEdition(ctx, topic, userId, lang ?? null);
+    const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return null;
-    const ref = await ctx.db
-      .query("references")
-      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
-      .unique();
-    if (!ref) return null;
-    const t = await trOne(ctx, topic._id, effLang, "reference", key);
-    const title = decodeEntities(t?.title ?? ref.title);
-    // References sit entirely past the Preview — locked for a `preview` caller.
-    if (level === "preview") return { key: ref.key, title, html: "", locked: true };
-    return { key: ref.key, title, locked: false, ...pickContentBody(t, ref) };
+    return await readReference(ctx, topic, effLang, level, key);
   },
 });
 

@@ -1,0 +1,1539 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My Course — Design source of truth</title>
+<meta name="description" content="Per-screen layout spec + component library for the My Course app. Standalone, shareable.">
+
+<!-- Real fonts: Spectral (app serif) + Noto Serif Devanagari (--font-deva chrome).
+     This is a local file, not a sandboxed artifact, so external fonts are fine. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Serif+Devanagari:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+  /* ============================================================================
+     TOKENS — the 14-token whitelabel contract, lifted verbatim from
+     src/design/tokens.ts + src/styles/globals.css so this doc IS the app palette.
+     Themed at :root so the viewer's OS light/dark wins; the toggle stamps
+     data-theme to override (exactly like the app's html[data-theme]).
+     ============================================================================ */
+  :root {
+    --paper:#fbf7f0; --card:#fffdf9; --ink:#2b2622; --soft:#6b6258;
+    --line:#e7ddd4; --accent:#9c5b34; --accent2:#3f6f5e; --gold:#b88a2e; --hi:#fbeecb;
+    --danger:#b4442f;
+    --good:#e7f3ec; --good-b:#3f8f63; --bad:#fbe9e7; --bad-b:#c0573f;
+    --radius:16px;
+    --shadow-sm:0 1px 2px rgba(43,38,34,.06),0 1px 3px rgba(43,38,34,.05);
+    --shadow-md:0 6px 24px -12px rgba(43,38,34,.28);
+    --shadow-pop:0 12px 40px -12px rgba(43,38,34,.35);
+    --serif:Spectral,Georgia,"Times New Roman",ui-serif,serif;
+    --deva:"Noto Serif Devanagari",Spectral,Georgia,serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --paper:#1b1815; --card:#241f1a; --ink:#e9e1d4; --soft:#a99d8a;
+      --line:#3a322a; --accent:#dd9863; --accent2:#79b39b; --gold:#d8ab57; --hi:#4a3c1f;
+      --danger:#e0785f; --good:#1e3328; --good-b:#74cf9b; --bad:#3c241e; --bad-b:#e0937c;
+      --shadow-md:0 8px 28px -12px rgba(0,0,0,.6);
+      --shadow-pop:0 14px 44px -12px rgba(0,0,0,.7);
+    }
+  }
+  :root[data-theme="light"]{
+    --paper:#fbf7f0; --card:#fffdf9; --ink:#2b2622; --soft:#6b6258;
+    --line:#e7ddd4; --accent:#9c5b34; --accent2:#3f6f5e; --gold:#b88a2e; --hi:#fbeecb; --danger:#b4442f;
+    --good:#e7f3ec; --good-b:#3f8f63; --bad:#fbe9e7; --bad-b:#c0573f;
+    --shadow-md:0 6px 24px -12px rgba(43,38,34,.28);
+    --shadow-pop:0 12px 40px -12px rgba(43,38,34,.35);
+  }
+  :root[data-theme="dark"]{
+    --paper:#1b1815; --card:#241f1a; --ink:#e9e1d4; --soft:#a99d8a;
+    --line:#3a322a; --accent:#dd9863; --accent2:#79b39b; --gold:#d8ab57; --hi:#4a3c1f; --danger:#e0785f;
+    --good:#1e3328; --good-b:#74cf9b; --bad:#3c241e; --bad-b:#e0937c;
+    --shadow-md:0 8px 28px -12px rgba(0,0,0,.6);
+    --shadow-pop:0 14px 44px -12px rgba(0,0,0,.7);
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--serif);
+       -webkit-font-smoothing:antialiased;line-height:1.5}
+  h1,h2,h3{text-wrap:balance;margin:0}
+  button{font-family:inherit;cursor:pointer}
+  input,textarea,select{font-family:inherit}
+  a{color:inherit}
+  /* Devanagari chrome font (globals.css .font-deva) — Hindi endonyms + sample copy. */
+  .deva{font-family:var(--deva)}
+
+  .wrap{max-width:1120px;margin:0 auto;padding:28px 20px 120px}
+
+  /* ---- Doc chrome (not part of the app; frames the showcase) ---- */
+  .protobar{position:sticky;top:0;z-index:60;display:flex;align-items:center;justify-content:space-between;
+    gap:16px;padding:12px 20px;background:color-mix(in oklab,var(--paper) 90%,transparent);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+  .protobar .brand{display:flex;align-items:center;gap:10px;min-width:0}
+  .protobar .brand .mark{width:30px;height:30px;color:var(--accent);flex:none}
+  .protobar .brand b{color:var(--accent);font-size:16px;letter-spacing:.01em}
+  .protobar .brand span{color:var(--soft);font-size:12.5px}
+  .protonav{display:flex;gap:2px;padding:3px;background:var(--hi);border-radius:11px}
+  .protonav a{border:0;background:transparent;color:var(--soft);font-size:12.5px;font-weight:600;
+    padding:6px 12px;border-radius:8px;text-decoration:none}
+  .protonav a:hover{color:var(--accent)}
+  .seg{display:flex;gap:2px;padding:3px;background:var(--hi);border-radius:11px}
+  .seg button{border:0;background:transparent;color:var(--soft);font-size:12.5px;font-weight:600;
+    padding:6px 11px;border-radius:8px;display:flex;align-items:center;gap:6px}
+  .seg button[aria-pressed="true"]{background:var(--card);color:var(--accent);box-shadow:var(--shadow-sm)}
+
+  .part-head{margin:56px 0 8px}
+  .part-head .kicker{font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--gold)}
+  .part-head h2{font-size:30px;color:var(--accent);letter-spacing:-.02em;margin-top:6px}
+  .part-head p{color:var(--soft);font-size:15px;max-width:74ch;margin:8px 0 0;line-height:1.55}
+
+  .group{margin-top:44px}
+  .group-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--accent2)}
+  .group h2{font-size:22px;color:var(--accent);letter-spacing:-.01em}
+  .group .lede{color:var(--soft);font-size:14.5px;max-width:66ch;margin:2px 0 22px}
+  .stage{border:1px dashed var(--line);border-radius:20px;padding:26px;background:
+     radial-gradient(120% 120% at 100% 0,color-mix(in oklab,var(--hi) 40%,transparent),transparent 55%)}
+  .stage-note{font-size:12.5px;color:var(--soft);margin:0 0 18px;display:flex;gap:8px;align-items:center}
+  .stage-note svg{flex:none;color:var(--accent2)}
+
+  /* ============================================================================
+     SCREEN SPEC — the per-screen "source of truth". A screen = header (id · name ·
+     route) + purpose + a labelled layout wireframe + a region legend + its states.
+     ============================================================================ */
+  .screen{border:1px solid var(--line);border-radius:18px;background:var(--card);
+    margin-bottom:20px;overflow:hidden;box-shadow:var(--shadow-sm);scroll-margin-top:80px}
+  .screen-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:15px 20px;
+    border-bottom:1px solid var(--line);background:color-mix(in oklab,var(--hi) 20%,transparent)}
+  .screen-head .sid{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;font-weight:700;
+    color:#fff;background:var(--accent2);border-radius:6px;padding:3px 8px;letter-spacing:.02em}
+  .screen-head h3{font-size:17px;color:var(--accent);letter-spacing:-.01em}
+  .screen-head .route{margin-left:auto;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;
+    color:var(--soft);background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:3px 9px}
+  .screen-body{padding:20px}
+  .screen-purpose{font-size:13.5px;color:var(--ink);line-height:1.55;margin:0 0 18px;max-width:80ch}
+  .screen-purpose b{color:var(--accent)}
+  .spec{display:grid;grid-template-columns:1.15fr .85fr;gap:24px;align-items:start}
+  @media(max-width:800px){.spec{grid-template-columns:1fr}}
+  .spec h5{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent2);
+    font-weight:700;margin:0 0 10px}
+  .legend{list-style:none;margin:0 0 16px;padding:0;display:flex;flex-direction:column;gap:8px}
+  .legend li{font-size:12.5px;color:var(--soft);line-height:1.45;display:flex;gap:8px}
+  .legend li b{color:var(--ink);font-weight:600;flex:none;min-width:96px}
+  .legend li b.r{color:var(--accent2)}
+  .states{display:flex;flex-wrap:wrap;gap:6px}
+  .state{font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--hi);color:var(--accent2)}
+  .state.warn{background:color-mix(in oklab,var(--gold) 18%,transparent);color:var(--gold)}
+  .state.bad{background:color-mix(in oklab,var(--danger) 12%,transparent);color:var(--danger)}
+
+  /* Wireframe primitive — dashed labelled region boxes, nested to show layout. */
+  .wf{border:1px solid var(--line);border-radius:12px;background:var(--paper);padding:9px;
+    display:flex;flex-direction:column;gap:8px}
+  .wf-row{display:flex;gap:8px}
+  .wf-box{border:1px dashed color-mix(in oklab,var(--accent2) 38%,var(--line));border-radius:8px;
+    padding:8px 10px;background:color-mix(in oklab,var(--card) 65%,transparent);flex:1;min-width:0;
+    display:flex;flex-direction:column;gap:3px;justify-content:center;min-height:38px}
+  .wf-box .r{font-size:8.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent2)}
+  .wf-box .c{font-size:11px;color:var(--soft);line-height:1.35}
+  .wf-box.accent{border-color:color-mix(in oklab,var(--accent) 48%,var(--line));
+    background:color-mix(in oklab,var(--accent) 7%,var(--card))}
+  .wf-box.accent .r{color:var(--accent)}
+  .wf-box.gold{border-color:color-mix(in oklab,var(--gold) 55%,var(--line));
+    background:color-mix(in oklab,var(--gold) 9%,var(--card))}
+  .wf-box.gold .r{color:var(--gold)}
+  .wf-box.solid{border-style:solid}
+  .wf-box.flush{flex:none}
+  .wf-col{display:flex;flex-direction:column;gap:8px;flex:1;min-width:0}
+  .wf-side{flex:none;width:34%}
+  .wf-mini{font-size:10px;color:var(--soft);padding:4px 8px;border-radius:6px;background:color-mix(in oklab,var(--hi) 40%,transparent)}
+
+  /* ---- Icon system. Inline SVG, 2px stroke, round caps (src/app/_components/icons.tsx) ---- */
+  .icon{width:20px;height:20px;display:inline-block;vertical-align:middle;flex:none}
+  .icons-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px}
+  .icon-cell{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 8px;border:1px solid var(--line);
+    border-radius:12px;background:var(--card);color:var(--ink)}
+  .icon-cell .icon{width:24px;height:24px}
+  .icon-cell code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:10.5px;color:var(--soft)}
+  .icon-cell.fresh{border-color:color-mix(in oklab,var(--accent2) 45%,var(--line));
+    background:color-mix(in oklab,var(--accent2) 7%,var(--card))}
+  .icon-cell.fresh code{color:var(--accent2);font-weight:700}
+
+  /* ---- IconButton primitive ---- */
+  .iconbtn{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;
+    border:1px solid var(--line);background:transparent;color:var(--soft);transition:background .15s,color .15s,border-color .15s}
+  .iconbtn:hover{background:var(--hi);color:var(--accent);border-color:transparent}
+  .iconbtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .iconbtn:disabled{opacity:.45;cursor:not-allowed}
+  .iconbtn.ghost{border-color:transparent}
+  .prim-demo{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+
+  /* buttons */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:10px;font-size:14px;
+    font-weight:600;padding:9px 14px;border:1px solid transparent;transition:background .15s,color .15s,border-color .15s;
+    min-height:40px}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.primary:hover{background:color-mix(in oklab,var(--accent) 90%,black)}
+  .btn.outline{background:transparent;border-color:var(--line);color:var(--soft)}
+  .btn.outline:hover{background:var(--hi);color:var(--accent);border-color:transparent}
+  .btn.gold{background:color-mix(in oklab,var(--gold) 22%,transparent);color:var(--accent)}
+  .btn.gold:hover{background:color-mix(in oklab,var(--gold) 32%,transparent)}
+  .btn.danger{background:transparent;border-color:color-mix(in oklab,var(--danger) 40%,var(--line));color:var(--danger)}
+  .btn.danger:hover{background:color-mix(in oklab,var(--danger) 12%,transparent)}
+  .btn.block{width:100%}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.sm{min-height:34px;padding:7px 11px;font-size:12.5px}
+
+  /* ---- App dashboard header (real chrome) ---- */
+  .appheader{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+    padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+  .appheader .h-brand{display:flex;align-items:center;gap:12px;min-width:0}
+  .appheader .h-brand .mark{width:38px;height:38px;color:var(--accent);flex:none}
+  .appheader h1{font-size:26px;font-weight:600;letter-spacing:-.02em;color:var(--accent)}
+  .appheader .tagline{font-size:13px;color:var(--soft);margin-top:2px}
+  .appheader .h-actions{display:flex;align-items:center;gap:4px;flex:none}
+  .h-icon{border:0;background:transparent;color:var(--soft);border-radius:8px;padding:6px;
+    display:inline-flex;transition:background .15s,color .15s}
+  .h-icon:hover{background:var(--hi);color:var(--accent)}
+  .h-link{border:0;background:transparent;color:var(--soft);border-radius:8px;padding:5px 9px;font-size:13.5px;transition:background .15s,color .15s}
+  .h-link:hover{background:var(--hi);color:var(--accent)}
+
+  /* ---- Course card ---- */
+  .grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fill,minmax(288px,1fr))}
+  .card{position:relative;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);
+    border-radius:var(--radius);padding:18px;box-shadow:var(--shadow-sm);transition:box-shadow .2s,transform .2s}
+  .card:hover{box-shadow:var(--shadow-md)}
+  .card.complete{border-color:color-mix(in oklab,var(--gold) 55%,var(--line))}
+  .card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .card h3{font-size:17.5px;line-height:1.25;color:var(--ink);letter-spacing:-.01em}
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.06em;padding:3px 8px;border-radius:999px;white-space:nowrap}
+  .pill.pub{background:color-mix(in oklab,var(--accent2) 16%,transparent);color:var(--accent2)}
+  .pill.setup{background:var(--hi);color:var(--accent)}
+  .pill.done{background:color-mix(in oklab,var(--gold) 22%,transparent);color:var(--gold)}
+  .pill .icon{width:12px;height:12px}
+  .mission{font-size:13.5px;color:var(--soft);text-align:left;background:none;border:0;padding:0;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:38px;line-height:1.45}
+  .mission:hover{color:var(--accent)}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin:12px 0 0}
+  .chip{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--hi);color:var(--accent2)}
+  .chip.more{background:transparent;color:var(--soft)}
+  .progress-wrap{margin:14px 0 0}
+  .progress-meta{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--soft);margin-bottom:6px}
+  .progress-meta b{color:var(--ink);font-variant-numeric:tabular-nums;font-weight:600}
+  .bar{height:6px;border-radius:999px;background:var(--line);overflow:hidden}
+  .bar>i{display:block;height:100%;border-radius:999px;background:var(--accent2);transition:width .3s}
+  .card.complete .bar>i{background:linear-gradient(90deg,var(--accent2),var(--gold))}
+  .spacer{flex:1;min-height:14px}
+
+  /* action bar */
+  .actions{display:flex;align-items:center;gap:8px;margin-top:16px}
+  .actions .btn.primary{flex:1}
+  .newcard{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:200px;
+    border:2px dashed var(--line);border-radius:var(--radius);color:var(--soft);background:transparent;transition:.15s}
+  .newcard:hover{border-color:color-mix(in oklab,var(--gold) 60%,var(--line));background:color-mix(in oklab,var(--hi) 40%,transparent);color:var(--accent)}
+  .newcard .plus{width:34px;height:34px;border-radius:11px;background:var(--hi);color:var(--accent);display:flex;align-items:center;justify-content:center}
+
+  /* ---- Popover menu ---- */
+  .menu-anchor{position:relative}
+  .menu{position:absolute;right:0;top:calc(100% + 6px);z-index:50;min-width:216px;background:var(--card);
+    border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-pop);padding:6px;display:none;
+    animation:pop .12s ease-out}
+  .menu.open{display:block}
+  @keyframes pop{from{opacity:0;transform:translateY(-4px) scale(.98)}to{opacity:1;transform:none}}
+  .menu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:transparent;
+    color:var(--ink);font-size:13.5px;padding:9px 10px;border-radius:8px}
+  .menu button:hover{background:var(--hi);color:var(--accent)}
+  .menu button .icon{color:var(--soft);width:17px;height:17px}
+  .menu button:hover .icon{color:var(--accent)}
+  .menu button.gold-item .icon{color:var(--gold)}
+
+  /* ---- Dialog ---- */
+  dialog{margin:auto;width:min(92vw,520px);border:1px solid var(--line);border-radius:18px;padding:0;color:var(--ink);
+    background:var(--paper);box-shadow:var(--shadow-pop)}
+  dialog::backdrop{background:rgba(20,16,12,.5)}
+  dialog[open]{animation:dlg .18s ease-out}
+  @keyframes dlg{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+  .dlg-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .dlg-head h3{font-size:15px;color:var(--accent)}
+  .dlg-body{padding:20px 22px;max-height:76vh;overflow:auto}
+  .field{display:flex;flex-direction:column;gap:7px;margin-bottom:18px}
+  .label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--accent2)}
+  .input,.textarea,.select{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;
+    padding:9px 11px;font-size:14px;width:100%}
+  .input:focus,.textarea:focus,.select:focus{outline:none;border-color:var(--gold)}
+  .textarea{resize:vertical;min-height:84px}
+  .help{font-size:12px;color:var(--soft);margin:0}
+  .dlg-section{padding:18px 0;border-top:1px solid var(--line)}
+  .dlg-section:first-child{border-top:0;padding-top:0}
+  .dlg-section h4{font-size:13px;color:var(--ink);margin:0 0 4px;font-weight:700}
+  .dlg-section .sub{font-size:12.5px;color:var(--soft);margin:0 0 14px}
+  .row{display:flex;gap:10px;align-items:center}
+  .between{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .danger-zone{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;
+    border:1px solid color-mix(in oklab,var(--danger) 26%,var(--line));background:color-mix(in oklab,var(--danger) 6%,transparent)}
+  .emblem-preview{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:26px;border:2px solid color-mix(in oklab,var(--gold) 70%,var(--line));
+    background:radial-gradient(circle at 38% 30%,rgba(255,255,255,.6),transparent 45%),linear-gradient(145deg,var(--hi),var(--gold) 62%,#7c5e1c);
+    box-shadow:inset 0 1px 2px rgba(255,255,255,.5),inset 0 -3px 5px rgba(0,0,0,.28)}
+
+  /* ---- Account settings dialog (NEW) ---- */
+  .locale-list{display:flex;flex-direction:column;gap:2px}
+  .locale-row{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;text-align:left;
+    border:0;background:transparent;border-radius:10px;padding:9px 11px;transition:background .12s}
+  .locale-row:hover{background:var(--hi)}
+  .locale-row.active{background:var(--hi)}
+  .locale-row .lnative{font-size:14px;color:var(--ink)}
+  .locale-row .lname{font-size:11.5px;color:var(--soft)}
+  .locale-row .icon{width:16px;height:16px;color:var(--gold);flex:none}
+  .theme-seg{display:inline-flex;width:fit-content;border:1px solid var(--line);border-radius:10px;padding:2px}
+  .theme-seg button{border:0;background:transparent;color:var(--soft);font-size:13.5px;font-weight:600;
+    padding:7px 13px;border-radius:8px;display:flex;align-items:center;gap:6px}
+  .theme-seg button .icon{width:16px;height:16px}
+  .theme-seg button.on{background:var(--hi);color:var(--accent)}
+  .save-inline{display:flex;gap:8px}
+  .save-inline .input{flex:1;min-width:0}
+
+  /* editions list / tabs */
+  .link-field{display:flex;gap:6px}
+  .link-field .input{background:var(--hi);font-size:12px;padding:7px 9px}
+  .lang-results{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+  .lang-results button{display:flex;justify-content:space-between;align-items:center;gap:8px;border:1px solid var(--line);
+    background:transparent;border-radius:9px;padding:8px 11px;color:var(--ink);font-size:13.5px}
+  .lang-results button:hover{background:var(--hi)}
+  .lang-results .sub{font-size:11.5px;color:var(--soft)}
+
+  .public-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 12px;
+    border:1px solid var(--line);border-radius:12px;background:var(--card);transition:border-color .18s}
+  .public-row.on{border-color:color-mix(in oklab,var(--accent2) 40%,var(--line))}
+  .pub-label{display:flex;align-items:center;gap:11px;min-width:0}
+  .pub-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;
+    background:var(--hi);color:var(--soft);flex:none;transition:background .18s,color .18s}
+  .public-row.on .pub-icon{background:color-mix(in oklab,var(--accent2) 18%,transparent);color:var(--accent2)}
+  .pub-icon .ic{display:none;line-height:0}
+  .public-row:not(.on) .pub-icon .ic-lock{display:inline-flex}
+  .public-row.on .pub-icon .ic-globe{display:inline-flex}
+  .pub-text{min-width:0}
+  .pub-text b{display:block;font-size:13.5px;color:var(--ink);font-weight:600}
+  .pub-text span{font-size:11.5px;color:var(--soft)}
+  .public-reveal{margin-top:10px;display:none;flex-direction:column;gap:9px}
+  .public-reveal.open{display:flex}
+  .linklike{align-self:flex-start;display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;
+    color:var(--soft);font-size:12.5px;padding:2px 2px}
+  .linklike:hover{color:var(--accent)}
+  .linklike.danger:hover{color:var(--danger)}
+  .linklike .icon{width:15px;height:15px}
+
+  .switch{position:relative;display:inline-flex;align-items:center;flex:none;cursor:pointer}
+  .switch input{position:absolute;opacity:0;width:0;height:0}
+  .switch .track{width:42px;height:24px;border-radius:999px;background:var(--line);transition:background .18s;display:inline-block;position:relative}
+  .switch .track::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;
+    background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .18s}
+  .switch input:checked + .track{background:var(--accent2)}
+  .switch input:checked + .track::after{transform:translateX(18px)}
+
+  .panel-foot{display:flex;flex-direction:column;align-items:flex-start;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+  .soon{margin-left:auto;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gold);
+    background:color-mix(in oklab,var(--gold) 16%,transparent);padding:2px 7px;border-radius:999px;flex:none}
+
+  .tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line);margin-bottom:18px}
+  .tab{display:inline-flex;align-items:center;gap:7px;border:0;background:transparent;color:var(--soft);font-size:13.5px;
+    font-weight:600;padding:8px 12px;border-radius:9px 9px 0 0;margin-bottom:-1px;border-bottom:2px solid transparent}
+  .tab:hover{color:var(--accent);background:var(--hi)}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .tab-src{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2);
+    background:color-mix(in oklab,var(--accent2) 14%,transparent);padding:1px 6px;border-radius:999px}
+  .tab-dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .tab-dot.translating{background:var(--gold);animation:pulse 1.2s ease-in-out infinite}
+  .tab-dot.failed{background:var(--danger)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  .tab-add{color:var(--soft);padding:8px 11px}
+  .tab-add .icon{width:18px;height:18px}
+  .tabpanel[hidden]{display:none}
+  .empty-panel{display:flex;flex-direction:column;gap:14px;align-items:flex-start;padding:18px;border:1px dashed var(--line);
+    border-radius:12px;color:var(--soft);font-size:13px;line-height:1.45}
+  .share-block{margin-bottom:16px}
+  .ed-share-row{display:flex;gap:8px}
+  .price{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 8px;
+    border-radius:999px;background:color-mix(in oklab,var(--gold) 18%,transparent);color:var(--gold);
+    white-space:nowrap;font-variant-numeric:tabular-nums}
+  .price .icon{width:12px;height:12px}
+  .sell{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:12px 14px;margin-top:2px}
+  .sell.on{border-color:color-mix(in oklab,var(--gold) 40%,var(--line))}
+  .sell-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .sell-title{display:flex;align-items:center;gap:10px;min-width:0}
+  .sell-icon{width:34px;height:34px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;
+    background:var(--hi);color:var(--soft)}
+  .sell.on .sell-icon{background:color-mix(in oklab,var(--gold) 18%,transparent);color:var(--gold)}
+  .sell-title b{display:block;font-size:13.5px;color:var(--ink);font-weight:600}
+  .sell-title span{font-size:11.5px;color:var(--soft)}
+  .sell-reveal{margin-top:12px;display:none;flex-direction:column;gap:12px}
+  .sell-reveal.open{display:flex}
+  .price-input{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+  .price-input .field{margin-bottom:0}
+  .price-input .amt{width:140px}
+  .price-input .cur{width:120px}
+  .gatebox{display:flex;align-items:flex-start;gap:11px;border:1px dashed var(--line);border-radius:12px;
+    padding:13px 14px;font-size:13px;color:var(--soft);line-height:1.45}
+  .gatebox.solid{border-style:solid}
+  .gatebox .gi{width:34px;height:34px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;
+    background:var(--hi);color:var(--accent)}
+  .gatebox b{color:var(--ink);font-weight:600}
+
+  /* Viewer (shared-with-you) */
+  .viewer-grid{display:grid;grid-template-columns:minmax(0,320px) 1fr;gap:26px;align-items:start}
+  @media(max-width:820px){.viewer-grid{grid-template-columns:1fr}}
+  .pill.shared{background:var(--hi);color:var(--accent)}
+  .pill.owned{background:color-mix(in oklab,var(--accent2) 16%,transparent);color:var(--accent2)}
+  .pill.paid{background:color-mix(in oklab,var(--gold) 20%,transparent);color:var(--gold)}
+  .pill.paid .icon,.pill.owned .icon{width:12px;height:12px}
+  .shared-by{font-size:12px;color:var(--soft);margin:2px 0 0}
+  .shared-by b{color:var(--ink);font-weight:600}
+  .caps{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  @media(max-width:640px){.caps{grid-template-columns:1fr}}
+  .caps h4{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;margin:0 0 8px;font-weight:700}
+  .caps .can h4{color:var(--accent2)}
+  .caps .cant h4{color:var(--soft)}
+  .cap{display:flex;align-items:flex-start;gap:9px;font-size:13px;color:var(--ink);padding:5px 0;line-height:1.35}
+  .cap .icon{width:17px;height:17px;flex:none;margin-top:1px}
+  .cap.yes .icon{color:var(--accent2)}
+  .cap.no{color:var(--soft)}
+  .cap.no .icon{color:color-mix(in oklab,var(--danger) 65%,var(--soft))}
+
+  /* ---- sidebar / reader ---- */
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:720px){.compare{grid-template-columns:1fr}.icons-grid{grid-template-columns:repeat(auto-fill,minmax(80px,1fr))}}
+  .compare .col > .tag-lg{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;text-transform:uppercase;
+    letter-spacing:.1em;color:var(--soft);margin-bottom:10px}
+  .compare .before .tag-lg{color:var(--danger)}
+  .compare .after .tag-lg{color:var(--accent2)}
+  .side{width:100%;max-width:280px;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:14px;
+    display:flex;flex-direction:column;gap:2px;min-height:420px}
+  .side .top{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--soft);margin-bottom:6px}
+  .side .title{font-size:16px;font-weight:600;color:var(--accent);margin-bottom:12px}
+  .side .navlbl{font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--accent2);padding:6px 8px 4px}
+  .side .navitem{display:flex;align-items:center;justify-content:space-between;font-size:13px;padding:7px 9px;border-radius:8px;color:var(--ink)}
+  .side .navitem.active{background:var(--accent);color:#fff}
+  .side .navitem .tick{color:var(--accent2);font-size:11px}
+  .side .navitem.active .tick{color:#fff}
+  .side .navitem.locked{color:var(--soft)}
+  .side .navitem.locked .icon{width:14px;height:14px;color:var(--soft);opacity:.8}
+  .freetag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--accent2);
+    background:color-mix(in oklab,var(--accent2) 16%,transparent);padding:1px 6px;border-radius:999px}
+  .navitem.active .freetag{background:rgba(255,255,255,.22);color:#fff}
+  .side .fullbtn{display:flex;align-items:center;gap:8px;justify-content:center;border:1px solid var(--line);border-radius:9px;
+    padding:9px;font-size:12.5px;color:var(--soft);background:transparent;margin-top:6px}
+  .side .pinned{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding-top:10px}
+  .side .selectrow{display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--line);
+    border-radius:9px;padding:7px 10px;font-size:12.5px;color:var(--soft)}
+  .callout{font-size:12px;color:var(--soft);margin-top:10px;display:flex;gap:8px;align-items:flex-start}
+  .callout svg{flex:none;color:var(--accent2);margin-top:1px}
+
+  .reader-demo{display:grid;grid-template-columns:minmax(0,240px) 1fr;gap:22px;align-items:start}
+  @media(max-width:760px){.reader-demo{grid-template-columns:1fr}}
+  .page{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 24px}
+  .page .lesson-title{font-size:20px;color:var(--ink);margin:0 0 12px;letter-spacing:-.01em}
+  .page .lesson-copy{font-size:14.5px;color:var(--ink);line-height:1.65;margin:0 0 12px;max-width:60ch}
+  .page .lesson-copy.fade{position:relative;max-height:70px;overflow:hidden;margin-bottom:0}
+  .page .lesson-copy.fade::after{content:"";position:absolute;inset:0;
+    background:linear-gradient(180deg,transparent,var(--card))}
+  .paygate{margin-top:18px;border:1px solid color-mix(in oklab,var(--gold) 42%,var(--line));border-radius:16px;
+    padding:22px;box-shadow:var(--shadow-sm);
+    background:radial-gradient(130% 120% at 100% 0,color-mix(in oklab,var(--hi) 55%,transparent),transparent 60%),var(--card)}
+  .pg-lock{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+    background:color-mix(in oklab,var(--gold) 18%,transparent);color:var(--gold);margin-bottom:12px}
+  .pg-lock .icon{width:20px;height:20px}
+  .paygate h4{font-size:17px;color:var(--ink);margin:0 0 6px}
+  .paygate .pg-sub{font-size:13.5px;color:var(--soft);margin:0 0 16px;max-width:52ch;line-height:1.5}
+  .pg-buy{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .pg-price{font-size:22px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;font-family:var(--serif)}
+  .pg-note{font-size:11.5px;color:var(--soft);margin:12px 0 0;display:flex;align-items:center;gap:6px}
+  .pg-note .icon{width:14px;height:14px;color:var(--accent2);flex:none}
+
+  /* ---- certificate (simplified doc) ---- */
+  .cert-doc{position:relative;aspect-ratio:297/210;max-width:520px;margin:0 auto;background:var(--card);
+    border:3px solid color-mix(in oklab,var(--gold) 70%,transparent);border-radius:12px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:6% 8%;
+    box-shadow:0 18px 60px -18px rgba(184,138,46,.45),0 2px 10px rgba(0,0,0,.08)}
+  .cert-doc::before{content:"";position:absolute;inset:14px;border:1px solid color-mix(in oklab,var(--gold) 45%,transparent);border-radius:7px}
+  .cert-medal{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;
+    margin-bottom:12px;border:2px solid color-mix(in oklab,var(--gold) 75%,transparent);
+    background:radial-gradient(circle at 38% 30%,rgba(255,255,255,.7),transparent 45%),linear-gradient(145deg,var(--hi),var(--gold) 60%,#7c5e1c);
+    box-shadow:inset 0 1px 2px rgba(255,255,255,.55),inset 0 -3px 5px rgba(0,0,0,.28)}
+  .cert-eyebrow{font-size:10px;font-weight:600;letter-spacing:.4em;text-transform:uppercase;color:var(--accent2)}
+  .cert-name{font-size:26px;font-weight:600;color:var(--accent);margin:6px 0 2px;line-height:1.05}
+  .cert-title{font-size:15px;font-weight:600;color:var(--ink)}
+  .cert-meta{font-size:11px;color:var(--soft);margin-top:14px;letter-spacing:.04em}
+
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);
+    padding:10px 16px;border-radius:10px;font-size:13px;box-shadow:var(--shadow-pop);opacity:0;pointer-events:none;
+    transition:opacity .2s,transform .2s;z-index:100}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .changelog{border:1px solid color-mix(in oklab,var(--accent2) 35%,var(--line));border-radius:16px;
+    background:color-mix(in oklab,var(--accent2) 6%,var(--card));padding:20px 22px;margin-top:20px}
+  .changelog h3{font-size:15px;color:var(--accent2);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .changelog ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+  .changelog li{font-size:13.5px;color:var(--ink);line-height:1.5}
+  .changelog li b{color:var(--accent)}
+  .changelog code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--soft);
+    background:var(--hi);padding:1px 6px;border-radius:5px}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<!-- ================= DOC CHROME ================= -->
+<div class="protobar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20"/></svg>
+    <div><b>My Course</b> <span>&nbsp;· design source of truth</span></div>
+  </div>
+  <div class="protonav">
+    <a href="#screens">Screens</a>
+    <a href="#components">Components</a>
+    <a href="#changes">What's new</a>
+  </div>
+  <div class="seg" role="group" aria-label="Theme">
+    <button id="tLight" aria-pressed="false" onclick="setTheme('light')">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></svg>Light
+    </button>
+    <button id="tDark" aria-pressed="false" onclick="setTheme('dark')">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Dark
+    </button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ============================================================ -->
+  <!-- PART A — SCREENS: the per-screen layout source of truth       -->
+  <!-- ============================================================ -->
+  <div class="part-head" id="screens">
+    <div class="kicker">Part A · Source of truth</div>
+    <h2>Screens &amp; layout</h2>
+    <p>One entry per screen the app renders. Each shows its <b>route</b>, its <b>purpose</b>, a labelled <b>layout wireframe</b> of the regions, what fills each region, and the <b>states</b> it must handle. Overlays (dialogs) are listed as their own entries — they float over whatever screen opened them. This is the reference the component library in Part B is built to satisfy.</p>
+  </div>
+
+  <!-- S1 · Dashboard -->
+  <section class="screen" id="s-dashboard">
+    <div class="screen-head"><span class="sid">S1</span><h3>Dashboard (home)</h3><span class="route">/</span></div>
+    <div class="screen-body">
+      <p class="screen-purpose">The signed-in learner's home. A header, then the courses they own as a card grid, then everything shared with them, then everything they've purchased. The header's <b>gear</b> is the single entry point to account preferences (it replaced the old separate globe + theme toggle).</p>
+      <div class="spec">
+        <div>
+          <h5>Layout</h5>
+          <div class="wf">
+            <div class="wf-row">
+              <div class="wf-box accent flush" style="flex:2"><span class="r">Header · left</span><span class="c">Logo · "My Course" · tagline</span></div>
+              <div class="wf-box accent" style="flex:1"><span class="r">Header · right</span><span class="c">⚙ Settings · Admin* · Sign out</span></div>
+            </div>
+            <div class="wf-row">
+              <div class="wf-box"><span class="r">Course grid</span><span class="c">Owner course cards + "New course" tile (if allowlisted) · responsive 1→3 cols</span></div>
+            </div>
+            <div class="wf-row">
+              <div class="wf-box"><span class="r">Shared with me</span><span class="c">Read-only course cards</span></div>
+            </div>
+            <div class="wf-row">
+              <div class="wf-box"><span class="r">Purchased</span><span class="c">Owned/unlocked course cards</span></div>
+            </div>
+            <div class="wf-row">
+              <div class="wf-box muted flush" style="flex:1;opacity:.8"><span class="r">Footer</span><span class="c">SiteFooter · legal links</span></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h5>Regions</h5>
+          <ul class="legend">
+            <li><b class="r">Header</b> Logo + title, then gear&nbsp;→&nbsp;<b>S3 Account settings</b>, Admin link (admins only), Sign out.</li>
+            <li><b class="r">Course grid</b> <b>C1 course card</b> per owned course; New-course tile appended for allowlisted users.</li>
+            <li><b class="r">Shared</b> Cards with a "Shared" pill → open <b>S9 viewer</b>.</li>
+            <li><b class="r">Purchased</b> Cards with a "Purchased" pill → open the unlocked reader.</li>
+          </ul>
+          <h5>States</h5>
+          <div class="states">
+            <span class="state">loading (skeletons)</span>
+            <span class="state">empty library</span>
+            <span class="state">populated</span>
+            <span class="state">admin</span>
+            <span class="state">allowlisted</span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:20px">
+        <h5 style="font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent2);font-weight:700;margin:0 0 10px">Live header</h5>
+        <div class="appheader">
+          <div class="h-brand">
+            <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20"/></svg>
+            <div><h1>My Course</h1><div class="tagline">Learn anything, one conversation at a time.</div></div>
+          </div>
+          <div class="h-actions">
+            <button class="h-icon" title="Account settings" aria-label="Account settings" onclick="dlg('prefsDlg')">{{i:settings}}</button>
+            <button class="h-link">Admin</button>
+            <button class="h-link">Sign out</button>
+          </div>
+        </div>
+        <p class="help" style="margin-top:8px">The gear opens <b>S3 · Account settings</b> — display name, app language and theme now live there, not as loose header controls.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- S2 · Course reader -->
+  <section class="screen" id="s-reader">
+    <div class="screen-head"><span class="sid">S2</span><h3>Course reader (owner)</h3><span class="route">/courses/[slug]/lessons/[key]</span></div>
+    <div class="screen-body">
+      <p class="screen-purpose">Where a course is actually read. A persistent left <b>sidebar</b> (nav + owner controls) beside a <b>reading pane</b>. Owner controls collapsed into a single <b>Course settings</b> entry; the app-language + theme now live in <b>S3</b>, so the sidebar's pinned area keeps only the content-<b>edition</b> switcher and a theme shortcut.</p>
+      <div class="spec">
+        <div>
+          <h5>Layout</h5>
+          <div class="wf">
+            <div class="wf-row">
+              <div class="wf-box wf-side accent"><span class="r">Sidebar</span><span class="c">← Courses / Sign out · title · Lessons · References · Resources · Course settings · pinned: edition + theme</span></div>
+              <div class="wf-box" style="min-height:150px"><span class="r">Reading pane</span><span class="c">Lesson title + body (served HTML) · quiz · next/prev</span></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h5>Regions</h5>
+          <ul class="legend">
+            <li><b class="r">Sidebar top</b> Back to Courses · Sign out.</li>
+            <li><b class="r">Nav</b> Lessons (with ✓ ticks), References, Resources.</li>
+            <li><b class="r">Controls</b> Single <b>Course settings</b> button → <b>S4</b>.</li>
+            <li><b class="r">Pinned</b> Edition/language switcher + theme shortcut.</li>
+            <li><b class="r">Pane</b> The lesson or reference content.</li>
+          </ul>
+          <h5>States</h5>
+          <div class="states">
+            <span class="state">lesson</span><span class="state">reference</span>
+            <span class="state">resource</span><span class="state">completed course</span>
+            <span class="state warn">nav hides on scroll-down</span>
+          </div>
+        </div>
+      </div>
+      <div class="callout" style="margin-top:18px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>See <b>Part B · Group 5</b> for the before/after of the sidebar cleanup, and <b>S9</b> for the read-only variant a viewer/buyer sees.</span></div>
+    </div>
+  </section>
+
+  <!-- S3 · Account settings (NEW) -->
+  <section class="screen" id="s-account">
+    <div class="screen-head"><span class="sid">S3</span><h3>Account settings dialog <span class="tab-src" style="margin-left:2px">New</span></h3><span class="route">overlay · gear in S1 header</span></div>
+    <div class="screen-body">
+      <p class="screen-purpose">The gear in the dashboard header. Bundles the three preferences a learner tweaks into one place: <b>display name</b> (their account name — also what prints on the certificate), <b>app language</b>, and <b>theme</b>. This replaced the header's separate globe picker + theme toggle. Guests don't get it — they have no account — so guest surfaces keep the standalone <b>C-locale</b> picker instead.</p>
+      <div class="spec">
+        <div>
+          <h5>Layout</h5>
+          <div class="wf">
+            <div class="wf-row"><div class="wf-box accent"><span class="r">Section 1 · Display name</span><span class="c">Text field + inline Save (idle → saving → saved) · hint</span></div></div>
+            <div class="wf-row"><div class="wf-box"><span class="r">Section 2 · App language</span><span class="c">5 locales · native + English name · ✓ on active</span></div></div>
+            <div class="wf-row"><div class="wf-box"><span class="r">Section 3 · Theme</span><span class="c">Light / Dark segmented (sun / moon)</span></div></div>
+          </div>
+          <p class="help" style="margin-top:10px">Offer-set = <code>LOCALES</code> in <code>src/i18n/config.ts</code>: <b>en, af, es, fr, hi</b> — the locales with a <code>messages/&lt;code&gt;.json</code> file, not the ~130-entry content picker.</p>
+        </div>
+        <div>
+          <h5>States</h5>
+          <div class="states" style="margin-bottom:16px">
+            <span class="state">name idle</span><span class="state">saving</span><span class="state">saved</span>
+            <span class="state">locale switch → refresh</span><span class="state">light</span><span class="state">dark</span>
+          </div>
+          <button class="btn primary" onclick="dlg('prefsDlg')">{{i:settings}} Open account settings</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- S4 · Course settings -->
+  <section class="screen" id="s-coursesettings">
+    <div class="screen-head"><span class="sid">S4</span><h3>Course settings dialog</h3><span class="route">overlay · card ✎ / sidebar</span></div>
+    <div class="screen-body">
+      <p class="screen-purpose">A course owner's controls, reachable from the card's edit button <em>and</em> the reader sidebar. Consolidates rename + mission, the certificate emblem, and the complete/reopen lifecycle. The destructive lifecycle action is visually separated in a danger zone.</p>
+      <div class="spec">
+        <div>
+          <h5>Layout</h5>
+          <div class="wf">
+            <div class="wf-row"><div class="wf-box accent"><span class="r">Details</span><span class="c">Title · Mission · Save</span></div></div>
+            <div class="wf-row"><div class="wf-box gold"><span class="r">Certificate emblem</span><span class="c">Glyph field or image upload · medallion preview</span></div></div>
+            <div class="wf-row"><div class="wf-box" style="border-color:color-mix(in oklab,var(--danger) 40%,var(--line))"><span class="r" style="color:var(--danger)">Completion (danger zone)</span><span class="c">Mark complete / Reopen</span></div></div>
+          </div>
+        </div>
+        <div>
+          <h5>States</h5>
+          <div class="states" style="margin-bottom:16px">
+            <span class="state">active</span><span class="state">complete → reopen</span>
+            <span class="state">auto emblem</span><span class="state">custom emblem</span>
+          </div>
+          <button class="btn outline" onclick="dlg('settingsDlg')">{{i:settings}} Open course settings</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- S5 · Editions & sharing -->
+  <section class="screen" id="s-editions">
+    <div class="screen-head"><span class="sid">S5</span><h3>Editions &amp; sharing dialog</h3><span class="route">overlay · card 🌐</span></div>
+    <div class="screen-body">
+      <p class="screen-purpose">Each language is an <b>edition</b> — a tab. Source English plus each translation, each with its own live status, sharing and (marketplace) price. Sharing is two friendly actions per edition: invite by email, and a real on/off toggle for the public link (lock → globe). Managing <em>who</em> has access is deferred to a dedicated dashboard.</p>
+      <div class="spec">
+        <div>
+          <h5>Layout</h5>
+          <div class="wf">
+            <div class="wf-row"><div class="wf-box accent"><span class="r">Edition tabs</span><span class="c">English (Source · $price) · हिन्दी · translating● · failed● · +add</span></div></div>
+            <div class="wf-row"><div class="wf-box"><span class="r">Invite</span><span class="c">Email field + Invite</span></div></div>
+            <div class="wf-row"><div class="wf-box"><span class="r">Public link</span><span class="c">Toggle → reveals URL + copy + regenerate</span></div></div>
+            <div class="wf-row"><div class="wf-box gold"><span class="r">Sell this edition</span><span class="c">Set price / edit price · currency</span></div></div>
+            <div class="wf-row"><div class="wf-box muted flush" style="opacity:.8"><span class="r">Foot</span><span class="c">Who has access (Soon) · Remove edition</span></div></div>
+          </div>
+        </div>
+        <div>
+          <h5>Per-edition states</h5>
+          <div class="states" style="margin-bottom:16px">
+            <span class="state">source</span><span class="state">ready</span>
+            <span class="state warn">translating</span><span class="state bad">failed</span>
+            <span class="state">public on/off</span><span class="state">free</span><span class="state">paid</span>
+          </div>
+          <button class="btn outline" onclick="dlg('shareDlg')">{{i:globe}} Open editions &amp; sharing</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- S6 · Paygate -->
+  <section class="screen" id="s-paygate">
+    <div class="screen-head"><span class="sid">S6</span><h3>Paygate — paid edition preview</h3><span class="route">/courses/[slug] · /share/[token]</span></div>
+    <div class="screen-body">
+      <p class="screen-purpose">What a visitor without access sees on a <b>paid</b> edition. The first lesson reads as a free preview with the whole table of contents visible; every lesson and reference past it is clearly <b>locked</b>, never broken or missing. One purchase unlocks the whole edition, for life. Buying is open to guests — the account is created as part of the purchase.</p>
+      <div class="spec">
+        <div>
+          <h5>Layout</h5>
+          <div class="wf">
+            <div class="wf-row">
+              <div class="wf-box wf-side"><span class="r">Nav</span><span class="c">Lesson 1 (Free) · locked 🔒 items</span></div>
+              <div class="wf-col">
+                <div class="wf-box accent"><span class="r">Preview</span><span class="c">Free first lesson, fading out</span></div>
+                <div class="wf-box gold"><span class="r">Paygate card</span><span class="c">Lock · price · "Unlock the full course" → S7</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h5>States</h5>
+          <div class="states">
+            <span class="state">signed-in visitor</span><span class="state">guest on public link</span>
+            <span class="state">per-edition price</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- S7 · Checkout -->
+  <section class="screen" id="s-checkout">
+    <div class="screen-head"><span class="sid">S7</span><h3>Checkout dialog</h3><span class="route">overlay · from S6 paygate</span></div>
+    <div class="screen-body">
+      <p class="screen-purpose">Confirms the purchase before handing off to Stripe. Names the course + edition, the price, and what unlocks. No account is required first — buying creates one.</p>
+      <div class="spec">
+        <div>
+          <h5>Layout</h5>
+          <div class="wf">
+            <div class="wf-row"><div class="wf-box accent"><span class="r">Summary</span><span class="c">Course + edition · price</span></div></div>
+            <div class="wf-row"><div class="wf-box"><span class="r">Unlock note</span><span class="c">What the purchase grants · lifetime</span></div></div>
+            <div class="wf-row"><div class="wf-box gold"><span class="r">CTA</span><span class="c">Continue to secure checkout · local currency</span></div></div>
+          </div>
+        </div>
+        <div>
+          <h5>States</h5>
+          <div class="states" style="margin-bottom:16px"><span class="state">guest</span><span class="state">signed-in</span><span class="state">redirecting</span></div>
+          <button class="btn primary" onclick="dlg('buyDlg')">{{i:card}} Open checkout</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- S8 · Certificate -->
+  <section class="screen" id="s-certificate">
+    <div class="screen-head"><span class="sid">S8</span><h3>Certificate</h3><span class="route">/certificate/[token]</span></div>
+    <div class="screen-body">
+      <p class="screen-purpose">The standalone, shareable proof of completion — an A4-landscape document carrying the learner's name, the course title, and the subject emblem struck into a gold medallion. On screen it's a premium artefact (foil sheen, pointer tilt); it prints and exports to PDF as a flat engraved document. The palette is <b>frozen</b> to the default gold/green even under a tenant skin.</p>
+      <div class="spec">
+        <div>
+          <h5>Preview (simplified)</h5>
+          <div class="cert-doc">
+            <div class="cert-medal">🪷</div>
+            <div class="cert-eyebrow">Certificate of completion</div>
+            <div class="cert-name">Jordan Lee</div>
+            <div class="cert-title">Conversational Hindi</div>
+            <div class="cert-meta">Issued 20 Jul 2026 · verify at mycourse.app</div>
+          </div>
+        </div>
+        <div>
+          <h5>Regions</h5>
+          <ul class="legend">
+            <li><b class="r">Medallion</b> Emblem glyph or image, struck in gold.</li>
+            <li><b class="r">Name</b> The learner's display name (from S3).</li>
+            <li><b class="r">Title</b> The course, in the edition earned.</li>
+            <li><b class="r">Seal + rules</b> Foil seal, signature lines, date.</li>
+          </ul>
+          <h5>States</h5>
+          <div class="states"><span class="state">on-screen (animated)</span><span class="state">print / PDF (flat)</span><span class="state">reduced-motion</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- S9 · Shared / buyer reader -->
+  <section class="screen" id="s-viewer">
+    <div class="screen-head"><span class="sid">S9</span><h3>Shared &amp; buyer reader (read-only)</h3><span class="route">/share/[token] · unlocked course</span></div>
+    <div class="screen-body">
+      <p class="screen-purpose">What someone a course is shared with — or who bought an edition — sees: a read-only learner. Same nav as the owner <em>minus</em> Course settings and the language switcher: they read the edition they were given/bought and can't change it. They track their own progress, ask the owner questions, and earn their own certificate. A buyer is identical to a shared viewer — only how they got in differs.</p>
+      <div class="spec">
+        <div>
+          <h5>Capabilities</h5>
+          <div class="caps">
+            <div class="can">
+              <h4>They can</h4>
+              <div class="cap yes">{{i:check}} Read every lesson &amp; reference</div>
+              <div class="cap yes">{{i:check}} Track their own progress</div>
+              <div class="cap yes">{{i:check}} Ask questions on any lesson</div>
+              <div class="cap yes">{{i:check}} Earn their own certificate</div>
+            </div>
+            <div class="cant">
+              <h4>They can't</h4>
+              <div class="cap no">{{i:x}} Edit title, mission or lessons</div>
+              <div class="cap no">{{i:x}} Invite others / change the link</div>
+              <div class="cap no">{{i:x}} Add, remove or switch language</div>
+              <div class="cap no">{{i:x}} Mark complete / set emblem</div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <h5>States</h5>
+          <div class="states"><span class="state">shared viewer</span><span class="state">buyer (entitled)</span><span class="state">refunded → drops to S6</span></div>
+          <p class="help" style="margin-top:12px">Full renders (home card + read-only reader) in <b>Part B · Viewer</b> and <b>Marketplace 3</b>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- S10 · Sign in / Landing -->
+  <section class="screen" id="s-auth">
+    <div class="screen-head"><span class="sid">S10</span><h3>Sign in &amp; landing</h3><span class="route">/ (guest) · /signin</span></div>
+    <div class="screen-body">
+      <p class="screen-purpose">The unauthenticated entry. Guests see the marketing landing; the sign-in surface is a centred card. Because a guest has no account, chrome language is set by the standalone <b>C-locale</b> picker in the footer, not the account dialog.</p>
+      <div class="spec">
+        <div>
+          <h5>Layout · sign in</h5>
+          <div class="wf">
+            <div class="wf-row"><div class="wf-box accent"><span class="r">Centred card</span><span class="c">Logo · heading · email / passkey · continue</span></div></div>
+            <div class="wf-row"><div class="wf-box muted flush" style="opacity:.8"><span class="r">Footer</span><span class="c">Legal links · 🌐 C-locale picker (guest)</span></div></div>
+          </div>
+        </div>
+        <div>
+          <h5>States</h5>
+          <div class="states"><span class="state">landing (guest)</span><span class="state">sign in</span><span class="state">invite-only</span><span class="state">buy-to-enter</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ============================================================ -->
+  <!-- PART B — COMPONENT LIBRARY                                    -->
+  <!-- ============================================================ -->
+  <div class="part-head" id="components">
+    <div class="kicker">Part B · Living components</div>
+    <h2>Component library &amp; states</h2>
+    <p>The interactive pieces the screens above are assembled from — every state the real app renders, in both palettes. Buttons open the real dialogs. Toggle the theme in the top bar; both light and dark are tuned.</p>
+  </div>
+
+  <!-- GROUP 0 — FOUNDATION -->
+  <section class="group" id="g0">
+    <div class="group-head"><span class="eyebrow">Group 0</span><h2>Foundation</h2></div>
+    <p class="lede">One inline-SVG icon set (2px stroke, round caps — <code>src/app/_components/icons.tsx</code>), an <code>IconButton</code> with real hover / focus / disabled states, buttons, and one reusable dialog + popover. Everything below is built on these. Icons new since the last revision are highlighted.</p>
+    <div class="stage">
+      <p class="stage-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Replaces emoji-as-icons (🎓 ✦ ✓ ↻ 🔗). <b>moon</b> &amp; <b>chat</b> are new; <b>tag</b> was resimplified to match the shipped path.</p>
+      <div class="icons-grid" id="iconGrid"></div>
+
+      <div style="margin-top:26px;display:flex;flex-wrap:wrap;gap:32px;align-items:flex-end">
+        <div>
+          <p class="label" style="margin-bottom:10px">IconButton</p>
+          <div class="prim-demo">
+            <span class="iconbtn" title="default">{{i:edit}}</span>
+            <span class="iconbtn" style="background:var(--hi);color:var(--accent);border-color:transparent" title="hover">{{i:globe}}</span>
+            <span class="iconbtn" style="outline:2px solid var(--accent);outline-offset:2px" title="focus">{{i:settings}}</span>
+            <span class="iconbtn" disabled title="disabled" style="opacity:.45">{{i:trash}}</span>
+          </div>
+        </div>
+        <div>
+          <p class="label" style="margin-bottom:10px">Buttons</p>
+          <div class="prim-demo">
+            <button class="btn primary">Open course</button>
+            <button class="btn outline">{{i:edit}} Edit</button>
+            <button class="btn gold">{{i:award}} Certificate</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GROUP 1 — COURSE CARD -->
+  <section class="group" id="g1">
+    <div class="group-head"><span class="eyebrow">Group 1</span><h2>Course card</h2></div>
+    <p class="lede">Tighter hierarchy — title → single status pill → mission → progress → actions. A completed course shows one <b>Complete</b> badge; the certificate moves into the ⋯ actions menu (Group 2).</p>
+    <div class="stage">
+      <p class="stage-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Every state the dashboard grid renders. Hindi chips render in the Devanagari chrome font.</p>
+      <div class="grid" id="cardGrid"></div>
+    </div>
+  </section>
+
+  <!-- GROUP 2 — CARD ACTIONS -->
+  <section class="group" id="g2">
+    <div class="group-head"><span class="eyebrow">Group 2</span><h2>Card actions &amp; certificate placement</h2></div>
+    <p class="lede">One primary CTA (<b>Open course</b>) + icon buttons for <b>Edit</b> (✎) and <b>Editions</b> (globe) + an overflow <b>⋯</b> that holds the certificate. Sharing isn't its own button — it lives inside Editions, per-edition.</p>
+    <div class="stage">
+      <p class="stage-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Click Edit, the globe, or the ⋯ menu — they open the real S3/S4/S5 dialogs.</p>
+      <div style="max-width:340px">
+        <div class="card complete">
+          <div class="card-top"><h3>Conversational Hindi</h3><span class="pill done">{{i:award}}Complete</span></div>
+          <button class="mission" onclick="showToast('Opens the full mission')">Hold a real conversation with my partner's family in Jaipur this winter — greetings, food, and small talk.</button>
+          <div class="chips"><span class="chip deva" dir="auto">हिन्दी</span><span class="chip">Español</span><span class="chip more">+2</span></div>
+          <div class="progress-wrap">
+            <div class="progress-meta"><span><b>8</b> / 8 lessons</span><span style="color:var(--gold);font-weight:600;display:inline-flex;gap:4px;align-items:center">{{i:check}} Complete</span></div>
+            <div class="bar"><i style="width:100%"></i></div>
+          </div>
+          <div class="spacer"></div>
+          <div class="actions">
+            <button class="btn primary">Open course</button>
+            <button class="iconbtn" aria-label="Edit course" title="Edit" onclick="dlg('settingsDlg')">{{i:edit}}</button>
+            <button class="iconbtn" aria-label="Editions &amp; sharing" title="Editions" onclick="dlg('shareDlg')">{{i:globe}}</button>
+            <div class="menu-anchor">
+              <button class="iconbtn" aria-label="Certificate" aria-haspopup="menu" title="Certificate" onclick="toggleMenu(event,'m2')">{{i:kebab}}</button>
+              <div class="menu" id="m2" role="menu">
+                <button class="gold-item" role="menuitem" onclick="closeMenus();showToast('Opens the certificate')">{{i:award}} View certificate {{i:ext}}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GROUP 3 — SETTINGS POPUPS -->
+  <section class="group" id="g3">
+    <div class="group-head"><span class="eyebrow">Group 3</span><h2>Settings dialogs — account &amp; course</h2></div>
+    <p class="lede">Two distinct dialogs. <b>Account settings</b> (the header gear, S3) holds the learner's own preferences — display name, app language, theme. <b>Course settings</b> (S4) holds one course's details, emblem and lifecycle. Keeping them separate stops "my preferences" and "this course" from bleeding together.</p>
+    <div class="stage">
+      <p class="stage-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Account = who you are, across the app. Course = this one course.</p>
+      <div class="prim-demo">
+        <button class="btn primary" onclick="dlg('prefsDlg')">{{i:settings}} Account settings <span class="tab-src">New</span></button>
+        <button class="btn outline" onclick="dlg('settingsDlg')">{{i:settings}} Course settings</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- GROUP 4 — SHARE & EDITIONS -->
+  <section class="group" id="g4">
+    <div class="group-head"><span class="eyebrow">Group 4</span><h2>Share &amp; editions panel</h2></div>
+    <p class="lede">Source English plus each translation, each with live status. Sharing is invite-by-email + a real on/off toggle for the public link (lock → globe), the URL revealed only when it's on.</p>
+    <div class="stage">
+      <p class="stage-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>Each language is a tab; <b>+</b> adds one. English's link is on — open the हिन्दी tab and flip its toggle. العربية is translating, Español failed.</p>
+      <button class="btn outline" onclick="dlg('shareDlg')">{{i:globe}} Open editions &amp; sharing</button>
+    </div>
+  </section>
+
+  <!-- GROUP 5 — SIDEBAR CLEANUP -->
+  <section class="group" id="g5">
+    <div class="group-head"><span class="eyebrow">Group 5</span><h2>Course sidebar cleanup</h2></div>
+    <p class="lede">Once S3/S4 absorb the owner controls, the two full-width buttons crowding the lesson nav collapse into a single <b>Course settings</b> entry; the edition switcher &amp; theme stay pinned at the bottom.</p>
+    <div class="stage">
+      <div class="compare">
+        <div class="col before">
+          <span class="tag-lg">Before</span>
+          <div class="side">
+            <div class="top"><span>← Courses</span><span>Sign out</span></div>
+            <div class="title">Conversational Hindi</div>
+            <div class="navlbl">Lessons</div>
+            <div class="navitem active">1. Greetings <span class="tick">✓</span></div>
+            <div class="navitem">2. Food &amp; ordering <span class="tick">✓</span></div>
+            <div class="navitem">3. Small talk</div>
+            <div class="navlbl">References</div>
+            <div class="navitem">Devanagari chart</div>
+            <button class="fullbtn">✦ Set certificate emblem</button>
+            <button class="fullbtn">✓ Mark course complete</button>
+            <div class="pinned">
+              <div class="selectrow"><span>Language</span><span class="deva">हिन्दी ▾</span></div>
+              <div class="selectrow"><span>Light mode</span><span>☀</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="col after">
+          <span class="tag-lg">After</span>
+          <div class="side">
+            <div class="top"><span>← Courses</span><span>Sign out</span></div>
+            <div class="title">Conversational Hindi</div>
+            <div class="navlbl">Lessons</div>
+            <div class="navitem active">1. Greetings <span class="tick">✓</span></div>
+            <div class="navitem">2. Food &amp; ordering <span class="tick">✓</span></div>
+            <div class="navitem">3. Small talk</div>
+            <div class="navlbl">References</div>
+            <div class="navitem">Devanagari chart</div>
+            <button class="fullbtn" onclick="dlg('settingsDlg')" style="cursor:pointer">{{i:settings}} Course settings</button>
+            <div class="pinned">
+              <div class="selectrow"><span>Language</span><span class="deva">हिन्दी ▾</span></div>
+              <div class="selectrow"><span>Light mode</span><span>{{i:sun}}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- VIEWER -->
+  <section class="group" id="gv">
+    <div class="group-head"><span class="eyebrow">Viewer</span><h2>Shared with you</h2></div>
+    <p class="lede">A read-only learner (screen S9). Their own <b>Shared with me</b> card and a reader with no owner controls.</p>
+    <div class="stage">
+      <div class="viewer-grid">
+        <div>
+          <p class="label" style="margin-bottom:10px">On their home dashboard</p>
+          <article class="card">
+            <div class="card-top"><h3>Conversational Hindi</h3><span class="pill shared">Shared</span></div>
+            <p class="shared-by">Shared by <b>anjali@example.com</b></p>
+            <div class="chips"><span class="chip deva" dir="auto">हिन्दी</span></div>
+            <div class="progress-wrap">
+              <div class="progress-meta"><span><b>2</b> / 8 lessons</span><span>25%</span></div>
+              <div class="bar"><i style="width:25%"></i></div>
+            </div>
+            <div class="spacer"></div>
+            <div class="actions"><button class="btn primary" onclick="showToast('Opens the read-only reader')">Open course</button></div>
+          </article>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:24px">
+          <div class="caps">
+            <div class="can">
+              <h4>They can</h4>
+              <div class="cap yes">{{i:check}} Read every lesson, reference &amp; resource</div>
+              <div class="cap yes">{{i:check}} Mark their own progress</div>
+              <div class="cap yes">{{i:check}} Ask you questions on any lesson</div>
+              <div class="cap yes">{{i:check}} Claim their own certificate</div>
+            </div>
+            <div class="cant">
+              <h4>They can't</h4>
+              <div class="cap no">{{i:x}} Edit the title, mission or lessons</div>
+              <div class="cap no">{{i:x}} Invite others or change the public link</div>
+              <div class="cap no">{{i:x}} Add, remove or switch language</div>
+              <div class="cap no">{{i:x}} Mark complete or set the emblem</div>
+            </div>
+          </div>
+          <div>
+            <p class="label" style="margin-bottom:10px">Their reader — read-only</p>
+            <div class="side" style="max-width:100%">
+              <div class="top"><span>← Courses</span><span>Sign out</span></div>
+              <div class="title">Conversational Hindi</div>
+              <div class="navlbl">Lessons</div>
+              <div class="navitem active">1. Greetings <span class="tick">✓</span></div>
+              <div class="navitem">2. Food &amp; ordering <span class="tick">✓</span></div>
+              <div class="navitem">3. Small talk</div>
+              <div class="navlbl">References</div>
+              <div class="navitem">Devanagari chart</div>
+              <div class="pinned">
+                <div class="selectrow"><span>Light mode</span><span>{{i:sun}}</span></div>
+              </div>
+            </div>
+            <p class="help" style="margin-top:8px">Same nav as the owner — <b>minus Course settings and the language switcher</b>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MARKETPLACE 1 — SELL -->
+  <section class="group" id="gm1">
+    <div class="group-head"><span class="eyebrow">Marketplace</span><h2>Price an edition to sell it</h2></div>
+    <p class="lede">Selling rides on editions: a finished course is sold <b>per language</b>. Pricing lives inside the editions panel — price it and it becomes <b>paid</b> (first lesson stays a free preview); leave it unpriced and it's free.</p>
+    <div class="stage">
+      <p class="stage-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>The card gains a gold price pill; the globe opens editions where each language has its own <b>Sell this edition</b> block.</p>
+      <div style="max-width:340px">
+        <article class="card">
+          <div class="card-top"><h3>Conversational Hindi</h3><span class="pill paid">{{i:tag}} $12</span></div>
+          <button class="mission" onclick="showToast('Opens the full mission')">Hold a real conversation with my partner's family in Jaipur this winter.</button>
+          <div class="chips"><span class="chip deva" dir="auto">हिन्दी</span><span class="chip">English</span></div>
+          <div class="progress-wrap">
+            <div class="progress-meta"><span><b>8</b> / 8 lessons</span><span style="color:var(--accent2);font-weight:600">On sale</span></div>
+            <div class="bar"><i style="width:100%"></i></div>
+          </div>
+          <div class="spacer"></div>
+          <div class="actions">
+            <button class="btn primary" onclick="showToast('Navigates to the course')">Open course</button>
+            <button class="iconbtn" aria-label="Edit course" title="Edit" onclick="dlg('settingsDlg')">{{i:edit}}</button>
+            <button class="iconbtn" aria-label="Editions, sharing &amp; pricing" title="Editions" onclick="dlg('shareDlg')">{{i:globe}}</button>
+          </div>
+        </article>
+      </div>
+      <div class="callout"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>Becoming a seller is two steps handled elsewhere — the <b>admin grants</b> the can-sell capability, then you finish <b>Stripe payout setup</b>.</span></div>
+    </div>
+  </section>
+
+  <!-- MARKETPLACE 2 — PAYGATE -->
+  <section class="group" id="gm2">
+    <div class="group-head"><span class="eyebrow">Marketplace</span><h2>The paygate — first lesson free, then buy</h2></div>
+    <p class="lede">Screen S6, rendered. The preview reads normally; locked items carry a lock in the nav; the reading pane ends at the paygate. Buying is open to guests.</p>
+    <div class="stage">
+      <div class="reader-demo">
+        <div class="side">
+          <div class="top"><span>← Courses</span><span>Sign in</span></div>
+          <div class="title">Conversational Hindi</div>
+          <div class="navlbl">Lessons</div>
+          <div class="navitem active">1. Greetings <span class="freetag">Free</span></div>
+          <div class="navitem locked">2. Food &amp; ordering {{i:lock}}</div>
+          <div class="navitem locked">3. Small talk {{i:lock}}</div>
+          <div class="navitem locked">4. Directions {{i:lock}}</div>
+          <div class="navlbl">References</div>
+          <div class="navitem locked">Devanagari chart {{i:lock}}</div>
+          <div class="pinned">
+            <div class="selectrow"><span>Language</span><span>English ▾</span></div>
+          </div>
+        </div>
+        <div class="page">
+          <h3 class="lesson-title">1. Greetings</h3>
+          <p class="lesson-copy"><b class="deva" dir="auto">नमस्ते</b> (namaste) is your all-purpose greeting — palms together, a slight nod, and it works morning to night, for one person or a whole room.</p>
+          <p class="lesson-copy fade">Say it back when you're greeted, then add <b class="deva" dir="auto">आप कैसे हैं?</b> (aap kaise hain?) — "how are you?" — to keep the exchange going. In Jaipur you'll also hear…</p>
+          <div class="paygate">
+            <div class="pg-lock">{{i:lock}}</div>
+            <h4>You've read the free preview</h4>
+            <p class="pg-sub">Unlock the remaining 7 lessons and the Devanagari reference — lifetime access to the English edition, in a single payment.</p>
+            <div class="pg-buy">
+              <button class="btn primary" onclick="dlg('buyDlg')">{{i:card}} Unlock the full course</button>
+              <span class="pg-price">$12.00</span>
+            </div>
+            <p class="pg-note">{{i:globe}} Shown in your local currency · pay once, keep forever</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MARKETPLACE 3 — AFTER BUY -->
+  <section class="group" id="gm3">
+    <div class="group-head"><span class="eyebrow">Marketplace</span><h2>After you buy — a first-class reader</h2></div>
+    <p class="lede">A purchase is a lifetime <b>entitlement</b>. A buyer is treated exactly like a shared viewer (S9): full content, own progress, own certificate — they simply paid instead of being invited. Buying never grants the ability to sell or author.</p>
+    <div class="stage">
+      <div class="viewer-grid">
+        <div>
+          <p class="label" style="margin-bottom:10px">On their home dashboard</p>
+          <article class="card">
+            <div class="card-top"><h3>Conversational Hindi</h3><span class="pill owned">{{i:check}} Purchased</span></div>
+            <p class="shared-by">English edition · unlocked for life</p>
+            <div class="chips"><span class="chip">English</span></div>
+            <div class="progress-wrap">
+              <div class="progress-meta"><span><b>3</b> / 8 lessons</span><span>38%</span></div>
+              <div class="bar"><i style="width:38%"></i></div>
+            </div>
+            <div class="spacer"></div>
+            <div class="actions"><button class="btn primary" onclick="showToast('Opens the full course')">Open course</button></div>
+          </article>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:24px">
+          <div class="caps">
+            <div class="can">
+              <h4>They can</h4>
+              <div class="cap yes">{{i:check}} Read every lesson &amp; reference in the edition they bought</div>
+              <div class="cap yes">{{i:check}} Track their own progress</div>
+              <div class="cap yes">{{i:check}} Ask the seller questions</div>
+              <div class="cap yes">{{i:check}} Earn their own certificate</div>
+            </div>
+            <div class="cant">
+              <h4>They can't</h4>
+              <div class="cap no">{{i:x}} Read another language without buying it too</div>
+              <div class="cap no">{{i:x}} Edit, translate, or sell the course</div>
+              <div class="cap no">{{i:x}} Invite others or change the public link</div>
+              <div class="cap no">{{i:x}} Record quiz answers (those stay the owner's)</div>
+            </div>
+          </div>
+          <div class="gatebox solid">
+            <span class="gi">{{i:store}}</span>
+            <div>Buying <b>admits you to the platform</b> even while sign-up is invite-only — your purchase creates your account. Selling stays gated behind the admin's approval.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHAT'S NEW -->
+  <div class="changelog" id="changes">
+    <h3>{{i:refresh}} What changed in this revision</h3>
+    <ul>
+      <li><b>Account settings dialog (S3 · new)</b> — the dashboard header's separate globe picker + theme toggle are replaced by a single <code>⚙</code> gear opening one dialog: display name, app language, theme. <code>SettingsDialog.tsx</code>.</li>
+      <li><b>App-language picker</b> — chrome offer-set is <code>en · af · es · fr · hi</code> (<code>src/i18n/config.ts</code>). Signed-in users pick it in S3; guests use the standalone footer picker. <code>LocalePicker.tsx</code>.</li>
+      <li><b>Devanagari chrome font</b> — Hindi endonyms and sample copy now render in <code>--font-deva</code> (Noto Serif Devanagari), not the Latin serif. Applied via <code>.deva</code> here / <code>.font-deva</code> in the app.</li>
+      <li><b>Icon set</b> — <code>moon</code> and <code>chat</code> added; <code>tag</code> path resimplified to match the shipped <code>icons.tsx</code>.</li>
+      <li><b>Tokens verified</b> against <code>src/design/tokens.ts</code> + <code>globals.css</code> — the full 14-token contract (incl. quiz <code>good/bad</code>) in both palettes.</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- ================= DIALOGS ================= -->
+
+<!-- S3 · Account settings (NEW) -->
+<dialog id="prefsDlg">
+  <div class="dlg-head"><h3>Account settings</h3><button class="iconbtn ghost" aria-label="Close" onclick="this.closest('dialog').close()">{{i:x}}</button></div>
+  <div class="dlg-body">
+    <div class="dlg-section">
+      <h4>Display name</h4>
+      <p class="sub">Your account name — also what prints on your certificates.</p>
+      <div class="save-inline">
+        <input class="input" value="Jordan Lee">
+        <button class="btn outline sm" onclick="showToast('Saved')">Save</button>
+      </div>
+    </div>
+    <div class="dlg-section">
+      <h4>App language</h4>
+      <p class="sub">The language of the app chrome. Picking one refreshes so everything re-renders.</p>
+      <div class="locale-list" id="localeList"></div>
+    </div>
+    <div class="dlg-section">
+      <h4>Theme</h4>
+      <p class="sub">Light or dark — a durable device preference.</p>
+      <div class="theme-seg" id="prefTheme">
+        <button data-mode="light" onclick="setTheme('light')">{{i:sun}} Light</button>
+        <button data-mode="dark" onclick="setTheme('dark')">{{i:moon}} Dark</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- S4 · Course settings -->
+<dialog id="settingsDlg">
+  <div class="dlg-head"><h3>Course settings</h3><button class="iconbtn ghost" aria-label="Close" onclick="this.closest('dialog').close()">{{i:x}}</button></div>
+  <div class="dlg-body">
+    <div class="dlg-section">
+      <h4>Details</h4>
+      <p class="sub">Rename the course and curate the mission — the "why" shown on its card.</p>
+      <div class="field"><label class="label">Title</label><input class="input" value="Conversational Hindi"></div>
+      <div class="field"><label class="label">Mission</label><textarea class="textarea">Hold a real conversation with my partner's family in Jaipur this winter — greetings, food, and small talk.</textarea></div>
+      <button class="btn primary" onclick="showToast('Saved')">Save changes</button>
+    </div>
+    <div class="dlg-section">
+      <h4>Certificate emblem</h4>
+      <p class="sub">The mark of your subject on the certificate. Set an emoji / character, or upload an image.</p>
+      <div class="row" style="align-items:flex-start;gap:16px">
+        <div class="emblem-preview">🪷</div>
+        <div style="flex:1">
+          <div class="field" style="margin-bottom:12px"><label class="label">Glyph</label>
+            <div class="row"><input class="input" value="🪷" style="text-align:center;font-size:18px"><button class="btn primary sm" onclick="showToast('Emblem updated')">Save</button></div>
+          </div>
+          <label class="label" style="display:block;margin-bottom:6px">Or upload an image</label>
+          <button class="btn outline sm" onclick="showToast('Image picker')">{{i:upload}} Choose image…</button>
+        </div>
+      </div>
+    </div>
+    <div class="dlg-section">
+      <h4>Completion</h4>
+      <p class="sub">Marking complete ends the course — no more lessons are generated. Unlocks translations. You can reopen it later.</p>
+      <div class="danger-zone">
+        <span style="font-size:13.5px">Mark this course complete</span>
+        <button class="btn danger sm" onclick="showToast('Confirm dialog would appear')">{{i:check}} Mark complete</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- S5 · Editions & sharing -->
+<dialog id="shareDlg">
+  <div class="dlg-head"><h3>Editions &amp; sharing</h3><button class="iconbtn ghost" aria-label="Close" onclick="this.closest('dialog').close()">{{i:x}}</button></div>
+  <div class="dlg-body">
+    <div class="tabs" role="tablist" aria-label="Editions">
+      <button class="tab active" role="tab" data-tab="en" onclick="showEdition('en')">English <span class="tab-src">Source</span> <span class="price">{{i:tag}}$12</span></button>
+      <button class="tab" role="tab" data-tab="hi" onclick="showEdition('hi')"><span class="deva" dir="auto">हिन्दी</span></button>
+      <button class="tab" role="tab" data-tab="ar" onclick="showEdition('ar')"><span dir="auto">العربية</span><span class="tab-dot translating" title="Translating"></span></button>
+      <button class="tab" role="tab" data-tab="es" onclick="showEdition('es')">Español<span class="tab-dot failed" title="Failed"></span></button>
+      <button class="tab tab-add" role="tab" data-tab="add" aria-label="Add a language" title="Add a language" onclick="showEdition('add')">{{i:plus}}</button>
+    </div>
+
+    <div class="tabpanel" id="tab-en" role="tabpanel">
+      <div class="share-block">
+        <div class="ed-share-row"><input class="input" placeholder="Invite by email" type="email"><button class="btn primary sm" onclick="showToast('Invitation sent')">Invite</button></div>
+        <p class="help" style="margin-top:8px">Read-only access. No account yet? They're in when they sign up.</p>
+      </div>
+      <div class="public-row on" id="pub1">
+        <div class="pub-label">
+          <span class="pub-icon"><span class="ic ic-lock">{{i:lock}}</span><span class="ic ic-globe">{{i:globe}}</span></span>
+          <div class="pub-text"><b>Public link</b><span id="pub1sub">Anyone with the link can view — no account needed</span></div>
+        </div>
+        <label class="switch"><input type="checkbox" checked onchange="togglePublic('pub1',this.checked)"><span class="track"></span></label>
+      </div>
+      <div class="public-reveal open" id="pub1rev">
+        <div class="link-field"><input class="input" readonly value="mycourse.app/share/8fq2…" onfocus="this.select()"><button class="btn sm" style="background:var(--accent2);color:#fff" onclick="showToast('Link copied')">{{i:link}} Copy</button></div>
+        <button class="linklike" onclick="showToast('New link generated')">{{i:refresh}} Regenerate link</button>
+      </div>
+      <div class="sell on" style="margin-top:12px">
+        <div class="sell-head">
+          <div class="sell-title"><span class="sell-icon">{{i:tag}}</span><div><b>Sell this edition</b><span>Paid · $12.00 USD · first lesson free</span></div></div>
+          <button class="btn outline sm" onclick="toggleSell('sell-en')">Edit price</button>
+        </div>
+        <div class="sell-reveal" id="sell-en-rev">
+          <div class="price-input">
+            <div class="field amt"><label class="label">Price</label><input class="input" value="12.00" inputmode="decimal"></div>
+            <div class="field cur"><label class="label">Currency</label><select class="select"><option>USD</option><option>EUR</option><option>GBP</option><option>INR</option></select></div>
+            <button class="btn primary sm" onclick="showToast('Price saved')">Save</button>
+          </div>
+          <button class="linklike danger" onclick="showToast('English is free again')">{{i:x}} Stop selling — make this edition free</button>
+        </div>
+      </div>
+      <div class="panel-foot">
+        <button class="linklike" onclick="showToast('Coming soon')">{{i:users}} See who has access &amp; their progress <span class="soon">Soon</span></button>
+      </div>
+    </div>
+
+    <div class="tabpanel" id="tab-hi" role="tabpanel" hidden>
+      <div class="share-block">
+        <div class="ed-share-row"><input class="input" placeholder="Invite by email" type="email"><button class="btn primary sm" onclick="showToast('Invitation sent')">Invite</button></div>
+        <p class="help" style="margin-top:8px">Read-only access. No account yet? They're in when they sign up.</p>
+      </div>
+      <div class="public-row" id="pub2">
+        <div class="pub-label">
+          <span class="pub-icon"><span class="ic ic-lock">{{i:lock}}</span><span class="ic ic-globe">{{i:globe}}</span></span>
+          <div class="pub-text"><b>Public link</b><span id="pub2sub">Off — only you and people you invite can see this</span></div>
+        </div>
+        <label class="switch"><input type="checkbox" onchange="togglePublic('pub2',this.checked)"><span class="track"></span></label>
+      </div>
+      <div class="public-reveal" id="pub2rev">
+        <div class="link-field"><input class="input" readonly value="mycourse.app/share/6kd9…" onfocus="this.select()"><button class="btn sm" style="background:var(--accent2);color:#fff" onclick="showToast('Link copied')">{{i:link}} Copy</button></div>
+        <button class="linklike" onclick="showToast('New link generated')">{{i:refresh}} Regenerate link</button>
+      </div>
+      <div class="sell" style="margin-top:12px">
+        <div class="sell-head">
+          <div class="sell-title"><span class="sell-icon">{{i:tag}}</span><div><b>Sell this edition</b><span>Free — set a price to sell <span class="deva" dir="auto">हिन्दी</span></span></div></div>
+          <button class="btn gold sm" onclick="toggleSell('sell-hi')">Set a price</button>
+        </div>
+        <div class="sell-reveal" id="sell-hi-rev">
+          <div class="price-input">
+            <div class="field amt"><label class="label">Price</label><input class="input" placeholder="0.00" inputmode="decimal"></div>
+            <div class="field cur"><label class="label">Currency</label><select class="select"><option>USD</option><option>EUR</option><option>INR</option></select></div>
+            <button class="btn primary sm" onclick="showToast('हिन्दी is now on sale')">Save</button>
+          </div>
+          <p class="help">Each language is priced on its own — sell some editions and keep others free.</p>
+        </div>
+      </div>
+      <div class="panel-foot">
+        <button class="linklike" onclick="showToast('Coming soon')">{{i:users}} See who has access &amp; their progress <span class="soon">Soon</span></button>
+        <button class="linklike danger" onclick="showToast('Removed edition')">{{i:trash}} Remove this edition</button>
+      </div>
+    </div>
+
+    <div class="tabpanel" id="tab-ar" role="tabpanel" hidden>
+      <div class="empty-panel">
+        <p style="margin:0"><b dir="auto" style="color:var(--ink)">العربية</b> is still translating (14/22). Sharing opens the moment it's ready.</p>
+        <div class="bar" style="width:100%"><i style="width:64%"></i></div>
+        <button class="linklike danger" onclick="showToast('Removed edition')">{{i:trash}} Remove this edition</button>
+      </div>
+    </div>
+
+    <div class="tabpanel" id="tab-es" role="tabpanel" hidden>
+      <div class="empty-panel">
+        <p style="margin:0">Some items in <b style="color:var(--ink)">Español</b> didn't translate. Retry, then you can share it.</p>
+        <div class="row"><button class="btn primary sm" onclick="showToast('Retrying')">{{i:refresh}} Retry</button><button class="linklike danger" onclick="showToast('Removed edition')">{{i:trash}} Remove</button></div>
+      </div>
+    </div>
+
+    <div class="tabpanel" id="tab-add" role="tabpanel" hidden>
+      <p class="help" style="margin-bottom:10px">Translate this course into another language — it becomes a new tab you can share once ready.</p>
+      <input class="input" placeholder="Search languages…" value="fr">
+      <div class="lang-results">
+        <button onclick="showToast('Translating into Français…')"><span dir="auto">Français</span><span class="sub">French</span></button>
+        <button onclick="showToast('Translating into Frisian…')"><span dir="auto">Frysk</span><span class="sub">Frisian</span></button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
+<!-- S7 · Checkout -->
+<dialog id="buyDlg">
+  <div class="dlg-head"><h3>Unlock this course</h3><button class="iconbtn ghost" aria-label="Close" onclick="this.closest('dialog').close()">{{i:x}}</button></div>
+  <div class="dlg-body">
+    <div class="between" style="margin-bottom:18px">
+      <div><b style="font-size:15px;color:var(--ink)">Conversational Hindi</b><span style="display:block;font-size:12.5px;color:var(--soft)">English edition · 8 lessons + Devanagari reference</span></div>
+      <span class="price" style="font-size:13px">{{i:tag}} $12.00</span>
+    </div>
+    <div class="gatebox solid" style="margin-bottom:16px"><span class="gi">{{i:check}}</span><div>You've read the free first lesson. This unlocks the other <b>7 lessons</b> and the reference — <b>lifetime access</b>, in English.</div></div>
+    <button class="btn primary block" onclick="showToast('Redirecting to secure checkout…')">{{i:card}} Continue to checkout · $12.00</button>
+    <p class="pg-note" style="justify-content:center">{{i:globe}} Shown in your local currency · pay once, keep forever</p>
+    <p class="help" style="text-align:center;margin-top:10px">Payment is handled by the seller through Stripe. No account? Buying creates one for you.</p>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  /* ---- Icon library: id -> inner SVG markup (24 viewBox, 2px stroke).
+     Lifted verbatim from src/app/_components/icons.tsx (plus marketplace card/store). ---- */
+  const P = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+  const ICONS = {
+    edit:`<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>`,
+    settings:`<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>`,
+    kebab:`<circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/>`,
+    chat:`<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>`,
+    award:`<circle cx="12" cy="8" r="5"/><path d="M8.2 12.5 7 22l5-3 5 3-1.2-9.5"/>`,
+    globe:`<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>`,
+    check:`<path d="M20 6 9 17l-5-5"/>`,
+    refresh:`<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/>`,
+    plus:`<path d="M12 5v14M5 12h14"/>`,
+    link:`<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>`,
+    trash:`<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>`,
+    x:`<path d="M18 6 6 18M6 6l12 12"/>`,
+    upload:`<path d="M4 17v3h16v-3"/><path d="M12 3v13M7 8l5-5 5 5"/>`,
+    ext:`<path d="M14 4h6v6"/><path d="M20 4 10 14"/><path d="M18 13v6H5V6h6"/>`,
+    sun:`<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/>`,
+    moon:`<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>`,
+    book:`<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20"/>`,
+    lock:`<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>`,
+    chevron:`<path d="M6 9l6 6 6-6"/>`,
+    users:`<path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-6A3.5 3.5 0 0 0 4 18.5V20"/><circle cx="10.5" cy="8" r="3.5"/><path d="M20 20v-1.5a3.5 3.5 0 0 0-2.6-3.4"/><path d="M15.5 4.6a3.5 3.5 0 0 1 0 6.8"/>`,
+    tag:`<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.8 8.8a2 2 0 0 0 2.8 0l6.4-6.4a2 2 0 0 0 0-2.8z"/><circle cx="7.5" cy="7.5" r="1.1"/>`,
+    card:`<rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><path d="M6 15h4"/>`,
+    store:`<path d="M4 9.5V20h16V9.5"/><path d="M2.8 4h18.4l1.1 4.1a2.3 2.3 0 0 1-4.4.9 2.3 2.3 0 0 1-4.45 0 2.3 2.3 0 0 1-4.45 0 2.3 2.3 0 0 1-4.4-.9z"/><path d="M9.5 20v-5.5h5V20"/>`,
+  };
+  /* Icons shipped in icons.tsx (vs. marketplace-only extras). Used to badge the grid. */
+  const APP_ICONS = ["edit","settings","kebab","award","globe","check","refresh","plus","link","trash","x","upload","ext","sun","moon","book","lock","chevron","tag","users","chat"];
+  const FRESH = ["moon","chat"];
+  function svg(id, cls){ return `<svg class="icon ${cls||''}" viewBox="0 0 24 24" ${P}>${ICONS[id]||''}</svg>`; }
+
+  function hydrateIcons(){
+    document.querySelectorAll('*').forEach(el=>{
+      for(const n of Array.from(el.childNodes)){
+        if(n.nodeType===3 && n.nodeValue.includes('{{i:')){
+          const span=document.createElement('span');
+          span.innerHTML=n.nodeValue.replace(/\{\{i:(\w+)\}\}/g,(_,k)=>svg(k));
+          n.replaceWith(...span.childNodes);
+        }
+      }
+    });
+  }
+
+  /* Icon reference grid — app icons first (fresh ones badged), then marketplace extras. */
+  const grid=document.getElementById('iconGrid');
+  const order=[...APP_ICONS, ...Object.keys(ICONS).filter(k=>!APP_ICONS.includes(k))];
+  order.forEach(k=>{
+    const cell=document.createElement('div');
+    cell.className='icon-cell'+(FRESH.includes(k)?' fresh':'');
+    cell.innerHTML=svg(k)+`<code>${k}</code>`;grid.appendChild(cell);
+  });
+
+  /* App-language list (S3) — LOCALES from src/i18n/config.ts, names from convex/languages.ts */
+  const LOCALES=[
+    {code:'en',native:'English',name:'English'},
+    {code:'af',native:'Afrikaans',name:'Afrikaans'},
+    {code:'es',native:'Español',name:'Spanish'},
+    {code:'fr',native:'Français',name:'French'},
+    {code:'hi',native:'हिन्दी',name:'Hindi',deva:true},
+  ];
+  let activeLocale='en';
+  function renderLocales(){
+    const list=document.getElementById('localeList');
+    list.innerHTML=LOCALES.map(l=>`
+      <button class="locale-row ${l.code===activeLocale?'active':''}" onclick="pickLocale('${l.code}')">
+        <span style="display:flex;flex-direction:column">
+          <span class="lnative ${l.deva?'deva':''}">${l.native}</span>
+          ${l.name!==l.native?`<span class="lname">${l.name}</span>`:''}
+        </span>
+        ${l.code===activeLocale?svg('check'):''}
+      </button>`).join('');
+  }
+  function pickLocale(code){ activeLocale=code; renderLocales(); const l=LOCALES.find(x=>x.code===code); showToast('App language → '+l.native); }
+
+  /* Course cards (Group 1) */
+  const cards=[
+    {t:'Conversational Hindi',state:'complete',pill:'<span class="pill done">'+svg('award')+'Complete</span>',
+     mission:"Hold a real conversation with my partner's family in Jaipur this winter.",chips:[{t:'हिन्दी',deva:true},{t:'Español'},{t:'+2',more:true}],c:8,n:8},
+    {t:'Devanagari Script',state:'active',pill:'<span class="pill pub">'+svg('globe')+'Public</span>',
+     mission:'Read street signs and menus on my own — recognise every letter and matra.',chips:[{t:'हिन्दी',deva:true}],c:3,n:6},
+    {t:'Business Mandarin',state:'active',pill:'',
+     mission:'Run a supplier call in Mandarin without an interpreter by Q4.',chips:[],c:1,n:5},
+    {t:'Kitchen French',state:'setup',pill:'<span class="pill setup">Setting up</span>',
+     mission:'',setupText:'Your teacher is preparing the first lesson.',chips:[],c:0,n:0},
+  ];
+  const grid1=document.getElementById('cardGrid');
+  cards.forEach((c,idx)=>{
+    const pct=c.n>0?Math.round(c.c/c.n*100):0;
+    const el=document.createElement('article');
+    el.className='card'+(c.state==='complete'?' complete':'');
+    el.innerHTML=`
+      <div class="card-top"><h3>${c.t}</h3>${c.pill||''}</div>
+      ${c.mission?`<button class="mission" onclick="showToast('Opens the full mission')">${c.mission}</button>`
+                 :`<p class="mission" style="cursor:default">${c.setupText||'No mission yet.'}</p>`}
+      ${c.chips.length?`<div class="chips">${c.chips.map(ch=>`<span class="chip ${ch.more?'more':''} ${ch.deva?'deva':''}" dir="auto">${ch.t}</span>`).join('')}</div>`:''}
+      <div class="progress-wrap">
+        <div class="progress-meta">
+          <span>${c.n===0?'No lessons yet':`<b>${c.c}</b> / ${c.n} lessons`}</span>
+          ${c.state==='complete'?`<span style="color:var(--gold);font-weight:600">${pct}%</span>`:c.n>0?`<span>${pct}%</span>`:''}
+        </div>
+        <div class="bar"><i style="width:${pct}%"></i></div>
+      </div>
+      <div class="spacer"></div>
+      <div class="actions">
+        ${c.state==='setup'
+          ? `<button class="btn gold block" onclick="showToast('Setup started')">Set up now</button>`
+          : `<button class="btn primary" onclick="showToast('Navigates to the course')">Open course</button>
+             <button class="iconbtn" aria-label="Edit ${c.t}" title="Edit" onclick="dlg('settingsDlg')">${svg('edit')}</button>
+             <button class="iconbtn" aria-label="Editions & sharing for ${c.t}" title="Editions" onclick="dlg('shareDlg')">${svg('globe')}</button>
+             ${c.state==='complete' ? `
+             <div class="menu-anchor">
+               <button class="iconbtn" aria-label="Certificate" aria-haspopup="menu" title="Certificate" onclick="toggleMenu(event,'cm${idx}')">${svg('kebab')}</button>
+               <div class="menu" id="cm${idx}" role="menu">
+                 <button class="gold-item" role="menuitem" onclick="closeMenus();showToast('Opens the certificate')">${svg('award')} View certificate ${svg('ext')}</button>
+               </div>
+             </div>` : ``}`}
+      </div>`;
+    grid1.appendChild(el);
+  });
+  const nc=document.createElement('button');nc.className='newcard';
+  nc.innerHTML=`<span class="plus">${svg('plus')}</span><span style="font-weight:600;font-size:14px">New course</span>`;
+  nc.onclick=()=>showToast('Opens the new-course form');
+  grid1.appendChild(nc);
+
+  renderLocales();
+  hydrateIcons();
+
+  /* ---- Interactions ---- */
+  function dlg(id){ closeMenus(); document.getElementById(id).showModal(); syncPrefTheme(); }
+  function toggleSell(id){ document.getElementById(id+'-rev').classList.toggle('open'); }
+  function togglePublic(id,on){
+    document.getElementById(id).classList.toggle('on',on);
+    const rev=document.getElementById(id+'rev'); if(rev) rev.classList.toggle('open',on);
+    const sub=document.getElementById(id+'sub'); if(sub) sub.textContent = on
+      ? 'Anyone with the link can view — no account needed'
+      : 'Off — only you and people you invite can see this';
+    showToast(on ? 'Public link is on' : 'Public link turned off');
+  }
+  function showEdition(key){
+    document.querySelectorAll('#shareDlg .tabpanel').forEach(p=>{ p.hidden = (p.id !== 'tab-'+key); });
+    document.querySelectorAll('#shareDlg .tab').forEach(t=>{ const on=t.dataset.tab===key; t.classList.toggle('active',on); });
+  }
+  function toggleMenu(e,id){ e.stopPropagation(); const m=document.getElementById(id); const wasOpen=m.classList.contains('open'); closeMenus(); if(!wasOpen)m.classList.add('open'); }
+  function closeMenus(){ document.querySelectorAll('.menu.open').forEach(m=>m.classList.remove('open')); }
+  document.addEventListener('click',closeMenus);
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape')closeMenus(); });
+
+  let toastT;
+  function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2200); }
+
+  /* Theme toggle (drives root data-theme, exactly like the app's ThemeContext) */
+  function setTheme(mode){ document.documentElement.setAttribute('data-theme',mode); reflectTheme(); syncPrefTheme(); }
+  function curTheme(){ return document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'); }
+  function reflectTheme(){
+    const cur=curTheme();
+    document.getElementById('tLight').setAttribute('aria-pressed',cur==='light');
+    document.getElementById('tDark').setAttribute('aria-pressed',cur==='dark');
+  }
+  function syncPrefTheme(){
+    const cur=curTheme();
+    document.querySelectorAll('#prefTheme button').forEach(b=>b.classList.toggle('on',b.dataset.mode===cur));
+  }
+  reflectTheme(); syncPrefTheme();
+</script>
+
+</body>
+</html>

@@ -108,8 +108,19 @@ safety net, `publishTranslation` re-checks each Lesson's quiz-marker counts and
 The rules also require translating **quoted passages and the "Sources" citation
 footer** — a quote the course cites is learner-read prose, not object-of-study, so
 it must be rendered in the target language (keeping only the attribution: author
-names, work titles, proper nouns, page/verse refs; Bible verses from a published
-translation). Skipping these is the most common real-world miss — see §7 / §8.
+names, work titles, proper nouns, page/verse refs; Bible verses substituted
+**verbatim** from a published target-language Bible — BSI/HHBD Devanagari for Hindi
+— never back-translated). Skipping these is the most common real-world miss —
+see §7 / §8.
+
+Three further guardrails (added after grading real Hindi output — the tells were a
+coined word *inside a verse*, a mixed romanized/Devanagari document, and ordinary
+words left in English at random): **never coin a word** (a model appending an
+English gloss to its own term is confessing the term is invented — use the real
+standard term); **one script per Edition, no leaks** (a `hi` Edition is pure
+Devanagari, a `-Latn` Edition pure Latin); and **translate ordinary vocabulary
+consistently** rather than leaving some source-language words scattered through. All
+three now live in both the `translate` skill and the `buildTranslateMessages` prompt.
 
 ---
 

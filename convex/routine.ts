@@ -237,6 +237,66 @@ export const runHistory = query({
   },
 });
 
+// Generation + translation usage over time, bucketed by day, for the admin
+// Generation tab's activity graph (.scratch/admin-sales follow-up). Two series
+// on one count axis:
+//   - generation: `generationRuns` that did work — `published` or `failed`,
+//     excluding `nothing` (the routine's idle "caught up" polls, which aren't
+//     usage). Bucketed by `_creationTime` (≈ when the run finished).
+//   - translation: `translationJobs` by `_creationTime` (when an edition's
+//     translation was first started). There's no per-run translation log, so
+//     this is the coarse-but-comparable signal — one event per edition, on the
+//     same scale as a generation run, which keeps both honest on one axis.
+// Days are UTC (integer `_creationTime / DAY`); the window is zero-filled so the
+// time axis is continuous. `from`/`to` are ms (from inclusive, to exclusive),
+// supplied by the caller (floored to the day, so the args stay stable across
+// renders). Admin-only.
+const USAGE_DAY_CAP = 366; // defensive: never return more than a year of buckets
+
+export const usageByDay = query({
+  args: { from: v.number(), to: v.number() },
+  returns: v.array(
+    v.object({
+      dayMs: v.number(),
+      generation: v.number(),
+      translation: v.number(),
+    }),
+  ),
+  handler: async (ctx, { from, to }) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const DAY = 86_400_000;
+    const startDay = Math.floor(from / DAY);
+    const endDay = Math.floor((to - 1) / DAY);
+    if (endDay < startDay) return [];
+
+    const bump = (m: Map<number, number>, ts: number) => {
+      const d = Math.floor(ts / DAY);
+      m.set(d, (m.get(d) ?? 0) + 1);
+    };
+
+    const runs = await ctx.db
+      .query("generationRuns")
+      .withIndex("by_creation_time", (q) => q.gte("_creationTime", from).lt("_creationTime", to))
+      .collect();
+    const jobs = await ctx.db
+      .query("translationJobs")
+      .withIndex("by_creation_time", (q) => q.gte("_creationTime", from).lt("_creationTime", to))
+      .collect();
+
+    const gen = new Map<number, number>();
+    for (const r of runs) if (r.outcome !== "nothing") bump(gen, r._creationTime);
+    const tr = new Map<number, number>();
+    for (const j of jobs) bump(tr, j._creationTime);
+
+    const out: { dayMs: number; generation: number; translation: number }[] = [];
+    const lastDay = Math.min(endDay, startDay + USAGE_DAY_CAP - 1);
+    for (let d = startDay; d <= lastDay; d++) {
+      out.push({ dayMs: d * DAY, generation: gen.get(d) ?? 0, translation: tr.get(d) ?? 0 });
+    }
+    return out;
+  },
+});
+
 // ---- The gate + lock (atomic) ----------------------------------------------
 
 type AcquireResult =

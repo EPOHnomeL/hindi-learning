@@ -1,6 +1,7 @@
 "use client";
 
 import { useAction, useMutation, useQuery } from "convex/react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -163,6 +164,7 @@ export function Frame({
   // opens the native share sheet. Null/absent → no share buttons (private course).
   share?: { courseTitle: string; url: string } | null;
 }) {
+  const t = useTranslations("Artifact");
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const router = useRouter();
   // Card share is offered only when there's a public course link (reference-cards/03).
@@ -355,7 +357,7 @@ export function Frame({
           role="status"
           className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-card px-4 py-2 text-sm text-ink shadow-lg"
         >
-          Copied — paste it anywhere ✓
+          {t("copied")}
         </div>
       )}
     </>
@@ -398,6 +400,7 @@ function LessonView({
   dir?: "ltr" | "rtl";
   contentLang?: string;
 }) {
+  const t = useTranslations("Artifact");
   const { theme } = useTheme();
   const lang = useEditionLang();
   const buyMarker = useBuyMarker();
@@ -452,8 +455,8 @@ function LessonView({
   }, [topicSlug, lessonKey, recordResponse, readOnly]);
 
   if (lesson === undefined || html === undefined) return <ReaderSkeleton />;
-  if (lesson === null) return <p className="text-soft">Lesson not found.</p>;
-  if (html === null) return <p className="text-soft">Couldn’t load this lesson. Try refreshing.</p>;
+  if (lesson === null) return <p className="text-soft">{t("lessonNotFound")}</p>;
+  if (html === null) return <p className="text-soft">{t("lessonLoadError")}</p>;
 
   // Paid marketplace: a locked Lesson (past the free Preview on a paid Edition the
   // caller doesn't hold) shows the paygate in place of the content — never a blank
@@ -506,7 +509,7 @@ function LessonView({
                     : "border-accent text-accent hover:bg-hi"
                 }`}
               >
-                {completed ? "✓ Completed" : "Mark complete"}
+                {completed ? t("completed") : t("markComplete")}
               </button>
             )}
             {/* A Viewer also gets plain navigation to the next lesson. */}
@@ -515,7 +518,7 @@ function LessonView({
                 href={withLang(`/courses/${topicSlug}/lessons/${nextLessonKey}`, lang)}
                 className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90"
               >
-                Next lesson →
+                {t("nextLesson")}
               </Link>
             )}
           </div>
@@ -529,11 +532,11 @@ function LessonView({
             <button
               type="button"
               onClick={() => setEditing(true)}
-              aria-label="Edit this lesson"
-              title="Edit this lesson"
+              aria-label={t("editLesson")}
+              title={t("editLesson")}
               className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent opacity-100 shadow-sm backdrop-blur transition-opacity hover:bg-hi focus:opacity-100 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
             >
-              ✎ Edit
+              {t("edit")}
             </button>
           )}
         </div>
@@ -622,6 +625,7 @@ function ContentEditor({
   onClose: () => void;
   commit: (storageId: Id<"_storage">) => Promise<unknown>;
 }) {
+  const t = useTranslations("Artifact");
   const dialogRef = useRef<HTMLDialogElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const generateUploadUrl = useMutation(api.content.generateEditUploadUrl);
@@ -643,7 +647,7 @@ function ContentEditor({
       const edited = replaceBodyInner(html, doc.body.innerHTML);
       const url = await generateUploadUrl({ topicSlug });
       const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/html" }, body: edited });
-      if (!res.ok) throw new Error("Upload failed — please try again.");
+      if (!res.ok) throw new Error(t("uploadFailed"));
       const { storageId } = (await res.json()) as { storageId: string };
       // The write path may reject (e.g. a Lesson's quiz-structure guard) — show it.
       await commit(storageId as Id<"_storage">);
@@ -662,21 +666,21 @@ function ContentEditor({
       className="m-auto flex h-[90vh] w-[96vw] max-w-4xl flex-col rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
     >
       <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
-        <h2 className="min-w-0 truncate text-base font-semibold text-ink">Edit {label}</h2>
+        <h2 className="min-w-0 truncate text-base font-semibold text-ink">{t("editHeading", { label: t(label) })}</h2>
         <div className="flex shrink-0 items-center gap-2">
           <button
             onClick={onClose}
             disabled={saving}
             className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition-colors hover:bg-hi disabled:opacity-60"
           >
-            Cancel
+            {t("cancel")}
           </button>
           <button
             onClick={() => void save()}
             disabled={saving}
             className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
           >
-            {saving ? "Saving…" : "Save"}
+            {saving ? t("saving") : t("save")}
           </button>
         </div>
       </div>
@@ -705,6 +709,7 @@ function ContentEditor({
 // subscription), at which point this lesson is no longer the Frontier and the
 // button unmounts.
 function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; frontierKey: string }) {
+  const t = useTranslations("Artifact");
   const gen = useQuery(api.routine.generationStatus, { topicSlug });
   const amAdmin = useQuery(api.whitelist.amIAdmin);
   const requestNext = useAction(api.routine.requestNextLesson);
@@ -746,29 +751,29 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
   }
 
   if (generating && !stale) {
-    return <span className="animate-pulse text-sm text-soft">Generating next lesson…</span>;
+    return <span className="animate-pulse text-sm text-soft">{t("generating")}</span>;
   }
   if (caughtUp) {
     return (
-      <span className="text-sm text-accent2" title="Your teacher has nothing new queued yet.">
-        ✨ All caught up
+      <span className="text-sm text-accent2" title={t("caughtUpTitle")}>
+        {t("caughtUp")}
       </span>
     );
   }
   if ((rateLimited || capped) && status !== "failed") {
     return (
-      <span className="text-sm text-soft" title="The daily schedule will continue authoring — this caps on-demand runs to one per day.">
-        ✓ Generated today
+      <span className="text-sm text-soft" title={t("generatedTodayTitle")}>
+        {t("generatedToday")}
       </span>
     );
   }
 
-  const label = status === "failed" ? "Retry" : stale ? "Still working — retry" : "Generate next lesson →";
+  const label = status === "failed" ? t("retry") : stale ? t("stillWorkingRetry") : t("generateNext");
   return (
     <div className="flex items-center gap-2">
       {status === "failed" && gen?.error && (
         <span title={gen.error} className="text-xs text-soft">
-          generation failed
+          {t("generationFailed")}
         </span>
       )}
       <button
@@ -776,7 +781,7 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
         disabled={pending}
         className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
       >
-        {pending ? "Starting…" : label}
+        {pending ? t("starting") : label}
       </button>
     </div>
   );
@@ -797,6 +802,7 @@ function ReferenceView({
   dir?: "ltr" | "rtl";
   contentLang?: string;
 }) {
+  const t = useTranslations("Artifact");
   const { theme } = useTheme();
   const lang = useEditionLang();
   const buyMarker = useBuyMarker();
@@ -820,8 +826,8 @@ function ReferenceView({
   // mutable (ADR 0003), so the save takes the write path with no quiz guard.
   const canEditRef = canEdit && (lang == null || lang === "en");
   if (ref === undefined || html === undefined) return <ReaderSkeleton aside={false} />;
-  if (ref === null) return <p className="text-soft">Reference not found.</p>;
-  if (html === null) return <p className="text-soft">Couldn’t load this reference. Try refreshing.</p>;
+  if (ref === null) return <p className="text-soft">{t("referenceNotFound")}</p>;
+  if (html === null) return <p className="text-soft">{t("referenceLoadError")}</p>;
   // Paid marketplace: References sit entirely past the free Preview, so a `preview`
   // caller gets the paygate here (the reader returns `locked` on a paid Edition).
   // A locked body is served as html:"" so the guards above pass to here.
@@ -857,11 +863,11 @@ function ReferenceView({
           <button
             type="button"
             onClick={() => setEditing(true)}
-            aria-label="Edit this reference"
-            title="Edit this reference"
+            aria-label={t("editReference")}
+            title={t("editReference")}
             className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent opacity-100 shadow-sm backdrop-blur transition-opacity hover:bg-hi focus:opacity-100 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
           >
-            ✎ Edit
+            {t("edit")}
           </button>
         )}
       </div>
@@ -895,6 +901,7 @@ function QuestionBox({
   variant?: "panel" | "inline";
   readOnly: boolean;
 }) {
+  const t = useTranslations("Artifact");
   const lang = useEditionLang();
   const questions = useQuery(api.capture.myQuestions, { topicSlug, lang: lang ?? undefined });
   const askQuestion = useMutation(api.capture.askQuestion);
@@ -911,24 +918,24 @@ function QuestionBox({
       }
     >
       <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-accent2">
-        {readOnly ? "Questions & replies" : "Ask about this lesson"}
+        {readOnly ? t("questionsAndReplies") : t("askAboutLesson")}
       </h3>
       {!readOnly && (
         <form
           className="flex gap-2"
           onSubmit={async (e) => {
             e.preventDefault();
-            const t = text.trim();
-            if (!t) return;
+            const trimmed = text.trim();
+            if (!trimmed) return;
             setText("");
-            await askQuestion({ topicSlug, lessonKey, text: t });
+            await askQuestion({ topicSlug, lessonKey, text: trimmed });
           }}
         >
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Your question…" className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none" />
-          <button type="submit" className="rounded-lg bg-accent2 px-3 py-2 text-sm text-white hover:bg-accent2/90">Ask</button>
+          <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t("questionPlaceholder")} className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none" />
+          <button type="submit" className="rounded-lg bg-accent2 px-3 py-2 text-sm text-white hover:bg-accent2/90">{t("ask")}</button>
         </form>
       )}
-      {readOnly && mine.length === 0 && <p className="text-sm text-soft">No questions on this lesson yet.</p>}
+      {readOnly && mine.length === 0 && <p className="text-sm text-soft">{t("noQuestions")}</p>}
       <ul className={`mt-3 flex flex-col gap-3 ${variant === "inline" ? "" : "min-h-0 flex-1 overflow-y-auto"}`}>
         {mine.map((q) => (
           <li key={q.id} className="text-sm">
@@ -936,21 +943,21 @@ function QuestionBox({
             {q.reply ? (
               <div className="mt-1.5 rounded-lg border-l-2 border-accent2 bg-hi px-3 py-2">
                 <div className="mb-0.5 flex items-center justify-between gap-2">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-accent2">Teacher</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-accent2">{t("teacher")}</p>
                   {variant === "panel" && (
                     <button
                       type="button"
                       onClick={() => setExpanded({ text: q.text, reply: q.reply! })}
                       className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-soft transition-colors hover:bg-card hover:text-accent"
                     >
-                      ⤢ View
+                      {t("viewQa")}
                     </button>
                   )}
                 </div>
                 <Markdown source={q.reply} className="flex flex-col gap-2 text-sm leading-relaxed text-ink" />
               </div>
             ) : (
-              <p className="mt-1 text-xs text-soft">Waiting for your teacher — your question will be answered once the next lesson is generated.</p>
+              <p className="mt-1 text-xs text-soft">{t("waitingReply")}</p>
             )}
           </li>
         ))}
@@ -965,6 +972,7 @@ function QuestionBox({
 // MissionDialog (native <dialog> → free Esc/backdrop/focus-trap); extract to a
 // shared module if a third use appears.
 function QaDialog({ question, reply, onClose }: { question: string; reply: string; onClose: () => void }) {
+  const t = useTranslations("Artifact");
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => ref.current?.showModal(), []);
   return (
@@ -978,12 +986,12 @@ function QaDialog({ question, reply, onClose }: { question: string; reply: strin
     >
       <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-3">
         <h2 className="min-w-0 text-base font-semibold text-ink">{question}</h2>
-        <button onClick={() => ref.current?.close()} aria-label="Close" className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
+        <button onClick={() => ref.current?.close()} aria-label={t("close")} className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
           ✕
         </button>
       </div>
       <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
-        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent2">Teacher</p>
+        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent2">{t("teacher")}</p>
         <Markdown source={reply} className="flex flex-col gap-3 text-base leading-relaxed text-ink" />
       </div>
     </dialog>

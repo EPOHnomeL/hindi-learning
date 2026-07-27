@@ -255,3 +255,16 @@ test("appUrl enforces same-origin — no open redirect off SITE_URL", () => {
   expect(appUrl("//evil.com")).toBe("https://app.example.com/");
   expect(appUrl("https://evil.com/phish")).toBe("https://app.example.com/");
 });
+
+test("appUrl routes a tenant course's links to its subdomain (base minus a leading www)", () => {
+  process.env.SITE_URL = "https://www.my-course.app";
+  expect(appUrl("/courses/hindi", "ywampotch")).toBe("https://ywampotch.my-course.app/courses/hindi");
+  // No slug → SITE_URL verbatim (default-site behaviour, unchanged).
+  expect(appUrl("/courses/hindi")).toBe("https://www.my-course.app/courses/hindi");
+  // The open-redirect guard now keys off the RESOLVED tenant origin.
+  expect(appUrl("https://evil.com/phish", "ywampotch")).toBe("https://ywampotch.my-course.app/");
+  expect(appUrl("//evil.com", "ywampotch")).toBe("https://ywampotch.my-course.app/");
+  // A dot-less host (localhost) has no room for a subdomain → kept verbatim.
+  process.env.SITE_URL = "http://localhost:3000";
+  expect(appUrl("/x", "ywampotch")).toBe("http://localhost:3000/x");
+});

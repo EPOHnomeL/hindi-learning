@@ -229,10 +229,19 @@ export function validateUrl(): string {
 // trusted SITE_URL origin — an absolute `https://evil.com`, a protocol-relative
 // `//evil.com` — is discarded for the origin root, closing the open-redirect
 // that would otherwise flow into PayFast's return/cancel URLs.
-export function appUrl(path = "/"): string {
+export function appUrl(path = "/", tenantSlug?: string): string {
   const base = env().SITE_URL;
   if (!base) throw new Error("SITE_URL is not set — provision it as a Convex env var");
   const baseUrl = new URL(base);
+  // A tenant course's server-built links ride its own subdomain — `<slug>.<base>`,
+  // where `base` is SITE_URL's host minus a leading `www` (issue 12 / ADR 0021 §3).
+  // No slug = the default site, and a dot-less host (localhost) has no room for a
+  // subdomain — both keep SITE_URL verbatim. `tenantSlug` is a trusted topic column
+  // (never client input), so the same-origin guard below implicitly bounds the set
+  // to { SITE_URL } ∪ { <slug>.<base> } — no allow-list needed.
+  if (tenantSlug && baseUrl.hostname.includes(".")) {
+    baseUrl.hostname = `${tenantSlug}.${baseUrl.hostname.replace(/^www\./, "")}`;
+  }
   let resolved: URL;
   try {
     resolved = new URL(path, baseUrl);

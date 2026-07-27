@@ -2,15 +2,20 @@
 
 import { useAction, useMutation, useQuery } from "convex/react";
 import { type FunctionReturnType } from "convex/server";
-import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { LANGUAGES } from "../../../convex/languages";
 import { Icon } from "./icons";
 import { formatPrice } from "./Paygate";
-import { Dialog } from "./ui";
+import { ConfirmDialog, Dialog, MenuItem } from "./ui";
 
 // One row of the owner's Editions panel, straight from api.translate.editions.
 type Edition = NonNullable<FunctionReturnType<typeof api.translate.editions>>["editions"][number];
+// The translation engine for one Edition (translation-engine-picker): `free` fires
+// the cloud translate Routine (no token cost, slower); `gemini` schedules the paid
+// in-Convex action (spends tokens, faster).
+type Engine = Edition["engine"];
 
 // The Topic's Editions & sharing dialog (UI redesign): the source English Edition
 // plus each translation is a tab (a trailing "+" tab adds a language). Sharing
@@ -19,6 +24,7 @@ type Edition = NonNullable<FunctionReturnType<typeof api.translate.editions>>["e
 // *who* has access & their progress is deferred to a dedicated dashboard.
 // Reuses every existing query/mutation unchanged.
 export function EditionsDialog({ topicSlug, title, onClose }: { topicSlug: string; title: string; onClose: () => void }) {
+  const t = useTranslations("Editions");
   const data = useQuery(api.translate.editions, { topicSlug });
   const [tab, setTab] = useState<string>("en"); // a lang code, or "add"
   // A language we just kicked off translating — we hold this until it appears in
@@ -48,37 +54,29 @@ export function EditionsDialog({ topicSlug, title, onClose }: { topicSlug: strin
   const active = editions.find((e) => e.lang === tab) ?? null;
 
   return (
-    <Dialog title="Editions & sharing" onClose={onClose}>
+    <Dialog title={t("dialogTitle")} onClose={onClose}>
       {data === undefined ? (
         <EditionsDialogSkeleton />
       ) : data === null ? (
-        <div className="flex flex-col items-center justify-center text-center p-8 rounded-xl border border-dashed border-line bg-card/30 min-h-[220px]">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-bad/15 text-danger mb-3">
-            <Icon name="x" className="h-5 w-5" />
-          </div>
-          <h3 className="text-sm font-semibold text-ink">Couldn't Load Editions</h3>
-          <p className="mt-1.5 text-xs text-soft max-w-xs leading-relaxed">
-            There was a problem fetching this course's editions. Please check your connection or try again.
-          </p>
-        </div>
+        <EmptyPanel icon="x" tone="bad" message={t("loadError")} />
       ) : (
         <>
-          <div role="tablist" aria-label="Editions" className="mb-5 flex flex-wrap gap-1 border-b border-line">
+          <div role="tablist" aria-label={t("tablistLabel")} className="mb-5 flex flex-wrap gap-1 border-b border-line">
             {editions.map((ed) => (
               <EditionTab key={ed.lang} edition={ed} active={tab === ed.lang} onSelect={() => setTab(ed.lang)} />
             ))}
             <button
               role="tab"
               aria-selected={tab === "add"}
-              aria-label="Add translation"
-              title="Add translation"
+              aria-label={t("addLanguage")}
+              title={t("addLanguage")}
               onClick={() => setTab("add")}
               className={`-mb-px inline-flex items-center gap-1 rounded-t-lg border-b-2 px-3 py-2 text-sm font-semibold transition-colors ${
                 tab === "add" ? "border-accent text-accent" : "border-transparent text-soft hover:bg-hi hover:text-accent"
               }`}
             >
               <Icon name="plus" className="h-4.5 w-4.5" />
-              <span>Translation</span>
+              <span>{t("addLanguage")}</span>
             </button>
           </div>
 
@@ -101,6 +99,7 @@ export function EditionsDialog({ topicSlug, title, onClose }: { topicSlug: strin
 // One edition tab: its endonym, a "Source" badge for English, and a status dot
 // (amber pulse = translating, red = failed, none = ready).
 function EditionTab({ edition, active, onSelect }: { edition: Edition; active: boolean; onSelect: () => void }) {
+  const t = useTranslations("Editions");
   return (
     <button
       role="tab"
@@ -113,14 +112,14 @@ function EditionTab({ edition, active, onSelect }: { edition: Edition; active: b
       <span dir={edition.rtl ? "rtl" : undefined}>{edition.native}</span>
       {edition.source && (
         <span className="rounded-full bg-accent2/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-accent2">
-          Source
+          {t("sourceBadge")}
         </span>
       )}
       {edition.status === "translating" && (
-        <span className="h-1.75 w-1.75 shrink-0 animate-pulse rounded-full bg-gold" title="Translating" aria-hidden />
+        <span className="h-1.75 w-1.75 shrink-0 animate-pulse rounded-full bg-gold" title={t("translatingStatus")} aria-hidden />
       )}
       {edition.status === "failed" && (
-        <span className="h-1.75 w-1.75 shrink-0 rounded-full bg-danger" title="Failed" aria-hidden />
+        <span className="h-1.75 w-1.75 shrink-0 rounded-full bg-danger" title={t("failedStatus")} aria-hidden />
       )}
     </button>
   );
@@ -140,15 +139,22 @@ function EditionPanel({
   edition: Edition;
   completed: boolean;
 }) {
+  const t = useTranslations("Editions");
   if (edition.status === "translating") {
     const pct = edition.total > 0 ? Math.round((edition.done / edition.total) * 100) : 0;
     return (
       <div className="flex flex-col items-start gap-3.5 rounded-xl border border-dashed border-line p-4 text-sm leading-relaxed text-soft">
         <p className="m-0">
-          <b className="font-semibold text-ink" dir={edition.rtl ? "rtl" : undefined}>
-            {edition.native}
-          </b>{" "}
-          is still translating ({edition.done}/{edition.total}). Sharing opens the moment it’s ready.
+          {t.rich("translatingProgress", {
+            native: edition.native,
+            done: edition.done,
+            total: edition.total,
+            b: (chunks) => (
+              <b className="font-semibold text-ink" dir={edition.rtl ? "rtl" : undefined}>
+                {chunks}
+              </b>
+            ),
+          })}
         </p>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
           <div className="h-full rounded-full bg-accent2 transition-[width] duration-300" style={{ width: `${pct}%` }} />
@@ -162,8 +168,10 @@ function EditionPanel({
     return (
       <div className="flex flex-col items-start gap-3.5 rounded-xl border border-dashed border-line p-4 text-sm leading-relaxed text-soft">
         <p className="m-0">
-          Some items in <b className="font-semibold text-ink">{edition.native}</b> didn’t translate. Retry, then you can
-          share it.
+          {t.rich("failedMessage", {
+            native: edition.native,
+            b: (chunks) => <b className="font-semibold text-ink">{chunks}</b>,
+          })}
         </p>
         <div className="flex items-center gap-3">
           <RetryTranslation topicSlug={topicSlug} lang={edition.lang} />
@@ -179,11 +187,11 @@ function EditionPanel({
       <InviteByEmail topicSlug={topicSlug} lang={edition.lang} />
       <PublicLinkToggle topicSlug={topicSlug} lang={edition.lang} publicToken={edition.publicToken} />
       <SellEdition topicSlug={topicSlug} lang={edition.lang} native={edition.native} rtl={edition.rtl} completed={completed} />
-      <div className="flex flex-col items-start gap-2 border-t border-line pt-4">
+      <div className="flex flex-col items-start gap-3 border-t border-line pt-4">
         <AccessRoster topicSlug={topicSlug} lang={edition.lang} />
-        {!edition.source && (
-          <RemoveEdition topicSlug={topicSlug} lang={edition.lang} label="Remove this edition" />
-        )}
+        {/* Destructive actions (regenerate link, re-translate, remove) live behind a
+            two-click danger menu with a confirm — see EditionDangerMenu. */}
+        <EditionDangerMenu topicSlug={topicSlug} edition={edition} />
       </div>
     </div>
   );
@@ -192,6 +200,7 @@ function EditionPanel({
 // Invite one person to this edition by email (read-only Viewer access). Scoped to
 // `lang` — a Viewer gets exactly the Edition(s) shared with them.
 function InviteByEmail({ topicSlug, lang }: { topicSlug: string; lang: string }) {
+  const t = useTranslations("Editions");
   const shareTopic = useMutation(api.shares.shareTopic);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -212,7 +221,7 @@ function InviteByEmail({ topicSlug, lang }: { topicSlug: string; lang: string })
           setDone({ email: addr, status });
           setEmail("");
         } catch {
-          setError("Couldn’t invite — please try again.");
+          setError(t("inviteError"));
         } finally {
           setBusy(false);
         }
@@ -227,7 +236,7 @@ function InviteByEmail({ topicSlug, lang }: { topicSlug: string; lang: string })
             setError(null);
             setDone(null);
           }}
-          placeholder="Invite by email"
+          placeholder={t("invitePlaceholder")}
           className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
         />
         <button
@@ -235,13 +244,13 @@ function InviteByEmail({ topicSlug, lang }: { topicSlug: string; lang: string })
           disabled={busy}
           className="shrink-0 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
         >
-          {busy ? "Inviting…" : "Invite"}
+          {busy ? t("inviting") : t("invite")}
         </button>
       </div>
-      <p className="text-xs text-soft">Read-only access to this edition. No account yet? They’re in the moment they sign up.</p>
+      <p className="text-xs text-soft">{t("inviteHelp")}</p>
       {error && <p className="text-xs text-danger">{error}</p>}
-      {done?.status === "shared" && <p className="text-xs text-accent2">Shared with {done.email}.</p>}
-      {done?.status === "pending" && <p className="text-xs text-accent2">Invited {done.email} — they’ll get access when they sign up.</p>}
+      {done?.status === "shared" && <p className="text-xs text-accent2">{t("shared", { email: done.email })}</p>}
+      {done?.status === "pending" && <p className="text-xs text-accent2">{t("invited", { email: done.email })}</p>}
     </form>
   );
 }
@@ -252,12 +261,13 @@ function InviteByEmail({ topicSlug, lang }: { topicSlug: string; lang: string })
 // (a live query), so promoting/revoking/inviting reflects immediately. "Can
 // edit" grants exactly the owner's in-place prose editing on this one Edition.
 function AccessRoster({ topicSlug, lang }: { topicSlug: string; lang: string }) {
+  const t = useTranslations("Editions");
   const roster = useQuery(api.shares.listEditionAccess, { topicSlug, lang });
-  if (roster === undefined) return <p className="text-xs text-soft">Loading access…</p>;
-  if (roster.length === 0) return <p className="text-xs text-soft">No one has access to this edition yet.</p>;
+  if (roster === undefined) return <p className="text-xs text-soft">{t("loadingAccess")}</p>;
+  if (roster.length === 0) return <p className="text-xs text-soft">{t("noAccess")}</p>;
   return (
     <div className="flex w-full flex-col gap-1.5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-soft">Who has access</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-soft">{t("whoHasAccess")}</p>
       <ul className="flex flex-col gap-1.5">
         {roster.map((entry) => (
           <AccessRow key={`${entry.status}:${entry.email}`} topicSlug={topicSlug} lang={lang} entry={entry} />
@@ -280,6 +290,7 @@ function AccessRow({
   lang: string;
   entry: { email: string; role: "viewer" | "editor"; status: "accepted" | "pending" };
 }) {
+  const t = useTranslations("Editions");
   const setShareRole = useMutation(api.shares.setShareRole);
   const revokeShare = useMutation(api.shares.revokeShare);
   const [busy, setBusy] = useState(false);
@@ -297,7 +308,7 @@ function AccessRow({
           {entry.email}
         </span>
         {entry.status === "pending" && (
-          <span className="text-[11px] text-soft">Pending — joins when they sign up</span>
+          <span className="text-[11px] text-soft">{t("pendingJoins")}</span>
         )}
       </div>
       <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-line text-[12px]">
@@ -312,15 +323,15 @@ function AccessRow({
               entry.role === role ? "bg-accent text-white" : "bg-card text-soft hover:bg-hi"
             }`}
           >
-            {role === "viewer" ? "Can view" : "Can edit"}
+            {role === "viewer" ? t("canView") : t("canEdit")}
           </button>
         ))}
       </div>
       <button
         type="button"
         disabled={busy}
-        aria-label={`Revoke access for ${entry.email}`}
-        title="Revoke access"
+        aria-label={t("revokeAccessFor", { email: entry.email })}
+        title={t("revokeAccess")}
         onClick={() => {
           setBusy(true);
           void revokeShare({ topicSlug, email: entry.email, lang }).finally(() => setBusy(false));
@@ -334,10 +345,12 @@ function AccessRow({
 }
 
 // The anonymous public link for one edition, presented as an on/off toggle. Off →
-// a lock; on → a globe, the URL revealed below with Copy + a quiet Regenerate.
-// Both "on" and "Regenerate" mint a fresh token (the old link dies); the toggle
-// off revokes it. Token is read live from the reactive editions query.
+// a lock; on → a globe, the URL revealed below with Copy. Turning it on mints a
+// fresh token; turning it off revokes it. Regenerating (minting a new token while
+// on) is a destructive action, so it lives in the edition's danger menu, not here.
+// Token is read live from the reactive editions query.
 function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string; lang: string; publicToken: string | null }) {
+  const t = useTranslations("Editions");
   const setPublic = useMutation(api.shares.setEditionPublic);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -366,9 +379,9 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
             <Icon name={on ? "globe" : "lock"} className="h-4.5 w-4.5" />
           </span>
           <div className="min-w-0">
-            <b className="block text-[13.5px] font-semibold text-ink">Public link</b>
+            <b className="block text-[13.5px] font-semibold text-ink">{t("publicLink")}</b>
             <span className="text-[11.5px] text-soft">
-              {on ? "Anyone with the link can view — no account needed" : "Off — only you and people you invite can see this"}
+              {on ? t("publicOn") : t("publicOff")}
             </span>
           </div>
         </div>
@@ -384,51 +397,39 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
         </label>
       </div>
 
-      <div className="mt-2.5 flex flex-col gap-2.5">
-        <div className="flex gap-1.5">
-          <input
-            readOnly
-            disabled={!on}
-            value={on && url ? url : "Public link is disabled"}
-            onFocus={(e) => on && e.currentTarget.select()}
-            className={`min-w-0 flex-1 rounded-lg border px-2.5 py-2 text-xs focus:outline-none transition-colors ${
-              on ? "border-line bg-hi text-ink" : "border-line/60 bg-line/20 text-soft/60"
-            }`}
-          />
-          <button
-            type="button"
-            disabled={!on || busy}
-            onClick={() => {
-              if (!url) return;
-              navigator.clipboard?.writeText(url).then(
-                () => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                },
-                () => {
-                  /* clipboard blocked — the field is selectable to copy by hand */
-                }
-              );
-            }}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-              on ? "bg-accent2 text-white hover:bg-accent2/90" : "bg-soft/10 text-soft/50 cursor-not-allowed"
-            }`}
-          >
-            <Icon name="link" className="h-3.5 w-3.5" /> {copied ? "Copied" : "Copy"}
-          </button>
-        </div>
-        {on ? (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => run(true)}
-            className="inline-flex items-center gap-1.5 self-start text-[12.5px] text-soft transition-colors hover:text-accent disabled:opacity-60"
-          >
-            <Icon name="refresh" className="h-3.75 w-3.75" /> Regenerate link
-          </button>
-        ) : (
-          <div className="h-[21px]" /> /* Hold height of the regenerate button */
-        )}
+      {/* Shift-free (mobile polish): the link row always renders — greyed out and
+          disabled while sharing is off — so toggling doesn't resize the panel. */}
+      <div className="mt-2.5 flex gap-1.5">
+        <input
+          readOnly
+          disabled={!on}
+          value={on && url ? url : t("publicLinkDisabled")}
+          onFocus={(e) => on && e.currentTarget.select()}
+          className={`min-w-0 flex-1 rounded-lg border px-2.5 py-2 text-xs transition-colors focus:outline-none ${
+            on ? "border-line bg-hi text-ink" : "border-line/60 bg-line/20 text-soft/60"
+          }`}
+        />
+        <button
+          type="button"
+          disabled={!on || busy}
+          onClick={() => {
+            if (!url) return;
+            navigator.clipboard?.writeText(url).then(
+              () => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              },
+              () => {
+                /* clipboard blocked — the field is selectable to copy by hand */
+              },
+            );
+          }}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+            on ? "bg-accent2 text-white hover:bg-accent2/90" : "cursor-not-allowed bg-soft/10 text-soft/50"
+          }`}
+        >
+          <Icon name="link" className="h-3.5 w-3.5" /> {copied ? t("copied") : t("copy")}
+        </button>
       </div>
     </div>
   );
@@ -440,6 +441,7 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
 // into any non-admin UI, so the form always starts blank (re-submitting
 // overwrites). Rendered inside the SellEdition gate.
 function PayoutDetailsForm() {
+  const t = useTranslations("Editions");
   const save = useMutation(api.sellers.savePayoutDetails);
   const [form, setForm] = useState({ accountHolder: "", bank: "", accountNumber: "", branchCode: "" });
   const [busy, setBusy] = useState(false);
@@ -471,23 +473,23 @@ function PayoutDetailsForm() {
         try {
           await save(form);
         } catch {
-          setError("Couldn’t save — check every field (account number and branch code are digits).");
+          setError(t("payoutSaveError"));
           setBusy(false);
         }
       }}
     >
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-        {field("accountHolder", "Account holder", "Full name on the account")}
-        {field("bank", "Bank", "e.g. FNB")}
-        {field("accountNumber", "Account number", "62…", "numeric")}
-        {field("branchCode", "Branch code", "Digits", "numeric")}
+        {field("accountHolder", t("accountHolder"), t("accountHolderPlaceholder"))}
+        {field("bank", t("bank"), t("bankPlaceholder"))}
+        {field("accountNumber", t("accountNumber"), t("accountNumberPlaceholder"), "numeric")}
+        {field("branchCode", t("branchCode"), t("branchCodePlaceholder"), "numeric")}
       </div>
       <button
         type="submit"
         disabled={busy}
         className="self-start rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
       >
-        {busy ? "Saving…" : "Save payout details"}
+        {busy ? t("saving") : t("savePayoutDetails")}
       </button>
       {error && <p className="text-xs text-danger">{error}</p>}
     </form>
@@ -513,6 +515,7 @@ function SellEdition({
   rtl: boolean;
   completed: boolean;
 }) {
+  const t = useTranslations("Editions");
   const status = useQuery(api.sellers.sellerStatus);
   const pricing = useQuery(api.market.editionPricing, { topicSlug });
   const setPrice = useMutation(api.market.setEditionPrice);
@@ -530,7 +533,7 @@ function SellEdition({
     return (
       <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-line px-3 py-2.5 text-[12.5px] text-soft">
         <Icon name="tag" className="h-4 w-4 shrink-0" />
-        <span>Selling opens once the course is marked complete.</span>
+        <span>{t("sellIncomplete")}</span>
       </div>
     );
   }
@@ -546,24 +549,21 @@ function SellEdition({
         </span>
         <div className="min-w-0 flex-1">
           {status === undefined ? (
-            <span>Checking your seller status…</span>
+            <span>{t("checkingSellerStatus")}</span>
           ) : status === "payments-unconfigured" ? (
             // The deployment's PayFast rail isn't provisioned (env vars absent) —
             // selling is off platform-wide and enables itself when they land.
             <span>
-              <b className="font-semibold text-ink">Selling isn&rsquo;t available yet.</b> Payments aren&rsquo;t
-              configured on this deployment — selling opens automatically once they are.
+              <b className="font-semibold text-ink">{t("paymentsUnconfiguredTitle")}</b> {t("paymentsUnconfiguredBody")}
             </span>
           ) : status === "not-granted" ? (
             <span>
-              <b className="font-semibold text-ink">Sell this course.</b> Selling is enabled by the workspace admin —
-              ask them to turn it on for your account.
+              <b className="font-semibold text-ink">{t("notGrantedTitle")}</b> {t("notGrantedBody")}
             </span>
           ) : (
             <>
               <span>
-                <b className="font-semibold text-ink">Add your payout details to sell.</b> Save the bank account your
-                earnings are paid to; then you can price this edition.
+                <b className="font-semibold text-ink">{t("addPayoutTitle")}</b> {t("addPayoutBody")}
               </span>
               <PayoutDetailsForm />
             </>
@@ -583,7 +583,7 @@ function SellEdition({
   const save = async () => {
     const minor = Math.round(parseFloat(amount) * 100);
     if (!Number.isFinite(minor) || minor <= 0) {
-      setError("Enter a price greater than zero.");
+      setError(t("priceGreaterThanZero"));
       return;
     }
     setBusy(true);
@@ -593,7 +593,7 @@ function SellEdition({
       await setPrice({ topicSlug, lang, amount: minor, currency: "ZAR" });
       setOpen(false);
     } catch {
-      setError("Couldn’t save the price — please try again.");
+      setError(t("savePriceError"));
     } finally {
       setBusy(false);
     }
@@ -605,7 +605,7 @@ function SellEdition({
       await clearPrice({ topicSlug, lang });
       setOpen(false);
     } catch {
-      setError("Couldn’t update — please try again.");
+      setError(t("updateError"));
     } finally {
       setBusy(false);
     }
@@ -623,18 +623,18 @@ function SellEdition({
             <Icon name="tag" className="h-4.5 w-4.5" />
           </span>
           <div className="min-w-0">
-            <b className="block text-[13.5px] font-semibold text-ink">Sell this edition</b>
+            <b className="block text-[13.5px] font-semibold text-ink">{t("sellThisEdition")}</b>
             <span className="text-[11.5px] text-soft">
               {current ? (
-                <>
-                  Paid · <span className="font-semibold text-gold">{formatPrice(current.amount, current.currency)}</span> ·
-                  first lesson free
-                </>
+                t.rich("paidState", {
+                  price: () => (
+                    <span className="font-semibold text-gold">{formatPrice(current.amount, current.currency)}</span>
+                  ),
+                })
               ) : (
-                <>
-                  Free — set a price to sell{" "}
-                  <span dir={rtl ? "rtl" : undefined}>{native}</span>
-                </>
+                t.rich("freeState", {
+                  native: () => <span dir={rtl ? "rtl" : undefined}>{native}</span>,
+                })
               )}
             </span>
           </div>
@@ -648,7 +648,7 @@ function SellEdition({
               : "bg-gold/20 text-accent hover:bg-gold/30"
           }`}
         >
-          {current ? "Edit price" : "Set a price"}
+          {current ? t("editPrice") : t("setAPrice")}
         </button>
       </div>
 
@@ -656,7 +656,7 @@ function SellEdition({
         <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
           <div className="flex flex-wrap items-end gap-2.5">
             <label className="flex flex-col gap-1">
-              <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">Price (ZAR)</span>
+              <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{t("priceZar")}</span>
               <input
                 value={amount}
                 inputMode="decimal"
@@ -664,7 +664,7 @@ function SellEdition({
                   setAmount(e.target.value);
                   setError(null);
                 }}
-                placeholder="0.00"
+                placeholder={t("pricePlaceholder")}
                 className="w-32 rounded-lg border border-line bg-card px-3 py-2 text-sm tabular-nums focus:border-gold focus:outline-none"
               />
             </label>
@@ -674,7 +674,7 @@ function SellEdition({
               onClick={() => void save()}
               className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
             >
-              {busy ? "Saving…" : "Save"}
+              {busy ? t("saving") : t("save")}
             </button>
           </div>
           {error && <p className="text-xs text-danger">{error}</p>}
@@ -685,10 +685,10 @@ function SellEdition({
               onClick={() => void stopSelling()}
               className="inline-flex items-center gap-1.5 self-start text-[12.5px] text-soft transition-colors hover:text-danger disabled:opacity-60"
             >
-              <Icon name="x" className="h-3.75 w-3.75" /> Stop selling — make this edition free
+              <Icon name="x" className="h-3.75 w-3.75" /> {t("stopSelling")}
             </button>
           ) : (
-            <p className="text-xs text-soft">Each language is priced on its own — sell some editions, keep others free.</p>
+            <p className="text-xs text-soft">{t("eachLanguagePriced")}</p>
           )}
         </div>
       )}
@@ -699,6 +699,7 @@ function SellEdition({
 // Retry a failed translation — re-runs startTranslation, which only reschedules
 // the items that changed/failed.
 function RetryTranslation({ topicSlug, lang }: { topicSlug: string; lang: string }) {
+  const t = useTranslations("Editions");
   const retry = useAction(api.translate.startTranslation);
   const [busy, setBusy] = useState(false);
   return (
@@ -711,14 +712,15 @@ function RetryTranslation({ topicSlug, lang }: { topicSlug: string; lang: string
       }}
       className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
     >
-      <Icon name="refresh" className="h-4 w-4" /> {busy ? "Retrying…" : "Retry"}
+      <Icon name="refresh" className="h-4 w-4" /> {busy ? t("retrying") : t("retry")}
     </button>
   );
 }
 
 // Remove a translation edition. A quiet danger text link by default; the failed/
 // translating panels pass a shorter label.
-function RemoveEdition({ topicSlug, lang, label = "Remove" }: { topicSlug: string; lang: string; label?: string }) {
+function RemoveEdition({ topicSlug, lang, label }: { topicSlug: string; lang: string; label?: string }) {
+  const t = useTranslations("Editions");
   const remove = useMutation(api.translate.removeEdition);
   const [busy, setBusy] = useState(false);
   return (
@@ -731,8 +733,238 @@ function RemoveEdition({ topicSlug, lang, label = "Remove" }: { topicSlug: strin
       }}
       className="inline-flex items-center gap-1.5 self-start text-[12.5px] text-soft transition-colors hover:text-danger disabled:opacity-60"
     >
-      <Icon name="trash" className="h-3.75 w-3.75" /> {label}
+      <Icon name="trash" className="h-3.75 w-3.75" /> {label ?? t("remove")}
     </button>
+  );
+}
+
+// The Free / Gemini engine picker (translation-engine-picker): a segmented toggle
+// with a per-engine hint below. Gemini's hint warns it uses tokens — the label IS
+// the warning (no blocking confirm modal, per the PRD). Shared by the add-language
+// panel and the ready-edition re-translate control.
+function EngineToggle({ value, onChange, disabled }: { value: Engine; onChange: (e: Engine) => void; disabled?: boolean }) {
+  const t = useTranslations("Editions");
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{t("engineLabel")}</span>
+      <div className="inline-flex self-start overflow-hidden rounded-lg border border-line text-[12.5px]">
+        {(["free", "gemini"] as const).map((eng) => (
+          <button
+            key={eng}
+            type="button"
+            disabled={disabled}
+            aria-pressed={value === eng}
+            onClick={() => onChange(eng)}
+            className={`px-3 py-1.5 font-medium transition-colors disabled:opacity-60 ${
+              value === eng ? "bg-accent text-white" : "bg-card text-soft hover:bg-hi"
+            }`}
+          >
+            {eng === "free" ? t("engineFree") : t("engineGemini")}
+          </button>
+        ))}
+      </div>
+      <span className="text-[11.5px] text-soft">{value === "gemini" ? t("engineGeminiWarn") : t("engineFreeHint")}</span>
+    </div>
+  );
+}
+
+// The ready edition's destructive-action menu, at the foot of the panel. Every
+// action here either invalidates a shared link or throws work away, so each one
+// is two clicks deep (open the menu, pick the action) and then gated by an
+// "are you sure" confirm. A translation gets all three (regenerate the public
+// link, re-translate, remove); the English source can only regenerate its link —
+// it has no engine to re-run and can't be removed. Regenerate only appears while
+// the public link is on (there's no token to replace otherwise), so the source
+// with its link off shows no menu at all.
+function EditionDangerMenu({ topicSlug, edition }: { topicSlug: string; edition: Edition }) {
+  const t = useTranslations("Editions");
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState<null | "regenerate" | "retranslate" | "remove">(null);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close the dropdown on click-outside / Esc (the confirm dialogs handle their
+  // own dismissal via the native <dialog>).
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const canRegenerate = edition.publicToken != null;
+  // Source: only ever the (conditional) regenerate. Translation: all three.
+  if (edition.source && !canRegenerate) return null;
+
+  const pick = (which: NonNullable<typeof confirm>) => {
+    setOpen(false);
+    setConfirm(which);
+  };
+
+  return (
+    <div ref={ref} className="relative self-start">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-[13px] font-medium text-soft transition-colors hover:bg-hi hover:text-accent"
+      >
+        <Icon name="settings" className="h-4 w-4" />
+        {t("manageEdition")}
+        <Icon name="chevron" className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="pop-in absolute bottom-[calc(100%+6px)] left-0 z-50 min-w-56 rounded-xl border border-line bg-card p-1.5 shadow-xl"
+        >
+          {canRegenerate && (
+            <MenuItem icon="refresh" onClick={() => pick("regenerate")}>
+              {t("regenerateLink")}
+            </MenuItem>
+          )}
+          {!edition.source && (
+            <MenuItem icon="refresh" onClick={() => pick("retranslate")}>
+              {t("retranslate")}
+            </MenuItem>
+          )}
+          {!edition.source && (
+            <MenuItem icon="trash" onClick={() => pick("remove")}>
+              {t("removeThisEdition")}
+            </MenuItem>
+          )}
+        </div>
+      )}
+
+      {confirm === "regenerate" && (
+        <RegenerateLinkConfirm topicSlug={topicSlug} lang={edition.lang} onClose={() => setConfirm(null)} />
+      )}
+      {confirm === "retranslate" && (
+        <RetranslateConfirm topicSlug={topicSlug} edition={edition} onClose={() => setConfirm(null)} />
+      )}
+      {confirm === "remove" && (
+        <RemoveEditionConfirm
+          topicSlug={topicSlug}
+          lang={edition.lang}
+          native={edition.native}
+          onClose={() => setConfirm(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// "Are you sure?" for regenerating the public link: minting a fresh token kills
+// the link everyone already has. Reuses setEditionPublic (isPublic: true swaps
+// the token in place).
+function RegenerateLinkConfirm({ topicSlug, lang, onClose }: { topicSlug: string; lang: string; onClose: () => void }) {
+  const t = useTranslations("Editions");
+  const setPublic = useMutation(api.shares.setEditionPublic);
+  const [busy, setBusy] = useState(false);
+  return (
+    <ConfirmDialog
+      title={t("confirmRegenerateTitle")}
+      body={t("confirmRegenerateBody")}
+      confirmLabel={busy ? t("regenerating") : t("regenerateLink")}
+      confirmDisabled={busy}
+      onConfirm={() => {
+        setBusy(true);
+        void setPublic({ topicSlug, lang, isPublic: true }).then(onClose, () => setBusy(false));
+      }}
+      onClose={onClose}
+    />
+  );
+}
+
+// "Are you sure?" for removing a translation edition: it and everyone's access to
+// it go for good. Reuses removeEdition.
+function RemoveEditionConfirm({
+  topicSlug,
+  lang,
+  native,
+  onClose,
+}: {
+  topicSlug: string;
+  lang: string;
+  native: string;
+  onClose: () => void;
+}) {
+  const t = useTranslations("Editions");
+  const remove = useMutation(api.translate.removeEdition);
+  const [busy, setBusy] = useState(false);
+  return (
+    <ConfirmDialog
+      title={t("confirmRemoveTitle")}
+      body={t("confirmRemoveBody", { native })}
+      confirmLabel={busy ? t("removing") : t("removeThisEdition")}
+      confirmDisabled={busy}
+      onConfirm={() => {
+        setBusy(true);
+        void remove({ topicSlug, lang }).then(onClose, () => setBusy(false));
+      }}
+      onClose={onClose}
+    />
+  );
+}
+
+// "Are you sure?" for re-translating a ready edition (translation-engine-picker):
+// carries the engine picker inside the confirm, seeded from the engine that last
+// produced this edition. Switching engines forces a full redo server-side; the
+// same engine is a cheap resume/repair. This is how a free edition is upgraded to
+// Gemini. Its own <dialog> shell (not ConfirmDialog) so the engine toggle can sit
+// above the buttons.
+function RetranslateConfirm({ topicSlug, edition, onClose }: { topicSlug: string; edition: Edition; onClose: () => void }) {
+  const t = useTranslations("Common");
+  const te = useTranslations("Editions");
+  const start = useAction(api.translate.startTranslation);
+  const [engine, setEngine] = useState<Engine>(edition.engine);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => ref.current?.showModal(), []);
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === ref.current) ref.current?.close();
+      }}
+      className="m-auto w-[92vw] max-w-md rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/50"
+    >
+      <div className="px-6 py-5">
+        <h2 className="text-base font-semibold text-accent">{te("confirmRetranslateTitle")}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-soft">{te("confirmRetranslateBody", { native: edition.native })}</p>
+        <div className="mt-4">
+          <EngineToggle value={engine} onChange={setEngine} disabled={busy} />
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            onClick={() => ref.current?.close()}
+            className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi"
+          >
+            {t("cancel")}
+          </button>
+          <button
+            onClick={() => {
+              setBusy(true);
+              void start({ topicSlug, lang: edition.lang, engine }).then(onClose, () => setBusy(false));
+            }}
+            disabled={busy}
+            className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+          >
+            {busy ? te("retranslating") : te("confirmRetranslate")}
+          </button>
+        </div>
+      </div>
+    </dialog>
   );
 }
 
@@ -751,21 +983,16 @@ function AddLanguagePanel({
   completed: boolean;
   onAdded: (code: string) => void;
 }) {
+  const t = useTranslations("Editions");
   const start = useAction(api.translate.startTranslation);
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
+  // Defaults to Free (translate for free first; upgrade to Gemini later per edition).
+  const [engine, setEngine] = useState<Engine>("free");
 
   if (!completed) {
     return (
-      <div className="flex flex-col items-center justify-center text-center p-8 rounded-xl border border-dashed border-line bg-card/30 min-h-[220px]">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-hi text-soft mb-3">
-          <Icon name="lock" className="h-6 w-6" />
-        </div>
-        <h3 className="text-sm font-semibold text-ink">Translation Locked</h3>
-        <p className="mt-1.5 text-xs text-soft max-w-xs leading-relaxed">
-          Translation unlocks once the course is marked complete (its content is frozen first).
-        </p>
-      </div>
+      <EmptyPanel icon="lock" tone="soft" message={t("translationLocked")} />
     );
   }
 
@@ -784,23 +1011,27 @@ function AddLanguagePanel({
   const add = (code: string) => {
     setBusy(true);
     setQ("");
-    void start({ topicSlug, lang: code }).finally(() => setBusy(false));
+    void start({ topicSlug, lang: code, engine }).finally(() => setBusy(false));
     onAdded(code);
   };
 
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-sm text-soft">
-        Translate this course into another language — it becomes a new tab you can share once ready.
+        {t("addLanguageIntro")}
       </p>
+      <EngineToggle value={engine} onChange={setEngine} disabled={busy} />
       <input
         value={q}
         onChange={(e) => setQ(e.target.value)}
         disabled={busy}
-        placeholder="Search languages…"
+        placeholder={t("searchLanguages")}
         className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none disabled:opacity-60"
       />
-      <div className="min-h-[290px] max-h-[290px] h-[290px] overflow-y-auto pr-0.5">
+      {/* Fixed-height, scrollable list (mobile polish): the panel keeps its height
+          whether the query matches 8 languages, one, or none — no layout shift as
+          the user types. Empty query pre-fills with suggestions. */}
+      <div className="h-[290px] overflow-y-auto pr-0.5">
         {matches.length > 0 ? (
           <ul className="flex flex-col gap-1.5">
             {matches.map((l) => (
@@ -814,18 +1045,36 @@ function AddLanguagePanel({
                   <span dir={l.rtl ? "rtl" : undefined}>{l.native}</span>
                   <span className="shrink-0 text-xs text-soft">
                     {l.name}
-                    {l.rtl ? " · RTL" : ""}
+                    {l.rtl ? t("rtlSuffix") : ""}
                   </span>
                 </button>
               </li>
             ))}
           </ul>
         ) : needle ? (
-          <p className="text-xs text-soft py-2">No matching language.</p>
+          <p className="py-2 text-xs text-soft">{t("noMatchingLanguage")}</p>
         ) : (
-          <p className="text-xs text-soft py-2">All languages already translated.</p>
+          <p className="py-2 text-xs text-soft">{t("allLanguagesTranslated")}</p>
         )}
       </div>
+    </div>
+  );
+}
+
+// A layout-locked empty-state card (mobile polish): the Editions dialog's
+// "couldn't load" and "translation locked" states render at panel height, so the
+// dialog doesn't resize when one of them replaces a real panel.
+function EmptyPanel({ icon, tone, message }: { icon: "x" | "lock"; tone: "bad" | "soft"; message: string }) {
+  return (
+    <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-line bg-card/30 p-8 text-center">
+      <div
+        className={`mb-3 flex h-12 w-12 items-center justify-center rounded-full ${
+          tone === "bad" ? "bg-bad/15 text-danger" : "bg-hi text-soft"
+        }`}
+      >
+        <Icon name={icon} className="h-5 w-5" />
+      </div>
+      <p className="max-w-xs text-xs leading-relaxed text-soft">{message}</p>
     </div>
   );
 }

@@ -75,6 +75,7 @@ export default defineSchema({
   tenants: defineTable({
     slug: v.string(),
     displayName: v.string(),
+    motto: v.optional(v.string()),
     theme: tenantThemeValidator,
     flags: tenantFlagsValidator,
   }).index("by_slug", ["slug"]),
@@ -443,6 +444,13 @@ export default defineSchema({
     done: v.number(),
     failed: v.number(),
     error: v.optional(v.string()),
+    // Which engine last produced (or is producing) this Edition (translation-engine-
+    // picker): `free` POSTs the cloud claude.ai translate Routine (no token cost,
+    // slower); `gemini` schedules the in-Convex `translateTopic` action (follows
+    // TRANSLATE_PROVIDER, Gemini by default). Optional — ABSENT reads as `gemini`,
+    // so every pre-existing job stays on today's behaviour with no migration. A
+    // re-translate with a DIFFERENT engine forces a full redo (translate.ts).
+    engine: v.optional(v.union(v.literal("free"), v.literal("gemini"))),
     // The run's heartbeat: stamped at acquire, re-stamped by every published
     // item. A "translating" job whose heartbeat goes silent (the action was
     // killed infra-side, so nothing ever reported) is presumed dead and its
