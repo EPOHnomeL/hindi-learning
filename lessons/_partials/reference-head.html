@@ -12,17 +12,27 @@
      AUTHORING.md §7 for the slug rule. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Devanagari:wght@400;600&family=Noto+Sans+Devanagari:wght@400;600&family=Spectral:ital,wght@0,400;0,600;1,400&display=block" rel="stylesheet">
 <style>
   :root{
     --ink:#2b2622; --soft:#6b6258; --paper:#fbf7f0; --card:#fffdf9;
     --accent:#9c5b34; --accent2:#3f6f5e; --gold:#b88a2e; --hi:#fbeecb;
   }
   *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
+  html{scroll-behavior:smooth; max-width:100%; overflow-x:hidden}
   body{margin:0; background:var(--paper); color:var(--ink);
-    font-family:'Spectral',Georgia,'Times New Roman',serif; line-height:1.62; font-size:18px;}
+    font-family:'Spectral',Georgia,'Times New Roman',serif; line-height:1.62; font-size:18px;
+    max-width:100%; overflow-x:hidden; word-wrap:break-word; overflow-wrap:break-word;}
   .wrap{max-width:760px; margin:0 auto; padding:48px 26px 110px}
+  @media (max-width: 640px) {
+    .wrap { padding: 24px 16px 80px; }
+  }
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
   .deva{font-family:'Noto Serif Devanagari','Noto Sans Devanagari',serif;}
 
   header.ref{border-bottom:1px solid #e7ddd4; padding-bottom:24px; margin-bottom:24px}

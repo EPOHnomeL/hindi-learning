@@ -343,7 +343,8 @@ export function Frame({
           postScroll(id);
           if (reference && id) setTimeout(() => postScroll(id), 350);
         }}
-        style={mobile && contentH ? { height: contentH } : undefined}
+        scrolling={mobile ? "no" : undefined}
+        style={mobile && contentH ? { height: contentH, overflow: "hidden" } : undefined}
         className={`w-full border-y border-line bg-card md:min-h-[60vh] md:flex-1 md:rounded-xl md:border ${contentH ? "" : "min-h-[60vh]"}`}
       />
       {mdResource && (
@@ -502,7 +503,7 @@ function LessonView({
               <button
                 onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
                 disabled={completed}
-                className={`rounded-lg border px-3 py-1.5 text-sm transition-colors ${
+                className={`hidden md:inline-flex rounded-lg border px-3 py-1.5 text-sm transition-colors ${
                   completed
                     ? "cursor-default border-accent2 bg-accent2 text-white"
                     : "border-accent text-accent hover:bg-hi"
@@ -569,6 +570,20 @@ function LessonView({
         <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
           <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} readOnly={readOnly} />
         </aside>
+      )}
+      {/* Mobile green floating action button for "Mark complete" */}
+      {!preview && !completed && (
+        <button
+          onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
+          className={`fixed bottom-6 right-6 z-30 md:hidden flex items-center gap-1.5 rounded-full shadow-lg bg-good-b hover:bg-good-b/90 text-white px-4 py-3 text-sm font-semibold transition-all duration-300 transform ${
+            navHidden ? "translate-y-24 opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+          }`}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span>Mark complete</span>
+        </button>
       )}
     </div>
   );

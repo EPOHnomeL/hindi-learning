@@ -120,23 +120,47 @@ export function PublicCourseShell({ token, children }: { token: string; children
             navHidden ? "-translate-y-full" : "translate-y-0"
           }`}
         >
-          <button onClick={() => setMenuOpen(true)} aria-label={t("openLessons")} className="rounded-lg p-1.5 text-ink hover:bg-hi">
+          <Link
+            href="/"
+            aria-label={t("backToCoursesLabel") ?? "Back to courses"}
+            title={t("backToCoursesLabel") ?? "Back to courses"}
+            className="rounded-lg p-1.5 text-soft hover:bg-hi hover:text-accent"
+          >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg>
+          </Link>
+          <button
+            onClick={() => setMenuOpen((prev) => !prev)}
+            className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-accent hover:text-accent/80 active:scale-98 transition-transform"
+          >
+            <span className="truncate max-w-[200px]">{course.title}</span>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`}
+            >
+              <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
-          <h1 className="text-base font-semibold tracking-tight text-accent">{course.title}</h1>
         </header>
 
-        {menuOpen && <div onClick={() => setMenuOpen(false)} aria-hidden className="fixed inset-0 z-40 bg-black/40 md:hidden" />}
+        {menuOpen && <div onClick={() => setMenuOpen(false)} aria-hidden className="fixed inset-0 z-30 bg-black/40 md:hidden" />}
 
         <aside
-          className={`fixed inset-y-0 left-0 z-50 flex w-72 transform flex-col overflow-y-auto border-r border-line bg-paper p-4 transition-transform duration-300 md:static md:z-auto md:w-64 md:translate-x-0 md:transition-none ${
-            menuOpen ? "translate-x-0" : "-translate-x-full"
+          className={`fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] transform flex-col overflow-y-auto border-t border-line rounded-t-2xl bg-paper p-4 transition-transform duration-300 md:static md:z-auto md:w-64 md:h-auto md:border-r md:border-t-0 md:rounded-t-none md:translate-y-0 md:translate-x-0 md:max-h-none md:transition-none ${
+            menuOpen ? "translate-y-0" : "translate-y-full"
           }`}
         >
+          {/* Drawer handle for mobile */}
+          <div className="mx-auto mb-3.5 h-1.5 w-12 shrink-0 rounded-full bg-line md:hidden" />
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-accent2">{t(preview ? "course" : "publicCourse")}</p>
           <div className="mb-4">
             <h1 className="truncate text-lg font-semibold tracking-tight text-accent">{course.title}</h1>
@@ -205,7 +229,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
           <ThemeToggle />
         </aside>
 
-        <section className="min-w-0 flex-1 md:overflow-hidden md:p-4">{children}</section>
+        <section className="flex min-w-0 flex-1 flex-col md:overflow-hidden md:p-4">{children}</section>
       </div>
     </Ctx.Provider>
   );

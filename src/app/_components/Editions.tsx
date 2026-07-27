@@ -56,9 +56,9 @@ export function EditionsDialog({ topicSlug, title, onClose }: { topicSlug: strin
   return (
     <Dialog title={t("dialogTitle")} onClose={onClose}>
       {data === undefined ? (
-        <p className="text-sm text-soft">{t("loading")}</p>
+        <EditionsDialogSkeleton />
       ) : data === null ? (
-        <p className="text-sm text-soft">{t("loadError")}</p>
+        <EmptyPanel icon="x" tone="bad" message={t("loadError")} />
       ) : (
         <>
           <div role="tablist" aria-label={t("tablistLabel")} className="mb-5 flex flex-wrap gap-1 border-b border-line">
@@ -71,11 +71,12 @@ export function EditionsDialog({ topicSlug, title, onClose }: { topicSlug: strin
               aria-label={t("addLanguage")}
               title={t("addLanguage")}
               onClick={() => setTab("add")}
-              className={`-mb-px inline-flex items-center rounded-t-lg border-b-2 px-3 py-2 transition-colors ${
+              className={`-mb-px inline-flex items-center gap-1 rounded-t-lg border-b-2 px-3 py-2 text-sm font-semibold transition-colors ${
                 tab === "add" ? "border-accent text-accent" : "border-transparent text-soft hover:bg-hi hover:text-accent"
               }`}
             >
               <Icon name="plus" className="h-4.5 w-4.5" />
+              <span>{t("addLanguage")}</span>
             </button>
           </div>
 
@@ -396,33 +397,40 @@ function PublicLinkToggle({ topicSlug, lang, publicToken }: { topicSlug: string;
         </label>
       </div>
 
-      {on && url && (
-        <div className="mt-2.5 flex gap-1.5">
-          <input
-            readOnly
-            value={url}
-            onFocus={(e) => e.currentTarget.select()}
-            className="min-w-0 flex-1 rounded-lg border border-line bg-hi px-2.5 py-2 text-xs text-ink focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              navigator.clipboard?.writeText(url).then(
-                () => {
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 1500);
-                },
-                () => {
-                  /* clipboard blocked — the field is selectable to copy by hand */
-                },
-              );
-            }}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-accent2 px-3 py-2 text-xs font-medium text-white"
-          >
-            <Icon name="link" className="h-3.5 w-3.5" /> {copied ? t("copied") : t("copy")}
-          </button>
-        </div>
-      )}
+      {/* Shift-free (mobile polish): the link row always renders — greyed out and
+          disabled while sharing is off — so toggling doesn't resize the panel. */}
+      <div className="mt-2.5 flex gap-1.5">
+        <input
+          readOnly
+          disabled={!on}
+          value={on && url ? url : t("publicLinkDisabled")}
+          onFocus={(e) => on && e.currentTarget.select()}
+          className={`min-w-0 flex-1 rounded-lg border px-2.5 py-2 text-xs transition-colors focus:outline-none ${
+            on ? "border-line bg-hi text-ink" : "border-line/60 bg-line/20 text-soft/60"
+          }`}
+        />
+        <button
+          type="button"
+          disabled={!on || busy}
+          onClick={() => {
+            if (!url) return;
+            navigator.clipboard?.writeText(url).then(
+              () => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              },
+              () => {
+                /* clipboard blocked — the field is selectable to copy by hand */
+              },
+            );
+          }}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
+            on ? "bg-accent2 text-white hover:bg-accent2/90" : "cursor-not-allowed bg-soft/10 text-soft/50"
+          }`}
+        >
+          <Icon name="link" className="h-3.5 w-3.5" /> {copied ? t("copied") : t("copy")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -984,9 +992,7 @@ function AddLanguagePanel({
 
   if (!completed) {
     return (
-      <p className="rounded-lg border border-dashed border-line px-3 py-2.5 text-sm text-soft">
-        {t("translationLocked")}
-      </p>
+      <EmptyPanel icon="lock" tone="soft" message={t("translationLocked")} />
     );
   }
 
@@ -1000,7 +1006,7 @@ function AddLanguagePanel({
             l.native.toLowerCase().includes(needle) ||
             l.code.toLowerCase().includes(needle)),
       ).slice(0, 8)
-    : [];
+    : LANGUAGES.filter((l) => !present.has(l.code) && l.code !== "en").slice(0, 8);
 
   const add = (code: string) => {
     setBusy(true);
@@ -1022,26 +1028,87 @@ function AddLanguagePanel({
         placeholder={t("searchLanguages")}
         className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none disabled:opacity-60"
       />
-      {matches.length > 0 && (
-        <ul className="flex flex-col gap-1.5">
-          {matches.map((l) => (
-            <li key={l.code}>
-              <button
-                type="button"
-                onClick={() => add(l.code)}
-                className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-hi"
-              >
-                <span dir={l.rtl ? "rtl" : undefined}>{l.native}</span>
-                <span className="shrink-0 text-xs text-soft">
-                  {l.name}
-                  {l.rtl ? t("rtlSuffix") : ""}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {needle && matches.length === 0 && <p className="text-xs text-soft">{t("noMatchingLanguage")}</p>}
+      {/* Fixed-height, scrollable list (mobile polish): the panel keeps its height
+          whether the query matches 8 languages, one, or none — no layout shift as
+          the user types. Empty query pre-fills with suggestions. */}
+      <div className="h-[290px] overflow-y-auto pr-0.5">
+        {matches.length > 0 ? (
+          <ul className="flex flex-col gap-1.5">
+            {matches.map((l) => (
+              <li key={l.code}>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => add(l.code)}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-hi"
+                >
+                  <span dir={l.rtl ? "rtl" : undefined}>{l.native}</span>
+                  <span className="shrink-0 text-xs text-soft">
+                    {l.name}
+                    {l.rtl ? t("rtlSuffix") : ""}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : needle ? (
+          <p className="py-2 text-xs text-soft">{t("noMatchingLanguage")}</p>
+        ) : (
+          <p className="py-2 text-xs text-soft">{t("allLanguagesTranslated")}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// A layout-locked empty-state card (mobile polish): the Editions dialog's
+// "couldn't load" and "translation locked" states render at panel height, so the
+// dialog doesn't resize when one of them replaces a real panel.
+function EmptyPanel({ icon, tone, message }: { icon: "x" | "lock"; tone: "bad" | "soft"; message: string }) {
+  return (
+    <div className="flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-line bg-card/30 p-8 text-center">
+      <div
+        className={`mb-3 flex h-12 w-12 items-center justify-center rounded-full ${
+          tone === "bad" ? "bg-bad/15 text-danger" : "bg-hi text-soft"
+        }`}
+      >
+        <Icon name={icon} className="h-5 w-5" />
+      </div>
+      <p className="max-w-xs text-xs leading-relaxed text-soft">{message}</p>
+    </div>
+  );
+}
+
+function EditionsDialogSkeleton() {
+  return (
+    <div className="animate-pulse">
+      {/* Pulsing tabs */}
+      <div className="mb-5 flex gap-2 border-b border-line pb-px">
+        <div className="h-8 w-24 rounded-t-lg bg-soft/20" />
+        <div className="h-8 w-24 rounded-t-lg bg-soft/20" />
+      </div>
+      {/* Panel skeleton */}
+      <div className="flex flex-col gap-5">
+        {/* Invite section skeleton */}
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <div className="h-9 flex-1 rounded-lg bg-soft/20" />
+            <div className="h-9 w-20 rounded-lg bg-soft/20" />
+          </div>
+          <div className="h-3.5 w-3/4 rounded bg-soft/10" />
+        </div>
+        {/* Public Link section skeleton */}
+        <div className="h-[54px] rounded-xl border border-line bg-card/50 p-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-[10px] bg-soft/20" />
+            <div className="flex flex-col gap-1.5">
+              <div className="h-4 w-24 rounded bg-soft/20" />
+              <div className="h-3 w-48 rounded bg-soft/10" />
+            </div>
+          </div>
+          <div className="h-6 w-11 rounded-full bg-soft/20" />
+        </div>
+      </div>
     </div>
   );
 }

@@ -57,7 +57,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 
   return (
     <ConvexAuthNextjsServerProvider>
-      <html lang={locale} className={`${spectral.variable} ${notoDeva.variable}`}>
+      <html lang={locale} className={`${spectral.variable} ${notoDeva.variable}`} suppressHydrationWarning>
         <head>
           {/* Tenant palette, before paint: the injected --color-* overrides supply
               both light and (partial) dark values; the dark-mode script below only

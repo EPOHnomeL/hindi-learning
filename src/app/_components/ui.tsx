@@ -219,17 +219,23 @@ export function ReaderSkeleton({ aside = true }: { aside?: boolean }) {
   // Ragged widths so the body reads like paragraphs rather than a solid block.
   const lines = ["w-11/12", "w-full", "w-4/5", "w-full", "w-3/4", "w-11/12", "w-2/3"];
   return (
-    <div className="flex flex-col gap-4 md:h-full md:flex-row">
+    <div className="flex flex-col flex-1 gap-4 md:h-full md:flex-row">
       {/* Centred reading column, mirroring the lesson body's centred measure. */}
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-          {/* Title bar */}
-          <div className="h-7 w-1/2 animate-pulse rounded-lg bg-soft/20" />
-          {/* Body lines */}
-          <div className="flex flex-col gap-3">
-            {lines.map((w, i) => (
-              <div key={i} className={`h-4 ${w} animate-pulse rounded bg-soft/20`} />
-            ))}
+        {/* Title + actions bar skeleton */}
+        <div className="flex items-center justify-between border-b border-line bg-paper px-3 py-2 md:border-0 md:bg-transparent md:px-0 md:py-0">
+          <div className="h-7 w-1/3 animate-pulse rounded-lg bg-soft/20" />
+          <div className="h-8 w-24 animate-pulse rounded-lg bg-soft/20" />
+        </div>
+        {/* Card shell mimicking the iframe */}
+        <div className="w-full flex-1 border-y border-line bg-card p-6 md:rounded-xl md:border md:p-10 mt-3 md:mt-4">
+          <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+            {/* Body lines */}
+            <div className="flex flex-col gap-3">
+              {lines.map((w, i) => (
+                <div key={i} className={`h-4 ${w} animate-pulse rounded bg-soft/20`} />
+              ))}
+            </div>
           </div>
         </div>
       </div>
