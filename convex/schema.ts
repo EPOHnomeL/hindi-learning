@@ -13,6 +13,33 @@ export const payoutDetailsValidator = v.object({
   branchCode: v.string(),
 });
 
+// A **Collection account**'s bank details (.scratch/bank-transfer-payments): the
+// regional account a course owner asks buyers to transfer into. Deliberately
+// looser than `payoutDetailsValidator` because the fields differ by region — an
+// Indian account is named by IFSC, a South African one by branch code, a UK one
+// by sort code — so `routingCode` is one free-form field the owner labels in the
+// `instructions`. Single source of truth for the shape: the field set below, the
+// add/update mutation args, and the buyer's details read all derive from it.
+export const bankAccountDetailsValidator = v.object({
+  // What the buyer picks from ("India (INR)") — the only part of an account
+  // shown before a transfer is requested.
+  label: v.string(),
+  // ISO-3166 alpha-2, upper-case ("IN", "ZA"). A hint for the buyer, not a gate.
+  country: v.string(),
+  // Lower-case ISO-4217 ("inr", "zar") — the currency this account receives in,
+  // which may differ from the Edition's ZAR listing price (see the PRD: no FX
+  // lives in the app; the approver records what actually arrived).
+  currency: v.string(),
+  accountHolder: v.string(),
+  bankName: v.string(),
+  accountNumber: v.string(),
+  // IFSC / branch code / sort code / routing number — whichever this region uses.
+  routingCode: v.optional(v.string()),
+  swift: v.optional(v.string()),
+  // Free text shown with the details ("quote the reference in the remarks field").
+  instructions: v.optional(v.string()),
+});
+
 // A tenant's theme (whitelabel, ticket 03 / whitelabel ADR draft §1): the 14-token palette
 // plus optional brand assets. `light`/`dark` are loose records — not a fixed
 // v.object — because CSS-friendly hyphenated token names (good-b, bad-b) can't
@@ -535,6 +562,11 @@ export default defineSchema({
     // The PayFast payment that bought this Edition — provenance back to the sale
     // (and its Ledger row). Optional: Admin-granted / legacy rows carry none.
     pfPaymentId: v.optional(v.string()),
+    // The approved **Bank transfer** that bought this Edition, by its reference
+    // (.scratch/bank-transfer-payments) — the other rail's provenance. At most
+    // one of `pfPaymentId` / `bankTransferRef` is set; a manual Admin grant has
+    // neither.
+    bankTransferRef: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_topic", ["topicId"])
@@ -573,6 +605,12 @@ export default defineSchema({
   // into sellerShare (owed to the Seller) and platformShare. The operator pays out
   // by EFT out of band and flips `owed` → `paid` with a reference — `by_status`
   // is the owed-per-Seller rollup's scan.
+  //
+  // A **Bank transfer** sale (.scratch/bank-transfer-payments) writes a row here
+  // too — same shape, so `sales.report` counts both rails identically — but with
+  // `fee` 0 (no gateway took a cut) and written straight to `paid` with
+  // `payoutRef` = the transfer reference: the buyer paid into the owner's OWN
+  // Collection account, so there is nothing for the operator to EFT out.
   ledger: defineTable({
     topicId: v.id("topics"),
     lang: v.string(),
@@ -583,7 +621,11 @@ export default defineSchema({
     net: v.number(),
     sellerShare: v.number(),
     platformShare: v.number(),
-    pfPaymentId: v.string(),
+    // The sale's provenance — exactly one of these, by rail. `pfPaymentId` is
+    // optional (not dropped) because every PayFast row carries it; a widened
+    // required field needs no migration.
+    pfPaymentId: v.optional(v.string()),
+    bankTransferRef: v.optional(v.string()),
     status: v.union(v.literal("owed"), v.literal("paid")),
     payoutRef: v.optional(v.string()),
   }).index("by_status", ["status"]),
@@ -601,6 +643,64 @@ export default defineSchema({
     userId: v.id("users"),
     payout: v.optional(payoutDetailsValidator),
   }).index("by_user", ["userId"]),
+
+  // ---- Bank transfer payments (.scratch/bank-transfer-payments) -------------
+
+  // A **Collection account**: one regional bank account a course owner asks
+  // buyers to transfer into (an Indian one, a South African one, …). Owner-level,
+  // not per-course — the same accounts serve every Edition the owner sells. The
+  // opposite direction to `sellers.payout`, which is where the operator pays the
+  // Seller: this is where a BUYER pays the owner. `disabled` retires an account
+  // from the buyer's picker without deleting it, so the Bank transfers that named
+  // it keep resolving. `by_owner` is the only lookup (the picker, the owner's own
+  // list, and the ownership guard on request/approve).
+  bankAccounts: defineTable({
+    ownerId: v.id("users"),
+    details: bankAccountDetailsValidator,
+    disabled: v.optional(v.boolean()),
+  }).index("by_owner", ["ownerId"]),
+
+  // A **Bank transfer**: one buyer's manual payment for one **Edition**, named by
+  // a short human-transcribable `reference` (`MC-XXXX-XXXX`) they quote to their
+  // bank. The row IS the payment record — the Edition (topicId × lang), the
+  // buyer's ACCOUNT email and id (auth-first, frozen at request), the price frozen
+  // at request (`amount`/`currency`, the listing as shown then), and which
+  // Collection account was named. Requesting grants NOTHING: `awaiting` →
+  // `approved` (the course owner or the Admin confirms the money landed, which
+  // mints the Entitlement + writes the Ledger row in one transaction) or
+  // `declined` (with a reason the buyer reads). The reference is SHORT, so it is
+  // guessable and is NOT a bearer capability — every read is authorised by
+  // identity (buyer / Topic owner / Admin), never by possession.
+  // `by_reference` is the approve/decline lookup; `by_topic_user` finds a buyer's
+  // open transfer for an Edition (dedup: one open transfer per buyer per Edition);
+  // `by_owner_status` is the owner's approval queue; `by_status` the Admin's.
+  bankTransfers: defineTable({
+    reference: v.string(),
+    topicId: v.id("topics"),
+    lang: v.string(),
+    // The course owner at request time — denormalised so the approval queue is one
+    // indexed read instead of a scan joined through topics.
+    ownerId: v.id("users"),
+    buyerId: v.id("users"),
+    buyerEmail: v.string(),
+    bankAccountId: v.id("bankAccounts"),
+    // The Edition's price frozen at request (minor units + lower-case ISO-4217,
+    // i.e. ZAR cents today) — what the ITN's amount-match is to the PayFast rail.
+    amount: v.number(),
+    currency: v.string(),
+    status: v.union(v.literal("awaiting"), v.literal("approved"), v.literal("declined")),
+    // Terminal bookkeeping, absent while `awaiting`. `receivedAmount` is what
+    // actually arrived when it differs from `amount` (a cross-border FX difference,
+    // a bank charge) — the Ledger records the real money, not the sticker price.
+    decidedBy: v.optional(v.id("users")),
+    decidedAt: v.optional(v.number()),
+    receivedAmount: v.optional(v.number()),
+    note: v.optional(v.string()),
+  })
+    .index("by_reference", ["reference"])
+    .index("by_topic_user", ["topicId", "buyerId"])
+    .index("by_owner_status", ["ownerId", "status"])
+    .index("by_status", ["status"]),
 
   // A signed-in user's personal preferences (app-language-i18n ticket 03 §1).
   // One row per user, minted on their first app-language pick. `locale` is a
