@@ -8,7 +8,21 @@ import { claimPendingShares } from "./lib";
 // Sign-up is open (ADR 0021): anyone may create an account — the Allowlist
 // gates course *creation*, not existence. Password-only means an email is
 // unverified at sign-up; email OTP verification is a planned later bolt-on.
+// How long a sign-in lasts. Convex Auth defaults both of these to 30 days, which
+// is short for a course worked through over months. The cookie that carries the
+// session must be given a matching `maxAge` in src/middleware.ts or the shorter of
+// the two wins — these literals are duplicated there (convex/ has its own tsconfig
+// and never imports from src/), so change them together. See
+// src/lib/sessionLifetime.ts for the full reasoning.
+const DAY_MS = 24 * 60 * 60 * 1000;
+const SESSION_TOTAL_DURATION_MS = 365 * DAY_MS;
+const SESSION_INACTIVE_DURATION_MS = 60 * DAY_MS;
+
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
+  session: {
+    totalDurationMs: SESSION_TOTAL_DURATION_MS,
+    inactiveDurationMs: SESSION_INACTIVE_DURATION_MS,
+  },
   providers: [
     Password({
       // Normalise (trim + lower-case) the account identity here, where the

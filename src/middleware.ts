@@ -4,6 +4,7 @@ import { resolveTenantSlug, TENANT_SLUG_HEADER } from "./lib/tenant";
 import { cookieDomainFor } from "./lib/cookieDomain";
 import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from "./i18n/config";
 import { matchAcceptLanguage } from "./i18n/acceptLanguage";
+import { AUTH_COOKIE_MAX_AGE_SECONDS } from "./lib/sessionLifetime";
 
 // Convex Auth keeps the session in sync across server/client for the App Router.
 // The custom handler resolves the whitelabel tenant from the Host header and
@@ -53,7 +54,15 @@ export default convexAuthNextjsMiddleware(
     }
     return response;
   },
-  { convexUrl: process.env.NEXT_PUBLIC_CONVEX_URL },
+  {
+    convexUrl: process.env.NEXT_PUBLIC_CONVEX_URL,
+    // Without an explicit `maxAge` Convex Auth writes the JWT and refresh-token
+    // cookies as *browser-session* cookies, so quitting the browser signs the user
+    // out even though the server-side session is still valid for months (issue
+    // 110). Must stay >= the `session` durations in convex/auth.ts — see
+    // lib/sessionLifetime.ts.
+    cookieConfig: { maxAge: AUTH_COOKIE_MAX_AGE_SECONDS },
+  },
 );
 
 export const config = {
