@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { Icon } from "./icons";
 import { useTenant } from "./TenantContext";
-import { IconButton } from "./ui";
+import { Dialog, IconButton } from "./ui";
 import { missionExcerpt } from "./welcomeDerive";
 
 // The first-open welcome panel (welcome/01). Someone's first contact with a course
@@ -13,10 +13,12 @@ import { missionExcerpt } from "./welcomeDerive";
 // orientation. This says what the course is, how long it is, and which lesson to
 // start on, plus a way back to the brand's front door.
 //
-// Deliberately an inline card above the lesson, not a modal: a Guest must never be
-// trapped behind a dialog to read a page they were linked to, and the lesson stays
-// readable without dismissing anything. Rendered by both readers (CourseShell and
-// PublicReader) so the two stay in step.
+// A modal, on the shared `Dialog` (user's call, 2026-07-28 — this reverses the
+// scoping ticket's inline-card default). The ticket's objection to a modal was that
+// it could trap a Guest behind a dialog on a page they were linked to; `Dialog` is
+// the native `<dialog>`, so Esc, a backdrop click and the X all close it through one
+// path, and the lesson is one dismissal away. Rendered by both readers (CourseShell
+// and PublicReader) so the two stay in step.
 export function Welcome({
   course,
   lessonCount,
@@ -42,10 +44,7 @@ export function Welcome({
   const excerpt = missionExcerpt(mission);
 
   return (
-    <section
-      aria-labelledby="welcome-heading"
-      className="mb-4 rounded-2xl border border-line bg-card p-5 shadow-sm md:p-6"
-    >
+    <Dialog onClose={onDismiss}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-hi text-accent">
@@ -81,6 +80,6 @@ export function Welcome({
       </div>
 
       {next && <p className="mt-2 text-xs text-soft">{next.title}</p>}
-    </section>
+    </Dialog>
   );
 }

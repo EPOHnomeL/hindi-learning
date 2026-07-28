@@ -279,16 +279,14 @@ export function PublicCourseShell({ token, children }: { token: string; children
           {/* The first-open welcome (welcome/01). Lessons only — a Guest who lands
               on a Reference deep link is looking something up, not starting out. */}
           {showWelcome && (
-            <div className="shrink-0 px-3 pt-3 md:px-0 md:pt-0">
-              <Welcome
-                course={course.title}
-                lessonCount={course.lessons.length}
-                mission={course.mission}
-                next={startLesson && { seq: startLesson.seq, title: startLesson.title, href: `${base}/lessons/${startLesson.key}` }}
-                homeHref={homeHref}
-                onDismiss={() => setDismissed(true)}
-              />
-            </div>
+            <Welcome
+              course={course.title}
+              lessonCount={course.lessons.length}
+              mission={course.mission}
+              next={startLesson && { seq: startLesson.seq, title: startLesson.title, href: `${base}/lessons/${startLesson.key}` }}
+              homeHref={homeHref}
+              onDismiss={() => setDismissed(true)}
+            />
           )}
           {children}
         </section>

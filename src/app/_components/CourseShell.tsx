@@ -314,16 +314,14 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               front door. (The Guest reader has no such bounce, hence tenantHomeHref
               there.) */}
           {showWelcome && header && (
-            <div className="shrink-0">
-              <Welcome
-                course={header.title}
-                lessonCount={lessons?.length ?? 0}
-                mission={header.mission}
-                next={startLesson && { seq: startLesson.seq, title: startLesson.title, href: withLang(`/courses/${slug}/lessons/${startLesson.key}`, lang) }}
-                homeHref="/"
-                onDismiss={() => setDismissed(true)}
-              />
-            </div>
+            <Welcome
+              course={header.title}
+              lessonCount={lessons?.length ?? 0}
+              mission={header.mission}
+              next={startLesson && { seq: startLesson.seq, title: startLesson.title, href: withLang(`/courses/${slug}/lessons/${startLesson.key}`, lang) }}
+              homeHref="/"
+              onDismiss={() => setDismissed(true)}
+            />
           )}
           <div className="flex min-h-0 flex-1 flex-col">{children}</div>
         </section>
