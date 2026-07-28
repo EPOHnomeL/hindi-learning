@@ -21,7 +21,7 @@ import { Markdown } from "./MarkdownView";
 import { missionPreview } from "./markdown";
 import { SettingsDialog } from "./SettingsDialog";
 import { SiteFooter } from "./SiteFooter";
-import { useTenant } from "./TenantContext";
+import { useTenant, useTenantSlug } from "./TenantContext";
 import { Dialog, IconButton, Menu, MenuItem } from "./ui";
 import { useResourceUpload } from "./useResourceUpload";
 
@@ -652,15 +652,18 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
   );
 }
 
-// Courses published in this member's own site catalogue that they don't own
-// (course-publishing) — the discovery surface, deliberately a section on the
-// signed-in home rather than a route of its own. Hidden when nothing is
+// Courses published in the catalogue of the site being browsed that this member
+// doesn't own (course-publishing) — the discovery surface, deliberately a section
+// on the signed-in home rather than a route of its own. Hidden when nothing is
 // published. Free editions are already readable (publishing IS the grant), so
 // there is no "join" step: the card just opens the course, and a priced course
 // lands the reader on its Preview + the existing paygate.
+//
+// Scoped by the host's tenant, not by a field on the account: `users.tenantSlug`
+// is never written, so scoping on it left every tenant member's catalogue empty.
 function AvailableSection() {
   const t = useTranslations("Dashboard");
-  const available = useQuery(api.catalogue.list);
+  const available = useQuery(api.catalogue.list, { tenantSlug: useTenantSlug() });
   if (!available || available.length === 0) return null;
   return (
     <section className="mt-12">

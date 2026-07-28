@@ -130,9 +130,6 @@ async function seedTenant(t: ReturnType<typeof convexTest>, slug: string) {
     }),
   );
 }
-async function seedMember(t: ReturnType<typeof convexTest>, email: string, tenantSlug?: string) {
-  return await t.run((ctx) => ctx.db.insert("users", { email, tenantSlug }));
-}
 async function seedTenantTopic(
   t: ReturnType<typeof convexTest>,
   ownerId: Id<"users">,
@@ -147,7 +144,14 @@ async function publish(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, 
   await t.run((ctx) => ctx.db.insert("publishedEditions", { topicId, lang, published: true }));
 }
 
-test("the catalogue is scoped symmetrically to the member's own tenant", async () => {
+// The regression this replaced: the catalogue used to scope on `users.tenantSlug`,
+// a field NO production path ever writes (`auth.ts` inserts `{ email }` and nothing
+// else) — so it resolved to `undefined` for every real account and a tenant member
+// saw an empty catalogue forever. The old test passed only because it seeded that
+// impossible row shape by hand. Scope now follows the **host being browsed**, which
+// is the only thing that actually knows the tenant. Note the single member below
+// carries no tenant field at all: that IS the shape every sign-up has.
+test("the catalogue is scoped to the tenant site being browsed", async () => {
   const t = convexTest(schema, modules);
   await seedTenant(t, "upf");
   const owner = await seedUser(t, "owner@example.com");
@@ -156,13 +160,16 @@ test("the catalogue is scoped symmetrically to the member's own tenant", async (
   const awTopic = await seedTenantTopic(t, owner, "aw-course", "almighty-warriors");
   for (const id of [upfTopic, siteTopic, awTopic]) await publish(t, id, "en");
 
-  const upfMember = await seedMember(t, "member@upf.example", "upf");
-  const siteMember = await seedMember(t, "member@example.com");
+  const member = await seedUser(t, "member@example.com");
+  const seen = async (tenantSlug: string | null) =>
+    (await asUser(t, member).query(api.catalogue.list, { tenantSlug })).map((c) => c.slug);
 
-  // A subdomain member sees their own tenant's courses only…
-  expect((await asUser(t, upfMember).query(api.catalogue.list, {})).map((c) => c.slug)).toEqual(["upf-course"]);
-  // …and a default-site member sees only the courses with no tenant at all.
-  expect((await asUser(t, siteMember).query(api.catalogue.list, {})).map((c) => c.slug)).toEqual(["site-course"]);
+  // On a tenant subdomain: that tenant's courses only, never the apex's or a
+  // sibling tenant's.
+  expect(await seen("upf")).toEqual(["upf-course"]);
+  expect(await seen("almighty-warriors")).toEqual(["aw-course"]);
+  // Symmetric on the default site: only the courses with no tenant at all.
+  expect(await seen(null)).toEqual(["site-course"]);
 });
 
 test("the catalogue lists published courses only, and never the caller's own", async () => {
@@ -176,9 +183,9 @@ test("the catalogue lists published courses only, and never the caller's own", a
   await publish(t, mine, "en");
 
   // The caller's own courses are already their library — no duplicate card here.
-  expect((await asUser(t, member).query(api.catalogue.list, {})).map((c) => c.slug)).toEqual(["listed"]);
+  expect((await asUser(t, member).query(api.catalogue.list, { tenantSlug: null })).map((c) => c.slug)).toEqual(["listed"]);
   // Signed out there is no catalogue at all (it is a member surface).
-  expect(await t.query(api.catalogue.list, {})).toEqual([]);
+  expect(await t.query(api.catalogue.list, { tenantSlug: null })).toEqual([]);
 });
 
 test("a card carries its Editions and its price, English first", async () => {
@@ -199,7 +206,7 @@ test("a card carries its Editions and its price, English first", async () => {
   await publish(t, paid, "en");
   await t.run((ctx) => ctx.db.insert("listings", { topicId: paid, lang: "en", amount: 25000, currency: "zar" }));
 
-  const cards = await asUser(t, member).query(api.catalogue.list, {});
+  const cards = await asUser(t, member).query(api.catalogue.list, { tenantSlug: null });
   expect(cards.find((c) => c.slug === "free-course")).toMatchObject({
     title: "free-course",
     mission: "Learn to read Hindi",

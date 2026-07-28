@@ -57,10 +57,22 @@ export const setEditionPublished = mutation({
 // Nothing else is filtered out — a free published Edition already reads as a
 // Viewer (lib.ts), so there is no join step to gate the card on.
 //
-// Tenant scope is **symmetric**, taken from the signed-in member's own
-// `tenantSlug`: a subdomain member sees that subdomain's courses; a default-site
-// member sees only the courses with no tenant at all. Never cross-tenant — one
-// indexed `by_tenant` read, and a member belongs to exactly one site.
+// Tenant scope is **symmetric** and follows the **host being browsed**, passed in
+// by the caller (`useTenantSlug()`, resolved server-side from the host — the client
+// never parses it): on a subdomain, that tenant's courses; on the default site, only
+// the courses with no tenant at all. Never cross-tenant — one indexed `by_tenant`
+// read.
+//
+// It scopes on the host and NOT on `users.tenantSlug` because nothing ever writes
+// that field — sign-up (`auth.ts`) inserts `{ email }` alone, and tenant membership
+// is recorded on the Allowlist row, not the account. Reading it here made every real
+// member's catalogue permanently empty. The host is the only thing that knows which
+// site someone is on, and a member may legitimately visit more than one.
+//
+// A client-supplied slug is safe here: tenancy is a visibility filter and a skin,
+// not a hard partition (schema, `tenants`), and a free published Edition already
+// reads as a Viewer for any signed-in caller (`grantsFor`), so widening this
+// argument reveals nothing that the course URL itself wouldn't.
 //
 // `price` is the whole acquisition story in one field: **null** means some
 // published Edition is free to read, otherwise it is the cheapest published
@@ -69,7 +81,8 @@ export const setEditionPublished = mutation({
 // logic is duplicated here. Title and mission are the source language (localising
 // them per Edition is the deferred follow-up, PRD non-goals).
 export const list = query({
-  args: {},
+  // `null` is the default site (an absent slug on the topic), not "any tenant".
+  args: { tenantSlug: v.union(v.string(), v.null()) },
   returns: v.array(
     v.object({
       slug: v.string(),
@@ -79,13 +92,12 @@ export const list = query({
       price: v.union(v.object({ amount: v.number(), currency: v.string() }), v.null()),
     }),
   ),
-  handler: async (ctx) => {
+  handler: async (ctx, { tenantSlug }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
-    const me = await ctx.db.get(userId);
     const topics = await ctx.db
       .query("topics")
-      .withIndex("by_tenant", (q) => q.eq("tenantSlug", me?.tenantSlug))
+      .withIndex("by_tenant", (q) => q.eq("tenantSlug", tenantSlug ?? undefined))
       .collect();
     const cards = [];
     for (const topic of topics) {
