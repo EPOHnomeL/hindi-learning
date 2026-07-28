@@ -45,12 +45,26 @@ test("buildTenantThemeCss emits all 14 light tokens as --color-<t> under a speci
   const css = buildTenantThemeCss({ light: LIGHT });
   // `:root:root` (not a bare `:root`) so the override beats Tailwind's @theme :root
   // regardless of stylesheet source order.
-  expect(css).toContain(":root:root{");
+  expect(css).toContain(":root:root");
   for (const t of CONTRACT) {
     expect(css, `missing --color-${t}`).toContain(`--color-${t}:${LIGHT[t]}`);
   }
-  // A palette with no dark emits no dark block — the globals default dark governs.
-  expect(css).not.toContain('data-theme="dark"');
+});
+
+// Dark mode on a tenant host. The light block's raised specificity ALSO outranks the
+// default dark palettes (`html[data-theme="dark"]` in globals.css,
+// `:root[data-theme="dark"]` in head.html), so it must exclude the dark document or
+// dark mode keeps painting tenant light colours.
+test("buildTenantThemeCss scopes the light block out of dark mode", () => {
+  const light = buildTenantThemeCss({ light: LIGHT });
+  expect(light).toContain(':root:root:not([data-theme="dark"]){');
+  // No dark block of its own: with the light block gated off, the default dark
+  // palette governs — which is the whole point of "tenant dark, else default dark".
+  expect(light).not.toContain(':root:root[data-theme="dark"]');
+
+  // Same gate with the lesson namespace (head.html's dark selector is only
+  // `:root[data-theme="dark"]`, which a bare `:root:root` would tie and out-order).
+  expect(buildTenantThemeCss({ light: LIGHT }, "")).toContain(':root:root:not([data-theme="dark"]){');
 });
 
 test("buildTenantThemeCss with a bare prefix emits --<t> (the lesson-iframe var names)", () => {
@@ -65,7 +79,9 @@ test("buildTenantThemeCss with a bare prefix emits --<t> (the lesson-iframe var 
 test("buildTenantThemeCss emits a dark block with ONLY the tenant's partial dark tokens", () => {
   const css = buildTenantThemeCss({ light: LIGHT, dark: { paper: "#000000", "good-b": "#00ff00" } });
   expect(css).toContain(':root:root[data-theme="dark"]{');
-  const darkBlock = css.slice(css.indexOf('[data-theme="dark"]'));
+  // From the dark block's own selector — not the first `[data-theme="dark"]` in the
+  // string, which is now the light block's `:not(…)` gate.
+  const darkBlock = css.slice(css.indexOf(':root:root[data-theme="dark"]'));
   expect(darkBlock).toContain("--color-paper:#000000");
   expect(darkBlock).toContain("--color-good-b:#00ff00"); // hyphenated token survives
   // Tokens absent from the tenant's dark palette are NOT emitted (they fall through

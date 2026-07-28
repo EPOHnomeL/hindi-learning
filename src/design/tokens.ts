@@ -49,13 +49,21 @@ export type TenantTheme = {
 // overrode, so the rest fall through to the default dark palette via the cascade
 // (decision 03 #5 — "tenant dark, else default dark"). No dark block at all when the
 // tenant has no dark palette.
+//
+// The light block is gated on `:not([data-theme="dark"])` — WITHOUT it, that same
+// raised specificity also beat the DEFAULT dark palettes (globals.css's
+// `html[data-theme="dark"]`, head.html's `:root[data-theme="dark"]`), so on a tenant
+// host dark mode kept painting the tenant's LIGHT colours for every token the tenant
+// hadn't overridden in dark — and broke entirely for a tenant with no dark palette.
+// Gating makes the documented "tenant dark, else default dark" fall-through real:
+// in dark mode the light block simply doesn't apply.
 export function buildTenantThemeCss(theme: TenantTheme, prefix = "color-"): string {
   const decls = (palette: Partial<Record<Token, string>>) =>
     TENANT_THEME_TOKENS.filter((tok) => palette[tok] != null)
       .map((tok) => `--${prefix}${tok}:${palette[tok]}`)
       .join(";");
 
-  let css = `:root:root{${decls(theme.light)}}`;
+  let css = `:root:root:not([data-theme="dark"]){${decls(theme.light)}}`;
   if (theme.dark && Object.keys(theme.dark).length > 0) {
     css += `:root:root[data-theme="dark"]{${decls(theme.dark)}}`;
   }
