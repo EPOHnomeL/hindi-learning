@@ -27,6 +27,27 @@ import { isCallerAdmin } from "./whitelist";
 // A run stuck "generating" past this is treated as crashed and re-fireable.
 const STALE_MS = 10 * 60 * 1000;
 
+// ---- The authoring Provider axis (architecture-deepening/05) -----------------
+
+// WHICH runtime writes a course's lessons (ADR 0014): the cloud claude.ai teach
+// Routine, or the in-Convex OpenRouter authoring action. A per-COURSE choice.
+//
+// Deliberately not called just "provider": two other, unrelated selection axes
+// live in translate.ts — a per-EDITION translation `engine` (`free` | `gemini`)
+// and the deployment-wide `translationBackend()` (`gemini` | `openrouter`). Three
+// axes, three distinct nouns, so no reader has to hold three meanings of one word.
+export type AuthoringProvider = "claude" | "openrouter";
+
+// A course's authoring Provider. ABSENT reads as `claude`, so every course
+// predating the field keeps its behaviour and the field needed no migration —
+// and THIS is the one place that fallback is stated, rather than restated at
+// every read site. The stored column keeps its legacy name (`topics.provider`);
+// renaming a live schema field would cost a widen-migrate-narrow deploy for a
+// vocabulary win, so only the code vocabulary moved.
+export function authoringProvider(topic: { provider?: AuthoringProvider }): AuthoringProvider {
+  return topic.provider ?? "claude";
+}
+
 // The on-demand button caps a user to one manual fire per this window; the daily
 // cron is the primary authoring path (issue 08 — bounds Claude usage). The cap is
 // per USER (across all their Topics), not per Topic, so "1 additional lesson per
@@ -300,7 +321,7 @@ export const usageByDay = query({
 // ---- The gate + lock (atomic) ----------------------------------------------
 
 type AcquireResult =
-  | { acquired: true; topicSlug: string; frontierKey: string; provider: "claude" | "openrouter" }
+  | { acquired: true; topicSlug: string; frontierKey: string; authoringProvider: AuthoringProvider }
   | { acquired: false; reason: string };
 
 // Check the gate and grab the lock in one transaction. Returns whether the
@@ -369,8 +390,9 @@ export const tryAcquireGeneration = internalMutation({
     else await ctx.db.insert("generation", { topicId: topic._id, ...patch });
 
     // The fire step branches on this: `claude` POSTs the routine, `openrouter`
-    // schedules the authoring action. Absent on the row ⇒ `claude` (ADR 0014).
-    return { acquired: true, topicSlug, frontierKey, provider: topic.provider ?? "claude" };
+    // schedules the authoring action (the absent-reads-as-claude rule lives in
+    // `authoringProvider`).
+    return { acquired: true, topicSlug, frontierKey, authoringProvider: authoringProvider(topic) };
   },
 });
 
@@ -515,7 +537,7 @@ async function fireForTopic(ctx: ActionCtx, topicSlug: string, manual: boolean):
   // claude.ai Routine. No `claim` protocol — hand the action its topic directly.
   // The gate/lock above is reused unchanged; the action reports via the same
   // `reportGeneration`. A failed schedule releases the lock, as the POST path does.
-  if (acquired.provider === "openrouter") {
+  if (acquired.authoringProvider === "openrouter") {
     try {
       await ctx.scheduler.runAfter(0, internal.openrouter.authorTopic, { topicSlug });
       return { fired: true };
@@ -632,14 +654,14 @@ export const callerIsAdmin = internalQuery({
 });
 
 // The course's authoring Provider (ADR 0014), or null if the Topic is gone —
-// `refireFinish` reads it to fire the RIGHT engine for each lesson.
+// `refireFinish` reads it to fire the RIGHT runtime for each lesson.
 export const finishProvider = internalQuery({
   args: { topicSlug: v.string() },
   returns: v.union(v.literal("claude"), v.literal("openrouter"), v.null()),
   handler: async (ctx, { topicSlug }) => {
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return null;
-    return topic.provider ?? "claude";
+    return authoringProvider(topic);
   },
 });
 
@@ -937,7 +959,7 @@ export const materialiseForProvider = internalQuery({
       // The owner's email — the publish mutations (publishMission, etc.) key by it,
       // and it's intrinsic to the Topic, so the action never supplies it out of band.
       ownerEmail: owner.email ?? null,
-      provider: topic.provider ?? "claude",
+      authoringProvider: authoringProvider(topic),
       frontier: frontier ? { key: frontier.key, seq: frontier.seq } : null,
       ...(await collectTopicContext(ctx, topic, owner)),
     };

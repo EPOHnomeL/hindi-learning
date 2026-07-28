@@ -40,6 +40,12 @@ type Kind = "lesson" | "reference" | "mission" | "title" | "question";
 // The translation engine of one job/edition (translation-engine-picker), hoisted
 // like `kindV` since it recurs across this file's validators. `free` fires the
 // cloud translate Routine; `gemini` schedules the in-Convex action.
+//
+// This is the per-EDITION axis. Two other selection axes are deliberately named
+// differently so no reader has to hold three meanings of one noun
+// (architecture-deepening/05): `translationBackend()` below is the
+// deployment-wide choice of WHICH API the `gemini` engine calls, and
+// `routine.authoringProvider` is the per-COURSE authoring runtime.
 const engineV = v.union(v.literal("free"), v.literal("gemini"));
 
 // ---- Source enumeration + staleness hashing -------------------------------
@@ -147,6 +153,14 @@ async function readSource(
 
 type Engine = "free" | "gemini";
 
+// A job's engine. ABSENT reads as `gemini` — every job predating the field stays
+// on today's behaviour, so the field needed no migration — and THIS is the one
+// place that fallback is stated, rather than restated at each read site. `null`
+// (no job at all, e.g. the never-translated English source) reads the same way.
+function engineOf(job: { engine?: Engine } | null | undefined): Engine {
+  return job?.engine ?? "gemini";
+}
+
 type AcquireResult =
   | { acquired: true; topicSlug: string; lang: string; total: number; engine: Engine; forced: boolean }
   | { acquired: false; reason: string };
@@ -204,12 +218,12 @@ export const tryAcquireTranslation = internalMutation({
 
     // Resolve the engine (translation-engine-picker): use the arg when given
     // (add-language / re-translate); otherwise reuse the job's stored engine
-    // (failed-retry). Absent stored engine reads as `gemini` — today's behaviour,
-    // so no migration. A requested engine that DIFFERS from the stored one is a
+    // (failed-retry — `engineOf` states the absent-reads-as-gemini rule). A
+    // requested engine that DIFFERS from the stored one is a
     // deliberate engine switch, which must be a full redo — otherwise per-item
     // freshness (`sourceHash`, engine-blind) would mistake the old engine's rows
     // for "already done" and the switch would translate nothing.
-    const stored: Engine = job?.engine ?? "gemini";
+    const stored: Engine = engineOf(job);
     const resolved: Engine = engine ?? stored;
     const forced = engine !== undefined && engine !== stored;
 
@@ -717,23 +731,30 @@ export function buildTranslateMessages(content: string, langName: string, mode: 
   ];
 }
 
-// Which provider runs translation, per-deployment. Default `gemini` — the native
-// Google AI Studio API, where thinking is genuinely disabled (translation-cost 05);
-// `openrouter` keeps the legacy Gemini-via-OpenRouter path as a rollback. Case/space
-// tolerant; any other value falls back to `gemini`.
-function translateProvider(): "gemini" | "openrouter" {
+// Which API the `gemini` engine actually calls, per-DEPLOYMENT — a different axis
+// from the per-Edition `engine` above and from the per-course
+// `routine.authoringProvider` (architecture-deepening/05). Default `gemini`: the
+// native Google AI Studio API, where thinking is genuinely disabled
+// (translation-cost 05); `openrouter` keeps the legacy Gemini-via-OpenRouter path
+// as a rollback. THE one place the fallback is stated: case/space tolerant, and
+// any value other than `openrouter` — including unset — reads as `gemini`.
+//
+// The env var keeps its provisioned name (`TRANSLATE_PROVIDER`); only the code
+// vocabulary moved, so no deployment needs reconfiguring.
+type TranslationBackend = "gemini" | "openrouter";
+function translationBackend(): TranslationBackend {
   return (process.env.TRANSLATE_PROVIDER ?? "").trim().toLowerCase() === "openrouter" ? "openrouter" : "gemini";
 }
 
 // Translate one item's field, single-pass. Empty content is returned as-is
-// (nothing to translate) to avoid a wasted call. Either provider runs with
+// (nothing to translate) to avoid a wasted call. Either backend runs with
 // thinking/reasoning OFF — thinking tokens are billed as output and buy nothing
 // for constrained translation (translation-cost 02/05) — but only the native
 // Gemini path actually honours the opt-out (the reason it's the default).
 async function translateField(content: string, langName: string, mode: "html" | "text"): Promise<string> {
   if (content.trim() === "") return content;
   const messages = buildTranslateMessages(content, langName, mode);
-  if (translateProvider() === "openrouter") {
+  if (translationBackend() === "openrouter") {
     return await chatComplete({ model: translateModel(), messages, reasoning: "none" });
   }
   return await geminiComplete({ model: geminiTranslateModel(), messages });
@@ -745,7 +766,7 @@ async function translateField(content: string, langName: string, mode: "html" | 
 // itself for the rest. ~45s/item observed → a chunk stays a few minutes.
 const CHUNK = 5;
 
-// Translate a completed course into `lang` via the configured translate provider
+// Translate a completed course into `lang` via the configured translation backend
 // (default native Gemini), in chunks of CHUNK items per invocation. Reads each
 // source item, translates it single-pass,
 // and publishes through the existing publishTranslation (which stamps the source
@@ -946,7 +967,9 @@ export const editions = query({
         rtl: false,
         source: true,
         status: "ready" as const,
-        engine: "gemini" as const,
+        // The English source is never translated, so it has no job — `engineOf`
+        // reads that as `gemini`, the neutral constant the toggle seeds from.
+        engine: engineOf(null),
         total: 0,
         done: 0,
         failed: 0,
@@ -965,7 +988,7 @@ export const editions = query({
             rtl: !!li.rtl,
             source: false,
             status: j.status,
-            engine: j.engine ?? ("gemini" as const),
+            engine: engineOf(j),
             total: j.total,
             done: j.done,
             failed: j.failed,

@@ -300,12 +300,12 @@ test("tryAcquireGeneration reports the topic's provider so the fire step can bra
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
   // A seeded OpenRouter course (bootstrap gate passes) and a seeded default course
-  // (no provider → claude).
+  // (the stored `provider` column absent → `authoringProvider` reads it as claude).
   await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "glm", title: "GLM", status: "seeded", provider: "openrouter" }));
   await t.run((ctx) => ctx.db.insert("topics", { ownerId: alice, slug: "std", title: "Std", status: "seeded" }));
 
-  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "glm" })).toMatchObject({ acquired: true, provider: "openrouter" });
-  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "std" })).toMatchObject({ acquired: true, provider: "claude" });
+  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "glm" })).toMatchObject({ acquired: true, authoringProvider: "openrouter" });
+  expect(await t.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "std" })).toMatchObject({ acquired: true, authoringProvider: "claude" });
 });
 
 test("the on-demand button is capped to one manual fire per user per day, across topics; the daily cron is not", async () => {
