@@ -12,6 +12,19 @@ accepted — decision agreed during course-publishing ticket 01 (`/grilling` +
 branch implemented in course-publishing issue 09 (2026-07-19). Additive — does
 not supersede any prior ADR.
 
+**Amended 2026-07-28 by [ADR 0024](0024-publish-at-the-edition-grain.md).** Two things below have
+moved, and the reader should hold them in mind throughout:
+
+- **"Published" is a row, not a status.** Where this ADR says a course is `published` (a
+  `topics.status` value from the then-current ticket 03), it now means "this Edition has a
+  `publishedEditions` row with `published: true`" — per-Edition, off the authoring lifecycle.
+- **Nothing writes an `enrollments` row today.** A *free published* Edition reads ≡ a Viewer for any
+  signed-in account, granted live by the resolver, so the one-click join this ADR was designed for
+  never shipped. The table, the `enrolled` level and the resolver branch **all stay in place and are
+  still honoured** — an existing row grants exactly what is described below, including the
+  grandfathering the live grant deliberately does not do. It is the primitive to reach for the day a
+  grant must outlive the owner's publish decision (a grandfathered free cohort, expiry, revocation).
+
 ## Context
 
 The app has **no "enroll" concept**. Read access to a course Edition `(topic, lang)` resolves at one

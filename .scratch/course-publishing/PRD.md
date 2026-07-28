@@ -1,6 +1,25 @@
 # Course publishing, tenant catalogue & free self-enroll — PRD
 
-**Status:** ready for implementation
+> **AMENDED 2026-07-28 at build time — read this first.** Four of the five moving parts below shipped
+> differently. The decision of record is
+> [ADR 0024](../../docs/adr/0024-publish-at-the-edition-grain.md); this PRD's reasoning is still worth
+> reading, but where the two disagree the ADR (and the code) win.
+>
+> | This PRD says | What shipped |
+> |---|---|
+> | `topics.status` gains `published` (§Data model, §Feature area 2) | A per-Edition **`publishedEditions`** row `{ topicId, lang, published }`. `topics.status` untouched; no Routine-gate change; no `setEditionPrice` gate widening (publishing is off the status axis, so the friction that motivated it doesn't exist) |
+> | `enroll` mutation writes an `enrollments` row on a one-click Join (§Feature area 5, issue 13) | **No join click and no row.** A *free published* Edition reads ≡ a Viewer for any signed-in account, granted live in `grantsFor`. `enrollments` (ADR 0023) stays in place and is still honoured — nothing writes it |
+> | A "Browse courses" **route** with filter chips, per-card language pick, Join/Buy affordances (§Feature area 4, issues 14–15) | An **available-courses section on the signed-in home**. No new route, no public catalogue, no landing-page change. One card action (Open); a priced Edition lands on its existing Preview + paygate, so no second checkout path. No filter chips, no per-card language selector |
+> | Tenant scope resolved from the request host (issue 14) | Resolved from the signed-in member's own `tenantSlug` — same symmetry (subdomain → own slug; default site → untenanted only), one less thing threaded |
+>
+> **Unchanged and still true:** owner-only publish; symmetric tenant scope, never cross-tenant; the
+> anonymous public link persists beside all of it; publish is orthogonal to price and is not an
+> acquisition gate (`startCheckout` stays un-gated on publish); title/mission stay source-language.
+> **Not built and still open:** the per-tenant `selling` flag (issue 11) — independent of this build.
+> (Issue 12's tenant-domain links shipped separately: `appUrl(path, tenantSlug?)`, `convex/payfast.ts`.)
+
+**Status:** superseded in part by [ADR 0024](../../docs/adr/0024-publish-at-the-edition-grain.md); see
+the amendment above
 **Source:** [Course-publishing map](00-course-publishing-map.md) — eight decision tickets
 (01–05, 07, 08), all `done`. This PRD **synthesizes** their resolutions into one build plan; it does
 not re-decide anything. Where a section restates a decision, the ticket/ADR is the source of truth —

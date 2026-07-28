@@ -44,8 +44,16 @@ Something the learner raises unprompted while in a lesson ("I don't understand X
 _Avoid_: Comment, note, feedback
 
 **Publish**:
-The explicit action of pushing authored artifacts from the teach workspace into the Hub — new Lessons inserted (immutable), changed References upserted, the drafted Mission and any processed Resources written back. A deliberate command, not a live sync. The workspace is a transient working copy materialised from the Hub for a run; the Hub is the source of truth (see [ADR 0009](docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md)).
-_Avoid_: Deploy, push, sync, upload
+The explicit action of pushing authored artifacts from the teach workspace into the Hub — new Lessons inserted (immutable), changed References upserted, the drafted Mission and any processed Resources written back. A deliberate command, not a live sync. The workspace is a transient working copy materialised from the Hub for a run; the Hub is the source of truth (see [ADR 0009](docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md)). **Distinct from [[Publishing]] an Edition** — the owner's act of listing it in the [[Catalogue]] — which shares the word and nothing else.
+_Avoid_: Deploy, push, sync, upload; "publish" unqualified when the [[Catalogue]] sense is meant
+
+**Publishing** _(an Edition)_:
+The owner's act of listing one **[[Edition]]** in its tenant's [[Catalogue]] — a `published` boolean on a `publishedEditions` row, per Edition, deliberately **not** a course status ([ADR 0024](docs/adr/0024-publish-at-the-edition-grain.md)). Owner-only: not an [[Editor]], not a tenant [[Admin]]. Two consequences, both per-Edition: the Edition appears in the Catalogue, and — **while it is free** — any *signed-in* account reads it exactly as a [[Viewer]] does (own [[Progress]], [[Resource]]s, [[Certificate]] eligibility), with no join step and no stored grant. That read is **live, not grandfathered**: unpublishing or pricing the Edition ends it. A *priced* published Edition is listed but not opened up — it shows its [[Preview]] and its paygate. Orthogonal to price, and never an acquisition gate: a priced Edition stays buyable by direct link whether listed or not.
+_Avoid_: [[Publish]] (the teach→Hub push), [[Public link]] (anonymous, token-bearing), Listing (that is the *price* row), release, launch
+
+**Catalogue**:
+The set of **published** [[Edition]]s a tenant's members can discover — surfaced as an "available courses" section on the **signed-in home**, never a public page. Scoped **symmetrically** from the member's own site: a subdomain member sees that subdomain's courses; a default-site member sees only the courses with no tenant. Never cross-tenant. It lists; it does not grant — what a member may *read* is decided by [[Publishing]] and price.
+_Avoid_: Marketplace (the paid-sales machinery), store, browse page, library ("my courses" — the member's own shelf)
 
 **Reply**:
 Claude Code's answer to a specific Question, written back to the hub and readable on the web inline with the Question it answers. Transitions the Question to `answered`. The return leg that makes the loop a conversation rather than a feedback form.

@@ -5,6 +5,12 @@ ticket 06 resolved. The spec is captured in **[PRD.md](PRD.md)** + eight impleme
 (`09`–`16` in this directory), ready to hand to a `/tdd` build. Planning is complete; the next step is
 a separate build effort against the PRD.
 **Labels:** wayfinder:map
+**Built 2026-07-28** (GitHub #114–#118) — and the build **amended the spec**: publishing is a
+per-Edition `publishedEditions` row, not a `topics.status` value; a free published Edition reads ≡ a
+Viewer with no join click (so nothing writes `enrollments`); the catalogue is a section on the
+signed-in home, not a route. Decision of record:
+[ADR 0024](../../docs/adr/0024-publish-at-the-edition-grain.md). The ticket-03 line below and the
+PRD carry in-place amendment notes; **issue 11 (the per-tenant `selling` flag) is still unbuilt.**
 
 ## Destination
 

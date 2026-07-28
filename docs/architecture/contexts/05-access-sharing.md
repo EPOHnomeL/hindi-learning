@@ -3,7 +3,7 @@ slug: access-sharing
 name: Access & Sharing
 position: 5
 status: draft
-adrs: [0011, 0013, 0015, 0017, 0020]
+adrs: [0011, 0013, 0015, 0017, 0020, 0023, 0024]
 ---
 
 # Access & Sharing
@@ -38,8 +38,9 @@ would bypass the gate.
 ## Sharing (read gate)
 
 The read-side authorization lives in one helper —
-[`getViewableTopic`](/convex/lib.ts#L31-L40): return the Topic if the caller **owns** it, else if a
-`shares` row matches `(topicId, viewerId)` on `by_topic_viewer`. Every content read query
+[`getViewableTopic`](/convex/lib.ts): return the Topic if the caller **owns** it, else if their
+**grant walk** ([`grantsFor`](/convex/lib.ts)) is non-empty — i.e. they hold *any* Edition of it, by
+`shares` row, `entitlements` row, `enrollments` row, or a free **published** Edition (see below). Every content read query
 (`listLessons`, `getLesson`, `listReferences`, `getReference`) routes through it. Writes route through
 `getOwnedTopic` instead, so a Viewer is read-only by construction — the one exception is
 `setProgress`, which routes through `getViewableTopic` so a Viewer tracks their **own** Progress.
@@ -74,6 +75,26 @@ reaches `publicCourse`/`publicLesson`/`publicReference` by token only, each with
 allowlist**; a missing token returns a uniform null (no enumeration). `/share/[token]` sets
 `robots:noindex` + `referrer:no-referrer` so the token doesn't leak via `Referer`.
 
+## Published Editions & the catalogue
+
+[`catalogue.setEditionPublished`](/convex/catalogue.ts) is the owner's per-Edition publish switch — a
+`publishedEditions` row `{ topicId, lang, published }`, deliberately **not** a course status
+([ADR 0024](/docs/adr/0024-publish-at-the-edition-grain.md)). Owner-only via `getOwnedTopic`;
+publishing needs a real Edition (English source or a `ready` translation job), unpublishing is
+un-gated.
+
+The read consequence lives in the grant walk: [`freePublishedLangs`](/convex/lib.ts) (listed, minus
+priced, minus languages whose Edition has gone away) enters `grantsFor` at the **lowest** precedence as
+a `viewer`, so a free published Edition reads exactly like a Share for **any signed-in** account — no
+join click, no stored row — while Shares/Entitlements/enrollments keep their own badge. It is a **live**
+grant: unpublish or price the Edition and it ends. Anonymous readers are unaffected (that is the Public
+link's job). A **priced** published Edition grants nothing extra — the caller still gets `preview`.
+
+[`catalogue.list`](/convex/catalogue.ts) is the read side: published courses in the member's own tenant
+(symmetric — subdomain slug, or untenanted only; never cross-tenant), minus their own, rendered as the
+signed-in home's "available courses" section. `enrollments` ([ADR 0023](/docs/adr/0023-self-enroll-access-primitive.md))
+is still honoured by the resolver but **nothing writes it** on this path.
+
 ## Certificates
 
 [certificates.ts](/convex/certificates.ts) has two auth models: authed owner-or-Viewer (`myCertificate`,
@@ -103,6 +124,10 @@ sends via Resend and **no-ops with a warning if `RESEND_API_KEY`/`INVITE_FROM_EM
 - **Read-gate and write-gate are independent.** Viewer read-only is enforced because writes use
   `getOwnedTopic`; per-Edition text edits go through `getEditableTopic`. `canEdit`/`canWrite` only hide
   the UI — the real boundary is the server helper.
+- **Three things are called "publish".** The teach→Hub push
+  ([content/publish.ts](/convex/content/publish.ts)), listing an Edition in the catalogue
+  (`catalogue.setEditionPublished`), and the anonymous link (`shares.setEditionPublic` — one letter
+  away). They share nothing but the word; `CONTEXT.md` holds the names apart.
 - **Lang matching is in-memory, not indexed.** Legacy `shares`/`pendingShares` rows carry no `lang`, so
   Edition matching (and dedup) is done in code, defaulting absent → `en`/`viewer`. `getViewableTopic`
   uses `.first()` not `.unique()` because a Viewer may now hold several Editions of one Topic.

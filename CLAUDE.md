@@ -18,10 +18,14 @@ file above instead. Context must travel with the repo, not the computer.
   `pnpm-lock.yaml` is the lockfile of record. Prefer `pnpm dlx` over `npx`.
 - **Commits:** commit straight to `main` (no feature branch). Split work into
   separate logical, conventional-commit (`feat(scope): …`) commits; end messages
-  with the `Co-Authored-By` trailer. **Stage explicitly by path** and re-check
-  `git diff --cached --stat` before committing — the user runs concurrent
-  sessions on `main`, so never `git add -A`/`.` and never `git commit --amend`
-  (amend swallows another session's staged files). Push only when asked.
+  with the `Co-Authored-By` trailer. **Commit with `git commit --only <paths>`**
+  (add an untracked file with `git add -N` first) — the user runs concurrent
+  sessions on `main` and the index is shared, so a plain `git add` + `git commit`
+  will happily swallow whatever another session staged in between. Never
+  `git add -A`/`.`, never `git commit --amend` (amend swallows another session's
+  staged files). `--only` still commits the *whole current content* of the paths
+  you name, so `git diff <paths>` first and don't name a file another session is
+  mid-edit in. Push only when asked.
 - **`.env` is the user's** — never edit/`sed`/`cp` it; tell the user the exact
   line to change. Reading config at runtime is fine.
 - **Issues live on GitHub** (reenabled 2026-07-24, after a brief 2026-07-15

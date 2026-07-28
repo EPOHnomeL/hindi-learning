@@ -1,8 +1,28 @@
 # course-publishing/03: Define the "publish" action & course states
 
-**Status:** done
+**Status:** done — **§1 and §2's sequencing SUPERSEDED at build time**, see the amendment below
 **Depends on:** 01, 02
 **Labels:** wayfinder:grilling
+
+> **AMENDED 2026-07-28 — read this before §1.** The build replaced the course-level grain with a
+> per-**Edition** `publishedEditions` row (`published: boolean`) and dropped the fourth
+> `topics.status` value entirely. Rationale + the full decision:
+> [ADR 0024](../../docs/adr/0024-publish-at-the-edition-grain.md).
+>
+> - **§1 (course lifecycle status) — superseded.** No `published` status, no state machine change, no
+>   Routine gate change. Publishing is per-Edition and off the authoring axis, so an owner may list
+>   English while Spanish is still in proofing, and may list a course that is still `active`.
+> - **§2 (price/publish orthogonality) — still holds**, but its *sequence* ("price while `completed`,
+>   then publish") is gone: the two axes are independent, so `setEditionPrice` keeps its own
+>   `completed` gate and there is nothing to widen.
+> - **§3 (owner-only) — reaffirmed.** Publish is the owner's alone: not edition Editors, and not
+>   tenant admins. This was reconsidered during the build and the original answer stands.
+> - **§4 (visibility, not an acquisition gate) — still holds**, and goes further: for a **free**
+>   published Edition there is no acquisition step at all — it reads ≡ a Viewer for any signed-in
+>   account, with no join click and no `enrollments` row
+>   ([ADR 0023](../../docs/adr/0023-self-enroll-access-primitive.md) amended accordingly).
+> - The catalogue landed as a **section on the signed-in home**, not a route: no public catalogue, no
+>   landing-page change.
 
 Child of [Course publishing map](00-course-publishing-map.md).
 
