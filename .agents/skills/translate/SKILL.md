@@ -24,7 +24,8 @@ Each step is a repo `pnpm` script; run them in order.
 2. `pnpm run materialise:prod --topic "$SLUG"` — pull the source into
    `topics/$SLUG/`: `TITLE.txt`, `MISSION.md` (only if the course has one),
    `lessons/<key>.html`, `references/<key>.html`.
-3. Read `TRANSLATE_LANG` from `.env.local`, then translate the source into
+3. `grep TRANSLATE_LANG .env.local` (grep it — don't read the whole file), then
+   have the source translated into
    `topics/$SLUG/translations/$TRANSLATE_LANG/`, mirroring the layout exactly:
    - `title.txt` ← `TITLE.txt`
    - `mission.txt` ← `MISSION.md` (skip if there is no `MISSION.md` — never draft
@@ -32,102 +33,92 @@ Each step is a repo `pnpm` script; run them in order.
    - `lessons/<key>.html` ← each `lessons/<key>.html`
    - `references/<key>.html` ← each `references/<key>.html`
 
-   Apply the **fidelity** rules below to every file. **Done only when every source
-   item above** — the title, the mission if present, and *each* lesson and
-   reference — **has a counterpart at its mirrored path.** A missing file falls
-   back to English and is counted as failed, so translate them all.
+   Every file is translated by a **subagent** working to
+   [FIDELITY.md](FIDELITY.md), in **parallel batches of 8, publishing after each** —
+   see the two sections below. **Done only when every source item above** — the
+   title, the mission if present, and *each* lesson and reference — **has a
+   counterpart at its mirrored path.** A missing file falls back to English and is
+   counted as failed, so translate them all.
 4. `pnpm run publish-translation:prod --topic "$SLUG"` — publish every translated
-   file (the per-item title is read from each HTML's `<title>`). **Read the
-   output:** each item prints `saved` or `skipped`. A `skipped` lesson means its
-   quiz markers drifted from the source — fix that file's quiz structure to match
-   and re-run publish before reporting.
+   file present so far (the per-item title is read from each HTML's `<title>`).
+   It is **idempotent and incremental**: it publishes whatever exists in the
+   workspace and re-publishing an item just overwrites it, so run it after every
+   batch, not only at the end. **Read the output:** each item prints `saved` or
+   `skipped`. A `skipped` lesson means its quiz markers drifted from the source —
+   fix that file's quiz structure to match and re-run publish before reporting.
 5. `pnpm run report-translation:prod ready "$SLUG"` — **always run this, even if a
    step failed** (then use `failed "$SLUG" "<reason>"`), to release the lock. Run
    it exactly once, last.
 
-## Fidelity — the whole point
+## You orchestrate; subagents translate
 
-Translate the prose a **learner** reads. Leave two things byte-for-byte unchanged:
-everything the **scorer** reads — the machine that grades quizzes — and the
-**object of study**, the material the course teaches. Quiz identity is
-**positional** (the reader derives it from DOM order and the `data-*` markers), so
-structure is load-bearing.
+**You never translate anything yourself and never read a source or translated
+file.** Not the title, not the mission, not a lesson — every file goes to a
+subagent. Course content in your context is the single largest waste in this run:
+you would pay for it once as input and again as output, and you are not the one
+writing the file. You drive scripts, dispatch subagents, and read their one-line
+replies.
 
-**Preserve exactly** — never translate, reorder, add, or remove:
+You therefore do not need the fidelity rules in your own context. They live in
+[FIDELITY.md](FIDELITY.md) — hand every subagent that path and let it read them.
 
-- every tag, attribute, `class`, and `id`, and the number and order of elements —
-  especially `.quiz` blocks and their `.opt` options (a reordered option or a
-  changed key silently misgrades);
-- every quiz scoring marker verbatim: `data-correct`, each `.opt`'s `data-k`, and
-  fill-in `data-answer` / `data-alt`;
-- every `<script>` and `<style>` block and all inline JS/CSS, and every `href` /
-  `src`;
-- the **object of study** — the *target-language* material the course teaches:
-  its vocabulary, example sentences, and the script being taught — plus code and
-  proper nouns, even when they sit inside prose you are translating. This is the
-  language being taught, **not** every term the course names. A concept the course
-  *explains* in the **source language** — study-science jargon such as "storage
-  strength", "spacing", "interleaving", "retrieval", or any coined key term — is
-  learner-read prose: **translate it**, even when it is highlighted (`<mark>`),
-  bold, or sitting in a heading. A highlight marks a term as important; it never
-  means "leave untranslated." When unsure, decide by language: a source-language
-  token is prose → translate it; a target-language token is the object of study →
-  keep it.
+**The subagent prompt is four lines**, no rules pasted inline:
 
-**Translate** — the learner-read prose only:
+> Read `.agents/skills/translate/FIDELITY.md` and follow it exactly.
+> Translate `<abs source path>` into `<lang>` (`<language name>`).
+> Write the result to `<abs destination path>` — same layout, same markers.
+> Reply with one line only: `done <filename>` or `failed <filename> — <reason>`.
 
-- visible text nodes;
-- the `<title>` element (the reader stores it as the Edition's per-item title);
-- the human-readable values of `title`, `alt`, `placeholder`, and `aria-label`;
-- the quiz feedback in `data-ok` / `data-no` (translating these is the only safe
-  way to localise feedback — keep any object-of-study tokens inside them as-is).
+## Batches — publish as you go
 
-**Quoted and cited passages are learner-read prose — translate them.** This is the
-single most common miss: the narration gets translated while the quotations it
-introduces are left in the source language. A verbatim quote the course cites (a
-`.book` / `.note` / `.verse` card, a block quote, an epigraph) **and the entire
-"Sources" / citation footer** (`<footer>` — the "ذرائع / حوالہ جات / Sources"
-apparatus that quotes the source works) are read by the learner and **must** be
-rendered in the target language, exactly like body prose. Never leave a quoted
-teaching passage in the source language just because it is a quotation. What you
-keep inside such a citation is only the **attribution**: author names, the *titles*
-of works (e.g. *Walking in Power*), proper nouns, and the page / verse references —
-translate the quoted words themselves. (Scripture quotations follow the
-published-Bible rule below.) A fill-in-the-blank quiz whose answer is a
-**source-language** word (the blank asks the learner to type that word) is object
-of study — keep its sentence in the source language.
+The learner watches the Edition fill up. Never translate the whole course in one
+silent pass and publish once at the end; work in batches and publish after each so
+progress is visible in the Hub while the run continues.
 
-> The server-side guard only compares the **counts** of
-> `data-correct`/`data-answer`/`data-k`; it does **not** catch a changed key value
-> or a reordered option. Getting those right is your job, not the guard's.
+1. List the source files and their sizes with one command (`ls -l topics/$SLUG/lessons
+   topics/$SLUG/references`) — do **not** open them. The title and mission ride
+   along in the first batch as one subagent between them.
+2. Dispatch **up to 8 subagents per batch**, all in a single message so they run
+   concurrently, one file each.
+3. When the batch returns, verify structure with **one command** rather than by
+   reading files — for each pair, the counts of `data-correct`, `data-answer`,
+   `data-k`, `<script`, and `<style` must match the source:
 
-**Scripture uses an existing translation, not yours.** When the prose quotes the
-Bible — a `.verse` block, a cited passage, an epigraph — do not translate the
-English yourself. Substitute the wording of a widely-used published Bible in the
-target language **verbatim** (e.g. the Afrikaanse Bybel for Afrikaans; the Bible
-Society of India / HHBD Devanagari text for Hindi) and leave the reference as-is, so
-the learner meets Scripture in its familiar published form, not a back-translation.
-If you cannot reproduce a reliable published rendering, leave that quotation in the
-source language rather than invent one. When the source has already pasted the
-canonical verse in, treat it as object of study and leave it byte-for-byte.
+   ```sh
+   for t in topics/$SLUG/translations/$TRANSLATE_LANG/*/*.html; do
+     s=$(echo "$t" | sed "s#translations/$TRANSLATE_LANG/##")
+     for m in data-correct data-answer data-k '<script' '<style'; do
+       a=$(grep -o "$m" "$s" | wc -l); b=$(grep -o "$m" "$t" | wc -l)
+       [ "$a" = "$b" ] || echo "MISMATCH ${t##*/} $m $a vs $b"
+     done
+   done
+   ```
+4. Re-dispatch any file that mismatched — a fresh subagent, whole file. **Never
+   hand-edit markers yourself**; that means opening the file, which is exactly what
+   you are avoiding.
+5. `pnpm run publish-translation:prod --topic "$SLUG"`, read the `saved`/`skipped`
+   lines, tell the user in one sentence which items just went live, then start the
+   next batch.
 
-**Never coin a word** — anywhere, but a coined word *inside a verse* is the worst
-place to hallucinate. Use only real, standard, correctly-spelled words of the target
-language. If you catch yourself appending an English gloss after a term you produced
-— "*vachisth* (new covenant)" — that gloss confesses the term is invented; drop both
-and use the real standard term (नई वाचा / *nayi vaacha*).
+## Splitting a big file
 
-**One script per Edition, no leaks.** Write the whole file in the target Edition's
-script: a Devanagari Edition (`hi`, `mr`, `ne`, …) is pure Devanagari; a `-Latn`
-Edition is pure Latin. Never let the other script leak in mid-sentence ("par
-परिस्थिति (circumstances)"), and translate everyday vocabulary consistently rather
-than leaving some source-language words among their translated neighbours.
+A source lesson or reference over ~600 lines (or ~40 KB) is translated in
+**sections, in parallel** — the exception, not the routine. Split it mechanically so
+its content still never enters your context:
 
-For **plain-text files** (`title.txt`, `mission.txt`): translate the
-natural-language prose only; leave any HTML tags, markdown, code, proper nouns, and
-object-of-study material unchanged.
+```sh
+mkdir -p "topics/$SLUG/.parts/<key>"
+csplit -z -s -f "topics/$SLUG/.parts/<key>/" -b '%02d.src.html' "topics/$SLUG/<dir>/<key>.html" '/<h2/' '{*}'
+```
 
-Output only the translated content — **no markdown fences**, no commentary. A
-translated `.html` file must be valid HTML that can replace the original verbatim.
-The reader stamps text direction and `lang` from the Edition, so never add
-`dir`/`lang` or other direction markup — just translate the text.
+`.parts/` sits outside the translations tree, so it is never published. Then:
+
+1. One subagent per chunk, dispatched concurrently, same four-line prompt plus:
+   *this is a fragment — do not add or close tags it does not contain, do not
+   reorder or renumber anything, only chunk 00 has a `<title>`.* Each writes
+   `NN.out.html` beside its source chunk.
+2. `cat topics/$SLUG/.parts/<key>/*.out.html > topics/$SLUG/translations/$TRANSLATE_LANG/<dir>/<key>.html`
+   — the zero-padded names sort into the right order.
+3. Run the count check above on that file, re-run any bad chunk alone, publish.
+4. `rm -rf topics/$SLUG/.parts` at the end of the run.
+
