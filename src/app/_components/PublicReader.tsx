@@ -156,7 +156,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
         {menuOpen && <div onClick={() => setMenuOpen(false)} aria-hidden className="fixed inset-0 z-30 bg-black/40 md:hidden" />}
 
         <aside
-          className={`fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] transform flex-col overflow-y-auto border-t border-line rounded-t-2xl bg-paper p-4 transition-transform duration-300 md:static md:z-auto md:w-64 md:h-auto md:border-r md:border-t-0 md:rounded-t-none md:translate-y-0 md:translate-x-0 md:max-h-none md:transition-none ${
+          className={`fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] transform flex-col overflow-y-auto overscroll-y-none border-t border-line rounded-t-2xl bg-paper p-4 transition-transform duration-300 md:static md:z-auto md:w-64 md:h-auto md:border-r md:border-t-0 md:rounded-t-none md:translate-y-0 md:translate-x-0 md:max-h-none md:transition-none ${
             menuOpen ? "translate-y-0" : "translate-y-full"
           }`}
         >
