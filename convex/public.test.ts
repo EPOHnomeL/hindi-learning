@@ -107,6 +107,25 @@ test("setTopicPublic: regenerate invalidates the old token, make-private revokes
   ).rejects.toThrow();
 });
 
+test("publicEditionLang reports the Edition a token serves, so a Guest gets chrome in that language", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi");
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
+
+  // The legacy per-Topic token is the English source Edition.
+  const english = await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true });
+  expect(await t.query(api.public.publicEditionLang, { token: english! })).toBe("en");
+
+  // A per-language link reports its own language, no account needed.
+  await t.run((ctx) => ctx.db.insert("publicLinks", { topicId, lang: "es", token: "spanish-token" }));
+  expect(await t.query(api.public.publicEditionLang, { token: "spanish-token" })).toBe("es");
+
+  // An unknown/revoked token reveals nothing, like the rest of the seam.
+  expect(await t.query(api.public.publicEditionLang, { token: "not-a-real-token" })).toBeNull();
+  expect(await t.query(api.public.publicEditionLang, { token: "" })).toBeNull();
+});
+
 test("the read seam is identity-agnostic: any signed-in user (and the owner) read a public Topic by token", async () => {
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");

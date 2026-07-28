@@ -51,6 +51,20 @@ async function resolveGuestEdition(
   return { ...resolved, level };
 }
 
+// The language of the Edition a Public link serves — the Guest's chrome-language
+// hint (app-language-i18n). A shared link is for ONE Edition, so its language is
+// the best guess at the language the Guest reads; the middleware asks for it on a
+// cookieless `/share/<token>` request so the chrome paints in that language on
+// first paint. Deliberately the cheapest read in this file (token → Edition, no
+// content, no access resolution) so that guess never pays for the whole bundle,
+// and it leaks nothing a Guest holding the token can't already see. Null for an
+// unknown/revoked token — same "reveals nothing" contract as the rest of the seam.
+export const publicEditionLang = query({
+  args: { token: v.string() },
+  returns: v.union(v.null(), v.string()),
+  handler: async (ctx, { token }) => (await guestEditionFromToken(ctx, token))?.lang ?? null,
+});
+
 // Everything a Guest needs to render the course shell + read-only panels, in one
 // reactive bundle: the sidebar lists, Resources, and the owner's Progress and
 // Q&A (full mirror, ADR 0013). Per-artifact HTML is fetched on demand by

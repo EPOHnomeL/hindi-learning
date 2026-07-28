@@ -4,6 +4,7 @@ import { resolveTenantSlug, TENANT_SLUG_HEADER } from "./lib/tenant";
 import { cookieDomainFor } from "./lib/cookieDomain";
 import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from "./i18n/config";
 import { matchAcceptLanguage } from "./i18n/acceptLanguage";
+import { shareEditionLocale, shareTokenFromPath } from "./i18n/shareLocale";
 import { AUTH_COOKIE_MAX_AGE_SECONDS } from "./lib/sessionLifetime";
 
 // Convex Auth keeps the session in sync across server/client for the App Router.
@@ -15,7 +16,7 @@ import { AUTH_COOKIE_MAX_AGE_SECONDS } from "./lib/sessionLifetime";
 // to convex/nextjs, which logs a noisy "deploymentUrl is undefined" error even
 // though it falls back to NEXT_PUBLIC_CONVEX_URL. Next inlines this at build.
 export default convexAuthNextjsMiddleware(
-  (request) => {
+  async (request) => {
     const headers = new Headers(request.headers);
     // Never trust an inbound value — a client must not be able to force a skin by
     // sending its own x-tenant-slug. Resolution is from the Host header only.
@@ -28,14 +29,25 @@ export default convexAuthNextjsMiddleware(
     headers.set("x-url", request.url);
 
     // Cookie-writer #3 (app-language-i18n ticket 03 §3): first visit, nothing
-    // stored → sniff Accept-Language ONCE, map to an offered locale (else
-    // English), and persist so the negotiation never re-runs. Stamping the
-    // forwarded Cookie header makes it visible to THIS request's getRequestConfig,
-    // so a Spanish browser lands in Spanish chrome on first paint (no flash); the
-    // Set-Cookie below makes it durable. An explicit pick always overrides later.
-    const sniffed = request.cookies.get(LOCALE_COOKIE)
+    // stored → resolve an offered locale ONCE and persist it so the negotiation
+    // never re-runs. Stamping the forwarded Cookie header makes it visible to THIS
+    // request's getRequestConfig, so a Spanish browser lands in Spanish chrome on
+    // first paint (no flash); the Set-Cookie below makes it durable. An explicit
+    // pick always overrides later.
+    //
+    // Two signals, in this order:
+    //   1. the Public link's Edition language — a Guest opening `/share/<token>`
+    //      is reading that Edition, so its language wins when we ship chrome for
+    //      it (i18n/shareLocale.ts). One extra Convex read, and only on a
+    //      cookieless share request: the cookie written below ends it.
+    //   2. Accept-Language, the browser's own claim (English if nothing matches).
+    // Both are first-touch only, so neither can override a stored locale.
+    const stored = request.cookies.get(LOCALE_COOKIE);
+    const shareToken = stored ? null : shareTokenFromPath(request.nextUrl.pathname);
+    const sniffed = stored
       ? null
-      : matchAcceptLanguage(request.headers.get("accept-language"));
+      : ((shareToken ? await shareEditionLocale(shareToken) : null) ??
+        matchAcceptLanguage(request.headers.get("accept-language")));
     if (sniffed) {
       const existing = headers.get("cookie");
       headers.set("cookie", existing ? `${existing}; ${LOCALE_COOKIE}=${sniffed}` : `${LOCALE_COOKIE}=${sniffed}`);

@@ -31,7 +31,16 @@ export const LOCALE_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 // message file that doesn't exist ("picks Telugu, silently gets English", ticket
 // 04) — an unoffered code resolves to English deliberately, not by import crash.
 export function resolveLocale(value: string | undefined | null): Locale {
-  return value && (LOCALES as readonly string[]).includes(value)
-    ? (value as Locale)
-    : DEFAULT_LOCALE;
+  return offeredLocale(value) ?? DEFAULT_LOCALE;
+}
+
+// The same offer-set test, but "offered, or nothing" instead of "offered, or
+// English" — for callers that have a *further* fallback and so must tell the two
+// apart. The Public-link adoption (i18n/shareLocale.ts) is one: an Edition
+// language we don't ship chrome for must fall through to the browser's
+// Accept-Language, not straight to English. Note this matches whole codes only,
+// so a romanized Edition (`hi-Latn`) is deliberately NOT Hindi chrome — someone
+// reading Hindi in Latin letters is exactly the reader Devanagari chrome fails.
+export function offeredLocale(value: string | undefined | null): Locale | null {
+  return value && (LOCALES as readonly string[]).includes(value) ? (value as Locale) : null;
 }
