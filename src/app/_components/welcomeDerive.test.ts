@@ -22,6 +22,29 @@ describe("missionExcerpt", () => {
     expect(missionExcerpt("   \n  ")).toBe(null);
   });
 
+  // Missions are authored as markdown and the excerpt is plain text, so the syntax
+  // has to come off — a mission opening "# Mission: …" rendered its own hash marks
+  // into the panel.
+  it("strips heading markers, keeping the heading's words", () => {
+    expect(missionExcerpt("# Mission: read Premchand")).toBe("Mission: read Premchand");
+    expect(missionExcerpt("###### Deeply nested")).toBe("Deeply nested");
+    expect(missionExcerpt("# Why I read\n\n## In the original")).toBe("Why I read In the original");
+  });
+
+  it("strips emphasis and inline-code markers, keeping the words", () => {
+    expect(missionExcerpt("Read **Premchand** in the _original_.")).toBe("Read Premchand in the original.");
+    expect(missionExcerpt("Read `Godaan` first.")).toBe("Read Godaan first.");
+  });
+
+  it("leaves a hash that isn't a heading marker alone", () => {
+    expect(missionExcerpt("Lesson #1 covers C# and #hashtags")).toBe("Lesson #1 covers C# and #hashtags");
+  });
+
+  it("treats a mission of nothing but markers as no mission at all", () => {
+    expect(missionExcerpt("#")).toBe(null);
+    expect(missionExcerpt("## \n # ")).toBe(null);
+  });
+
   it("truncates a long mission on a word boundary and marks the cut", () => {
     const mission =
       "Learn to read Hindi well enough to follow a newspaper column without a dictionary, " +
