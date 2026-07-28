@@ -237,6 +237,23 @@ function injectDevanagariCss(html: string): string {
   return i === -1 ? DEVANAGARI_CSS + html : html.slice(0, i) + DEVANAGARI_CSS + html.slice(i);
 }
 
+// Quiz options are <button>s, and head.html's `.opt` rule sets `font:inherit` but
+// no colour — so the label fell through to the UA's ButtonText, which renders as a
+// dim grey under a dark colour-scheme (visibly fainter than the question above it).
+// Fixed in head.html for newly authored lessons; this override carries the fix to
+// the lessons ALREADY stored, whose HTML has the old rule baked in.
+//
+// `:not(.correct):not(.wrong)` so an answered option keeps the state colour
+// head.html sets at `.opt.correct` — and it's what carries the specificity too:
+// (0,3,0) already outranks the authored `.opt` (0,1,0), so this needs no `:root:root`
+// doubling (which is reserved for the tenant palette blocks).
+const LESSON_OPTION_INK_CSS = `<style>.opt:not(.correct):not(.wrong){color:var(--ink)}</style>`;
+
+function injectLessonOptionInk(html: string): string {
+  const i = html.indexOf("</head>");
+  return i === -1 ? LESSON_OPTION_INK_CSS + html : html.slice(0, i) + LESSON_OPTION_INK_CSS + html.slice(i);
+}
+
 // Re-point the lesson design system's HARDCODED dark surfaces at the palette
 // tokens, for tenant hosts only. Every lesson's stored HTML carries head.html's
 // dark block, which hardcodes ~20 warm-brown hexes (#241f1a cards, #3a322a
@@ -385,6 +402,9 @@ export function buildSrcDoc(
   }
   const reference = opts.reference || opts.refShare;
   if (reference) doc = injectReferenceCardCss(doc);
+  // Lessons only — `quiz` is what distinguishes a lesson from a reference here, and
+  // references carry no quiz options.
+  if (opts.quiz) doc = injectLessonOptionInk(doc);
   doc = setRootDirLang(doc, opts.dir, opts.lang);
   if (opts.lang && isDevanagari(opts.lang)) doc = injectDevanagariCss(doc);
   if (opts.tenantPalette) doc = injectTenantPaletteCss(doc, opts.tenantPalette);

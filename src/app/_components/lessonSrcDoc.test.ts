@@ -121,6 +121,16 @@ describe("buildSrcDoc", () => {
     expect(out).not.toContain(":root:root"); // no tenant palette block
   });
 
+  it("paints quiz option labels in ink, without stealing an answered option's state colour", () => {
+    // `.opt` is a <button>: head.html gives it `font:inherit` but no colour, so the
+    // label fell through to the UA ButtonText (dim grey in dark). Carried to lessons
+    // already stored with the old rule.
+    const out = buildSrcDoc(LESSON, { quiz: true, theme: "dark" });
+    expect(out).toContain(".opt:not(.correct):not(.wrong){color:var(--ink)}");
+    // References have no options, so they don't get the rule.
+    expect(buildSrcDoc(LESSON, { quiz: false, theme: "dark" })).not.toContain(".opt:not(.correct)");
+  });
+
   it("re-points the lesson's hardcoded dark surfaces at the palette tokens for a tenant", () => {
     // head.html bakes warm-brown literals into every lesson's dark CSS (#241f1a
     // cards, #3a322a borders, #221d16 quiz options), which a token override can't
