@@ -9,6 +9,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
 import { Frame, useCardTarget, useContentHtml } from "./ArtifactView";
+import { Brand } from "./Brand";
 import { NavItem } from "./NavItem";
 import { Markdown } from "./MarkdownView";
 import { LockedPane, Paygate } from "./Paygate";
@@ -161,6 +162,17 @@ export function PublicCourseShell({ token, children }: { token: string; children
         >
           {/* Drawer handle for mobile */}
           <div className="mx-auto mb-3.5 h-1.5 w-12 shrink-0 rounded-full bg-line md:hidden" />
+          {/* The tenant lockup in the top-left corner. A Guest arrives on a Public
+              link with no auth chrome, so this is their one way to the tenant's front
+              door: "/" is the landing signed out, the dashboard signed in. */}
+          <Link
+            href="/"
+            aria-label={t("backToCoursesLabel") ?? "Back to courses"}
+            title={t("backToCoursesLabel") ?? "Back to courses"}
+            className="mb-4 block shrink-0 hover:opacity-80"
+          >
+            <Brand className="h-8 w-auto max-w-40 object-contain" />
+          </Link>
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-accent2">{t(preview ? "course" : "publicCourse")}</p>
           <div className="mb-4">
             <h1 className="truncate text-lg font-semibold tracking-tight text-accent">{course.title}</h1>
