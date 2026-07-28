@@ -17,7 +17,9 @@ import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { useResourceUpload } from "./useResourceUpload";
-import { completedKeys, frontierKey, nextLessonKey, seenAfterOpening } from "./readerDerive";
+import { completedKeys, frontierKey, nextLessonKey, resumeLessonKey, seenAfterOpening } from "./readerDerive";
+import { Welcome } from "./Welcome";
+import { latchFirstOpen } from "./welcomeDerive";
 
 // localStorage key for answered-question ids the learner has already seen.
 const SEEN_KEY = "hindi:answers-seen";
@@ -109,6 +111,16 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   // Lesson "Free", which is meaningless to a caller who holds the Edition.
   const preview = header?.role === "preview";
 
+  // The first-open welcome panel (welcome/01): shown when the caller has no
+  // progress at all on this course. Latched, because rendering a lesson writes an
+  // `opened` row (ArtifactView) and progress is a live query — an unlatched check
+  // would tear the panel away a beat after it appeared.
+  const [firstOpen, setFirstOpen] = useState<boolean | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    setFirstOpen((prev) => latchFirstOpen(prev, progress));
+  }, [progress]);
+
   const completed = completedKeys(progress ?? []);
   const frontier = frontierKey(lessons ?? []);
   const nextKey = useCallback((lessonKey: string) => nextLessonKey(lessons ?? [], lessonKey), [lessons]);
@@ -133,9 +145,17 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
     [questions],
   );
 
+  // The welcome panel's "start here" lesson: the caller's resume point, or — on a
+  // paid Edition, where everything past the free Preview is locked — the first
+  // lesson they can actually open. Never point at a door that won't open.
+  const resumeKey = resumeLessonKey(lessons ?? [], progress ?? []);
+  const startLesson =
+    lessons?.find((l) => l.key === resumeKey && !l.locked) ?? lessons?.find((l) => !l.locked) ?? null;
+
   // Which nav item is active, read from the URL.
   const isRef = pathname.includes("/references/");
   const activeKey = decodeURIComponent(pathname.split("/").pop() ?? "");
+  const showWelcome = firstOpen === true && !dismissed && !isRef;
 
   // Selecting a Lesson/Reference navigates; close the mobile drawer when the route
   // changes. Keyed on the route so tapping Resource uploads/links doesn't close it.
@@ -287,6 +307,24 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
 
         <section className="flex min-w-0 flex-1 flex-col md:overflow-hidden md:p-4">
           <ConfirmingBanner />
+          {/* The first-open welcome (welcome/01). Lessons only — someone deep-linking
+              to a Reference is looking something up, not starting the course. The
+              portal link is a plain "/" here: this route's layout bounces to the
+              course's canonical host (ADR 0022 §3), so "/" already IS its tenant's
+              front door. (The Guest reader has no such bounce, hence tenantHomeHref
+              there.) */}
+          {showWelcome && header && (
+            <div className="shrink-0">
+              <Welcome
+                course={header.title}
+                lessonCount={lessons?.length ?? 0}
+                mission={header.mission}
+                next={startLesson && { seq: startLesson.seq, title: startLesson.title, href: withLang(`/courses/${slug}/lessons/${startLesson.key}`, lang) }}
+                homeHref="/"
+                onDismiss={() => setDismissed(true)}
+              />
+            </div>
+          )}
           <div className="flex min-h-0 flex-1 flex-col">{children}</div>
         </section>
       </div>

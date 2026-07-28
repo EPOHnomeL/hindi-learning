@@ -17,7 +17,10 @@ import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { CourseSkeleton, ReaderSkeleton } from "./ui";
 import { useHideOnScroll } from "./useHideOnScroll";
-import { firstLessonKey, nextLessonKey } from "./readerDerive";
+import { firstLessonKey, nextLessonKey, resumeLessonKey } from "./readerDerive";
+import { Welcome } from "./Welcome";
+import { guestProgress, latchFirstOpen } from "./welcomeDerive";
+import { tenantHomeHref, type TenantSlug } from "~/lib/tenant";
 
 // The Guest reader (issue 07 / ADR 0013): the read-only `/share/[token]` view an
 // anonymous Guest sees. It mirrors the authed reader's shape but reaches data
@@ -75,6 +78,10 @@ export function PublicCourseShell({ token, children }: { token: string; children
   // on mount; `markComplete` adds one and persists. No account, so this is all
   // client-side.
   const [completed, setCompleted] = useState<Set<string>>(new Set());
+  // Whether that load has happened yet. The welcome panel (welcome/01) turns on an
+  // EMPTY completed set, and the set starts empty before localStorage is read — so
+  // without this a returning Guest would get a flash of "welcome" on every visit.
+  const [doneLoaded, setDoneLoaded] = useState(false);
   useEffect(() => {
     try {
       const raw = localStorage.getItem(`${DONE_KEY}:${token}`);
@@ -82,7 +89,17 @@ export function PublicCourseShell({ token, children }: { token: string; children
     } catch {
       /* unavailable or corrupt storage — start empty */
     }
+    setDoneLoaded(true);
   }, [token]);
+
+  // First open of this Public link on this device? Latched once the stored set has
+  // been read (`undefined` = still loading, so no verdict yet), then held for the
+  // mount so pressing "Next lesson" mid-read can't yank the panel away.
+  const [firstOpen, setFirstOpen] = useState<boolean | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    setFirstOpen((prev) => latchFirstOpen(prev, doneLoaded ? guestProgress(completed) : undefined));
+  }, [doneLoaded, completed]);
   const markComplete = useCallback(
     (lessonKey: string) => {
       setCompleted((prev) => {
@@ -114,6 +131,21 @@ export function PublicCourseShell({ token, children }: { token: string; children
   // whether the paygate is on show, which drives the "Free" badge and the
   // Resources/Q&A affordances. A free Edition has no paywall and reads as before.
   const preview = !!course.paywall;
+
+  // The welcome panel's "start here" lesson: the Guest's resume point, or — on a
+  // paid Edition, where everything past the free Preview is locked — the first
+  // lesson they can actually open. Never point at a door that won't open.
+  const resumeKey = resumeLessonKey(course.lessons, guestProgress(completed));
+  const startLesson =
+    course.lessons.find((l) => l.key === resumeKey && !l.locked) ?? course.lessons.find((l) => !l.locked) ?? null;
+  // A Public link has no canonical-host bounce (only the authed course layout has
+  // one), so the Guest may be reading a tenanted course on the apex — resolve the
+  // portal's real front door rather than assuming "/" is it.
+  const homeHref =
+    typeof window === "undefined"
+      ? "/"
+      : tenantHomeHref(window.location.href, (course.tenantSlug as TenantSlug | null) ?? null);
+  const showWelcome = firstOpen === true && !dismissed && !isRef;
 
   return (
     <Ctx.Provider value={{ token, course, completed, markComplete }}>
@@ -243,7 +275,23 @@ export function PublicCourseShell({ token, children }: { token: string; children
           <ThemeToggle />
         </aside>
 
-        <section className="flex min-w-0 flex-1 flex-col md:overflow-hidden md:p-4">{children}</section>
+        <section className="flex min-w-0 flex-1 flex-col md:overflow-hidden md:p-4">
+          {/* The first-open welcome (welcome/01). Lessons only — a Guest who lands
+              on a Reference deep link is looking something up, not starting out. */}
+          {showWelcome && (
+            <div className="shrink-0 px-3 pt-3 md:px-0 md:pt-0">
+              <Welcome
+                course={course.title}
+                lessonCount={course.lessons.length}
+                mission={course.mission}
+                next={startLesson && { seq: startLesson.seq, title: startLesson.title, href: `${base}/lessons/${startLesson.key}` }}
+                homeHref={homeHref}
+                onDismiss={() => setDismissed(true)}
+              />
+            </div>
+          )}
+          {children}
+        </section>
       </div>
     </Ctx.Provider>
   );
