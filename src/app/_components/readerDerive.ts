@@ -112,6 +112,23 @@ export function resourceOpenMode(filename: string, kind: "file" | "url"): "dialo
   return kind === "file" && /\.(md|markdown)$/i.test(filename) ? "dialog" : "tab";
 }
 
+// What a clicked Resource link actually opens, resolved against the Resource list
+// the reader already holds (freshly-signed urls, never a baked-in expiring one).
+// Null is the graceful no-op (rich-media/11): the id isn't in the bundle because
+// it's withheld on a paid Preview or the Resource was deleted, the reader holds no
+// list yet, or the blob URL hasn't landed. Callers do nothing on null — no
+// navigation, no error, no console noise.
+type ResourceLite = { id: string; filename: string; kind: "file" | "url"; url: string | null };
+
+export function resourceTarget(
+  resources: readonly ResourceLite[] | undefined,
+  id: string,
+): { mode: "dialog" | "tab"; filename: string; url: string } | null {
+  const r = resources?.find((x) => x.id === id);
+  if (!r?.url) return null;
+  return { mode: resourceOpenMode(r.filename, r.kind), filename: r.filename, url: r.url };
+}
+
 // The target glossary card id from a URL hash (reference-cards/02). A Lesson
 // deep-links to a card as `…/references/<key>#<cardId>`; the reference reader
 // forwards this id to the iframe bridge to scroll + flash it. Strips the leading

@@ -13,7 +13,7 @@ import { publicCourseUrl, useBuyMarker, useEditionLang, withLang } from "./editi
 import { buildEditDoc, buildSrcDoc, replaceBodyInner, scrollToCardMessage, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
 import { MarkdownResourceDialog } from "./ResourceItem";
-import { cardIdFromHash, composeCardShare, resolveArtifactClick, resourceOpenMode } from "./readerDerive";
+import { cardIdFromHash, composeCardShare, resolveArtifactClick, resourceTarget } from "./readerDerive";
 import { ReaderSkeleton } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useTenant } from "./TenantContext";
@@ -310,11 +310,11 @@ export function Frame({
         if (action.kind === "resource") {
           // Resolve the id against the reader's in-bundle Resources → a fresh signed
           // url. A withheld (paid Preview) or deleted Resource isn't in the list, so
-          // this is a graceful no-op (rich-media/11).
-          const res = resources?.find((r) => r.id === action.id);
-          if (!res?.url) return;
-          if (resourceOpenMode(res.filename, res.kind) === "dialog") setMdResource({ title: res.filename, url: res.url });
-          else window.open(res.url, "_blank", "noopener,noreferrer");
+          // resourceTarget returns null and this is a graceful no-op (rich-media/11).
+          const target = resourceTarget(resources, action.id);
+          if (!target) return;
+          if (target.mode === "dialog") setMdResource({ title: target.filename, url: target.url });
+          else window.open(target.url, "_blank", "noopener,noreferrer");
           return;
         }
         const path = action.path + url.search + url.hash;

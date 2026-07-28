@@ -10,6 +10,7 @@ import {
   nextLessonKey,
   resolveArtifactClick,
   resourceOpenMode,
+  resourceTarget,
   resumeLessonKey,
   seenAfterOpening,
   unseenReplyKeys,
@@ -120,6 +121,40 @@ describe("resourceOpenMode", () => {
   it("opens an external URL Resource in a new tab, even one ending .md", () => {
     // A `url` Resource is a link to open, never our Markdown dialog.
     expect(resourceOpenMode("https://example.com/readme.md", "url")).toBe("tab");
+  });
+});
+
+describe("resourceTarget", () => {
+  const bundle = [
+    { id: "r_md", filename: "notes.md", kind: "file" as const, url: "https://blob/notes" },
+    { id: "r_pdf", filename: "Handbook.pdf", kind: "file" as const, url: "https://blob/handbook" },
+    { id: "r_link", filename: "https://example.com/x", kind: "url" as const, url: "https://example.com/x" },
+    { id: "r_pending", filename: "landing.pdf", kind: "file" as const, url: null },
+  ];
+
+  it("resolves an in-bundle Markdown Resource to its dialog target", () => {
+    expect(resourceTarget(bundle, "r_md")).toEqual({
+      mode: "dialog",
+      filename: "notes.md",
+      url: "https://blob/notes",
+    });
+  });
+
+  it("resolves a PDF or external-URL Resource to a new-tab target — sidebar parity", () => {
+    expect(resourceTarget(bundle, "r_pdf")).toMatchObject({ mode: "tab", url: "https://blob/handbook" });
+    expect(resourceTarget(bundle, "r_link")).toMatchObject({ mode: "tab", url: "https://example.com/x" });
+  });
+
+  it("no-ops on an id absent from the bundle — a withheld paid Preview or deleted Resource", () => {
+    expect(resourceTarget(bundle, "r_withheld")).toBeNull();
+  });
+
+  it("no-ops when the reader holds no Resource list at all", () => {
+    expect(resourceTarget(undefined, "r_md")).toBeNull();
+  });
+
+  it("no-ops on a Resource whose blob URL hasn't landed yet", () => {
+    expect(resourceTarget(bundle, "r_pending")).toBeNull();
   });
 });
 
