@@ -101,11 +101,13 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
     }
   }, []);
 
-  // Paid marketplace (ADR 0016): a `preview` caller holds no access to a paid
-  // Edition, so every Lesson past the free Preview (and every Reference) is locked
-  // in the nav. The Preview itself — `paywall.previewKey` — is flagged Free.
+  // Paid marketplace (ADR 0016): WHICH items are locked is the server's call —
+  // `listLessons`/`listReferences` carry a per-item `locked` from the same rule
+  // the body reads apply, so the nav never re-derives it from
+  // `paywall.previewKey` (architecture-deepening/03). `preview` is only used to
+  // decide whether the paygate is on show at all: it badges the one unlocked
+  // Lesson "Free", which is meaningless to a caller who holds the Edition.
   const preview = header?.role === "preview";
-  const previewKey = header?.paywall?.previewKey ?? null;
 
   const completed = completedKeys(progress ?? []);
   const frontier = frontierKey(lessons ?? []);
@@ -236,8 +238,8 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
                 href={withLang(`/courses/${slug}/lessons/${l.key}`, lang)}
                 active={!isRef && activeKey === l.key}
                 done={completed.has(l.key)}
-                locked={preview && l.key !== previewKey}
-                free={preview && l.key === previewKey}
+                locked={l.locked}
+                free={preview && !l.locked}
               >
                 {l.seq}. {l.title.split("—")[0]!.trim()}
               </NavItem>
@@ -249,7 +251,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
                 key={r.key}
                 href={withLang(`/courses/${slug}/references/${r.key}`, lang)}
                 active={isRef && activeKey === r.key}
-                locked={preview}
+                locked={r.locked}
               >
                 {r.title}
               </NavItem>

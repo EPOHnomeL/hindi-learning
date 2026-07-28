@@ -207,3 +207,88 @@ test("courseHeader.canEdit: true for the owner and an Editor of the served lang,
   expect(await asUser(t, enEditor).query(api.content.reader.courseHeader, { topicSlug: "hindi" })).toMatchObject({ role: "viewer", canEdit: true });
   expect(await asUser(t, viewer).query(api.content.reader.courseHeader, { topicSlug: "hindi" })).toMatchObject({ role: "viewer", canEdit: false });
 });
+
+// ---- The paygate lock lives server-side (architecture-deepening/03) ----------
+//
+// `listLessons`/`listReferences` carry a per-item `locked` computed from the same
+// `lessonLocked` rule `getLesson` applies, so the TOC never re-derives it from
+// `paywall.previewKey`. Moving the Preview to a different Lesson is therefore
+// correct in the nav from one server-side change.
+
+// A paid Edition (a `listings` row makes it paid) with three Lessons; the caller
+// holds no grant, so `resolveEdition` classifies them `preview`.
+async function seedPaidCourse(t: ReturnType<typeof convexTest>) {
+  const owner = await seedUser(t, "owner@example.com");
+  const stranger = await seedUser(t, "stranger@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  await t.run(async (ctx) => {
+    for (const [key, seq] of [["0001", 1], ["0002", 2], ["0003", 3]] as const) {
+      await ctx.db.insert("lessons", { topicId, key, seq, title: `Lesson ${key}` });
+    }
+    const refSid = await ctx.storage.store(new Blob(["<p>g</p>"], { type: "text/html" }));
+    await ctx.db.insert("references", { topicId, key: "glossary", title: "Glossary", htmlStorageId: refSid, contentHash: "h" });
+    await ctx.db.insert("listings", { topicId, lang: "en", amount: 100, currency: "zar" });
+  });
+  return { owner, stranger, topicId };
+}
+
+test("listLessons: a preview caller gets locked:true for every Lesson past the free Preview", async () => {
+  const t = convexTest(schema, modules);
+  const { stranger } = await seedPaidCourse(t);
+
+  const lessons = await asUser(t, stranger).query(api.content.reader.listLessons, { topicSlug: "hindi" });
+  expect(lessons.map((l) => [l.key, l.locked])).toEqual([
+    ["0001", false], // the Preview — the lowest-ordered live Lesson
+    ["0002", true],
+    ["0003", true],
+  ]);
+});
+
+test("listLessons: the lock follows the Preview when the first Lesson is superseded", async () => {
+  const t = convexTest(schema, modules);
+  const { stranger, topicId } = await seedPaidCourse(t);
+  // Supersede 0001 → the Preview becomes 0002, with no client-side follow-up.
+  await t.run(async (ctx) => {
+    const first = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", "0001"))
+      .unique();
+    await ctx.db.patch(first!._id, { supersededBy: "0002" });
+  });
+
+  const lessons = await asUser(t, stranger).query(api.content.reader.listLessons, { topicSlug: "hindi" });
+  expect(lessons.map((l) => [l.key, l.locked])).toEqual([
+    ["0002", false],
+    ["0003", true],
+  ]);
+});
+
+test("listLessons: an owner / viewer / entitled / enrolled caller gets locked:false everywhere", async () => {
+  const t = convexTest(schema, modules);
+  const { owner, topicId } = await seedPaidCourse(t);
+  const viewer = await seedUser(t, "viewer@example.com");
+  const entitled = await seedUser(t, "entitled@example.com");
+  const enrolled = await seedUser(t, "enrolled@example.com");
+  await t.run(async (ctx) => {
+    await ctx.db.insert("shares", { topicId, viewerId: viewer, lang: "en" });
+    await ctx.db.insert("entitlements", { topicId, userId: entitled, lang: "en" });
+    await ctx.db.insert("enrollments", { topicId, userId: enrolled, lang: "en" });
+  });
+
+  for (const who of [owner, viewer, entitled, enrolled]) {
+    const lessons = await asUser(t, who).query(api.content.reader.listLessons, { topicSlug: "hindi" });
+    expect(lessons.map((l) => l.locked)).toEqual([false, false, false]);
+  }
+});
+
+test("listReferences: locked wholesale for a preview caller, unlocked for a holder", async () => {
+  const t = convexTest(schema, modules);
+  const { owner, stranger } = await seedPaidCourse(t);
+
+  expect(await asUser(t, stranger).query(api.content.reader.listReferences, { topicSlug: "hindi" })).toEqual([
+    { key: "glossary", title: "Glossary", locked: true },
+  ]);
+  expect(await asUser(t, owner).query(api.content.reader.listReferences, { topicSlug: "hindi" })).toEqual([
+    { key: "glossary", title: "Glossary", locked: false },
+  ]);
+});

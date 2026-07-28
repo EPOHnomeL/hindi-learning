@@ -84,7 +84,9 @@ test("owner reads a translated Edition; unheld languages fall back to English", 
     html: "<p>es 0001</p>",
   });
   expect(await a.query(api.content.reader.listLessons, { topicSlug: "hindi", lang: "es" })).toEqual([
-    { key: "0001", seq: 1, title: "Lección 0001" },
+    // `locked` is the server's paygate verdict (architecture-deepening/03); this
+    // Edition is free, so nothing is withheld.
+    { key: "0001", seq: 1, title: "Lección 0001", locked: false },
   ]);
   // English (source) is always available; its blob body is served as a content URL.
   expect(await a.query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001", lang: "en" })).toMatchObject({

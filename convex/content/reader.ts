@@ -211,11 +211,13 @@ export const listLessons = query({
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return [];
     // The table of contents is served in full even to a `preview` caller (only
-    // the Lesson *bodies* past the Preview are locked, in getLesson); `none` is
-    // not-found (a free Edition the caller holds no grant to).
+    // the Lesson *bodies* past the Preview are locked); `none` is not-found (a
+    // free Edition the caller holds no grant to). Each entry carries the
+    // server-computed `locked` verdict, so the nav renders the paygate without
+    // re-deriving it from `paywall.previewKey` (architecture-deepening/03).
     const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return [];
-    return await lessonsToc(ctx, topic, await loadEdition(ctx, topic, effLang).map());
+    return await lessonsToc(ctx, topic, await loadEdition(ctx, topic, effLang).map(), level);
   },
 });
 
@@ -242,11 +244,12 @@ export const listReferences = query({
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return [];
     // References are past the Preview, but their titles ride along in the table
-    // of contents even for a `preview` caller (the bodies are locked in
-    // getReference). `none` is not-found.
+    // of contents even for a `preview` caller — each carrying the server-computed
+    // `locked` verdict (`referenceLocked`) rather than the nav re-checking the
+    // role. `none` is not-found.
     const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return [];
-    return await referencesToc(ctx, topic, await loadEdition(ctx, topic, effLang).map());
+    return await referencesToc(ctx, topic, await loadEdition(ctx, topic, effLang).map(), level);
   },
 });
 

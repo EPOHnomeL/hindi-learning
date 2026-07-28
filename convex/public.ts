@@ -86,8 +86,22 @@ export const publicCourse = query({
       // The Edition this token serves + its text direction (course-translation).
       lang: v.string(),
       dir: v.union(v.literal("ltr"), v.literal("rtl")),
-      lessons: v.array(v.object({ key: v.string(), seq: v.number(), title: v.string() })),
-      references: v.array(v.object({ key: v.string(), title: v.string() })),
+      // The served Edition's mission (translated, English fallback), null when the
+      // course has none — the welcome panel's "what is this course for" line
+      // (welcome/01). Deliberately served on a paid Edition too: like the title and
+      // the table of contents, the mission is what makes the paygate legible, not
+      // paid material.
+      mission: v.union(v.string(), v.null()),
+      // The course's tenant subdomain label, null for a default-site course
+      // (welcome/01). Not secret — it is the public host every canonical link to
+      // this course already carries — and needed because `/share/<token>` has no
+      // canonical-host bounce: a Guest can be reading a tenanted course on the
+      // apex, where "/" is the wrong front door.
+      tenantSlug: v.union(v.string(), v.null()),
+      // `locked` is the server's paygate verdict per item (architecture-deepening
+      // /03) — the Guest's nav reads it rather than re-deriving it from `paywall`.
+      lessons: v.array(v.object({ key: v.string(), seq: v.number(), title: v.string(), locked: v.boolean() })),
+      references: v.array(v.object({ key: v.string(), title: v.string(), locked: v.boolean() })),
       resources: v.array(
         v.object({
           id: v.id("resources"),
@@ -127,13 +141,16 @@ export const publicCourse = query({
     // per-Lesson bodies are locked in publicLesson. A free Edition is `viewer`
     // and unchanged.
     const preview = level === "preview";
-    const m = await loadEdition(ctx, topic, lang).map();
+    // One Edition reader for both profiles: `map()` (memoised, backs the TOC lists)
+    // and the single-item `mission()` point-read.
+    const ed = loadEdition(ctx, topic, lang);
+    const m = await ed.map();
 
     // The table of contents uses the shared TOC projections (edition-deepening/04);
     // the resources/progress/questions full-mirror below stays Guest-only, behind
     // the explicit output allowlist (anonymous, public-internet-facing).
-    const lessons = await lessonsToc(ctx, topic, m);
-    const references = await referencesToc(ctx, topic, m);
+    const lessons = await lessonsToc(ctx, topic, m, level);
+    const references = await referencesToc(ctx, topic, m, level);
 
     const resources = await Promise.all(
       (await ctx.db.query("resources").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()).map(
@@ -178,6 +195,10 @@ export const publicCourse = query({
       slug: topic.slug,
       lang,
       dir: langInfo(lang).rtl ? ("rtl" as const) : ("ltr" as const),
+      // The welcome panel's orientation (welcome/01) — see the validator above for
+      // why both are served even on a paid Edition.
+      mission: await ed.mission(),
+      tenantSlug: topic.tenantSlug ?? null,
       lessons,
       references,
       // Paid material is withheld from a Guest until they buy; the TOC above stays.

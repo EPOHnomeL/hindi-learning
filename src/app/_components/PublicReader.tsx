@@ -108,10 +108,12 @@ export function PublicCourseShell({ token, children }: { token: string; children
 
   // Paid marketplace (ADR 0016): a Public link to a PAID Edition serves a Guest
   // only the free Preview + the table of contents (`publicCourse.paywall` is
-  // present). Everything past the Preview is locked in the nav; the Preview Lesson
-  // itself is flagged Free. A free Edition has no paywall and reads as before.
+  // present). WHICH items are locked is the server's call — each entry carries a
+  // `locked` verdict from the shared paygate rule (architecture-deepening/03), so
+  // the nav never re-derives it from `paywall.previewKey`. `preview` only says
+  // whether the paygate is on show, which drives the "Free" badge and the
+  // Resources/Q&A affordances. A free Edition has no paywall and reads as before.
   const preview = !!course.paywall;
-  const previewKey = course.paywall?.previewKey ?? null;
 
   return (
     <Ctx.Provider value={{ token, course, completed, markComplete }}>
@@ -194,8 +196,8 @@ export function PublicCourseShell({ token, children }: { token: string; children
                 href={`${base}/lessons/${l.key}`}
                 active={!isRef && activeKey === l.key}
                 done={completed.has(l.key)}
-                locked={preview && l.key !== previewKey}
-                free={preview && l.key === previewKey}
+                locked={l.locked}
+                free={preview && !l.locked}
               >
                 {l.seq}. {l.title.split("—")[0]!.trim()}
               </NavItem>
@@ -205,7 +207,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
               <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">{t("references")}</p>
             )}
             {course.references.map((r) => (
-              <NavItem key={r.key} href={`${base}/references/${r.key}`} active={isRef && activeKey === r.key} locked={preview}>
+              <NavItem key={r.key} href={`${base}/references/${r.key}`} active={isRef && activeKey === r.key} locked={r.locked}>
                 {r.title}
               </NavItem>
             ))}
