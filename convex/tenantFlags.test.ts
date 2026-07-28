@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { assertTenantFlag } from "./lib";
+import { assertTenantFlag } from "./tenantFlags";
 import type { Id } from "./_generated/dataModel";
 
 // Issue 17 — server-side feature-flag enforcement. The five create-side mutations

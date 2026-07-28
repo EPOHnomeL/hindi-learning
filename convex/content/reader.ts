@@ -2,7 +2,8 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, type QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { buildPaywall, getEditableTopic, heldLangs, lessonsToc, loadEdition, readLesson, readReference, referencesToc, resolveEdition, SOURCE_LANG, topicBySlug, topicLessonCounts } from "../lib";
+import { buildPaywall, getEditableTopic, heldLangs, lessonsToc, loadEdition, readLesson, readReference, referencesToc, resolveEdition, SOURCE_LANG, topicBySlug } from "../lib";
+import { topicLessonCounts } from "../progressCounts";
 import { langInfo } from "../languages";
 
 // Lessons & references. Reader queries are auth-gated and owner-scoped: a Topic

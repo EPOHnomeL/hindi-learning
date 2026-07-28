@@ -1,7 +1,5 @@
-import { v, type Infer } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { tenantFlagsValidator } from "./schema";
 
 // Shared backend helpers. (Plain module — no Convex functions registered here.)
 
@@ -119,33 +117,6 @@ export function pickContentBody(
 export function assertAdmin(secret: string) {
   const expected = process.env.PUBLISH_SECRET;
   if (!expected || secret !== expected) throw new Error("unauthorized");
-}
-
-// ---- Whitelabel feature flags (issue 04 / 17) -------------------------------
-
-// One of a tenant's five feature flags (schema `tenantFlagsValidator`).
-export type TenantFlag = keyof Infer<typeof tenantFlagsValidator>;
-
-// The server-side flag gate: throws when `flag` is off for `tenantSlug`. Called
-// inline in the five create-side mutations so a disabled feature is enforced at
-// the API boundary, not merely hidden in the UI (issue 17). `tenantSlug`
-// undefined = default site / not-yet-tenanted content, where every flag is
-// implicitly on — matching today's always-on behaviour exactly (no regression).
-// Read paths never call this: only the CREATE path is gated, so anything already
-// granted keeps resolving after a flag flips off (flag-off is frozen, not
-// revoked, ADR/issue 04). A slug with no `tenants` row is denied (fail-closed).
-// The `by_slug` read hits the bounded, indexed tenants table.
-export async function assertTenantFlag(
-  ctx: QueryCtx,
-  tenantSlug: string | undefined,
-  flag: TenantFlag,
-): Promise<void> {
-  if (tenantSlug === undefined) return;
-  const tenant = await ctx.db
-    .query("tenants")
-    .withIndex("by_slug", (q) => q.eq("slug", tenantSlug))
-    .unique();
-  if (!tenant?.flags[flag]) throw new Error("This feature isn't available on this site.");
 }
 
 export async function topicBySlug(ctx: QueryCtx, slug: string): Promise<Doc<"topics"> | null> {
@@ -513,48 +484,6 @@ export async function referencesToc(
   return refs.sort((a, b) => a.key.localeCompare(b.key)).map((r) => ({ key: r.key, title: snap.referenceTitle(r) }));
 }
 
-// ---- Paid marketplace: Sellers (ADR 0016) -----------------------------------
-
-// A Seller's readiness stage, derived from their `sellers` row (see schema):
-//   not-granted               — no row: the Admin has not granted can-sell
-//   granted-no-payout-details — granted, but no payout bank details on file yet
-//   ready                     — grant + bank details: may price and be paid
-// A Seller (CONTEXT) is only `ready` when both gates are satisfied — a course is
-// never sold with nowhere to send the Seller's cut. Single source of truth: the
-// validator (used by every Convex function that returns a status) and the
-// `SellerStatus` type both derive from this one declaration.
-export const sellerStatusValidator = v.union(
-  v.literal("not-granted"),
-  v.literal("granted-no-payout-details"),
-  v.literal("ready"),
-  // The deployment itself can't sell: PayFast env vars aren't provisioned
-  // (payfastConfigured). Reported by the self-status query only — per-Seller
-  // row readiness (the admin list) is independent of deployment config.
-  v.literal("payments-unconfigured"),
-);
-export type SellerStatus = Infer<typeof sellerStatusValidator>;
-
-// The caller's Seller row, or null when can-sell was never granted.
-export async function getSeller(ctx: QueryCtx, userId: Id<"users">): Promise<Doc<"sellers"> | null> {
-  return await ctx.db
-    .query("sellers")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
-    .unique();
-}
-
-// Map a Seller row (or its absence) to the readiness stage the self-status query
-// and the pricing guard both read. Payout bank details are the single gate on `ready`.
-export function sellerStatusOf(seller: Doc<"sellers"> | null): SellerStatus {
-  if (!seller) return "not-granted";
-  return seller.payout ? "ready" : "granted-no-payout-details";
-}
-
-// Whether the caller may price/sell right now — granted AND bank details on file.
-// The guard the pricing action enforces.
-export async function isReadySeller(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
-  return sellerStatusOf(await getSeller(ctx, userId)) === "ready";
-}
-
 // ---- Paid marketplace: the Edition access resolver (ADR 0016) ---------------
 
 // The caller's relationship to a requested Edition. `owner`/`viewer`/`entitled`/
@@ -709,24 +638,4 @@ export async function resolveEdition(
   if (effLang !== null) return { lang: effLang, level: await editionAccessLevel(ctx, topic, effLang, userId, false, grants) };
   const lang = requested ?? SOURCE_LANG;
   return { lang, level: await editionAccessLevel(ctx, topic, lang, userId, false, grants) };
-}
-
-// A Topic's live progress counts for a dashboard/Shared-with-me card: how many
-// non-superseded Lessons it has, and how many `userId` has completed. Progress is
-// per-reader, so the counts are the caller's own — an owner sees their own
-// progress; a Viewer sees theirs (fresh on a shared Topic), not the owner's.
-export async function topicLessonCounts(
-  ctx: QueryCtx,
-  topicId: Id<"topics">,
-  userId: Id<"users">,
-): Promise<{ lessonCount: number; completedCount: number }> {
-  const lessons = (
-    await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect()
-  ).filter((l) => !l.supersededBy);
-  const progress = await ctx.db
-    .query("progress")
-    .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topicId).eq("userId", userId))
-    .collect();
-  const done = new Set(progress.filter((p) => p.status === "completed").map((p) => p.lessonKey));
-  return { lessonCount: lessons.length, completedCount: lessons.filter((l) => done.has(l.key)).length };
 }

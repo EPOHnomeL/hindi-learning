@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
-import { getSeller, normaliseEmail, sellerStatusOf, sellerStatusValidator, type SellerStatus } from "./lib";
+import { normaliseEmail } from "./lib";
+import { getSeller, sellerStatusOf, sellerStatusValidator, type SellerStatus } from "./sellerStatus";
 import { sellingEnabled } from "./payfast";
 import { payoutDetailsValidator } from "./schema";
 import { isCallerAdmin } from "./whitelist";

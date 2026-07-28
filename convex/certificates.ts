@@ -2,7 +2,9 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertTenantFlag, getViewableTopic, loadEdition, mintToken, readableLang, SOURCE_LANG, topicLessonCounts } from "./lib";
+import { getViewableTopic, loadEdition, mintToken, readableLang, SOURCE_LANG } from "./lib";
+import { assertTenantFlag } from "./tenantFlags";
+import { topicLessonCounts } from "./progressCounts";
 import { langInfo } from "./languages";
 import { resolveEmblem, resolvedEmblemValidator, snapshotEmblem } from "./emblem";
 

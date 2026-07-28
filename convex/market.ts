@@ -7,14 +7,14 @@ import {
   editionPrice,
   getOwnedTopic,
   heldLangs,
-  isReadySeller,
   mintToken,
   normaliseEmail,
   SOURCE_LANG,
   topicBySlug,
-  topicLessonCounts,
   translatedTitle,
 } from "./lib";
+import { isReadySeller } from "./sellerStatus";
+import { topicLessonCounts } from "./progressCounts";
 import { langInfo } from "./languages";
 import { appUrl, buildCheckoutFields, platformFeeBps, processUrl, sellingEnabled, splitNet } from "./payfast";
 import { isCallerAdmin } from "./whitelist";
