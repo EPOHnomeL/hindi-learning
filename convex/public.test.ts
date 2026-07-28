@@ -139,3 +139,68 @@ test("the read seam is identity-agnostic: any signed-in user (and the owner) rea
   // The owner opening their own share URL previews the same Guest view.
   expect(await asUser(t, owner).query(api.public.publicCourse, { token: token! })).toMatchObject({ title: "Hindi" });
 });
+
+// ---- The first-open welcome panel (welcome/01) -----------------------------
+//
+// The Guest reader's welcome needs two things the bundle didn't carry: the course
+// mission (the "what is this for" line) and the course's tenant (its portal's
+// front door — `/share/<token>` has no canonical-host bounce, so a Guest can be
+// reading a tenanted course on the apex).
+
+test("publicCourse carries the mission + the course's tenant, for the welcome panel", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", "Read Premchand in the original.");
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
+  const token = await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true });
+  // Tenant the course after minting the link: whether a tenant may share publicly
+  // at all is a feature-flag question owned by setTopicPublic's own tests — this one
+  // is about what the Guest bundle projects.
+  await t.run((ctx) => ctx.db.patch(topicId, { tenantSlug: "ywampotch" }));
+
+  expect(await t.query(api.public.publicCourse, { token: token! })).toMatchObject({
+    mission: "Read Premchand in the original.",
+    tenantSlug: "ywampotch",
+  });
+});
+
+test("publicCourse: a course with no mission and no tenant reports both as null", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi");
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
+  const token = await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true });
+
+  const pub = await t.query(api.public.publicCourse, { token: token! });
+  expect(pub!.mission).toBeNull();
+  expect(pub!.tenantSlug).toBeNull();
+});
+
+test("publicCourse serves the Edition's translated mission, falling back to English", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", "Read Premchand in the original.");
+  await t.run(async (ctx) => {
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" });
+    // A per-language Public link fixes the Guest to one Edition (course-translation).
+    await ctx.db.insert("publicLinks", { topicId, lang: "es", token: "tok-es" });
+    await ctx.db.insert("publicLinks", { topicId, lang: "fr", token: "tok-fr" });
+    // ...but only the Spanish Edition has the mission translated.
+    await ctx.db.insert("translations", {
+      topicId,
+      lang: "es",
+      kind: "mission",
+      key: "",
+      text: "Leer a Premchand en el original.",
+      sourceHash: "h",
+    });
+  });
+
+  expect((await t.query(api.public.publicCourse, { token: "tok-es" }))!.mission).toBe(
+    "Leer a Premchand en el original.",
+  );
+  // French has no translated mission row yet — the English source stands in.
+  expect((await t.query(api.public.publicCourse, { token: "tok-fr" }))!.mission).toBe(
+    "Read Premchand in the original.",
+  );
+});

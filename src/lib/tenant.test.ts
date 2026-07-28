@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { canonicalRedirect, resolveTenantSlug, TENANT_SLUGS } from "./tenant";
+import { canonicalRedirect, resolveTenantSlug, tenantHomeHref, TENANT_SLUGS } from "./tenant";
 
 test("TENANT_SLUGS is exactly the four seeded tenants", () => {
   expect([...TENANT_SLUGS].sort()).toEqual(["upf", "ywampotch", "almighty-warriors", "yknot"].sort());
@@ -84,6 +84,40 @@ test.each([
   ["https://my-course.app/courses/verbs", null],
 ])("already-canonical is a no-op: canonicalRedirect(%j, %j) → null", (url, tenant) => {
   expect(canonicalRedirect(url, tenant as (typeof TENANT_SLUGS)[number] | null)).toBeNull();
+});
+
+// ---- tenantHomeHref (welcome/01) -----------------------------------------
+//
+// The welcome panel's "front door" link. The Guest reader (`/share/<token>`) has
+// NO canonical-host bounce — unlike the authed course layout — so a Public link
+// pasted on the apex renders a tenanted course under the default skin. There, "/"
+// is the wrong home, hence the absolute form.
+
+test.each([
+  // Already on the course's canonical host → a plain relative link, no needless
+  // cross-origin hop (this is the overwhelmingly common case).
+  ["https://ywampotch.my-course.app/share/abc123", "ywampotch", "/"],
+  ["https://my-course.app/share/abc123", null, "/"],
+  // `www` also serves the default site, so an untenanted course there is home.
+  ["https://www.my-course.app/share/abc123", null, "/"],
+  // A tenanted course reached off-host → that tenant's portal, absolute.
+  ["https://my-course.app/share/abc123", "ywampotch", "https://ywampotch.my-course.app/"],
+  ["https://upf.my-course.app/share/abc123", "ywampotch", "https://ywampotch.my-course.app/"],
+  // An untenanted course reached on a tenant host → back to the default site.
+  ["https://upf.my-course.app/share/abc123", null, "https://my-course.app/"],
+])("tenantHomeHref(%j, %j) → %j", (url, tenant, expected) => {
+  expect(tenantHomeHref(url, tenant as (typeof TENANT_SLUGS)[number] | null)).toBe(expected);
+});
+
+test("tenantHomeHref drops the reader's path, query and hash — the token must not ride along", () => {
+  expect(tenantHomeHref("https://my-course.app/share/tok/lessons/0001-a?lang=hi#card", "yknot")).toBe(
+    "https://yknot.my-course.app/",
+  );
+});
+
+test("tenantHomeHref: dev hosts keep their port", () => {
+  expect(tenantHomeHref("http://localhost:3000/share/abc", "ywampotch")).toBe("http://ywampotch.localhost:3000/");
+  expect(tenantHomeHref("http://ywampotch.localhost:3000/share/abc", "ywampotch")).toBe("/");
 });
 
 // Local dev uses <slug>.localhost subdomains (see resolveTenantSlug tests), so

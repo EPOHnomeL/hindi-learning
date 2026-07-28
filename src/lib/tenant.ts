@@ -37,6 +37,26 @@ export function resolveTenantSlug(host: string | null | undefined): TenantSlug |
 // The `null` no-op is load-bearing: links are minted canonical by construction, so
 // this net is rarely hit; returning `null` for the already-canonical case is what
 // guarantees no redirect loop. Pure, so the whole decision is unit-tested.
+// The href of a course's tenant portal — its front door on its canonical host
+// (welcome/01). Relative "/" when the reader is already there (the common case:
+// links are minted canonical), else the absolute tenant home.
+//
+// This exists for the Guest reader specifically: `/share/<token>` has no
+// canonical-host bounce (only the authed course layout does), so a Public link
+// opened on the apex renders a tenanted course under the default skin — where "/"
+// would send the Guest to the wrong front door. Path/query/hash are dropped: the
+// destination is the portal home, and the Public link token must never ride along
+// into a link the Guest might share on (ADR 0013).
+export function tenantHomeHref(currentUrl: string, courseTenant: TenantSlug | null): string {
+  const canonical = canonicalRedirect(currentUrl, courseTenant);
+  if (!canonical) return "/";
+  const url = new URL(canonical);
+  url.pathname = "/";
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
 export function canonicalRedirect(currentUrl: string, courseTenant: TenantSlug | null): string | null {
   const url = new URL(currentUrl);
   // Strip an existing known-tenant label to find the base domain (`my-course.app`
