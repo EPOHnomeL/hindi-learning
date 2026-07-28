@@ -142,34 +142,16 @@ export async function getViewableTopic(ctx: QueryCtx, userId: Id<"users">, slug:
   const topic = await topicBySlug(ctx, slug);
   if (!topic) return null;
   if (topic.ownerId === userId) return topic;
-  // Any Share (in any language) grants topic-level visibility; WHICH Edition the
-  // Viewer may read is resolved separately by `readableLang`. `.first()` (not
-  // `.unique()`): a Viewer can now hold several Shares on one Topic.
-  const share = await ctx.db
-    .query("shares")
-    .withIndex("by_topic_viewer", (q) => q.eq("topicId", topic._id).eq("viewerId", userId))
-    .first();
-  if (share) return topic;
-  // An **Entitlement** (paid marketplace, ADR 0016) grants the same topic-level
-  // visibility as a Share — an entitled buyer is a Viewer of the Edition they
-  // bought (their own Progress, Resources, Certificate eligibility all follow for
-  // free). A caller with neither a Share nor an Entitlement (e.g. a Preview-only
-  // visitor) still gets null here and reaches paid content only via the reader's
-  // resolver, never the owner/Viewer write & capture seams.
-  const entitlement = await ctx.db
-    .query("entitlements")
-    .withIndex("by_topic_user", (q) => q.eq("topicId", topic._id).eq("userId", userId))
-    .first();
-  if (entitlement) return topic;
-  // A self-enroll grant (ADR 0023) is the account-based free twin of an
-  // Entitlement — it grants the same topic-level visibility (own Progress,
-  // Resources, Certificate eligibility all follow). Matched in-memory elsewhere;
-  // here any enrollment on the Topic is enough for visibility.
-  const enrollment = await ctx.db
-    .query("enrollments")
-    .withIndex("by_topic_user", (q) => q.eq("topicId", topic._id).eq("userId", userId))
-    .first();
-  return enrollment ? topic : null;
+  // Holding ANY Edition grants topic-level visibility — a Share, an Entitlement,
+  // an enrollment, or a free published Edition all read ≡ a Viewer, and each
+  // carries the same knock-on rights (own Progress, Resources, Certificate
+  // eligibility). WHICH Edition is resolved separately by `readableLang`, so this
+  // is exactly "is the caller's grant walk non-empty?". A caller holding nothing
+  // (e.g. a Preview-only visitor to a paid course) gets null here and reaches
+  // content only through the reader's resolver, never the owner/Viewer write &
+  // capture seams.
+  const grants = await grantsFor(ctx, topic._id, userId);
+  return grants.size > 0 ? topic : null;
 }
 
 // A Topic this user may *edit* on one Edition (ADR 0020): one they own, or one
@@ -238,7 +220,51 @@ export async function grantsFor(
     .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
     .collect();
   for (const e of enrollments) if (!grants.has(e.lang)) grants.set(e.lang, "enrolled");
+  // Published & free (course-publishing) — the only grant that is not a row about
+  // THIS caller: an Edition the owner listed in the catalogue and left free reads
+  // ≡ a Viewer for every signed-in account, with no join click and nothing stored.
+  // Lowest precedence, so a real grant above keeps its own badge. Being live
+  // rather than stored, it also ends when the owner unpublishes or prices the
+  // Edition — grandfathering an already-joined learner is what an `enrollments`
+  // row is for (still honoured above; unused by the catalogue path).
+  for (const lang of await freePublishedLangs(ctx, topicId)) if (!grants.has(lang)) grants.set(lang, "viewer");
   return grants;
+}
+
+// The Editions a course has listed in its tenant's catalogue
+// (`publishedEditions`, course-publishing): `published: true` rows only — an
+// absent row and `published: false` both read as unlisted.
+export async function publishedLangs(ctx: QueryCtx, topicId: Id<"topics">): Promise<Set<string>> {
+  const rows = await ctx.db
+    .query("publishedEditions")
+    .withIndex("by_topic", (q) => q.eq("topicId", topicId))
+    .collect();
+  return new Set(rows.filter((r) => r.published).map((r) => r.lang));
+}
+
+// The listed Editions that are free to read — the ones publishing actually opens
+// up. Two subtractions from `publishedLangs`: a PRICED Edition is bought, never
+// read for free (only its Preview shows); and a listed language with no ready
+// translation any more is not an Edition at all, so serving it would mean English
+// text under a foreign-language label (the same guard publishing enforces
+// create-side, re-checked here because an Edition can be removed after listing).
+export async function freePublishedLangs(ctx: QueryCtx, topicId: Id<"topics">): Promise<Set<string>> {
+  const langs = await publishedLangs(ctx, topicId);
+  if (langs.size === 0) return langs;
+  const priced = await ctx.db
+    .query("listings")
+    .withIndex("by_topic", (q) => q.eq("topicId", topicId))
+    .collect();
+  for (const l of priced) langs.delete(l.lang);
+  if ([...langs].some((l) => l !== SOURCE_LANG)) {
+    const jobs = await ctx.db
+      .query("translationJobs")
+      .withIndex("by_topic", (q) => q.eq("topicId", topicId))
+      .collect();
+    const ready = new Set(jobs.filter((j) => j.status === "ready").map((j) => j.lang));
+    for (const l of langs) if (l !== SOURCE_LANG && !ready.has(l)) langs.delete(l);
+  }
+  return langs;
 }
 
 // The set of Editions the caller may read on a Topic. The owner holds the source
@@ -451,7 +477,7 @@ export async function readReference(
     .unique();
   if (!ref) return null;
   const { title, body } = await loadEdition(ctx, topic, lang).reference(ref);
-  if (level === "preview") return { key: ref.key, title, html: "", locked: true };
+  if (referenceLocked(level)) return { key: ref.key, title, html: "", locked: true };
   return { key: ref.key, title, locked: false, ...body };
 }
 
@@ -460,28 +486,46 @@ export async function readReference(
 // (`loadEdition(...).map()`) so the collect is reused, not repeated. Lessons in
 // `by_topic_seq` order, non-superseded; References alphabetised by key — the TOC
 // still renders in full even to a `preview` caller (only the bodies are locked).
+//
+// Each entry carries the same `locked` verdict the per-item read applies
+// (`lessonLocked`/`referenceLocked`), so the paygate rule is evaluated once,
+// server-side: no caller re-derives it from `paywall.previewKey`
+// (architecture-deepening/03).
 export async function lessonsToc(
   ctx: QueryCtx,
   topic: Doc<"topics">,
   snap: EditionSnapshot,
-): Promise<Array<{ key: string; seq: number; title: string }>> {
+  level: EditionAccess,
+): Promise<Array<{ key: string; seq: number; title: string; locked: boolean }>> {
   const lessons = await ctx.db
     .query("lessons")
     .withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id))
     .collect();
-  return lessons.filter((l) => !l.supersededBy).map((l) => ({ key: l.key, seq: l.seq, title: snap.lessonTitle(l) }));
+  return await Promise.all(
+    lessons
+      .filter((l) => !l.supersededBy)
+      .map(async (l) => ({
+        key: l.key,
+        seq: l.seq,
+        title: snap.lessonTitle(l),
+        locked: await lessonLocked(ctx, topic._id, level, l.key),
+      })),
+  );
 }
 
 export async function referencesToc(
   ctx: QueryCtx,
   topic: Doc<"topics">,
   snap: EditionSnapshot,
-): Promise<Array<{ key: string; title: string }>> {
+  level: EditionAccess,
+): Promise<Array<{ key: string; title: string; locked: boolean }>> {
   const refs = await ctx.db
     .query("references")
     .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
     .collect();
-  return refs.sort((a, b) => a.key.localeCompare(b.key)).map((r) => ({ key: r.key, title: snap.referenceTitle(r) }));
+  return refs
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map((r) => ({ key: r.key, title: snap.referenceTitle(r), locked: referenceLocked(level) }));
 }
 
 // ---- Paid marketplace: the Edition access resolver (ADR 0016) ---------------
@@ -580,6 +624,15 @@ export async function lessonLocked(
   key: string,
 ): Promise<boolean> {
   return level === "preview" && key !== (await previewLessonKey(ctx, topicId));
+}
+
+// Whether a Reference body is withheld: References sit entirely past the free
+// Preview, so a `preview` caller loses them wholesale — no per-key exception.
+// The Reference twin of `lessonLocked`, so both readers' per-Reference queries and
+// the table of contents state the rule in one place rather than each testing
+// `level === "preview"` inline.
+export function referenceLocked(level: EditionAccess): boolean {
+  return level === "preview";
 }
 
 // The translated title text for an Edition, or the source title when the Edition
