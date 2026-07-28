@@ -124,41 +124,45 @@ export const LANGUAGES: LanguageInfo[] = [
   // learners who can't read the native script. One entry per non-Latin-script
   // language above; the `-Latn` script subtag keeps the code valid BCP-47 and
   // makes isRtl/isDevanagari treat it as Latin. The English name doubles as the
-  // translate-prompt target ("Translate … into ${name}"), so each spells out
-  // the romanization it wants; `native` is the plain language name in Latin
-  // script, so the picker/switcher reads "Hindi" against the native "हिन्दी".
-  { code: "hi-Latn", name: "Romanized Hindi (Latin script)", native: "Hindi" },
-  { code: "ur-Latn", name: "Romanized Urdu (Latin script)", native: "Urdu" },
-  { code: "ne-Latn", name: "Romanized Nepali (Latin script)", native: "Nepali" },
-  { code: "mr-Latn", name: "Romanized Marathi (Latin script)", native: "Marathi" },
-  { code: "ar-Latn", name: "Romanized Arabic (Latin script)", native: "Arabic" },
-  { code: "fa-Latn", name: "Romanized Persian (Latin script)", native: "Persian" },
-  { code: "ps-Latn", name: "Romanized Pashto (Latin script)", native: "Pashto" },
-  { code: "sd-Latn", name: "Romanized Sindhi (Latin script)", native: "Sindhi" },
-  { code: "ug-Latn", name: "Romanized Uyghur (Latin script)", native: "Uyghur" },
-  { code: "ckb-Latn", name: "Romanized Kurdish Sorani (Latin script)", native: "Kurdish (Sorani)" },
-  { code: "he-Latn", name: "Romanized Hebrew (Latin script)", native: "Hebrew" },
-  { code: "yi-Latn", name: "Romanized Yiddish (Latin script)", native: "Yiddish" },
-  { code: "dv-Latn", name: "Romanized Dhivehi (Latin script)", native: "Dhivehi" },
-  { code: "ru-Latn", name: "Romanized Russian (Latin script)", native: "Russian" },
-  { code: "uk-Latn", name: "Romanized Ukrainian (Latin script)", native: "Ukrainian" },
-  { code: "bg-Latn", name: "Romanized Bulgarian (Latin script)", native: "Bulgarian" },
-  { code: "sr-Latn", name: "Serbian (Latin script)", native: "Serbian" },
-  { code: "el-Latn", name: "Romanized Greek (Latin script)", native: "Greek" },
-  { code: "zh-Latn", name: "Romanized Chinese (Hanyu Pinyin)", native: "Chinese" },
-  { code: "ja-Latn", name: "Romanized Japanese (Rōmaji)", native: "Japanese" },
-  { code: "ko-Latn", name: "Romanized Korean (Revised Romanization)", native: "Korean" },
-  { code: "th-Latn", name: "Romanized Thai (Latin script)", native: "Thai" },
-  { code: "bn-Latn", name: "Romanized Bengali (Latin script)", native: "Bengali" },
-  { code: "pa-Latn", name: "Romanized Punjabi (Latin script)", native: "Punjabi" },
-  { code: "ta-Latn", name: "Romanized Tamil (Latin script)", native: "Tamil" },
-  { code: "te-Latn", name: "Romanized Telugu (Latin script)", native: "Telugu" },
-  { code: "gu-Latn", name: "Romanized Gujarati (Latin script)", native: "Gujarati" },
-  { code: "kn-Latn", name: "Romanized Kannada (Latin script)", native: "Kannada" },
-  { code: "ml-Latn", name: "Romanized Malayalam (Latin script)", native: "Malayalam" },
-  { code: "si-Latn", name: "Romanized Sinhala (Latin script)", native: "Sinhala" },
-  { code: "am-Latn", name: "Romanized Amharic (Latin script)", native: "Amharic" },
-  { code: "ti-Latn", name: "Romanized Tigrinya (Latin script)", native: "Tigrinya" },
+  // translate-prompt target ("Translate … into ${name}"), so every entry here
+  // carries the "<Language> (Latin Alphabet)" suffix — that suffix IS what tells
+  // the model to romanize (see the `quality` prompt in translate.ts, which names
+  // the same convention), and it reads as a plain edition name in the picker
+  // ("Hindi (Latin Alphabet)" beside the Devanagari "Hindi"). Where the language
+  // has a canonical romanization system, it is named alongside. `native` is the
+  // plain language name in Latin script, for the reader UI.
+  { code: "hi-Latn", name: "Hindi (Latin Alphabet)", native: "Hindi" },
+  { code: "ur-Latn", name: "Urdu (Latin Alphabet)", native: "Urdu" },
+  { code: "ne-Latn", name: "Nepali (Latin Alphabet)", native: "Nepali" },
+  { code: "mr-Latn", name: "Marathi (Latin Alphabet)", native: "Marathi" },
+  { code: "ar-Latn", name: "Arabic (Latin Alphabet)", native: "Arabic" },
+  { code: "fa-Latn", name: "Persian (Latin Alphabet)", native: "Persian" },
+  { code: "ps-Latn", name: "Pashto (Latin Alphabet)", native: "Pashto" },
+  { code: "sd-Latn", name: "Sindhi (Latin Alphabet)", native: "Sindhi" },
+  { code: "ug-Latn", name: "Uyghur (Latin Alphabet)", native: "Uyghur" },
+  { code: "ckb-Latn", name: "Kurdish Sorani (Latin Alphabet)", native: "Kurdish (Sorani)" },
+  { code: "he-Latn", name: "Hebrew (Latin Alphabet)", native: "Hebrew" },
+  { code: "yi-Latn", name: "Yiddish (Latin Alphabet)", native: "Yiddish" },
+  { code: "dv-Latn", name: "Dhivehi (Latin Alphabet)", native: "Dhivehi" },
+  { code: "ru-Latn", name: "Russian (Latin Alphabet)", native: "Russian" },
+  { code: "uk-Latn", name: "Ukrainian (Latin Alphabet)", native: "Ukrainian" },
+  { code: "bg-Latn", name: "Bulgarian (Latin Alphabet)", native: "Bulgarian" },
+  { code: "sr-Latn", name: "Serbian (Latin Alphabet)", native: "Serbian" },
+  { code: "el-Latn", name: "Greek (Latin Alphabet)", native: "Greek" },
+  { code: "zh-Latn", name: "Chinese (Hanyu Pinyin, Latin Alphabet)", native: "Chinese" },
+  { code: "ja-Latn", name: "Japanese (Rōmaji, Latin Alphabet)", native: "Japanese" },
+  { code: "ko-Latn", name: "Korean (Revised Romanization, Latin Alphabet)", native: "Korean" },
+  { code: "th-Latn", name: "Thai (Latin Alphabet)", native: "Thai" },
+  { code: "bn-Latn", name: "Bengali (Latin Alphabet)", native: "Bengali" },
+  { code: "pa-Latn", name: "Punjabi (Latin Alphabet)", native: "Punjabi" },
+  { code: "ta-Latn", name: "Tamil (Latin Alphabet)", native: "Tamil" },
+  { code: "te-Latn", name: "Telugu (Latin Alphabet)", native: "Telugu" },
+  { code: "gu-Latn", name: "Gujarati (Latin Alphabet)", native: "Gujarati" },
+  { code: "kn-Latn", name: "Kannada (Latin Alphabet)", native: "Kannada" },
+  { code: "ml-Latn", name: "Malayalam (Latin Alphabet)", native: "Malayalam" },
+  { code: "si-Latn", name: "Sinhala (Latin Alphabet)", native: "Sinhala" },
+  { code: "am-Latn", name: "Amharic (Latin Alphabet)", native: "Amharic" },
+  { code: "ti-Latn", name: "Tigrinya (Latin Alphabet)", native: "Tigrinya" },
 ];
 
 const BY_CODE = new Map(LANGUAGES.map((l) => [l.code, l]));
