@@ -579,21 +579,67 @@ test("assignCourse refuses stealing a course already owned by another tenant", a
   ).rejects.toThrow(/another tenant/i);
 });
 
-test("assignCourse: a tenant admin may assign to their own tenant but not another's; a member is refused", async () => {
+// Allocation is provisioning: a tenant admin manages what the sys admin gave
+// them, and never reaches into the global default pool to help themselves — nor
+// hands a course back. Both sides are the sys admin's call (symmetric), so both
+// mutations are gated unscoped. A tenant admin is refused **on their own tenant**,
+// which is the whole point: the scoped gate used to let them through.
+test("assignCourse: a tenant admin is refused even on their own tenant (sys-admin only)", async () => {
   const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
   const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
   const member = await t.run((ctx) => ctx.db.insert("users", { email: "member@example.com" }));
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
-  await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "AW", theme: THEME, flags: FLAGS });
   const own = await seedTopic(t, "greek", "Greek");
-  const other = await seedTopic(t, "hebrew", "Hebrew");
 
-  await asUser(t, upfAdmin).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId: own });
   await expect(
-    asUser(t, upfAdmin).mutation(api.tenants.assignCourse, { tenantSlug: "aw", topicId: other }),
+    asUser(t, upfAdmin).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId: own }),
   ).rejects.toThrow(/forbidden/i);
   await expect(
-    asUser(t, member).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId: other }),
+    asUser(t, member).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId: own }),
+  ).rejects.toThrow(/forbidden/i);
+  // The sys admin still may.
+  await asUser(t, sys).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId: own });
+  expect(await t.run((ctx) => ctx.db.get(own)).then((r) => r?.tenantSlug)).toBe("upf");
+});
+
+test("unassignCourse: a tenant admin is refused even on their own tenant (sys-admin only)", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  const own = await seedTopic(t, "greek", "Greek", "upf");
+
+  await expect(
+    asUser(t, upfAdmin).mutation(api.tenants.unassignCourse, { tenantSlug: "upf", topicId: own }),
+  ).rejects.toThrow(/forbidden/i);
+  await asUser(t, sys).mutation(api.tenants.unassignCourse, { tenantSlug: "upf", topicId: own });
+  expect(await t.run((ctx) => ctx.db.get(own)).then((r) => r?.tenantSlug)).toBeUndefined();
+});
+
+// The course-pool leak: `courseAssignment` is the tenant admin's read of their own
+// Courses section, so it stays scope-gated — but `available` is the *global*
+// default pool (every course carrying no tenant, including other people's), which
+// is the sys admin's allocation surface, not theirs. It's emptied server-side, not
+// merely hidden in the UI.
+test("courseAssignment: a tenant admin sees their assigned courses but never the global pool", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await seedTopic(t, "greek", "Greek", "upf");
+  await seedTopic(t, "hebrew", "Hebrew"); // the pool — not theirs to see
+
+  const view = await asUser(t, upfAdmin).query(api.tenants.courseAssignment, { tenantSlug: "upf" });
+  expect(view.assigned.map((c) => c.title)).toEqual(["Greek"]);
+  expect(view.available).toEqual([]);
+});
+
+test("courseAssignment: a tenant admin is still refused another tenant's courses", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "AW", theme: THEME, flags: FLAGS });
+  await expect(
+    asUser(t, upfAdmin).query(api.tenants.courseAssignment, { tenantSlug: "aw" }),
   ).rejects.toThrow(/forbidden/i);
 });
 
@@ -685,21 +731,20 @@ test("setTenantFlags can toggle a flag back on", async () => {
   expect(row?.flags.publicLinks).toBe(true);
 });
 
-test("setTenantFlags: a tenant admin may toggle only their own tenant's flags", async () => {
+// Flags decide what the tenant may do at all, so flipping one widens the tenant's
+// own grant — provisioning, never a tenant admin's. Refused on their **own**
+// tenant, which the scoped gate used to permit.
+test("setTenantFlags: a tenant admin is refused even on their own tenant (sys-admin only)", async () => {
   const t = convexTest(schema, modules);
   const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
-  await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "AW", theme: THEME, flags: FLAGS });
-  // Own tenant → allowed.
-  await asUser(t, upfAdmin).mutation(api.tenants.setTenantFlags, { tenantSlug: "upf", flags: { seeding: false } });
+  await expect(
+    asUser(t, upfAdmin).mutation(api.tenants.setTenantFlags, { tenantSlug: "upf", flags: { seeding: false } }),
+  ).rejects.toThrow(/forbidden/i);
   const upf = await t.run((ctx) =>
     ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
   );
-  expect(upf?.flags.seeding).toBe(false);
-  // Another tenant → refused.
-  await expect(
-    asUser(t, upfAdmin).mutation(api.tenants.setTenantFlags, { tenantSlug: "aw", flags: { seeding: false } }),
-  ).rejects.toThrow(/forbidden/i);
+  expect(upf?.flags.seeding).toBe(true);
 });
 
 test("setTenantFlags: a plain member is refused", async () => {
@@ -729,21 +774,44 @@ test("unassignMember refuses a tenant admin (clearing the slug would promote the
   ).rejects.toThrow(/tenant admin/i);
 });
 
-test("assignMember: a tenant admin may act on their own tenant but not another's; a member is refused", async () => {
+// Membership allocation is the sys admin's, both ways — so a tenant admin can
+// neither pull an unassigned Allowlist email in nor push one of their own back out,
+// on their own tenant. (The Members section is the sys admin's surface; a tenant
+// admin's own roster is a separate read still to be built.)
+test("assignMember / unassignMember: a tenant admin is refused on their own tenant (sys-admin only)", async () => {
   const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
   const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
   const plain = await t.run((ctx) => ctx.db.insert("users", { email: "plain@example.com" }));
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
-  await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "AW", theme: THEME, flags: FLAGS });
   await t.mutation(internal.whitelist.seedEmail, { email: "ben@example.com" });
 
-  await asUser(t, upfAdmin).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ben@example.com" });
-  await asUser(t, upfAdmin).mutation(api.tenants.unassignMember, { tenantSlug: "upf", email: "ben@example.com" });
   await expect(
-    asUser(t, upfAdmin).mutation(api.tenants.assignMember, { tenantSlug: "aw", email: "ben@example.com" }),
+    asUser(t, upfAdmin).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ben@example.com" }),
   ).rejects.toThrow(/forbidden/i);
   await expect(
     asUser(t, plain).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ben@example.com" }),
+  ).rejects.toThrow(/forbidden/i);
+
+  // The sys admin still may — and the tenant admin can't undo it either.
+  await asUser(t, sys).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ben@example.com" });
+  await expect(
+    asUser(t, upfAdmin).mutation(api.tenants.unassignMember, { tenantSlug: "upf", email: "ben@example.com" }),
+  ).rejects.toThrow(/forbidden/i);
+  await asUser(t, sys).mutation(api.tenants.unassignMember, { tenantSlug: "upf", email: "ben@example.com" });
+});
+
+// The assignable pool `memberAssignment` returns is every unassigned, non-admin
+// Allowlist email **platform-wide** — other tenants' prospective members and
+// default-site users. That's a cross-tenant personal-data read, so the whole query
+// is sys-admin-only rather than pool-emptied like courseAssignment.
+test("memberAssignment: a tenant admin is refused even on their own tenant (sys-admin only)", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(internal.whitelist.seedEmail, { email: "ben@example.com" });
+  await expect(
+    asUser(t, upfAdmin).query(api.tenants.memberAssignment, { tenantSlug: "upf" }),
   ).rejects.toThrow(/forbidden/i);
 });
 
@@ -812,6 +880,43 @@ test("removeTenant: a plain member is refused", async () => {
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await expect(
     asUser(t, member).mutation(api.tenants.removeTenant, { tenantSlug: "upf" }),
+  ).rejects.toThrow(/forbidden/i);
+});
+
+// Self-deletion. Deleting a tenant is provisioning, so the refusal must come from
+// the **auth gate**, not incidentally from the reference guard: a tenant admin's own
+// Allowlist row always carries their slug, so the count guard happens to refuse them
+// today too. Pinning the message keeps the boundary where it belongs — a future
+// change to the reference rules can't quietly re-open self-deletion.
+test("removeTenant: a tenant admin is refused by the auth gate, not the reference guard", async () => {
+  const t = convexTest(schema, modules);
+  const awAdmin = await seedAdmin(t, "awadmin@example.com", "aw");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "AW", theme: THEME, flags: FLAGS });
+
+  await expect(
+    asUser(t, awAdmin).mutation(api.tenants.removeTenant, { tenantSlug: "aw" }),
+  ).rejects.toThrow(/forbidden/i);
+  expect(
+    await t.run((ctx) => ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "aw")).unique()),
+  ).not.toBeNull();
+});
+
+// tenantReferenceCounts stays scope-gated: it reveals only the caller's own tenant's
+// counts (no titles, no emails), and it exists to explain the Remove control. A
+// tenant admin reading it leaks nothing about the platform.
+test("tenantReferenceCounts: a tenant admin may read their own tenant's counts, never another's", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "AW", theme: THEME, flags: FLAGS });
+
+  expect(await asUser(t, upfAdmin).query(api.tenants.tenantReferenceCounts, { tenantSlug: "upf" })).toEqual({
+    courses: 0,
+    members: 1, // their own Allowlist row
+    users: 0,
+  });
+  await expect(
+    asUser(t, upfAdmin).query(api.tenants.tenantReferenceCounts, { tenantSlug: "aw" }),
   ).rejects.toThrow(/forbidden/i);
 });
 

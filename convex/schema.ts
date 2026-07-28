@@ -499,6 +499,27 @@ export default defineSchema({
     .index("by_topic", ["topicId"])
     .index("by_topic_user", ["topicId", "userId"]),
 
+  // A **published Edition**: the owner's decision to list ONE (Topic, language)
+  // Edition in its tenant's catalogue. Publishing is a `published` BOOLEAN at the
+  // Edition grain — deliberately NOT a `topics.status` value (that course-level
+  // grain is superseded) — so it composes with prices, Shares and public links
+  // rather than folding into the authoring lifecycle. The row is written on the
+  // first publish and flipped in place on unpublish (an absent row and
+  // `published: false` both read as unlisted). Owner-only to write
+  // (catalogue.setEditionPublished). Two consequences, both per-Edition: the
+  // catalogue lists it, and — while the Edition is FREE — any signed-in caller
+  // reads it as a Viewer (convex/lib.ts). Not to be confused with a **Public
+  // link** (`publicLinks`, anonymous bearer token) or with the teach→Hub
+  // "publish" push. `by_topic_lang` is the per-Edition lookup both consequences
+  // use; `by_topic` lists a course's published Editions (and cascades on delete).
+  publishedEditions: defineTable({
+    topicId: v.id("topics"),
+    lang: v.string(),
+    published: v.boolean(),
+  })
+    .index("by_topic", ["topicId"])
+    .index("by_topic_lang", ["topicId", "lang"]),
+
   // ---- Monetisation (paid marketplace, ADR 0016) ---------------------------
 
   // The price of one **Edition** — a (Topic, language) pair. The PRESENCE of a
