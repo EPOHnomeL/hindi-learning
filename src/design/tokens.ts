@@ -41,14 +41,13 @@ export type TenantTheme = {
 // reads `--color-<t>` (Tailwind `@theme`, globals.css); `""` for the lesson design
 // system, which reads bare `--<t>` (head.html). Same 14-token contract, one builder.
 //
-// Light overrides all 14 tokens under `:root:root` — the doubled `:root` raises
-// specificity above the authored `:root` palette (Tailwind's `@theme` for chrome,
-// head.html's `:root{}` for lessons) so the tenant palette wins no matter the
-// stylesheet source order (a plain `:root` would only tie, leaving it to load
-// order). Dark is intentionally partial: we emit only the tokens the tenant actually
-// overrode, so the rest fall through to the default dark palette via the cascade
-// (decision 03 #5 — "tenant dark, else default dark"). No dark block at all when the
-// tenant has no dark palette.
+// Dark mode keeps the tenant's BRAND rather than falling back to the shipped warm
+// palette: a navy tenant in dark mode was rendering as the default brown/orange
+// skin, which reads as someone else's brand. `deriveDarkFromLight` re-lights the
+// tenant's own hues for a dark surface (below); any token the tenant authored in
+// `theme.dark` is emitted after the derived ones, in the same block, so an authored
+// value still wins. The 4 quiz-state tokens stay unset and fall through to the
+// default dark palette — right/wrong colours are semantics, not brand.
 //
 // The light block is gated on `:not([data-theme="dark"])` — WITHOUT it, that same
 // raised specificity also beat the DEFAULT dark palettes (globals.css's
@@ -63,9 +62,61 @@ export function buildTenantThemeCss(theme: TenantTheme, prefix = "color-"): stri
       .map((tok) => `--${prefix}${tok}:${palette[tok]}`)
       .join(";");
 
-  let css = `:root:root:not([data-theme="dark"]){${decls(theme.light)}}`;
-  if (theme.dark && Object.keys(theme.dark).length > 0) {
-    css += `:root:root[data-theme="dark"]{${decls(theme.dark)}}`;
-  }
-  return css;
+  const dark = { ...deriveDarkFromLight(theme.light), ...theme.dark };
+  return (
+    `:root:root:not([data-theme="dark"]){${decls(theme.light)}}` +
+    `:root:root[data-theme="dark"]{${decls(dark)}}`
+  );
+}
+
+// Re-light a tenant's light palette for the dark surface, keeping its hues. Pure
+// CSS relative-color syntax (`oklch(from <color> L C H)`) rather than a colour
+// library: the browser does the conversion and gamut-mapping, so this stays a
+// string builder with no dependency and no maths to get wrong. OKLCH (not HSL)
+// because its lightness is perceptual — one L target reads evenly across hues.
+//
+// The mapping, and why each one:
+//   paper/card/line ← the tenant's INK, the darkest neutral they already chose, so
+//     the page is a deep version of their own brand colour (navy brand → navy-black
+//     page) instead of the shipped warm brown. Chroma is pulled back so a large
+//     surface stays a near-neutral, not a saturated wash.
+//   ink  ← their light PAPER, held bright: the light mode's paper cream becomes the
+//     dark mode's text, so the pairing stays theirs in both directions.
+//   soft ← their soft, lifted to read as muted-but-legible on a dark surface.
+//   accent/accent2/gold ← their brand hues at a lightness that has contrast against
+//     the dark paper. A dark-on-light brand colour (ywampotch's #1b2a80 navy) is
+//     unreadable on a dark page as-is; raising L keeps the hue and makes it legible.
+//   hi ← a dark tint of their GOLD, mirroring how the default dark palette derives
+//     its highlight-mark background from its own ornament colour.
+//
+// The lightness targets are the SHIPPED dark palette's own measured L values
+// (paper .211, card .243, line .323, ink .913, soft .701, gold .766, hi .364), so a
+// derived skin sits at the depth the design already reads as dark — only the hue is
+// the tenant's. `accent2` is pulled below `accent` because a brand whose two accents
+// share a hue (ywampotch's navy pair) collapses into one colour once both are
+// re-lit. Chroma is scaled down on the large surfaces only: the shipped dark
+// surfaces are near-neutral (C ≤ .018), and a full-chroma brand hue across a whole
+// page reads as a colour wash rather than as a dark surface. Checked against all
+// four seeded tenants: every text token clears WCAG AA (≥ 4.5:1) on its own derived
+// paper, and a monochrome brand (Almighty Warriors) stays monochrome.
+//
+// Unsupported relative colour syntax (pre-2023 browsers) makes each declaration
+// invalid-at-computed-value, so it drops to the default dark palette underneath —
+// degrading to the old behaviour rather than to nothing.
+export function deriveDarkFromLight(light: Record<Token, string>): Partial<Record<Token, string>> {
+  const relight = (from: string, l: number, chroma = 1) =>
+    `oklch(from ${from} ${l} ${chroma === 1 ? "c" : `calc(c * ${chroma})`} h)`;
+
+  return {
+    paper: relight(light.ink, 0.21, 0.55),
+    card: relight(light.ink, 0.245, 0.55),
+    line: relight(light.ink, 0.325, 0.5),
+    ink: relight(light.paper, 0.91, 0.6),
+    soft: relight(light.soft, 0.7),
+    accent: relight(light.accent, 0.74),
+    accent2: relight(light.accent2, 0.68),
+    gold: relight(light.gold, 0.77),
+    hi: relight(light.gold, 0.36, 0.7),
+    danger: relight(light.danger, 0.69),
+  };
 }
