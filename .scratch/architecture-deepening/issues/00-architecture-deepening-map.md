@@ -1,6 +1,6 @@
 # architecture-deepening/00: Architecture review — map
 
-**Status:** open (ticket 01 landed, 02–05 open)
+**Status:** closed — all five tickets landed (01 as PR #107; 02–05 as trunk commits on `main`)
 **Labels:** wayfinder:map
 
 <!-- The canonical wayfinder map for the 2026-07-24 architecture review. An INDEX,
@@ -31,9 +31,9 @@ locality). Domain terms: `CONTEXT.md`.
   (before shipping).
 - **Coordination:** the user runs concurrent sessions on `main`. Stage explicitly **by path**,
   re-check `git diff --cached --stat`, never `git add -A`, never `--amend`.
-- Delivery mode for this batch: **actual GitHub PRs** (branch + push + `gh pr create`) per ticket —
-  a deliberate one-off deviation from this repo's normal trunk-based convention, confirmed with the
-  user for the architecture-deepening work specifically.
+- Delivery mode: ticket 01 shipped as a PR (#107) under an earlier one-off deviation from this
+  repo's trunk-based convention. **The user reverted that for 02–05** (2026-07-28) — those landed as
+  trunk commits on `main`, the repo's normal convention.
 
 ## Decisions so far
 
@@ -44,6 +44,28 @@ locality). Domain terms: `CONTEXT.md`.
   `convex/content/reader.ts` / `authoring.ts` / `publish.ts`, every `api.content.*` /
   `internal.content.*` call site updated, tests split to match. Pure move, `tsc` clean, full
   convex suite green (458/459, one pre-existing unrelated flake). PR #107.
+- [Give lib.ts's sections real module boundaries](02-lib-module-boundaries.md) — **landed**
+  (`2adb6c2`). Tenant-flag gating, Seller readiness and progress counts split out of `convex/lib.ts`
+  into `tenantFlags.ts` / `sellerStatus.ts` / `progressCounts.ts`; `lib.test.ts` (all tenant-flag
+  tests) moved to `tenantFlags.test.ts`. Pure move. `lib.ts` keeps its name and its other residents —
+  see Follow-ups.
+- [Stop re-deriving paygate lock state on the client](03-paygate-lock-locality.md) — **landed**
+  (`2610434`). `lessonsToc`/`referencesToc` take the caller's `EditionAccess` and carry a per-item
+  `locked` from the same `lessonLocked` the body reads use, so `listLessons`/`listReferences`/
+  `publicCourse` all ship the verdict. The References rule got the same treatment (`referenceLocked`).
+  Removed the duplicate derivations in `CourseShell.tsx` **and** `PublicReader.tsx` (a third copy the
+  spec hadn't listed). `ArtifactView.tsx` needed no change — its `role === "preview"` gates Q&A and
+  Progress, not lock state.
+- [Name the PayFast ITN acceptance rules as their own seam](04-payfast-acceptance-seam.md) —
+  **landed** (`ddd0eae`). `payfast.acceptNotification(fields, intent)` is pure and returns a
+  three-way verdict (`grant` / `ignore` / `refuse`) — three, not two, because "don't grant" means
+  200-acknowledge for a CANCELLED notification and 400-reject for a tampered one. `payfastNotify` is
+  now an adapter. Existing mocked-fetch ITN tests pass unmodified.
+- [Disambiguate the three "engine"/"provider" axes](05-engine-vocab-disambiguation.md) — **landed**
+  (`0f685b6`). `engine` (per-Edition) / `translationBackend()` (per-deployment) /
+  `authoringProvider()` (per-course), each fallback stated once in its accessor. **No migration:**
+  both persisted columns and `TRANSLATE_PROVIDER` keep their names — only the code vocabulary moved,
+  which is what the "additive alias" question in the spec was really asking.
 
 ## Not yet specified
 
@@ -53,10 +75,25 @@ locality). Domain terms: `CONTEXT.md`.
 
 ## Open tickets
 
-- [Give lib.ts's sections real module boundaries](02-lib-module-boundaries.md) — Strong.
-- [Stop re-deriving paygate lock state on the client](03-paygate-lock-locality.md) — Worth exploring.
-- [Name the PayFast ITN acceptance rules as their own seam](04-payfast-acceptance-seam.md) — Worth exploring.
-- [Disambiguate the three "engine"/"provider" axes](05-engine-vocab-disambiguation.md) — Worth exploring.
+- _(none — all five landed.)_
+
+## Follow-ups this batch surfaced
+
+<!-- real, out of scope for the tickets that found them; each needs its own decision -->
+
+- **Finish emptying `lib.ts`, then rename it.** Ticket 02 moved out the three concerns it scoped
+  (`tenantFlags.ts`, `sellerStatus.ts`, `progressCounts.ts`), but `lib.ts` still hosts the topic
+  resolvers, the content-blob helpers, `assertAdmin`, and the share/email/token/hash primitives. The
+  `lib.ts` → `edition.ts` rename is **declined until then** — with those residents it would misname
+  the file. ~25 import sites.
+- **`tenants.ts`'s equivalent split** — noted in ticket 02's framing, still not ticketed, and Handoff
+  A owns that file.
+- **ADR-0014's citation is narrower than its scope.** `routine.ts` cites
+  `docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md` (still "proposed") as the rationale
+  for the shipped per-course authoring Provider field, but the ADR's real scope (BYOK line, Agent-SDK
+  port, per-customer metering) is far larger than what's cited against it. Ticket 05 flagged this and
+  left the ADR untouched — it needs the user's call: narrow the citation, or split the ADR.
+  **Awaiting sign-off.**
 
 ## Out of scope
 

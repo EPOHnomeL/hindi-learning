@@ -1,7 +1,7 @@
 # architecture-deepening/02: Give lib.ts's sections real module boundaries
 
-**Status:** open
-**Labels:** ready-for-agent
+**Status:** closed (landed on `main`)
+**Labels:** done
 
 ## Why
 
@@ -38,10 +38,17 @@ too, once the shape is proven on `lib.ts`.
 
 ## Acceptance criteria
 
-- [ ] `pnpm typecheck` clean.
-- [ ] Full convex suite green, no new red beyond the known pre-existing `sales.test.ts` flake.
-- [ ] `lib.ts` (or its renamed successor) contains only Edition-access code; a reader can delete
-      the Seller-status or tenant-flag block from the repo without touching Edition-access code.
+- [x] `pnpm typecheck` clean.
+- [x] Full convex suite green, no new red beyond the known pre-existing `sales.test.ts` flake.
+- [x] A reader can delete the Seller-status, tenant-flag or progress-count module from the repo
+      without touching Edition-access code — the deletion test this ticket was framed on.
+- [ ] `lib.ts` contains **only** Edition-access code. **Partially met, deliberately.** The three
+      concerns Scope names are out; `lib.ts` still holds the topic resolvers, the content-blob
+      helpers, `assertAdmin`, and the small share/email/token/hash primitives, none of which Scope
+      asked to move. Emptying it fully would mean re-pointing ~25 more import sites in the same
+      breath. It also means the `lib.ts` → `edition.ts` rename was **declined**: while those
+      residents remain, `edition.ts` would misname the file. A follow-up ticket can finish the job
+      and then earn the rename.
 
 ## Notes
 

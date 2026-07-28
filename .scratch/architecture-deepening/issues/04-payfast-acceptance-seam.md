@@ -1,7 +1,7 @@
 # architecture-deepening/04: Name the PayFast ITN acceptance rules as their own seam
 
-**Status:** open
-**Labels:** ready-for-agent
+**Status:** closed (landed on `main`)
+**Labels:** done
 
 ## Why
 
@@ -27,11 +27,11 @@ mocked-fetch test harness instead of as a plain function call.
 
 ## Acceptance criteria
 
-- [ ] The "only COMPLETE grants" and "amount must match intent" rules are each expressed once, in
+- [x] The "only COMPLETE grants" and "amount must match intent" rules are each expressed once, in
       `payfast.ts`, as a pure function — not inline in `http.ts`.
-- [ ] Both rules are covered by direct unit tests against the pure function, with no HTTP mock
+- [x] Both rules are covered by direct unit tests against the pure function, with no HTTP mock
       required for that coverage.
-- [ ] `payfastNotify`'s existing mocked-fetch integration tests still pass unchanged (behavior
+- [x] `payfastNotify`'s existing mocked-fetch integration tests still pass unchanged (behavior
       preserved).
 
 ## Tests (TDD, `convexTest` seam)

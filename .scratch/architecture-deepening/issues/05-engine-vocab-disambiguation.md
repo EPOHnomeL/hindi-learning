@@ -1,7 +1,7 @@
 # architecture-deepening/05: Disambiguate the three "engine"/"provider" axes
 
-**Status:** open
-**Labels:** ready-for-agent
+**Status:** closed (landed on `main`)
+**Labels:** done
 
 ## Why
 
@@ -45,9 +45,9 @@ pure refactor.
 
 ## Acceptance criteria
 
-- [ ] Three distinct names in code, no shared noun across the three axes.
-- [ ] Each axis's fallback rule stated once (in the accessor), not restated at every read site.
-- [ ] `pnpm typecheck` clean, full convex suite green.
+- [x] Three distinct names in code, no shared noun across the three axes.
+- [x] Each axis's fallback rule stated once (in the accessor), not restated at every read site.
+- [x] `pnpm typecheck` clean, full convex suite green.
 
 ## Notes
 

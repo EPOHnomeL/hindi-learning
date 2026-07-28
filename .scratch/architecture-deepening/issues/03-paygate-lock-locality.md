@@ -1,7 +1,7 @@
 # architecture-deepening/03: Stop re-deriving paygate lock state on the client
 
-**Status:** open
-**Labels:** ready-for-agent
+**Status:** closed (landed on `main`)
+**Labels:** done
 
 ## Why
 
@@ -35,10 +35,10 @@ hand whenever the paygate rule changes.
 
 ## Acceptance criteria
 
-- [ ] `listLessons` response includes `locked` per lesson.
-- [ ] `CourseShell.tsx` and `ArtifactView.tsx` contain no independent `role === "preview"` /
+- [x] `listLessons` response includes `locked` per lesson.
+- [x] `CourseShell.tsx` and `ArtifactView.tsx` contain no independent `role === "preview"` /
       `previewKey` lock-state re-derivation — they read the server field.
-- [ ] A change to the paygate rule (e.g. moving the Preview to a different lesson) is correct in
+- [x] A change to the paygate rule (e.g. moving the Preview to a different lesson) is correct in
       the TOC and the artifact view from one server-side change, no client-side follow-up.
 
 ## Tests (TDD, `convexTest` seam)
