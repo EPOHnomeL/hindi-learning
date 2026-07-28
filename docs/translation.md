@@ -57,8 +57,16 @@ The cloud run's steps (repo `pnpm` scripts, mirroring the teacher routine):
    `none` → end). Persists `TRANSLATE_LANG` + `OWNER_EMAIL` to `.env.local`.
 2. `pnpm run materialise:prod --topic "$SLUG"` — pull the source into `topics/$SLUG/`.
 3. Follow [`.agents/skills/translate/SKILL.md`](../.agents/skills/translate/SKILL.md);
-   write translations into `topics/$SLUG/translations/$TRANSLATE_LANG/`.
-4. `pnpm run publish-translation:prod --topic "$SLUG"` — publish each translated item.
+   write translations into `topics/$SLUG/translations/$TRANSLATE_LANG/`. The run
+   **fans out**: one subagent per file, in batches of 8, each working to
+   [`FIDELITY.md`](../.agents/skills/translate/FIDELITY.md); a file over ~600 lines
+   is split at `<h2>` boundaries and its sections translated in parallel. The
+   orchestrating run never reads course content itself — that is the token budget.
+4. `pnpm run publish-translation:prod --topic "$SLUG"` — publish each translated
+   item. Run **after every batch**, not only at the end: it is idempotent and
+   publishes whatever is in the workspace, so the Editions panel ticks upward
+   while the run is still going, and a run killed infra-side loses at most one
+   batch.
 5. `pnpm run report-translation:prod ready "$SLUG"` — always, even on failure.
 
 ---
@@ -80,7 +88,10 @@ npx convex env set --prod TRANSLATE_FIRE_TOKEN …
 ```
 
 **The cloud translate Routine** (a claude.ai routine, sibling of
-`teacher-next-lesson`): it clones the repo, then runs the five steps in §2. Its
+`teacher-next-lesson`): it clones the repo, then runs the steps in §2. Its
+Instructions field is kept in the repo at
+[translation-routine-prompt.md](translation-routine-prompt.md) — **that file wins**
+if the two drift; re-paste it. Its
 cloud env needs `PUBLISH_SECRET` and `CONVEX_PROD_URL` (identical to the teacher
 routine). Point `TRANSLATE_FIRE_URL` / `TRANSLATE_FIRE_TOKEN` (above) at this
 routine's Fire endpoint.
@@ -92,8 +103,10 @@ any more — the cloud run owns the model choice.
 
 ## 4. Translation fidelity (the hard rules)
 
-The rules live in the `translate` skill
-([`.agents/skills/translate/SKILL.md`](../.agents/skills/translate/SKILL.md)):
+The rules live in the `translate` skill, in
+[`FIDELITY.md`](../.agents/skills/translate/FIDELITY.md) beside its
+[`SKILL.md`](../.agents/skills/translate/SKILL.md) — they are a separate file
+because every translating subagent reads them and the orchestrating run does not:
 Lesson/Reference HTML is translated with strict preservation — every tag,
 attribute, class, id, `data-*` (especially `data-correct` / `data-k` /
 `data-answer` / `data-alt`), `<script>`/`<style>`, and element order kept
@@ -108,10 +121,15 @@ safety net, `publishTranslation` re-checks each Lesson's quiz-marker counts and
 The rules also require translating **quoted passages and the "Sources" citation
 footer** — a quote the course cites is learner-read prose, not object-of-study, so
 it must be rendered in the target language (keeping only the attribution: author
-names, work titles, proper nouns, page/verse refs; Bible verses substituted
-**verbatim** from a published target-language Bible — BSI/HHBD Devanagari for Hindi
-— never back-translated). Skipping these is the most common real-world miss —
-see §7 / §8.
+names, work titles, proper nouns, page/verse refs). Skipping these is the most
+common real-world miss — see §7 / §8.
+
+**Nothing ships in the source language.** Bible verses prefer the **verbatim**
+wording of a published target-language Bible (BSI/HHBD Devanagari for Hindi) rather
+than a back-translation — but where no reliable published rendering can be
+recalled, the translator now renders the passage itself, plainly and at
+printed-Bible register, instead of leaving it in English. "Couldn't find a
+translation" changes *how* the text is produced, never *whether* it is.
 
 Three further guardrails (added after grading real Hindi output — the tells were a
 coined word *inside a verse*, a mixed romanized/Devanagari document, and ordinary
