@@ -2,6 +2,7 @@
 
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useAction, useMutation, useQuery } from "convex/react";
+import { type FunctionReturnType } from "convex/server";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -57,6 +58,11 @@ type SharedCourse = {
 // A purchased course (paid marketplace, ADR 0016) — the paid twin of a shared
 // one: the same shape minus the owner attribution (a buyer reads it like a Viewer).
 type PurchasedCourse = Omit<SharedCourse, "ownerEmail">;
+
+// A course published in this member's site catalogue that they don't own
+// (course-publishing). No progress (they haven't taken it up yet); `price` is null
+// when a published Edition is free to read, else the cheapest published price.
+type AvailableCourse = FunctionReturnType<typeof api.catalogue.list>[number];
 
 // The home dashboard (`/`): the course grid (create / edit / open) plus the
 // "Shared with me" section. Opening a course is a real navigation to
@@ -169,6 +175,7 @@ export function Dashboard() {
 
         <SharedSection />
         <PurchasedSection />
+        <AvailableSection />
       </div>
       <SiteFooter />
       {prefsOpen && <SettingsDialog onClose={() => setPrefsOpen(false)} />}
@@ -637,6 +644,88 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
         </Link>
         {allDone && <CourseCertMenu topicSlug={course.slug} />}
       </div>
+
+      {showMission && course.mission && (
+        <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />
+      )}
+    </article>
+  );
+}
+
+// Courses published in this member's own site catalogue that they don't own
+// (course-publishing) — the discovery surface, deliberately a section on the
+// signed-in home rather than a route of its own. Hidden when nothing is
+// published. Free editions are already readable (publishing IS the grant), so
+// there is no "join" step: the card just opens the course, and a priced course
+// lands the reader on its Preview + the existing paygate.
+function AvailableSection() {
+  const t = useTranslations("Dashboard");
+  const available = useQuery(api.catalogue.list);
+  if (!available || available.length === 0) return null;
+  return (
+    <section className="mt-12">
+      <h2 className="mb-1 text-lg font-semibold tracking-tight text-accent">{t("availableCourses")}</h2>
+      <p className="mb-4 text-sm text-soft">{t("availableSubtitle")}</p>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {available.map((c) => (
+          <AvailableCourseCard key={c.slug} course={c} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+// One catalogue card: title + a Free/price badge, the mission, the Edition chips
+// and Open. No progress bar — this is a course the member hasn't taken up yet; it
+// moves to their own list once they start it.
+function AvailableCourseCard({ course }: { course: AvailableCourse }) {
+  const t = useTranslations("Dashboard");
+  const [showMission, setShowMission] = useState(false);
+  // Open the Edition matching the app language when the course has one, else
+  // English, else its first — the same preference SharedCourseCard uses.
+  const locale = useLocale();
+  const openLang = course.langs.some((l) => l.lang === locale)
+    ? locale
+    : course.langs.some((l) => l.lang === "en")
+      ? "en"
+      : course.langs[0]?.lang;
+
+  return (
+    <article className="flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <h2 className="min-w-0 text-lg font-semibold leading-snug text-ink">{course.title}</h2>
+        {course.price ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
+            <Icon name="tag" className="h-3 w-3" />
+            {formatPrice(course.price.amount, course.price.currency)}
+          </span>
+        ) : (
+          <span className="shrink-0 rounded-full bg-accent2/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-accent2">
+            {t("free")}
+          </span>
+        )}
+      </div>
+
+      {course.mission && (
+        <button
+          onClick={() => setShowMission(true)}
+          title={t("viewMission")}
+          className="line-clamp-2 min-h-[38px] text-left text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
+        >
+          {missionPreview(course.mission)}
+        </button>
+      )}
+
+      <LangChips langs={course.langs} />
+
+      <div className="min-h-[14px] flex-1" />
+
+      <Link
+        href={withLang(`/courses/${course.slug}`, openLang)}
+        className="mt-3.5 rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
+      >
+        {t("openCourse")}
+      </Link>
 
       {showMission && course.mission && (
         <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />

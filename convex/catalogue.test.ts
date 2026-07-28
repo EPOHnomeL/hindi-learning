@@ -118,6 +118,101 @@ test("only a real Edition can be published: a non-English language needs a ready
   expect(await readRows(t, topicId)).toMatchObject([{ lang: "es", published: true }]);
 });
 
+// ---- catalogue.list: the signed-in home's "available courses" section --------
+
+async function seedTenant(t: ReturnType<typeof convexTest>, slug: string) {
+  await t.run((ctx) =>
+    ctx.db.insert("tenants", {
+      slug,
+      displayName: slug,
+      theme: { light: {} },
+      flags: { certificates: true, translations: true, publicLinks: true, qa: true, seeding: true },
+    }),
+  );
+}
+async function seedMember(t: ReturnType<typeof convexTest>, email: string, tenantSlug?: string) {
+  return await t.run((ctx) => ctx.db.insert("users", { email, tenantSlug }));
+}
+async function seedTenantTopic(
+  t: ReturnType<typeof convexTest>,
+  ownerId: Id<"users">,
+  slug: string,
+  tenantSlug?: string,
+) {
+  return await t.run((ctx) =>
+    ctx.db.insert("topics", { ownerId, slug, title: slug, status: "completed" as const, tenantSlug }),
+  );
+}
+async function publish(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, lang: string) {
+  await t.run((ctx) => ctx.db.insert("publishedEditions", { topicId, lang, published: true }));
+}
+
+test("the catalogue is scoped symmetrically to the member's own tenant", async () => {
+  const t = convexTest(schema, modules);
+  await seedTenant(t, "upf");
+  const owner = await seedUser(t, "owner@example.com");
+  const upfTopic = await seedTenantTopic(t, owner, "upf-course", "upf");
+  const siteTopic = await seedTenantTopic(t, owner, "site-course");
+  const awTopic = await seedTenantTopic(t, owner, "aw-course", "almighty-warriors");
+  for (const id of [upfTopic, siteTopic, awTopic]) await publish(t, id, "en");
+
+  const upfMember = await seedMember(t, "member@upf.example", "upf");
+  const siteMember = await seedMember(t, "member@example.com");
+
+  // A subdomain member sees their own tenant's courses only…
+  expect((await asUser(t, upfMember).query(api.catalogue.list, {})).map((c) => c.slug)).toEqual(["upf-course"]);
+  // …and a default-site member sees only the courses with no tenant at all.
+  expect((await asUser(t, siteMember).query(api.catalogue.list, {})).map((c) => c.slug)).toEqual(["site-course"]);
+});
+
+test("the catalogue lists published courses only, and never the caller's own", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const member = await seedUser(t, "member@example.com");
+  const listed = await seedTenantTopic(t, owner, "listed");
+  await seedTenantTopic(t, owner, "unlisted");
+  const mine = await seedTenantTopic(t, member, "mine");
+  await publish(t, listed, "en");
+  await publish(t, mine, "en");
+
+  // The caller's own courses are already their library — no duplicate card here.
+  expect((await asUser(t, member).query(api.catalogue.list, {})).map((c) => c.slug)).toEqual(["listed"]);
+  // Signed out there is no catalogue at all (it is a member surface).
+  expect(await t.query(api.catalogue.list, {})).toEqual([]);
+});
+
+test("a card carries its Editions and its price, English first", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const member = await seedUser(t, "member@example.com");
+  const free = await seedTenantTopic(t, owner, "free-course");
+  const paid = await seedTenantTopic(t, owner, "paid-course");
+  await t.run((ctx) => ctx.db.patch(free, { mission: "Learn to read Hindi" }));
+  await t.run(async (ctx) => {
+    await ctx.db.insert("translationJobs", { topicId: free, lang: "es", status: "ready", total: 1, done: 1, failed: 0 });
+    // A listed language whose translation is still running is not an Edition yet.
+    await ctx.db.insert("translationJobs", { topicId: free, lang: "fr", status: "translating", total: 1, done: 0, failed: 0 });
+  });
+  await publish(t, free, "es");
+  await publish(t, free, "en");
+  await publish(t, free, "fr");
+  await publish(t, paid, "en");
+  await t.run((ctx) => ctx.db.insert("listings", { topicId: paid, lang: "en", amount: 25000, currency: "zar" }));
+
+  const cards = await asUser(t, member).query(api.catalogue.list, {});
+  expect(cards.find((c) => c.slug === "free-course")).toMatchObject({
+    title: "free-course",
+    mission: "Learn to read Hindi",
+    // English first, and no `fr` — its Edition isn't ready.
+    langs: [{ lang: "en" }, { lang: "es" }],
+    // `null` price = there is a free Edition to read.
+    price: null,
+  });
+  expect(cards.find((c) => c.slug === "paid-course")).toMatchObject({
+    price: { amount: 25000, currency: "zar" },
+  });
+});
+
 test("the owner's Editions panel reports each Edition's published state", async () => {
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
