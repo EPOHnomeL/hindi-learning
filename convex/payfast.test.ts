@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
 import {
+  acceptNotification,
   appUrl,
   buildCheckoutFields,
   centsFromRand,
@@ -267,4 +268,81 @@ test("appUrl routes a tenant course's links to its subdomain (base minus a leadi
   // A dot-less host (localhost) has no room for a subdomain → kept verbatim.
   process.env.SITE_URL = "http://localhost:3000";
   expect(appUrl("/x", "ywampotch")).toBe("http://localhost:3000/x");
+});
+
+// ---- the ITN acceptance rules (architecture-deepening/04) --------------------
+//
+// Whether a signature-verified notification may grant access. Pure — no HTTP mock
+// and no database: the rules used to sit inline in `http.ts`'s payfastNotify and
+// were reachable only through the mocked-fetch integration harness.
+
+// A well-formed COMPLETE notification for a R120.00 sale (fee arrives negative).
+function itnFields(over: Record<string, string> = {}): Record<string, string> {
+  return {
+    m_payment_id: "intent-1",
+    pf_payment_id: "9876543",
+    payment_status: "COMPLETE",
+    amount_gross: "120.00",
+    amount_fee: "-4.60",
+    amount_net: "115.40",
+    ...over,
+  };
+}
+const intent = { amount: 12000 };
+
+test("acceptNotification grants a COMPLETE, amount-matching notification", () => {
+  expect(acceptNotification(itnFields(), intent)).toEqual({
+    outcome: "grant",
+    // The money, parsed into integer cents; the fee is normalised to positive.
+    payment: { pfPaymentId: "9876543", gross: 12000, fee: 460, net: 11540 },
+    // The verdict hands the vouched-for intent back, so the caller reads what to
+    // grant off it without re-checking that it exists.
+    intent,
+  });
+});
+
+test("acceptNotification ignores a payment that isn't COMPLETE — nothing to do", () => {
+  // Ignore, not refuse: the notification is genuine, so it is acknowledged and
+  // PayFast stops re-sending it. Checked before anything else, so a CANCELLED
+  // notification with no amounts at all is still merely ignored.
+  for (const status of ["CANCELLED", "FAILED", "PENDING", ""]) {
+    expect(acceptNotification(itnFields({ payment_status: status }), intent)).toEqual({ outcome: "ignore" });
+  }
+  expect(acceptNotification({ payment_status: "CANCELLED" }, intent)).toEqual({ outcome: "ignore" });
+});
+
+test("acceptNotification refuses an amount that doesn't match the frozen intent", () => {
+  // Underpaying a dearer Edition never unlocks it...
+  expect(acceptNotification(itnFields(), { amount: 50000 })).toEqual({
+    outcome: "refuse",
+    reason: "amount mismatch",
+  });
+  // ...and neither does overpaying: the intent's price is the only thing trusted.
+  expect(acceptNotification(itnFields({ amount_gross: "500.00" }), intent)).toEqual({
+    outcome: "refuse",
+    reason: "amount mismatch",
+  });
+});
+
+test("acceptNotification refuses a notification with no matching checkout intent", () => {
+  // No intent ⇒ this payment never came from our checkout.
+  expect(acceptNotification(itnFields(), null)).toEqual({
+    outcome: "refuse",
+    reason: "unknown payment reference",
+  });
+});
+
+test("acceptNotification refuses a malformed notification", () => {
+  for (const bad of [
+    { pf_payment_id: "" },
+    { m_payment_id: "" },
+    { amount_gross: "R120" },
+    { amount_fee: "" },
+    { amount_net: "twelve" },
+  ]) {
+    expect(acceptNotification(itnFields(bad), intent)).toEqual({
+      outcome: "refuse",
+      reason: "malformed notification",
+    });
+  }
 });

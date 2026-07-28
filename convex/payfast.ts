@@ -105,6 +105,58 @@ export function centsFromRand(amount: string): number | null {
   return m[1] === "-" ? -cents : cents;
 }
 
+// ---- the ITN acceptance rules (architecture-deepening/04) --------------------
+
+// Whether a signature-verified notification may grant access, and the money it
+// grants. Three outcomes, because "don't grant" is two different things to
+// PayFast: `ignore` acknowledges a genuine notification there is nothing to do
+// about (so it stops re-sending), `refuse` rejects one that must never grant.
+// The accepted notification hands back the very intent it was matched against, so
+// the caller reads what to grant (topic/lang/buyer) off a value the rules have
+// already vouched for — there is no second, unguarded `if (!intent)` at the call
+// site, and no way to dispatch on a `grant` without one.
+export type ItnAcceptance<T> =
+  | { outcome: "grant"; payment: { pfPaymentId: string; gross: number; fee: number; net: number }; intent: T }
+  | { outcome: "ignore" }
+  | { outcome: "refuse"; reason: string };
+
+// THE money-acceptance decision for a PayFast ITN — the rules that used to sit
+// inline in `http.ts`'s payfastNotify, where they were reachable only through the
+// mocked-fetch harness. Pure: the caller has already verified the signature and
+// looked up the checkout-intent this `m_payment_id` names (null when there is
+// none); the network postback happens after, on `grant`.
+//
+// In order, cheapest and most-certain first:
+//   1. only a COMPLETE payment grants — anything else is acknowledged and dropped;
+//   2. the notification must parse (both references present, all three amounts
+//      well-formed Rand) — integer cents, never parseFloat at the money boundary;
+//   3. it must answer a Buy click of ours — no intent ⇒ not from our checkout;
+//   4. the paid amount must equal the price FROZEN on that intent — what was
+//      listed when the buyer clicked Buy. A tampered/cheap payment never unlocks
+//      a dearer Edition, and a re-price or un-list after Buy never strands a
+//      genuine payment: once they've paid what was asked, they own it.
+// The fee is normalised to positive here (PayFast sends it negative), so the
+// ledger's caller never has to remember to.
+export function acceptNotification<T extends { amount: number }>(
+  fields: Record<string, string>,
+  intent: T | null,
+): ItnAcceptance<T> {
+  if (fields.payment_status !== "COMPLETE") return { outcome: "ignore" };
+
+  const pfPaymentId = fields.pf_payment_id;
+  const gross = centsFromRand(fields.amount_gross ?? "");
+  const fee = centsFromRand(fields.amount_fee ?? "");
+  const net = centsFromRand(fields.amount_net ?? "");
+  if (!pfPaymentId || !fields.m_payment_id || gross === null || fee === null || net === null) {
+    return { outcome: "refuse", reason: "malformed notification" };
+  }
+
+  if (!intent) return { outcome: "refuse", reason: "unknown payment reference" };
+  if (intent.amount !== gross) return { outcome: "refuse", reason: "amount mismatch" };
+
+  return { outcome: "grant", payment: { pfPaymentId, gross, fee: Math.abs(fee), net }, intent };
+}
+
 // ---- the checkout field builder --------------------------------------------------
 
 // The signed field set startCheckout returns for the client to form-POST to the
