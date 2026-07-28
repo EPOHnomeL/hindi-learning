@@ -48,7 +48,7 @@ export function AdminPanel() {
             ← Courses
           </Link>
         </header>
-        <TenantDetail slug={scope.tenantSlug!} />
+        <TenantDetail slug={scope.tenantSlug!} role="tenant" />
       </div>
     );
   }
@@ -831,7 +831,7 @@ function TenantsManager() {
           Select a tenant to manage its branding, flags, courses, and members.
         </div>
       ) : (
-        <TenantDetail slug={selected} onRemoved={() => setSelected(null)} />
+        <TenantDetail slug={selected} role="sys" onRemoved={() => setSelected(null)} />
       )}
     </div>
   );
@@ -903,9 +903,23 @@ function NewTenantForm({ onCreated }: { onCreated: (slug: string) => void }) {
 // scaffolding; tickets 20–22 fill in each section's real content and mutations.
 // `displayName` comes from the public `getTheme` read (also serves both admin
 // tiers, so a tenant admin needs no extra query).
-function TenantDetail({ slug, onRemoved }: { slug: string; onRemoved?: () => void }) {
+//
+// `role` is which tier is looking. The panel shipped as "the sys-admin panel, minus
+// tabs" — the same sections for both tiers — which handed a tenant admin the
+// *provisioning* surface (flags, the global course pool, member allocation, delete
+// the tenant). A tenant admin manages what the sys admin allocated to them, so they
+// get Theme (their brand) and Courses read-only (what they were given); Flags,
+// Members, and Remove tenant are the allocator's and aren't rendered for them. The
+// mutations behind each are sys-admin-only server-side — this only stops drawing
+// controls that would refuse.
+//
+// That leaves a deliberately thin tenant panel for now: the reads a tenant admin
+// actually wants — their member roster and their payouts — are separate builds
+// (prior review items 5 and 6), each blocked on its own open decision.
+function TenantDetail({ slug, role, onRemoved }: { slug: string; role: "sys" | "tenant"; onRemoved?: () => void }) {
   const view = useQuery(api.tenants.getTheme, { slug });
   const displayName = view?.displayName ?? slug;
+  const isSys = role === "sys";
 
   return (
     <div className="flex flex-col gap-10">
@@ -923,24 +937,33 @@ function TenantDetail({ slug, onRemoved }: { slug: string; onRemoved?: () => voi
           <ThemeEditor key={slug} slug={slug} view={view} />
         )}
       </TenantSection>
-      <TenantSection title="Flags" hint="Which features are on for this tenant.">
-        {view === undefined ? (
-          <span>Loading…</span>
-        ) : view === null ? (
-          <span>This tenant has no flags yet.</span>
-        ) : (
-          <FlagToggles key={slug} slug={slug} flags={view.flags} />
-        )}
+      {isSys && (
+        <TenantSection title="Flags" hint="Which features are on for this tenant.">
+          {view === undefined ? (
+            <span>Loading…</span>
+          ) : view === null ? (
+            <span>This tenant has no flags yet.</span>
+          ) : (
+            <FlagToggles key={slug} slug={slug} flags={view.flags} />
+          )}
+        </TenantSection>
+      )}
+      <TenantSection
+        title="Courses"
+        hint={isSys ? "Which courses belong to this tenant." : "The courses allocated to this tenant."}
+      >
+        <TenantCourses slug={slug} canAllocate={isSys} />
       </TenantSection>
-      <TenantSection title="Courses" hint="Which courses belong to this tenant.">
-        <TenantCourses slug={slug} />
-      </TenantSection>
-      <TenantSection title="Members" hint="Who belongs to this tenant, and its admins.">
-        <TenantMembers slug={slug} />
-      </TenantSection>
-      <TenantSection title="Remove tenant" hint="Delete this tenant. Blocked while any course or member still references it.">
-        <TenantRemoval slug={slug} displayName={displayName} onRemoved={onRemoved} />
-      </TenantSection>
+      {isSys && (
+        <TenantSection title="Members" hint="Who belongs to this tenant, and its admins.">
+          <TenantMembers slug={slug} />
+        </TenantSection>
+      )}
+      {isSys && (
+        <TenantSection title="Remove tenant" hint="Delete this tenant. Blocked while any course or member still references it.">
+          <TenantRemoval slug={slug} displayName={displayName} onRemoved={onRemoved} />
+        </TenantSection>
+      )}
     </div>
   );
 }
@@ -965,7 +988,12 @@ function TenantSection({ title, hint, children }: { title: string; hint: string;
 // (default-only courses). Assigning sets `topics.tenantSlug`; the live
 // `courseAssignment` query re-renders both lists on every write. Tenant-centric —
 // the same course is managed here, never on CourseSettings.
-function TenantCourses({ slug }: { slug: string }) {
+//
+// `canAllocate` is the sys admin. Allocation is theirs both ways, so a tenant admin
+// gets the assigned list read-only — no add picker, no Remove. The server agrees
+// independently: `courseAssignment` returns them an empty `available` (the pool's
+// titles are never sent), and assign/unassignCourse refuse them outright.
+function TenantCourses({ slug, canAllocate }: { slug: string; canAllocate: boolean }) {
   const data = useQuery(api.tenants.courseAssignment, { tenantSlug: slug });
   const assign = useMutation(api.tenants.assignCourse);
   const unassign = useMutation(api.tenants.unassignCourse);
@@ -982,21 +1010,29 @@ function TenantCourses({ slug }: { slug: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <SearchAddPicker
-        placeholder="Search a course by title…"
-        empty="No unassigned courses left to add."
-        options={data.available.map((c) => ({ id: c.topicId, label: c.title }))}
-        onAdd={(topicId) => assign({ tenantSlug: slug, topicId: topicId as Id<"topics"> })}
-      />
+      {canAllocate && (
+        <SearchAddPicker
+          placeholder="Search a course by title…"
+          empty="No unassigned courses left to add."
+          options={data.available.map((c) => ({ id: c.topicId, label: c.title }))}
+          onAdd={(topicId) => assign({ tenantSlug: slug, topicId: topicId as Id<"topics"> })}
+        />
+      )}
       {data.assigned.length === 0 ? (
-        <p className="text-sm text-soft">No courses assigned yet.</p>
+        <p className="text-sm text-soft">
+          {canAllocate ? "No courses assigned yet." : "No courses have been allocated to this tenant yet."}
+        </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {data.assigned.map((c) => (
             <AssignedRow
               key={c.topicId}
               label={c.title}
-              onRemove={() => unassign({ tenantSlug: slug, topicId: c.topicId as Id<"topics"> })}
+              onRemove={
+                canAllocate
+                  ? () => unassign({ tenantSlug: slug, topicId: c.topicId as Id<"topics"> })
+                  : undefined
+              }
               removeAria={`Unassign ${c.title}`}
             />
           ))}
@@ -1011,15 +1047,17 @@ function TenantCourses({ slug }: { slug: string }) {
 // via the Allowlist, since clearing their slug would promote them to a sys admin)
 // plus a search-and-add picker over the assignable pool (unassigned, non-admin
 // Allowlist emails). Assigning sets `whitelist.tenantSlug`.
+//
+// **Sys-admin only** — member allocation is provisioning, so `TenantDetail` doesn't
+// render this section for a tenant admin and `memberAssignment` refuses them anyway
+// (its pool is platform-wide personal data). That makes every control here
+// unconditionally the sys admin's: the old per-row `myAdminScope` re-check that hid
+// grant/revoke from a tenant admin is gone with the tier that needed it.
 function TenantMembers({ slug }: { slug: string }) {
   const data = useQuery(api.tenants.memberAssignment, { tenantSlug: slug });
-  const scope = useQuery(api.whitelist.myAdminScope);
   const assign = useMutation(api.tenants.assignMember);
   const unassign = useMutation(api.tenants.unassignMember);
   const setAdmin = useMutation(api.tenants.setTenantAdmin);
-  // Only a sys admin mints tenant admins (issue 24) — the grant/revoke control is
-  // hidden for a tenant admin (UX only; setTenantAdmin re-checks server-side).
-  const isSys = scope?.role === "sys";
 
   if (data === undefined) {
     return (
@@ -1051,14 +1089,11 @@ function TenantMembers({ slug }: { slug: string }) {
               // An admin can't be unassigned directly — demote first (revoke admin),
               // then the normal picker Remove applies (mirrors the DB-privilege lock).
               onRemove={m.isAdmin ? undefined : () => unassign({ tenantSlug: slug, email: m.email })}
-              lockedNote={m.isAdmin && !isSys ? "Remove via Allowlist" : undefined}
               removeAria={`Unassign ${m.email}`}
               action={
-                isSys
-                  ? m.isAdmin
-                    ? { label: "Revoke admin", busyLabel: "Revoking…", aria: `Revoke admin for ${m.email}`, run: () => setAdmin({ tenantSlug: slug, email: m.email, makeAdmin: false }) }
-                    : { label: "Make admin", busyLabel: "Granting…", aria: `Make ${m.email} an admin`, run: () => setAdmin({ tenantSlug: slug, email: m.email, makeAdmin: true }) }
-                  : undefined
+                m.isAdmin
+                  ? { label: "Revoke admin", busyLabel: "Revoking…", aria: `Revoke admin for ${m.email}`, run: () => setAdmin({ tenantSlug: slug, email: m.email, makeAdmin: false }) }
+                  : { label: "Make admin", busyLabel: "Granting…", aria: `Make ${m.email} an admin`, run: () => setAdmin({ tenantSlug: slug, email: m.email, makeAdmin: true }) }
               }
             />
           ))}
@@ -1192,23 +1227,23 @@ function SearchAddPicker({
   );
 }
 
-// One assigned-item row: a label, an optional badge (e.g. a tenant admin), and
-// either a Remove control or a locked note when the row can't be removed here.
+// One assigned-item row: a label, an optional badge (e.g. a tenant admin), and a
+// Remove control when the row is removable here. Omitting `onRemove` makes the row
+// read-only — a tenant admin's allocated-courses list, or a tenant-admin member row
+// (demote them first; clearing an admin's slug would promote them to a sys admin).
 function AssignedRow({
   label,
   badge,
   onRemove,
-  lockedNote,
   removeAria,
   action,
 }: {
   label: string;
   badge?: string;
   onRemove?: () => Promise<unknown>;
-  lockedNote?: string;
   removeAria?: string;
   // An optional secondary control (e.g. "Make admin" / "Revoke admin"), rendered
-  // before the remove/lockedNote. Manages its own busy/error, independent of remove.
+  // before the remove control. Manages its own busy/error, independent of remove.
   action?: { label: string; busyLabel: string; run: () => Promise<unknown>; aria?: string };
 }) {
   const [busy, setBusy] = useState(false);
@@ -1224,7 +1259,7 @@ function AssignedRow({
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {action && <RowActionButton {...action} />}
-        {onRemove ? (
+        {onRemove && (
           <>
             {error && <span className="text-xs text-danger">Failed — retry</span>}
             <button
@@ -1246,8 +1281,6 @@ function AssignedRow({
               {busy ? "Removing…" : "Remove"}
             </button>
           </>
-        ) : (
-          lockedNote && <span className="text-xs text-soft">{lockedNote}</span>
         )}
       </div>
     </li>
