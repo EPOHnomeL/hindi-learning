@@ -63,7 +63,12 @@ type PurchasedCourse = Omit<SharedCourse, "ownerEmail">;
 // /courses/[slug] (ADR 0012), not a local view toggle.
 export function Dashboard() {
   const courses = useQuery(api.content.reader.dashboard);
-  const amAdmin = useQuery(api.whitelist.amIAdmin);
+  // The /admin door, for **both** admin tiers. `amIAdmin` is `isCallerAdmin(ctx)`
+  // unscoped — i.e. "is a sys admin" — so gating the link on it left a tenant admin
+  // with a panel that existed and authorised them but had no way in. `myAdminScope`
+  // is the tier-aware read: `role` is sys / tenant / none. UX only; AdminPanel and
+  // every mutation behind it re-check server-side.
+  const scope = useQuery(api.whitelist.myAdminScope);
   // Course creation is Allowlist-gated (ADR 0021): non-members get a clean
   // library with no "New course" card (UX only — seedTopic enforces server-side).
   const amAllowlisted = useQuery(api.whitelist.amIAllowlisted);
@@ -125,9 +130,12 @@ export function Dashboard() {
             >
               <Icon name="settings" className="h-4 w-4" />
             </button>
-            {amAdmin && (
+            {scope && scope.role !== "none" && (
               <Link href="/admin" className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
-                Admin
+                {/* The label names the page the link opens: a sys admin lands on the
+                    platform dashboard ("Admin"), a tenant admin on their own tenant's
+                    panel, whose heading already reads "Tenant". */}
+                {scope.role === "tenant" ? "Tenant" : "Admin"}
               </Link>
             )}
             <button
