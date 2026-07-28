@@ -146,6 +146,13 @@
     "referenceNotFound": "Reference not found.",
     "loadReferenceFailed": "Couldn’t load this reference. Try refreshing."
   },
+  "Welcome": {
+    "eyebrow": "Welcome",
+    "lessonCount": "{count, plural, one {# lesson} other {# lessons}}",
+    "start": "Start Lesson {seq}",
+    "home": "More from {brand}",
+    "dismiss": "Dismiss"
+  },
   "Resource": {
     "openRawFile": "Open the raw file",
     "raw": "Raw",
@@ -267,6 +274,9 @@
     "canEdit": "Can edit",
     "revokeAccessFor": "Revoke access for {email}",
     "revokeAccess": "Revoke access",
+    "publish": "Publish",
+    "publishOn": "Listed in your site’s course catalogue — free editions can be read by anyone signed in",
+    "publishOff": "Off — this edition isn’t listed in the catalogue",
     "publicLink": "Public link",
     "publicOn": "Anyone with the link can view — no account needed",
     "publicOff": "Off — only you and people you invite can see this",

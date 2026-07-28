@@ -298,6 +298,7 @@ function EditionPanel({
   return (
     <div className="flex flex-col gap-4">
       <InviteByEmail topicSlug={topicSlug} lang={edition.lang} />
+      <PublishToggle topicSlug={topicSlug} lang={edition.lang} published={edition.published} />
       <PublicLinkToggle topicSlug={topicSlug} lang={edition.lang} publicToken={edition.publicToken} />
       <SellEdition topicSlug={topicSlug} lang={edition.lang} name={edition.name} completed={completed} />
       <div className="flex flex-col items-start gap-3 border-t border-line pt-4">
@@ -454,6 +455,53 @@ function AccessRow({
         <Icon name="trash" className="h-3.75 w-3.75" />
       </button>
     </li>
+  );
+}
+
+// Whether this edition is listed in the site's course catalogue
+// (course-publishing), as an on/off toggle — the owner's publish control. Sits
+// above the public link because it is the broader act, and is deliberately a
+// separate switch: publishing lists the edition for signed-in members (and, while
+// it is free, lets them read it), whereas a public link hands anonymous access to
+// anyone holding the token.
+function PublishToggle({ topicSlug, lang, published }: { topicSlug: string; lang: string; published: boolean }) {
+  const t = useTranslations("Editions");
+  const setPublished = useMutation(api.catalogue.setEditionPublished);
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <div
+      className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
+        published ? "border-accent2/40" : "border-line"
+      } bg-card`}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] transition-colors ${
+            published ? "bg-accent2/15 text-accent2" : "bg-hi text-soft"
+          }`}
+        >
+          <Icon name="book" className="h-4.5 w-4.5" />
+        </span>
+        <div className="min-w-0">
+          <b className="block text-[13.5px] font-semibold text-ink">{t("publish")}</b>
+          <span className="text-[11.5px] text-soft">{published ? t("publishOn") : t("publishOff")}</span>
+        </div>
+      </div>
+      <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+        <input
+          type="checkbox"
+          checked={published}
+          disabled={busy}
+          onChange={(e) => {
+            setBusy(true);
+            void setPublished({ topicSlug, lang, published: e.target.checked }).finally(() => setBusy(false));
+          }}
+          className="peer sr-only"
+        />
+        <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 peer-checked:after:translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
+      </label>
+    </div>
   );
 }
 

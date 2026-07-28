@@ -12,6 +12,7 @@ import type * as auth from "../auth.js";
 import type * as authoring from "../authoring.js";
 import type * as backfill from "../backfill.js";
 import type * as capture from "../capture.js";
+import type * as catalogue from "../catalogue.js";
 import type * as certificates from "../certificates.js";
 import type * as content_authoring from "../content/authoring.js";
 import type * as content_publish from "../content/publish.js";
@@ -56,6 +57,7 @@ declare const fullApi: ApiFromModules<{
   authoring: typeof authoring;
   backfill: typeof backfill;
   capture: typeof capture;
+  catalogue: typeof catalogue;
   certificates: typeof certificates;
   "content/authoring": typeof content_authoring;
   "content/publish": typeof content_publish;

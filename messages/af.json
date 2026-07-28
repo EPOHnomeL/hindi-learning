@@ -114,6 +114,13 @@
     "referenceNotFound": "Verwysing nie gevind nie.",
     "loadReferenceFailed": "Kon nie hierdie verwysing laai nie. Probeer verfris."
   },
+  "Welcome": {
+    "eyebrow": "Welkom",
+    "lessonCount": "{count, plural, one {# les} other {# lesse}}",
+    "start": "Begin Les {seq}",
+    "home": "Meer van {brand}",
+    "dismiss": "Maak toe"
+  },
   "Resource": {
     "openRawFile": "Open die rou lêer",
     "raw": "Rou",
@@ -267,6 +274,9 @@
     "canEdit": "Kan redigeer",
     "revokeAccessFor": "Herroep toegang vir {email}",
     "revokeAccess": "Herroep toegang",
+    "publish": "Publiseer",
+    "publishOn": "Gelys in jou werf se kursuskatalogus — gratis uitgawes kan deur enigiemand wat aangemeld is gelees word",
+    "publishOff": "Af — hierdie uitgawe is nie in die katalogus gelys nie",
     "publicLink": "Openbare skakel",
     "publicOn": "Enigiemand met die skakel kan bekyk — geen rekening nodig nie",
     "publicOff": "Af — net jy en mense wat jy nooi kan dit sien",

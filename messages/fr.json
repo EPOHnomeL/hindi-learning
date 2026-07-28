@@ -114,6 +114,13 @@
     "referenceNotFound": "Référence introuvable.",
     "loadReferenceFailed": "Impossible de charger cette référence. Essayez d’actualiser."
   },
+  "Welcome": {
+    "eyebrow": "Bienvenue",
+    "lessonCount": "{count, plural, one {# leçon} other {# leçons}}",
+    "start": "Commencer la leçon {seq}",
+    "home": "Plus de {brand}",
+    "dismiss": "Fermer"
+  },
   "Resource": {
     "openRawFile": "Ouvrir le fichier brut",
     "raw": "Brut",
@@ -267,6 +274,9 @@
     "canEdit": "Peut modifier",
     "revokeAccessFor": "Révoquer l’accès de {email}",
     "revokeAccess": "Révoquer l’accès",
+    "publish": "Publier",
+    "publishOn": "Répertoriée dans le catalogue de cours de votre site — les éditions gratuites sont lisibles par toute personne connectée",
+    "publishOff": "Désactivé — cette édition n’apparaît pas dans le catalogue",
     "publicLink": "Lien public",
     "publicOn": "Toute personne disposant du lien peut consulter — aucun compte nécessaire",
     "publicOff": "Désactivé — seuls vous et les personnes que vous invitez pouvez voir ceci",

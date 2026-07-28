@@ -3,7 +3,16 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
 import { action, internalAction, internalMutation, internalQuery, mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, getEditableTopic, getOwnedTopic, hashString, SOURCE_LANG, shareLang, topicBySlug } from "./lib";
+import {
+  assertAdmin,
+  getEditableTopic,
+  getOwnedTopic,
+  hashString,
+  publishedLangs,
+  SOURCE_LANG,
+  shareLang,
+  topicBySlug,
+} from "./lib";
 import { assertTenantFlag } from "./tenantFlags";
 import { isKnownLang, langInfo } from "./languages";
 import { chatComplete, translateModel, type ChatMessage } from "./openrouterClient";
@@ -901,6 +910,10 @@ export const editions = query({
           failed: v.number(),
           shareCount: v.number(),
           publicToken: v.union(v.string(), v.null()),
+          // Whether this Edition is listed in the tenant catalogue
+          // (course-publishing) — seeds the panel's Publish toggle. Distinct from
+          // `publicToken`, which is the anonymous bearer link.
+          published: v.boolean(),
         }),
       ),
     }),
@@ -914,6 +927,7 @@ export const editions = query({
     const shares = await ctx.db.query("shares").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect();
     const links = await ctx.db.query("publicLinks").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect();
     const jobs = await ctx.db.query("translationJobs").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect();
+    const listed = await publishedLangs(ctx, topic._id);
 
     const shareCount = (lang: string) => shares.filter((s) => shareLang(s) === lang).length;
     const tokenFor = (lang: string) => {
@@ -938,6 +952,7 @@ export const editions = query({
         failed: 0,
         shareCount: shareCount(SOURCE_LANG),
         publicToken: tokenFor(SOURCE_LANG),
+        published: listed.has(SOURCE_LANG),
       },
       ...jobs
         .sort((a, b) => a.lang.localeCompare(b.lang))
@@ -956,6 +971,7 @@ export const editions = query({
             failed: j.failed,
             shareCount: shareCount(j.lang),
             publicToken: tokenFor(j.lang),
+            published: listed.has(j.lang),
           };
         }),
     ];

@@ -118,6 +118,35 @@ test("only a real Edition can be published: a non-English language needs a ready
   expect(await readRows(t, topicId)).toMatchObject([{ lang: "es", published: true }]);
 });
 
+test("the owner's Editions panel reports each Edition's published state", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi");
+  await t.run((ctx) =>
+    ctx.db.insert("translationJobs", { topicId, lang: "es", status: "ready", total: 1, done: 1, failed: 0 }),
+  );
+
+  const editions = async () =>
+    (await asUser(t, owner).query(api.translate.editions, { topicSlug: "hindi" }))!.editions.map((e) => [
+      e.lang,
+      e.published,
+    ]);
+  expect(await editions()).toEqual([
+    ["en", false],
+    ["es", false],
+  ]);
+
+  await asUser(t, owner).mutation(api.catalogue.setEditionPublished, {
+    topicSlug: "hindi",
+    lang: "es",
+    published: true,
+  });
+  expect(await editions()).toEqual([
+    ["en", false],
+    ["es", true],
+  ]);
+});
+
 test("unpublishing a language whose Edition has gone away still works", async () => {
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
