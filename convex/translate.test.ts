@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { itemHash } from "./translate";
+import { buildTranslateMessages, itemHash, swapBackStatic, swapOutStatic } from "./translate";
 import type { Id } from "./_generated/dataModel";
 
 // The translate Routine's publish seams are PUBLISH_SECRET-guarded (assertAdmin).
@@ -510,4 +510,27 @@ test("a certificate snapshots the title + language of the Edition completed in",
   expect(cert).toMatchObject({ courseTitle: "Hindi (es)", lang: "es" });
   const pub = await t.query(api.certificates.publicCertificate, { token: cert.token });
   expect(pub).toMatchObject({ courseTitle: "Hindi (es)", lang: "es", dir: "ltr" });
+});
+
+// ---- Resource links survive translation (rich-media/11) ---------------------
+
+test("a Resource link's href round-trips unchanged through the html translate pass", () => {
+  // A Lesson cites an owned Resource by its stable id (AUTHORING.md §5–§6). The
+  // href must reach the model byte-identical — a mangled or rewritten id would
+  // resolve to nothing in the reader and silently kill the citation.
+  const href = "/courses/hindi/resources/k17c2abf9d3e";
+  const html = `<p>The perfective is formed by <a class="cite" href="${href}">the Handbook</a>.</p>`;
+
+  // Nothing pre-processes the body: the static swap only lifts <style>/<script>.
+  const { stripped, blocks } = swapOutStatic(`<style>p{color:red}</style>${html}`);
+  expect(blocks).toHaveLength(1);
+  expect(stripped).toContain(`href="${href}"`);
+
+  // The model is handed the markup verbatim and told to preserve every attribute.
+  const [system, user] = buildTranslateMessages(stripped, "Spanish", "html");
+  expect(user?.content).toContain(`<a class="cite" href="${href}">`);
+  expect(system?.content).toContain("Preserve EVERY HTML tag, attribute, and value EXACTLY");
+
+  // And the swap-back restores the document with the href still intact.
+  expect(swapBackStatic(stripped, blocks)).toContain(`href="${href}"`);
 });
