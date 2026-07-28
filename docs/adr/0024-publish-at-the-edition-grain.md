@@ -71,9 +71,22 @@ lands on its [[Preview]] and the existing paygate. `startCheckout` remains un-ga
 (unlisted-but-buyable via a direct link), and pricing keeps its own `completed` gate — with publishing
 off the status axis there is nothing to widen.
 
-**6. The catalogue is a section on the signed-in home**, scoped **symmetrically** from the member's own
-`tenantSlug` (a subdomain member sees that subdomain's courses; a default-site member sees only
-untenanted ones; never cross-tenant). No public catalogue, no new route, no landing-page change.
+**6. The catalogue is a section on the signed-in home**, scoped **symmetrically** to the **host being
+browsed** — on `<slug>.my-course.app`, that tenant's courses; on the apex, only untenanted ones; never
+cross-tenant. No public catalogue, no new route, no landing-page change.
+
+> **Amended 2026-07-28.** As first written this said "from the member's own `tenantSlug`", and that was
+> unimplementable: **nothing writes `users.tenantSlug`.** Sign-up (`convex/auth.ts`) inserts `{ email }`
+> alone, and tenant membership lives on the Allowlist row (`whitelist.tenantSlug`), not the account — so
+> the field read `undefined` for every real member and their catalogue was permanently empty. The
+> Allowlist row is no substitute either: sign-up is open (ADR 0021), so a self-signed-up member has no
+> row at all. The host is the only thing that actually knows which site someone is on, and a member may
+> legitimately visit more than one. `catalogue.list` therefore takes the slug as an argument, supplied by
+> `useTenantSlug()` (resolved server-side from the host per ADR 0022 §3 — the client never parses it).
+> A client-supplied slug is not a privilege boundary here: tenancy is a visibility filter and a skin, not
+> a hard partition, and a free published Edition already reads as a Viewer for any signed-in caller, so
+> the argument reveals nothing the course URL wouldn't. `users.tenantSlug` is left in the schema, read
+> only by the tenant-removal guard (whitelabel issue 22).
 
 **7. `enrollments` (ADR 0023) stays in place** — the table, the `enrolled` level and the resolver branch
 are all still honoured — but the catalogue path never writes a row. It remains the right primitive the

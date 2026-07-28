@@ -66,3 +66,13 @@ A query — `catalogue.list` (new `convex/catalogue.ts`) — for the signed-in m
 - All scope + state + progress tests pass.
 
 **Unblocks:** 15.
+
+## Comments
+
+**2026-07-28 — the Scope warning above was overridden in the build, then restored.** `catalogue.list`
+shipped scoping on `users.tenantSlug`, exactly what this ticket said not to do. It was empty in
+production for every member (nothing writes that field — `auth.ts` inserts `{ email }` alone), so a
+tenant member browsing `<slug>.my-course.app` saw no catalogue at all. Now back to this ticket's
+design: the slug comes from the host, threaded as a `catalogue.list` argument via `useTenantSlug()`.
+The tests missed it because they seeded `users` rows *with* a `tenantSlug` — a shape production can't
+produce. ADR 0024 §6 carries the amendment.
