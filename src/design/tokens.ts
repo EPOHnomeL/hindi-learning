@@ -86,8 +86,11 @@ export function buildTenantThemeCss(theme: TenantTheme, prefix = "color-"): stri
 //   accent/accent2/gold ← their brand hues at a lightness that has contrast against
 //     the dark paper. A dark-on-light brand colour (ywampotch's #1b2a80 navy) is
 //     unreadable on a dark page as-is; raising L keeps the hue and makes it legible.
-//   hi ← a dark tint of their GOLD, mirroring how the default dark palette derives
-//     its highlight-mark background from its own ornament colour.
+//   hi ← a dark tint of their ACCENT (their primary), not their gold: gold-tinted
+//     highlight marks read as muddy brown boxes on a cool brand's dark surface. A
+//     tint of the primary is the same colour family as the page, so highlights sit
+//     in the design instead of fighting it. A warm brand's accent is warm anyway, so
+//     the shipped skin's warm-highlight look is unchanged.
 //
 // The lightness targets are the SHIPPED dark palette's own measured L values
 // (paper .211, card .243, line .323, ink .913, soft .701, gold .766, hi .364), so a
@@ -104,10 +107,13 @@ export function buildTenantThemeCss(theme: TenantTheme, prefix = "color-"): stri
 // invalid-at-computed-value, so it drops to the default dark palette underneath —
 // degrading to the old behaviour rather than to nothing.
 export function deriveDarkFromLight(light: Record<Token, string>): Partial<Record<Token, string>> {
-  const relight = (from: string, l: number, chroma = 1) =>
-    `oklch(from ${from} ${l} ${chroma === 1 ? "c" : `calc(c * ${chroma})`} h)`;
+  // A missing source token derives nothing rather than `oklch(from undefined …)`:
+  // Convex validates a stored light palette as complete, but this stays a pure
+  // function anyone can call, so a gap degrades to the default dark for that token.
+  const relight = (from: string | undefined, l: number, chroma = 1) =>
+    from ? `oklch(from ${from} ${l} ${chroma === 1 ? "c" : `calc(c * ${chroma})`} h)` : undefined;
 
-  return {
+  const derived: Partial<Record<Token, string | undefined>> = {
     paper: relight(light.ink, 0.21, 0.55),
     card: relight(light.ink, 0.245, 0.55),
     line: relight(light.ink, 0.325, 0.5),
@@ -116,7 +122,10 @@ export function deriveDarkFromLight(light: Record<Token, string>): Partial<Recor
     accent: relight(light.accent, 0.74),
     accent2: relight(light.accent2, 0.68),
     gold: relight(light.gold, 0.77),
-    hi: relight(light.gold, 0.36, 0.7),
+    hi: relight(light.accent, 0.4, 0.5),
     danger: relight(light.danger, 0.69),
   };
+  return Object.fromEntries(Object.entries(derived).filter(([, v]) => v != null)) as Partial<
+    Record<Token, string>
+  >;
 }

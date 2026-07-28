@@ -237,6 +237,48 @@ function injectDevanagariCss(html: string): string {
   return i === -1 ? DEVANAGARI_CSS + html : html.slice(0, i) + DEVANAGARI_CSS + html.slice(i);
 }
 
+// Re-point the lesson design system's HARDCODED dark surfaces at the palette
+// tokens, for tenant hosts only. Every lesson's stored HTML carries head.html's
+// dark block, which hardcodes ~20 warm-brown hexes (#241f1a cards, #3a322a
+// borders, #221d16 quiz options…) chosen for the shipped warm skin. Overriding
+// the 14 tokens re-skins everything that reads a var, but those literals don't —
+// so a navy tenant's lesson came out navy-paper with brown cards, quiz options
+// and callouts sitting on top of it. Mapping them to `var(--card)`/`var(--line)`
+// makes them follow whatever palette is live.
+//
+// `:root:root[data-theme="dark"] <sel>` outranks head.html's
+// `:root[data-theme="dark"] <sel>`, so this wins regardless of source order.
+// Injected ONLY alongside a tenant palette: on the default site the authored
+// warm values already agree with the palette, and leaving them untouched keeps
+// the shipped skin exactly as designed.
+//
+// Deliberately NOT remapped: the grammar mark colours (mark.r/v/b green,
+// mark.c/j blue) and .note.devo purple are semantic colour-coding, not surfaces —
+// they carry meaning a reader learns, so they stay fixed across tenants.
+const TENANT_LESSON_DARK_CSS = `
+:root:root[data-theme="dark"] header.lesson, :root:root[data-theme="dark"] footer,
+:root:root[data-theme="dark"] .verse, :root:root[data-theme="dark"] .quiz,
+:root:root[data-theme="dark"] .grid2 .col, :root:root[data-theme="dark"] .word,
+:root:root[data-theme="dark"] table.paradigm th, :root:root[data-theme="dark"] table.paradigm td,
+:root:root[data-theme="dark"] .build .chip{border-color:var(--line)}
+:root:root[data-theme="dark"] .grid2 .row{border-top-color:var(--line)}
+:root:root[data-theme="dark"] .word{border-bottom-color:var(--line)}
+:root:root[data-theme="dark"] .note, :root:root[data-theme="dark"] .recap,
+:root:root[data-theme="dark"] .pill, :root:root[data-theme="dark"] .build .chip,
+:root:root[data-theme="dark"] table.paradigm th{background:var(--card)}
+/* Slightly recessed surfaces (quiz options, the parked-for-next-lesson card) and
+   their lifted hover state, expressed as mixes of the live tokens. */
+:root:root[data-theme="dark"] .park, :root:root[data-theme="dark"] .opt{background:color-mix(in oklab, var(--card) 85%, var(--paper))}
+:root:root[data-theme="dark"] .opt:hover, :root:root[data-theme="dark"] .fill input{background:color-mix(in oklab, var(--card) 88%, var(--ink))}
+/* Gold-ornamented edges (.park, .build .res) keep their hint of ornament, mixed
+   from the tenant's own gold rather than the shipped #4a3d2a. */
+:root:root[data-theme="dark"] .park, :root:root[data-theme="dark"] .build .res{border-color:color-mix(in oklab, var(--line) 70%, var(--gold))}
+:root:root[data-theme="dark"] .win{background:linear-gradient(180deg,var(--card),color-mix(in oklab, var(--card) 88%, var(--gold))); border-color:color-mix(in oklab, var(--line) 70%, var(--gold))}
+/* The singular/plural cells stay distinguishable, tinted from the two brand hues
+   instead of the shipped warm/green pair. */
+:root:root[data-theme="dark"] .grid2 .col.sg .ch{background:color-mix(in oklab, var(--card) 88%, var(--gold))}
+:root:root[data-theme="dark"] .grid2 .col.pl .ch{background:color-mix(in oklab, var(--card) 88%, var(--accent2))}`;
+
 // Inject the tenant's palette (issue 13 / decision 03 #6) before </head> so it
 // applies before the artifact paints. Uses BARE var names (--paper, --accent…) —
 // the lesson design system's namespace (head.html), not the app chrome's --color-*
@@ -246,7 +288,7 @@ function injectDevanagariCss(html: string): string {
 // the 14 contract vars: head.html hardcodes dozens of hex beyond them, so legacy
 // content is re-skinned partially by design — full fidelity is issue 23's job.
 function injectTenantPaletteCss(html: string, palette: TenantTheme): string {
-  const style = `<style>${buildTenantThemeCss(palette, "")}</style>`;
+  const style = `<style>${buildTenantThemeCss(palette, "")}${TENANT_LESSON_DARK_CSS}</style>`;
   const i = html.indexOf("</head>");
   return i === -1 ? style + html : html.slice(0, i) + style + html.slice(i);
 }

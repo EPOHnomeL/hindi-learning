@@ -121,6 +121,19 @@ describe("buildSrcDoc", () => {
     expect(out).not.toContain(":root:root"); // no tenant palette block
   });
 
+  it("re-points the lesson's hardcoded dark surfaces at the palette tokens for a tenant", () => {
+    // head.html bakes warm-brown literals into every lesson's dark CSS (#241f1a
+    // cards, #3a322a borders, #221d16 quiz options), which a token override can't
+    // reach — so a cool-branded tenant got brown cards on its own dark paper.
+    const out = buildSrcDoc(LESSON, { quiz: true, theme: "dark", tenantPalette: { light: { paper: "#111111" } } });
+    expect(out).toContain(':root:root[data-theme="dark"] .note');
+    expect(out).toContain("background:var(--card)");
+    // Higher specificity than head.html's own `:root[data-theme="dark"] .opt`.
+    expect(out).toContain(':root:root[data-theme="dark"] .opt');
+    // Grammar colour-coding is semantic, not surface — left alone across tenants.
+    expect(out).not.toContain("mark.r");
+  });
+
   it("themes a reference: bakes theme, injects the dark palette into <head>, adds the bridge", () => {
     const ref = `<!DOCTYPE html><html lang="en"><head><style>:root{--paper:#fbf7f0}</style></head><body><div class="term"><div class="name">x</div></div></body></html>`;
     const out = buildSrcDoc(ref, { quiz: false, theme: "dark", themeCss: true });
