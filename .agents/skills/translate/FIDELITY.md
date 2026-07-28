@@ -103,6 +103,11 @@ file is waste.
 
 - **Read the source once**, write the destination once. Never re-read either file
   to check your work, and never print the translation into your reply.
+- **Do not research.** No web search, no fetching — not for a Bible verse, not for
+  terminology. Well-known Scripture you translate from what you know; anything you
+  genuinely cannot recall you render yourself under the rule above. Verse-hunting
+  online was measured as the single biggest time and token sink in a real run
+  (15–75 tool calls for one lesson) and it buys nothing the rule above doesn't.
 - **A `<script>` or `<style>` block over ~20 lines is not retyped.** Copy the source
   file to the destination first (`cp`), then use edits to replace the prose in
   place. The markers and code then cannot drift, and you pay tokens only for prose.

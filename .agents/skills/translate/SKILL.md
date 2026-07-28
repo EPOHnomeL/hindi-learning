@@ -10,12 +10,31 @@ render the Topic's existing content into that language, publish it back to the
 Hub, and report. You never author — not a lesson, not a mission; you only
 translate what is already there.
 
-The run is driven from the repo root by the `pnpm` scripts below. The source you
-translate lives in the per-Topic workspace `topics/<slug>/` you materialise.
+The source you translate lives in the per-Topic workspace `topics/<slug>/` you
+materialise.
+
+## Sight unseen
+
+**You translate this course sight unseen.** Every file goes to a **subagent** — the
+title, the mission, each lesson, each reference — and not one line of course content
+enters your own context. You drive scripts, dispatch subagents, and read their
+one-line replies.
+
+Sight unseen is what the run costs turn on: content you read is paid for once as
+your input and again as the subagent's output, for a file you were never going to
+write. It is also why the fidelity rules are not here. They live in
+[FIDELITY.md](FIDELITY.md) — hand every subagent that path and let it read them.
+
+**The subagent prompt is four lines**, no rules pasted inline:
+
+> Read `.agents/skills/translate/FIDELITY.md` and follow it exactly.
+> Translate these files into `<lang>` (`<language name>`), one at a time:
+> `<abs source path>` → `<abs destination path>` (repeat per file, 2–4 of them).
+> Reply with one line per file: `done <filename>` or `failed <filename> — <reason>`.
 
 ## The run
 
-Each step is a repo `pnpm` script; run them in order.
+Run these repo `pnpm` scripts from the repo root, in order.
 
 1. `SLUG=$(pnpm -s run claim-translation:prod)` — atomically claim one pending
    Edition. It prints the slug, or `none` → **end the run, nothing to do.** It
@@ -24,8 +43,8 @@ Each step is a repo `pnpm` script; run them in order.
 2. `pnpm run materialise:prod --topic "$SLUG"` — pull the source into
    `topics/$SLUG/`: `TITLE.txt`, `MISSION.md` (only if the course has one),
    `lessons/<key>.html`, `references/<key>.html`.
-3. `grep TRANSLATE_LANG .env.local` (grep it — don't read the whole file), then
-   have the source translated into
+3. `grep TRANSLATE_LANG .env.local` — the target language code. Then have the
+   source translated into
    `topics/$SLUG/translations/$TRANSLATE_LANG/`, mirroring the layout exactly:
    - `title.txt` ← `TITLE.txt`
    - `mission.txt` ← `MISSION.md` (skip if there is no `MISSION.md` — never draft
@@ -33,56 +52,58 @@ Each step is a repo `pnpm` script; run them in order.
    - `lessons/<key>.html` ← each `lessons/<key>.html`
    - `references/<key>.html` ← each `references/<key>.html`
 
-   Every file is translated by a **subagent** working to
-   [FIDELITY.md](FIDELITY.md), in **parallel batches of 8, publishing after each** —
-   see the two sections below. **Done only when every source item above** — the
-   title, the mission if present, and *each* lesson and reference — **has a
-   counterpart at its mirrored path.** A missing file falls back to English and is
-   counted as failed, so translate them all.
-4. `pnpm run publish-translation:prod --topic "$SLUG"` — publish every translated
-   file present so far (the per-item title is read from each HTML's `<title>`).
-   It is **idempotent and incremental**: it publishes whatever exists in the
-   workspace and re-publishing an item just overwrites it, so run it after every
-   batch, not only at the end. **Read the output:** each item prints `saved` or
-   `skipped`. A `skipped` lesson means its quiz markers drifted from the source —
-   fix that file's quiz structure to match and re-run publish before reporting.
+   **Done only when every source item above** — the title, the mission if present,
+   and *each* lesson and reference — **has a counterpart at its mirrored path.** A
+   missing file falls back to English and counts as failed. *How* you get there is
+   the rest of this file: **waves** of subagents, published as they land.
+4. `pnpm run publish-translation:prod --topic "$SLUG"` — publish the translated
+   files (the per-item title is read from each HTML's `<title>`). Once per **wave**,
+   not once per run.
 5. `pnpm run report-translation:prod ready "$SLUG"` — **always run this, even if a
    step failed** (then use `failed "$SLUG" "<reason>"`), to release the lock. Run
    it exactly once, last.
 
-## You orchestrate; subagents translate
+## Waves
 
-**You never translate anything yourself and never read a source or translated
-file.** Not the title, not the mission, not a lesson — every file goes to a
-subagent. Course content in your context is the single largest waste in this run:
-you would pay for it once as input and again as output, and you are not the one
-writing the file. You drive scripts, dispatch subagents, and read their one-line
-replies.
+The course is translated in **waves**: dispatch a few subagents, let the wave
+**drain** completely, publish what it landed, then dispatch the next. The owner
+watches the Edition fill up as you go, and every drained wave is banked against
+whatever ends the run.
 
-You therefore do not need the fidelity rules in your own context. They live in
-[FIDELITY.md](FIDELITY.md) — hand every subagent that path and let it read them.
+> **A wave is at most 4 subagents, and the next wave starts only once every agent
+> in this one has drained.** The environment has a concurrency ceiling it does not
+> announce. Exceed it and it **silently preempts** running agents to make room:
+> they stop with real token and tool-use counts, never write their file, and never
+> report an error to you. A preempted agent is indistinguishable from a finished one
+> from where you sit, so a small wave, fully drained, is the only defence. A run
+> that launched a second wave on top of a first that had not drained lost 7 lessons
+> this way and shipped a half-translated Edition. Impatience is what causes this: a
+> wave that feels slow is a wave to wait for.
 
-**The subagent prompt is four lines**, no rules pasted inline:
+1. List the source files and their sizes with one command — sight unseen:
+   `ls -l topics/$SLUG/lessons topics/$SLUG/references`.
+2. **Group 2–4 files per subagent**, so a wave of 4 agents covers ~8–12 files. Per-agent
+   overhead (reading FIDELITY.md, orienting) is paid once per agent, not once per
+   file, so one agent per file doubles the agent count and buys nothing. Give each
+   agent files of similar size, and let the title and mission ride along as one
+   agent's extra work in the first wave. **A file over ~600 lines (or ~40 KB) is too
+   big for one subagent — read [SPLITTING.md](SPLITTING.md) and follow it for that
+   file**; the rest need nothing from it.
+3. Dispatch the wave in a **single message**, then **wait** for it to drain.
+4. **Verify by artifact, not by report.** Agent replies are advisory — a preempted
+   agent may never reply at all, and a "stopped" one looks like a finished one. The
+   disk is the truth:
 
-> Read `.agents/skills/translate/FIDELITY.md` and follow it exactly.
-> Translate `<abs source path>` into `<lang>` (`<language name>`).
-> Write the result to `<abs destination path>` — same layout, same markers.
-> Reply with one line only: `done <filename>` or `failed <filename> — <reason>`.
+   ```sh
+   ls topics/$SLUG/translations/$TRANSLATE_LANG/lessons \
+      topics/$SLUG/translations/$TRANSLATE_LANG/references
+   ```
 
-## Batches — publish as you go
-
-The learner watches the Edition fill up. Never translate the whole course in one
-silent pass and publish once at the end; work in batches and publish after each so
-progress is visible in the Hub while the run continues.
-
-1. List the source files and their sizes with one command (`ls -l topics/$SLUG/lessons
-   topics/$SLUG/references`) — do **not** open them. The title and mission ride
-   along in the first batch as one subagent between them.
-2. Dispatch **up to 8 subagents per batch**, all in a single message so they run
-   concurrently, one file each.
-3. When the batch returns, verify structure with **one command** rather than by
-   reading files — for each pair, the counts of `data-correct`, `data-answer`,
-   `data-k`, `<script`, and `<style` must match the source:
+   Every file the wave was given must exist. **A missing file means its agent was
+   preempted or died** — re-queue it for the next wave, and take it as evidence you
+   are running too wide. Once the files are on disk, check structure with one
+   command — the counts of `data-correct`, `data-answer`, `data-k`, `<script`, and
+   `<style` must match the source:
 
    ```sh
    for t in topics/$SLUG/translations/$TRANSLATE_LANG/*/*.html; do
@@ -93,32 +114,23 @@ progress is visible in the Hub while the run continues.
      done
    done
    ```
-4. Re-dispatch any file that mismatched — a fresh subagent, whole file. **Never
-   hand-edit markers yourself**; that means opening the file, which is exactly what
-   you are avoiding.
-5. `pnpm run publish-translation:prod --topic "$SLUG"`, read the `saved`/`skipped`
-   lines, tell the user in one sentence which items just went live, then start the
-   next batch.
+5. A mismatched file is fixed by **a fresh subagent on the whole file** — that keeps
+   it sight unseen, where opening your editor on a quiz marker would not.
+6. **Publish, then dispatch the next wave** — `pnpm run publish-translation:prod
+   --topic "$SLUG"`, every wave, in that order. Publishing is what makes the run
+   survivable: a drained wave that is published is **banked**, so a run killed,
+   preempted, or stopped by the owner loses at most the wave in flight. The script
+   is idempotent — it publishes whatever is in the workspace and re-publishing
+   overwrites — so there is nothing to skip or track. Read the `saved`/`skipped`
+   lines; a `skipped` lesson is a quiz-marker drift the count check missed, so
+   re-queue that file. Say in one sentence what went live.
 
-## Splitting a big file
+## Stopping early
 
-A source lesson or reference over ~600 lines (or ~40 KB) is translated in
-**sections, in parallel** — the exception, not the routine. Split it mechanically so
-its content still never enters your context:
-
-```sh
-mkdir -p "topics/$SLUG/.parts/<key>"
-csplit -z -s -f "topics/$SLUG/.parts/<key>/" -b '%02d.src.html' "topics/$SLUG/<dir>/<key>.html" '/<h2/' '{*}'
-```
-
-`.parts/` sits outside the translations tree, so it is never published. Then:
-
-1. One subagent per chunk, dispatched concurrently, same four-line prompt plus:
-   *this is a fragment — do not add or close tags it does not contain, do not
-   reorder or renumber anything, only chunk 00 has a `<title>`.* Each writes
-   `NN.out.html` beside its source chunk.
-2. `cat topics/$SLUG/.parts/<key>/*.out.html > topics/$SLUG/translations/$TRANSLATE_LANG/<dir>/<key>.html`
-   — the zero-padded names sort into the right order.
-3. Run the count check above on that file, re-run any bad chunk alone, publish.
-4. `rm -rf topics/$SLUG/.parts` at the end of the run.
+If the run has to end before every item is translated — the owner stops it, the
+environment kills it, waves keep coming back short — **publish what exists, then
+report `failed` with the list of missing items.** `ready` is for a complete Edition
+only: the untranslated items fall back to English silently, and `failed` is what
+releases the lock so the Edition can be reclaimed and finished later. Everything
+banked so far is kept and counted, so the retry resumes rather than restarts.
 

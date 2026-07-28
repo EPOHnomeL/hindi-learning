@@ -58,15 +58,17 @@ The cloud run's steps (repo `pnpm` scripts, mirroring the teacher routine):
 2. `pnpm run materialise:prod --topic "$SLUG"` — pull the source into `topics/$SLUG/`.
 3. Follow [`.agents/skills/translate/SKILL.md`](../.agents/skills/translate/SKILL.md);
    write translations into `topics/$SLUG/translations/$TRANSLATE_LANG/`. The run
-   **fans out**: one subagent per file, in batches of 8, each working to
+   **fans out** in **waves** of at most 4 subagents (2–4 files each, each wave
+   drained and published before the next is dispatched), each agent working to
    [`FIDELITY.md`](../.agents/skills/translate/FIDELITY.md); a file over ~600 lines
-   is split at `<h2>` boundaries and its sections translated in parallel. The
-   orchestrating run never reads course content itself — that is the token budget.
+   is split at `<h2>` boundaries and its sections translated across waves. The
+   orchestrating run works **sight unseen** — no course content ever enters its own
+   context; that is the token budget.
 4. `pnpm run publish-translation:prod --topic "$SLUG"` — publish each translated
-   item. Run **after every batch**, not only at the end: it is idempotent and
+   item. Run **after every wave**, not only at the end: it is idempotent and
    publishes whatever is in the workspace, so the Editions panel ticks upward
-   while the run is still going, and a run killed infra-side loses at most one
-   batch.
+   while the run is still going, and a run killed infra-side loses at most the
+   wave in flight.
 5. `pnpm run report-translation:prod ready "$SLUG"` — always, even on failure.
 
 ---

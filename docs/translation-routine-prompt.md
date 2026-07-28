@@ -19,12 +19,12 @@ everything you need is pulled from the backend at run time — NOT from this rep
 The repo holds only code and the translate skill. You never author a lesson or a
 mission — you only translate what already exists.
 
-You are an ORCHESTRATOR, not a translator. You never read a lesson, a reference,
-a title, or a mission — not the source, not the translation. Every file is
-translated by a SUBAGENT. Course content pulled into your own context is the
-single biggest cost in this run: you would pay for it as input and the subagent
-would pay for it again as output, and you are not the one writing the file. You
-run scripts, dispatch subagents, and read their one-line replies.
+You translate this course SIGHT UNSEEN. Every file — the title, the mission, each
+lesson, each reference — goes to a SUBAGENT, and not one line of course content
+enters your own context. You run scripts, dispatch subagents, and read their
+one-line replies. Sight unseen is what this run's cost turns on: content you read
+is paid for once as your input and again as the subagent's output, for a file you
+were never going to write.
 
 Do these steps IN ORDER:
 
@@ -46,11 +46,11 @@ Do these steps IN ORDER:
    Work INSIDE topics/$SLUG/ from here on. Never read another course's files.
 
 3. READ ONE file to know how to work: `.agents/skills/translate/SKILL.md` — how to
-   batch, dispatch, split a big file, and verify. Do NOT read
-   `.agents/skills/translate/FIDELITY.md` yourself: it is the subagents' contract,
-   and you are not translating. Get the target language with
+   group a wave, dispatch it, split a big file, and verify. Its sibling
+   `.agents/skills/translate/FIDELITY.md` is the SUBAGENTS' contract — you hand them
+   the path and they read it, which is what keeps you sight unseen. Get the target
+   language with
        grep TRANSLATE_LANG .env.local
-   (grep it — do not open the file).
 
 4. TRANSLATE BY FAN-OUT, into topics/$SLUG/translations/$TRANSLATE_LANG/,
    mirroring the source layout exactly:
@@ -58,47 +58,54 @@ Do these steps IN ORDER:
      - mission.txt            from MISSION.md (skip if there is no MISSION.md)
      - lessons/<key>.html     from each lessons/<key>.html
      - references/<key>.html  from each references/<key>.html
-   List the work with `ls -l topics/$SLUG/lessons topics/$SLUG/references` — do NOT
-   open the files. Then dispatch UP TO 8 SUBAGENTS PER BATCH, all in ONE message so
-   they run concurrently, one file each (title and mission ride along in the first
-   batch as a single subagent). Each subagent's prompt is four lines — never paste
-   the fidelity rules inline:
+   The course is translated in WAVES: dispatch a few subagents, let the wave DRAIN
+   completely, publish what it landed, then dispatch the next. SKILL.md has the
+   mechanics — how to group files into a wave, the four-line subagent prompt, how to
+   split a file too big for one agent, and the one command that verifies a wave.
+   Follow it. These three hold whatever it says:
 
-       Read `.agents/skills/translate/FIDELITY.md` and follow it exactly.
-       Translate <abs source path> into <lang> (<language name>).
-       Write the result to <abs destination path> — same layout, same markers.
-       Reply with one line only: `done <filename>` or `failed <filename> — <reason>`.
+   *** A WAVE IS AT MOST 4 SUBAGENTS, AND THE NEXT WAVE STARTS ONLY ONCE EVERY
+   AGENT IN THIS ONE HAS DRAINED. ***
 
-   A source file over ~600 lines is split at <h2> boundaries with csplit into
-   topics/$SLUG/.parts/<key>/ and its sections translated in parallel, then cat'd
-   back together in order — see SKILL.md. That keeps even a huge reference out of
-   your context. Delete .parts/ at the end of the run.
+   The environment has an unannounced concurrency ceiling; exceed it and it SILENTLY
+   PREEMPTS agents that are already running. A preempted agent stops with real token
+   and tool-use counts, never writes its file, and never reports an error to you —
+   from your seat it is indistinguishable from a finished one. A real run launched a
+   second wave on top of a first that had not drained and lost 7 lessons that way.
+   A wave that feels slow is a wave to wait for; waiting is the job.
 
-   When a batch returns, verify structure with ONE command, not by reading files —
-   for every translated file the counts of data-correct, data-answer, data-k,
-   `<script` and `<style` must equal the source's. Re-dispatch a fresh subagent for
-   any file that mismatched; never hand-edit markers yourself.
+   *** VERIFY BY ARTIFACT, NOT BY REPORT. ***
+
+   Agent replies are advisory; a preempted agent may never reply at all. `ls` the
+   destination directories and confirm EVERY file the wave was given exists on disk
+   before you treat that wave as drained. A missing file means that agent died —
+   re-queue it, and take it as a signal you are running too wide.
+
+   *** PUBLISH EVERY WAVE, BEFORE DISPATCHING THE NEXT. ***
+
+       pnpm run publish-translation:prod --topic "$SLUG"
+
+   A published wave is BANKED: a run killed, preempted, or stopped by the owner
+   loses at most the wave in flight rather than the whole course. The script is
+   idempotent, so there is nothing to skip or track. Read the output — each item
+   prints `saved` or `skipped`, and a `skipped` lesson is a quiz-marker drift, so
+   re-queue that file. Do NOT commit anything to git (ADR 0009): no branch, no PR,
+   no push.
 
    Translate EVERY source item — a missing file falls back to English and counts as
    failed.
 
-5. PUBLISH AFTER EVERY BATCH — not once at the end:
-       pnpm run publish-translation:prod --topic "$SLUG"
-   It is idempotent and incremental: it publishes whatever is in the workspace and
-   re-publishing just overwrites, so the owner watches the Edition fill up while
-   the run continues, and a run killed infra-side loses at most one batch. Read the
-   output: each item prints `saved` or `skipped`. A skipped lesson means its quiz
-   markers drifted from the source — re-dispatch that file to a subagent and re-run
-   publish before reporting. Do NOT commit anything to git (ADR 0009): no branch,
-   no PR, no push. Then start the next batch.
-
 6. REPORT the outcome — ALWAYS, as the very last step, even on failure (treat it
    like a finally block):
        pnpm run report-translation:prod <ready|failed> "$SLUG" ["error message"]
-   - ready — you translated and published the Edition (any item you couldn't
-     publish falls back to English and is counted as failed).
-   - failed "<what went wrong>" — the run errored; this releases the lock so the
-     owner can retry.
+   - ready — you translated and published EVERY item.
+   - failed "<what went wrong, incl. which items are missing>" — the run errored, or
+     ended with items untranslated. If you have to stop early for any reason (the
+     owner stops you, waves keep coming back short, you are running out of room),
+     PUBLISH WHAT EXISTS FIRST, then report failed. Do not report `ready` on a
+     partial Edition: the missing items fall back to English silently, and `failed`
+     is what releases the lock so the Edition can be reclaimed and finished later.
+     Already-published items are kept, so the retry resumes rather than restarts.
    If step 1 printed "none", no report is needed — just end the run.
 
 Nothing ships in the source language. A verse, a quotation, a "Sources" footer
