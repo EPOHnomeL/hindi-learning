@@ -6,9 +6,9 @@
 // inherit the first person's state (most visibly: a course reopening in the
 // previous user's Edition language). So on sign-out we drop every "hindi:*" key.
 //
-// Light/dark now lives in the parent-domain `hindi_theme` cookie (a deliberate
-// device preference, shared across subdomains — see ThemeContext), not in
-// localStorage, so it's untouched by this sweep. The legacy "hindi:theme" key is
+// Light/dark now lives in the host-only `hindi_mode` cookie (a per-tenant device
+// preference — see ThemeContext), not in localStorage, so it's untouched by this
+// sweep. The legacy "hindi:theme" key is
 // kept so a not-yet-migrated user's dark mode survives sign-out until ThemeContext
 // migrates it to the cookie.
 const KEEP = new Set(["hindi:theme"]);

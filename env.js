@@ -11,16 +11,12 @@ export const env = createEnv({
   client: {
     // The Convex deployment URL the browser client connects to.
     NEXT_PUBLIC_CONVEX_URL: z.string().url(),
-    // The registrable parent domain to scope the session/theme/locale cookies to
-    // (e.g. "my-course.app"), so one sign-in and the chosen theme/language span
-    // every tenant subdomain. Optional: leave unset in dev/preview to keep cookies
-    // host-only (a *.vercel.app Domain would be rejected as a public suffix). Also
-    // read by the @convex-dev/auth cookie patch and src/lib/cookieDomain.ts.
-    NEXT_PUBLIC_COOKIE_DOMAIN: z.string().optional(),
+    // NEXT_PUBLIC_COOKIE_DOMAIN is gone: cookies are host-only so each tenant
+    // subdomain has its own session, language and theme (ADR 0025). Don't add it
+    // back — a parent `Domain` is exactly what shared one account across brands.
   },
   runtimeEnv: {
     NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL,
-    NEXT_PUBLIC_COOKIE_DOMAIN: process.env.NEXT_PUBLIC_COOKIE_DOMAIN,
   },
   // Let Docker/CI image builds opt out of validation (create-t3-app convention).
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

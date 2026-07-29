@@ -65,13 +65,17 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               globals.css palette governs, unchanged. */}
           {themeCss && <style id="tenant-theme" dangerouslySetInnerHTML={{ __html: themeCss }} />}
           {/* Apply the saved theme before paint so a dark-mode user never flashes
-              the light "paper" palette on load. Reads the parent-domain `hindi_theme`
-              cookie (shared across subdomains) written by ThemeContext, falling back
-              to the legacy `hindi:theme` localStorage key for not-yet-migrated
-              users (ADR 0011 / 0022). */}
+              the light "paper" palette on load. Reads the host-only `hindi_mode`
+              cookie written by ThemeContext — per-tenant, not shared across
+              subdomains (ADR 0025) — falling back to the legacy `hindi:theme`
+              localStorage key for not-yet-migrated users (ADR 0011).
+              The cookie name is hardcoded in the regex below: it is inside an
+              inline string, so neither the type checker nor a rename tool can see
+              it. Keep it in sync with THEME_COOKIE or every page paints light and
+              then flashes to dark. */}
           <script
             dangerouslySetInnerHTML={{
-              __html: `try{var m=document.cookie.match(/(?:^|; )hindi_theme=(dark|light)/);var t=m?m[1]:localStorage.getItem('hindi:theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);}catch(e){}`,
+              __html: `try{var m=document.cookie.match(/(?:^|; )hindi_mode=(dark|light)/);var t=m?m[1]:localStorage.getItem('hindi:theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);}catch(e){}`,
             }}
           />
         </head>

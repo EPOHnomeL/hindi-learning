@@ -1,2 +1,5 @@
-patchedDependencies:
-  '@convex-dev/auth@0.0.80': patches/@convex-dev__auth@0.0.80.patch
+# No patched dependencies. The `@convex-dev/auth` patch that used to live here
+# rewrote the session cookie's `__Host-` prefix to `__Secure-` so it could carry a
+# `Domain` and span every tenant subdomain. Per-tenant session isolation (ADR 0025)
+# made it unnecessary — sessions are host-only on upstream defaults — and removed
+# the chore of re-cutting the patch on every `@convex-dev/auth` bump.

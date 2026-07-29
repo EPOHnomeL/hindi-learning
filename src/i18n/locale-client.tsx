@@ -5,9 +5,8 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 import { api } from "../../convex/_generated/api";
 import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from "./config";
-import { cookieDomainFor } from "~/lib/cookieDomain";
 
-// The render source of truth is the `hindi_locale` cookie (ticket 03). These two
+// The render source of truth is the `hindi_lang` cookie (ticket 03). These two
 // client writers keep it correct out-of-band from the render path:
 //   #1 explicit pick  — useSetLocale (the picker calls it)
 //   #2 login sync      — <LocaleSync/> (mounted once, app-wide)
@@ -16,11 +15,9 @@ import { cookieDomainFor } from "~/lib/cookieDomain";
 // Write the cookie with the same attributes the middleware uses, so the cookie
 // behaves identically whoever set it.
 function writeLocaleCookie(locale: string) {
-  // Mirror the middleware's attributes, including the shared parent-domain scope
-  // so an explicit pick survives switching subdomains.
-  const domain = cookieDomainFor(window.location.host);
-  const domainPart = domain ? `; domain=${domain}` : "";
-  document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; samesite=lax${domainPart}`;
+  // Mirror the middleware's attributes — including host-only scope (no `Domain`),
+  // so an explicit pick applies to this tenant and not to every subdomain.
+  document.cookie = `${LOCALE_COOKIE}=${locale}; path=/; max-age=${LOCALE_COOKIE_MAX_AGE}; samesite=lax`;
 }
 
 function readLocaleCookie(): string | undefined {

@@ -18,7 +18,13 @@ export const DEFAULT_LOCALE: Locale = "en";
 // of truth (ticket 03). Underscore (not the `hindi:*` colon the reader's
 // localStorage keys use): a colon is not a valid RFC 6265 cookie-name token, and
 // this is distinct from `hindi:lang` (the content-Edition preference) regardless.
-export const LOCALE_COOKIE = "hindi_locale";
+//
+// Written **host-only** (no `Domain`), so each tenant subdomain keeps its own app
+// language (ADR 0025). Renamed from `hindi_locale` alongside that change, and the
+// rename is load-bearing: the old parent-domain cookie is still in browsers with a
+// year of max-age, and a host-only cookie of the SAME name would not replace it —
+// the browser keeps both, sends both, and the stale shared value can win forever.
+export const LOCALE_COOKIE = "hindi_lang";
 
 // A long-lived persistent cookie (ticket 03 §2): the app-language is a durable
 // device preference, so it outlives the session like the theme does. One year,

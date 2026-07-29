@@ -1,7 +1,6 @@
 import { convexAuthNextjsMiddleware } from "@convex-dev/auth/nextjs/server";
 import { NextResponse } from "next/server";
 import { resolveTenantSlug, TENANT_SLUG_HEADER } from "./lib/tenant";
-import { cookieDomainFor } from "./lib/cookieDomain";
 import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE } from "./i18n/config";
 import { matchAcceptLanguage } from "./i18n/acceptLanguage";
 import { shareEditionLocale, shareTokenFromPath } from "./i18n/shareLocale";
@@ -59,9 +58,8 @@ export default convexAuthNextjsMiddleware(
         path: "/",
         maxAge: LOCALE_COOKIE_MAX_AGE,
         sameSite: "lax",
-        // Scope to the shared parent domain so the picked UI language survives a
-        // subdomain switch (undefined → host-only, the dev/preview default).
-        domain: cookieDomainFor(request.headers.get("host")),
+        // No `domain`: host-only, so each tenant subdomain sniffs and keeps its own
+        // language (ADR 0025). Next defaults an omitted domain to host-only.
       });
     }
     return response;

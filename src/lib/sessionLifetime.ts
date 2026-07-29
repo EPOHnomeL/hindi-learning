@@ -17,8 +17,10 @@
 // duration fixes it.
 //
 // convex/ has its own tsconfig and never imports from src/, so convex/auth.ts
-// repeats these literals with a pointer back here — same arrangement as
-// cookieDomain.ts and the Convex Auth cookie patch. Change them together.
+// repeats these literals with a pointer back here. Change them together.
+//
+// The session cookie is host-only (upstream `__Host-` prefix), so a sign-in is
+// per-tenant-subdomain by design — see ADR 0025.
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 

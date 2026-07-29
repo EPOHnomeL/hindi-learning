@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { Theme } from "./lessonSrcDoc";
-import { cookieDomainFor } from "~/lib/cookieDomain";
 
 // App-wide light/dark, owned by the app rather than the lesson (ADR 0011). The
 // choice lives on <html data-theme> (so the Tailwind color tokens re-skin the
@@ -10,12 +9,18 @@ import { cookieDomainFor } from "~/lib/cookieDomain";
 // applies it before React hydrates, so this provider only needs to read back
 // what's already there and let the sidebar toggle change it.
 //
-// Persisted in a COOKIE (not localStorage) so the preference is scoped to the
-// shared parent domain and survives switching between tenant subdomains — the
-// same reason the locale and auth-session cookies are parent-scoped. Underscore
-// name (RFC 6265 token), mirroring the locale cookie. Not httpOnly: the pre-paint
-// script reads it in the browser.
-export const THEME_COOKIE = "hindi_theme";
+// Persisted in a COOKIE (not localStorage) so the server can read it on the render
+// path. Deliberately **host-only** — no `Domain` — so each tenant subdomain keeps
+// its own light/dark choice (ADR 0025), like its own session and language.
+// Underscore name (RFC 6265 token), mirroring the locale cookie. Not httpOnly: the
+// pre-paint script reads it in the browser.
+//
+// Renamed from `hindi_theme` with the cookie-scope change, and the rename is
+// load-bearing: the old parent-domain cookie is still in browsers with a year of
+// max-age, and a host-only cookie of the SAME name would not replace it — the
+// browser would keep both and send both, letting the stale shared value silently
+// win forever. A new name makes that collision impossible.
+export const THEME_COOKIE = "hindi_mode";
 const LEGACY_KEY = "hindi:theme";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // one year, like the locale cookie
 
@@ -46,9 +51,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   function setTheme(t: Theme) {
     setThemeState(t);
     document.documentElement.dataset.theme = t;
-    const domain = cookieDomainFor(window.location.host);
-    const domainPart = domain ? `; domain=${domain}` : "";
-    document.cookie = `${THEME_COOKIE}=${t}; path=/; max-age=${COOKIE_MAX_AGE}; samesite=lax${domainPart}`;
+    // No `domain` — host-only, so this tenant's choice stays this tenant's.
+    document.cookie = `${THEME_COOKIE}=${t}; path=/; max-age=${COOKIE_MAX_AGE}; samesite=lax`;
   }
 
   const value: ThemeCtx = { theme, setTheme, toggle: () => setTheme(theme === "dark" ? "light" : "dark") };
