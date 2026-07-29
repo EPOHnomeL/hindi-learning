@@ -1,9 +1,10 @@
-// Pure model for the admin Sales-by-course chart (.scratch/admin-sales, dataviz
-// skill). Bars are courses, segments are editions, measured in number of sales;
-// segment colour follows the edition's LANGUAGE (a fixed categorical slot),
-// consistently across every course — never the language's position within one
-// course. The 9th+ language folds into a neutral "other" so the categorical
-// palette is never cycled past its validated eight slots.
+// Pure colour model for the admin Sales charts (.scratch/admin-sales, dataviz
+// skill). Segments are editions, measured in number of sales; segment colour
+// follows the edition's LANGUAGE (a fixed categorical slot), assigned once from
+// the whole period's ranking and reused on every column/row — never the
+// language's position within one day or one course. The 9th+ language folds into
+// a neutral "other" so the categorical palette is never cycled past its
+// validated eight slots.
 
 export const VIZ_SLOTS = 8;
 

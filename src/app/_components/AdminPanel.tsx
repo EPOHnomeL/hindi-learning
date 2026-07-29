@@ -10,7 +10,8 @@ import type { SellerStatus } from "../../../convex/sellerStatus";
 import type { TenantFlag } from "../../../convex/tenantFlags";
 import { TENANT_THEME_TOKENS, type Token } from "../../design/tokens";
 import { salesRange, type SalesPreset } from "./salesRange";
-import { colorVar, rankLanguages } from "./salesChart";
+import { colorVar, rankLanguages, VIZ_SLOTS } from "./salesChart";
+import { axisTicks, labelIndices, niceMax } from "./dayChart";
 
 // The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
 // dashboard is now scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
@@ -115,82 +116,176 @@ function GenerationManager() {
   );
 }
 
+// ---------------------------------------------------------------------------
+// The shared day-bucketed stacked column chart (dataviz skill) behind both admin
+// graphs: the Generation activity chart and the Sales-by-day chart. One column
+// per day on a single count axis, stacked by series, with hairline gridlines at
+// round tick values, a capped-width mark, 2px surface gaps between the stacked
+// fills, and a hover tooltip per day. The tooltip is CSS-only (it lives inside
+// the column it describes, revealed by group-hover), so the chart holds no
+// state and re-renders only when its data does.
+// ---------------------------------------------------------------------------
+
+// One series' contribution to one day. `segments` are given bottom-to-top and
+// carry their own colour, so the caller owns the palette mapping (language rank
+// for Sales, fixed slots for Generation).
+type DaySegment = { key: string; label: string; value: number; color: string };
+type DayColumn = { dayMs: number; segments: DaySegment[] };
+
+const dayLabel = (ms: number) => new Date(ms).toLocaleDateString("en-ZA", { day: "numeric", month: "short", timeZone: "UTC" });
+
+function DayStackChart({ columns, empty, zero }: { columns: DayColumn[]; empty: string; zero: string }) {
+  const H = 160; // px plot height
+  const totals = columns.map((c) => c.segments.reduce((sum, s) => sum + s.value, 0));
+  const peak = Math.max(...totals, 0);
+  if (columns.length === 0 || peak === 0) return <p className="py-12 text-center text-sm text-soft">{empty}</p>;
+
+  const top = niceMax(peak);
+  const ticks = axisTicks(top);
+  const labelled = new Set(labelIndices(columns.length));
+  // A nonzero count always draws at least 3px, so a single sale on a busy axis
+  // stays visible instead of rounding away to nothing.
+  const px = (n: number) => (n > 0 ? Math.max((n / top) * H, 3) : 0);
+
+  return (
+    <div className="flex">
+      <div className="relative w-7 shrink-0" style={{ height: H }} aria-hidden>
+        {ticks.map((t) => (
+          <span
+            key={t}
+            className="absolute right-1.5 translate-y-1/2 text-[10px] tabular-nums text-soft"
+            style={{ bottom: `${(t / top) * 100}%` }}
+          >
+            {t}
+          </span>
+        ))}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="relative" style={{ height: H }}>
+          {ticks.map((t) => (
+            <div
+              key={t}
+              className="pointer-events-none absolute inset-x-0 border-t border-line"
+              style={{ bottom: `${(t / top) * 100}%` }}
+              aria-hidden
+            />
+          ))}
+          <div className="relative flex h-full items-end gap-[2px]">
+            {columns.map((c, i) => (
+              <div key={c.dayMs} className="group relative flex h-full min-w-0 flex-1 justify-center">
+                <div className="pointer-events-none absolute inset-x-0 inset-y-0 hidden rounded-[3px] bg-hi/50 group-hover:block" />
+                <div className="relative flex h-full w-full max-w-6 flex-col justify-end gap-[2px]">
+                  {[...c.segments].reverse().map((s, j, all) => {
+                    const h = px(s.value);
+                    if (h === 0) return null;
+                    const topMost = all.slice(0, j).every((o) => o.value === 0);
+                    return (
+                      <div
+                        key={s.key}
+                        className={`w-full ${topMost ? "rounded-t-[4px]" : ""}`}
+                        style={{ height: `${h}px`, background: s.color }}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden -translate-x-1/2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-left whitespace-nowrap shadow-lg group-hover:block">
+                  <div className="text-[11px] font-semibold text-ink">{dayLabel(c.dayMs)}</div>
+                  {totals[i] === 0 ? (
+                    <div className="mt-0.5 text-[11px] text-soft">{zero}</div>
+                  ) : (
+                    c.segments
+                      .filter((s) => s.value > 0)
+                      .map((s) => (
+                        <div key={s.key} className="mt-0.5 flex items-center gap-1.5 text-[11px] text-soft">
+                          <span className="inline-block h-2 w-2 rounded-[2px]" style={{ background: s.color }} aria-hidden />
+                          <span>{s.label}</span>
+                          <span className="ml-auto pl-2 font-medium tabular-nums text-ink">{s.value}</span>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-2 flex gap-[2px]">
+          {columns.map((c, i) => (
+            <div key={c.dayMs} className="min-w-0 flex-1">
+              {labelled.has(i) && (
+                <span
+                  className={`block text-[10px] tabular-nums whitespace-nowrap text-soft ${
+                    i === 0 ? "text-left" : i === columns.length - 1 ? "text-right" : "text-center"
+                  }`}
+                >
+                  {dayLabel(c.dayMs)}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// A chart legend row — one swatch + name per series. Two or more series always
+// carry one; a single series doesn't (the caption already names it).
+function VizLegend({ series }: { series: { key: string; label: string; color: string }[] }) {
+  if (series.length < 2) return null;
+  return (
+    <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      {series.map((s) => (
+        <li key={s.key} className="flex items-center gap-1.5 text-xs text-soft">
+          <span className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: s.color }} aria-hidden />
+          {s.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 // The Generation-tab activity graph: daily generation + translation usage over
-// the last 30 days as vertical stacked bars (generation on the bottom,
-// translation on top), on one shared count axis. Colours are the shared viz
-// palette (slot 1 / slot 2). The 30-day window is floored to the UTC day so the
-// query args stay stable across renders (a raw Date.now() would resubscribe
-// forever — see salesRange).
+// the last 30 days as stacked columns (generation on the bottom, translation on
+// top), on one shared count axis. Colours are the shared viz palette (slot 1 /
+// slot 2). The 30-day window is floored to the UTC day so the query args stay
+// stable across renders (a raw Date.now() would resubscribe forever — see
+// salesRange).
 function GenerationUsageChart() {
   const day = 86_400_000;
   const to = Math.floor(Date.now() / day) * day + day; // start of tomorrow, UTC
   const from = to - 30 * day;
   const rows = useQuery(api.routine.usageByDay, { from, to });
+  const total = rows?.reduce((sum, r) => sum + r.generation + r.translation, 0) ?? 0;
   return (
     <figure className="viz-chart mb-12 rounded-xl border border-line bg-card p-4">
-      <figcaption className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <span className="text-xs font-medium tracking-wide text-soft uppercase">Activity · last 30 days</span>
-        <ul className="flex items-center gap-3">
-          <li className="flex items-center gap-1.5 text-xs text-soft">
-            <span className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--viz-1)" }} aria-hidden />
-            Generation
-          </li>
-          <li className="flex items-center gap-1.5 text-xs text-soft">
-            <span className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: "var(--viz-2)" }} aria-hidden />
-            Translation
-          </li>
-        </ul>
+      <figcaption className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="text-xs font-medium tracking-wide text-soft uppercase">
+          Activity · last 30 days
+          {total > 0 && <span className="ml-2 tabular-nums normal-case">{total} in total</span>}
+        </span>
+        <VizLegend
+          series={[
+            { key: "generation", label: "Generation", color: "var(--viz-1)" },
+            { key: "translation", label: "Translation", color: "var(--viz-2)" },
+          ]}
+        />
       </figcaption>
       {rows === undefined ? (
-        <div className="h-32 animate-pulse rounded-lg bg-hi/40" aria-busy />
+        <div className="h-40 animate-pulse rounded-lg bg-hi/40" aria-busy />
       ) : (
-        <GenerationUsageBars rows={rows} />
+        <DayStackChart
+          columns={rows.map((r) => ({
+            dayMs: r.dayMs,
+            segments: [
+              { key: "generation", label: "Generation", value: r.generation, color: "var(--viz-1)" },
+              { key: "translation", label: "Translation", value: r.translation, color: "var(--viz-2)" },
+            ],
+          }))}
+          empty="No generation or translation in the last 30 days."
+          zero="Nothing built"
+        />
       )}
     </figure>
-  );
-}
-
-function GenerationUsageBars({ rows }: { rows: FunctionReturnType<typeof api.routine.usageByDay> }) {
-  const H = 128; // px plot height
-  const max = Math.max(...rows.map((r) => r.generation + r.translation), 1);
-  const total = rows.reduce((sum, r) => sum + r.generation + r.translation, 0);
-  const fmt = (ms: number) =>
-    new Date(ms).toLocaleDateString("en-ZA", { day: "numeric", month: "short", timeZone: "UTC" });
-  // A nonzero count always draws at least 2px so a single event stays visible.
-  const px = (n: number) => (n > 0 ? Math.max((n / max) * H, 2) : 0);
-
-  if (total === 0) {
-    return <p className="py-10 text-center text-sm text-soft">No generation or translation in the last 30 days.</p>;
-  }
-  return (
-    <div>
-      <div className="flex h-32 items-end gap-[2px]">
-        {rows.map((r) => {
-          const tr = px(r.translation);
-          const g = px(r.generation);
-          return (
-            <div
-              key={r.dayMs}
-              className="flex flex-1 flex-col justify-end gap-[2px]"
-              title={`${fmt(r.dayMs)} — ${r.generation} generation, ${r.translation} translation`}
-            >
-              {tr > 0 && <div className="w-full rounded-t-[3px]" style={{ height: `${tr}px`, background: "var(--viz-2)" }} />}
-              {g > 0 && (
-                <div
-                  className={`w-full ${tr > 0 ? "" : "rounded-t-[3px]"}`}
-                  style={{ height: `${g}px`, background: "var(--viz-1)" }}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
-      <div className="mt-1.5 flex justify-between text-[11px] tabular-nums text-soft">
-        <span>{fmt(rows[0]!.dayMs)}</span>
-        {rows.length > 2 && <span>{fmt(rows[Math.floor(rows.length / 2)]!.dayMs)}</span>}
-        <span>{fmt(rows[rows.length - 1]!.dayMs)}</span>
-      </div>
-    </div>
   );
 }
 
@@ -383,7 +478,8 @@ function SalesManager() {
   const [to, setTo] = useState("");
   // `salesRange` floors `now` to the day, so these args are stable across
   // renders — a raw `Date.now()` here would make useQuery loop forever.
-  const report = useQuery(api.sales.report, salesRange(preset, from, to, Date.now()));
+  const range = salesRange(preset, from, to, Date.now());
+  const report = useQuery(api.sales.report, range);
   const totalGross = report?.reduce((sum, c) => sum + c.gross, 0) ?? 0;
   const totalCount = report?.reduce((sum, c) => sum + c.count, 0) ?? 0;
 
@@ -441,7 +537,7 @@ function SalesManager() {
             </span>
             <span className="font-semibold tabular-nums text-ink">{formatRand(totalGross)}</span>
           </div>
-          <SalesChart report={report} />
+          <SalesDayChart range={range} ranked={rankLanguages(report)} />
           <ul className="flex flex-col gap-2">
             {report.map((c) => (
               <SalesCourseRow key={c.topicId} course={c} />
@@ -453,56 +549,54 @@ function SalesManager() {
   );
 }
 
-// The sales-by-course chart (dataviz skill): one horizontal bar per course,
-// length = its sale count on a shared scale, split into per-edition segments
-// coloured by language (consistent across courses). Number of sales is the
-// measure. The 2px gaps between segments are the card surface showing through.
-function SalesChart({ report }: { report: FunctionReturnType<typeof api.sales.report> }) {
-  const ranked = rankLanguages(report);
-  const maxCount = Math.max(...report.map((c) => c.count), 1);
+// The sales-by-day chart (dataviz skill): one column per day of the chosen
+// period, height = that day's sale count on one shared axis, stacked into
+// per-edition segments coloured by language. The language→colour mapping comes
+// from the whole period's ranking (`rankLanguages`), so a language keeps its
+// colour on every day and in the breakdown below — the eye can follow "AF" down
+// the timeline. The course dimension lives in the expandable list underneath;
+// with one course a bar-per-course chart was a one-bar chart, and it never
+// showed *when* anything sold.
+function SalesDayChart({ range, ranked }: { range: { from?: number; to?: number }; ranked: readonly string[] }) {
+  const days = useQuery(api.sales.byDay, range);
+  const order = (lang: string) => {
+    const i = ranked.indexOf(lang);
+    return i < 0 ? ranked.length : i;
+  };
   return (
     <figure className="viz-chart mb-4 rounded-xl border border-line bg-card p-4">
-      <figcaption className="mb-3 flex items-center justify-between gap-3">
-        <span className="text-xs font-medium tracking-wide text-soft uppercase">Sales by course</span>
-        {ranked.length >= 2 && (
-          <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            {ranked.slice(0, 8).map((lang) => (
-              <li key={lang} className="flex items-center gap-1.5 text-xs text-soft">
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-[3px]"
-                  style={{ background: colorVar(lang, ranked) }}
-                  aria-hidden
-                />
-                <span className="uppercase">{lang}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+      <figcaption className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <span className="text-xs font-medium tracking-wide text-soft uppercase">Sales by day and edition</span>
+        <VizLegend
+          series={ranked.slice(0, VIZ_SLOTS).map((lang) => ({
+            key: lang,
+            label: lang.toUpperCase(),
+            color: colorVar(lang, ranked),
+          }))}
+        />
       </figcaption>
-      <ul className="flex flex-col gap-2.5">
-        {report.map((course) => (
-          <li key={course.topicId}>
-            <div className="mb-1 flex items-baseline justify-between gap-3">
-              <span className="min-w-0 truncate text-sm text-ink">{course.courseTitle}</span>
-              <span className="shrink-0 text-xs tabular-nums text-soft">
-                {course.count} sale{course.count === 1 ? "" : "s"}
-              </span>
-            </div>
-            <div className="h-5 w-full">
-              <div className="flex h-full gap-[2px]" style={{ width: `${(course.count / maxCount) * 100}%` }}>
-                {course.editions.map((e) => (
-                  <div
-                    key={e.lang}
-                    className="h-full min-w-[3px] first:rounded-l last:rounded-r"
-                    style={{ flexGrow: e.count, background: colorVar(e.lang, ranked) }}
-                    title={`${e.title} (${e.lang.toUpperCase()}) — ${e.count} sale${e.count === 1 ? "" : "s"}`}
-                  />
-                ))}
-              </div>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {days === undefined ? (
+        <div className="h-40 animate-pulse rounded-lg bg-hi/40" aria-busy />
+      ) : (
+        <DayStackChart
+          columns={days.map((d) => ({
+            dayMs: d.dayMs,
+            // Sorted by the period-wide rank — top seller on the baseline — so
+            // the stack order is identical on every column instead of following
+            // each day's own top seller.
+            segments: [...d.editions]
+              .sort((a, b) => order(a.lang) - order(b.lang))
+              .map((e) => ({
+                key: e.lang,
+                label: `${e.lang.toUpperCase()} · ${formatRand(e.gross)}`,
+                value: e.count,
+                color: colorVar(e.lang, ranked),
+              })),
+          }))}
+          empty="No sales in this period."
+          zero="No sales"
+        />
+      )}
     </figure>
   );
 }
