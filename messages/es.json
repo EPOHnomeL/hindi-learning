@@ -138,6 +138,7 @@
     "signInFailed": "Error al iniciar sesión. Comprueba tu correo electrónico y contraseña.",
     "signUpFailed": "Error al registrarse. Prueba con otro correo electrónico o una contraseña más segura.",
     "continueWithGoogle": "Continuar con Google",
+    "lastUsed": "Usado por última vez",
     "or": "o",
     "googleFailed": "No se pudo iniciar sesión con Google. Inténtalo de nuevo o usa tu correo electrónico y contraseña.",
     "buyIntent": "Crea una cuenta para completar tu compra — ¿ya tienes una? Inicia sesión abajo.",

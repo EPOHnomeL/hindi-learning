@@ -170,6 +170,7 @@
     "signInFailed": "Sign-in failed. Check your email and password.",
     "signUpFailed": "Sign-up failed. Try a different email or a stronger password.",
     "continueWithGoogle": "Continue with Google",
+    "lastUsed": "Last used",
     "or": "or",
     "googleFailed": "Google sign-in failed. Try again, or use your email and password.",
     "buyIntent": "Create an account to complete your purchase — already have one? Sign in below.",

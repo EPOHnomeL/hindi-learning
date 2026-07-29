@@ -11,8 +11,42 @@
 // sweep. The legacy "hindi:theme" key is
 // kept so a not-yet-migrated user's dark mode survives sign-out until ThemeContext
 // migrates it to the cookie.
-const KEEP = new Set(["hindi:theme"]);
+// Which method signed in on this browser last ("google" | "password"), powering
+// the sign-in screen's "Last used" hint (SignIn.tsx) so a returning reader is
+// nudged to the right button instead of guessing — and, after #111's email
+// linking, so someone with BOTH credentials on one account picks the one they
+// actually use.
+export const LAST_AUTH_KEY = "hindi:last-auth";
+
+// Survives the sign-out sweep below, deliberately. The hint is worthless if it is
+// wiped by the very act it describes — and unlike an Edition language or guest
+// progress it names a *method*, not an identity: it reveals nothing about the
+// account that just left, so the shared-browser leak the sweep exists to prevent
+// doesn't apply.
+const KEEP = new Set(["hindi:theme", LAST_AUTH_KEY]);
 const PREFIX = "hindi:";
+
+export type AuthMethod = "google" | "password";
+
+// Best-effort both ways — storage can be disabled, and the hint is pure polish, so
+// a failure degrades to "no badge" rather than breaking sign-in. Unknown/corrupt
+// values read as null rather than being trusted into the UI.
+export function readLastAuthMethod(): AuthMethod | null {
+  try {
+    const value = window.localStorage.getItem(LAST_AUTH_KEY);
+    return value === "google" || value === "password" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+export function rememberAuthMethod(method: AuthMethod): void {
+  try {
+    window.localStorage.setItem(LAST_AUTH_KEY, method);
+  } catch {
+    /* storage unavailable — the hint is optional */
+  }
+}
 
 // Pure over the passed Storage so it's testable without a DOM. Collect the
 // doomed keys first, then remove — mutating while iterating by index skips keys.

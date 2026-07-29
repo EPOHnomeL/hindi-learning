@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearAccountLocalState } from "./accountLocalState";
+import { clearAccountLocalState, LAST_AUTH_KEY } from "./accountLocalState";
 
 // A minimal in-memory Storage stand-in — the helper only touches
 // length/key/removeItem, but a full setItem/getItem keeps the test readable.
@@ -38,6 +38,15 @@ describe("clearAccountLocalState", () => {
     clearAccountLocalState(storage);
 
     expect(storage.getItem("hindi:theme")).toBe("dark");
+    expect(storage.getItem("hindi:lang")).toBeNull();
+  });
+
+  it("keeps the last-used sign-in method — the hint's whole job is to survive sign-out", () => {
+    const storage = fakeStorage({ [LAST_AUTH_KEY]: "google", "hindi:lang": "xh" });
+
+    clearAccountLocalState(storage);
+
+    expect(storage.getItem(LAST_AUTH_KEY)).toBe("google");
     expect(storage.getItem("hindi:lang")).toBeNull();
   });
 

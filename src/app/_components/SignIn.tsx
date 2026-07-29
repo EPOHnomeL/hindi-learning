@@ -3,7 +3,8 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { readLastAuthMethod, rememberAuthMethod, type AuthMethod } from "./accountLocalState";
 import { useBuyMarker } from "./editionUrl";
 import { Logo } from "./Logo";
 import { useTenant } from "./TenantContext";
@@ -22,6 +23,25 @@ function GoogleMark() {
   );
 }
 
+// The "Last used" marker: a little banner pinned over the top-right corner of the
+// method it describes, rather than a word inside the label — the button's own text
+// stays the thing you read, and the hint sits beside it instead of lengthening it.
+//
+// Carries its own `bg-card` + gold outline so it reads identically on both hosts,
+// which are opposite surfaces: the Google button is the card itself, the submit
+// button a solid accent fill. A tinted-transparent chip would need a different
+// colour on each; an opaque one needs none.
+//
+// The host button must be `relative`. `pointer-events-none` so the banner is never
+// a dead spot on the button it overhangs.
+function LastUsedPill({ label }: { label: string }) {
+  return (
+    <span className="pointer-events-none absolute -right-2 -top-2 whitespace-nowrap rounded-full border border-gold bg-card px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-accent shadow-sm">
+      {label}
+    </span>
+  );
+}
+
 export function SignIn() {
   const { signIn } = useAuthActions();
   const t = useTranslations("Auth");
@@ -35,6 +55,13 @@ export function SignIn() {
   const [flow, setFlow] = useState<"signIn" | "signUp">(buyIntent ? "signUp" : "signIn");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Read in an effect, not during render: localStorage doesn't exist on the server,
+  // so reading it inline would render no pill server-side and a pill on the client
+  // — a hydration mismatch. The pill therefore appears one paint late, which is
+  // invisible next to the OAuth round-trip it's advising on. Same mount-gating the
+  // Landing's DemoCertificate uses for its locale-dependent dates.
+  const [lastUsed, setLastUsed] = useState<AuthMethod | null>(null);
+  useEffect(() => setLastUsed(readLastAuthMethod()), []);
 
   return (
     <div className="grid min-h-screen place-items-center px-4">
@@ -63,6 +90,9 @@ export function SignIn() {
             formData.set("flow", flow);
             try {
               await signIn("password", formData);
+              // Only on success, and only after it — a failed attempt shouldn't
+              // rewrite the hint. A sign-*up* counts too: it's how they'll come back.
+              rememberAuthMethod("password");
             } catch {
               setError(flow === "signIn" ? t("signInFailed") : t("signUpFailed"));
               setBusy(false);
@@ -78,11 +108,17 @@ export function SignIn() {
           <button
             type="button"
             disabled={busy}
-            className="flex items-center justify-center gap-2 rounded-lg border border-line bg-card px-3 py-2 font-medium text-accent hover:border-gold disabled:opacity-50"
+            className="relative flex items-center justify-center gap-2 rounded-lg border border-line bg-card px-3 py-2 font-medium text-accent hover:border-gold disabled:opacity-50"
             onClick={async () => {
               setBusy(true);
               setError(null);
               try {
+                // Written *before* the call, unlike the password path: `signIn`
+                // hands the browser to Google, so nothing after the await is
+                // guaranteed to run. The cost of being early is a stale hint if the
+                // reader abandons Google's consent screen — they'd be nudged at a
+                // button they didn't finish with, which is nearly free to ignore.
+                rememberAuthMethod("google");
                 // `redirectTo` is required, not optional polish: with it omitted the
                 // OAuth callback falls back to SITE_URL — the apex — and under ADR
                 // 0025's host-only session cookie the buyer would come back signed
@@ -99,6 +135,7 @@ export function SignIn() {
           >
             <GoogleMark />
             {t("continueWithGoogle")}
+            {lastUsed === "google" && <LastUsedPill label={t("lastUsed")} />}
           </button>
           <div className="flex items-center gap-3 text-xs text-soft">
             <span className="h-px flex-1 bg-line" />
@@ -107,8 +144,11 @@ export function SignIn() {
           </div>
           <input name="email" type="email" placeholder={t("email")} autoComplete="email" required className="rounded-lg border border-line bg-card px-3 py-2 focus:border-gold focus:outline-none" />
           <input name="password" type="password" placeholder={t("password")} autoComplete={flow === "signIn" ? "current-password" : "new-password"} required className="rounded-lg border border-line bg-card px-3 py-2 focus:border-gold focus:outline-none" />
-          <button type="submit" disabled={busy} className="rounded-lg bg-accent px-3 py-2 font-medium text-white disabled:opacity-50">
+          <button type="submit" disabled={busy} className="relative rounded-lg bg-accent px-3 py-2 font-medium text-white disabled:opacity-50">
             {busy ? "…" : flow === "signIn" ? t("signIn") : t("signUp")}
+            {/* Only while signing in: on the "Create account" toggle a "Last used"
+                banner would be nonsense — you can't have last created this account. */}
+            {!busy && flow === "signIn" && lastUsed === "password" && <LastUsedPill label={t("lastUsed")} />}
           </button>
           {error && <p className="text-sm text-danger">{error}</p>}
           <button
