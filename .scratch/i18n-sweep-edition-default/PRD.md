@@ -1,5 +1,20 @@
 # PRD — Full-app i18n sweep + locale-aware course editions
 
+> **Status: shipped.** Reconciled against `main` on 2026-07-29 — all nine issues
+> (01–09) have landed. `useTranslations` is wired through `CourseSettings`,
+> `Editions`, `ArtifactView`, `Certificate`, `Landing`, `Dashboard` and `ui.tsx`;
+> `messages/{en,af,es,fr,hi}.json` each carry 395 keys with real (not placeholder)
+> values across 14 namespaces; `Dashboard.openLang` and `CoursePanes` both take
+> the UI locale via `useLocale()`. `AdminPanel` remains deliberately un-translated
+> (out of scope). GitHub #70/#71/#72 track 07/08/09 and are closable.
+>
+> **One stale detail below:** this PRD says the App-language cookie is
+> `hindi_locale`. It was **renamed to `hindi_lang`** (and `hindi_theme` →
+> `hindi_mode`) at the per-tenant session cutover — [ADR 0025](../../docs/adr/0025-per-tenant-session-isolation.md).
+> The rename is load-bearing, not cosmetic: the old parent-domain cookies are still
+> in browsers with a year-long max-age and would shadow the new host-only ones under
+> the same name.
+
 ## Problem
 
 The app has a working chrome-i18n system (next-intl, 5 locales `en/af/es/fr/hi`,

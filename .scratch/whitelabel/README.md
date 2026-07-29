@@ -10,9 +10,19 @@ holds the destination, the decisions so far, and the fog. Work it with `/wayfind
 (or bare `/wayfinder` on the map to take the next frontier ticket) — one ticket per session.
 
 **The map has reached its destination.** All six scoping tickets are closed, synthesized into
-[PRD.md](PRD.md), broken into 17 local implementation issues (07–23, `ready-for-agent`, listed in
-the PRD's own table). Current work is building those issues one at a time with `/tdd` +
-`/ponytail`, in the PRD's dependency order — not another `/wayfinder` session.
+[PRD.md](PRD.md), broken into local implementation issues 07–24 (listed in the PRD's own table).
+
+**Whitelabel v1 is built** (reconciled against `main` 2026-07-29): issues **07–24 have all
+landed** — tenant schema + seed, scope-aware admin roles, token cleanup, resolution
+middleware, SSR theming, brand-asset upload, lesson palette override, tenant-aware invite
+email and certificate, per-tenant landing pages, flag enforcement, canonical redirect, and
+the whole dashboard Tenants tab (shell, theme editor, flag toggles, assignment/removal,
+tenant-admin grant) plus the legacy-course tenant backfill. Remaining follow-up work — the
+bespoke per-tenant landing pages, the last unbranded header, the colour-literal audit — is
+tracked in [TODO.md](TODO.md), not here.
+
+Note the tenant slug is **`almighty-warriors`** (plural). This README's opening line says
+"almighty-warrior"; the slug in the DB, the Vercel domain and `src/lib/tenant.ts` is plural.
 
 ## Tickets (children of the map)
 
@@ -31,8 +41,11 @@ CLAUDE.md's pipeline, not another `/wayfinder` session.
 
 ## Interactions to keep in view
 
-- **Site-wide singletons break under tenancy**: the [[Allowlist]] and single [[Admin]]
-  (ADR 0011) are per-*site* concepts today — ticket 02 owns this.
+- ~~**Site-wide singletons break under tenancy**: the [[Allowlist]] and single [[Admin]]
+  (ADR 0011) are per-*site* concepts today~~ — **resolved.** The Admin singleton is gone:
+  ADR 0022 §4 replaced it with the two-tier sys-admin / tenant-admin model (a `whitelist`
+  row's optional `tenantSlug` is the scope), shipped in issue 08. The Allowlist table
+  itself is still one site-wide table — that is now a deliberate shape, not debt.
 - **Published lesson blobs carry the design system**: lesson HTML is wrapped with a shared
   head at publish and stored immutably — per-tenant theming must not require republishing
   content (tickets 01/03).
