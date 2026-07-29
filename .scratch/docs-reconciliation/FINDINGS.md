@@ -191,11 +191,13 @@ The raw gap is misleading, so here is the shape rather than a number:
   titled `"07 — …"`, `#80` is `"01 — …"`, `#50` drops the prefix entirely. Any
   prefix-matching reconciliation script will report these as local-only. They aren't.
 - **Genuinely local-only and genuinely open — one cluster:**
-  **`.scratch/ywampotch-launch/`** (PRD + 9 tickets, `00`–`08`), which is
-  **untracked in git** (`?? .scratch/ywampotch-launch/` in `git status`). It is the
-  current live feature — funnel fixes plus a **manual EFT rail** on a money path — and
-  it is invisible to `gh issue list` *and* to anyone who clones the repo. This is the
-  real cost of the split, not the archive.
+  **`.scratch/ywampotch-launch/`** (PRD + 9 tickets, `00`–`08`). It is the current live
+  feature — funnel fixes plus a **manual EFT rail** on a money path — and it is
+  invisible to `gh issue list`. This is the real cost of the split, not the archive.
+  **Update, mid-sweep:** it was untracked (`?? .scratch/ywampotch-launch/`) when this
+  sweep started, but a **concurrent session committed it as `7ab47ad`** while the sweep
+  ran. So it is now in the repo — but still not on GitHub, so the `gh`-invisibility
+  half stands.
   Also local-only: `admin-allowlist/01` (a prod ops follow-up),
   `landing-page/01`, `rich-media/01` and `/10` (scoping notes for shipped or
   GitHub-tracked work), `edition-title-edit/01–02`, `invite-emails/01–03`,
@@ -205,9 +207,10 @@ The raw gap is misleading, so here is the shape rather than a number:
 for PRDs, maps and scoping prose only — which is what `CLAUDE.md` already says. Two
 concrete steps, both yours to authorise:
 
-1. **Commit `.scratch/ywampotch-launch/` and file its 8 tickets on GitHub.** It is
-   in-flight work on the payment path that currently exists on one machine only.
-   Highest-value, lowest-risk step.
+1. **File `.scratch/ywampotch-launch/`'s 8 tickets on GitHub.** (Committing the
+   directory is already done — `7ab47ad`, by a concurrent session mid-sweep.) It is
+   in-flight work on the live payment path, and the tracker `CLAUDE.md` points at
+   cannot see it. Highest-value, lowest-risk step.
 2. **Mark the archive as archive** — one `STATUS: shipped` line at the top of each
    closed feature's `README`/map (several already have this). Cheaper and safer than
    migrating or deleting 100+ files, and it makes the remaining backlog legible.
