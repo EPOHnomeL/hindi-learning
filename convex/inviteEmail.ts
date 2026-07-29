@@ -2,7 +2,11 @@
 // module — no Convex server imports — so it's unit-testable without a runtime and
 // reused by the `email.sendInvite` action to build the Resend payload.
 
-export type InviteKind = "granted" | "invited" | "role-changed";
+// `purchased` (manual EFT rail, ywampotch-launch ticket 05) is not an invite: it
+// is the one email a buyer gets when the operator confirms their bank transfer
+// cleared. It rides this renderer because the markup, brand and palette are
+// identical and a second email module would be a second thing to keep in step.
+export type InviteKind = "granted" | "invited" | "role-changed" | "purchased";
 
 export type InviteData = {
   courseTitle: string;
@@ -109,7 +113,16 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
   let heading: string;
   let lead: string;
   let cta: string;
-  if (kind === "invited") {
+  if (kind === "purchased") {
+    // The buyer paid by bank transfer and has been waiting — hours, maybe days.
+    // The only job of this email is "the money landed, your access is live, here
+    // is the door". `inviterEmail` is carried in the payload but says nothing to a
+    // buyer, so the copy ignores it.
+    subject = `Your access to “${courseTitle}” is live`;
+    heading = "Payment confirmed";
+    lead = `We've matched your bank transfer and unlocked ${edition} on ${BRAND}. It's yours for good — open it whenever you like.`;
+    cta = "Start the course";
+  } else if (kind === "invited") {
     subject = `You’ve been invited to “${courseTitle}”`;
     heading = "You’ve been invited";
     lead = `${inviterEmail} invited you to ${edition} on ${BRAND}. Create your account to get ${access(role)} access.`;
@@ -126,7 +139,15 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
     cta = "Open the course";
   }
 
-  const text = `${heading}\n\n${lead}\n\n${cta}: ${link}\n\nYou received this because someone shared a course with you on ${BRAND}.\n`;
+  // Why-you-got-this line. A buyer who paid was not "shared a course with", and a
+  // wrong reason on a payment email is exactly the kind of thing that reads as a
+  // scam to someone who has just transferred money to a stranger's account.
+  const because =
+    kind === "purchased"
+      ? `You received this because you bought a course on ${BRAND}.`
+      : `You received this because someone shared a course with you on ${BRAND}.`;
+
+  const text = `${heading}\n\n${lead}\n\n${cta}: ${link}\n\n${because}\n`;
 
   // Header: the tenant logo (absolute storage URL) when set, else the text
   // wordmark (the brand name in the accent colour) — the pre-whitelabel default.
@@ -159,7 +180,7 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
             </td>
           </tr>
           <tr>
-            <td style="padding:20px 4px 0;font-family:${FONT};font-size:12px;line-height:1.5;color:${C.faint};">You received this because someone shared a course with you on ${BRAND}.</td>
+            <td style="padding:20px 4px 0;font-family:${FONT};font-size:12px;line-height:1.5;color:${C.faint};">${because}</td>
           </tr>
         </table>
       </td>

@@ -4,6 +4,7 @@ import { beforeAll, expect, test } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
+import { renderInviteEmail } from "./inviteEmail";
 
 // The manual EFT rail (ywampotch-launch ticket 02): the **operator's collection**
 // bank account. Two seams:
@@ -49,10 +50,12 @@ const BANK = {
 // refuses without it), and pricing is what makes an Edition payable at all — so
 // the EFT tests reach the paid state through the same production path, with the
 // sandbox trio in place. The EFT rail itself never touches PayFast.
+// `SITE_URL` is what the confirmation email's deep link is built from (appUrl).
 beforeAll(() => {
   process.env.PAYFAST_MERCHANT_ID = "10000100";
   process.env.PAYFAST_MERCHANT_KEY = "46f0cd694581a";
   process.env.PAYFAST_PASSPHRASE = "jt7NOE43FZPn";
+  process.env.SITE_URL = "https://my-course.app";
 });
 
 const PAYOUT = { accountHolder: "A. Author", bank: "FNB", accountNumber: "62000000001", branchCode: "250655" };
@@ -526,6 +529,110 @@ test("the queue lists what the operator needs to match a transfer", async () => 
   // silts up stops being read, and that is how a real payment gets missed.
   await asUser(t, sys).mutation(api.eft.confirmEftPayment, { ref });
   expect(await asUser(t, sys).query(api.eft.pendingEftIntents, {})).toEqual([]);
+});
+
+// ---- Seam — the confirmation email (ticket 05) -------------------------------
+
+// Follows convex/invite-emails.test.ts: assert the SCHEDULED payload (the send
+// itself is `email.sendInvite`, already covered there), because that payload is
+// what carries the deep link and the branding.
+async function scheduledEmails(t: ReturnType<typeof convexTest>) {
+  const rows = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+  return rows.filter((r) => String(r.name).includes("sendInvite")).map((r) => r.args[0] as Record<string, unknown>);
+}
+
+test("confirming sends one email, deep-linked to the tenant's own host", async () => {
+  process.env.SITE_URL = "https://my-course.app";
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  // A tenanted course, because the host is the whole point: under ADR 0025 sessions
+  // are host-only per subdomain, so a link to the apex lands the buyer signed out.
+  const topicId = await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await t.run((ctx) => ctx.db.patch(topicId, { tenantSlug: "ywampotch" }));
+  await enableRail(t, sys);
+  const { ref } = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+
+  // Nothing at intent time — an "we've recorded your intent" email tells the buyer
+  // nothing they don't already know (ticket 05, out of scope).
+  expect(await scheduledEmails(t)).toEqual([]);
+
+  await asUser(t, sys).mutation(api.eft.confirmEftPayment, { ref });
+
+  const sent = await scheduledEmails(t);
+  expect(sent).toHaveLength(1);
+  expect(sent[0]).toMatchObject({
+    to: "buyer@example.com",
+    kind: "purchased",
+    courseTitle: "tswana",
+    langName: "English",
+    link: "https://ywampotch.my-course.app/courses/tswana",
+  });
+});
+
+test("no email on a repeat confirm, and none on dismiss", async () => {
+  process.env.SITE_URL = "https://my-course.app";
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  const other = await seedUser(t, "other@example.com");
+  await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+  const { ref } = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+
+  await asUser(t, sys).mutation(api.eft.confirmEftPayment, { ref });
+  await asUser(t, sys).mutation(api.eft.confirmEftPayment, { ref });
+  expect(await scheduledEmails(t)).toHaveLength(1);
+
+  const dismissed = await asUser(t, other).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+  await asUser(t, sys).mutation(api.eft.dismissEftIntent, { ref: dismissed.ref });
+  expect(await scheduledEmails(t)).toHaveLength(1);
+});
+
+test("a confirmed sale survives an email that can't even be addressed", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  const topicId = await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+  const { ref } = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+
+  // No SITE_URL: `appUrl` throws, and a throw inside a mutation rolls the whole
+  // transaction back — which would mean a deployment that silently refuses to
+  // confirm real payments because of a missing env var. The money must win.
+  const saved = process.env.SITE_URL;
+  delete process.env.SITE_URL;
+  try {
+    await asUser(t, sys).mutation(api.eft.confirmEftPayment, { ref });
+  } finally {
+    if (saved) process.env.SITE_URL = saved;
+  }
+
+  expect(await entitlementRows(t, topicId, buyer)).toHaveLength(1);
+  expect(await ledgerRows(t)).toHaveLength(1);
+  expect((await intentRows(t))[0]!.status).toBe("confirmed");
+  expect(await scheduledEmails(t)).toEqual([]);
+});
+
+test("the purchased email reads as a receipt, not as a share invite", async () => {
+  const rendered = renderInviteEmail("purchased", {
+    courseTitle: "Basic Tswana",
+    langName: "English",
+    inviterEmail: "seller@example.com",
+    role: "viewer",
+    link: "https://ywampotch.my-course.app/courses/tswana",
+  });
+
+  // A buyer who just transferred money to a stranger's bank account is primed to
+  // read a wrong-sounding email as a scam, so the copy has to be about the payment.
+  expect(rendered.subject).toContain("Basic Tswana");
+  expect(rendered.text).toContain("bank transfer");
+  expect(rendered.text).toContain("you bought a course");
+  expect(rendered.text).not.toContain("shared a course with you");
+  expect(rendered.html).toContain("https://ywampotch.my-course.app/courses/tswana");
 });
 
 test("a tenant admin can neither read the queue nor confirm or dismiss", async () => {

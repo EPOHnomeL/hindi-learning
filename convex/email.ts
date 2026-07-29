@@ -16,7 +16,15 @@ const RESEND_URL = "https://api.resend.com/emails";
 export const sendInvite = internalAction({
   args: {
     to: v.string(),
-    kind: v.union(v.literal("granted"), v.literal("invited"), v.literal("role-changed")),
+    kind: v.union(
+      v.literal("granted"),
+      v.literal("invited"),
+      v.literal("role-changed"),
+      // The confirmed-bank-transfer email (manual EFT rail, ticket 05). Same
+      // sender, same no-op-when-unconfigured property: a bounced email must never
+      // roll back a confirmed sale.
+      v.literal("purchased"),
+    ),
     courseTitle: v.string(),
     langName: v.string(),
     inviterEmail: v.string(),

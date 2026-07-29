@@ -3,8 +3,10 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { editionPrice, normaliseEmail, topicBySlug } from "./lib";
-import { platformFeeBps, splitNet } from "./payfast";
+import { internal } from "./_generated/api";
+import { editionPrice, normaliseEmail, SOURCE_LANG, topicBySlug } from "./lib";
+import { langInfo } from "./languages";
+import { appUrl, platformFeeBps, splitNet } from "./payfast";
 import { payoutDetailsValidator } from "./schema";
 import { isReadySeller } from "./sellerStatus";
 import { isCallerAdmin } from "./whitelist";
@@ -342,9 +344,82 @@ export const confirmEftPayment = mutation({
     });
 
     await ctx.db.patch(intent._id, { status: "confirmed" });
+
+    // The one email this rail sends (ticket 05). An EFT clears in hours or days
+    // and the buyer closed the tab long ago; if nothing reaches them they conclude
+    // they have been robbed, and the operator hears about the sale as a support
+    // message. Scheduled AFTER the writes, best-effort: `email.sendInvite` no-ops
+    // with a warning when Resend is unconfigured and swallows a bad response, so a
+    // bounced email can never roll back a confirmed sale.
+    //
+    // Nothing is sent on a repeat confirm — the not-pending early return above
+    // means we never get here twice — and nothing is sent on dismiss.
+    // Everything in here is best-effort, INCLUDING building the link: `appUrl`
+    // throws when SITE_URL isn't provisioned, and a throw in a mutation rolls back
+    // the transaction — which would mean an unconfigurable deployment silently
+    // refusing to confirm real payments. The sale is the thing that matters; if we
+    // can't email about it, log and move on.
+    try {
+      await scheduleAccessEmail(ctx, { intent, topic, buyerEmail: user.email ?? "" });
+    } catch (err) {
+      console.error(`confirmEftPayment: could not schedule the access email for ${ref}:`, err);
+    }
     return null;
   },
 });
+
+// The "your access is live" email for a confirmed transfer. Split out so the
+// caller can treat the whole thing — link building included — as best-effort.
+async function scheduleAccessEmail(
+  ctx: MutationCtx,
+  { intent, topic, buyerEmail }: { intent: Doc<"eftIntents">; topic: Doc<"topics">; buyerEmail: string },
+): Promise<void> {
+  const langName = intent.lang === SOURCE_LANG ? "English" : langInfo(intent.lang).name;
+  const seller = topic.ownerId ? await ctx.db.get(topic.ownerId) : null;
+  await ctx.scheduler.runAfter(0, internal.email.sendInvite, {
+    to: normaliseEmail(buyerEmail),
+    kind: "purchased",
+    courseTitle: topic.title,
+    langName,
+    // Unused by the purchased copy (a buyer doesn't care who the seller is), but
+    // the payload field is shared with invites — carry the seller for the log.
+    inviterEmail: normaliseEmail(seller?.email ?? ""),
+    role: "viewer",
+    // The deep link must ride the TENANT's own host: under ADR 0025 sessions are
+    // host-only per subdomain, so a link to the apex lands the buyer signed out
+    // looking at a paygate for a course they just paid for.
+    link: appUrl(
+      intent.lang === SOURCE_LANG
+        ? `/courses/${topic.slug}`
+        : `/courses/${topic.slug}?lang=${encodeURIComponent(intent.lang)}`,
+      topic.tenantSlug,
+    ),
+    brand: await tenantBrand(ctx, topic.tenantSlug),
+  });
+}
+
+// The tenant's email brand, so a YWAM Potch buyer gets a YWAM Potch email rather
+// than a house-branded one immediately after paying them money. Same one-row
+// `by_slug` read as `shares.ts`'s copy; `undefined` for the default site.
+// ponytail: duplicated from shares.ts rather than hoisted into lib.ts — two call
+// sites, ten lines, and hoisting would touch the working invite path. Hoist on the
+// third caller.
+async function tenantBrand(
+  ctx: MutationCtx,
+  slug: string | undefined,
+): Promise<{ name: string; light: Record<string, string>; logoUrl: string | null } | undefined> {
+  if (!slug) return undefined;
+  const tenant = await ctx.db
+    .query("tenants")
+    .withIndex("by_slug", (q) => q.eq("slug", slug))
+    .unique();
+  if (!tenant) return undefined;
+  return {
+    name: tenant.displayName,
+    light: tenant.theme.light,
+    logoUrl: tenant.theme.logo ? await ctx.storage.getUrl(tenant.theme.logo) : null,
+  };
+}
 
 // The transfer never came: take the intent off the queue. Grants nothing, records
 // no money, and is not an error state — stale intents are litter. Without a
