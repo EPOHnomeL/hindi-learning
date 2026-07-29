@@ -7,6 +7,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { Brand } from "./Brand";
 import { CompletionCelebration } from "./Certificate";
 import { CourseSettingsDialog } from "./CourseSettings";
 import { Icon } from "./icons";
@@ -223,6 +224,22 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
         >
           {/* Drawer handle for mobile */}
           <div className="mx-auto mb-3.5 h-1.5 w-12 shrink-0 rounded-full bg-line md:hidden" />
+
+          {/* The brand lockup, mirroring PublicReader's sidebar (ywampotch-launch
+              01). This was the last chrome surface with no brand mark at all: a
+              tenant learner signed in off a branded landing page and read the
+              course under an unbranded frame, immediately before being asked to
+              pay. Lives in the sidebar rather than the mobile top bar on purpose —
+              that bar is a fixed h-12 with an already-truncating course title, and
+              a 7:1 banner logo would wreck it. */}
+          <Link
+            href="/"
+            aria-label={t("backToCoursesLabel")}
+            title={t("backToCoursesLabel")}
+            className="mb-3 block shrink-0 hover:opacity-80"
+          >
+            <Brand className="h-8 w-auto max-w-40 object-contain" />
+          </Link>
 
           <div className="mb-2 flex items-center justify-between gap-2">
             <Link

@@ -1,6 +1,24 @@
 # ywampotch-launch/01: Brand continuity through the funnel
 
-**Status:** open
+**Status:** built (2026-07-29) — pending the browser check below
+
+> **The premise below was already stale when this ticket was written.** Only
+> **`CourseShell`** actually lacked a brand mark. `PublicReader` already renders
+> `<Brand>` (`5cd6b76`); `SignIn` and `Dashboard` already render `tenant.logoUrl`
+> / `displayName` / `motto` directly with the "My Course" fallback (`18af604`), in
+> bespoke centred/header lockups that carry the motto — which `<Brand>` does not.
+> Routing those two through `<Brand>` would have *removed* the motto and shrunk the
+> logo, so it was left alone: the acceptance criteria are about what the learner
+> sees, and those two already meet them.
+>
+> **Built:** `<Brand>` in `CourseShell`'s sidebar, mirroring `PublicReader`'s
+> pattern. Deliberately not in the mobile top bar — that is a fixed `h-12` with an
+> already-truncating course title, and a 7:1 banner logo would wreck it.
+>
+> **No unit test.** The repo has no component-test infrastructure (no
+> `.test.tsx`, no RTL, no jsdom; every `src/` test is pure logic), so a render test
+> for `<Brand>`'s two-branch ternary would mean a new dependency and test category
+> for near-zero value. Criterion 3 wants a browser look anyway.
 
 ## Why
 
