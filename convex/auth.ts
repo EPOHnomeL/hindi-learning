@@ -2,7 +2,8 @@ import Google from "@auth/core/providers/google";
 import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
 import type { MutationCtx } from "./_generated/server";
-import { claimPendingShares } from "./lib";
+import { env } from "./env";
+import { claimPendingShares, oauthRedirectUrl } from "./lib";
 
 // Convex Auth (PRD §6 — auth must "just work"). Email + password, plus Google.
 // No JWT/cookie plumbing of our own.
@@ -43,6 +44,16 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     Google,
   ],
   callbacks: {
+    // Send an OAuth sign-in back to the host it started on. The library's default
+    // admits only SITE_URL, which under ADR 0025's host-only cookies would leave a
+    // buyer who signed in on `ywampotch.my-course.app` signed in on the apex and
+    // still signed out where they started. See `oauthRedirectUrl` in lib.ts for the
+    // host rule and why it is a security boundary.
+    async redirect({ redirectTo }) {
+      const siteUrl = env().SITE_URL;
+      if (!siteUrl) throw new Error("SITE_URL is not set — provision it as a Convex env var");
+      return oauthRedirectUrl(redirectTo, siteUrl);
+    },
     async createOrUpdateUser(genericCtx, { existingUserId, provider, profile }) {
       // Convex Auth types this callback's ctx against `AnyDataModel`, so
       // `ctx.db.query("users")` would lose our tables and indexes and the
