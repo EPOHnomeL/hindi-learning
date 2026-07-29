@@ -158,14 +158,25 @@ Gotchas:
   matters now): PayFast for SA, ZAR card + Instant EFT, priced R100–R500, owner
   as seller of record; gate ~100+ paid courses/month. Don't build Phase 2–4
   (other African countries, mobile money, India) plumbing before Phase 1 sells.
-- **Status (as of 2026-07-17):** auth-first checkout + open sign-up + the
-  marketplace are implemented and merged to `main`. Prod is provisioned with the
-  operator's LIVE merchant (`29853249`), `PAYFAST_MODE`, `PLATFORM_FEE_BPS=5000`,
-  `SITE_URL=https://my-course.app`. The **live PayFast account is pending FICA
-  verification** ("this merchant account is currently not able to receive
-  payments"), so selling should be paused (`PAYFAST_MODE=off`) until it clears.
-  Live sandbox merchant for testing was `10051521` (passphrase `jt7NOE43FZPn`);
-  never mix live and sandbox accounts.
+- **Status (as of 2026-07-29): the rail is LIVE and taking real money.** FICA
+  verification cleared and **5 real purchases have completed** on prod. Auth-first
+  checkout + open sign-up + the marketplace are implemented and merged to `main`.
+  Prod is provisioned with the operator's LIVE merchant (`29853249`),
+  `PLATFORM_FEE_BPS=5000`, `SITE_URL=https://my-course.app`.
+  - **Treat the rail as production infrastructure**: don't refactor
+    `convex/payfast.ts` or `market.startCheckout` casually, and don't test against
+    prod. The diagnosed funnel problems are *checkout abandonment* and *sign-up
+    friction* — the rail itself is not the fault (see
+    `.scratch/ywampotch-launch/PRD.md`).
+  - The earlier "pending FICA → pause selling with `PAYFAST_MODE=off`" instruction
+    is **retired**. `off` remains the kill switch in `convex/env.ts`, but nothing
+    is asking you to use it.
+  - The **dev** deployment runs `PAYFAST_MODE=sandbox` (verified 2026-07-29) —
+    sandbox merchant `10051521`, passphrase `jt7NOE43FZPn`. Never mix live and
+    sandbox accounts.
+  - Prod Convex env vars are **not readable from this machine**: `.env.local` pins
+    a *dev* deploy key, and that key wins over `--prod` (`npx convex env get X
+    --prod` silently answers for dev). Read prod env in the Convex dashboard.
 
 ## Whitelabel LMS (the end goal)
 
@@ -220,7 +231,30 @@ which decays every session — re-verify before resuming).
 - **`.claude/skills/<skill>` shared entries are directory symlinks into
   `.agents/skills/<skill>`** — not duplicates. `diff -rq` follows the symlinks
   and falsely reports them identical; `git rm -r .agents/skills` dangles every
-  `.claude` symlink and wipes the skills. Only the design-family skills
-  (banner-design, brand, design, design-system, slides, ui-styling,
-  ui-ux-pro-max, thermo-nuclear-code-quality-review) are real dirs unique to
-  `.claude/skills`. Verify with `ls -ld` / `readlink` before touching.
+  `.claude` symlink and wipes the skills. Verify with `ls -ld` / `readlink`
+  before touching.
+  - **The real (non-symlink) dirs under `.claude/skills` are** (verified
+    2026-07-29): `teach`, `html-demo-wizard`,
+    `thermo-nuclear-code-quality-review`, and the six Convex ones (`convex`,
+    `convex-create-component`, `convex-migration-helper`,
+    `convex-performance-audit`, `convex-quickstart`, `convex-setup-auth`).
+    The design-family list this note used to carry (banner-design, brand,
+    design, design-system, slides, ui-styling, ui-ux-pro-max) was already
+    wrong — those dirs exist in neither tree and were never tracked in git.
+  - **`teach` is a real dir in BOTH trees, and they have drifted.**
+    `.claude/skills/teach/SKILL.md` (188 lines) carries "Terminating a Course",
+    "Choosing the Emblem" and "The Lesson-Count Estimate";
+    `.agents/skills/teach/SKILL.md` (142 lines) does not. The Routine reads
+    `.agents/`, so those three sections are **not** reaching unattended runs.
+    Reconciling them is real work, not a formatting nit.
+- **Conventional-commit subjects on `main` are not trustworthy** — several
+  changes from the parallel-agent batches landed under the wrong message,
+  because concurrent sessions share one git index and `git commit --only <paths>`
+  was not always used. Two confirmed examples: `792a20a`
+  ("feat(auth): implement Google sign-in and improve session persistence") adds
+  **only** `.scratch/google-signin/PRD.md` — no Google provider was written, and
+  #111/#112 are still genuinely open; `02aedcb` ("feat(publish): publishedEditions
+  table…") also carries +109/+145 lines of the **tenant-admin scoping** work in
+  `convex/tenants.ts`. **Read the diff, never the subject**, and expect
+  `git blame`/`git bisect` to point at the wrong commit for anything in that
+  window (roughly 2026-07-27 → 2026-07-29).
