@@ -80,6 +80,52 @@ Failing to understand the mission will mean knowledge acquisition is not grounde
 
 Missions may change as the user develops more skills and knowledge. This is normal - make sure to update the `MISSION.md` and add a learning record to capture the change. Confirm with the user before changing the mission.
 
+## Terminating a Course
+
+A course is not infinite. Once the mission is achieved it should **end** — stop generating new lessons — rather than manufacturing busywork past the point of value. A finished course that keeps offering "just one more lesson" cheapens the achievement and wastes the learner's effort. There is *arriving*, not just endless motion.
+
+Each run, before authoring, judge the course against the mission's **"Success looks like"** outcomes (see [MISSION-FORMAT.md](./MISSION-FORMAT.md)):
+
+- **Terminate** when those outcomes are **substantially met**, or when the zone of proximal development is genuinely exhausted — the returns on another lesson have diminished to noise and you'd be padding, not teaching. This is a judgement against the mission, not a lesson count: there is no fixed syllabus length and no lesson quota.
+- **Keep going** when there is a real next step in the ZPD that advances the mission. When genuinely unsure, author the lesson: under-terminating is cheap to undo (the course reopens), whereas over-terminating robs the learner of the ending.
+
+Terminating is **not** the same as "nothing to add right now". Reporting `nothing` is a soft, re-fireable pause (the learner may complete more and fire again); terminating is the terminal end of the course. Use termination only when the mission is done, not when you're merely caught up for today.
+
+### Choosing the Emblem
+
+When you terminate, give the course an **Emblem** — the mark of its subject that appears on the certificate (see [ADR 0017](../../../docs/adr/0017-topic-emblem-on-certificates.md)). Supply both, so the certificate is never blank and always has a fallback:
+
+- **An image.** Find a fitting, recognisable image for the subject (a lotus for a Hindi course, a barbell for a fitness course). **Normalise it before uploading**: a small **square raster** — PNG, JPEG, or WebP (SVG is rejected) — roughly 256×256 and under ~100 KB, so it prints predictably and stays cheap on the anonymous page. Save it to a local file and pass its path.
+- **A fallback glyph.** A single emoji or short character for the same subject (🪷, 🏋️, 🎼). It stands in when there's no image, so always include one.
+
+The backend fetches nothing and processes nothing — it stores exactly the bytes you upload and serves them **same-origin**. The **owner** may override your choice from the app afterwards, and their choice always wins; never worry about clobbering it (the backend guarantees it).
+
+In the cloud Routine, terminate by calling the backend (the twin of `publish` / `report`) instead of authoring a lesson:
+
+```sh
+pnpm run complete:prod "$SLUG" --image ./emblem.png --glyph "🪷"
+```
+
+Both `--image` and `--glyph` are optional (a lifelong mission or a subject you can't picture may pass just a glyph, or neither — a course with no Emblem falls back to a generic 🎓). Then report `nothing` for the run. This sets the course's terminal `completed` state: the authoring gate refuses it, the reader stops offering "Generate next lesson", and an eligible learner can earn their certificate. It is reversible — the **owner** can reopen the course from the app if their goals grow later.
+
+**Lifelong or open-ended missions** (e.g. "keep improving my Hindi forever", "stay fit for life") may legitimately *never* auto-complete — there is no discrete outcome to satisfy. Do **not** force these to a finish. Leave them to the learner's own "Mark course complete" action, and keep teaching while there is a worthwhile next step in the ZPD.
+
+## The Lesson-Count Estimate
+
+Each run, alongside the outcome, report a **soft estimate** of the course's eventual size — your best guess at the **total** number of lessons the whole course will contain when it's done (not how many *remain*). The owner sees it on their dashboard, on the course card, as `~N lessons`: a rough gauge of scope while the course is still being built. It appears only mid-build — nothing shows on a freshly seeded course, and it disappears once the course is completed and the real count stands.
+
+It is a **forecast, never a quota**:
+
+- It is a **total**, a whole number — lessons already authored plus those you expect still to come.
+- **Revise it freely** each run; drift is expected and fine (±1 is nothing to worry about). A learner's question that opens new ground legitimately raises it — the number simply ticks up on the next run.
+- **Never author a lesson just to reach it.** Termination stays a judgement against the mission (see [Terminating a Course](#terminating-a-course)) — the estimate never sets a syllabus length or a lesson quota, and you must never pad the course to hit the number. If the mission is met at *fewer* lessons than you last forecast, terminate anyway; the forecast was only ever a guess. See [ADR 0018](../../../docs/adr/0018-lesson-count-estimate-advisory.md).
+
+In the cloud Routine, pass it on the final report (see [routine-prompt.md](../../../docs/routine-prompt.md) step 8):
+
+```sh
+pnpm run report:prod published "$SLUG" --estimate 8
+```
+
 ## Zone Of Proximal Development
 
 Each lesson, the user should always feel as if they are being challenged 'just enough'.
