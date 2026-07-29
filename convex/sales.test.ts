@@ -109,6 +109,68 @@ test("groups by course then edition, sums gross and counts, owed + paid both cou
   expect(tamilRow.editions).toEqual([{ lang: "en", title: "Tamil", gross: 7000, count: 1 }]);
 });
 
+test("byDay is Admin-only", async () => {
+  const t = convexTest(schema, modules);
+  const user = await seedUser(t, "u@example.com");
+  await expect(asUser(t, user).query(api.sales.byDay, {})).rejects.toThrow();
+  await expect(t.query(api.sales.byDay, {})).rejects.toThrow();
+});
+
+test("byDay buckets the window by day and splits each day by edition", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const author = await seedUser(t, "author@example.com");
+  const topicId = await t.run((ctx) =>
+    ctx.db.insert("topics", { ownerId: author, slug: "hindi", title: "Hindi", status: "completed" as const }),
+  );
+
+  // convex-test freezes the clock, so every sale lands in the same day bucket.
+  await seedSale(t, { topicId, sellerId: author, lang: "en", gross: 10000, pf: "s1" });
+  await seedSale(t, { topicId, sellerId: author, lang: "en", gross: 20000, pf: "s2", status: "paid" });
+  const third = await seedSale(t, { topicId, sellerId: author, lang: "af", gross: 5000, pf: "s3" });
+  const at = (await t.run((ctx) => ctx.db.get(third)))!._creationTime;
+
+  const DAY = 86_400_000;
+  const today = Math.floor(at / DAY) * DAY;
+
+  const days = await asUser(t, admin).query(api.sales.byDay, {});
+  const sold = days.find((d) => d.dayMs === today)!;
+  expect(sold).toMatchObject({ count: 3, gross: 35000 });
+  expect([...sold.editions].sort((a, b) => a.lang.localeCompare(b.lang))).toEqual([
+    { lang: "af", count: 1, gross: 5000 },
+    { lang: "en", count: 2, gross: 30000 },
+  ]);
+
+  // An empty window is an empty axis, not a row of zeroes.
+  expect(await asUser(t, admin).query(api.sales.byDay, { to: today })).toEqual([]);
+});
+
+test("byDay returns every day in the window, sales or not, and honours the bounds", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const author = await seedUser(t, "author@example.com");
+  const topicId = await t.run((ctx) =>
+    ctx.db.insert("topics", { ownerId: author, slug: "hindi", title: "Hindi", status: "completed" as const }),
+  );
+  const sale = await seedSale(t, { topicId, sellerId: author, lang: "en", gross: 10000, pf: "s1" });
+  const at = (await t.run((ctx) => ctx.db.get(sale)))!._creationTime;
+
+  const DAY = 86_400_000;
+  const today = Math.floor(at / DAY);
+
+  // A 7-day window ending today: 7 buckets, only the last one with a sale, so
+  // the chart draws a real timeline with visible gaps.
+  const week = await asUser(t, admin).query(api.sales.byDay, { from: (today - 6) * DAY });
+  expect(week.length).toBe(7);
+  expect(week.map((d) => d.dayMs)).toEqual([...Array(7).keys()].map((i) => (today - 6 + i) * DAY));
+  expect(week.slice(0, 6).every((d) => d.count === 0 && d.editions.length === 0)).toBe(true);
+  expect(week.at(-1)).toMatchObject({ count: 1, gross: 10000 });
+
+  // A bounded window stops at its last sale rather than padding trailing days.
+  const bounded = await asUser(t, admin).query(api.sales.byDay, { from: (today - 1) * DAY, to: (today + 5) * DAY });
+  expect(bounded.map((d) => d.dayMs)).toEqual([(today - 1) * DAY, today * DAY]);
+});
+
 test("filters by the sale timestamp; all-time returns everything", async () => {
   const t = convexTest(schema, modules);
   const admin = await seedAdmin(t, "admin@example.com");
