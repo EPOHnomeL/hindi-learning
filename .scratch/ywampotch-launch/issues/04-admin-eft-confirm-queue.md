@@ -49,8 +49,11 @@ sale has no PayFast id.
 - Confirming the **same** reference twice is a no-op — no duplicate grant, no
   duplicate Ledger row, no double-counted money.
 - Confirming for a buyer who **already holds** that Edition (bought it by card
-  meanwhile) does not create a second Entitlement, and does not silently swallow
-  the money either — decide and state which happens.
+  meanwhile) does not create a second Entitlement — that falls out of the
+  `(buyer, Topic, language)` idempotency and needs **no special handling**.
+  **Decided by the operator, 2026-07-29:** this collision is rare enough to sort
+  out by hand; do not write code, a branch or a warning for it. Whatever the
+  idempotency guard naturally does is correct. Don't reopen this.
 - The Ledger row's `sellerShare` + `platformShare` equal `net`, and `net == gross`.
 - The sale appears in the Sales tab and as `owed` to the seller in Payouts.
 - Dismissing removes the intent from the queue and grants nothing.
