@@ -156,11 +156,21 @@ Neither ADR 0022's tenant model nor 0025 nor 0023 nor 0024 contradicts current c
 
 ## 5. Facts I could not verify (stated, not guessed)
 
-- **Prod Convex env vars**, including today's `PAYFAST_MODE`. `.env.local` pins a *dev*
-  deploy key, and it **wins over `--prod`**: `npx convex env get PAYFAST_MODE --prod`
-  answers `sandbox` while printing *"Ignoring `--prod` … using deployment from
-  `CONVEX_DEPLOY_KEY`"`. That is a real footgun — it looks like a prod answer. Read
-  prod env in the Convex dashboard. Now recorded in `project-context.md`.
+- ~~**Prod Convex env vars**~~ — **resolved, and the footgun is the finding.**
+  `npx convex env get PAYFAST_MODE --prod` answers **`sandbox`** while printing
+  *"Ignoring `--prod` … using deployment from `CONVEX_DEPLOY_KEY`"*: the dev key in
+  `.env.local` wins over the flag, and the output looks exactly like a prod answer.
+  `.env.local` also holds `PROD_CONVEX_DEPLOY_KEY`, so prod **is** readable by
+  passing the key instead of the flag:
+
+  ```sh
+  CONVEX_DEPLOY_KEY="$PROD_CONVEX_DEPLOY_KEY" npx convex env get PAYFAST_MODE
+  # → live
+  ```
+
+  **Prod `PAYFAST_MODE` is `live`**, confirming the corrected Payments section from
+  the deployment's own config rather than from the handoff. Both the value and the
+  method are now in `project-context.md`.
 - **The 5 purchases** are asserted, not counted by me — real data lives only on prod.
   Corroborated in-repo by `.scratch/ywampotch-launch/issues/00-ywampotch-launch-map.md`
   ("PayFast itself is live and working (5 real purchases)"), which is independent of
@@ -221,15 +231,35 @@ No migration was performed.
 
 ## 7. Other drift found, not fixed
 
-- **`teach` skill drift (real, and it matters).** Both trees hold a *real directory*
-  (neither is a symlink). `.claude/skills/teach/SKILL.md` is **188** lines;
-  `.agents/skills/teach/SKILL.md` is **142**, and is missing exactly three sections:
+- **`teach` skill drift — found, then fixed.** Both trees hold a *real directory*
+  (neither is a symlink), so they drift silently.
+  `.claude/skills/teach/SKILL.md` was **188** lines and
+  `.agents/skills/teach/SKILL.md` **142**, missing exactly three sections:
   **"Terminating a Course"**, **"Choosing the Emblem"**, **"The Lesson-Count
-  Estimate"**. The **Routine reads `.agents/`**, so unattended runs are operating
-  without the course-termination, Emblem and lesson-count guidance — and ADR 0018
-  (lesson-count estimate) and ADR 0017 (Emblem) both describe behaviour the Routine
-  is supposed to have. Not fixed here: choosing which file is authoritative is a
-  content decision, and the two have diverged rather than one simply lagging.
+  Estimate"**. Since the **Routine reads `.agents/`**, unattended runs were authoring
+  without the course-termination, Emblem and lesson-count guidance that **ADR 0017**
+  (Emblem) and **ADR 0018** (lesson-count estimate) describe as Routine behaviour —
+  including how to *end* a course at all.
+
+  This report first called the fix a content decision. That was wrong, and a byte
+  comparison settled it: normalising line endings (`.agents` is CRLF, which is why a
+  plain `diff` reports every line changed and hides this), `.claude` is a **strict
+  superset** — identical to `.agents` apart from one contiguous 46-line insertion at
+  line 83. Nothing had been edited in both directions, so there was no authorship
+  call to make, only a lagging copy.
+
+  **Merged** the block into `.agents/skills/teach/SKILL.md`, preserving its CRLF
+  endings; the two files are now content-identical at 189 lines. The inserted block's
+  references were checked rather than assumed: `MISSION-FORMAT.md`, `AUTHORING.md`,
+  ADR 0017, ADR 0018 and `docs/routine-prompt.md` all resolve from
+  `.agents/skills/teach/` (same depth, so `../../../` is unchanged), and the CLI it
+  instructs the Routine to call is real — `--image`/`--glyph` in `scripts/complete.ts`
+  and `--estimate` in `scripts/report.ts`.
+
+  **The standing hazard remains:** these are two files, not a symlink like every other
+  shared skill. Edit one, edit the other. Making `.claude/skills/teach` a symlink into
+  `.agents/` would remove the hazard permanently, but that is a tooling change beyond
+  this sweep's remit — recommended, not done.
 - **`.scratch/whitelabel/README.md`** says the tenant is `almighty-warrior`; the slug
   everywhere else is **`almighty-warriors`**. Flagged inline; not renamed.
 - **`docs/agents/domain.md`** hasn't been touched since `6256d01` ("init commit",

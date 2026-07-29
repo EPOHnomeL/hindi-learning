@@ -174,9 +174,20 @@ Gotchas:
   - The **dev** deployment runs `PAYFAST_MODE=sandbox` (verified 2026-07-29) —
     sandbox merchant `10051521`, passphrase `jt7NOE43FZPn`. Never mix live and
     sandbox accounts.
-  - Prod Convex env vars are **not readable from this machine**: `.env.local` pins
-    a *dev* deploy key, and that key wins over `--prod` (`npx convex env get X
-    --prod` silently answers for dev). Read prod env in the Convex dashboard.
+  - **Prod `PAYFAST_MODE` is `live`** (read from prod 2026-07-29).
+  - **`--prod` does not work here — pass the key instead.** `.env.local` pins a
+    *dev* `CONVEX_DEPLOY_KEY`, and the env var **wins over `--prod`**: `npx convex
+    env get X --prod` prints *"Ignoring `--prod` … using deployment from
+    CONVEX_DEPLOY_KEY"* and answers for **dev**, which reads exactly like a prod
+    answer. `.env.local` also holds `PROD_CONVEX_DEPLOY_KEY`, so to read prod:
+
+    ```sh
+    CONVEX_DEPLOY_KEY="$PROD_CONVEX_DEPLOY_KEY" npx convex env get PAYFAST_MODE
+    ```
+
+    Same override applies to `convex env list` / `convex logs`. Prefer fetching the
+    one var you need over dumping the whole env — the PayFast merchant key and
+    passphrase live there too.
 
 ## Whitelabel LMS (the end goal)
 
@@ -241,12 +252,14 @@ which decays every session — re-verify before resuming).
     The design-family list this note used to carry (banner-design, brand,
     design, design-system, slides, ui-styling, ui-ux-pro-max) was already
     wrong — those dirs exist in neither tree and were never tracked in git.
-  - **`teach` is a real dir in BOTH trees, and they have drifted.**
-    `.claude/skills/teach/SKILL.md` (188 lines) carries "Terminating a Course",
-    "Choosing the Emblem" and "The Lesson-Count Estimate";
-    `.agents/skills/teach/SKILL.md` (142 lines) does not. The Routine reads
-    `.agents/`, so those three sections are **not** reaching unattended runs.
-    Reconciling them is real work, not a formatting nit.
+  - **`teach` is a real dir in BOTH trees — they are two files, not a symlink, so
+    they can drift silently.** They did: `.agents/skills/teach/SKILL.md` was missing
+    "Terminating a Course", "Choosing the Emblem" and "The Lesson-Count Estimate",
+    and since the **Routine reads `.agents/`**, unattended runs were authoring
+    without the course-termination, Emblem and lesson-count guidance that ADR 0017
+    and ADR 0018 assume. **Resynced 2026-07-29** — the two are now content-identical
+    (189 lines). When you edit one, edit the other, or the Routine and interactive
+    sessions will disagree again.
 - **Conventional-commit subjects on `main` are not trustworthy** — several
   changes from the parallel-agent batches landed under the wrong message,
   because concurrent sessions share one git index and `git commit --only <paths>`
