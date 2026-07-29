@@ -96,7 +96,7 @@ A **Share** the owner has promoted to write access — a User who may correct th
 _Avoid_: collaborator, co-owner, contributor, maintainer; "write access" as a *separate* grant — Editor is a role *on* a Share, not a second grant
 
 **Public link**:
-An unguessable token granting *anonymous*, read-only access to a single Topic — the account-less, capability-based counterpart to a Share. The token *is* the credential: anyone holding the link reads the Topic on the web without signing in. Minted by the Topic's owner ("make public") and revoked by turning it off or regenerating it, which invalidates the old link immediately. A Topic is **public** while a Public link is live and **private** otherwise. Confers read-only access only; a Guest writes nothing.
+An unguessable token granting *anonymous*, read-only access to a single **[[Edition]]** — the account-less, capability-based counterpart to a Share, and scoped to one language exactly as a Share is (`publicLinks` rows are keyed `(topicId, lang)`, so a Topic may have several live links, one per Edition, each revocable on its own). The token *is* the credential: anyone holding the link reads that Edition on the web without signing in, and it also sets their **[[App language]]**. Minted by the Topic's owner ("make public") and revoked by turning it off or regenerating it, which invalidates the old link immediately. An Edition is **public** while a Public link for it is live and **private** otherwise. Confers read-only access only; a Guest writes nothing.
 _Avoid_: Share (the account-bound grant), Publish (the teach→Hub push), invite, public share
 
 **Guest**:
@@ -120,8 +120,16 @@ The set of emails permitted to **create courses** ([ADR 0021](docs/adr/0021-open
 _Avoid_: Whitelist, allowed emails, AUTH_ALLOWED_EMAILS (the retired env-var form); "admission gate" / "sign-up gate" (the pre-ADR-0021 meaning)
 
 **Admin**:
-The single User who governs the Allowlist — adds and removes emails permitted to create courses. Site-wide and distinct from a Topic's **owner** (a User owns the Topics they create; the Admin owns who may create them). Exactly one Admin exists; the Admin's own row is fixed and cannot be removed through the portal.
-_Avoid_: Owner (that is the Topic owner), superuser, moderator
+A User who governs the **Allowlist** — adds and removes emails permitted to create courses — and, for a [[Tenant]], that tenant's theme, flags, courses and members. An Admin is an `isAdmin` row in the Allowlist, and comes in **two scopes** ([ADR 0022 §4](docs/adr/0022-tenant-subdomain-model.md), superseding ADR 0011's one-Admin invariant): a **sys admin** (no `tenantSlug` — governs every tenant and the platform-wide sections: Allowlist, Sales, Payouts, Generation) and a **tenant admin** (a `tenantSlug` — governs that one tenant and sees nothing else). The scope is the client seam too: `whitelist.myAdminScope` answers `sys | tenant | none`, and `isCallerAdmin(ctx, tenantSlug?)` with no argument means "is sys admin". Distinct from a Topic's **owner** (a User owns the Topics they create; an Admin owns who may create them) and from **[[Publishing]]**, which is owner-only and *not* an Admin power. Several Admins may exist; an Admin's own row is shown but cannot be removed through the portal.
+_Avoid_: Owner (that is the Topic owner), superuser, moderator; "the Admin" as a singular global person (retired with the two-tier model)
+
+**Tenant**:
+One **branded site** served by the single codebase — the unit of whitelabelling. Identified by a `slug` that is also its host (`<slug>.my-course.app`, resolved from the request host by the middleware), and carrying its own `displayName`, `motto`, logo/favicon, colour `theme` and **feature flags**. Current tenants: `upf`, `ywampotch`, `almighty-warriors`, `yknot`; the apex domain is the *default site*, which is **not** a tenant (its slug is `null`). A tenant scopes what its members see and hold: the [[Catalogue]] is per-tenant, an [[Admin]] may be scoped to one tenant, and — since [ADR 0025](docs/adr/0025-per-tenant-session-isolation.md) — a **session, [[App language]] and theme are per-tenant too** (signing in on one subdomain signs you in on that subdomain only). A Topic belongs to at most one tenant; a Topic with none belongs to the default site.
+_Avoid_: Client, customer, organisation, workspace, brand (that is the *styling* of a tenant, not the tenant), site (ambiguous with the default site)
+
+**Feature flag**:
+A per-**[[Tenant]]** on/off switch for a capability, stored as one of five flat required booleans on `tenants.flags` — `certificates`, `translations`, `publicLinks`, `qa`, `seeding` (course creation). Enforced explicitly by `assertTenantFlag(ctx, tenantSlug, flag)` called from each gated mutation, never woven into the access resolvers (`getOwnedTopic` / `getViewableTopic` stay flag-agnostic). **Frozen, not revoked**: turning a flag off blocks *new* grants and actions but never destroys what already exists — an issued [[Certificate]] stays valid, a live [[Public link]] stays live. A flag added after the v1 migration defaults `false`.
+_Avoid_: Toggle, setting, permission, entitlement (that is the paid access row), plan/tier
 
 ## Productisation (proposed — [ADR 0014](docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md))
 
@@ -141,7 +149,11 @@ These name the concepts of the **paid course marketplace** built on top of the f
 
 **Entitlement**:
 An account's purchased, permanent right to read a paid **Edition** — a `(Topic, language)` pair — past its free first Lesson (the **Preview**), including that Edition's References. One per (buyer, Topic, language), created when a purchase succeeds (minted only by the verified PayFast **ITN**, never the client redirect) and never expiring (one-time, lifetime). The presence of the row *is* the access; it attributes to an account (like a Certificate) and never to a Guest. It is the **paid counterpart to a language-scoped Share** — bought, not granted — and, like a Share, is scoped to one Edition: buying the Spanish Edition does not unlock the Urdu one.
-_Avoid_: Purchase, licence, subscription (it is one-time, not recurring), access grant, enrollment (the deferred per-learner-progress concept — not this)
+_Avoid_: Purchase, licence, subscription (it is one-time, not recurring), access grant; **[[Enrollment]]** (a distinct, now-built primitive — the *free* self-join, not the paid right)
+
+**Enrollment**:
+A learner's own, **self-initiated** read access to one **[[Edition]]** of a *free, [[Publishing|published]]* course — the fifth access primitive ([ADR 0023](docs/adr/0023-self-enroll-access-primitive.md)), and the only one the holder grants themselves. Kept as its own `enrollments` table rather than folded into `shares` or `entitlements` so a self-join is never mislabelled to the learner as "Shared with me" or a purchase: it is a *discovery* act. One row per (User, Topic, language); the presence of the row **is** the access, and an enrolled learner is treated ≡ a **[[Viewer]]** of that Edition everywhere (read access, own [[Progress]], [[Certificate]] eligibility), scoped to that one language. **Permanent and grandfathered** like an [[Entitlement]]: later pricing a formerly-free Edition keeps existing enrollees in and only stops *new* free joins. Writable only while the Edition is free and published.
+_Avoid_: Entitlement (that is bought), Share (that is granted by the owner), Join, membership, registration, sign-up (that is account creation)
 
 **Seller**:
 A User the **Admin** has explicitly granted the **can-sell** capability (a per-user flag in the admin portal, *distinct from* the Allowlist that gates course creation) **and** who has saved **payout bank details** in-app — the SA bank account the operator EFTs their **Ledger** share to. No external onboarding: a Seller never registers a payment account. A Seller chooses which **Editions** (specific languages) of a finished course to sell and sets a price on **each Edition independently**, in Rand. Being on the **Allowlist** lets you *create courses*; the can-sell grant lets you *charge* for them.
