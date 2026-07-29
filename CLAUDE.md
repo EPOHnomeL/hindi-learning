@@ -28,9 +28,15 @@ file above instead. Context must travel with the repo, not the computer.
   mid-edit in. Push only when asked.
 - **`.env` is the user's** — never edit/`sed`/`cp` it; tell the user the exact
   line to change. Reading config at runtime is fine.
-- **Issues live on GitHub** (reenabled 2026-07-24, after a brief 2026-07-15
-  local-only retirement). Use `gh issue` for tracking; `.scratch/<feature>/`
-  still holds PRDs and any scoping notes that don't belong as an issue body.
+- **Issues have two homes, split by kind** (2026-07-29). **Implementation work →
+  local Markdown** under `.scratch/<feature>/issues/`, beside its PRD — it gets
+  built and then the commits are the record. **GitHub (`gh issue`) is reserved
+  for non-ephemeral, non-implementation tickets**: planning, scoping, product
+  decisions, open forks, anything a collaborator reads or comments on. Test:
+  if nobody but the implementing agent needs to read it, it is local. Issues
+  filed before 2026-07-29 predate the split — GitHub still holds many
+  implementation tickets, grandfathered, not a precedent. See
+  `docs/agents/issue-tracker.md`.
 
 ## Feature workflow
 
@@ -38,14 +44,17 @@ For any non-trivial feature or change, do **not** use plan mode. Follow this pip
 
 1. **Grill** — run the `grilling` skill to stress-test the idea and pin down requirements.
 2. **PRD** — capture the agreed scope as a PRD under `.scratch/<feature>/` (see Issue tracker).
-3. **Issues** — break the PRD into GitHub issues (`gh issue create`), one per unit of work.
+3. **Issues** — break the PRD into tickets, one per unit of work, in the home its
+   kind calls for (see Issue tracker above — implementation work is local).
 4. **Implement** — build each issue with the `tdd` skill (test-first) and the `ponytail` skill (laziest solution that works).
 
 ## Agent skills
 
 ### Issue tracker
 
-Issues live on GitHub (reenabled 2026-07-24); PRDs live locally as `.scratch/<feature>/PRD.md`. See `docs/agents/issue-tracker.md`.
+Two homes, split by kind: implementation tickets are local Markdown under `.scratch/<feature>/issues/`;
+GitHub is for non-ephemeral, non-implementation tickets (planning, decisions, collaboration). PRDs live
+locally as `.scratch/<feature>/PRD.md`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
