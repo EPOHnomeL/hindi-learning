@@ -170,7 +170,6 @@
     "bankGuidance": "<b>¿Tu banco no aparece en Instant EFT?</b> Elige Credit & Cheque card: funciona con todos los bancos.",
     "purchaseAgreement": "Al comprar aceptas los <terms>Términos</terms> y la <refund>Política de reembolsos</refund>.",
     "payByEft": "Pagar por transferencia bancaria (EFT)",
-    "eftTitle": "Datos de la transferencia bancaria",
     "eftBody": "Transfiere {price} a la cuenta de abajo, usando la referencia exactamente como aparece: así asociamos tu pago con tu cuenta.",
     "eftReference": "Tu referencia",
     "eftAccountName": "Titular de la cuenta",

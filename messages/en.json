@@ -202,7 +202,6 @@
     "bankGuidance": "<b>Bank not listed under Instant EFT?</b> Choose Credit & Cheque card — it works with every bank.",
     "purchaseAgreement": "By purchasing you agree to the <terms>Terms</terms> and <refund>Refund Policy</refund>.",
     "payByEft": "Pay by bank transfer (EFT)",
-    "eftTitle": "Bank transfer details",
     "eftBody": "Transfer {price} to the account below, using the reference exactly as shown — that's how we match your payment to your account.",
     "eftReference": "Your reference",
     "eftAccountName": "Account name",

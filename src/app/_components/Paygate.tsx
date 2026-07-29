@@ -217,24 +217,37 @@ function BuyDialog({
         )}
       </div>
 
-      <div className="mt-4 flex items-start gap-3 rounded-xl border border-line bg-hi/40 p-3.5 text-sm leading-relaxed text-soft">
-        <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-accent2" />
-        <span>{t("unlockDialogBody", { edition: editionName ?? t("thisLanguage") })}</span>
-      </div>
+      {/* Everything below the course + price is for the buyer who has NOT chosen a
+          method yet. Once they're on the transfer screen, the sales pitch, the
+          PayFast bank guidance and the card reassurance are all noise in front of
+          the numbers they came to copy — so that screen is the panel and nothing
+          else. */}
+      {!eft && (
+        <>
+          <div className="mt-4 flex items-start gap-3 rounded-xl border border-line bg-hi/40 p-3.5 text-sm leading-relaxed text-soft">
+            <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-accent2" />
+            <span>{t("unlockDialogBody", { edition: editionName ?? t("thisLanguage") })}</span>
+          </div>
 
-      {/* Bank-to-method guidance — the last surface we own before PayFast's hosted
-          picker, which is theirs to word. PayFast advertises 9 Instant EFT banks
-          but renders only 5 on this account (Absa, Standard Bank, Capitec and
-          African Bank are absent), so a buyer at one of those banks picks the
-          tile that sounds right, finds no bank, and abandons. "Credit & Cheque
-          card" is the answer for all of them, so that's all this says. Both tile
-          names are quoted VERBATIM from PayFast's picker and stay English in every
-          locale — a translated label is one the buyer can't find on screen.
-          ponytail: hardcodes PayFast's CURRENT coverage. If they restore the four
-          banks, delete this note and the `bankGuidance` key rather than editing it. */}
-      <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">
-        {t.rich("bankGuidance", { b: (c) => <b className="font-semibold text-ink">{c}</b> })}
-      </p>
+          {/* Bank-to-method guidance — the last surface we own before PayFast's
+              hosted picker, which is theirs to word. PayFast advertises 9 Instant
+              EFT banks but renders only 5 on this account (Absa, Standard Bank,
+              Capitec and African Bank are absent), so a buyer at one of those banks
+              picks the tile that sounds right, finds no bank, and abandons. "Credit
+              & Cheque card" is the answer for all of them, so that's all this says.
+              Both tile names are quoted VERBATIM from PayFast's picker and stay
+              English in every locale — a translated label is one the buyer can't
+              find on screen. Deliberately NOT shown on the bank-transfer screen: a
+              buyer who chose to transfer directly is never going to see PayFast's
+              picker, so there it is only clutter about a competing method.
+              ponytail: hardcodes PayFast's CURRENT coverage. If they restore the
+              four banks, delete this note and the `bankGuidance` key rather than
+              editing it. */}
+          <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">
+            {t.rich("bankGuidance", { b: (c) => <b className="font-semibold text-ink">{c}</b> })}
+          </p>
+        </>
+      )}
 
       {eft ? (
         <EftInstructions ref_={eft.ref} amount={eft.amount} bank={eft.bank} currency={"zar"} />
@@ -277,9 +290,11 @@ function BuyDialog({
       {error ? (
         <p className="mt-2.5 text-center text-xs text-danger">{error}</p>
       ) : (
-        <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-xs text-soft">
-          <Icon name="globe" className="h-3.5 w-3.5 text-accent2" /> {t("payFastNoteShort")}
-        </p>
+        !eft && (
+          <p className="mt-2.5 flex items-center justify-center gap-1.5 text-center text-xs text-soft">
+            <Icon name="globe" className="h-3.5 w-3.5 text-accent2" /> {t("payFastNoteShort")}
+          </p>
+        )
       )}
       {/* Point-of-sale compliance: the refund policy (all sales final) linked where the buyer commits. */}
       <p className="mt-1 text-center text-xs text-soft">
@@ -315,31 +330,36 @@ function EftInstructions({
   const t = useTranslations("Checkout");
   if (!bank) return null;
   return (
-    <div className="mt-4 rounded-xl border border-gold/40 bg-gold/10 p-3.5">
-      <b className="block text-sm font-semibold text-ink">{t("eftTitle")}</b>
-      <p className="mt-1 text-xs leading-relaxed text-soft">
-        {t("eftBody", { price: formatPrice(amount, currency) })}
-      </p>
-      <div className="mt-3 rounded-lg border border-gold/50 bg-card px-3 py-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-accent2">{t("eftReference")}</span>
-        <b className="block select-all text-lg font-bold tracking-wider text-ink">{ref_}</b>
+    <div className="mt-4 rounded-xl border border-gold/40 bg-gold/10 p-4">
+      <p className="text-sm leading-relaxed text-soft">{t("eftBody", { price: formatPrice(amount, currency) })}</p>
+
+      {/* The reference and the account are what the buyer is here to copy into a
+          banking app — often on a phone, sometimes retyped by hand — so they are set
+          at reading size and left selectable, and nothing competes with them. */}
+      <div className="mt-3.5 rounded-lg border border-gold/50 bg-card px-4 py-3">
+        <span className="text-xs font-semibold uppercase tracking-wide text-accent2">{t("eftReference")}</span>
+        <b className="mt-0.5 block select-all text-2xl font-bold tracking-[0.12em] text-ink">{ref_}</b>
       </div>
-      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+      <dl className="mt-3.5 flex flex-col gap-2 rounded-lg border border-gold/50 bg-card px-4 py-3 text-[15px]">
         {(
           [
-            [t("eftAccountName"), bank.accountHolder],
-            [t("eftBankLabel"), bank.bank],
-            [t("eftAccountNumber"), bank.accountNumber],
-            [t("eftBranchCode"), bank.branchCode],
+            [t("eftAccountName"), bank.accountHolder, false],
+            [t("eftBankLabel"), bank.bank, false],
+            [t("eftAccountNumber"), bank.accountNumber, true],
+            [t("eftBranchCode"), bank.branchCode, true],
           ] as const
-        ).map(([label, value]) => (
-          <div key={label} className="col-span-2 flex justify-between gap-3">
-            <dt className="text-soft">{label}</dt>
-            <dd className="select-all font-medium tabular-nums text-ink">{value}</dd>
+        ).map(([label, value, numeric]) => (
+          <div key={label} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5">
+            <dt className="text-sm text-soft">{label}</dt>
+            <dd
+              className={`select-all font-semibold text-ink ${numeric ? "text-lg tabular-nums tracking-wide" : ""}`}
+            >
+              {value}
+            </dd>
           </div>
         ))}
       </dl>
-      <p className="mt-3 text-xs leading-relaxed text-soft">{t("eftWait")}</p>
+      <p className="mt-3.5 text-xs leading-relaxed text-soft">{t("eftWait")}</p>
     </div>
   );
 }

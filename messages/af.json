@@ -170,7 +170,6 @@
     "bankGuidance": "<b>Word jou bank nie onder Instant EFT gelys nie?</b> Kies Credit & Cheque card — dit werk met elke bank.",
     "purchaseAgreement": "Deur aan te koop, stem jy in tot die <terms>Bepalings</terms> en <refund>Terugbetalingsbeleid</refund>.",
     "payByEft": "Betaal met bankoorbetaling (EFT)",
-    "eftTitle": "Bankoorbetaling-besonderhede",
     "eftBody": "Betaal {price} oor na die rekening hieronder, en gebruik die verwysing presies soos dit wys — so pas ons jou betaling by jou rekening.",
     "eftReference": "Jou verwysing",
     "eftAccountName": "Rekeningnaam",
