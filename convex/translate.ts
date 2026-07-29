@@ -232,7 +232,20 @@ export const tryAcquireTranslation = internalMutation({
     // rows from a prior (dead) run are kept, so the count resumes, not restarts —
     // the run itself skips them via `collectForTranslation`.
     let done = 0;
-    if (!forced) for (const it of items) if (await isFresh(ctx, topic._id, lang, it)) done++;
+    if (forced) {
+      // A full redo discards the old engine's work outright. Resetting `done` was
+      // never enough on its own: the rows survived, and `isFresh` is engine-blind,
+      // so a forced redo that died halfway left the NEXT (unforced) resume reading
+      // them as "already done" and skipping the items the switch existed to redo.
+      // Deleting them is also what keeps `done` an honest count of rows landed.
+      for (const row of await ctx.db
+        .query("translations")
+        .withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topic._id).eq("lang", lang))
+        .collect())
+        await ctx.db.delete(row._id);
+    } else {
+      for (const it of items) if (await isFresh(ctx, topic._id, lang, it)) done++;
+    }
     const patch = {
       status: "translating" as const,
       total: items.length,
@@ -584,8 +597,8 @@ export const publishTranslation = mutation({
     text: v.optional(v.string()),
     reply: v.optional(v.string()),
   },
-  returns: v.object({ status: v.union(v.literal("saved"), v.literal("skipped")) }),
-  handler: async (ctx, a): Promise<{ status: "saved" | "skipped" }> => {
+  returns: v.object({ status: v.union(v.literal("saved"), v.literal("skipped"), v.literal("unchanged")) }),
+  handler: async (ctx, a): Promise<{ status: "saved" | "skipped" | "unchanged" }> => {
     assertAdmin(a.secret);
     const owner = await ctx.db.query("users").withIndex("email", (q) => q.eq("email", a.ownerEmail)).unique();
     if (!owner) throw new Error("owner not found");
@@ -627,12 +640,30 @@ export const publishTranslation = mutation({
         q.eq("topicId", topic._id).eq("lang", a.lang).eq("kind", a.kind).eq("key", a.key),
       )
       .unique();
-    if (existing) await ctx.db.replace(existing._id, row);
-    else await ctx.db.insert("translations", row);
-    // The tick doubles as the run's heartbeat: while items keep landing, the
-    // lock stays held; silence past STALE_MS marks the run dead (re-fireable).
-    await ctx.db.patch(job._id, { done: job.done + 1, claimedAt: Date.now() });
-    return { status: "saved" };
+    // `done` counts ITEMS LANDED, so only a first landing ticks it. The run
+    // publishes once per wave over the whole workspace (SKILL.md mandates it, to
+    // bank each drained wave), so every later wave re-sends every earlier item —
+    // a per-save tick made `done` the number of publish calls instead, and on a
+    // 56-lesson course it sailed past `total` (a real run hit 102/59). That did
+    // more than skew the bar: `reportTranslation` derived `failed` by subtracting
+    // `done` from `total`, so an inflated counter clamped `failed` to 0 and a
+    // half-translated Edition reported complete — silently disabling the one
+    // signal that catches a preempted agent, worst on the longest courses.
+    const unchanged =
+      existing !== null &&
+      existing.title === row.title &&
+      existing.html === row.html &&
+      existing.text === row.text &&
+      existing.reply === row.reply &&
+      existing.sourceHash === row.sourceHash;
+    if (!unchanged) {
+      if (existing) await ctx.db.replace(existing._id, row);
+      else await ctx.db.insert("translations", row);
+    }
+    // The heartbeat is re-stamped either way — a wave of re-publishes is the run
+    // very much alive, and letting it look dead would hand the lock to a rival.
+    await ctx.db.patch(job._id, { done: existing ? job.done : job.done + 1, claimedAt: Date.now() });
+    return { status: unchanged ? "unchanged" : "saved" };
   },
 });
 
@@ -659,7 +690,23 @@ export const reportTranslation = mutation({
     if (!job) return null;
     const clear = { claimedAt: undefined, runId: undefined };
     if (outcome === "ready") {
-      await ctx.db.patch(job._id, { status: "ready", failed: Math.max(0, job.total - job.done), error: undefined, ...clear });
+      // Count what actually landed rather than subtracting `done` from `total`.
+      // The report runs exactly once per run, so re-walking the items is cheap —
+      // and it makes `failed` independent of the counter's bookkeeping, which is
+      // the property that matters: a wrong counter must never be able to report a
+      // half-translated Edition as complete. It also heals a `done` inflated by a
+      // pre-fix run, so an existing Edition comes right without a re-translate.
+      const items = await collectItems(ctx, topic);
+      let landed = 0;
+      for (const it of items) if (await isFresh(ctx, topic._id, lang, it)) landed++;
+      await ctx.db.patch(job._id, {
+        status: "ready",
+        total: items.length,
+        done: landed,
+        failed: Math.max(0, items.length - landed),
+        error: undefined,
+        ...clear,
+      });
     } else {
       await ctx.db.patch(job._id, { status: "failed", error: error ?? "translation run failed", ...clear });
     }

@@ -248,6 +248,38 @@ test("engine defaults to gemini; a different engine flips it and forces done:0; 
   expect(await jobRow()).toMatchObject({ engine: "free", done: 0 });
 });
 
+test("a forced engine switch DELETES the old engine's rows — `done: 0` alone left them to be miscounted as fresh on a later resume", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  await addLesson(t, topicId, "0001", 1); // items = title + lesson = 2
+  const a = asUser(t, alice);
+  const rows = () =>
+    t.run((ctx) => ctx.db.query("translations").withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "es")).collect());
+
+  // A completed gemini run: both items translated and fresh.
+  await a.mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "gemini" });
+  const secret = "test-secret";
+  await t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "title", key: "", text: "Hindi (gemini)" });
+  await t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "lesson", key: "0001", title: "L", html: "<p>gemini</p>" });
+  await t.mutation(api.translate.reportTranslation, { secret, topicSlug: "hindi", lang: "es", outcome: "ready" });
+  expect(await rows()).toHaveLength(2);
+
+  // The owner switches engine. `forced` exists precisely because per-item
+  // freshness is engine-blind and would mistake the old engine's rows for "already
+  // done" — but resetting `done` never removed them, so a forced redo that died
+  // halfway left a later (unforced) resume skipping the very items it had to redo.
+  // Discarding the rows is what actually delivers the intent.
+  const switched = await a.mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "free" });
+  expect(switched).toMatchObject({ acquired: true, engine: "free", forced: true });
+  expect(await rows()).toHaveLength(0);
+  // With the rows gone, nothing can read as fresh — the redo really is full.
+  const job = await t.run((ctx) =>
+    ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique(),
+  );
+  expect(job).toMatchObject({ engine: "free", done: 0, total: 2 });
+});
+
 test("claimTranslation only grabs free jobs — a gemini (or absent-engine) job is never claimed", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
@@ -368,6 +400,92 @@ test("publishTranslation no longer quiz-guards a blob-backed source (body unread
       .unique(),
   );
   expect(row).toMatchObject({ kind: "lesson", key: "0001", html: "<div></div>" });
+});
+
+test("re-publishing an identical item is `unchanged` — a cumulative wave re-publish must not inflate `done` or mask a missing item", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  await addLesson(t, topicId, "0001", 1);
+  await addLesson(t, topicId, "0002", 2); // items = title + 2 lessons = 3
+  const secret = "test-secret";
+  const pub = (kind: "title" | "lesson", key: string, fields: { title?: string; html?: string; text?: string }) =>
+    t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind, key, ...fields });
+  const jobRow = () =>
+    t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
+
+  await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "free" });
+  await t.mutation(api.translate.claimTranslation, { secret, runId: "r1" });
+
+  // Wave 1 lands the title + lesson 0001.
+  expect(await pub("title", "", { text: "Hindi (es)" })).toEqual({ status: "saved" });
+  expect(await pub("lesson", "0001", { title: "Lección", html: "<p>es 1</p>" })).toEqual({ status: "saved" });
+  expect((await jobRow())!.done).toBe(2);
+
+  // Wave 2's publish is cumulative — the routine re-sends everything in the
+  // workspace every wave (SKILL.md mandates it), so wave 1's items arrive again
+  // byte-identical. That is a no-op, not progress: the docs promise the publish
+  // script is idempotent, and `done` is what has to honour it.
+  expect(await pub("title", "", { text: "Hindi (es)" })).toEqual({ status: "unchanged" });
+  expect(await pub("lesson", "0001", { title: "Lección", html: "<p>es 1</p>" })).toEqual({ status: "unchanged" });
+  expect((await jobRow())!.done).toBe(2);
+
+  // Lesson 0002's agent was silently preempted — it never landed. Reporting ready
+  // must still count it failed. When `done` accumulated per save this was
+  // `max(0, 3 - 4)` → 0, so a half-translated Edition reported as complete: the
+  // longer the course (the more waves), the more reliably the signal was lost.
+  await t.mutation(api.translate.reportTranslation, { secret, topicSlug: "hindi", lang: "es", outcome: "ready" });
+  expect(await jobRow()).toMatchObject({ status: "ready", total: 3, done: 2, failed: 1 });
+});
+
+test("a re-published item whose content CHANGED still saves and ticks (the unchanged short-circuit must not swallow a real revision)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  await addLesson(t, topicId, "0001", 1); // items = title + lesson = 2
+  const secret = "test-secret";
+  const pub = (html: string) =>
+    t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "lesson", key: "0001", title: "Lección", html });
+  const jobRow = () =>
+    t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
+
+  await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "free" });
+  expect(await pub("<p>first pass</p>")).toEqual({ status: "saved" });
+  // A re-queued file (quiz drift, mismatch fix) comes back with different markup —
+  // it must overwrite, and it counts as the item's progress.
+  expect(await pub("<p>second pass</p>")).toEqual({ status: "saved" });
+  expect((await jobRow())!.done).toBe(1); // one item, counted once — not twice
+  const row = await t.run((ctx) =>
+    ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "es").eq("kind", "lesson").eq("key", "0001"))
+      .unique(),
+  );
+  expect(row).toMatchObject({ html: "<p>second pass</p>" });
+});
+
+test("reportTranslation heals a `done` already poisoned by a pre-fix run", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  await addLesson(t, topicId, "0001", 1); // items = title + lesson = 2
+  const secret = "test-secret";
+  await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "free" });
+  await t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "title", key: "", text: "Hindi (es)" });
+  await t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "lesson", key: "0001", title: "Lección", html: "<p>es</p>" });
+  // Stand in for an Edition whose counter was inflated by cumulative re-publishing
+  // before the fix (the live Slovak run reached 102/59).
+  await t.run(async (ctx) => {
+    const job = await ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique();
+    await ctx.db.patch(job!._id, { done: 102 });
+  });
+  // Reporting counts the real rows rather than subtracting the counter, so the
+  // Edition lands truthful without a re-translate.
+  await t.mutation(api.translate.reportTranslation, { secret, topicSlug: "hindi", lang: "es", outcome: "ready" });
+  const job = await t.run((ctx) =>
+    ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique(),
+  );
+  expect(job).toMatchObject({ status: "ready", total: 2, done: 2, failed: 0 });
 });
 
 test("the translate Routine seams reject a bad secret", async () => {
