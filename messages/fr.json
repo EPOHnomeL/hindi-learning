@@ -168,7 +168,18 @@
     "checkoutFailed": "Impossible de démarrer le paiement — veuillez réessayer.",
     "payFastNoteShort": "Paiement sécurisé · payez une fois, gardez à vie",
     "bankGuidance": "<b>Votre banque n'apparaît pas sous Instant EFT ?</b> Choisissez Credit & Cheque card — cela fonctionne avec toutes les banques.",
-    "purchaseAgreement": "En achetant, vous acceptez les <terms>Conditions</terms> et la <refund>Politique de remboursement</refund>."
+    "purchaseAgreement": "En achetant, vous acceptez les <terms>Conditions</terms> et la <refund>Politique de remboursement</refund>.",
+    "payByEft": "Payer par virement bancaire (EFT)",
+    "eftTitle": "Coordonnées pour le virement",
+    "eftBody": "Virez {price} sur le compte ci-dessous, en utilisant la référence exactement telle qu'elle apparaît : c'est ainsi que nous rattachons votre paiement à votre compte.",
+    "eftReference": "Votre référence",
+    "eftAccountName": "Titulaire du compte",
+    "eftBankLabel": "Banque",
+    "eftAccountNumber": "Numéro de compte",
+    "eftBranchCode": "Code d'agence",
+    "eftWait": "Votre accès s'ouvre dès que nous avons rapproché le virement, généralement sous un jour ouvré. Nous vous enverrons un e-mail dès qu'il est actif.",
+    "eftPendingNote": "Nous attendons votre virement bancaire (référence {ref}). Votre accès s'ouvrira dès qu'il sera rapproché.",
+    "eftFailed": "Impossible de démarrer le virement bancaire — veuillez réessayer."
   },
   "Settings": {
     "title": "Paramètres",

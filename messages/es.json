@@ -168,7 +168,18 @@
     "checkoutFailed": "No se pudo iniciar el pago — inténtalo de nuevo.",
     "payFastNoteShort": "Pago seguro · paga una vez, consérvalo para siempre",
     "bankGuidance": "<b>¿Tu banco no aparece en Instant EFT?</b> Elige Credit & Cheque card: funciona con todos los bancos.",
-    "purchaseAgreement": "Al comprar aceptas los <terms>Términos</terms> y la <refund>Política de reembolsos</refund>."
+    "purchaseAgreement": "Al comprar aceptas los <terms>Términos</terms> y la <refund>Política de reembolsos</refund>.",
+    "payByEft": "Pagar por transferencia bancaria (EFT)",
+    "eftTitle": "Datos de la transferencia bancaria",
+    "eftBody": "Transfiere {price} a la cuenta de abajo, usando la referencia exactamente como aparece: así asociamos tu pago con tu cuenta.",
+    "eftReference": "Tu referencia",
+    "eftAccountName": "Titular de la cuenta",
+    "eftBankLabel": "Banco",
+    "eftAccountNumber": "Número de cuenta",
+    "eftBranchCode": "Código de sucursal",
+    "eftWait": "Tu acceso se abre en cuanto localicemos la transferencia, normalmente en un día laborable. Te enviaremos un correo en cuanto esté activo.",
+    "eftPendingNote": "Estamos esperando tu transferencia bancaria (referencia {ref}). Tu acceso se abrirá en cuanto la localicemos.",
+    "eftFailed": "No se pudo iniciar la transferencia bancaria: inténtalo de nuevo."
   },
   "Settings": {
     "title": "Ajustes",

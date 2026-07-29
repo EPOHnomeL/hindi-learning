@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
@@ -74,6 +74,15 @@ export function Paygate({
   const t = useTranslations("Checkout");
   const [buying, setBuying] = useState(!!autoOpenBuy && !buyHref);
   const price = paywall ? formatPrice(paywall.amount, paywall.currency) : null;
+  // A pending bank transfer (manual EFT rail): an EFT clears in hours or days, so
+  // a buyer who comes back before the operator confirms must see that we're
+  // waiting for their money — the bare paygate reappearing reads as "my payment
+  // failed". Reactive: it clears itself the moment the confirmation grants access.
+  // Skipped in the Guest reader (`buyHref`), where there's no signed-in account.
+  const pendingEft = useQuery(
+    api.eft.myEftIntent,
+    topicSlug && lang && !buyHref ? { topicSlug, lang } : "skip",
+  );
   const heading = kind === "reference" ? t("referenceLockedTitle") : t("courseLockedTitle");
   const ctaClass =
     "rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90";
@@ -102,10 +111,16 @@ export function Paygate({
           )}
           {price && <span className="text-2xl font-semibold tabular-nums text-ink">{price}</span>}
         </div>
-        <p className="mt-3 flex items-center gap-1.5 text-xs text-soft">
-          <Icon name="globe" className="h-3.5 w-3.5 text-accent2" />
-          {t("payFastNote")}
-        </p>
+        {pendingEft ? (
+          <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">
+            {t("eftPendingNote", { ref: pendingEft.ref })}
+          </p>
+        ) : (
+          <p className="mt-3 flex items-center gap-1.5 text-xs text-soft">
+            <Icon name="globe" className="h-3.5 w-3.5 text-accent2" />
+            {t("payFastNote")}
+          </p>
+        )}
       </div>
       {buying && !buyHref && (
         <BuyDialog
@@ -148,6 +163,16 @@ function BuyDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const canBuy = !!topicSlug && !!lang;
+
+  // The manual EFT rail. `eftDetails` is null whenever the rail is off (or
+  // unconfigured), so the second option simply doesn't exist then — and the
+  // mutation refuses it server-side regardless. A pending intent from an earlier
+  // visit shows the same instructions, so the buyer never loses their reference.
+  const eftBank = useQuery(api.eft.eftDetails);
+  const pendingEft = useQuery(api.eft.myEftIntent, canBuy ? { topicSlug: topicSlug!, lang: lang! } : "skip");
+  const startEft = useMutation(api.eft.startEftPurchase);
+  const [startedEft, setStartedEft] = useState<{ ref: string; amount: number; bank: typeof eftBank } | null>(null);
+  const eft = startedEft ?? pendingEft;
 
   const checkout = async () => {
     if (!canBuy) return;
@@ -211,20 +236,44 @@ function BuyDialog({
         {t.rich("bankGuidance", { b: (c) => <b className="font-semibold text-ink">{c}</b> })}
       </p>
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void checkout();
-        }}
-      >
-        <button
-          type="submit"
-          disabled={!canBuy || busy}
-          className="mt-4 w-full rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
+      {eft ? (
+        <EftInstructions ref_={eft.ref} amount={eft.amount} bank={eft.bank} currency={"zar"} />
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void checkout();
+          }}
         >
-          {busy ? t("redirecting") : price ? `${t("continueToPayFast")} · ${price}` : t("continueToPayFast")}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={!canBuy || busy}
+            className="mt-4 w-full rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            {busy ? t("redirecting") : price ? `${t("continueToPayFast")} · ${price}` : t("continueToPayFast")}
+          </button>
+          {eftBank && (
+            <button
+              type="button"
+              disabled={!canBuy || busy}
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                try {
+                  setStartedEft(await startEft({ topicSlug: topicSlug!, lang: lang! }));
+                } catch {
+                  setError(t("eftFailed"));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className="mt-2 w-full rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-gold disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {t("payByEft")}
+            </button>
+          )}
+        </form>
+      )}
       {error ? (
         <p className="mt-2.5 text-center text-xs text-danger">{error}</p>
       ) : (
@@ -240,5 +289,57 @@ function BuyDialog({
         })}
       </p>
     </Dialog>
+  );
+}
+
+// What the buyer needs to make the transfer: the amount, the operator's account,
+// and — the whole mechanism — THEIR reference. Without the reference the operator
+// receives a transfer labelled with someone's surname and has to work out by hand
+// who bought which Edition, which is the step that breaks first, and it breaks
+// silently, in money. So the reference is the loudest thing on the panel.
+//
+// No proof-of-payment upload (ticket 03, out of scope): the bank statement already
+// tells the operator what arrived. Access is granted when the operator confirms —
+// nothing here grants anything.
+function EftInstructions({
+  ref_,
+  amount,
+  bank,
+  currency,
+}: {
+  ref_: string;
+  amount: number;
+  bank: { accountHolder: string; bank: string; accountNumber: string; branchCode: string } | null | undefined;
+  currency: string;
+}) {
+  const t = useTranslations("Checkout");
+  if (!bank) return null;
+  return (
+    <div className="mt-4 rounded-xl border border-gold/40 bg-gold/10 p-3.5">
+      <b className="block text-sm font-semibold text-ink">{t("eftTitle")}</b>
+      <p className="mt-1 text-xs leading-relaxed text-soft">
+        {t("eftBody", { price: formatPrice(amount, currency) })}
+      </p>
+      <div className="mt-3 rounded-lg border border-gold/50 bg-card px-3 py-2">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-accent2">{t("eftReference")}</span>
+        <b className="block select-all text-lg font-bold tracking-wider text-ink">{ref_}</b>
+      </div>
+      <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+        {(
+          [
+            [t("eftAccountName"), bank.accountHolder],
+            [t("eftBankLabel"), bank.bank],
+            [t("eftAccountNumber"), bank.accountNumber],
+            [t("eftBranchCode"), bank.branchCode],
+          ] as const
+        ).map(([label, value]) => (
+          <div key={label} className="col-span-2 flex justify-between gap-3">
+            <dt className="text-soft">{label}</dt>
+            <dd className="select-all font-medium tabular-nums text-ink">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-3 text-xs leading-relaxed text-soft">{t("eftWait")}</p>
+    </div>
   );
 }

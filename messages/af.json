@@ -168,7 +168,18 @@
     "checkoutFailed": "Kon nie afhandeling begin nie — probeer asseblief weer.",
     "payFastNoteShort": "Veilige betaling · betaal een keer, hou dit vir altyd",
     "bankGuidance": "<b>Word jou bank nie onder Instant EFT gelys nie?</b> Kies Credit & Cheque card — dit werk met elke bank.",
-    "purchaseAgreement": "Deur aan te koop, stem jy in tot die <terms>Bepalings</terms> en <refund>Terugbetalingsbeleid</refund>."
+    "purchaseAgreement": "Deur aan te koop, stem jy in tot die <terms>Bepalings</terms> en <refund>Terugbetalingsbeleid</refund>.",
+    "payByEft": "Betaal met bankoorbetaling (EFT)",
+    "eftTitle": "Bankoorbetaling-besonderhede",
+    "eftBody": "Betaal {price} oor na die rekening hieronder, en gebruik die verwysing presies soos dit wys — so pas ons jou betaling by jou rekening.",
+    "eftReference": "Jou verwysing",
+    "eftAccountName": "Rekeningnaam",
+    "eftBankLabel": "Bank",
+    "eftAccountNumber": "Rekeningnommer",
+    "eftBranchCode": "Takkode",
+    "eftWait": "Jou toegang open sodra ons die oorbetaling opgespoor het — gewoonlik binne een werksdag. Ons stuur jou 'n e-pos sodra dit lewendig is.",
+    "eftPendingNote": "Ons wag vir jou bankoorbetaling (verwysing {ref}). Jou toegang open sodra dit opgespoor is.",
+    "eftFailed": "Kon nie die bankoorbetaling begin nie — probeer asseblief weer."
   },
   "Settings": {
     "title": "Instellings",

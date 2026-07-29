@@ -200,7 +200,18 @@
     "checkoutFailed": "Couldn’t start checkout — please try again.",
     "payFastNoteShort": "Secure payment · pay once, keep forever",
     "bankGuidance": "<b>Bank not listed under Instant EFT?</b> Choose Credit & Cheque card — it works with every bank.",
-    "purchaseAgreement": "By purchasing you agree to the <terms>Terms</terms> and <refund>Refund Policy</refund>."
+    "purchaseAgreement": "By purchasing you agree to the <terms>Terms</terms> and <refund>Refund Policy</refund>.",
+    "payByEft": "Pay by bank transfer (EFT)",
+    "eftTitle": "Bank transfer details",
+    "eftBody": "Transfer {price} to the account below, using the reference exactly as shown — that's how we match your payment to your account.",
+    "eftReference": "Your reference",
+    "eftAccountName": "Account name",
+    "eftBankLabel": "Bank",
+    "eftAccountNumber": "Account number",
+    "eftBranchCode": "Branch code",
+    "eftWait": "Your access opens as soon as we've matched the transfer — usually within one working day. We'll email you the moment it's live.",
+    "eftPendingNote": "We're waiting for your bank transfer (reference {ref}). Your access opens as soon as it's matched.",
+    "eftFailed": "Couldn't start the bank transfer — please try again."
   },
   "Settings": {
     "title": "Settings",

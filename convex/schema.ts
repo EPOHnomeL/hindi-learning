@@ -639,6 +639,35 @@ export default defineSchema({
     enabled: v.boolean(),
   }),
 
+  // An **EFT intent** (manual EFT rail, ywampotch-launch ticket 03): one row per
+  // "Pay by EFT" click, holding the `ref` the buyer types into their banking app
+  // and everything the operator needs to match the transfer that arrives — who
+  // (`userId`), what (`topicId` + `lang`) and how much was SHOWN (`amount`, cents,
+  // frozen at click like `checkoutIntents.amount`, so a re-price never strands a
+  // genuine payment). The intent grants NOTHING: only the operator's confirmation
+  // (ticket 04) mints the Entitlement + Ledger row.
+  //
+  // Deliberately NOT a widened `checkoutIntents` (see ticket 03 notes): that table
+  // sits on the live PayFast ITN path holding real purchases, and this rail must
+  // have zero blast radius on it.
+  //
+  // `status` is the queue's state: `pending` awaits the money, `confirmed` was
+  // granted, `dismissed` never got paid (litter, not an error). `by_ref` is the
+  // reference-uniqueness check and the operator's lookup; `by_status` is the
+  // confirm queue's read; `by_user_topic` is the buyer's own "do I already have a
+  // reference for this Edition?" read (lang matched in memory, like entitlements).
+  eftIntents: defineTable({
+    ref: v.string(),
+    userId: v.id("users"),
+    topicId: v.id("topics"),
+    lang: v.string(),
+    amount: v.number(),
+    status: v.union(v.literal("pending"), v.literal("confirmed"), v.literal("dismissed")),
+  })
+    .index("by_ref", ["ref"])
+    .index("by_status", ["status"])
+    .index("by_user_topic", ["userId", "topicId"]),
+
   // A signed-in user's personal preferences (app-language-i18n ticket 03 §1).
   // One row per user, minted on their first app-language pick. `locale` is a
   // free-form BCP-47 chrome-language code (e.g. "es"); absent = never picked.

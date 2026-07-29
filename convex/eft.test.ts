@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { expect, test } from "vitest";
+import { beforeAll, expect, test } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
@@ -44,6 +44,63 @@ const BANK = {
   accountNumber: "62000000001",
   branchCode: "250655",
 };
+
+// Pricing an Edition requires a provisioned PayFast rail (market.setEditionPrice
+// refuses without it), and pricing is what makes an Edition payable at all — so
+// the EFT tests reach the paid state through the same production path, with the
+// sandbox trio in place. The EFT rail itself never touches PayFast.
+beforeAll(() => {
+  process.env.PAYFAST_MERCHANT_ID = "10000100";
+  process.env.PAYFAST_MERCHANT_KEY = "46f0cd694581a";
+  process.env.PAYFAST_PASSPHRASE = "jt7NOE43FZPn";
+});
+
+const PAYOUT = { accountHolder: "A. Author", bank: "FNB", accountNumber: "62000000001", branchCode: "250655" };
+
+// A priced Edition, reached the way production reaches it: the admin grants
+// can-sell, the seller saves payout details, then the OWNER prices their own
+// completed course. Only the `topics`/`lessons` rows are hand-inserted (the shape
+// `content.seedTopic` and the Routine's publish write), following the precedent in
+// sellers.test.ts.
+async function seedPricedEdition(
+  t: ReturnType<typeof convexTest>,
+  admin: Id<"users">,
+  seller: Id<"users">,
+  sellerEmail: string,
+  slug: string,
+  langs: string[] = ["en"],
+  amount = 50000,
+) {
+  const topicId = await t.run((ctx) =>
+    ctx.db.insert("topics", { ownerId: seller, slug, title: slug, status: "completed" }),
+  );
+  await t.run(async (ctx) => {
+    const htmlStorageId = await ctx.storage.store(new Blob(["<p>lesson</p>"], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "Lesson 1", htmlStorageId });
+  });
+  await asUser(t, admin).mutation(api.sellers.grantCanSell, { email: sellerEmail });
+  await asUser(t, seller).mutation(api.sellers.savePayoutDetails, PAYOUT);
+  for (const lang of langs) {
+    // A non-English Edition has to be HELD before it can be priced, and for the
+    // owner "held" means a `ready` translation job (lib.ts heldLangs) — the row
+    // `reportTranslation` leaves behind at the end of a successful run.
+    if (lang !== "en") {
+      await t.run((ctx) =>
+        ctx.db.insert("translationJobs", { topicId, lang, status: "ready", total: 1, done: 1, failed: 0 }),
+      );
+    }
+    await asUser(t, seller).mutation(api.market.setEditionPrice, { topicSlug: slug, lang, amount, currency: "zar" });
+  }
+  return topicId;
+}
+
+async function enableRail(t: ReturnType<typeof convexTest>, sys: Id<"users">) {
+  await asUser(t, sys).mutation(api.eft.saveOperatorBank, { ...BANK, enabled: true });
+}
+
+async function intentRows(t: ReturnType<typeof convexTest>) {
+  return await t.run((ctx) => ctx.db.query("eftIntents").take(100));
+}
 
 // ---- Seam — the sys-admin editor --------------------------------------------
 
@@ -145,4 +202,175 @@ test("the buyer read is signed-in only — an anonymous visitor gets nothing", a
   // Checkout is auth-first (.scratch/auth-first-checkout), so the paygate always
   // has an account behind it — an anonymous read has no reason to see the account.
   expect(await t.query(api.eft.eftDetails, {})).toBeNull();
+});
+
+// ---- Seam — the buyer's "Pay by EFT" click (ticket 03) -----------------------
+
+test("a disabled rail refuses the intent server-side, not just in the component", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+
+  // Never configured → refused.
+  await expect(
+    asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" }),
+  ).rejects.toThrow();
+
+  // Configured but switched off → still refused. The toggle is the rail, not a UI hint.
+  await asUser(t, sys).mutation(api.eft.saveOperatorBank, { ...BANK, enabled: false });
+  await expect(
+    asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" }),
+  ).rejects.toThrow();
+  expect(await intentRows(t)).toHaveLength(0);
+});
+
+test("Pay by EFT mints a bank-statement-safe reference and grants nothing", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  const topicId = await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+
+  const { ref, bank, amount } = await asUser(t, buyer).mutation(api.eft.startEftPurchase, {
+    topicSlug: "tswana",
+    lang: "en",
+  });
+
+  // Short, upper-case, no lookalike characters — a human types this into a banking
+  // app and a mistyped reference is an unmatchable payment.
+  expect(ref).toMatch(/^TSW-[A-Z0-9]{4}$/); // topic-derived prefix + random suffix
+  // The RANDOM half avoids characters that collide when handwritten or read down
+  // a phone line (I/1, O/0, S/5, Z/2). The prefix is taken from the course slug, so
+  // it stays legible rather than being filtered into something unrecognisable.
+  expect(ref.split("-")[1]).not.toMatch(/[IOLSZ0125]/);
+  expect(bank).toEqual(BANK);
+  expect(amount).toBe(50000);
+
+  // The reference the buyer was shown IS the reference on the row, with the price
+  // frozen at click, pending, and attributed to the buyer's account.
+  const rows = await intentRows(t);
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({ ref, userId: buyer, topicId, lang: "en", amount: 50000, status: "pending" });
+
+  // An intent is not a grant: no Entitlement, and the reader is still locked.
+  const ents = await t.run((ctx) =>
+    ctx.db.query("entitlements").withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", buyer)).collect(),
+  );
+  expect(ents).toHaveLength(0);
+});
+
+test("clicking twice on the same Edition reuses the one reference", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+
+  const first = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+  const second = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+
+  // Two competing references for one buyer and one Edition is how a real payment
+  // gets matched to the wrong row (or to none).
+  expect(second.ref).toBe(first.ref);
+  expect(await intentRows(t)).toHaveLength(1);
+});
+
+test("references are unique per buyer and per Edition", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  const other = await seedUser(t, "other@example.com");
+  await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana", ["en", "af"]);
+  await enableRail(t, sys);
+
+  const refs = [
+    (await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" })).ref,
+    (await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "af" })).ref,
+    (await asUser(t, other).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" })).ref,
+  ];
+  expect(new Set(refs).size).toBe(3);
+  expect(await intentRows(t)).toHaveLength(3);
+});
+
+test("Pay by EFT needs an account and a priced Edition", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+
+  // Auth-first (ADR 0021): the intent is keyed to a user, and access has to
+  // attribute to one — an anonymous EFT reference could never be granted.
+  await expect(t.mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" })).rejects.toThrow();
+
+  // A free Edition has nothing to transfer, and an unknown course nothing to buy.
+  await t.run((ctx) => ctx.db.insert("topics", { ownerId: seller, slug: "free", title: "free", status: "completed" }));
+  await expect(
+    asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "free", lang: "en" }),
+  ).rejects.toThrow();
+  await expect(
+    asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "ghost", lang: "en" }),
+  ).rejects.toThrow();
+  expect(await intentRows(t)).toHaveLength(0);
+});
+
+// ---- Seam — the returning buyer's pending state ------------------------------
+
+test("a buyer who leaves and returns sees their pending reference, not the bare paygate", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  const other = await seedUser(t, "other@example.com");
+  await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana", ["en", "af"]);
+  await enableRail(t, sys);
+
+  // Nothing pending yet.
+  expect(await asUser(t, buyer).query(api.eft.myEftIntent, { topicSlug: "tswana", lang: "en" })).toBeNull();
+
+  const { ref } = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+
+  // The buyer's own pending intent, with the bank details to finish the transfer.
+  expect(await asUser(t, buyer).query(api.eft.myEftIntent, { topicSlug: "tswana", lang: "en" })).toEqual({
+    ref,
+    amount: 50000,
+    bank: BANK,
+  });
+
+  // Scoped to the Edition and to the buyer: another language and another account
+  // are unaffected (buying `en` says nothing about `af`).
+  expect(await asUser(t, buyer).query(api.eft.myEftIntent, { topicSlug: "tswana", lang: "af" })).toBeNull();
+  expect(await asUser(t, other).query(api.eft.myEftIntent, { topicSlug: "tswana", lang: "en" })).toBeNull();
+  expect(await t.query(api.eft.myEftIntent, { topicSlug: "tswana", lang: "en" })).toBeNull();
+});
+
+test("a resolved intent stops showing as pending", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+  await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+
+  // The confirm/dismiss actions land in ticket 04; this asserts only what the
+  // buyer-facing read promises — the pending banner is tied to `status`, so the
+  // reactive query clears itself the moment the operator resolves the row.
+  const [row] = await intentRows(t);
+  await t.run((ctx) => ctx.db.patch(row!._id, { status: "confirmed" }));
+  expect(await asUser(t, buyer).query(api.eft.myEftIntent, { topicSlug: "tswana", lang: "en" })).toBeNull();
+
+  await t.run((ctx) => ctx.db.patch(row!._id, { status: "dismissed" }));
+  expect(await asUser(t, buyer).query(api.eft.myEftIntent, { topicSlug: "tswana", lang: "en" })).toBeNull();
+
+  // A dismissed intent leaves the buyer free to start a fresh one (a new reference).
+  const again = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+  expect(again.ref).not.toBe(row!.ref);
+  expect(await intentRows(t)).toHaveLength(2);
 });
