@@ -556,6 +556,10 @@ export default defineSchema({
     // The PayFast payment that bought this Edition — provenance back to the sale
     // (and its Ledger row). Optional: Admin-granted / legacy rows carry none.
     pfPaymentId: v.optional(v.string()),
+    // The EFT reference that bought it instead (manual EFT rail, ticket 04). At
+    // most one of the two is ever present, so every Entitlement says which rail
+    // sold the seat; neither present = an Admin grant or a legacy row.
+    eftRef: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_topic", ["topicId"])
@@ -604,7 +608,14 @@ export default defineSchema({
     net: v.number(),
     sellerShare: v.number(),
     platformShare: v.number(),
-    pfPaymentId: v.string(),
+    // Provenance: which rail sold this seat. EXACTLY ONE of the two is present —
+    // `pfPaymentId` for a PayFast sale, `eftRef` for a manually confirmed bank
+    // transfer (manual EFT rail, ticket 04). `pfPaymentId` was widened from
+    // required to optional to make room for the second rail; there is no plan to
+    // narrow it back (narrowing needs the data stripped in an earlier merge —
+    // docs/agents/project-context.md).
+    pfPaymentId: v.optional(v.string()),
+    eftRef: v.optional(v.string()),
     status: v.union(v.literal("owed"), v.literal("paid")),
     payoutRef: v.optional(v.string()),
   }).index("by_status", ["status"]),

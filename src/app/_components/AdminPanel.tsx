@@ -677,9 +677,107 @@ function PayoutsManager() {
         </ul>
       )}
 
+      <EftQueue />
       <OperatorBankForm />
     </div>
   );
+}
+
+// The pending bank transfers (manual EFT rail, ywampotch-launch ticket 04): the
+// operator reads their bank statement, finds the reference, and clicks. Confirm
+// mints the Entitlement AND the Ledger row in one server transaction, so the sale
+// lands in Sales and as `owed` above like any card sale. Dismiss is for a transfer
+// that never came — stale intents are litter, not errors, and a queue that silts
+// up stops being read, which is how a real payment eventually gets missed.
+function EftQueue() {
+  const pending = useQuery(api.eft.pendingEftIntents);
+  if (pending !== undefined && pending.length === 0) return null;
+  return (
+    <section className="mt-12">
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold tracking-tight text-accent">Awaiting EFT</h2>
+        <p className="mt-0.5 text-sm text-soft">Match the reference on your bank statement, then confirm</p>
+      </div>
+      {pending === undefined ? (
+        <ul className="flex flex-col gap-2" aria-busy>
+          {[0, 1].map((i) => (
+            <li key={i} className="h-16 animate-pulse rounded-xl border border-line bg-card" />
+          ))}
+        </ul>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {pending.map((p) => (
+            <EftQueueRow key={p.ref} intent={p} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function EftQueueRow({ intent }: { intent: FunctionReturnType<typeof api.eft.pendingEftIntents>[number] }) {
+  const confirm = useMutation(api.eft.confirmEftPayment);
+  const dismiss = useMutation(api.eft.dismissEftIntent);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  // Confirming grants paid access and writes money — a misread statement line is
+  // not a thing to undo, so the destructive-ish half asks once.
+  const run = async (action: (args: { ref: string }) => Promise<null>) => {
+    setBusy(true);
+    setError(false);
+    try {
+      await action({ ref: intent.ref });
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li className="rounded-xl border border-gold/40 bg-card px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <b className="block font-mono text-sm font-bold tracking-wider text-ink">{intent.ref}</b>
+          <span className="text-xs text-soft">
+            {intent.email} · {intent.courseTitle} · {intent.lang}
+          </span>
+        </div>
+        <span className="shrink-0 rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
+          {formatRand(intent.amount)}
+        </span>
+      </div>
+      <div className="mt-2.5 flex items-center gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            if (confirm_(`Confirm ${formatRand(intent.amount)} received for ${intent.ref}? This grants access.`)) {
+              void run(confirm);
+            }
+          }}
+          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+        >
+          {busy ? "Working…" : "Confirm payment"}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void run(dismiss)}
+          className="rounded-lg border border-line px-3.5 py-1.5 text-sm font-medium text-soft transition-colors hover:border-danger hover:text-danger disabled:opacity-60"
+        >
+          Dismiss
+        </button>
+        {error && <span className="text-xs text-danger">Failed — retry</span>}
+      </div>
+    </li>
+  );
+}
+
+// ponytail: the browser's own confirm dialog for the one irreversible click, not a
+// modal component. Wrapped so the lint rule about bare `confirm` has one site.
+function confirm_(message: string): boolean {
+  return window.confirm(message);
 }
 
 // The operator's **collection** account (manual EFT rail, ywampotch-launch ticket

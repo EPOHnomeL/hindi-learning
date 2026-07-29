@@ -3,7 +3,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { editionPrice, topicBySlug } from "./lib";
+import { editionPrice, normaliseEmail, topicBySlug } from "./lib";
+import { platformFeeBps, splitNet } from "./payfast";
 import { payoutDetailsValidator } from "./schema";
 import { isReadySeller } from "./sellerStatus";
 import { isCallerAdmin } from "./whitelist";
@@ -222,5 +223,141 @@ export const myEftIntent = query({
     const intent = await pendingIntent(ctx, userId, topic._id, lang);
     if (!intent) return null;
     return { ref: intent.ref, amount: intent.amount, bank: bankOf(row) };
+  },
+});
+
+// ---- The operator's confirm queue (ticket 04) --------------------------------
+
+// A pending intent by its reference. `ref` is what the operator reads off their
+// bank statement, so it's the queue's natural key.
+async function intentByRef(ctx: MutationCtx | QueryCtx, ref: string) {
+  return await ctx.db
+    .query("eftIntents")
+    .withIndex("by_ref", (q) => q.eq("ref", ref))
+    .unique();
+}
+
+// The pending EFT payments, for the operator's queue (sys admin only — confirming
+// mints access AND money). Everything needed to match a transfer on a bank
+// statement to a person and an Edition: reference, buyer email, course, language,
+// amount. Resolved intents are absent by construction — this is a to-do list, not
+// a log; a queue that silts up stops being read, and that is how a real payment
+// gets missed.
+export const pendingEftIntents = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      ref: v.string(),
+      email: v.string(),
+      courseTitle: v.string(),
+      lang: v.string(),
+      amount: v.number(),
+    }),
+  ),
+  handler: async (ctx) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    // Bounded: the queue is what the operator has yet to confirm by hand, so it is
+    // small by definition — but read it through the index and cap it anyway.
+    const rows = await ctx.db
+      .query("eftIntents")
+      .withIndex("by_status", (q) => q.eq("status", "pending"))
+      .take(500);
+    return await Promise.all(
+      rows.map(async (r) => {
+        const [user, topic] = await Promise.all([ctx.db.get(r.userId), ctx.db.get(r.topicId)]);
+        return {
+          ref: r.ref,
+          email: user?.email ?? "(unknown)",
+          courseTitle: topic?.title ?? "(deleted course)",
+          lang: r.lang,
+          amount: r.amount,
+        };
+      }),
+    );
+  },
+});
+
+// The money arrived: mint the Entitlement AND the Ledger row, in one transaction,
+// mirroring `market.fulfillPurchase`'s ordering and its idempotency guarantees.
+// Sys admin only.
+//
+// A bare `market.grantEntitlement` would give access but write no Ledger row, so
+// the sale would be invisible to the Sales tab and never `owed` in Payouts — a
+// sale the operator can't see is a sale the seller doesn't get paid for. Hence
+// both writes here, together.
+//
+// `fee: 0` and `net == gross`: no gateway took a cut. The 50/50 split still goes
+// through `splitNet`, so payout arithmetic stays identical to the card rail's.
+//
+// Idempotent on BOTH keys, which is the money-losing failure this exists to
+// prevent: per reference (only a `pending` row is ever acted on) and per
+// (buyer, Topic, language). A buyer who already holds the Edition — they bought it
+// by card meanwhile — simply gets no second Entitlement; per the operator's
+// 2026-07-29 decision that rare collision is sorted out by hand, so there is
+// deliberately no branch, warning or special case for it here.
+export const confirmEftPayment = mutation({
+  args: { ref: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { ref }) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const intent = await intentByRef(ctx, ref);
+    // Not pending → already confirmed, or dismissed. Either way a no-op: a second
+    // click must never mean a second grant or a second Ledger row.
+    if (!intent || intent.status !== "pending") return null;
+
+    const user = await ctx.db.get(intent.userId);
+    if (!user) throw new Error(`no account behind ${ref} — cannot grant access to nobody`);
+    const topic = await ctx.db.get(intent.topicId);
+    if (!topic?.ownerId) throw new Error(`the course behind ${ref} has no owner to owe`);
+
+    const held = await ctx.db
+      .query("entitlements")
+      .withIndex("by_topic_user", (q) => q.eq("topicId", intent.topicId).eq("userId", intent.userId))
+      .collect();
+    if (!held.some((e) => e.lang === intent.lang)) {
+      await ctx.db.insert("entitlements", {
+        userId: intent.userId,
+        topicId: intent.topicId,
+        lang: intent.lang,
+        eftRef: ref,
+      });
+    }
+
+    // The money, recorded the way the card rail records it — same table, same
+    // `owed` status, same split — so Sales and Payouts need no EFT special case.
+    const gross = intent.amount;
+    const { sellerShare, platformShare } = splitNet(gross, platformFeeBps());
+    await ctx.db.insert("ledger", {
+      topicId: intent.topicId,
+      lang: intent.lang,
+      sellerId: topic.ownerId,
+      buyerEmail: normaliseEmail(user.email ?? ""),
+      gross,
+      fee: 0,
+      net: gross,
+      sellerShare,
+      platformShare,
+      eftRef: ref,
+      status: "owed",
+    });
+
+    await ctx.db.patch(intent._id, { status: "confirmed" });
+    return null;
+  },
+});
+
+// The transfer never came: take the intent off the queue. Grants nothing, records
+// no money, and is not an error state — stale intents are litter. Without a
+// dismiss the queue silts up and stops being read, which is the slow path to a
+// real payment being missed. Sys admin only.
+export const dismissEftIntent = mutation({
+  args: { ref: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { ref }) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const intent = await intentByRef(ctx, ref);
+    if (!intent || intent.status !== "pending") return null;
+    await ctx.db.patch(intent._id, { status: "dismissed" });
+    return null;
   },
 });

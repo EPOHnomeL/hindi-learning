@@ -101,6 +101,17 @@ async function enableRail(t: ReturnType<typeof convexTest>, sys: Id<"users">) {
 async function intentRows(t: ReturnType<typeof convexTest>) {
   return await t.run((ctx) => ctx.db.query("eftIntents").take(100));
 }
+async function ledgerRows(t: ReturnType<typeof convexTest>) {
+  return await t.run((ctx) => ctx.db.query("ledger").take(100));
+}
+async function entitlementRows(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, userId: Id<"users">) {
+  return await t.run((ctx) =>
+    ctx.db
+      .query("entitlements")
+      .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
+      .collect(),
+  );
+}
 
 // ---- Seam — the sys-admin editor --------------------------------------------
 
@@ -373,4 +384,168 @@ test("a resolved intent stops showing as pending", async () => {
   const again = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
   expect(again.ref).not.toBe(row!.ref);
   expect(await intentRows(t)).toHaveLength(2);
+});
+
+// ---- Seam — the operator's confirm queue (ticket 04) -------------------------
+
+// Idempotency comes first because it is the money-losing failure: a double
+// confirmation must never mean a double grant or a double Ledger row.
+
+test("confirming the same reference twice grants and owes exactly once", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  const topicId = await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+  const { ref } = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+
+  await asUser(t, sys).mutation(api.eft.confirmEftPayment, { ref });
+  await asUser(t, sys).mutation(api.eft.confirmEftPayment, { ref });
+
+  expect(await entitlementRows(t, topicId, buyer)).toHaveLength(1);
+  expect(await ledgerRows(t)).toHaveLength(1);
+  expect((await intentRows(t))[0]!.status).toBe("confirmed");
+});
+
+test("confirming mints the Entitlement and the Ledger row a manual sale needs", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  const topicId = await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+  const { ref } = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+
+  await asUser(t, sys).mutation(api.eft.confirmEftPayment, { ref });
+
+  // The Entitlement carries the EFT reference and no PayFast id — that is the
+  // provenance that says which rail sold the seat.
+  const [ent] = await entitlementRows(t, topicId, buyer);
+  expect(ent).toMatchObject({ lang: "en", eftRef: ref });
+  expect(ent!.pfPaymentId).toBeUndefined();
+
+  // No gateway took a cut, so fee is 0 and net == gross; the 50/50 split still
+  // comes from `splitNet`, so the payout arithmetic is the card rail's.
+  const [row] = await ledgerRows(t);
+  expect(row).toMatchObject({
+    topicId,
+    lang: "en",
+    sellerId: seller,
+    buyerEmail: "buyer@example.com",
+    gross: 50000,
+    fee: 0,
+    net: 50000,
+    eftRef: ref,
+    status: "owed",
+  });
+  expect(row!.pfPaymentId).toBeUndefined();
+  expect(row!.sellerShare + row!.platformShare).toBe(row!.net);
+});
+
+test("a confirmed EFT sale shows up as owed to the seller in Payouts", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+  const { ref } = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+  await asUser(t, sys).mutation(api.eft.confirmEftPayment, { ref });
+
+  // A sale the operator can't see is a sale the seller never gets paid for — this
+  // is exactly why confirm writes a Ledger row instead of a bare grant.
+  const owed = await asUser(t, sys).query(api.ledger.owedPayouts, {});
+  expect(owed).toHaveLength(1);
+  expect(owed[0]!.email).toBe("seller@example.com");
+  expect(owed[0]!.totalOwed).toBe(25000);
+});
+
+test("a buyer who already holds the Edition gets no second Entitlement", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  const topicId = await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+  const { ref } = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+
+  // They bought it another way meanwhile. `market.grantEntitlement` is the real
+  // seam that mints an Entitlement outside the ITN, so use it rather than a
+  // hand-inserted row.
+  await asUser(t, sys).mutation(api.market.grantEntitlement, {
+    email: "buyer@example.com",
+    topicSlug: "tswana",
+    lang: "en",
+  });
+  await asUser(t, sys).mutation(api.eft.confirmEftPayment, { ref });
+
+  // Per the operator's 2026-07-29 decision this collision is sorted out by hand:
+  // whatever the (buyer, Topic, language) guard naturally does is correct. No
+  // double grant — but the money that did arrive is still recorded.
+  expect(await entitlementRows(t, topicId, buyer)).toHaveLength(1);
+  expect(await ledgerRows(t)).toHaveLength(1);
+});
+
+test("dismiss clears an intent that never got paid, and grants nothing", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  const topicId = await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+  const { ref } = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+
+  await asUser(t, sys).mutation(api.eft.dismissEftIntent, { ref });
+
+  expect(await asUser(t, sys).query(api.eft.pendingEftIntents, {})).toEqual([]);
+  expect(await entitlementRows(t, topicId, buyer)).toHaveLength(0);
+  expect(await ledgerRows(t)).toHaveLength(0);
+
+  // A dismissed reference can't be quietly confirmed afterwards — the money would
+  // have to arrive against a fresh one.
+  await asUser(t, sys).mutation(api.eft.confirmEftPayment, { ref });
+  expect(await entitlementRows(t, topicId, buyer)).toHaveLength(0);
+  expect(await ledgerRows(t)).toHaveLength(0);
+});
+
+test("the queue lists what the operator needs to match a transfer", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+  const { ref } = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+
+  expect(await asUser(t, sys).query(api.eft.pendingEftIntents, {})).toEqual([
+    { ref, email: "buyer@example.com", courseTitle: "tswana", lang: "en", amount: 50000 },
+  ]);
+
+  // Resolved intents leave the queue — it is a to-do list, not a log. A queue that
+  // silts up stops being read, and that is how a real payment gets missed.
+  await asUser(t, sys).mutation(api.eft.confirmEftPayment, { ref });
+  expect(await asUser(t, sys).query(api.eft.pendingEftIntents, {})).toEqual([]);
+});
+
+test("a tenant admin can neither read the queue nor confirm or dismiss", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedSysAdmin(t, "admin@example.com");
+  const tenantAdmin = await seedTenantAdmin(t, "potch@example.com", "ywampotch");
+  const seller = await seedUser(t, "seller@example.com");
+  const buyer = await seedUser(t, "buyer@example.com");
+  const topicId = await seedPricedEdition(t, sys, seller, "seller@example.com", "tswana");
+  await enableRail(t, sys);
+  const { ref } = await asUser(t, buyer).mutation(api.eft.startEftPurchase, { topicSlug: "tswana", lang: "en" });
+
+  // Confirming mints access AND money. Tenant admins administer a subdomain.
+  await expect(asUser(t, tenantAdmin).query(api.eft.pendingEftIntents, {})).rejects.toThrow();
+  await expect(asUser(t, tenantAdmin).mutation(api.eft.confirmEftPayment, { ref })).rejects.toThrow();
+  await expect(asUser(t, tenantAdmin).mutation(api.eft.dismissEftIntent, { ref })).rejects.toThrow();
+  await expect(asUser(t, buyer).mutation(api.eft.confirmEftPayment, { ref })).rejects.toThrow();
+  await expect(t.mutation(api.eft.confirmEftPayment, { ref })).rejects.toThrow();
+
+  expect(await entitlementRows(t, topicId, buyer)).toHaveLength(0);
+  expect(await ledgerRows(t)).toHaveLength(0);
+  expect((await intentRows(t))[0]!.status).toBe("pending");
 });
