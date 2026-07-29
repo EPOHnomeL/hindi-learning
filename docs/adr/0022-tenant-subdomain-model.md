@@ -117,6 +117,15 @@ Roles encoded on the `whitelist` row by scope — reuse `isAdmin`, add `tenantSl
 
 ### 4a. One session (and device settings) across subdomains — cookie scope
 
+> **SUPERSEDED 2026-07-29 by [ADR 0025](0025-per-tenant-session-isolation.md).**
+> Sessions, app language and theme are now **per tenant subdomain** — the exact
+> opposite of this section. The reasoning below is left intact on purpose: it records
+> that host-locked sessions were once treated as a bug, which is precisely what a
+> future reader needs to know before "fixing" them again. What changed is the
+> product intent, not a misunderstanding of the mechanics. Everything else in §4a —
+> the `NEXT_PUBLIC_COOKIE_DOMAIN` knob, `src/lib/cookieDomain.ts`, and the
+> `@convex-dev/auth` cookie patch — is deleted.
+
 > Added 2026-07-21. Clarifies §3/§4 after the host-locked session was found to
 > contradict them in practice.
 

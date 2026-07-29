@@ -75,23 +75,26 @@ Validated with `@t3-oss/env` (see [env-validation](#env-validation-t3-oss-env)
 below). PayFast rail vars live in `convex/env.ts`; the Next client var in
 `env.js`.
 
-### Cross-subdomain cookie scope (`NEXT_PUBLIC_COOKIE_DOMAIN`)
+### Per-tenant sessions: cookies are host-only (no `NEXT_PUBLIC_COOKIE_DOMAIN`)
 
-- **One sign-in + one theme/language span every `*.my-course.app` subdomain.**
-  Set `NEXT_PUBLIC_COOKIE_DOMAIN=my-course.app` (prod, and the shared-dev Next
-  build if you want it there) so the auth-session, `hindi_theme`, and
-  `hindi_locale` cookies carry a parent `Domain`. Unset → cookies stay host-only
-  (the correct default for local dev and `*.vercel.app` previews, which reject a
-  `Domain` as a public suffix). Logic: `src/lib/cookieDomain.ts`. Design: ADR 0022
-  §4a.
-- **The auth cookies need a pnpm patch** (`patches/@convex-dev+auth@0.0.80.patch`,
-  registered in `pnpm-workspace.yaml`): Convex Auth hardcodes the `__Host-` cookie
-  prefix, which forbids `Domain`; the patch swaps it for `__Secure-` and sets
-  `Domain` when `NEXT_PUBLIC_COOKIE_DOMAIN` matches the host. **`pnpm install`
-  re-applies it**; if you bump `@convex-dev/auth` off `0.0.80` the patch must be
-  re-cut (`pnpm patch`). Keep it in sync with `src/lib/cookieDomain.ts`.
-- **Turning it on invalidates existing sessions once** (cookie name changes
-  `__Host-*`→`__Secure-*`): one re-sign-in on deploy, seamless thereafter.
+- **Each tenant subdomain has its own session, app language and theme.** Signing in
+  on `ywampotch.my-course.app` does not sign you in on the apex or another tenant,
+  so two different accounts can be signed in side by side in one browser. This is
+  simply the browser's default: no cookie carries a `Domain`. Design: **ADR 0025**,
+  which supersedes ADR 0022 §4a.
+- **There is no cookie-scope env var and no pnpm patch, deliberately.** Both existed
+  to do the opposite (a parent `Domain` plus a patched `__Host-`→`__Secure-` prefix
+  so the session could span subdomains) and both are deleted. The session cookie is
+  back on upstream `@convex-dev/auth` defaults, which removes the chore of re-cutting
+  the patch on every auth bump. **Do not reintroduce `NEXT_PUBLIC_COOKIE_DOMAIN`** —
+  setting it is what shared one account across every brand.
+- **Cookie names:** `hindi_lang` (app language) and `hindi_mode` (light/dark), both
+  host-only. Renamed from `hindi_locale` / `hindi_theme` at the cutover so the old
+  parent-domain cookies — still in browsers, year-long max-age — can't shadow the new
+  host-only ones under the same name. `hindi_mode` is also hardcoded in a regex in
+  `src/app/layout.tsx`'s pre-paint script, invisible to rename tooling.
+- **The cutover signed every user out once**, and reset language (back to the
+  `Accept-Language` sniff) and theme (back to light). Expected and accepted.
 
 ### env validation (@t3-oss/env)
 
