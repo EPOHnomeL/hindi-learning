@@ -623,6 +623,22 @@ export default defineSchema({
     payout: v.optional(payoutDetailsValidator),
   }).index("by_user", ["userId"]),
 
+  // The **operator's collection** bank account (manual EFT rail, ywampotch-launch
+  // ticket 02): where a buyer EFTs the purchase price. GLOBAL and SINGULAR — money
+  // lands in one account whichever tenant sold the course — so this table holds at
+  // most ONE row and needs no index (`.first()` is the read). Not to be confused
+  // with `sellers.payout`, which is the opposite direction: where the operator EFTs
+  // a Seller's share TO. Same four SA fields though, so it reuses
+  // `payoutDetailsValidator` (its `accountHolder` is the ticket's "account name").
+  // `enabled` is the rail's explicit on/off switch: false hides "Pay by EFT" and
+  // makes the buyer-facing read return nothing. Sys-admin-only to write.
+  // ponytail: a singleton row, not a settings key/value bag — grow it as typed
+  // fields if the rail ever needs more, like `userPrefs`.
+  operatorBank: defineTable({
+    ...payoutDetailsValidator.fields,
+    enabled: v.boolean(),
+  }),
+
   // A signed-in user's personal preferences (app-language-i18n ticket 03 §1).
   // One row per user, minted on their first app-language pick. `locale` is a
   // free-form BCP-47 chrome-language code (e.g. "es"); absent = never picked.

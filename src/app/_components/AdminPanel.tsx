@@ -582,7 +582,112 @@ function PayoutsManager() {
           ))}
         </ul>
       )}
+
+      <OperatorBankForm />
     </div>
+  );
+}
+
+// The operator's **collection** account (manual EFT rail, ywampotch-launch ticket
+// 02): where buyers EFT the purchase price IN — the mirror of the payouts above,
+// which is money going OUT, hence the same tab rather than a sixth one. Editable
+// here so the operator can correct it on prod without a deploy; sys-admin-only
+// server-side (`eft.saveOperatorBank`), so a tenant admin can never move where the
+// platform's money is collected. The `enabled` toggle IS the rail's on/off switch:
+// off, and no buyer is offered "Pay by EFT".
+function OperatorBankForm() {
+  const saved = useQuery(api.eft.operatorBank);
+  const save = useMutation(api.eft.saveOperatorBank);
+  const [form, setForm] = useState<{
+    accountHolder: string;
+    bank: string;
+    accountNumber: string;
+    branchCode: string;
+    enabled: boolean;
+  } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  // Seed the form from the saved record once it arrives (and never again, so
+  // typing isn't clobbered by the live query re-firing after a save).
+  const blank = { accountHolder: "", bank: "", accountNumber: "", branchCode: "", enabled: false };
+  const values = form ?? (saved === undefined ? null : (saved ?? blank));
+  const set = (patch: Partial<NonNullable<typeof values>>) => {
+    setForm({ ...(values ?? blank), ...patch });
+    setError(null);
+    setDone(false);
+  };
+
+  return (
+    <section className="mt-12">
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold tracking-tight text-accent">EFT collection account</h2>
+        <p className="mt-0.5 text-sm text-soft">Where buyers pay you directly, instead of by card</p>
+      </div>
+
+      {values === null ? (
+        <div className="h-56 animate-pulse rounded-2xl border border-line bg-card" aria-busy />
+      ) : (
+        <form
+          className="flex flex-col gap-3 rounded-2xl border border-gold/50 bg-card p-5 shadow-sm"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            setError(null);
+            try {
+              await save(values);
+              setDone(true);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Couldn't save those details.");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          {(
+            [
+              ["accountHolder", "Account name", "YWAM Potch"],
+              ["bank", "Bank", "FNB"],
+              ["accountNumber", "Account number", "62000000001"],
+              ["branchCode", "Branch code", "250655"],
+            ] as const
+          ).map(([field, label, placeholder]) => (
+            <label key={field} className="flex flex-col gap-1">
+              <span className="text-xs font-semibold uppercase tracking-wide text-accent2">{label}</span>
+              <input
+                value={values[field]}
+                onChange={(e) => set({ [field]: e.target.value })}
+                placeholder={placeholder}
+                className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+              />
+            </label>
+          ))}
+
+          <label className="mt-1 flex items-center gap-2 text-sm text-ink">
+            <input
+              type="checkbox"
+              checked={values.enabled}
+              onChange={(e) => set({ enabled: e.target.checked })}
+              className="size-4 accent-accent"
+            />
+            Offer &ldquo;Pay by EFT&rdquo; to buyers
+          </label>
+
+          <div className="mt-1 flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+            >
+              {busy ? "Saving…" : "Save"}
+            </button>
+            {error && <span className="text-xs text-danger">{error}</span>}
+            {done && !error && <span className="text-xs text-soft">Saved.</span>}
+          </div>
+        </form>
+      )}
+    </section>
   );
 }
 
