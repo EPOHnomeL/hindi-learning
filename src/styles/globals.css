@@ -47,10 +47,19 @@ html[data-theme="dark"] {
   --color-bad-b: #e0937c;
 }
 
+/* Suppress the horizontal overflow the hero's aurora/gold-fleck decoration would
+   otherwise scroll into view. `clip`, NOT `hidden`: `overflow-x: hidden` on the
+   root/body makes them *scroll containers* (the other axis computes to `auto`),
+   and the browser then resolves a fragment jump like the landing nav's
+   `href="#get-started"` against `body` — which is content-height and so cannot
+   scroll — while the real scrolling lives on `html`. The visible result is a jump
+   that immediately snaps back to the top of the page. `clip` does the same
+   clipping without creating a scroll container, so anchor jumps (and sticky
+   positioning) keep working. */
 html,
 body {
   max-width: 100%;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* Admin chart categorical palette (dataviz skill), shared by the Sales and
