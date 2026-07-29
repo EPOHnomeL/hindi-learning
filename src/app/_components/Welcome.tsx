@@ -2,10 +2,40 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import { useCallback, useEffect, useState } from "react";
 import { Icon } from "./icons";
 import { useTenant } from "./TenantContext";
 import { Dialog, IconButton } from "./ui";
 import { missionExcerpt } from "./welcomeDerive";
+
+// Has the reader already dismissed the welcome panel this session? Not component
+// state: both readers remount on every route change (and again after sign-in), so a
+// plain `useState(false)` re-opened the panel on every single lesson — the panel
+// followed you around instead of greeting you once. sessionStorage, not local: a
+// fresh tab is a fresh visit and still gets the orientation, but within one visit
+// one dismissal is final. Starts `true` so nothing flashes before the read, and a
+// blocked/absent sessionStorage just means "not dismissed" — the panel still works,
+// it simply can't remember.
+export function useWelcomeDismissed(scope: string): [boolean, () => void] {
+  const key = `welcome:dismissed:${scope}`;
+  const [dismissed, setDismissed] = useState(true);
+  useEffect(() => {
+    try {
+      setDismissed(sessionStorage.getItem(key) === "1");
+    } catch {
+      setDismissed(false);
+    }
+  }, [key]);
+  const dismiss = useCallback(() => {
+    setDismissed(true);
+    try {
+      sessionStorage.setItem(key, "1");
+    } catch {
+      /* ignore — dismissal holds for this mount either way */
+    }
+  }, [key]);
+  return [dismissed, dismiss];
+}
 
 // The first-open welcome panel (welcome/01). Someone's first contact with a course
 // is a lesson — they open one for the first time, or they arrive cold on a Public

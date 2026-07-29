@@ -18,7 +18,7 @@ import { useTheme } from "./ThemeContext";
 import { CourseSkeleton, ReaderSkeleton } from "./ui";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { firstLessonKey, nextLessonKey, resumeLessonKey } from "./readerDerive";
-import { Welcome } from "./Welcome";
+import { Welcome, useWelcomeDismissed } from "./Welcome";
 import { guestProgress, latchFirstOpen } from "./welcomeDerive";
 import { tenantHomeHref, type TenantSlug } from "~/lib/tenant";
 
@@ -96,7 +96,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
   // been read (`undefined` = still loading, so no verdict yet), then held for the
   // mount so pressing "Next lesson" mid-read can't yank the panel away.
   const [firstOpen, setFirstOpen] = useState<boolean | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, dismiss] = useWelcomeDismissed(token);
   useEffect(() => {
     setFirstOpen((prev) => latchFirstOpen(prev, doneLoaded ? guestProgress(completed) : undefined));
   }, [doneLoaded, completed]);
@@ -285,7 +285,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
               mission={course.mission}
               next={startLesson && { seq: startLesson.seq, title: startLesson.title, href: `${base}/lessons/${startLesson.key}` }}
               homeHref={homeHref}
-              onDismiss={() => setDismissed(true)}
+              onDismiss={dismiss}
             />
           )}
           {children}

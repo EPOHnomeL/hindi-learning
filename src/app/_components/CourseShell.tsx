@@ -19,7 +19,7 @@ import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { useResourceUpload } from "./useResourceUpload";
 import { completedKeys, frontierKey, nextLessonKey, resumeLessonKey, seenAfterOpening } from "./readerDerive";
-import { Welcome } from "./Welcome";
+import { Welcome, useWelcomeDismissed } from "./Welcome";
 import { latchFirstOpen } from "./welcomeDerive";
 
 // localStorage key for answered-question ids the learner has already seen.
@@ -117,7 +117,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   // `opened` row (ArtifactView) and progress is a live query — an unlatched check
   // would tear the panel away a beat after it appeared.
   const [firstOpen, setFirstOpen] = useState<boolean | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, dismiss] = useWelcomeDismissed(slug);
   useEffect(() => {
     setFirstOpen((prev) => latchFirstOpen(prev, progress));
   }, [progress]);
@@ -337,7 +337,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               mission={header.mission}
               next={startLesson && { seq: startLesson.seq, title: startLesson.title, href: withLang(`/courses/${slug}/lessons/${startLesson.key}`, lang) }}
               homeHref="/"
-              onDismiss={() => setDismissed(true)}
+              onDismiss={dismiss}
             />
           )}
           <div className="flex min-h-0 flex-1 flex-col">{children}</div>
