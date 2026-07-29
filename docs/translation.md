@@ -154,9 +154,15 @@ three now live in both the `translate` skill and the `buildTranslateMessages` pr
   single-flight lock. `claimedAt` is the run's **heartbeat** (stamped at acquire,
   re-stamped per published item); a `translating` job whose heartbeat goes silent
   past `STALE_MS` is presumed dead and re-fireable — the re-fire **resumes**
-  (fresh rows are skipped, `done` re-seeded). Seeded `translating` by
-  `startTranslation`; `publishTranslation` ticks `done`;
-  `reportTranslation` flips it `ready`/`failed`.
+  (fresh rows are skipped, `done` re-seeded); a **forced** re-fire (engine switch)
+  instead **deletes** the rows, so nothing can read as fresh. Seeded `translating`
+  by `startTranslation`; `publishTranslation` ticks `done` **once per item**, not
+  per call — a re-publish of an already-landed item returns `unchanged` and ticks
+  nothing, because the routine re-publishes the whole workspace every wave.
+  `reportTranslation` flips it `ready`/`failed` and, on `ready`, recomputes
+  `done`/`failed` by **counting the rows that actually landed** rather than
+  subtracting `done` from `total` — so a wrong counter can never report a
+  half-translated Edition as complete.
 - Sharing an Edition also touches `shares.lang` / `pendingShares.lang` and the
   `publicLinks` table (see §6).
 

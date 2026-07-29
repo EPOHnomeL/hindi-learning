@@ -81,10 +81,12 @@ Do these steps IN ORDER:
 
    A published wave is BANKED: a run killed, preempted, or stopped by the owner
    loses at most the wave in flight rather than the whole course. The script is
-   idempotent, so there is nothing to skip or track. Read the output — each item
-   prints `saved` or `skipped`, and a `skipped` lesson is a quiz-marker drift, so
-   re-queue that file. Do NOT commit anything to git (ADR 0009): no branch, no PR,
-   no push.
+   idempotent, so there is nothing to skip or track — every wave re-sends every
+   earlier wave's items, which is expected. Read the output — each item prints
+   `saved` (it landed), `unchanged` (already published, byte-identical: normal and
+   free, and what most lines say by the last wave — nothing to do), or `skipped`
+   (a quiz-marker drift, so re-queue that file). Do NOT commit anything to git
+   (ADR 0009): no branch, no PR, no push.
 
    Translate EVERY source item — a missing file falls back to English and counts as
    failed.

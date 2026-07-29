@@ -120,10 +120,17 @@ whatever ends the run.
    --topic "$SLUG"`, every wave, in that order. Publishing is what makes the run
    survivable: a drained wave that is published is **banked**, so a run killed,
    preempted, or stopped by the owner loses at most the wave in flight. The script
-   is idempotent — it publishes whatever is in the workspace and re-publishing
-   overwrites — so there is nothing to skip or track. Read the `saved`/`skipped`
-   lines; a `skipped` lesson is a quiz-marker drift the count check missed, so
-   re-queue that file. Say in one sentence what went live.
+   is idempotent — it publishes whatever is in the workspace, so there is nothing
+   to skip or track. Every wave therefore re-sends every earlier wave's items, and
+   that is fine and expected. Read the status per item:
+
+   - `saved` — the item landed (or a re-queued file overwrote its earlier version).
+   - `unchanged` — already published, byte-identical. **Normal and free**, and what
+     most lines say by the last wave. Nothing to do.
+   - `skipped` — a quiz-marker drift the count check missed, or a source item that
+     vanished. **Re-queue that file.**
+
+   Say in one sentence what went live.
 
 ## Stopping early
 

@@ -5,7 +5,10 @@
 // the source had a mission), `lessons/<key>.html`, `references/<key>.html`. Each
 // file is published via `translate.publishTranslation`, which re-reads the source
 // to stamp its hash and (for lessons) reject a quiz-structure drift — a rejected
-// or vanished item is skipped and falls back to English in the reader.
+// or vanished item is `skipped` and falls back to English in the reader.
+// This publishes the WHOLE workspace every time, and the routine runs it once per
+// wave, so later waves re-send earlier items: those come back `unchanged` (no
+// write, no progress tick) rather than counting as fresh progress.
 // Usage: pnpm run publish-translation:prod --topic <slug>   (TRANSLATE_LANG from .env.local)
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { ConvexHttpClient } from "convex/browser";
