@@ -1,6 +1,6 @@
 # ywampotch-launch/06: ADR for the manual EFT rail (+ glossary term)
 
-**Status:** open
+**Status:** built (2026-07-29)
 **Depends on:** [04](04-admin-eft-confirm-queue.md) — write it once the shape is real, not before
 
 ## Why

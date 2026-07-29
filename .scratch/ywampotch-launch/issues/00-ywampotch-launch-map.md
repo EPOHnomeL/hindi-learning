@@ -1,6 +1,8 @@
 # ywampotch-launch/00: Fix the funnel + manual EFT rail — map
 
-**Status:** open — nothing started
+**Status:** open — the funnel fix and the whole EFT rail are built (2026-07-29);
+07 (prod verification) and 08 (stale docs) remain, and the end-to-end claim below
+has NOT been verified on prod yet.
 **Labels:** wayfinder:map
 
 <!-- INDEX, not a store. Each unit lives in its own ticket; this map gists and
@@ -24,18 +26,22 @@ Strictly sequential — see [PRD § Execution](../PRD.md). File overlap is high
 the auth pair is hard-blocked, so parallelism buys little and costs attributable
 history on a repo that now handles real money.
 
-| # | Unit | Where |
-|---|---|---|
-| — | Link OAuth sign-in to an existing account by email | **GitHub [#111](https://github.com/EPOHnomeL/hindi-learning/issues/111)** |
-| — | Google provider + sign-in button | **GitHub [#112](https://github.com/EPOHnomeL/hindi-learning/issues/112)** |
-| 01 | Brand continuity through the funnel | [01](01-brand-continuity-through-the-funnel.md) |
-| 02 | Operator bank details as an admin-editable settings record | [02](02-operator-bank-details-settings-record.md) |
-| 03 | Buyer flow — Pay by EFT intent + reference | [03](03-buyer-pay-by-eft-intent-and-reference.md) |
-| 04 | Admin confirm queue — grant + Ledger row | [04](04-admin-eft-confirm-queue.md) |
-| 05 | EFT confirmation email | [05](05-eft-confirmation-email.md) |
-| 06 | ADR for the manual EFT rail (+ glossary term) | [06](06-adr-manual-eft-rail.md) |
-| 07 | Prod-verify the security fixes | [07](07-prod-verify-security-fixes.md) |
-| 08 | Fix the four known stale facts | [08](08-fix-known-stale-docs-and-tracker.md) |
+| # | Unit | Where | State |
+|---|---|---|---|
+| — | Link OAuth sign-in to an existing account by email | **GitHub [#111](https://github.com/EPOHnomeL/hindi-learning/issues/111)** | built `fbb4746` |
+| — | Google provider + sign-in button | **GitHub [#112](https://github.com/EPOHnomeL/hindi-learning/issues/112)** | built `f5a3be9` |
+| 01 | Brand continuity through the funnel | [01](01-brand-continuity-through-the-funnel.md) | built `1ffa433` |
+| 02 | Operator bank details as an admin-editable settings record | [02](02-operator-bank-details-settings-record.md) | built `2632b7e` |
+| 03 | Buyer flow — Pay by EFT intent + reference | [03](03-buyer-pay-by-eft-intent-and-reference.md) | built `3adb7e6` |
+| 04 | Admin confirm queue — grant + Ledger row | [04](04-admin-eft-confirm-queue.md) | built `eb6a836` |
+| 05 | EFT confirmation email | [05](05-eft-confirmation-email.md) | built `84d793a` |
+| 06 | ADR for the manual EFT rail (+ glossary term) | [06](06-adr-manual-eft-rail.md) | built — [ADR 0026](../../../docs/adr/0026-manual-eft-payment-rail.md) |
+| 07 | Prod-verify the security fixes | [07](07-prod-verify-security-fixes.md) | **open — needs a human on prod** |
+| 08 | Fix the four known stale facts | [08](08-fix-known-stale-docs-and-tracker.md) | open |
+
+**Before the rail can take a cent on prod**, a sys admin must open the Payouts tab
+and fill in the EFT collection account, then tick "Offer Pay by EFT to buyers" —
+the rail ships **off**, and the buyer-facing button does not exist until it is on.
 
 **Why the first two are on GitHub.** They predate the 2026-07-29 tracker split
 (`docs/agents/issue-tracker.md`) and are already fully specced and labelled

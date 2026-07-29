@@ -1,6 +1,6 @@
 # ywampotch-launch/05: EFT confirmation email
 
-**Status:** open
+**Status:** built (2026-07-29)
 **Depends on:** [04](04-admin-eft-confirm-queue.md)
 
 ## Why

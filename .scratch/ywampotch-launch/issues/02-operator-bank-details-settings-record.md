@@ -1,6 +1,6 @@
 # ywampotch-launch/02: Operator bank details as an admin-editable settings record
 
-**Status:** open
+**Status:** built (2026-07-29)
 
 ## Why
 

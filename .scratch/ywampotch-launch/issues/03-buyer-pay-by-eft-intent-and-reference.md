@@ -1,6 +1,6 @@
 # ywampotch-launch/03: Buyer flow — "Pay by EFT" intent + reference
 
-**Status:** open
+**Status:** built (2026-07-29)
 **Depends on:** [02](02-operator-bank-details-settings-record.md)
 
 ## Why

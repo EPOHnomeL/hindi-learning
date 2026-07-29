@@ -145,7 +145,7 @@ _Avoid_: Self-hosted, free tier, self-serve (BYOK is about the key, not the host
 
 ## Monetisation ([ADR 0016](docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md), payment rail superseded by the PayFast pivot — `.scratch/payfast-payments/PRD.md`)
 
-These name the concepts of the **paid course marketplace** built on top of the free-distribution model: vetted **Sellers** list finished courses, buyers purchase one-time lifetime **Entitlements**, and every sale is processed on the **operator's single PayFast (South Africa) account** — the operator is the sole **merchant of record**; Sellers never register a payment account of their own. Each sale's net (after PayFast's fee) is split 50/50 between the Seller and the platform in the **Ledger**, and the operator pays Sellers out manually by EFT. Pricing is **ZAR-only**. This is the first time the platform charges for *consuming* content. What is sold is an **Edition** — a `(Topic, language)` pair, the unit of content access introduced by the course-translation feature — so a course is bought and priced *in a specific language*.
+These name the concepts of the **paid course marketplace** built on top of the free-distribution model: vetted **Sellers** list finished courses, buyers purchase one-time lifetime **Entitlements**, and every sale is processed on the **operator's single PayFast (South Africa) account** — the operator is the sole **merchant of record**; Sellers never register a payment account of their own. Since [ADR 0026](docs/adr/0026-manual-eft-payment-rail.md) there is a **second rail beside the card one**: a buyer may instead transfer the price straight into the operator's account against an **[[EFT Intent]]** reference, and the operator confirms it by hand — same merchant of record, same Ledger, no gateway. Each sale's net (after the gateway's fee, which is zero on the manual rail) is split 50/50 between the Seller and the platform in the **Ledger**, and the operator pays Sellers out manually by EFT. Pricing is **ZAR-only**. This is the first time the platform charges for *consuming* content. What is sold is an **Edition** — a `(Topic, language)` pair, the unit of content access introduced by the course-translation feature — so a course is bought and priced *in a specific language*.
 
 **Entitlement**:
 An account's purchased, permanent right to read a paid **Edition** — a `(Topic, language)` pair — past its free first Lesson (the **Preview**), including that Edition's References. One per (buyer, Topic, language), created when a purchase succeeds (minted only by the verified PayFast **ITN**, never the client redirect) and never expiring (one-time, lifetime). The presence of the row *is* the access; it attributes to an account (like a Certificate) and never to a Guest. It is the **paid counterpart to a language-scoped Share** — bought, not granted — and, like a Share, is scoped to one Edition: buying the Spanish Edition does not unlock the Urdu one.
@@ -162,6 +162,19 @@ _Avoid_: Author (collides with the Routine *authoring* Lessons), Vendor, Creator
 **Ledger**:
 The money record: one row per sale, written by the verified ITN in the same transaction as the Entitlement it mints. Records the sale's gross / PayFast fee / net (cents) and the 50/50 net split into the **Seller's share** (what the operator owes) and the platform's, with a payout status `owed` → `paid`. The Admin's payouts view sums `owed` rows per Seller; marking rows paid records the EFT reference so a sale is never double-counted.
 _Avoid_: Balance, wallet, statement, payouts table (a Ledger row is per-sale, not per-Seller)
+
+**EFT Intent**:
+A buyer's stated intention to pay for one **[[Edition]]** by direct bank transfer, and the
+**reference** they must use so the money can be matched when it arrives — the manual EFT
+rail ([ADR 0026](docs/adr/0026-manual-eft-payment-rail.md)). Minted by the buyer clicking
+"Pay by EFT" on the paygate; idempotent per (buyer, Edition), so a second click returns the
+same reference rather than a competing one. An intent **grants nothing**: it is a promise to
+pay, and it becomes an [[Entitlement]] only when the operator **confirms** the transfer
+landed, which mints the Entitlement and the [[Ledger]] row together (at `fee: 0`, since no
+gateway took a cut). An intent the money never arrived for is **dismissed** — litter, not an
+error. Provenance for a manual sale is the intent's reference (`eftRef`), exactly where a
+card sale carries a PayFast payment id.
+_Avoid_: Order, invoice, pending purchase (nothing is owed by us), reservation; **[[Publishing|Publish]]** has no relation; "checkout intent" (that is the PayFast rail's own `checkoutIntents` row — a deliberately separate table)
 
 **Preview**:
 On a paid **Edition**, the free first Lesson *in that Edition's language* — readable without an Entitlement by anyone, including a Guest. The teaser that sits before the paygate; continuing past it requires a buyer account and an Entitlement for that Edition.

@@ -1,6 +1,6 @@
 # ywampotch-launch/04: Admin confirm queue — grant + Ledger row
 
-**Status:** open
+**Status:** built (2026-07-29)
 **Depends on:** [03](03-buyer-pay-by-eft-intent-and-reference.md)
 
 ## Why
