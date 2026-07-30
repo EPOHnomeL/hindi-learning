@@ -1,66 +1,58 @@
-# Issue tracker: two homes, split by kind
+<!-- chartr-tracker-adapter: v1 — chartr wrote this file; it is safe to edit, and chartr will ask before replacing it. -->
 
-There are deliberately **two** places a ticket can live, and which one it belongs
-in is decided by *what kind of ticket it is* — not by convenience, and not by
-which tool is closer to hand. This is a split, not drift: an earlier reading of
-this file treated the local tickets as a backlog that "can't be read in one
-place" and something to be migrated. It isn't. Leave it alone.
+# Issue tracker: chartr (local markdown)
 
-## Local — `.scratch/<feature-slug>/issues/` — **implementation work**
+This repo's wayfinder tracker is **chartr**: plain markdown under `.plan/maps/`,
+committed to git, watched live. **No remote tracker, no `.scratch/`.** Every
+wayfinder skill reads and writes maps by this file — the format below is the
+contract; don't invent shapes or fall back to any `.scratch/` default.
 
-The default for anything an agent will build. Ephemeral by nature: it describes a
-change to this codebase, it gets implemented, and then it is history the commits
-already record.
+## Layout
 
-- One Markdown file per unit of work, `NN-kebab-title.md`.
-- Lives beside its PRD at `.scratch/<feature-slug>/PRD.md`.
-- No triage labels — a local ticket is either open or done, tracked by the
-  `**Status:**` line at the top.
+```
+.plan/maps/<slug>/          # planning map + its spec.md (siblings)
+  map.md                    # H1 title; ## Destination, Notes, Decisions so far,
+  tickets/NN-slug.md        #   Not yet specified, Out of scope
+  assets/
+.plan/maps/<slug>-impl/     # implementation map, same shape
+```
 
-## GitHub — `gh issue …` — **non-ephemeral, non-implementation**
+Implementation maps go under `<slug>-impl/`. `NN` is a ticket's permanent
+identity — never reused or renumbered. (`.plan/handoffs/`, `.plan/research/` are
+not maps.)
 
-Reserved for tickets that need to outlive the work, or that exist to be
-*discussed* rather than built:
+## A ticket — `tickets/NN-slug.md`
 
-- Planning and scoping questions worked out collaboratively.
-- Product decisions and open forks awaiting a human answer.
-- Anything a collaborator needs to see, comment on, or be assigned.
-- Long-lived concerns with no implementation attached yet.
+```markdown
+---
+type: task            # task | grilling | research | prototype
+blocked_by: [01, 02]  # ticket numbers whose ## Answer this builds on
+claimed_by: <session> # set while worked; chartr writes/clears it (by hand only offline)
+---
+# Title
+## Question   — what it asks, workable cold
+## Done when  — the concrete condition
+## Answer     — what was decided/built (writing it resolves the ticket)
+```
 
-If the answer to "who else needs to read this?" is "nobody, an agent just needs
-to build it", it is a local ticket.
+## Status is derived, never stored — no `status:` field
 
-## Conventions (both homes)
+- `## Answer` with prose → **resolved** · `## Ruled out` with prose → **out_of_scope**
+- `claimed_by` and no closing section → **claimed** · else → **open**
 
-- Title: `<feature-slug>/<NN>: <title>` where useful, or a plain descriptive
-  title for standalone asks not tied to a feature/PRD.
-- Body sections, in order, using only the ones that apply: `Why`, `Scope`,
-  `Out of scope`, `Acceptance criteria`, `Tests`, `Notes`.
-- Reference dependent/blocking work inline — `#N` for a GitHub issue, a relative
-  path for a local one.
-- See [issue-template.md](issue-template.md) for a fillable copy of this shape.
+**Frontier** = open tickets whose `blocked_by` are all resolved — the work that can
+start now. Computed, never written. A blocker clears the instant its `## Answer`
+lands.
 
-### GitHub only
+## Rules
 
-- Apply a triage role label on creation (see [triage-labels.md](triage-labels.md)).
-- Conversation/history goes as issue comments (`gh issue comment`), append-only.
+1. Write only under `.plan/maps/` — never `.scratch/`, remote, or `docs/`; maps
+   elsewhere are invisible to chartr.
+2. Never store status; the agent writes prose, the tooling derives.
+3. The map is the memory — anything the next session needs lives in an `## Answer`
+   or the map's Notes.
 
-## When a skill says "publish to the issue tracker"
+## Before committing
 
-Decide by kind, per the split above. Implementation work → a Markdown file under
-`.scratch/<feature-slug>/issues/`. Non-ephemeral or discussion-shaped → `gh issue
-create` with a triage label.
-
-## When a skill says "fetch the relevant ticket"
-
-The user will normally name the number, title, or feature. A `#N` means GitHub
-(`gh issue view <n>`); a feature slug means look under
-`.scratch/<feature-slug>/issues/`.
-
-## History
-
-Local → GitHub #12–#36 on 2026-07-10 → local again on 2026-07-15 → GitHub
-reenabled 2026-07-24 → split by kind on 2026-07-29 (this file's current rule).
-Note that issues filed before 2026-07-29 predate the split, so GitHub still
-carries a large number of implementation tickets; they are grandfathered, not a
-precedent. If the rule changes again, update this file and `CLAUDE.md` together.
+Every `blocked_by` names a real ticket; each number used once; no stated progress
+counts (they're derived). chartr checks these live when it's driving.
