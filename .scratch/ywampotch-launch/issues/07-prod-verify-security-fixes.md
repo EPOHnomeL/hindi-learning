@@ -43,3 +43,11 @@ Two checks on **prod**, against real accounts. Minutes of work.
 Real tenant and user accounts exist **only on prod**; dev holds two operator
 accounts (`docs/agents/project-context.md`). Verifying against dev would prove
 nothing about the accounts that matter.
+
+**Ride-along, not scope.** This is the only planned session with a human on prod
+against a real tenant host, and the closed whitelabel map has six tickets whose
+UI check needs exactly that
+([whitelabel map § Verification still outstanding](../../whitelabel/issues/00-whitelabel-map.md)),
+plus [ticket 01's](01-brand-continuity-through-the-funnel.md) brand check. Clearing
+them in the same sitting is free; they are **not** acceptance criteria for this
+ticket and a failure in one of them does not block it.

@@ -5,6 +5,31 @@ issues (07–23) — next step is building them (`/tdd` + `/ponytail`), not anot
 session.
 **Labels:** wayfinder:map
 
+## Verification still outstanding (recorded 2026-07-30)
+
+The map is closed and every implementation issue is built, but **eight tickets
+were never verified in a browser or on prod** — they went green on static gates
+only. This is real open work that "destination reached" hides, so it is recorded
+here rather than left buried in ticket Status lines. Nothing below is a decision;
+none of it reopens the map.
+
+- **UI/browser check pending** (needs an authed sys-admin session on a tenant host):
+  [11 SSR theme application](11-ssr-theme-application.md),
+  [13 lesson palette override](13-lesson-tenant-palette-override.md),
+  [19 Tenants tab shell](19-dashboard-tenants-tab-shell.md),
+  [20 theme editor](20-dashboard-theme-editor.md),
+  [22 assignment + removal guard](22-dashboard-assignment-and-removal.md),
+  [24 grant/revoke tenant admin](24-grant-tenant-admin.md).
+- **Implemented, no verification recorded either way**:
+  [18 cross-host canonical redirect](18-cross-host-canonical-redirect.md).
+- **Waiting on an operator decision, not on code**:
+  [23 legacy course tenant backfill](23-legacy-course-tenant-backfill.md) — a real
+  prod re-bake is the operator's call.
+
+These overlap the live [ywampotch-launch map](../../ywampotch-launch/issues/00-ywampotch-launch-map.md):
+its ticket 07 puts a human on prod against a real tenant host, which is the same
+session that could clear most of the six above. Sequence them together.
+
 ## Destination — reached
 
 Whitelabel v1 is fully specified and captured as a [PRD](../PRD.md) + 17 local implementation
