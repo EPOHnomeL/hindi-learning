@@ -7,6 +7,35 @@ committed to git, watched live. **No remote tracker, no `.scratch/`.** Every
 wayfinder skill reads and writes maps by this file — the format below is the
 contract; don't invent shapes or fall back to any `.scratch/` default.
 
+chartr is also what **drives and visualises** the maps: the frontier, the blocking
+graph and progress are computed from these files live (see "Status is derived"
+below). That is the whole reason nothing here stores state — a written status is a
+lie waiting to happen, and a derived one cannot drift.
+
+## GitHub issues are retired (2026-07-30)
+
+There is **one** home for tickets, and it is this one. Do not open, read, update or
+reference GitHub issues for work tracking; do not run `gh issue`. The brief
+two-homes split of 2026-07-29 (implementation local, planning on GitHub) is
+reverted — it lasted a day and split the frontier across two systems that could
+not see each other.
+
+What happened to the old tracker, so nobody goes looking:
+
+- The **48 open issues** were migrated into maps here — bodies verbatim, ticket
+  numbers preserved from the efforts they were originally filed under — and then
+  **deleted** from GitHub. Each migrated ticket ends in an HTML comment naming its
+  original issue number and filing date.
+- The **29 closed issues stay closed on GitHub**, untouched. They are finished work
+  whose real record is the commits; deleting them would have destroyed history for
+  nothing. Closed-issue references in a ticket's prose (e.g. "closed on GitHub as
+  `google-signin/01`") still resolve there.
+- Links into `.scratch/` PRDs and already-resolved sibling tickets were **de-linked**
+  during the migration where the target no longer exists; the names are kept as
+  prose for provenance.
+
+GitHub is still the place for **code**: pull requests, releases, CI. Just not tickets.
+
 ## Layout
 
 ```

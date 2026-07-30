@@ -28,15 +28,15 @@ file above instead. Context must travel with the repo, not the computer.
   mid-edit in. Push only when asked.
 - **`.env` is the user's** — never edit/`sed`/`cp` it; tell the user the exact
   line to change. Reading config at runtime is fine.
-- **Issues have two homes, split by kind** (2026-07-29). **Implementation work →
-  local Markdown** under `.scratch/<feature>/issues/`, beside its PRD — it gets
-  built and then the commits are the record. **GitHub (`gh issue`) is reserved
-  for non-ephemeral, non-implementation tickets**: planning, scoping, product
-  decisions, open forks, anything a collaborator reads or comments on. Test:
-  if nobody but the implementing agent needs to read it, it is local. Issues
-  filed before 2026-07-29 predate the split — GitHub still holds many
-  implementation tickets, grandfathered, not a precedent. See
-  `docs/agents/issue-tracker.md`.
+- **Issues have one home: `.plan/maps/`, driven by chartr** (2026-07-30). Every
+  ticket — planning *and* implementation — is a Markdown file under
+  `.plan/maps/<effort>/tickets/NN-slug.md` beside its `map.md`, committed to git.
+  **GitHub issues are retired**: do not open, read, or reference `gh issue` for
+  work tracking. The two-homes split of 2026-07-29 lasted one day and is gone;
+  the 48 open GitHub issues were migrated into maps and deleted, and the closed
+  ones stay closed on GitHub as history only. `.scratch/` is retired too — maps
+  are not ephemeral, they are the record. See `docs/agents/issue-tracker.md` for
+  the file format, which is the contract.
 
 ## Feature workflow
 
@@ -45,21 +45,22 @@ file above instead. Context must travel with the repo, not the computer.
 it is `disable-model-invocation: true`, so the user invokes it with `/wayfinder`
 and an agent never starts one unasked. When work is big enough or foggy enough
 that the *route* isn't visible — more than one agent session, several open
-decisions — that is a wayfinder effort: a `wayfinder:map` at
-`.scratch/<effort>/map.md` (or `issues/00-…-map.md`, as `ywampotch-launch` has
-it) with one child ticket per decision, resolved **one per session**, planning
-not doing. Read `.agents/skills/wayfinder/SKILL.md` before touching a map, and
-`.agents/skills/setup-matt-pocock-skills/issue-tracker-local.md` §"Wayfinding
-operations" for how a map, its tickets, claims and blocking are expressed here.
+decisions — that is a wayfinder effort: a map at `.plan/maps/<effort>/map.md`
+with one child ticket per decision, resolved **one per session**, planning not
+doing. Read `.agents/skills/wayfinder/SKILL.md` before touching a map, and
+[docs/agents/issue-tracker.md](docs/agents/issue-tracker.md) for how a map, its
+tickets, claims and blocking are expressed here — that file is the chartr
+adapter and **overrides** the generic `.scratch/` shape described in
+`.agents/skills/setup-matt-pocock-skills/issue-tracker-local.md`.
 
 For a change that is **not** map-sized — the route is already clear, one session
 does it — do **not** use plan mode. Follow this pipeline:
 
 1. **Grill** — run the `grilling` skill to stress-test the idea and pin down requirements.
-2. **PRD** — capture the agreed scope as a PRD under `.scratch/<feature>/` (see Issue tracker).
-3. **Issues** — break the PRD into tickets, one per unit of work, in the home its
-   kind calls for (see Issue tracker above — implementation work is local).
-4. **Implement** — build each issue with the `tdd` skill (test-first) and the `ponytail` skill (laziest solution that works).
+2. **Spec** — capture the agreed scope as `.plan/maps/<effort>/spec.md` (see Issue tracker).
+3. **Tickets** — break the spec into tickets, one per unit of work, under
+   `.plan/maps/<effort>/tickets/` (see Issue tracker above — there is one home).
+4. **Implement** — build each ticket with the `tdd` skill (test-first) and the `ponytail` skill (laziest solution that works).
 
 If you can't tell which it is, the wayfinder test decides: try to state the open
 questions sharply. All sharp and few → pipeline. Fog you can name but can't yet
@@ -69,9 +70,11 @@ phrase as questions → map.
 
 ### Issue tracker
 
-Two homes, split by kind: implementation tickets are local Markdown under `.scratch/<feature>/issues/`;
-GitHub is for non-ephemeral, non-implementation tickets (planning, decisions, collaboration). PRDs live
-locally as `.scratch/<feature>/PRD.md`. See `docs/agents/issue-tracker.md`.
+One home: **chartr**, plain Markdown under `.plan/maps/`, committed to git. A map is
+`.plan/maps/<effort>/map.md`; its tickets are `tickets/NN-slug.md` beside it; a spec is
+`spec.md`. GitHub issues and `.scratch/` are both retired (2026-07-30). chartr also drives
+the wayfinder visualisations — the frontier, blocking edges and progress are *derived* from
+these files, never written into them. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
