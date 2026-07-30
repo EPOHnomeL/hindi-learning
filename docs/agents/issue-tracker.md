@@ -26,7 +26,7 @@ What happened to the old tracker, so nobody goes looking:
   numbers preserved from the efforts they were originally filed under — and then
   **deleted** from GitHub. Each migrated ticket ends in an HTML comment naming its
   original issue number and filing date.
-- The **29 closed issues stay closed on GitHub**, untouched. They are finished work
+- The **27 closed issues stay closed on GitHub**, untouched. They are finished work
   whose real record is the commits; deleting them would have destroyed history for
   nothing. Closed-issue references in a ticket's prose (e.g. "closed on GitHub as
   `google-signin/01`") still resolve there.
