@@ -52,11 +52,20 @@ export function missionExcerpt(mission: string | null | undefined, limit = 180):
 // false a beat after the panel appeared and tear it away mid-sentence. Decide once,
 // when progress first arrives, then hold: `prev` non-null is the latch, `undefined`
 // progress is "still loading — no verdict yet".
+//
+// `lessonCount` is the other half of the verdict, and it is the same latching
+// argument run forwards: a course with no lessons yet is one being *created*, and
+// the owner sitting on "Preparing your first lesson…" got a welcome panel over an
+// empty course announcing "0 lessons" with nothing to start — orientation for a
+// course that doesn't exist yet. Zero is a hard no, and because the verdict latches,
+// the panel doesn't then ambush them the instant generation lands lesson 1.
+// `undefined` is "lessons still loading", same as progress: no verdict yet.
 export function latchFirstOpen(
   prev: boolean | null,
   progress: readonly ProgressLite[] | undefined,
+  lessonCount: number | undefined,
 ): boolean | null {
   if (prev !== null) return prev;
-  if (progress === undefined) return null;
-  return progress.length === 0;
+  if (progress === undefined || lessonCount === undefined) return null;
+  return progress.length === 0 && lessonCount > 0;
 }

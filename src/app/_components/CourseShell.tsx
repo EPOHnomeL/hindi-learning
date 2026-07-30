@@ -113,14 +113,16 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const preview = header?.role === "preview";
 
   // The first-open welcome panel (welcome/01): shown when the caller has no
-  // progress at all on this course. Latched, because rendering a lesson writes an
-  // `opened` row (ArtifactView) and progress is a live query — an unlatched check
-  // would tear the panel away a beat after it appeared.
+  // progress at all on this course *and* the course has lessons to orient them
+  // around — a course still being generated gets no panel. Latched, because
+  // rendering a lesson writes an `opened` row (ArtifactView) and progress is a live
+  // query — an unlatched check would tear the panel away a beat after it appeared,
+  // and on a brand-new course it would pop the panel open the moment lesson 1 lands.
   const [firstOpen, setFirstOpen] = useState<boolean | null>(null);
   const [dismissed, dismiss] = useWelcomeDismissed(slug);
   useEffect(() => {
-    setFirstOpen((prev) => latchFirstOpen(prev, progress));
-  }, [progress]);
+    setFirstOpen((prev) => latchFirstOpen(prev, progress, lessons?.length));
+  }, [progress, lessons]);
 
   const completed = completedKeys(progress ?? []);
   const frontier = frontierKey(lessons ?? []);

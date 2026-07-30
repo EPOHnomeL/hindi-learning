@@ -98,8 +98,10 @@ export function PublicCourseShell({ token, children }: { token: string; children
   const [firstOpen, setFirstOpen] = useState<boolean | null>(null);
   const [dismissed, dismiss] = useWelcomeDismissed(token);
   useEffect(() => {
-    setFirstOpen((prev) => latchFirstOpen(prev, doneLoaded ? guestProgress(completed) : undefined));
-  }, [doneLoaded, completed]);
+    setFirstOpen((prev) =>
+      latchFirstOpen(prev, doneLoaded ? guestProgress(completed) : undefined, course?.lessons.length),
+    );
+  }, [doneLoaded, completed, course?.lessons.length]);
   const markComplete = useCallback(
     (lessonKey: string) => {
       setCompleted((prev) => {

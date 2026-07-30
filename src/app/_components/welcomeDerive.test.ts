@@ -70,28 +70,45 @@ describe("latchFirstOpen", () => {
   const opened = [{ lessonKey: "0001-alpha", status: "opened" as const }];
 
   it("stays undecided while progress is still loading", () => {
-    expect(latchFirstOpen(null, undefined)).toBe(null);
+    expect(latchFirstOpen(null, undefined, 3)).toBe(null);
+  });
+
+  it("stays undecided while the lesson list is still loading", () => {
+    expect(latchFirstOpen(null, [], undefined)).toBe(null);
   });
 
   it("decides true on an empty progress list — nothing opened, nothing completed", () => {
-    expect(latchFirstOpen(null, [])).toBe(true);
+    expect(latchFirstOpen(null, [], 3)).toBe(true);
   });
 
   it("decides false once any progress exists", () => {
-    expect(latchFirstOpen(null, opened)).toBe(false);
-    expect(latchFirstOpen(null, [{ lessonKey: "0001-alpha", status: "completed" as const }])).toBe(false);
+    expect(latchFirstOpen(null, opened, 3)).toBe(false);
+    expect(latchFirstOpen(null, [{ lessonKey: "0001-alpha", status: "completed" as const }], 3)).toBe(false);
+  });
+
+  // A course with no lessons yet is one still being created — the owner is watching
+  // "Preparing your first lesson…", and a welcome panel announcing "0 lessons" with
+  // no lesson to start is orientation for something that isn't there.
+  it("decides false on a course with no lessons yet", () => {
+    expect(latchFirstOpen(null, [], 0)).toBe(false);
   });
 
   // The load-bearing case: rendering a lesson immediately writes an `opened` row
   // (ArtifactView), and progress is a live query — so an unlatched predicate would
   // flip to false and yank the panel out from under the reader mid-sentence.
   it("keeps a true verdict after the reader's own `opened` row lands", () => {
-    expect(latchFirstOpen(true, opened)).toBe(true);
+    expect(latchFirstOpen(true, opened, 3)).toBe(true);
   });
 
   it("never revisits a false verdict, even if progress empties out", () => {
-    expect(latchFirstOpen(false, [])).toBe(false);
-    expect(latchFirstOpen(false, undefined)).toBe(false);
+    expect(latchFirstOpen(false, [], 3)).toBe(false);
+    expect(latchFirstOpen(false, undefined, 3)).toBe(false);
+  });
+
+  // The same latch, forwards: the course had no lessons when we first looked, so
+  // generation landing lesson 1 a moment later must not pop the panel over it.
+  it("holds the no-lessons verdict once the first generated lesson arrives", () => {
+    expect(latchFirstOpen(false, [], 1)).toBe(false);
   });
 });
 
