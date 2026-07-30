@@ -40,13 +40,30 @@ file above instead. Context must travel with the repo, not the computer.
 
 ## Feature workflow
 
-For any non-trivial feature or change, do **not** use plan mode. Follow this pipeline:
+**`wayfinder` is the main way of working in this repo.** Repo skills live in
+`.claude/skills/` (symlinks into `.agents/skills/`) — `wayfinder` is one of them;
+it is `disable-model-invocation: true`, so the user invokes it with `/wayfinder`
+and an agent never starts one unasked. When work is big enough or foggy enough
+that the *route* isn't visible — more than one agent session, several open
+decisions — that is a wayfinder effort: a `wayfinder:map` at
+`.scratch/<effort>/map.md` (or `issues/00-…-map.md`, as `ywampotch-launch` has
+it) with one child ticket per decision, resolved **one per session**, planning
+not doing. Read `.agents/skills/wayfinder/SKILL.md` before touching a map, and
+`.agents/skills/setup-matt-pocock-skills/issue-tracker-local.md` §"Wayfinding
+operations" for how a map, its tickets, claims and blocking are expressed here.
+
+For a change that is **not** map-sized — the route is already clear, one session
+does it — do **not** use plan mode. Follow this pipeline:
 
 1. **Grill** — run the `grilling` skill to stress-test the idea and pin down requirements.
 2. **PRD** — capture the agreed scope as a PRD under `.scratch/<feature>/` (see Issue tracker).
 3. **Issues** — break the PRD into tickets, one per unit of work, in the home its
    kind calls for (see Issue tracker above — implementation work is local).
 4. **Implement** — build each issue with the `tdd` skill (test-first) and the `ponytail` skill (laziest solution that works).
+
+If you can't tell which it is, the wayfinder test decides: try to state the open
+questions sharply. All sharp and few → pipeline. Fog you can name but can't yet
+phrase as questions → map.
 
 ## Agent skills
 
