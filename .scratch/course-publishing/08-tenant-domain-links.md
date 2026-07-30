@@ -44,7 +44,7 @@ Resolve, comment, close, add a Decisions-so-far line to the map. Feeds the PRD
 
 ## Resolution (2026-07-19)
 
-Research lead-in captured in [08-research-subdomain-serving.md](08-research-subdomain-serving.md)
+Research lead-in captured in [research-subdomain-serving.md](research-subdomain-serving.md)
 (how subdomains are configured/served today — ground truth, don't re-derive). Grilled with the user,
 one decision at a time. The `/ponytail` posture held: four known tenants, one convention, no
 speculative multi-tenant origin machinery.

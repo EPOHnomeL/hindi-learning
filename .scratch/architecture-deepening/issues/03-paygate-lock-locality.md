@@ -1,7 +1,7 @@
 # architecture-deepening/03: Stop re-deriving paygate lock state on the client
 
 **Status:** closed (landed on `main`)
-**Labels:** done
+**Labels:** —
 
 ## Why
 

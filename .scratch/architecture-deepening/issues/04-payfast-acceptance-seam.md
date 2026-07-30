@@ -1,7 +1,7 @@
 # architecture-deepening/04: Name the PayFast ITN acceptance rules as their own seam
 
 **Status:** closed (landed on `main`)
-**Labels:** done
+**Labels:** —
 
 ## Why
 

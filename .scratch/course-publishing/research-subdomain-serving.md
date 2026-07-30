@@ -1,4 +1,4 @@
-# course-publishing/08 — research lead-in: how tenant subdomains are configured & served today
+# course-publishing research lead-in: how tenant subdomains are configured & served today
 
 Captured 2026-07-19 for [ticket 08](08-tenant-domain-links.md). Facts with file:line refs;
 ground-truth for the 4 grilling decisions. **Don't re-derive.**

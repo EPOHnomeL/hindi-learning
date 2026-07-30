@@ -8,7 +8,7 @@ onto `SITE_URL`. Guard preserved per-tenant; full convex suite + `tsc` green.
 **Loop:** `/tdd` (test-first) + `/ponytail`
 
 Child of [Course-publishing PRD](PRD.md). Ground truth: [ticket 08](08-tenant-domain-links.md),
-[08-research-subdomain-serving.md](08-research-subdomain-serving.md) (how subdomains are served today
+[research-subdomain-serving.md](research-subdomain-serving.md) (how subdomains are served today
 — don't re-derive).
 
 ## Why

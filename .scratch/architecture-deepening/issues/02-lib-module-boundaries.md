@@ -1,7 +1,7 @@
 # architecture-deepening/02: Give lib.ts's sections real module boundaries
 
 **Status:** closed (landed on `main`)
-**Labels:** done
+**Labels:** —
 
 ## Why
 

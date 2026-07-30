@@ -1,7 +1,7 @@
 # architecture-deepening/05: Disambiguate the three "engine"/"provider" axes
 
 **Status:** closed (landed on `main`)
-**Labels:** done
+**Labels:** —
 
 ## Why
 
