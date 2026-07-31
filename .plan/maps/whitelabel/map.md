@@ -25,9 +25,14 @@ These overlap the live [ywampotch-launch map](../ywampotch-launch/map.md):
 its ticket 07 puts a human on prod against a real tenant host, which is the same
 session that could clear most of the six above. Sequence them together.
 
-## Destination — reached
+## Destination
 
-Whitelabel v1 is fully specified and captured as a [PRD](spec.md) + 17 local implementation
+<!-- Heading kept exactly `## Destination`: the parser matches section headings
+     literally, so annotating it ("— reached") made the whole section invisible and
+     the map reported as having no Destination at all. The reached/not-reached
+     status belongs in the body, as below. -->
+
+**Reached.** Whitelabel v1 is fully specified and captured as a [PRD](spec.md) + 17 local implementation
 issues (07–23), per the CLAUDE.md pipeline: an agreed tenant/subdomain model, per-subdomain
 theming on a tokenised design system, per-tenant feature flags with backend enforcement, and an
 operator whitelabel dashboard. One task was carried in-map as execution: the four tenant
@@ -121,6 +126,102 @@ issue per session in dependency order) is the next work — not another `/wayfin
   tenant-detail layouts, mounted on the real `/admin` route, mock data, then deleted once judged):
   **winner is the stacked-scroll layout** — sidebar tenant list, selected tenant's Theme/Flags/
   Courses/Members/Remove stacked as sections on one scrolling page, no sub-navigation.
+- [Tenant schema & seed](tickets/07-tenant-schema-and-seed.md) — `tenants` keyed `by_slug`;
+  `tenantSlug?` on `topics`/`users`/`whitelist` as a **slug string, no join**. `users` had to be
+  inlined from `authTables` (all original fields + email/phone indexes preserved) to carry the new
+  field. `seedTenant` upserts idempotently — **skip, never overwrite**. The 14-key token contract is
+  enforced in code (`assertThemeTokens`), but Convex cannot import `src/`, so its token list is a
+  **mirror** of 09's — keep the two in sync.
+- [Scope-aware admin roles](tickets/08-scope-aware-admin-roles.md) — **the row shape decides the
+  role**: `isAdmin` + no slug = sys admin (passes every check), `isAdmin` + slug = tenant admin
+  (passes only a matching scoped check). `isCallerAdmin`'s no-arg semantics are unchanged, so every
+  existing caller was unaffected. `removeEmail` refuses to drop a sys admin only when it is the
+  **last** one. The ADR graduated as **0022**, not 0021 — that number was taken in the interim —
+  and ADR 0011's one-Admin invariant is formally superseded.
+- [Design token contract cleanup](tickets/09-design-token-contract-cleanup.md) — `src/design/tokens.ts`
+  is the contract: the 14 names, the per-surface prefix rule, the token semantics. Both stylesheets
+  were reconciled **additively, zero visual change** (`globals.css` gained `good`/`bad`, `head.html`
+  gained `line`/`danger`, each inert on the other surface), taking `head.html`'s values because
+  **code is canonical**. One intended visual change: 7 raw red utilities → `text-danger`.
+- [Tenant resolution middleware](tickets/10-tenant-resolution-middleware.md) — `resolveTenantSlug(host)`
+  is pure, and `TENANT_SLUGS` is **static**: adding a tenant is an operator task, so there is no
+  per-request Convex read on the hot path. The middleware **deletes any inbound `x-tenant-slug`**
+  before forwarding, so a client cannot force a skin. `getTenantSlug()` keeps a direct Host
+  fallback, so correctness never depends on the header surviving Convex Auth's response re-wrap.
+- [SSR theme application](tickets/11-ssr-theme-application.md) — the app's first server-side Convex
+  fetch. **One `getTheme(slug)` serves all three consumers** (SSR palette, server favicon, client
+  context) precisely so they cannot drift; public by design (ADR 0021 §6). The no-flash `<style>`
+  emits under **`:root:root`** — the doubled selector beats Tailwind's `@theme :root` regardless of
+  source order — plus a **partial** dark block, so unset tokens fall through to the default dark.
+  `getTenantView()` degrades to the default skin and logs rather than 500ing the site.
+- [Brand asset upload](tickets/12-brand-asset-upload.md) — no new upload rail: reuses
+  `resources.generateUploadUrl` and **`assertEmblemImage` verbatim** (raster only, **SVG refused**
+  for anonymous-page XSS, 256 KB cap). **Mint-new-never-overwrite** — records the new storage id,
+  never deletes the old blob, and spreads the existing `theme` so only one id changes. `getTheme`
+  already resolved ids to urls, so there was no read-side change.
+- [Lesson tenant palette override](tickets/13-lesson-tenant-palette-override.md) — one builder for
+  both surfaces via a `prefix` param: chrome keeps `--color-<t>`, lessons pass `""` for the design
+  system's bare `--<t>` names. `buildSrcDoc` splices the `<style>` **last**, closest to `</head>`,
+  so it wins source-order ties. Wired once at `Frame`, which backs both `LessonView` and
+  `ReferenceView` — so one point covers lessons, references and translated Editions.
+- [Tenant-aware invite email](tickets/14-tenant-aware-invite-email.md) — `brand` is an **optional
+  third param**, and omitting it renders the pre-whitelabel email **byte-identical**.
+  `paletteFromTokens(light)` derives the 8-slot email palette, and a missing token falls back to the
+  house default so a **partial palette cannot blank a slot**; `faint` has no dedicated token and
+  shares `soft`. The header prefers the tenant logo, else the text wordmark.
+- [Tenant-aware certificate](tickets/15-tenant-aware-certificate.md) — identity comes from the
+  existing `useTenant()` seam, which resolves on anonymous pages too, replacing both hardcoded
+  issuer strings from one place. **The palette freeze is the crux:** a `.cert-card` reset
+  re-declares all 14 tokens back to the default, because custom-property resolution prefers a
+  declaration on the element itself over an inherited one — which is what stops 11's `:root:root`
+  tenant override from repainting a certificate.
+- [Per-tenant landing pages](tickets/16-per-tenant-landing-pages.md) — **the registry mechanism
+  only, no bespoke tenant pages**: that is the correct v1 deliverable, since authoring the copy is
+  later content work. `LANDING_REGISTRY` ships **empty**; `landingFor` is pure and
+  registry-injectable, kept import-light on purpose so it unit-tests under `edge-runtime`.
+  `useTenantSlug()` rides its own context because the registry keys on the slug and must resolve
+  while `<Unauthenticated>` — before the `getTheme` query, whose tenant object omits the slug.
+- [Feature flag enforcement](tickets/17-feature-flag-enforcement.md) — `assertTenantFlag` no-ops
+  when `tenantSlug` is undefined, **fails closed on an unknown slug**, and derives `TenantFlag` from
+  the schema validator so the keys cannot drift. Called inline at five create-side sites, and
+  **placement is what carries the frozen-not-revoked rule**: after `claimCertificate`'s idempotent
+  return, so a cert earned before the flip keeps resolving; and only when `isPublic === true`, so
+  revoking a link stays allowed.
+- [Cross-host canonical redirect](tickets/18-cross-host-canonical-redirect.md) —
+  `canonicalRedirect(currentUrl, courseTenant)` is pure: strip any known-tenant label to find the
+  base domain, re-attach the course's tenant, and swap **only the host**, with path, query and port
+  preserved. Returning `null` when already canonical **is the loop guard**, and is tested
+  explicitly from both the tenanted-subdomain and untenanted-apex sides.
+- [Dashboard — Tenants tab shell](tickets/19-dashboard-tenants-tab-shell.md) — `whitelist.myAdminScope`
+  (one indexed read → `{ role, tenantSlug }`) is **what now admits a tenant admin to `/admin` at
+  all**; it was sys-only before. `listTenants` is a sys-only full scan of an operator-bounded table,
+  the same posture as `whitelist.list`. `createTenant` normalises the slug and seeds the default
+  theme + all-on flags, so a new row is immediately SSR/`getTheme`-resolvable.
+- [Dashboard — theme editor](tickets/20-dashboard-theme-editor.md) — `updateTenantTheme` is the
+  **identity-guarded twin** of the secret-guarded `setTenantTheme`, so an admin repaints from the
+  dashboard without `PUBLISH_SECRET`. `themeWithAssetsPreserved` was extracted so both write paths
+  fold a palette identically: replace `light`, take `dark` only if given, carry `logo`/`favicon`
+  across. The editor is **both** JSON import and per-token fields, as 06 decided.
+- [Dashboard — flag toggles](tickets/21-dashboard-flag-toggles.md) — `setTenantFlags` is
+  **patch-style** (every flag optional, merged onto the existing set) so one switch sends one flag.
+  Deliberately **no confirm dialog and no destructive edit**, because flag-off is frozen-not-revoked:
+  the flip only changes what `assertTenantFlag` permits going forward, and touches nothing granted.
+- [Dashboard — assignment and removal](tickets/22-dashboard-assignment-and-removal.md) — assignment
+  is a one-field patch and removal a refuse-to-remove guard: **no cascade delete was introduced**.
+  `assignCourse` refuses to **steal** a course already owned by another tenant, and the assignable
+  member pool excludes sys admins so one cannot be silently demoted. Needed a new
+  `whitelist.by_tenant` index.
+- [Legacy course tenant backfill](tickets/23-legacy-course-tenant-backfill.md) — an operator
+  migration script, **not a runtime mechanism**. Fidelity beyond 13's render-time 14-var override
+  comes from **value substitution**: every default-palette hex is swapped for the tenant's across
+  the whole stored blob, which repaints the hardcoded literals that reused those values — the ones
+  the render-time override can never reach. The default palette is read **live** from `head.html`
+  so the bake cannot drift from what `publish.ts` inlines. Strictly more fidelity than 13, and
+  **not pixel-perfect** — that is the accepted bar.
+- [Grant tenant admin](tickets/24-grant-tenant-admin.md) — `setTenantAdmin` is **sys-admin-only, and
+  deliberately not the scoped check** the other member mutations use, because minting a tenant admin
+  is a platform privilege rather than a tenant one. Revoke **keeps** `tenantSlug` — it demotes to
+  member rather than unassigning — and an admin row cannot be unassigned directly: demote first.
 
 ## Not yet specified
 

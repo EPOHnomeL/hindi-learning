@@ -48,6 +48,43 @@ plus `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`, set **separately on dev and prod**
 It also needs an acceptance criterion that post-dates the issue — see
 [spec § 1.2](spec.md), the ADR 0025 host-preservation check.
 
+## Decisions so far
+
+<!-- one line per resolved ticket -->
+
+- [Brand continuity through the funnel](./tickets/01-brand-continuity-through-the-funnel.md) —
+  the premise was already stale: only **`CourseShell`** actually lacked a mark.
+  `SignIn` and `Dashboard` were deliberately **left alone** — routing them through
+  `<Brand>` would have *removed* the motto and shrunk the logo, and their bespoke
+  lockups already meet the criteria. Not in the mobile top bar either (a fixed
+  `h-12` with an already-truncating title).
+- [Operator bank details as a settings record](./tickets/02-operator-bank-details-settings-record.md) —
+  **one global record, not per tenant**, with an explicit `enabled` toggle; writes
+  gated on `isCallerAdmin(ctx)`, buyer-facing read returns details only while
+  enabled. The disclosure of bank details to any signed-in user while enabled is
+  intentional and documented at the query.
+- [Buyer flow — Pay by EFT intent + reference](./tickets/03-buyer-pay-by-eft-intent-and-reference.md) —
+  a **separate `eftIntents` table** is what keeps the PayFast path untouched.
+  Reference is topic-prefix + random suffix; creating an intent grants no access;
+  a returning buyer sees pending state via the `market.checkoutStatus` pattern.
+- [Admin confirm queue — grant + Ledger row](./tickets/04-admin-eft-confirm-queue.md) —
+  Confirm mints the Entitlement and writes the Ledger row **atomically in one
+  mutation**, mirroring `fulfillPurchase` (`fee: 0`, `net == gross`, split via
+  `splitNet`), idempotent per reference *and* per `(buyer, Topic, language)`.
+  Schema **widened**: `ledger.pfPaymentId` now optional, `ledger.eftRef` and
+  `entitlements.eftRef` added — exactly one of the two per row, which is the
+  provenance rule. No plan to narrow them back.
+- [EFT confirmation email](./tickets/05-eft-confirmation-email.md) — exactly one
+  Resend send per confirmation, deep-linked to the course on the **tenant's own
+  host** (ADR 0025). Keeps `email.ts`'s no-op-with-warning when Resend is
+  unconfigured, so a mail failure leaves the Entitlement and Ledger row intact;
+  an idempotent repeat confirm sends nothing.
+- [ADR for the manual EFT rail](./tickets/06-adr-manual-eft-rail.md) —
+  [ADR 0026](../../../docs/adr/0026-manual-eft-payment-rail.md): the operator stays
+  sole merchant-of-record, a manual sale mints a `fee: 0` Ledger row so Sales and
+  Payouts stay whole, provenance is `eftRef` vs `pfPaymentId`, and manual per-sale
+  reconciliation is the accepted cost. `CONTEXT.md` gained the glossary term.
+
 ## Rules for this build
 
 - **`tdd` then `ponytail`** on every ticket.
