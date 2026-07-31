@@ -254,6 +254,19 @@ function injectLessonOptionInk(html: string): string {
   return i === -1 ? LESSON_OPTION_INK_CSS + html : html.slice(0, i) + LESSON_OPTION_INK_CSS + html.slice(i);
 }
 
+// Justified prose. Added to head.html for newly published lessons; this carries
+// it to the lessons ALREADY stored, whose HTML has the old rule baked in
+// (published lessons are immutable — ADR 0003). Above the mobile breakpoint
+// only: at a phone's measure, justification opens rivers of whitespace between
+// words, so narrow screens stay ragged-right. Paragraphs only — headings, the
+// `.sub` deck and the pills are divs and stay as authored.
+const LESSON_JUSTIFY_CSS = `<style>@media (min-width: 641px){.wrap p{text-align:justify; hyphens:auto}}</style>`;
+
+function injectLessonJustify(html: string): string {
+  const i = html.indexOf("</head>");
+  return i === -1 ? LESSON_JUSTIFY_CSS + html : html.slice(0, i) + LESSON_JUSTIFY_CSS + html.slice(i);
+}
+
 // Re-point the lesson design system's HARDCODED dark surfaces at the palette
 // tokens, for tenant hosts only. Every lesson's stored HTML carries head.html's
 // dark block, which hardcodes ~20 warm-brown hexes (#241f1a cards, #3a322a
@@ -404,7 +417,10 @@ export function buildSrcDoc(
   if (reference) doc = injectReferenceCardCss(doc);
   // Lessons only — `quiz` is what distinguishes a lesson from a reference here, and
   // references carry no quiz options.
-  if (opts.quiz) doc = injectLessonOptionInk(doc);
+  if (opts.quiz) {
+    doc = injectLessonOptionInk(doc);
+    doc = injectLessonJustify(doc);
+  }
   doc = setRootDirLang(doc, opts.dir, opts.lang);
   if (opts.lang && isDevanagari(opts.lang)) doc = injectDevanagariCss(doc);
   if (opts.tenantPalette) doc = injectTenantPaletteCss(doc, opts.tenantPalette);
