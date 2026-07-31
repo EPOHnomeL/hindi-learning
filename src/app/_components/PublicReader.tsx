@@ -57,10 +57,12 @@ function Centered({ children }: { children: React.ReactNode }) {
 // Buy on a Public link routes into the authed app (auth-first, ADR 0021): the
 // SAME Lesson/Reference under /courses, carrying the Edition and a `buy` marker.
 // Signed out, that URL renders SignIn (defaulting to "Create account"); signed
-// in, it lands on the locked page with the buy dialog open.
+// in, it lands on the locked page with the buy dialog open. `lang` is ALWAYS
+// set, "en" included: the buyer must land on the Edition they chose to buy —
+// left implicit, the resolver would serve any free published Edition of the
+// course instead of this paid one's paygate (editionUrl.ts).
 function buyLink(slug: string, kind: "lessons" | "references", key: string, lang: string): string {
-  const params = new URLSearchParams({ buy: "1" });
-  if (lang !== "en") params.set("lang", lang);
+  const params = new URLSearchParams({ buy: "1", lang });
   return `/courses/${slug}/${kind}/${key}?${params.toString()}`;
 }
 

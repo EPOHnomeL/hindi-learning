@@ -400,9 +400,10 @@ function ThemeToggle() {
 
 // The Edition switcher (course-translation): swap the reader between the Editions
 // the caller holds. Selecting one navigates the current page with `?lang=<code>`
-// (English omits the param, keeping its URLs clean) and remembers the choice
-// per-device, so reopening a course lands back in that language. Rendered next to
-// ThemeToggle; only mounted when there's more than one Edition.
+// — English included: an explicit pick pins the Edition (editionUrl.ts) — and
+// remembers the choice per-device, so reopening a course lands back in that
+// language. Rendered next to ThemeToggle; only mounted when there's more than
+// one Edition.
 function LanguageSwitcher({
   editions,
   current,

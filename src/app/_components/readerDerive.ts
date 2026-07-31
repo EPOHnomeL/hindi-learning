@@ -16,11 +16,14 @@ export function firstLessonKey(lessons: readonly LessonLite[]): string | null {
 // The course-index redirect URL: the resolved lesson path carrying the CURRENT
 // query string through — dropping `purchase`/`mp` here would silently kill the
 // payment-return banner (auth-first checkout). `lang` is replaced by the
-// resolved Edition (null/"en" is the default and carries no param).
+// resolved Edition. An explicit "en" is KEPT (only null drops the param): an
+// explicit lang pins the served Edition, and stripping "en" once let the
+// resolver fall back from the paid English Edition to a free published one —
+// the buyer lost the paygate entirely (see editionUrl.ts).
 export function courseIndexRedirect(path: string, search: string, lang: string | null): string {
   const params = new URLSearchParams(search);
   params.delete("lang");
-  if (lang && lang !== "en") params.set("lang", lang);
+  if (lang) params.set("lang", lang);
   const qs = params.toString();
   return qs ? `${path}?${qs}` : path;
 }

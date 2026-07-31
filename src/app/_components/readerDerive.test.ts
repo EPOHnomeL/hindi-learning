@@ -34,9 +34,21 @@ describe("courseIndexRedirect", () => {
     );
   });
 
-  it("English is the default Edition and carries no lang param", () => {
+  it("no resolved Edition carries no lang param", () => {
     expect(courseIndexRedirect("/courses/hindi/lessons/0001", "", null)).toBe("/courses/hindi/lessons/0001");
-    expect(courseIndexRedirect("/courses/hindi/lessons/0001", "lang=en", "en")).toBe("/courses/hindi/lessons/0001");
+  });
+
+  it("an explicit English Edition is preserved, never stripped", () => {
+    // Regression (prod bug): a buyer pinned to the paid English Edition
+    // (`?lang=en` from the buy funnel or a catalogue card) must stay on it.
+    // Stripping "en" here left the request implicit, and the resolver then fell
+    // back to any free published Edition (the Finnish one) — no paygate, no buy.
+    expect(courseIndexRedirect("/courses/hindi/lessons/0001", "lang=en", "en")).toBe(
+      "/courses/hindi/lessons/0001?lang=en",
+    );
+    expect(courseIndexRedirect("/courses/hindi/lessons/0001", "buy=1&lang=en", "en")).toBe(
+      "/courses/hindi/lessons/0001?buy=1&lang=en",
+    );
   });
 });
 

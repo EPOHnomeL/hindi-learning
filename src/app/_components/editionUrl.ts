@@ -4,26 +4,32 @@ import { useSearchParams } from "next/navigation";
 import { canonicalRedirect, type TenantSlug } from "~/lib/tenant";
 
 // The reader's Edition language lives in the URL as `?lang=<code>` (course-
-// translation). English is the default and carries no param, so an English URL
-// stays clean and `?lang=en` is treated the same as absent. Every reader query
-// threads this through; the backend honours it only if the caller holds that
-// Edition (else it falls back), so the client just passes it along.
+// translation). ABSENT means "no preference" — the backend then serves a held
+// Edition (resolveEdition's fallback). PRESENT — including an explicit
+// `?lang=en` — is a request for exactly that Edition: the backend serves it in
+// full when held, or as the paid Preview (paygate) when it's priced. Explicit
+// "en" must never be collapsed to absent: on a course whose paid English
+// Edition coexists with a free published translation, an implicit request
+// falls back to the free Edition — which silently replaced the buy flow with
+// free foreign-language content (the prod checkout bug). Only links that carry
+// no language stay clean.
 
 // localStorage key for the reader's last-used Edition — mirrors ThemeContext's
 // "hindi:theme". Written on switch, read to reopen a course in that language.
 export const LANG_KEY = "hindi:lang";
 
-// The current Edition language from the URL, or null for the default English.
+// The current Edition language from the URL — "en" included — or null when the
+// URL carries no preference.
 export function useEditionLang(): string | null {
   const params = useSearchParams();
-  const lang = params.get("lang");
-  return lang && lang !== "en" ? lang : null;
+  return params.get("lang") || null;
 }
 
 // Append `?lang=<code>` to a reader href so the current Edition survives
-// navigation. English ("en") / null is the default and adds no param.
+// navigation — "en" included (an explicit Edition stays pinned; see the header
+// note). Only null/undefined (no preference) adds no param.
 export function withLang(href: string, lang: string | null | undefined): string {
-  if (!lang || lang === "en") return href;
+  if (!lang) return href;
   const sep = href.includes("?") ? "&" : "?";
   return `${href}${sep}lang=${encodeURIComponent(lang)}`;
 }
