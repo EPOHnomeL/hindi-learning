@@ -33,7 +33,7 @@ named and fixed — not a vague aspiration.
 
 ## Not yet specified
 
-- Everything downstream of the walkthrough. Fog stays fog here deliberately: the observations
+- **Everything downstream of the walkthrough.** Fog stays fog here deliberately: the observations
   come first, and the tickets are cut from them.
 
 ## Out of scope

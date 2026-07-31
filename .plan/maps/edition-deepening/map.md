@@ -71,7 +71,7 @@ place, and the two readers are adapters, not parallel re-implementations.
   (behavior-preserving):** `resolveReaderEdition` → **`resolveEdition`** (THE authed selection seam,
   doc'd) and `public.ts`'s private `resolveEdition(token)` → **`guestEditionFromToken`** (frees the
   name, documents the Guest-has-no-ladder distinction). Pure rename; `tsc` clean, **102 tests green**.
-  Commit `a1e4357`. **Unblocks the content/public collapse → [ticket 04](tickets/04-collapse-content-public-adapters.md).**
+  Commit `a1e4357`. **Unblocks the content/public collapse → ticket 04.**
 
 - [Collapse content.ts / public.ts onto a shared reader core](tickets/04-collapse-content-public-adapters.md) —
   **the destination's final leg, landed.** Grilling settled the open question empirically: a real core
@@ -88,7 +88,7 @@ place, and the two readers are adapters, not parallel re-implementations.
 
 <!-- in-scope fog: real but not yet sharp enough to ticket; graduates as the frontier advances -->
 
-- _(empty — all fog graduated and resolved; the destination is reached.)_
+_(empty — all fog graduated and resolved; the destination is reached.)_
 
 ## Out of scope
 

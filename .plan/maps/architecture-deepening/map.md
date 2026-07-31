@@ -68,7 +68,7 @@ locality). Domain terms: `CONTEXT.md`.
 
 <!-- in-scope fog: real but not yet sharp enough to ticket; graduates as the frontier advances -->
 
-- _(none — all five candidates from the review are already ticketed below.)_
+_(none — all five candidates from the review are already ticketed below.)_
 
 ## Open tickets
 

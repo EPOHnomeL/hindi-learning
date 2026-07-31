@@ -69,7 +69,7 @@ not the feature.
   enrollees in, stops only new free joins. Created only for a currently-free **published** Edition;
   private/unpublished stays grant-only. Captured as
   [ADR 0023 draft](../../../docs/adr/0023-self-enroll-access-primitive.md). Surfaced the language axis →
-  split three ways (see [ticket 07](tickets/07-language-scoped-access.md) + fog below).
+  split three ways (see ticket 07 + fog below).
 
 - [Per-tenant `selling` flag](tickets/02-per-tenant-selling-flag.md) — a **sixth required `tenants.flags`
   boolean, `selling`**, defaulting **`false`** everywhere (migration backfills the four existing rows;
@@ -78,7 +78,7 @@ not the feature.
   frozen-not-revoked: listing persists, existing buyers keep access, the Edition becomes unbuyable,
   and `clearEditionPrice` stays **un-gated** so an owner can always drop a stuck price to free.
   Default-site selling (undefined slug → flag implicitly on) is deferred to
-  [ticket 04](tickets/04-default-site-vs-tenant-scope.md).
+  ticket 04.
 
 - [Default-site vs tenant scope](tickets/04-default-site-vs-tenant-scope.md) — the default site **is** in
   scope (discovery pain is strongest on the flagship), but every catalogue is **scoped symmetrically**:
@@ -99,7 +99,7 @@ not the feature.
   status flip; free/priced stays per-Edition `listings`). Publish = catalogue **visibility only, not
   an acquisition gate**: self-enroll needs `published`, but **buy works via direct link regardless**
   (unlisted-but-buyable); public link + listings sit beside publish, unchanged. Surfaced
-  [ticket 08 — Tenant-domain link generation](tickets/08-tenant-domain-links.md) (blocks the PRD) and parked
+  ticket 08 — Tenant-domain link generation (blocks the PRD) and parked
   the learner-progress %/estimate pain out of scope (below).
 
 - [Tenant-domain link generation](tickets/08-tenant-domain-links.md) — a tenant course's server-built links
@@ -111,7 +111,7 @@ not the feature.
   the **one** `appUrl` helper — **retiring redundant `APP_BASE_URL` onto `SITE_URL`**. **Unchanged:**
   ITN `notify_url` (stays `CONVEX_SITE_URL`, reachability a non-issue), and **public/share links**
   (already tenant-correct — built client-side off `window.location.origin`). Research + build notes in
-  the [ticket](tickets/08-tenant-domain-links.md); PRD-blocker for [ticket 06](tickets/06-prd-and-issue-breakdown.md) cleared.
+  the ticket; PRD-blocker for ticket 06 cleared.
 
 - [Language-scoped access](tickets/07-language-scoped-access.md) — **rescoped mid-grilling; premise obsolete.**
   Content-translation is **already live** (the `translations` table, `convex/translate.ts`, the
@@ -124,7 +124,7 @@ not the feature.
   unchanged, **no new data model**); every published course joinable in ≥ English (**no locked cards**);
   the language control is **gated by the tenant `translations` flag** (off ⟹ English-only Join). **No
   `/prototype`** — the card affordance (language selector beside **Join**, native names from
-  `LANGUAGES`) is **spec'd in words for [ticket 05](tickets/05-tenant-catalogue-surface.md)**. **Unblocks
+  `LANGUAGES`) is **spec'd in words for ticket 05**. **Unblocks
   ticket 05.** Spun off the **chrome / app-UI i18n** effort (see below) as the user's actual priority.
 
 - [The catalogue surface](tickets/05-tenant-catalogue-surface.md) — `/prototype` judged with the user; winner
@@ -146,6 +146,38 @@ not the feature.
   (11), tenant-domain links via `appUrl(path, tenantSlug?)` (12), the self-enroll mutation (13), the
   catalogue query (14), the "Browse courses" surface (15), and enrolled-on-dashboard (16, safe to
   defer). No re-decisions; the collapsed ticket-07 content-language layer is kept out. **Map complete.**
+
+- [Enrollments table + `enrolled` grant](tickets/09-enrollments-and-enrolled-grant.md) — built test-first
+  2026-07-19: the `enrollments` table with `by_user` / `by_topic` / `by_topic_user` indexes, the
+  resolver's `enrolled` branch (checked before the price fallback → grandfathered), `enrolledLangs` /
+  `heldLangs` / `getViewableTopic` unioned in, `courseHeader.role` extended.
+
+- [Publish lifecycle](tickets/10-publish-lifecycle.md) — shipped 2026-07-28 **at a different grain than
+  specced**: per-**Edition** `publishedEditions` rows, not a fourth `topics.status` value
+  (decision of record [ADR 0024](../../../docs/adr/0024-publish-at-the-edition-grain.md)). No status-machine or
+  `setEditionPrice` gate change; owner-only publish reaffirmed; visibility-only, not an acquisition gate.
+
+- [Tenant-domain links (build)](tickets/12-tenant-domain-links.md) — done 2026-07-23: `appUrl(path,
+  tenantSlug?)` derives `<slug>.<base>`, routed through checkout return/cancel + invite deep-links;
+  `APP_BASE_URL` retired onto `SITE_URL`; open-redirect guard preserved per-tenant. Convex suite + `tsc` green.
+
+- [Self-enroll mutation](tickets/13-self-enroll-mutation.md) — **superseded by the build's shape**
+  (2026-07-28, ADR 0024): with per-Edition publishing, a free published Edition reads ≡ Viewer for any
+  signed-in account — zero-step access in `grantsFor`, no Join click, no `enrollments` row written
+  (table + resolver branch stay in place, honoured but unwritten). Priced Editions keep Preview + paygate.
+
+- [Catalogue query](tickets/14-catalogue-query.md) — `catalogue.list` shipped 2026-07-28; an initial
+  `users.tenantSlug` scoping was **broken in production** (nothing writes that field) and was reverted
+  same day to this ticket's host-derived design via `useTenantSlug()` (ADR 0024 §6 carries the amendment).
+
+- [Catalogue surface](tickets/15-catalogue-surface.md) — shipped 2026-07-28 **as a section, not a route**:
+  an available-courses section on the signed-in home reading the host-scoped `catalogue.list`; one
+  **Open** action per card (free reads immediately, priced lands on Preview + paygate); no filter chips,
+  no per-card language selector. End of the member-facing build.
+
+- [Enrolled-on-dashboard](tickets/16-enrolled-on-dashboard.md) — **moot by the shipped model** (2026-07-28,
+  ADR 0024): `enrollments` is never written, so the proposed `listEnrolledTopics` surface has no rows to
+  list and was not built; published courses surface via the home's available-courses section instead.
 
 ## Not yet specified
 

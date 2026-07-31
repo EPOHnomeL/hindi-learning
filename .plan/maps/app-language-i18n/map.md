@@ -44,6 +44,13 @@ Shipping the code is the *next* effort, not this map.
 
 <!-- one line per closed ticket: enough to judge relevance, then zoom the link -->
 
+- [Original proposal — global picker + full chrome i18n](tickets/01-global-app-language-picker-full-chrome-i18n.md) —
+  **superseded; folded into map 00 as prior art** (2026-07-19). Its founding premise (app language as a
+  separate, global, preference-resolved setting independent of Edition access) was adopted; its
+  app-wide-RTL and runtime-i18n-layer (Convex `localizations` + LLM generate-if-missing) proposals were
+  rejected by tickets 02/04's `next-intl` + repo-JSON architecture. Not a live ticket — the map grills
+  against it.
+
 - [Research — App Router i18n approach](tickets/02-research-app-router-i18n-approach.md) — recommends
   **`next-intl` "without i18n routing"** (locale from a cookie) over an in-house `t()` layer, with
   **repo per-locale JSON** catalogues (not a Convex `localizations` table + LLM rail). Corrects ticket
@@ -95,13 +102,13 @@ Shipping the code is the *next* effort, not this map.
 
 <!-- in-scope fog: real but not yet sharp enough to ticket; graduates as the frontier advances -->
 
-- ~~**Catalogue staleness / sync.**~~ **Closed by 05** — specced as a build-time **key-parity
+- **~~Catalogue staleness / sync.~~ Closed by 05** — specced as a build-time **key-parity
   `vitest` test** ("every `messages/<code>.json` carries exactly `en.json`'s leaf keys; CI fails on
   drift"), owned by ticket 05. No longer fog.
 - **Mixed-language UX marker.** Whether to surface a subtle banner/marker when chrome language ≠ the
   content Edition's language, so the mixed state isn't read as a bug (from ticket 01's notes).
   Graduates once storage (03) + architecture (04) settle.
-- ~~**Pluralization & number/date/currency formatting.**~~ **Resolved by 04** — absorbed into the
+- **~~Pluralization & number/date/currency formatting.~~ Resolved by 04** — absorbed into the
   `next-intl` layer choice: ICU message format + `Intl` give pluralization and number/date/currency
   formatting for free. No longer fog, not a separate ticket.
 - **Per-locale acceptance / QA.** How we judge a language "done" — visual QA pass across each
