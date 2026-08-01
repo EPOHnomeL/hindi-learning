@@ -54,7 +54,7 @@ history on a repo that now handles real money.
 | 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | **open — next** |
 | 15 | Launch risk — rollback + prod walk-through | [15](tickets/15-checkout-page-launch-risk-and-prod-walk.md) | blocked by 13, 14 |
 | 16 | The EFT dead end — a way out, and somewhere to wait | [16](tickets/16-eft-dead-end-and-awaiting-payment.md) | built `14b3888` — **operator's walk pending** |
-| 17 | The card buyer's payment-complete moment | [17](tickets/17-payment-complete-moment-on-card-return.md) | **open — next** |
+| 17 | The card buyer's payment-complete moment | [17](tickets/17-payment-complete-moment-on-card-return.md) | built `f8b55c3` — **operator's walk pending** |
 
 The strict sequencing above applied to units 01–06, which shared files and are
 done. The 2026-08-01 additions are a second strand: 09 stood alone (a
@@ -196,6 +196,22 @@ generic first-open Welcome panel fills the gap instead, saying nothing about
 money. Recorded here rather than by editing 12, whose reasoning was sound on what
 was known then; the fix is [ticket 17](./tickets/17-payment-complete-moment-on-card-return.md),
 and the operator has chosen its shape (a purchase variant of the Welcome panel).
+
+- [The card buyer's payment-complete moment](./tickets/17-payment-complete-moment-on-card-return.md) —
+  built `f8b55c3` (subject line mangled to `@`; real subject is the first body
+  line). One panel owns the opening moment: **Payment complete** (check mark,
+  start CTA) or **Confirming payment** (the old banner's pulsing dot and copy,
+  start CTA withheld until the grant lands), picked by a pure `welcomeVariant` —
+  so the generic Welcome can never also appear. Deliberately **not** gated on the
+  `firstOpen` latch (a buyer who read the free Preview carries progress and is
+  owed the receipt), holds a beat while the status resolves rather than flashing
+  "confirming" at a buyer already paid, and falls through to orientation on a
+  token naming no intent. Dismissal is scoped to the intent token, closing a hole
+  the ticket didn't name: dismissal is per-tab-session and buying happens inside
+  one session, so a pre-purchase dismissal would have silenced the receipt.
+  `ConfirmingBanner` and its two `Reader` strings deleted, four `Welcome` keys
+  added across all five locales. `convex/` untouched. **The operator's walk is
+  still owed**, same bar as 13 and 16.
 
 ## Not yet specified
 
