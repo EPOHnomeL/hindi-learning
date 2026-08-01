@@ -84,6 +84,28 @@ export const listSellers = query({
   },
 });
 
+// Just the emails of Sellers who are `ready` — the set of accounts that may be
+// named as a tenant's donation payee (ADR 0027). Admin-only, like every read on
+// this table.
+//
+// **Deliberately not `listSellers`**, which is the one read in the codebase that
+// returns payout bank details: a payee picker needs a list of names, and pulling
+// bank details into a tenant-config screen to populate a dropdown would widen
+// that surface for nothing. Same bounded scan, filtered to the only choices the
+// `setDonationPayee` gate would accept anyway.
+export const readySellerEmails = query({
+  args: {},
+  returns: v.array(v.string()),
+  handler: async (ctx) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const rows = await ctx.db.query("sellers").take(1000);
+    const emails = await Promise.all(
+      rows.map(async (r) => (sellerStatusOf(r) === "ready" ? (await ctx.db.get(r.userId))?.email : undefined)),
+    );
+    return emails.filter((e): e is string => !!e).sort((a, b) => a.localeCompare(b));
+  },
+});
+
 // ---- Self: payout bank details (the second gate) ----------------------------
 
 // Save (or correct) the caller's payout bank details — the step that makes a

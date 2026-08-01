@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
@@ -251,7 +251,15 @@ export const setTenantFlags = mutation({
     // Seller. Switching it OFF is always allowed.
     if (flags.donations === true) {
       if (!tenant.donationPayee || !(await isReadySeller(ctx, tenant.donationPayee))) {
-        throw new Error("Set a donation payee who is an approved seller with payout details before enabling donations.");
+        // ConvexError, not Error: a **production** deployment redacts a plain
+        // Error's message before it reaches the client and the operator gets a
+        // bare "Server Error" — which is what this precondition looked like the
+        // first time it fired for real. Only ConvexError's `data` crosses the
+        // wire in prod, so an instruction the operator is meant to act on has to
+        // be thrown as one.
+        throw new ConvexError(
+          "Set a donation payee who is an approved seller with payout details before enabling donations.",
+        );
       }
     }
     await ctx.db.patch(tenant._id, { flags: { ...tenant.flags, ...flags } });
@@ -313,9 +321,11 @@ export const setDonationPayee = mutation({
       .query("users")
       .withIndex("email", (q) => q.eq("email", normaliseEmail(email)))
       .unique();
-    if (!user) throw new Error(`No account for ${email.trim()} — the payee must have signed up.`);
+    // ConvexError for the same reason the flag gate uses one: these two are
+    // instructions to the operator, and prod redacts a plain Error's message.
+    if (!user) throw new ConvexError(`No account for ${email.trim()} — the payee must have signed up.`);
     if (!(await isReadySeller(ctx, user._id))) {
-      throw new Error("That payee must be an approved seller with payout bank details on file.");
+      throw new ConvexError("That payee must be an approved seller with payout bank details on file.");
     }
     await ctx.db.patch(tenant._id, { donationPayee: user._id });
     return null;

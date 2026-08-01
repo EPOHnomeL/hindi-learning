@@ -12,6 +12,20 @@ import { TENANT_THEME_TOKENS, type Token } from "../../design/tokens";
 import { salesRange, type SalesPreset } from "./salesRange";
 import { colorVar, rankLanguages, VIZ_SLOTS } from "./salesChart";
 import { axisTicks, labelIndices, niceMax } from "./dayChart";
+import { ConvexError } from "convex/values";
+
+// The message to show the operator when a mutation refuses.
+//
+// **A production Convex deployment redacts a plain `Error`'s message** before it
+// reaches the client — `e.message` is then the useless "[CONVEX M(...)] Server
+// Error" string, which is exactly what the donation-flag precondition looked
+// like the first time it fired in prod. Only `ConvexError`'s `data` survives the
+// trip, so that is what we read first; a server that threw a plain Error gets
+// the caller's own fallback rather than Convex's internal one.
+function mutationError(e: unknown, fallback: string): string {
+  if (e instanceof ConvexError && typeof e.data === "string") return e.data;
+  return fallback;
+}
 
 // The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
 // dashboard is now scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
@@ -1632,6 +1646,11 @@ function RowActionButton({ label, busyLabel, run, aria }: { label: string; busyL
 // switches the Donations flag off, so the two can never disagree.
 function DonationPayee({ slug }: { slug: string }) {
   const current = useQuery(api.tenants.donationPayeeEmail, { tenantSlug: slug });
+  // The only accounts the server would accept — a picker rather than a text
+  // field, so the two rejections below ("no account", "not a ready seller")
+  // become unreachable by construction instead of something the operator
+  // discovers by typing an email and being told no.
+  const candidates = useQuery(api.sellers.readySellerEmails);
   const setPayee = useMutation(api.tenants.setDonationPayee);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1644,7 +1663,7 @@ function DonationPayee({ slug }: { slug: string }) {
       await setPayee({ tenantSlug: slug, email: next });
       setEmail("");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't set that payee.");
+      setError(mutationError(e, "Couldn't set that payee."));
     } finally {
       setBusy(false);
     }
@@ -1666,12 +1685,25 @@ function DonationPayee({ slug }: { slug: string }) {
           void save(email);
         }}
       >
-        <input
+        <select
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder="payee@example.com"
-          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-1.5 text-sm focus:border-accent focus:outline-none"
-        />
+          disabled={busy || !candidates?.length}
+          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-1.5 text-sm focus:border-accent focus:outline-none disabled:opacity-60"
+        >
+          <option value="">
+            {candidates === undefined
+              ? "Loading…"
+              : candidates.length === 0
+                ? "No approved sellers with payout details yet"
+                : "Choose a payee…"}
+          </option>
+          {candidates?.map((e) => (
+            <option key={e} value={e}>
+              {e}
+            </option>
+          ))}
+        </select>
         <button
           type="submit"
           disabled={busy || !email.trim()}
@@ -1727,7 +1759,7 @@ function FlagToggles({ slug, flags }: { slug: string; flags: Partial<Record<Tena
     try {
       await setFlags({ tenantSlug: slug, flags: { [key]: next } });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Couldn't update that flag.");
+      setError(mutationError(e, "Couldn't update that flag."));
     } finally {
       setBusy(null);
     }

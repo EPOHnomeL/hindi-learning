@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
+import { ConvexError } from "convex/values";
 import { afterEach, beforeAll, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
@@ -390,6 +391,32 @@ test("the donations flag and payee are sys-admin-only and cannot be switched on 
   tenant = await t.run((ctx) => ctx.db.query("tenants").first());
   expect(tenant!.donationPayee).toBeUndefined();
   expect(tenant!.flags.donations).toBe(false);
+});
+
+// The bug this pins was found in PROD, not in a test: the flag refused to switch
+// on and the admin panel showed "Server Error", because a production Convex
+// deployment redacts a plain `Error`'s message before it reaches the client.
+// Only `ConvexError`'s data survives, so any refusal the OPERATOR is meant to act
+// on has to be one — a `new Error` here is invisible where it matters.
+test("the operator-facing refusals are ConvexError, so prod shows them instead of 'Server Error'", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  await t.run((ctx) => ctx.db.insert("users", { email: "payee@example.com" }));
+  await t.run((ctx) =>
+    ctx.db.insert("tenants", { slug: "ywampotch", displayName: "YWAM Potch", theme: THEME, flags: FLAGS }),
+  );
+  const sys = asUser(t, admin);
+
+  for (const call of [
+    () => sys.mutation(api.tenants.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } }),
+    () => sys.mutation(api.tenants.setDonationPayee, { tenantSlug: "ywampotch", email: "nobody@example.com" }),
+    () => sys.mutation(api.tenants.setDonationPayee, { tenantSlug: "ywampotch", email: "payee@example.com" }),
+  ]) {
+    const err = await call().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ConvexError);
+    // …and the payload is the sentence the operator reads, not an opaque code.
+    expect(typeof (err as ConvexError<string>).data).toBe("string");
+  }
 });
 
 test("a tenant with no donations flag set at all is off — absence is fail-closed, no backfill needed", async () => {
