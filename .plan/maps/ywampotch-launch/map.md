@@ -56,6 +56,7 @@ history on a repo that now handles real money.
 | 16 | The EFT dead end — a way out, and somewhere to wait | [16](tickets/16-eft-dead-end-and-awaiting-payment.md) | built `14b3888` — **operator's walk pending** |
 | 17 | The card buyer's payment-complete moment | [17](tickets/17-payment-complete-moment-on-card-return.md) | built `f8b55c3` — **operator's walk pending** |
 | 18 | The operator's prod walk — both paths, both rails | [18](tickets/18-operators-prod-walk.md) | open — collects the four pending walks |
+| 19 | One real EFT sale, end to end, on prod | [19](tickets/19-real-eft-sale-end-to-end-on-prod.md) | open — blocked by 18; the map's Done-when |
 
 The strict sequencing above applied to units 01–06, which shared files and are
 done. The 2026-08-01 additions are a second strand: 09 stood alone (a
@@ -69,6 +70,14 @@ the container was the complaint. 12 is the decision the other three hang off;
 13 and 14 are independent of each other and can run in parallel once it closes.
 **11 and 13 land in the same surface** — whichever ships second inherits the
 merge.
+
+**18 and 19 are what is left**, and they are the same person's afternoon in two
+sittings: 18 is the buyer's half (taste, on a phone, stopping at Awaiting
+payment), 19 is the operator's half and the map's Done-when (a real transfer,
+confirm, email, Sales, Payouts). 19 was **missed at charting** — 02–05 built the
+whole confirm side and every one of them was verified by tests and code-reading
+only, so nothing on the map ever carried the claim its Done-when makes. Added
+2026-08-01 by an audit session, not by a resolution.
 
 **The EFT rail is ON in dev and prod** (operator confirmed 2026-08-01), so the
 chooser, the bank-details panel and the pending state all render today. Earlier
@@ -337,10 +346,13 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   fault fixes it forward rather than reaching for an undo. The one hatch that
   exists (Vercel instant rollback to `ae3f1d3`) is documented in 15's Answer and
   retreats to known-degraded, so it is an emergency, not a workflow.
-- **Ticket 14's `00c78c5` is unpushed and pushing it deploys prod.** The operator
-  chose to walk prod as-is first and push after (ticket 18). Before any push,
-  note the Vercel rollback target and re-check it survived the build — 15 found
-  exactly one candidate, and it is the whole hatch.
+- ~~**Ticket 14's `00c78c5` is unpushed and pushing it deploys prod.**~~ **Stale
+  as of 2026-08-01 evening: `00c78c5` is on `origin/main` and therefore on prod**,
+  and prod has since moved several commits further (the marketplace donation rail
+  rode the same branch). The two-pass structure ticket 18 was written around is
+  gone — the whole strand, 14 included, is live and 18 is now a single walk.
+  Everything else in 15's hatch still holds: before any push, note the Vercel
+  rollback target and re-check it survived the build.
 
 ## Done when
 
