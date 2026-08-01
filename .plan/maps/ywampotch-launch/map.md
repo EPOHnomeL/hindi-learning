@@ -51,7 +51,7 @@ history on a repo that now handles real money.
 | 11 | Regional pricing mechanism ($10/€10/R100) | [11](tickets/11-regional-pricing-mechanism.md) | **open — grilling, needs the operator** |
 | 12 | Checkout as a page — route + step model | [12](tickets/12-checkout-page-route-and-step-model.md) | answered |
 | 13 | Move the purchase out of `BuyDialog` onto the page | [13](tickets/13-move-purchase-out-of-buydialog.md) | built `f971945` — **operator's walk pending** |
-| 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | **open — next** |
+| 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | built — **operator's walk pending** |
 | 15 | Launch risk — rollback + prod walk-through | [15](tickets/15-checkout-page-launch-risk-and-prod-walk.md) | blocked by 13, 14 |
 | 16 | The EFT dead end — a way out, and somewhere to wait | [16](tickets/16-eft-dead-end-and-awaiting-payment.md) | built `14b3888` — **operator's walk pending** |
 | 17 | The card buyer's payment-complete moment | [17](tickets/17-payment-complete-moment-on-card-return.md) | built `f8b55c3` — **operator's walk pending** |
@@ -212,6 +212,26 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   `ConfirmingBanner` and its two `Reader` strings deleted, four `Welcome` keys
   added across all five locales. `convex/` untouched. **The operator's walk is
   still owed**, same bar as 13 and 16.
+
+- [Phone-first pass — locked card and `SignIn`](./tickets/14-phone-first-pass-locked-card-and-signin.md) —
+  a presentation-only pass, and it found **one real bug behind the ugliness**: the
+  four-step rail **overflows a 320px phone**. Ticket 09 sized it against the 384px
+  sign-in card, but the rail's own `px-4` box leaves ~256px on a small screen and
+  `whitespace-nowrap` turns that into visible overflow — it fits a 375px iPhone and
+  breaks an SE. Afrikaans is the longest locale, not French or Hindi as 09 guessed.
+  Fixed by inverting the sizes — **the compact one is now the base**, `sm:` restores
+  the roomier row — plus `px-2` on the rail's box in **both** hosts (`SignIn` and
+  `CheckoutPage`'s `Shell`). On the `Paygate` card the price now comes **first** and
+  stacks above a full-width CTA on a phone, because the old `flex-wrap` dropped it
+  *under* the button that commits to it; `sm:flex-row-reverse` keeps the desktop
+  shape unchanged. `SignIn` went from **zero** responsive classes to `min-h-svh`
+  (not `vh` — the URL-bar jog), phone padding and type, and every tap target off
+  40px onto 44. **All three render sites checked** — `AppGate`, `Landing` and
+  `_landing/YwamPotch.tsx` — and none wraps or overrides `SignIn`'s classes, so the
+  leak the ticket warned about lands identically and benignly on every tenant. No
+  tokens, no scale, no breakpoint system. `convex/` untouched; 758/758 tests green.
+  **The operator's walk is owed** — nothing was seen in a browser, and the 320px
+  arithmetic is computed, not measured.
 
 - [Prod-verify the security fixes](./tickets/07-prod-verify-security-fixes.md) —
   **both checks passed on prod, no failures, no follow-up tickets.** The
