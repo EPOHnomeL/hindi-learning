@@ -82,6 +82,18 @@ that already ship.
   and `usdCents` over `usdAmount`. Rate **18.4**, minimum **$5**. One loose end, deliberately not
   a ticket: run `backfill-ledger-kind:prod`, then narrow `kind` — hygiene that buys safety for a
   *third* money kind, owed by whoever next touches the Ledger schema.
+- [Build the donation widget and landing section](tickets/08-build-donation-widget-and-landing-section.md) —
+  **built and shipped**; the rail is now whole, donor end to end. A flag-gated
+  `<section id="donations">` with $10/$25/$50/custom chips, the ZAR charge figure in its own
+  callout above the button, and the not-a-tax-receipt line — all five locales, floor/rate/10%
+  interpolated from `donations.config` so the copy cannot drift from the constants. Three
+  things it decided that 03 and 07 hadn't: the shared `<Landing/>` carries the section
+  automatically (a bespoke page like ywampotch places it by hand), the ZAR figure is computed
+  client-side from the same committed rate because the disclosure must precede the click that
+  signs, and the PayFast return URL gained the `#donations` anchor so the generic thank-you is
+  actually on screen. One limitation stated not fixed: `/` is the Dashboard when signed in, so
+  a logged-in operator cannot see their own donate section. **The live sandbox donation is the
+  one item not verifiable from a session** — the ticket ends in a six-step operator checklist.
 
 ## Not yet specified
 
