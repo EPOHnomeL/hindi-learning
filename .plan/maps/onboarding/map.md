@@ -20,15 +20,13 @@ vague aspiration.
   including* getting an account; [the welcome panel](tickets/02-first-open-welcome-panel.md)
   is the first moment *inside* a course, for a signed-in learner or a Guest on a Public link.
   They were charted apart and kept colliding — 01's walkthrough will land squarely on 02.
-- **02 is the more specified of the two** and is takeable without waiting on 01: both reader
-  shells (`CourseShell.tsx`, `PublicReader.tsx`) drop a newcomer straight into lesson content,
-  and `EmptyLibrary` does not cover it. Its content comes from what already exists — no
-  authoring, no new pipeline.
-
-- **The ticket is one sentence** (*"This should be as smooth as possible"*), so the first
-  session's real job is **turning it into observations**: walk a genuine cold sign-up on prod,
-  on a tenant subdomain, on a phone, and write down every place a person stalls. Until that
-  exists there is nothing to build.
+- **02 is done** — it was already built when this map was charted, and nobody noticed until
+  ywampotch-launch went looking for stale facts (2026-08-01). See Decisions so far.
+- **01 was a one-sentence stub** (*"This should be as smooth as possible"*) until 2026-08-01,
+  when the same sweep wrote the walk into its body. Its real job is **turning the aspiration
+  into observations**: walk a genuine cold sign-up on prod, on a tenant subdomain, on a phone,
+  and write down every place a person stalls. Until that exists there is nothing to build —
+  and with 02 shipped, 01 is now the whole of this map.
 - **Two funnel leaks were already diagnosed** for the ywampotch launch — checkout abandonment
   and sign-up friction — and the mechanical half was attacked there (Google sign-in, the
   manual EFT rail, brand continuity). Read
@@ -44,12 +42,23 @@ vague aspiration.
 
 <!-- one line per resolved ticket -->
 
+- [First-open welcome panel in the reader](tickets/02-first-open-welcome-panel.md) —
+  **it was already built**; the ticket was open on stale context and is closed on the
+  evidence, not on new work. `Welcome.tsx` + `welcomeDerive.ts`, rendered by *both*
+  shells, `mission` on the `publicCourse` allowlist. Two deliberate deviations: it is a
+  **modal** (`da02161`, the user reversing the spec's inline-card default), and dismissal
+  is per-tab-session — "once" is enforced by the **trigger** (server progress, latched)
+  rather than by a persisted dismissal. It has since grown a purchase variant
+  (`welcomeVariant`, ywampotch-launch 17) that wins over the generic welcome; read that
+  before touching the panel.
+
 ## Not yet specified
 
 - **Everything downstream of the walkthrough.** Fog stays fog here deliberately: the observations
-  come first, and the tickets are cut from them.
+  come first, and the tickets are cut from them. clears-with: 01
 - **Whitelabel treatment of the welcome panel.** A tenant's panel arguably needs that tenant's
-  voice, not just its palette. Not yet sharp.
+  voice, not just its palette. Not yet sharp — and now genuinely floating, since the panel it
+  would restyle is built and 01 won't sharpen it.
 
 ## Out of scope
 

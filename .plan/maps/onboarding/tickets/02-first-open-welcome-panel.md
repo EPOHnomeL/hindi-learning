@@ -147,6 +147,49 @@ course is, how big it is, and the next lesson to click.
 
 The Welcome panel renders once on first open in both reader shells with the specced content, and its dismissal is remembered for a signed-in learner and for a Guest alike.
 
+## Answer
+
+**Already built — this ticket was open on stale context.** Closed 2026-08-01 from
+[ywampotch-launch 08](../../ywampotch-launch/tickets/08-fix-known-stale-docs-and-tracker.md),
+which found it (as GitHub #113) among four facts the tracker still asserted about a
+world that no longer exists.
+
+Evidence in the tree today:
+
+- `src/app/_components/Welcome.tsx` — the panel, on the shared `Dialog`.
+- `src/app/_components/welcomeDerive.ts` (+ `.test.ts`) — the pure seam:
+  `missionExcerpt`, `latchFirstOpen`, `guestProgress`.
+- Rendered by **both** shells — `CourseShell.tsx:355` (signed-in) and
+  `PublicReader.tsx:274` (Guest / Public link).
+- `mission` is on the `publicCourse` allowlist (`convex/public.ts:94`), served as
+  the Edition-translated `await ed.mission()` (`convex/public.ts:200`) — exactly as
+  specced, and nothing else newly exposed.
+
+**Two deviations from the spec, both deliberate and both recorded in code:**
+
+1. **Modal, not the inline card the spec proposed as its "lazier default"** — the
+   user's call, `da02161`. The spec's objection to a modal was that it could trap a
+   Guest behind a dialog; `Dialog` is the native `<dialog>`, so Esc, backdrop and
+   the X all close it through one path.
+2. **Dismissal is per-tab-session (`sessionStorage`), not server-persisted** for
+   *either* audience — so the spec's "remembered for a signed-in learner and for a
+   Guest alike" is met by the *trigger* rather than by the dismissal: opening a
+   lesson writes an `opened` progress row, and `latchFirstOpen` reads server
+   progress, so the panel does not return on a second visit or a second device. The
+   latch exists because progress is a live query and an unlatched
+   `progress.length === 0` tore the panel away mid-sentence.
+
+**It has since grown past this spec.** [ywampotch-launch 17](../../ywampotch-launch/tickets/17-payment-complete-moment-on-card-return.md)
+(`f8b55c3`) made the purchase acknowledgement a *variant* of this same panel rather
+than a competing surface — `welcomeVariant()` picks `purchase-complete` /
+`purchase-confirming` / `first-open` / none, so the generic welcome can never also
+appear to a buyer. Anyone touching this panel must read that ticket too.
+
+**Not verified in a browser by this session** — the claim is read off the code and
+the commits, not a walk. The panel's *purchase* variants are still on
+ywampotch-launch's owed operator-walk list; the plain first-open variant predates
+that strand and shipped 2026-07-28.
+
 <!-- Migrated 2026-07-30 from GitHub issue #113 (filed 2026-07-28), when this repo retired
      its remote tracker; see docs/agents/issue-tracker.md. -->
 
