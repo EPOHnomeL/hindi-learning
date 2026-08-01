@@ -44,7 +44,7 @@ Three findings reshape this map:
 3. **There is no PWA — verified directly.** `public/` holds only `favicon.ico`,
    `icon.svg` and a stray demo HTML file. No `manifest.json`, no service worker, no
    `next-pwa`, no `viewport`/`themeColor` export, no `apple-touch-icon`. This
-   **contradicts the [pwa](../../pwa/map.md) map's Notes**, which state that its
+   **contradicts the [reader-experience](../../reader-experience/map.md) map's Notes**, which state that its
    ticket 01 ("implement the website as a PWA") was closed on GitHub and that PWA
    groundwork is already done. Nothing shipped. That map's premise needs revisiting
    when it resumes — it is not this effort's to fix.

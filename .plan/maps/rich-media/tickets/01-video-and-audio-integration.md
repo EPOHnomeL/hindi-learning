@@ -7,12 +7,12 @@ blocked_by: []
 
 ## Question
 
-Merged from 9 separate scope tickets (formerly [rich-media/01](01-video-and-audio-integration.md), #91–#98) — image/poster Resources,
+Merged from 9 separate scope tickets (formerly [Video and audio integration](01-video-and-audio-integration.md), #91–#98) — image/poster Resources,
 media embedded in Lessons, YouTube link embed, transcript ingestion, transcription
 fallback, uploaded-video hosting, video-anchored teach mode, provider-path ingestion, and
 Editions × embedded media are facets of one **video & audio integration** effort, not nine
 independent features. User's framing when requesting this: **"Video and audio integration."**
-(Resource *deep-linking* — [rich-media/11](11-resource-links-spec.md) — is a separate concern: linking to a course's own uploaded
+(Resource *deep-linking* — [Resource links spec](11-resource-links-spec.md) — is a separate concern: linking to a course's own uploaded
 documents, not video/audio playback — left un-merged.)
 
 ---

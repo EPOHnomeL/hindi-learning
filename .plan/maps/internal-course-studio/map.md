@@ -18,14 +18,14 @@ foundation the rest of the studio can be built on.
   reads through a **single** query path so the visibility filter lands in exactly one place.
   A per-surface filter is the bug factory here.
 - **This is visibility, never editing** — ADR 0003 keeps Lessons immutable. Note the overlap
-  with [course-authoring/01](../course-authoring/tickets/01-ai-assisted-course-editing.md),
+  with [AI-assisted course editing](../course-authoring/tickets/01-ai-assisted-course-editing.md),
   which also proposes a draft/review gate, from the authoring side. **One gate, not two** —
   reconcile before building either.
 - Ticket 03 (cost instrumentation) is **measurement only** — no billing, no enforcement. It
   is also the prerequisite the funding decision in
-  [paid-marketplace/01](../paid-marketplace/tickets/01-authoring-cost-and-model-provider-strategy.md)
+  [Authoring-cost funding & model-provider strategy](../marketplace/tickets/01-authoring-cost-and-model-provider-strategy.md)
   is explicitly waiting on, and the data
-  [authoring-efficiency/01](../authoring-efficiency/tickets/01-streamline-routine-effort.md)
+  [Streamline the Routine'"'"'s effort](../course-authoring/tickets/04-streamline-routine-effort.md)
   needs to prove a saving. It unblocks two other maps — take it early.
 - Ticket 04 **reconciles** shadcn/ui with the existing design system rather than overriding
   it: the warm-paper/dark-ink/rust `@theme` palette and Spectral + Noto Serif Devanagari stay

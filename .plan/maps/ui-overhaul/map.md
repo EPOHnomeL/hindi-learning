@@ -6,7 +6,7 @@ A spec (`spec.md` here) for an agent-driven UI/UX overhaul of both learner-facin
 authoring surfaces — visual polish, flow fixes, and mobile experience — grounded in
 Mobbin MCP references, foundation-first. Done when every decision needed to open a
 sibling `ui-overhaul-impl` map is resolved. This effort runs **before** the
-[pwa](../pwa/map.md) effort resumes.
+[reader-experience](../reader-experience/map.md) effort resumes.
 
 ## Notes
 
@@ -53,7 +53,7 @@ sibling `ui-overhaul-impl` map is resolved. This effort runs **before** the
 
 ## Out of scope
 
-- PWA/offline itself — that is the [pwa](../pwa/map.md) map; this effort only
+- PWA/offline itself — that is the [reader-experience](../reader-experience/map.md) map; this effort only
   precedes it. Note that ticket 04 found its "groundwork already closed" premise is
   false; correcting it belongs to that map.
 - Missing i18n coverage surfaced by the inventory (`AdminPanel.tsx` and
@@ -61,4 +61,4 @@ sibling `ui-overhaul-impl` map is resolved. This effort runs **before** the
   [app-language-i18n](../app-language-i18n/map.md).
 - Whitelabel leaks surfaced by the inventory (legal pages hardcode "My Course" and
   `support@my-course.app`) — [whitelabel](../whitelabel/map.md).
-- Session lifetime — [session-management](../session-management/map.md).
+- Session lifetime — [auth-sessions](../auth-sessions/map.md).

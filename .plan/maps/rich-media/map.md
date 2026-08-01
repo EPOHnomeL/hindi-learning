@@ -26,7 +26,7 @@ files are hosted, and how a Lesson cites the course's own Resources.
 - **The provider split is the recurring constraint:** Convex actions cannot run ffmpeg. TTS
   and transcript fetches are plain HTTP and fine; transcoding and video rendering are not.
   Every hosting or ingestion answer has to respect it — the same wall
-  [course-media/01](../course-media/tickets/01-scope-course-trailer.md) hits.
+  [Scope the course trailer](../media-generation/tickets/01-scope-course-trailer.md) hits.
 - **Ticket 11 (Resource links) is the odd one out and deliberately un-merged** — it is about
   linking into the course's *own uploaded documents* from Lesson prose, not media playback. It
   is the most specified thing on this map (labelled ready-for-agent on GitHub) and is
@@ -48,9 +48,9 @@ files are hosted, and how a Lesson cites the course's own Resources.
 - **Remediation policy** when a learner fails a video-anchored comprehension gate. The same
   seam surfaces in [pedagogy](../pedagogy/map.md) — one owner, not two.
 - **Cost of media at Edition scale.** Media multiplied by languages is a real bill; depends on
-  [paid-marketplace/01](../paid-marketplace/tickets/01-authoring-cost-and-model-provider-strategy.md).
+  [Authoring-cost funding & model-provider strategy](../marketplace/tickets/01-authoring-cost-and-model-provider-strategy.md).
 
 ## Out of scope
 
-- The marketing trailer and learner podcast ([course-media](../course-media/map.md)) — those
+- The marketing trailer and learner podcast ([course-media](../media-generation/map.md)) — those
   *generate* media; this map *ingests and serves* it.
