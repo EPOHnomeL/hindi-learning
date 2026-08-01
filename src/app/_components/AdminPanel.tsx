@@ -659,7 +659,7 @@ function PayoutsManager() {
     <div className="mx-auto max-w-2xl">
       <div className="mb-6">
         <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Payouts</h1>
-        <p className="mt-0.5 text-sm text-soft">What you owe each seller, from the sales ledger</p>
+        <p className="mt-0.5 text-sm text-soft">What you owe each payee — course sales and donations</p>
       </div>
       {owed === undefined ? (
         <ul className="flex flex-col gap-2" aria-busy>
@@ -910,8 +910,11 @@ function PayoutRow({ owed }: { owed: FunctionReturnType<typeof api.ledger.owedPa
         </span>
       </div>
       <p className="mt-1.5 text-xs text-soft">
-        {owed.sales.length} sale{owed.sales.length === 1 ? "" : "s"} ·{" "}
-        {owed.sales.map((s) => `${s.lang} ${formatRand(s.sellerShare)}`).join(", ")}
+        {owed.sales.length} item{owed.sales.length === 1 ? "" : "s"} ·{" "}
+        {/* A donation has no Edition, so the query hands back a null `lang` and
+            the kind to label it with (ADR 0027) — donations settle through this
+            same tab, alongside the payee's sales. */}
+        {owed.sales.map((s) => `${s.kind === "donation" ? "donation" : s.lang} ${formatRand(s.sellerShare)}`).join(", ")}
       </p>
       <form
         className="mt-2.5 flex flex-wrap items-center gap-2"
@@ -1243,6 +1246,14 @@ function TenantDetail({ slug, role, onRemoved }: { slug: string; role: "sys" | "
           ) : (
             <FlagToggles key={slug} slug={slug} flags={view.flags} />
           )}
+        </TenantSection>
+      )}
+      {isSys && (
+        <TenantSection
+          title="Donations"
+          hint="Who this tenant's donation income is owed to. Set this before switching the Donations flag on."
+        >
+          <DonationPayee key={slug} slug={slug} />
         </TenantSection>
       )}
       <TenantSection
@@ -1613,7 +1624,78 @@ function RowActionButton({ label, busyLabel, run, aria }: { label: string; busyL
   );
 }
 
-// The five feature flags in display order, with human labels (issue 21). The keys
+// The tenant's donation payee (ADR 0027) — the user the operator owes this
+// tenant's donation income to, settled through the existing Payouts tab. **Sys
+// admin only**, mirroring the server gate: a money destination is not a
+// subdomain administrator's call. The server refuses a payee who isn't an
+// approved seller with payout bank details on file, and clearing the payee also
+// switches the Donations flag off, so the two can never disagree.
+function DonationPayee({ slug }: { slug: string }) {
+  const current = useQuery(api.tenants.donationPayeeEmail, { tenantSlug: slug });
+  const setPayee = useMutation(api.tenants.setDonationPayee);
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save(next: string | undefined) {
+    setError(null);
+    setBusy(true);
+    try {
+      await setPayee({ tenantSlug: slug, email: next });
+      setEmail("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't set that payee.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-[13px] text-soft">
+        {current === undefined
+          ? "Loading…"
+          : current === null
+            ? "No payee set — donations cannot be switched on."
+            : `Donations are owed to ${current}.`}
+      </p>
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save(email);
+        }}
+      >
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="payee@example.com"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-1.5 text-sm focus:border-accent focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={busy || !email.trim()}
+          className="rounded-lg bg-accent px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+        >
+          {busy ? "Saving…" : "Set payee"}
+        </button>
+        {current && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void save(undefined)}
+            className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
+          >
+            Clear
+          </button>
+        )}
+      </form>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </div>
+  );
+}
+
+// The six feature flags in display order, with human labels (issue 21). The keys
 // mirror the schema's tenantFlagsValidator (issue 04); enforced server-side by
 // assertTenantFlag (issue 17), this is only the operator's on/off surface.
 const FLAG_META: { key: TenantFlag; label: string; hint: string }[] = [
@@ -1622,6 +1704,9 @@ const FLAG_META: { key: TenantFlag; label: string; hint: string }[] = [
   { key: "publicLinks", label: "Public links", hint: "Owners can publish a shareable public link to a course." },
   { key: "qa", label: "Questions", hint: "Learners can ask questions on a lesson." },
   { key: "seeding", label: "Course creation", hint: "Members can seed new courses on this tenant." },
+  // The one flag with a precondition (ADR 0027): the server refuses to switch it
+  // on until a donation payee is set and is a ready seller, and says so.
+  { key: "donations", label: "Donations", hint: "Show the donation section on this tenant's landing page." },
 ];
 
 // The Flags section (ticket 21): one plain switch per feature flag over the
@@ -1631,7 +1716,7 @@ const FLAG_META: { key: TenantFlag; label: string; hint: string }[] = [
 // so a toggle reflects immediately (Convex reactivity); a per-key busy flag guards
 // against a double-click mid-write. Keyed by slug at the call site so switching
 // tenants remounts with fresh state.
-function FlagToggles({ slug, flags }: { slug: string; flags: Record<TenantFlag, boolean> }) {
+function FlagToggles({ slug, flags }: { slug: string; flags: Partial<Record<TenantFlag, boolean>> }) {
   const setFlags = useMutation(api.tenants.setTenantFlags);
   const [busy, setBusy] = useState<TenantFlag | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1651,7 +1736,9 @@ function FlagToggles({ slug, flags }: { slug: string; flags: Record<TenantFlag, 
   return (
     <div className="flex flex-col gap-1 text-ink">
       {FLAG_META.map(({ key, label, hint }) => {
-        const on = flags[key];
+        // `donations` is optional in the schema — absence means off (ADR 0027),
+        // which is why it needed no backfill over every tenant row.
+        const on = flags[key] ?? false;
         return (
           <div key={key} className="flex items-center justify-between gap-4 py-2">
             <div className="min-w-0">
