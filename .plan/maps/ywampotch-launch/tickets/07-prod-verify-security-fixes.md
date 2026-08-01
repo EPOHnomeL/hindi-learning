@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: []
+claimed_by: wayfinder-07-prod-verify
+claimed_at: 2026-08-01T14:02:00+02:00
 ---
 
 # Prod-verify the security fixes
