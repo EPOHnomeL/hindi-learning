@@ -34,11 +34,17 @@ export function withLang(href: string, lang: string | null | undefined): string 
   return `${href}${sep}lang=${encodeURIComponent(lang)}`;
 }
 
-// The Buy marker (`?buy=1`, auth-first checkout ADR 0021): set when a share
-// reader's Buy CTA routed the visitor here. SignIn defaults to "Create account"
-// on it, and the locked authed reader auto-opens the buy dialog.
-export function useBuyMarker(): boolean {
-  return useSearchParams().get("buy") === "1";
+// The checkout page for one Edition (auth-first, ADR 0021 — ywampotch-launch/12).
+// Every "Unlock the full course" CTA points here, from the Guest reader and the
+// authed one alike; signed out, `AppGate` renders `SignIn` at this URL and
+// returns to it after auth, so there is no marker to carry across the hop.
+//
+// `lang` is a path SEGMENT and always explicit, "en" included: left implicit,
+// `resolveEdition` serves any free published Edition of the course instead of
+// this paid one's paygate (the prod checkout bug — see the header note above).
+// A segment cannot be dropped by a future caller the way a query param can.
+export function checkoutLink(slug: string, lang: string): string {
+  return `/checkout/${slug}/${encodeURIComponent(lang)}`;
 }
 
 // The absolute URL of a course's public `/share/<token>` Guest reader, minted on

@@ -3,9 +3,9 @@
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { readLastAuthMethod, rememberAuthMethod, type AuthMethod } from "./accountLocalState";
-import { useBuyMarker } from "./editionUrl";
 import { Logo } from "./Logo";
 import { CheckoutSteps } from "./Paygate";
 import { useTenant } from "./TenantContext";
@@ -48,11 +48,13 @@ export function SignIn() {
   const t = useTranslations("Auth");
   const tc = useTranslations("Common");
   const tenant = useTenant();
-  // Arriving via a share reader's Buy CTA (`buy=1`, auth-first checkout): the
-  // common path is a NEW buyer, so the form opens on "Create account" with
-  // purchase-flavoured copy; the toggle still reaches sign-in. Without the
-  // marker the default stays "Sign in".
-  const buyIntent = useBuyMarker();
+  // Standing on the checkout URL itself (auth-first, ADR 0021): `AppGate`
+  // renders this component *at* `/checkout/<slug>/<lang>` and re-renders into the
+  // page after auth, so the path is the buy intent — no marker to carry, and the
+  // trigger says what it means. The common path is a NEW buyer, so the form opens
+  // on "Create account" with purchase-flavoured copy; the toggle still reaches
+  // sign-in. Anywhere else the default stays "Sign in".
+  const buyIntent = !!usePathname()?.startsWith("/checkout");
   const [flow, setFlow] = useState<"signIn" | "signUp">(buyIntent ? "signUp" : "signIn");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -81,9 +83,9 @@ export function SignIn() {
             )}
           </div>
         </div>
-        {/* Arrived mid-purchase: show the same four-step rail the buy dialog
+        {/* Arrived mid-purchase: show the same four-step rail the checkout page
             shows, so the account step reads as one step of a purchase rather
-            than an unexplained wall in front of it. Only with the buy marker —
+            than an unexplained wall in front of it. Only on a checkout path —
             a plain sign-in is not a checkout. */}
         {buyIntent && (
           <div className="w-full rounded-xl border border-line bg-card px-4 py-3">
@@ -136,8 +138,9 @@ export function SignIn() {
                 // 0025's host-only session cookie the buyer would come back signed
                 // in on the apex and still signed out on the tenant subdomain they
                 // started from. Sending the current href returns them to this host,
-                // preserving `buy=1` and any course path. Validated server-side by
-                // `oauthRedirectUrl`.
+                // preserving the `/checkout/<slug>/<lang>` path they were buying
+                // from. Validated server-side by `oauthRedirectUrl`, which checks
+                // the HOST only and never inspects the path.
                 await signIn("google", { redirectTo: window.location.href });
               } catch {
                 setError(t("googleFailed"));

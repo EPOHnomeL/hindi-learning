@@ -46,8 +46,10 @@ describe("courseIndexRedirect", () => {
     expect(courseIndexRedirect("/courses/hindi/lessons/0001", "lang=en", "en")).toBe(
       "/courses/hindi/lessons/0001?lang=en",
     );
-    expect(courseIndexRedirect("/courses/hindi/lessons/0001", "buy=1&lang=en", "en")).toBe(
-      "/courses/hindi/lessons/0001?buy=1&lang=en",
+    // …and alongside the other params the redirect carries. (This case read
+    // `buy=1` until checkout became its own route and the marker was deleted.)
+    expect(courseIndexRedirect("/courses/hindi/lessons/0001", "purchase=return&lang=en", "en")).toBe(
+      "/courses/hindi/lessons/0001?purchase=return&lang=en",
     );
   });
 });

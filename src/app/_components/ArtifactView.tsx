@@ -9,7 +9,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { CertificateControl } from "./Certificate";
 import { LockedPane, Paygate } from "./Paygate";
-import { publicCourseUrl, useBuyMarker, useEditionLang, withLang } from "./editionUrl";
+import { checkoutLink, publicCourseUrl, useEditionLang, withLang } from "./editionUrl";
 import { buildEditDoc, buildSrcDoc, replaceBodyInner, scrollToCardMessage, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Markdown } from "./MarkdownView";
 import { MarkdownResourceDialog } from "./ResourceItem";
@@ -403,7 +403,6 @@ function LessonView({
   const t = useTranslations("Artifact");
   const { theme } = useTheme();
   const lang = useEditionLang();
-  const buyMarker = useBuyMarker();
   const navHidden = useHideOnScroll();
   const lesson = useQuery(api.content.reader.getLesson, { topicSlug, key: lessonKey, lang: lang ?? undefined });
   // The Topic's Resources, so a Resource link in the lesson opens with sidebar
@@ -467,10 +466,9 @@ function LessonView({
         <Paygate
           kind="lesson"
           paywall={header?.paywall ?? null}
-          courseTitle={header?.title}
           topicSlug={topicSlug}
           lang={lang ?? "en"}
-          autoOpenBuy={buyMarker}
+          checkoutHref={checkoutLink(topicSlug, lang ?? "en")}
         />
       </LockedPane>
     );
@@ -805,7 +803,6 @@ function ReferenceView({
   const t = useTranslations("Artifact");
   const { theme } = useTheme();
   const lang = useEditionLang();
-  const buyMarker = useBuyMarker();
   const navHidden = useHideOnScroll();
   const ref = useQuery(api.content.reader.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
   const header = useQuery(api.content.reader.courseHeader, { topicSlug, lang: lang ?? undefined });
@@ -837,10 +834,9 @@ function ReferenceView({
         <Paygate
           kind="reference"
           paywall={header?.paywall ?? null}
-          courseTitle={header?.title}
           topicSlug={topicSlug}
           lang={lang ?? "en"}
-          autoOpenBuy={buyMarker}
+          checkoutHref={checkoutLink(topicSlug, lang ?? "en")}
         />
       </LockedPane>
     );

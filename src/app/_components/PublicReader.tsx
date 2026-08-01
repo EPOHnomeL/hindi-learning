@@ -10,6 +10,7 @@ import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
 import { Frame, useCardTarget, useContentHtml } from "./ArtifactView";
 import { Brand } from "./Brand";
+import { checkoutLink } from "./editionUrl";
 import { NavItem } from "./NavItem";
 import { Markdown } from "./MarkdownView";
 import { LockedPane, Paygate } from "./Paygate";
@@ -52,18 +53,6 @@ function useGuestCourse() {
 
 function Centered({ children }: { children: React.ReactNode }) {
   return <p className="p-8 text-center text-soft">{children}</p>;
-}
-
-// Buy on a Public link routes into the authed app (auth-first, ADR 0021): the
-// SAME Lesson/Reference under /courses, carrying the Edition and a `buy` marker.
-// Signed out, that URL renders SignIn (defaulting to "Create account"); signed
-// in, it lands on the locked page with the buy dialog open. `lang` is ALWAYS
-// set, "en" included: the buyer must land on the Edition they chose to buy —
-// left implicit, the resolver would serve any free published Edition of the
-// course instead of this paid one's paygate (editionUrl.ts).
-function buyLink(slug: string, kind: "lessons" | "references", key: string, lang: string): string {
-  const params = new URLSearchParams({ buy: "1", lang });
-  return `/courses/${slug}/${kind}/${key}?${params.toString()}`;
 }
 
 // The persistent sidebar + pane shell, fixed by the URL token. Fetches the
@@ -355,9 +344,8 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
         <Paygate
           kind="lesson"
           paywall={course.paywall ?? null}
-          courseTitle={course.title}
           editionName={editionName}
-          buyHref={buyLink(course.slug, "lessons", lessonKey, course.lang)}
+          checkoutHref={checkoutLink(course.slug, course.lang)}
         />
       </LockedPane>
     );
@@ -452,9 +440,8 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
         <Paygate
           kind="reference"
           paywall={course.paywall ?? null}
-          courseTitle={course.title}
           editionName={course.lang !== "en" ? langInfo(course.lang).native : undefined}
-          buyHref={buyLink(course.slug, "references", refKey, course.lang)}
+          checkoutHref={checkoutLink(course.slug, course.lang)}
         />
       </LockedPane>
     );
