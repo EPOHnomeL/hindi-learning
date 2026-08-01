@@ -50,8 +50,8 @@ history on a repo that now handles real money.
 | 10 | Research — non-ZAR charging + buyer geo | [10](tickets/10-research-non-zar-charging-and-geo.md) | answered |
 | 11 | Regional pricing mechanism ($10/€10/R100) | [11](tickets/11-regional-pricing-mechanism.md) | **open — grilling, needs the operator** |
 | 12 | Checkout as a page — route + step model | [12](tickets/12-checkout-page-route-and-step-model.md) | answered |
-| 13 | Move the purchase out of `BuyDialog` onto the page | [13](tickets/13-move-purchase-out-of-buydialog.md) | **open — next** |
-| 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | **open — parallel with 13** |
+| 13 | Move the purchase out of `BuyDialog` onto the page | [13](tickets/13-move-purchase-out-of-buydialog.md) | built `f971945` — **operator's walk pending** |
+| 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | **open — next** |
 | 15 | Launch risk — rollback + prod walk-through | [15](tickets/15-checkout-page-launch-risk-and-prod-walk.md) | blocked by 13, 14 |
 
 The strict sequencing above applied to units 01–06, which shared files and are
@@ -160,6 +160,20 @@ It also needs an acceptance criterion that post-dates the issue — see
   route. `cancel_url` drops an abandoning buyer on the bare course index: accepted
   wart, fixing it would mean touching `convex/`. Ticket 15 still walks it on prod.
 
+- [Move the purchase out of `BuyDialog` onto the page](./tickets/13-move-purchase-out-of-buydialog.md) —
+  built as 12 designed it, `f971945`. `/checkout/<slug>/<lang>` is live
+  (`CheckoutPage.tsx` + a five-line route file); `BuyDialog`, `useBuyMarker()`,
+  `buyLink()` and `autoOpenBuy` are all deleted, `Paygate`'s CTA is one `<Link>`
+  on both paths, and `SignIn` keys off `pathname.startsWith("/checkout")`.
+  `git diff convex/` empty; the EFT-rail-off branch survives intact. **One
+  consequence 12 didn't foresee:** on a *page*, a buyer who already holds the
+  Edition is reachable — an EFT buyer watching the operator confirm, most of all
+  — so `checkoutStep` grew a **fourth step** that wins over both payment states,
+  and the page shows "This course is yours" instead of a chooser whose buttons
+  would throw. That is the EFT rail's step 4, the counterpart of PayFast's
+  `return_url`. **No purchase was completed and nothing was seen in a browser** —
+  the operator's walk in dev is the bar, and it is still owed.
+
 ## Not yet specified
 
 - **Regional pricing implementation** — schema shape for per-region amounts,
@@ -213,9 +227,9 @@ tests, not on localhost:
 > tab and is `owed` to the seller in Payouts. The app is called YWAM Potch
 > throughout.
 
-Plus `pnpm typecheck` and `pnpm test` green — noting **two** pre-existing
-failures that are not yours: the long-standing `convex/sales.test.ts` flake that
-passes in isolation, and `scripts/bundle-authoring-assets.test.ts`, which has
-failed since `d5f3dc2` added the justify media query to `lessons/_partials/`
-without re-running `pnpm bundle:authoring`. The second is a real staleness, not
-a flake — one command fixes it, and it belongs to whoever owns `d5f3dc2`.
+Plus `pnpm typecheck` and `pnpm test` green — noting **one** pre-existing failure
+that is not yours: the long-standing `convex/sales.test.ts` flake that passes in
+isolation. `scripts/bundle-authoring-assets.test.ts` was the second until
+`6588d8c` regenerated the bundle `d5f3dc2` had left stale; it passes now, and a
+session that sees it fail again should re-run `pnpm bundle:authoring` rather than
+treat it as known.
