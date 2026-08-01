@@ -10,6 +10,7 @@ import { checkoutStep } from "./checkoutDerive";
 import { withLang } from "./editionUrl";
 import { Icon } from "./icons";
 import { CheckoutSteps, formatPrice } from "./Paygate";
+import { postToPayFast } from "./payfastPost";
 
 // The whole purchase, as a page (ywampotch-launch/12–13): `/checkout/<slug>/<lang>`.
 // It was a dialog until the operator walked the live funnel and named the
@@ -56,21 +57,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
     setError(null);
     try {
       const { action, fields } = await startCheckout({ topicSlug, lang });
-      // POST the signed fields to PayFast's hosted checkout — a real form
-      // submission (top-level navigation), built off-DOM and fired once. The
-      // pairs are ordered: PayFast verifies the signature over the field order.
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = action;
-      for (const { name, value } of fields) {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = name;
-        input.value = value;
-        form.appendChild(input);
-      }
-      document.body.appendChild(form);
-      form.submit();
+      postToPayFast(action, fields);
     } catch {
       setError(t("checkoutFailed"));
       setBusy(false);
