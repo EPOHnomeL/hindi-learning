@@ -44,6 +44,40 @@ file above instead. Context must travel with the repo, not the computer.
   are not ephemeral, they are the record. See `docs/agents/issue-tracker.md` for
   the file format, which is the contract.
 
+## Verify the claim before you reason from it
+
+Written context records what was true **when it was written**, and this repo moves
+faster than its notes. That is not a failing of the notes — it is the normal state
+— but reasoning from a stale claim burns a session building for a world that no
+longer exists. It has cost real time twice: `project-context.md` told agents to
+switch off a live revenue rail for three weeks after FICA cleared, and two tickets
+were reasoned about at length that were already built and shipped.
+
+**Before you act on a factual claim in a ticket, map, spec, `project-context.md` or
+a code comment — verify it in the tree.** It is seconds of work:
+
+- *"X doesn't exist yet"* → `grep` for it. *"X is built"* → open the file.
+- *"the status is Y"* → `git log --format='%h %ad %s' --date=short -- <file>` on
+  whatever asserts it. **A ticket can be older than its own scope**: tickets get
+  transcribed from a spec days after it was written, so check the ticket's own
+  commit date against the dates of the things it describes.
+- A `#NN` GitHub reference anywhere in `.plan/` points at a **deleted** issue (see
+  Issues have one home). Don't try to open it — `grep -rn "issue #NN" .plan/` finds
+  the `<!-- Migrated … -->` footer on the ticket that inherited it.
+
+**When you find a stale claim, fix it where it lives** — in the same session, in its
+own commit — rather than routing around it. Leaving it costs the next session the
+same hour it just cost you. Two constraints on that fix:
+
+- **Give the correction an absolute date**, never "recently" or "now".
+- **Never rewrite an ADR to correct it.** A stale ADR gets a *superseding* ADR;
+  the original stands as the record of what was decided and when.
+
+**Prefer evidence over inference when you resolve a ticket, and say which you had.**
+"Verified by reading the code" and "walked in a browser" are different claims, and a
+resolution that doesn't distinguish them is how a built-but-never-seen feature gets
+recorded as done.
+
 ## Feature workflow
 
 **`wayfinder` is the main way of working in this repo.** Repo skills live in
