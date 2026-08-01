@@ -79,22 +79,22 @@ course is, how big it is, and the next lesson to click.
 
 ## Acceptance criteria
 
-- [ ] A signed-in learner opening their first lesson of a course sees the welcome
+- [x] A signed-in learner opening their first lesson of a course sees the welcome
       panel showing the course name, its lesson count, a mission excerpt, and a
       Continue action pointing at lesson 1.
-- [ ] A Guest arriving on a Public link sees the same panel, with a link to the
+- [x] A Guest arriving on a Public link sees the same panel, with a link to the
       tenant portal that lands on that tenant's front door.
-- [ ] The Continue action targets the lowest-`seq` **not-completed** lesson, so a
+- [x] The Continue action targets the lowest-`seq` **not-completed** lesson, so a
       returning person with partial progress is pointed at their next lesson, not
       back at lesson 1.
-- [ ] The panel does not appear on a second open of the same course — including
+- [x] The panel does not appear on a second open of the same course — including
       from a different device/browser for a signed-in learner.
-- [ ] A course with no mission renders the panel without an empty gap or the word
+- [x] A course with no mission renders the panel without an empty gap or the word
       "null"; a course with zero published lessons shows no Continue action.
-- [ ] The mission shown on a non-English Edition is that Edition's translated
+- [x] The mission shown on a non-English Edition is that Edition's translated
       mission, falling back to English when the translation isn't ready.
-- [ ] `publicCourse` returns `mission` and no other newly-exposed field.
-- [ ] The panel is dismissible and the lesson is readable without dismissing it.
+- [x] `publicCourse` returns `mission` and no other newly-exposed field.
+- [x] The panel is dismissible and the lesson is readable without dismissing it.
 
 ## Tests (TDD, `convexTest` seam)
 
@@ -185,10 +185,28 @@ than a competing surface — `welcomeVariant()` picks `purchase-complete` /
 `purchase-confirming` / `first-open` / none, so the generic welcome can never also
 appear to a buyer. Anyone touching this panel must read that ticket too.
 
-**Not verified in a browser by this session** — the claim is read off the code and
-the commits, not a walk. The panel's *purchase* variants are still on
-ywampotch-launch's owed operator-walk list; the plain first-open variant predates
-that strand and shipped 2026-07-28.
+**Walked in a browser 2026-08-01** — the earlier close was read off the code; this
+is the walk it owed. Local dev build (Chrome via Playwright) pointed at the **prod**
+Convex deployment, so the panel rendered the live `prophetic-school` course, its 56
+lessons and its real mission; Guest queries only, nothing written. Every acceptance
+criterion above is ticked on that evidence:
+
+- Panel renders on a Public link with the course name, "56 lessons", the mission
+  excerpt, `Start Lesson 1` → `…/lessons/0001-learning-to-listen`, and the portal
+  link (`http://ywampotch.localhost:3001/` locally — `tenantHomeHref`'s local
+  analogue of `https://ywampotch.my-course.app/`).
+- Dismissible, and the lesson is readable *behind* it — 8,075 characters of lesson
+  body present both before and after dismissal, so the modal never blocks the read.
+- Does not return on a second open in the same visit; a `/references/glossary` deep
+  link gets no panel at all.
+- The excerpt reads as prose — see the mission-excerpt note above; this walk is what
+  caught it.
+
+**The signed-in half was not walked** — it needs real credentials on prod, which this
+session had no business using. It rests on the shared component and the shared
+derivation (one `Welcome`, one `latchFirstOpen`, both shells), plus unit tests. The
+panel's *purchase* variants likewise remain on ywampotch-launch's owed operator-walk
+list.
 
 <!-- Migrated 2026-07-30 from GitHub issue #113 (filed 2026-07-28), when this repo retired
      its remote tracker; see docs/agents/issue-tracker.md. -->

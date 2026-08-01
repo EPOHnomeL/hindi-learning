@@ -50,7 +50,10 @@ vague aspiration.
   is per-tab-session — "once" is enforced by the **trigger** (server progress, latched)
   rather than by a persisted dismissal. It has since grown a purchase variant
   (`welcomeVariant`, ywampotch-launch 17) that wins over the generic welcome; read that
-  before touching the panel.
+  before touching the panel. **Walked in a browser 2026-08-01** against prod data on a
+  Public link — every acceptance criterion ticked, and the walk caught one real defect:
+  the mission excerpt glued the mission's own heading onto the sentence below it
+  (`ac16180`). The signed-in half is still code-evidence only; it needs prod credentials.
 
 ## Not yet specified
 
