@@ -25,10 +25,20 @@ describe("missionExcerpt", () => {
   // Missions are authored as markdown and the excerpt is plain text, so the syntax
   // has to come off — a mission opening "# Mission: …" rendered its own hash marks
   // into the panel.
-  it("strips heading markers, keeping the heading's words", () => {
+  it("excerpts the prose, dropping a heading rather than running it into the sentence below", () => {
+    expect(missionExcerpt("# Mission: read Premchand\n\nI want to follow a column unaided.")).toBe(
+      "I want to follow a column unaided.",
+    );
+    expect(missionExcerpt("## Why\n\nBecause the translations flatten him.\n\n## How\n\nSlowly.")).toBe(
+      "Because the translations flatten him. Slowly.",
+    );
+  });
+
+  // All heading, no prose: their words are all there is, so show them rather than
+  // rendering the panel with an empty gap.
+  it("falls back to the heading's words when a mission is nothing but headings", () => {
     expect(missionExcerpt("# Mission: read Premchand")).toBe("Mission: read Premchand");
     expect(missionExcerpt("###### Deeply nested")).toBe("Deeply nested");
-    expect(missionExcerpt("# Why I read\n\n## In the original")).toBe("Why I read In the original");
   });
 
   it("strips emphasis and inline-code markers, keeping the words", () => {

@@ -13,19 +13,22 @@ export function guestProgress(completed: ReadonlySet<string>): ProgressLite[] {
   return [...completed].map((lessonKey) => ({ lessonKey, status: "completed" as const }));
 }
 
-// Strip the markdown syntax out of authored prose, keeping the words. Missions are
-// written as markdown but the excerpt is plain text, so a mission opening
-// "# Mission: …" used to render its own hash marks into the panel. Headings are
-// matched at a line start only, so a "#1" or a "C#" mid-sentence survives; emphasis
-// and inline code are matched as *pairs*, so a lone underscore in a snake_case word
-// isn't silently eaten.
-function stripMarkdown(text: string): string {
+// A whole heading line, marker and words both — matched at a line start only, so a
+// "#1" or a "C#" mid-sentence survives. A bare marker with no words is a heading too.
+const HEADING_LINE = /^[ \t]*#{1,6}(?:[ \t].*)?$/gm;
+// Just the marker, leaving the heading's words behind.
+const HEADING_MARKER = /^[ \t]*#{1,6}[ \t]*/gm;
+
+// Flatten authored markdown prose to the one plain-text line the panel renders.
+// Emphasis and inline code are matched as *pairs*, so a lone underscore in a
+// snake_case word isn't silently eaten.
+function flatten(text: string): string {
   return text
-    .replace(/^[ \t]*#{1,6}[ \t]+/gm, "") // "## Heading" → "Heading"
-    .replace(/^[ \t]*#{1,6}[ \t]*$/gm, "") // a bare marker on its own line
     .replace(/\*\*?([^*\n]+)\*\*?/g, "$1") // **bold** / *italic*
     .replace(/_([^_\n]+)_/g, "$1") // _emphasis_
-    .replace(/`([^`\n]+)`/g, "$1"); // `code`
+    .replace(/`([^`\n]+)`/g, "$1") // `code`
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 // The opening line or two of the course mission, for the welcome panel. Missions
@@ -35,10 +38,16 @@ function stripMarkdown(text: string): string {
 // Over the limit: cut on the last word boundary and mark it with an ellipsis; a
 // single word longer than the limit is hard-cut, because there is nothing to break
 // on.
+//
+// Headings are dropped, not flattened. Collapsing to one line used to glue a
+// mission's own title onto the paragraph beneath it — "…hearing God's voice Why I
+// want a living, day-to-day walk…", two sentences with no punctuation between them —
+// and that title was usually the course name restated, which the panel already shows
+// directly above the excerpt. Excerpt the prose instead. A mission that is *nothing*
+// but headings falls back to their words, since that is all the prose there is.
 export function missionExcerpt(mission: string | null | undefined, limit = 180): string | null {
-  const text = stripMarkdown(mission ?? "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const raw = mission ?? "";
+  const text = flatten(raw.replace(HEADING_LINE, "")) || flatten(raw.replace(HEADING_MARKER, ""));
   if (!text) return null;
   if (text.length <= limit) return text;
   const cut = text.slice(0, limit);
