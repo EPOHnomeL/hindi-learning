@@ -45,6 +45,11 @@ that already ship.
   it) — chartr derives one status per file, so this split is the only way that difference is
   visible. Build tickets say so in their title ("Build …") and are always `blocked_by` the
   decision ticket that authorised them.
+- **The donation rail's remaining half is the widget** —
+  [Build the donation widget and landing section](tickets/08-build-donation-widget-and-landing-section.md),
+  unblocked since 07 shipped the money half. The pointer lives here rather than beside 07's
+  line in Decisions-so-far: that section indexes the route already walked, so naming an open
+  ticket from it is a malformation chartr catches (and did, twice).
 
 ## Decisions so far
 
@@ -60,8 +65,8 @@ that already ship.
   **Decided, not built** — its Handoff section names the build tickets.
 - [Build the donation rail — backend, config and ADR 0027](tickets/07-build-donation-rail-backend.md) —
   **built and shipped**; [ADR 0027](../../../docs/adr/0027-per-tenant-donation-rail.md) is the
-  record. Money half only — the widget is [08](tickets/08-build-donation-widget-and-landing-section.md),
-  now unblocked. Three deliberate deviations from the ticket, each argued in its Answer: **no
+  record. Money half only — the widget half is its own build ticket, now unblocked (see Notes).
+  Three deliberate deviations from the ticket, each argued in its Answer: **no
   tenant-flag backfill** (the flag is optional, because absence *means off* and that is
   fail-closed), **`kind` left optional** with Sales filtering `!== "donation"` (a required `kind`
   needs two deploys, and between them `=== "sale"` would drop the whole pre-0027 sales history),
