@@ -57,8 +57,7 @@ that already ship.
   anti-surprise line, 10% via `splitNet(net, 1000)`, owed to a sys-admin-set `donationPayee`
   through the existing Ledger + Payouts tab. **No intent table and no public mutation** — it
   rides on `custom_str1/custom_str2`, so ADR 0013's guarantee holds. One-off only.
-  **Decided, not built** — the build is [07](tickets/07-build-donation-rail-backend.md) and
-  [08](tickets/08-build-donation-widget-and-landing-section.md).
+  **Decided, not built** — its Handoff section names the build tickets.
 
 ## Not yet specified
 
