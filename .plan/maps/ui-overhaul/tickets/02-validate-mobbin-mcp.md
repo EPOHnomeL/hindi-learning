@@ -9,10 +9,14 @@ blocked_by: [01]
 ## Question
 
 The MCP is in beta and the sub is monthly precisely so this can fail cheap: does
-reference-driven output actually beat the agent's unaided taste? Pick one weak
-surface (use the worst-ranked from ticket 04's inventory if it has landed), pull
-Mobbin references for its pattern, and build a throwaway redesign prototype against
-them. React to it: is the difference worth ~€10/month?
+reference-driven output actually beat the agent's unaided taste? Pull Mobbin
+references for one weak surface, build a throwaway redesign prototype against them,
+and react to it: is the difference worth ~€10/month?
+
+Ticket 04 recommends the **Paygate** (`src/app/_components/Paygate.tsx`, 365 lines)
+as the target — small enough to prototype whole, the thinnest mobile treatment of any
+learner surface (`md:` ×2), and "checkout on a phone" is the richest category in
+Mobbin's library.
 
 ## Done when
 

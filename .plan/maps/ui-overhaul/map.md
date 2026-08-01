@@ -31,20 +31,34 @@ sibling `ui-overhaul-impl` map is resolved. This effort runs **before** the
 
 <!-- one line per resolved ticket -->
 
+- [Surface inventory and priority order](tickets/04-surface-inventory.md) — 21 surfaces
+  ranked worst-first; no design system exists (6 theme toggles, 7 confirm dialogs,
+  `PublicReader` is a fork of `CourseShell`), the lesson quiz lives outside React in an
+  iframe, and **no PWA has shipped** despite the pwa map assuming otherwise.
+
 ## Not yet specified
 
-- **Per-surface redesign directions** — one direction ticket per surface, cut and
-  ordered once the foundation exists and the inventory has ranked them. clears-with: 03
-- **Flow fixes** — which journeys are actually clunky (onboarding, discovery, lesson
-  progression?) and what they should become; needs the inventory plus real usage
-  input. clears-with: 04
-- **Mobile-readiness bar** — what "good on a phone" means per surface; feeds the pwa
-  effort that follows this one. clears-with: 04
+- **Per-surface redesign directions** — one direction ticket per surface, in the
+  inventory's priority order, cut once the foundation and the collapse plan exist.
+  clears-with: 06
+- **Flow fixes** — which journeys are actually clunky and what they should become. The
+  inventory names candidates (authoring composer stuffed in a dashboard grid cell;
+  pricing, payouts and access control sharing one modal; `/admin` role-branching on a
+  single route) but choosing among them needs real usage input. clears-with: 03
+- **Mobile-readiness bar** — what "good on a phone" means per surface, and the single
+  breakpoint scale to replace the current `md:`-only ad-hockery. Feeds the pwa effort
+  that follows. clears-with: 03
 - **Spec assembly** — folding the resolved decisions into `spec.md` and charting
   `ui-overhaul-impl`; the last patch to clear.
 
 ## Out of scope
 
 - PWA/offline itself — that is the [pwa](../pwa/map.md) map; this effort only
-  precedes it.
+  precedes it. Note that ticket 04 found its "groundwork already closed" premise is
+  false; correcting it belongs to that map.
+- Missing i18n coverage surfaced by the inventory (`AdminPanel.tsx` and
+  `YwamPotch.tsx` have zero translation calls; the legal pages are English-only) —
+  [app-language-i18n](../app-language-i18n/map.md).
+- Whitelabel leaks surfaced by the inventory (legal pages hardcode "My Course" and
+  `support@my-course.app`) — [whitelabel](../whitelabel/map.md).
 - Session lifetime — [session-management](../session-management/map.md).
