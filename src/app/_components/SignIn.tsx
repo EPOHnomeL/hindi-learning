@@ -67,17 +67,24 @@ export function SignIn() {
   useEffect(() => setLastUsed(readLastAuthMethod()), []);
 
   return (
-    <div className="grid min-h-screen place-items-center px-4">
-      <div className="flex w-full max-w-sm flex-col items-center gap-6">
+    // `svh`, not `vh`: on a phone `100vh` is the viewport with the browser chrome
+    // discounted, so a screen that exactly fits gains a scrollbar and a rubber-band
+    // jog as the URL bar hides. `svh` is the small viewport — the one that's always
+    // visible. Vertical padding as well as horizontal, because this centres a card
+    // taller than a small phone, and without it the logo is clipped at the top
+    // rather than scrolled to. `gap-5` on a phone: `gap-6` between four stacked
+    // blocks is most of a thumb's worth of scrolling for nothing.
+    <div className="grid min-h-svh place-items-center px-4 py-8">
+      <div className="flex w-full max-w-sm flex-col items-center gap-5 sm:gap-6">
         <div className="flex flex-col items-center gap-2 text-center">
           {tenant?.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- Convex storage URL, not a static asset.
-            <img src={tenant.logoUrl} alt={tenant.displayName} className="h-16 w-auto max-w-64 object-contain" />
+            <img src={tenant.logoUrl} alt={tenant.displayName} className="h-14 w-auto max-w-[min(16rem,100%)] object-contain sm:h-16" />
           ) : (
             <Logo className="h-11 w-11 text-accent" />
           )}
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-accent">{tenant?.displayName ?? "My Course"}</h1>
+            <h1 className="text-balance text-xl font-semibold tracking-tight text-accent sm:text-2xl">{tenant?.displayName ?? "My Course"}</h1>
             {(tenant ? tenant.motto : tc("tagline")) && (
               <p className="mt-0.5 text-sm text-soft">{tenant ? tenant.motto : tc("tagline")}</p>
             )}
@@ -88,14 +95,16 @@ export function SignIn() {
             than an unexplained wall in front of it. Only on a checkout path —
             a plain sign-in is not a checkout. */}
         {buyIntent && (
-          <div className="w-full rounded-xl border border-line bg-card px-4 py-3">
+          // `px-2` on a phone: the rail is the widest thing on this screen and
+          // its own box was eating 32px of the 320px it has to fit inside.
+          <div className="w-full rounded-xl border border-line bg-card px-2 py-3 sm:px-4">
             {/* Always step 1 by construction: AppGate renders SignIn only to
                 unauthenticated visitors, so there is nothing to derive here. */}
             <CheckoutSteps current={1} />
           </div>
         )}
         <form
-          className="flex w-full flex-col gap-3 rounded-2xl border border-line bg-card p-6 shadow-sm"
+          className="flex w-full flex-col gap-3 rounded-2xl border border-line bg-card p-5 shadow-sm sm:p-6"
           onSubmit={async (e) => {
             e.preventDefault();
             setBusy(true);
@@ -122,7 +131,7 @@ export function SignIn() {
           <button
             type="button"
             disabled={busy}
-            className="relative flex items-center justify-center gap-2 rounded-lg border border-line bg-card px-3 py-2 font-medium text-accent hover:border-gold disabled:opacity-50"
+            className="relative flex items-center justify-center gap-2 rounded-lg border border-line bg-card px-3 py-2.5 font-medium text-accent hover:border-gold disabled:opacity-50"
             onClick={async () => {
               setBusy(true);
               setError(null);
@@ -157,9 +166,9 @@ export function SignIn() {
             {t("or")}
             <span className="h-px flex-1 bg-line" />
           </div>
-          <input name="email" type="email" placeholder={t("email")} autoComplete="email" required className="rounded-lg border border-line bg-card px-3 py-2 focus:border-gold focus:outline-none" />
-          <input name="password" type="password" placeholder={t("password")} autoComplete={flow === "signIn" ? "current-password" : "new-password"} required className="rounded-lg border border-line bg-card px-3 py-2 focus:border-gold focus:outline-none" />
-          <button type="submit" disabled={busy} className="relative rounded-lg bg-accent px-3 py-2 font-medium text-white disabled:opacity-50">
+          <input name="email" type="email" placeholder={t("email")} autoComplete="email" required className="rounded-lg border border-line bg-card px-3 py-2.5 focus:border-gold focus:outline-none" />
+          <input name="password" type="password" placeholder={t("password")} autoComplete={flow === "signIn" ? "current-password" : "new-password"} required className="rounded-lg border border-line bg-card px-3 py-2.5 focus:border-gold focus:outline-none" />
+          <button type="submit" disabled={busy} className="relative rounded-lg bg-accent px-3 py-2.5 font-medium text-white disabled:opacity-50">
             {busy ? "…" : flow === "signIn" ? t("signIn") : t("signUp")}
             {/* Only while signing in: on the "Create account" toggle a "Last used"
                 banner would be nonsense — you can't have last created this account. */}
@@ -168,7 +177,7 @@ export function SignIn() {
           {error && <p className="text-sm text-danger">{error}</p>}
           <button
             type="button"
-            className="text-sm text-soft hover:text-accent"
+            className="py-1 text-sm text-soft hover:text-accent"
             onClick={() => {
               setError(null);
               setFlow(flow === "signIn" ? "signUp" : "signIn");

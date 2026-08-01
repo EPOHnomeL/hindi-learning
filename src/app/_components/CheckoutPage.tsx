@@ -276,7 +276,9 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
 function Shell({ step = 2, children }: { step?: ReturnType<typeof checkoutStep>; children: React.ReactNode }) {
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col px-4 py-6 sm:py-10">
-      <div className="rounded-xl border border-line bg-card px-4 py-3">
+      {/* `px-2` on a phone — see CheckoutSteps: the rail is the widest row on
+          this page and its own box was eating 32px of a 320px screen. */}
+      <div className="rounded-xl border border-line bg-card px-2 py-3 sm:px-4">
         <CheckoutSteps current={step} />
       </div>
       <div className="mt-4 rounded-2xl border border-line bg-card p-5 shadow-sm sm:p-6">{children}</div>

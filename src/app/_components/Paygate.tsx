@@ -42,14 +42,21 @@ export function formatPrice(amount: number, currency: string): string {
 // its own sake: this renders in a 384px sign-in card, and the sentence-length
 // labels it started with ("Choose payment method", "Continue to your course")
 // wrapped onto a second line and read as broken — in French and Hindi they are
-// longer still. Four short labels plus their markers measure ~275px, so the row
-// holds one line in every locale. `whitespace-nowrap` makes a regression here
-// overflow visibly instead of silently re-wrapping.
+// longer still. `whitespace-nowrap` makes a regression here overflow visibly
+// instead of silently re-wrapping.
+//
+// Two sizes, and the SMALL one is the base (ywampotch-launch/14). At the full
+// size below, four labels plus their markers measure ~275px — which fits the
+// 384px card on a 375px phone and OVERFLOWS a 320px one, where the rail's own
+// box leaves ~256px. Afrikaans ("Rekening") is the longest and goes first. The
+// compact base trims the markers, the separators and a point of type to land
+// near ~220px, so the smallest phone we sell to holds one line too; `sm:`
+// restores the roomier row everywhere it fits.
 export function CheckoutSteps({ current }: { current: CheckoutStep }) {
   const t = useTranslations("Checkout");
   const steps = [t("stepAccount"), t("stepMethod"), t("stepPay"), t("stepCourse")];
   return (
-    <ol className="flex items-center justify-center gap-1 text-[11px] leading-none">
+    <ol className="flex items-center justify-center gap-0.5 text-[10px] leading-none sm:gap-1 sm:text-[11px]">
       {steps.map((label, i) => {
         const n = i + 1;
         const done = n < current;
@@ -59,9 +66,9 @@ export function CheckoutSteps({ current }: { current: CheckoutStep }) {
             {/* A hairline instead of a chevron: at this size a "›" glyph sat on
                 a different baseline to the markers and read as punctuation
                 inside the label rather than a separator between steps. */}
-            {i > 0 && <span aria-hidden className="mr-1 h-px w-2.5 bg-line" />}
+            {i > 0 && <span aria-hidden className="mr-0.5 h-px w-1.5 bg-line sm:mr-1 sm:w-2.5" />}
             <span
-              className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold sm:h-4.5 sm:w-4.5 ${
                 done
                   ? "bg-accent2/15 text-accent2"
                   : active
@@ -69,7 +76,7 @@ export function CheckoutSteps({ current }: { current: CheckoutStep }) {
                     : "border border-line text-soft"
               }`}
             >
-              {done ? <Icon name="check" className="h-2.5 w-2.5" /> : n}
+              {done ? <Icon name="check" className="h-2 w-2 sm:h-2.5 sm:w-2.5" /> : n}
             </span>
             <span className={`whitespace-nowrap ${active ? "font-semibold text-ink" : "text-soft"}`}>{label}</span>
           </li>
@@ -122,26 +129,36 @@ export function Paygate({
   // failed". Reactive: it clears itself the moment the confirmation grants access.
   const pendingEft = useQuery(api.eft.myEftIntent, topicSlug && lang ? { topicSlug, lang } : "skip");
   const heading = kind === "reference" ? t("referenceLockedTitle") : t("courseLockedTitle");
+  // Full-width tap target on a phone, hugging its label from `sm:` up. At 320px
+  // the card leaves ~260px of content, and the button plus a `text-2xl` price
+  // side by side needs ~280 — so they used to wrap, dropping the price under a
+  // left-aligned button in a ragged L. Stacked deliberately instead.
   const ctaClass =
-    "rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90";
+    "block w-full rounded-[10px] bg-accent px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-accent/90 sm:w-auto";
 
   return (
-    <div className="flex min-h-[60vh] flex-1 items-center justify-center p-4 md:p-8">
-      <div className="w-full max-w-md rounded-2xl border border-gold/40 bg-card p-6 shadow-sm sm:p-7">
-        <span className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-gold/15 text-gold">
+    <div className="flex min-h-[60svh] flex-1 items-center justify-center p-4 md:p-8">
+      <div className="w-full max-w-md rounded-2xl border border-gold/40 bg-card p-5 shadow-sm sm:p-7">
+        <span className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gold/15 text-gold sm:h-11 sm:w-11">
           <Icon name="lock" />
         </span>
-        <h3 className="text-lg font-semibold tracking-tight text-ink">{heading}</h3>
+        <h3 className="text-lg font-semibold tracking-tight text-balance text-ink">{heading}</h3>
         <p className="mt-1.5 text-sm leading-relaxed text-soft">
           {t("unlockEditionBody", {
             edition: editionName ? t("namedEdition", { name: editionName }) : t("thisEdition"),
           })}
         </p>
-        <div className="mt-5 flex flex-wrap items-center gap-4">
+        {/* Price BEFORE the CTA, and on its own line on a phone: it's what the
+            buyer is deciding on, so it can't sit downstream of the button that
+            commits to it. From `sm:` they share a row again, price to the right,
+            which is the desktop shape this card already had. */}
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row-reverse sm:items-center sm:justify-end sm:gap-4">
+          {price && (
+            <span className="text-2xl font-semibold tabular-nums text-ink">{price}</span>
+          )}
           <Link href={checkoutHref} className={ctaClass}>
             {t("unlockFullCourse")}
           </Link>
-          {price && <span className="text-2xl font-semibold tabular-nums text-ink">{price}</span>}
         </div>
         {pendingEft ? (
           <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">
