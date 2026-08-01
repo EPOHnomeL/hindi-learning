@@ -2,15 +2,10 @@
 
 import { useConvex, useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import {
-  DONATION_PRESETS_USD_CENTS,
-  donationAmount,
-  formatUsd,
-  formatZar,
-  type DonationSelection,
-} from "./donateDerive";
+import { DONATION_PRESETS_USD_CENTS, donationAmount, formatUsd, type DonationSelection } from "./donateDerive";
 import { Icon } from "./icons";
 import { postToPayFast } from "./payfastPost";
 import { useTenant, useTenantSlug } from "./TenantContext";
@@ -54,12 +49,7 @@ export function DonateSection() {
   if (!slug || !tenant?.flags.donations || !config) return null;
 
   const name = tenant.displayName;
-  const amount = donationAmount({
-    selection,
-    custom,
-    minUsdCents: config.minUsdCents,
-    usdZarRate: config.usdZarRate,
-  });
+  const amount = donationAmount({ selection, custom, minUsdCents: config.minUsdCents });
   // "empty" is the custom field waiting to be filled — the button is simply
   // disabled. The other two reasons are things the donor needs told.
   const error = !amount.ok && amount.reason !== "empty" ? amount.reason : null;
@@ -152,39 +142,42 @@ export function DonateSection() {
             </p>
           )}
 
-          {/* The anti-surprise line, and it is load-bearing rather than polish:
-              the donor types dollars and their card is charged Rand, and with a
-              donor-chosen amount BOTH numbers are live. So the Rand figure sits
-              directly above the button, in its own callout, quoting the exact
-              amount the signed fields will carry. */}
-          {amount.ok && (
-            <p className="mt-4 rounded-xl border border-gold/40 bg-gold/10 p-3.5 text-sm leading-relaxed text-soft">
-              {t.rich("charge", {
-                zar: formatZar(amount.zarCents),
-                b: (c) => <b className="font-semibold text-ink">{c}</b>,
-              })}
-            </p>
-          )}
-
           <button
             type="button"
             onClick={() => void donate()}
             disabled={!amount.ok || busy}
             className="mt-4 w-full rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {busy ? t("redirecting") : amount.ok ? t("donateAmount", { zar: formatZar(amount.zarCents) }) : t("donate")}
+            {busy
+              ? t("redirecting")
+              : amount.ok
+                ? t("donateAmount", { amount: formatUsd(amount.usdCents) })
+                : t("donate")}
           </button>
         </fieldset>
 
         {failed && <p className="mt-2.5 text-center text-sm text-danger">{t("failed")}</p>}
 
-        {/* What the donor is owed in plain words before they commit: where the
-            money goes, and that this is not a Section 18A receipt (ADR 0027 —
-            the operator is merchant of record, so the tenant cannot issue one). */}
+        {/* One line, and it carries everything the disclosures used to.
+            **This section used to state three more things**: the exact rand
+            amount the card would be charged (03's anti-surprise line, in its own
+            callout), the platform's 10%, and that this is not a tax-deductible
+            receipt. All three came off on the operator's instruction (2026-08-02)
+            after seeing the live page — a donation ask that opens with a fee
+            disclosure and a tax disclaimer reads as terms and conditions, and the
+            widget's job is to take donations. They are not gone, they MOVED: the
+            terms page now has a Donations clause covering the rand conversion,
+            the operator's cut and the receipt position, and this line links to
+            it. If you are about to re-add prose here, add it there instead. */}
         <p className="mt-4 text-center text-xs leading-relaxed text-soft">
-          {t("feeNote", { percent: config.feeBps / 100, name })}
+          {t.rich("agreement", {
+            terms: (c) => (
+              <Link href="/terms" className="text-accent2 underline-offset-2 hover:underline">
+                {c}
+              </Link>
+            ),
+          })}
         </p>
-        <p className="mt-1.5 text-center text-xs leading-relaxed text-soft">{t("notReceipt")}</p>
       </div>
     </section>
   );

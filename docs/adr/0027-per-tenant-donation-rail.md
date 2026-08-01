@@ -51,16 +51,28 @@ donations unchanged at a different rate. **`DONATION_FEE_BPS` is deliberately no
 `PLATFORM_FEE_BPS`**: that is a global env var set to 5000 for the 50/50 sale
 split, and reusing it would silently take half of every donation. It is a
 committed constant rather than an env var because the take-rate is stated in the
-widget copy — it must not drift per deployment.
+terms of service — it must not drift per deployment.
 
 ### USD presented, ZAR charged, at a committed constant
 
-The donor types dollars; the charge is Rand at `USD_ZAR_RATE`, with an explicit
-anti-surprise line before they commit. This is the *worst* form of the presentment
-problem — a fixed price shows one agreed number, but a donor-typed amount leaves
-two live numbers — so the disclosure is load-bearing, not polish. The signed-fields
-query returns the very ZAR figure it signed, so the quoted number and the charged
-number cannot disagree.
+The donor types dollars; the charge is Rand at `USD_ZAR_RATE`. This is the *worst*
+form of the presentment problem — a fixed price shows one agreed number, but a
+donor-typed amount leaves two live numbers. The signed-fields query returns the
+very ZAR figure it signed, so wherever the number is quoted it cannot disagree
+with the charge.
+
+**Where that disclosure lives was revised on 2026-08-02, and this is the one part
+of this ADR the shipped widget does not match as first written.** The design put
+an explicit "you will be charged R920.00 (ZAR)" line in the widget, above the
+button, and called it load-bearing rather than polish. On seeing the live page the
+operator overruled it: the section had a rand callout, a 10% fee note and a
+tax-receipt disclaimer stacked under four chips, and a donation ask that opens
+with three disclosures reads as terms and conditions. **The widget now states the
+amount in dollars only and links to the terms**, whose Donations clause carries
+the rand conversion, the operator's cut and the receipt position. The donor still
+sees the exact rand figure before any money moves — on PayFast's own payment page,
+one click later. The presentment risk is *mitigated differently*, not accepted:
+what was lost is the figure appearing one screen earlier.
 
 **PayFast Multi-Currency Pricing cannot do this, and the reason is direction, not
 eligibility**: the price is set in ZAR, the *buyer* picks a display currency, and
@@ -154,8 +166,10 @@ after the flag went on must not keep collecting.
   receipt for money it did not receive, and the received-then-passed-on amount may
   read as operator revenue rather than a conduit. This is **structural, not a copy
   problem**: the only fix is reversing merchant-of-record for donations, which
-  reverses ADR 0026 and is its own effort. The widget's "this is not a
-  tax-deductible receipt" line is a mitigation, not a solution. **Worth an
+  reverses ADR 0026 and is its own effort. The **terms of service** say so
+  outright (clause 5, Donations) — that is the mitigation, not a solution. It was
+  in the widget copy until 2026-08-02, when the disclosures moved to the terms;
+  a donor now reads it one link away rather than under the button. **Worth an
   accountant's five minutes before go-live** — this ADR is not legal advice.
 - **The exchange rate goes stale unless someone watches it.** Accepted knowingly;
   the constant is under-set rather than over-set so the drift favours the donor.
@@ -183,8 +197,11 @@ after the flag went on must not keep collecting.
   by hand) and **a donation popup on Public links** (it interrupts a Guest
   mid-lesson, and it is the one place ADR 0013's queries-only Guest seam would need
   reasoning about again).
-- **The donation take-rate is stated to the donor, so the copy reads it from the
-  constant rather than repeating it.** The widget interpolates the take-rate, the
-  floor and the rate from the `donations.config` query into its message
-  catalogues, so a deploy that changes a constant changes the copy with it and the
-  two cannot drift.
+- **The donation disclosures live on the terms page, not in the widget** (clause
+  5, from 2026-08-02): the rand conversion, the 10%, the no-Section-18A position
+  and the once-off/non-refundable terms. The widget is chips and a button with one
+  line linking there. Consequence to hold onto: **the 10% is now written in prose
+  next to a constant that could change**, so `DONATION_FEE_BPS` and the terms page
+  must be edited together — the widget used to interpolate the number and could
+  not drift. The floor still comes from `donations.config`, so the *minimum* is
+  interpolated and safe.

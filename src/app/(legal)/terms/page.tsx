@@ -9,7 +9,7 @@ export default function TermsPage() {
   return (
     <>
       <h1>Terms &amp; Conditions</h1>
-      <p className="text-soft">Last updated: 13 July 2026</p>
+      <p className="text-soft">Last updated: 2 August 2026</p>
 
       <h2>1. Who we are</h2>
       <p>
@@ -53,27 +53,58 @@ export default function TermsPage() {
         </li>
       </ul>
 
-      <h2>5. Selling</h2>
+      {/* The donation rail (ADR 0027). This clause is where the widget's
+          disclosures live: the donate section on a site's landing page is
+          deliberately bare — chips and a button — and everything it used to say
+          in small print is stated here instead. Keep the two in step: if the
+          rate, the operator's cut or the receipt position changes, it changes
+          here. */}
+      <h2>5. Donations</h2>
+      <ul>
+        <li>
+          Some course sites invite donations. A donation is a gift: it buys nothing, grants no access to any course,
+          and creates no account. Donations are once-off — there is no recurring giving.
+        </li>
+        <li>
+          Donation amounts are shown in US dollars but <b>charged in South African Rand (ZAR)</b>, converted at a rate
+          set by the platform operator. The exact rand amount is shown on PayFast&rsquo;s payment page before you
+          confirm, and your card issuer applies its own exchange rate and may add its own fees.
+        </li>
+        <li>
+          The platform operator is the merchant of record for donations and retains 10% of the net amount received,
+          paying the remainder to the payee nominated for that site.
+        </li>
+        <li>
+          Because the operator — not the site you donated to — receives the payment, a donation is{" "}
+          <b>not tax-deductible</b> and no Section 18A receipt is issued. PayFast&rsquo;s payment confirmation email
+          is your record of the transaction.
+        </li>
+        <li>
+          Donations are final and not refundable — see the <Link href="/refunds">Refund &amp; Cancellation Policy</Link>.
+        </li>
+      </ul>
+
+      <h2>6. Selling</h2>
       <p>
         Selling is limited to sellers approved by the platform operator. Sellers price their own finished courses and
         are paid out their share of each sale by EFT, as agreed with the operator. The platform operator is the
         merchant of record for all sales.
       </p>
 
-      <h2>6. Liability</h2>
+      <h2>7. Liability</h2>
       <p>
         The service is provided &ldquo;as is&rdquo;. To the maximum extent permitted by law, we are not liable for
         indirect or consequential loss arising from use of the service. Nothing in these terms limits rights you have
         under the Consumer Protection Act or other applicable South African law.
       </p>
 
-      <h2>7. Changes</h2>
+      <h2>8. Changes</h2>
       <p>
         We may update these terms; the date above reflects the current version. Continued use after a change means
         you accept the updated terms.
       </p>
 
-      <h2>8. Law and contact</h2>
+      <h2>9. Law and contact</h2>
       <p>
         These terms are governed by the law of the Republic of South Africa. Questions:{" "}
         <a href="mailto:support@my-course.app">support@my-course.app</a>.

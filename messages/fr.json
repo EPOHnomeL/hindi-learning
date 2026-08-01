@@ -497,14 +497,12 @@
     "customPlaceholder": "ex. 20",
     "errorInvalid": "Saisissez un montant en dollars, comme 20 ou 20.50.",
     "errorMinimum": "Le don le plus petit que nous puissions accepter est {min}.",
-    "charge": "Votre carte sera débitée de <b>{zar}</b> (ZAR). Votre banque fixe le taux de change.",
     "donate": "Faire un don",
-    "donateAmount": "Donner {zar}",
+    "donateAmount": "Donner {amount}",
     "redirecting": "Redirection vers PayFast…",
     "failed": "Nous n’avons pas pu démarrer ce don. Veuillez réessayer.",
-    "feeNote": "{percent} % couvrent le fonctionnement de la plateforme ; le reste revient à {name}.",
-    "notReceipt": "Ceci n’est pas un reçu fiscal. PayFast vous enverra une confirmation de paiement par e-mail.",
+    "agreement": "En faisant un don, vous acceptez nos <terms>conditions</terms>.",
     "thanksHeading": "Merci.",
-    "thanksBody": "PayFast vous enverra par e-mail une confirmation de paiement pour votre don. Rappelez-vous qu’il ne s’agit pas d’un reçu fiscal."
+    "thanksBody": "PayFast vous enverra par e-mail une confirmation de paiement pour votre don."
   }
 }

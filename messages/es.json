@@ -497,14 +497,12 @@
     "customPlaceholder": "p. ej. 20",
     "errorInvalid": "Introduce un importe en dólares, como 20 o 20.50.",
     "errorMinimum": "El donativo más pequeño que podemos aceptar es {min}.",
-    "charge": "Se cargarán <b>{zar}</b> (ZAR) a tu tarjeta. Tu banco fija el tipo de cambio.",
     "donate": "Donar",
-    "donateAmount": "Donar {zar}",
+    "donateAmount": "Donar {amount}",
     "redirecting": "Te llevamos a PayFast…",
     "failed": "No pudimos iniciar ese donativo. Inténtalo de nuevo.",
-    "feeNote": "El {percent}% cubre el funcionamiento de la plataforma; el resto es para {name}.",
-    "notReceipt": "Esto no es un recibo deducible de impuestos. PayFast te enviará por correo la confirmación del pago.",
+    "agreement": "Al donar aceptas nuestros <terms>términos</terms>.",
     "thanksHeading": "Gracias.",
-    "thanksBody": "PayFast te enviará por correo la confirmación del pago de tu donativo. Recuerda que no es un recibo deducible de impuestos."
+    "thanksBody": "PayFast te enviará por correo la confirmación del pago de tu donativo."
   }
 }

@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { DONATION_PRESETS_USD_CENTS, donationAmount, formatUsd, formatZar, parseUsdCents } from "./donateDerive";
+import { DONATION_PRESETS_USD_CENTS, donationAmount, formatUsd, parseUsdCents } from "./donateDerive";
 
-// The rate and floor the widget is served by `donations.config`; hard-coded here
-// so a change to the committed constants shows up as a *deliberate* test edit.
-const RATE = 18.4;
+// The floor the widget is served by `donations.config`; hard-coded here so a
+// change to the committed constant shows up as a *deliberate* test edit.
 const MIN = 500;
-const base = { minUsdCents: MIN, usdZarRate: RATE };
+const base = { minUsdCents: MIN };
 
 describe("parseUsdCents", () => {
   it("reads whole dollars and cents as integer cents", () => {
@@ -32,22 +31,11 @@ describe("parseUsdCents", () => {
 
 describe("donationAmount", () => {
   it("takes a preset chip at face value", () => {
-    expect(donationAmount({ selection: 2500, custom: "", ...base })).toEqual({
-      ok: true,
-      usdCents: 2500,
-      zarCents: 46000,
-    });
+    expect(donationAmount({ selection: 2500, custom: "", ...base })).toEqual({ ok: true, usdCents: 2500 });
   });
 
-  // The whole reason this is a pure function: the ZAR figure the anti-surprise
-  // line quotes must be the one the server signs, and the server's rule is
-  // `Math.round(usdCents * USD_ZAR_RATE)` (convex/donations.ts).
-  it("converts to ZAR by the server's own rule, rounding to the cent", () => {
-    expect(donationAmount({ selection: "custom", custom: "7.77", ...base })).toEqual({
-      ok: true,
-      usdCents: 777,
-      zarCents: Math.round(777 * RATE),
-    });
+  it("takes the custom field to the cent", () => {
+    expect(donationAmount({ selection: "custom", custom: "7.77", ...base })).toEqual({ ok: true, usdCents: 777 });
   });
 
   it("holds an empty custom field open rather than calling it invalid", () => {
@@ -79,14 +67,6 @@ describe("donationAmount", () => {
 });
 
 describe("formatting", () => {
-  // Locale-independent on purpose: this is the number the donor's card will be
-  // charged, and it must read identically in all five catalogues.
-  it("writes Rand the South African way, with a space between thousands", () => {
-    expect(formatZar(46000)).toBe("R460.00");
-    expect(formatZar(1840000)).toBe("R18 400.00");
-    expect(formatZar(5)).toBe("R0.05");
-  });
-
   it("writes dollars without trailing zero cents", () => {
     expect(formatUsd(2500)).toBe("$25");
     expect(formatUsd(2050)).toBe("$20.50");

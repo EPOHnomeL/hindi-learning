@@ -2,10 +2,16 @@
 // beside checkoutDerive/welcomeDerive for the same reason they do: the widget's
 // own seam, testable without React or a DOM.
 //
-// Everything here is about ONE hazard — the donor types dollars and their card
-// is charged Rand, and with a donor-chosen amount *both* numbers are live. So
-// the parse is strict, the conversion is the server's own rule, and the Rand
-// figure is formatted identically in every locale.
+// The donor types dollars and their card is charged Rand, so the parse is
+// strict: at the money boundary an amount is either exactly what someone typed
+// or it is rejected, never coerced.
+//
+// This file used to also convert to Rand and format it, for the widget's
+// anti-surprise callout. That callout came off the page on 2026-08-02 (the
+// operator's call — the ask was drowning in disclosures; the conversion is
+// stated in the terms and the exact figure is on PayFast's own page), so the
+// conversion went with it rather than lingering here unused. `zarCentsFromUsdCents`
+// in convex/donations.ts is the live one, and always was the one that signs.
 
 // The chips, in US cents. Presets are the decision recorded in ticket 03
 // ($10 / $25 / $50 / custom); the floor lives server-side in `donations.config`
@@ -32,29 +38,23 @@ export function parseUsdCents(input: string): number | null {
 export type DonationSelection = number | "custom";
 
 export type DonationAmount =
-  | { ok: true; usdCents: number; zarCents: number }
+  | { ok: true; usdCents: number }
   // "empty" is not an error to shout about — it's the custom field waiting to be
   // filled. The widget disables the button and stays quiet; the other two speak.
   | { ok: false; reason: "empty" | "invalid" | "below-min" };
 
-// The amount to charge, and the Rand it becomes.
-//
-// The conversion mirrors `zarCentsFromUsdCents` in convex/donations.ts —
-// deliberately, because the anti-surprise line has to quote the figure BEFORE
-// the signed fields are fetched, and quoting a second, different conversion of
-// the same dollars would be the exact surprise it exists to prevent. The rate is
-// passed in from `donations.config`, so both sides read the one committed
-// constant and can only agree.
+// The amount to charge, in US cents — a chip taken at face value, or the custom
+// field parsed. `minUsdCents` comes from `donations.config`, so the floor the
+// widget enforces is the same integer `checkoutFields` throws on; this copy of
+// the check exists only so the donor is told before the click, not after it.
 export function donationAmount({
   selection,
   custom,
   minUsdCents,
-  usdZarRate,
 }: {
   selection: DonationSelection;
   custom: string;
   minUsdCents: number;
-  usdZarRate: number;
 }): DonationAmount {
   let usdCents: number;
   if (selection === "custom") {
@@ -66,17 +66,7 @@ export function donationAmount({
     usdCents = selection;
   }
   if (usdCents < minUsdCents) return { ok: false, reason: "below-min" };
-  return { ok: true, usdCents, zarCents: Math.round(usdCents * usdZarRate) };
-}
-
-// ZAR cents → "R18 400.00". Hand-formatted rather than `Intl.NumberFormat`
-// because this is the number the card is charged: it must read the same for a
-// donor whose browser is in `hi-IN` (which would group it 18,400 the Indian way)
-// as for one in `en-ZA`, and it must not silently become "ZAR 18,400.00" when a
-// runtime lacks the locale data.
-export function formatZar(cents: number): string {
-  const whole = String(Math.floor(cents / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-  return `R${whole}.${String(cents % 100).padStart(2, "0")}`;
+  return { ok: true, usdCents };
 }
 
 // US cents → "$25" / "$20.50". Whole dollars lose the ".00" — the chips are
