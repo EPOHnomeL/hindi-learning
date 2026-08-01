@@ -225,9 +225,10 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   *consistent with* the gate rather than proof of it, since prod's pool may be
   empty anyway (the discriminating sys-admin read wasn't done — see the ticket).
   **Ride-along:** all six outstanding whitelabel UI checks passed in the same
-  sitting, clearing that map's entire pending list (`ae579ca`);
-  [ticket 01](./tickets/01-brand-continuity-through-the-funnel.md)'s brand check
-  was not done and is still owed.
+  sitting, clearing that map's entire pending list (`ae579ca`); **ticket 01**'s
+  brand check (Brand continuity through the funnel) was not done and is still
+  owed — named in prose, not linked, because a second link to 01 in this section
+  reads as a second Decisions-so-far entry for it.
 
 ## Not yet specified
 
