@@ -179,24 +179,26 @@ test("filters by the sale timestamp; all-time returns everything", async () => {
     ctx.db.insert("topics", { ownerId: author, slug: "hindi", title: "Hindi", status: "completed" as const }),
   );
 
-  // convex-test freezes the clock, so both sales share one creation time `at`.
-  // That's enough to pin down the boundary semantics: from is inclusive, to is
-  // exclusive.
+  // The two sales bracket the window under test. They USUALLY land on the same
+  // millisecond, but not always — convex-test does not freeze the clock (an
+  // earlier version of this test assumed it did, and flaked under a loaded full
+  // suite run), so the bounds are taken from the real first and last rows.
   const first = await seedSale(t, { topicId, sellerId: author, lang: "en", gross: 10000, pf: "s1" });
-  await seedSale(t, { topicId, sellerId: author, lang: "en", gross: 20000, pf: "s2" });
+  const second = await seedSale(t, { topicId, sellerId: author, lang: "en", gross: 20000, pf: "s2" });
   const at = (await t.run((ctx) => ctx.db.get(first)))!._creationTime;
+  const last = (await t.run((ctx) => ctx.db.get(second)))!._creationTime;
 
   // All time: both sales.
   const all = await asUser(t, admin).query(api.sales.report, {});
   expect(all[0]).toMatchObject({ gross: 30000, count: 2 });
 
-  // from is inclusive: `at` keeps both, `at + 1` drops both.
+  // from is inclusive: the first sale's own time keeps both; past the last drops both.
   expect((await asUser(t, admin).query(api.sales.report, { from: at }))[0]).toMatchObject({ gross: 30000, count: 2 });
-  expect(await asUser(t, admin).query(api.sales.report, { from: at + 1 })).toEqual([]);
+  expect(await asUser(t, admin).query(api.sales.report, { from: last + 1 })).toEqual([]);
 
-  // to is exclusive: `at` drops both, `at + 1` keeps both.
+  // to is exclusive: the first sale's own time drops both; past the last keeps both.
   expect(await asUser(t, admin).query(api.sales.report, { to: at })).toEqual([]);
-  expect((await asUser(t, admin).query(api.sales.report, { to: at + 1 }))[0]).toMatchObject({
+  expect((await asUser(t, admin).query(api.sales.report, { to: last + 1 }))[0]).toMatchObject({
     gross: 30000,
     count: 2,
   });
