@@ -14,10 +14,19 @@ that already ship.
 
 ## Notes
 
-- **The paygate spine is decided and shipping** (ADR 0016): Edition-grain sale, free
-  first-Lesson Preview, lifetime Entitlement, Stripe Connect facilitator with the Seller as
-  merchant of record, 15% platform fee, **no refunds**. Nothing on this map re-opens that —
-  every ticket here consumes it.
+- **The paygate spine is decided and shipping**: Edition-grain sale, free first-Lesson
+  Preview, lifetime Entitlement, **no refunds**. Nothing on this map re-opens that — every
+  ticket here consumes it.
+- **⚠ Do not read the merchant model off ADR 0016.** This note used to say "Stripe Connect
+  facilitator with the Seller as merchant of record, 15% platform fee", quoting 0016. **All
+  three of those are wrong** (corrected 2026-08-01). ADR 0016 is `status: proposed` and was
+  inverted by the PayFast pivot of 2026-07-08/07-10 that actually shipped; nothing supersedes
+  it yet, so it still reads as current. The shipped reality: **PayFast**, the **operator as
+  sole merchant of record** ([ADR 0026](../../../docs/adr/0026-manual-eft-payment-rail.md)),
+  and a **50%** platform cut (`PLATFORM_FEE_BPS=5000`, split on the *net*). This matters most
+  to the donation tickets, which touch the same rails and must not inherit a seller-as-merchant
+  assumption. [Ticket 09](tickets/09-adr-superseding-0016-payfast-merchant-model.md) closes the
+  record itself.
 - **Ticket 01 is the blocked one and it blocks the least.** Authoring-cost funding needs real
   per-run token numbers first
   ([Cost instrumentation](../internal-course-studio/tickets/03-cost-instrumentation.md)), and
