@@ -167,7 +167,8 @@ Gotchas:
     `convex/payfast.ts` or `market.startCheckout` casually, and don't test against
     prod. The diagnosed funnel problems are *checkout abandonment* and *sign-up
     friction* — the rail itself is not the fault (see
-    `.scratch/ywampotch-launch/PRD.md`).
+    `.plan/maps/ywampotch-launch/spec.md`; the older
+    `.scratch/ywampotch-launch/PRD.md` is superseded).
   - The earlier "pending FICA → pause selling with `PAYFAST_MODE=off`" instruction
     is **retired**. `off` remains the kill switch in `convex/env.ts`, but nothing
     is asking you to use it.
