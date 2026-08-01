@@ -57,6 +57,7 @@ not maps.)
 type: task            # task | grilling | research | prototype
 blocked_by: [01, 02]  # ticket numbers whose ## Answer this builds on
 claimed_by: <session> # set while worked; chartr writes/clears it (by hand only offline)
+claimed_at: <RFC 3339> # ALWAYS set alongside claimed_by, same edit; cleared with it
 ---
 # Title
 ## Question   — what it asks, workable cold
@@ -68,6 +69,24 @@ claimed_by: <session> # set while worked; chartr writes/clears it (by hand only 
 
 - `## Answer` with prose → **resolved** · `## Ruled out` with prose → **out_of_scope**
 - `claimed_by` and no closing section → **claimed** · else → **open**
+
+A claim is **always the pair** `claimed_by` + `claimed_at`, written in the same edit
+and cleared together when the `## Answer` lands. `claimed_at` is not status — it's
+how a reader tells a live claim from an abandoned one, since a session that dies
+leaves `claimed_by` behind with nothing to say how stale it is. chartr flags a claim
+older than **72h** as a probable dead session.
+
+**`claimed_at` must be full RFC 3339** — date *and* time *and* offset:
+
+```
+claimed_at: 2026-08-01T14:02:00+02:00   # valid
+claimed_at: 2026-08-01                  # MALFORMATION — no time, no offset
+claimed_at: 2026-08-01 14:02            # MALFORMATION — space, no seconds/offset
+```
+
+A date alone or a space-separated time is a parse error chartr reports as a
+malformation on the ticket, not a warning it works around. Get it from
+`date -Iseconds`, never by hand.
 
 **Frontier** = open tickets whose `blocked_by` are all resolved — the work that can
 start now. Computed, never written. A blocker clears the instant its `## Answer`
