@@ -72,3 +72,90 @@ the unauthenticated signed-fields query returns correct signed fields for a dono
 amount; a simulated donation ITN mints one donation ledger row and **no Entitlement**, and
 a replayed one is a no-op; the PayFast sale path has no behaviour change; and ADR 0027 is
 written. Tests cover the ITN branch and the Sales-tab exclusion.
+
+## Answer
+
+Built 2026-08-01. **[ADR 0027](../../../../docs/adr/0027-per-tenant-donation-rail.md)
+is the record** — it holds the reasoning; this notes only what a later session
+would be surprised by. All nine steps landed, plus the sys-admin config UI (the
+flag is unusable without a way to name a payee). 774 tests pass; `tsc` clean.
+
+Commits: `119cb8e` (a flake fix that had to come first), `66cc9b3` (the rail),
+`ee27ea3` (the dashboard), `05fd26a` (ADR 0027 + CONTEXT.md).
+
+### Three places the build deviates from this ticket, all deliberate
+
+1. **No tenant-flag backfill, and the flag is `v.optional`** — step 6 asked for a
+   migration over every tenant row. It isn't needed, and the reason is that step
+   6 inherited the *shape* of the existing five flags without their *reason*:
+   those are required because their v1 default was `true`, so "no regression"
+   had to be written onto every row. A donation rail must default **off**, so
+   **absence already carries the right meaning** — and `assertTenantFlag` reads
+   it truthily, making an unset flag fail-closed, which is what money wants. A
+   test pins this: a tenant row with exactly today's five flags is off. One
+   fewer prod migration on a money feature.
+2. **`ledger.kind` is optional and the Sales filter reads `!== "donation"`, not
+   `=== "sale"`** — steps 2 and 3 asked for the backfill first so `kind` could be
+   required. Written that way it needs two deploys, and in the window between
+   them `=== "sale"` **silently drops the entire pre-0027 sales history from the
+   Sales report** — a worse regression than the one the step was guarding
+   against. So: `kind` optional, every writer sets it, readers deny-list
+   donations, and `pnpm run backfill-ledger-kind:prod` stamps the legacy rows.
+   **The narrow to required is the one piece of this ticket left undone** (see
+   below). A comment at the filter says a third money kind must flip it to an
+   allow-list — that is the single way the predicate goes wrong.
+3. **`usdCents`, not `usdAmount`** — step 8 named the arg `usdAmount` without
+   saying dollars or cents. Integer cents, matching the rest of the codebase
+   ("never trusts parseFloat at the money boundary"). The query returns the
+   `zarCents` it signed, so the widget's anti-surprise line quotes the number
+   actually charged rather than converting a second time.
+
+### The two numbers 03 left unnamed
+
+Grilled rather than invented, per this ticket's instruction:
+**`USD_ZAR_RATE = 18.4`** (deliberately under the market rate, so drift favours
+the donor) and **`MIN_DONATION_USD_CENTS = 500`** ($5 — low enough not to deter
+a casual donor, high enough that PayFast's fixed fee isn't most of the gift).
+Both are committed constants changed by deploy, per 03 §6.
+[Live USD→ZAR rate](05-live-usd-zar-rate.md) replaces the first later.
+
+### Decided here, since 03 didn't
+
+- **A donation row in Payouts** shows `lang: null` plus an explicit `kind`; the
+  UI writes "donation" where a language code would go. Nullable rather than a
+  stand-in string — "Donation" is not a language code, and inventing one puts
+  presentation text inside a Convex query.
+- **The donation checkout sends no `m_payment_id` at all.** It has no intent to
+  reference, and the alternative (minting a random token) would put
+  non-determinism in a cached query for a value nothing reads.
+- **A donation that lands with no valid payee 500s**, rolling back the
+  idempotency row so PayFast retries. Better a retried notification than money
+  banked with nobody recorded as owed.
+- **`setDonationPayee` with no email clears the payee AND switches the flag
+  off**, so the pair can never disagree — the failure would otherwise surface at
+  donor time instead of configuration time.
+
+### Left undone, on purpose
+
+**`ledger.kind` is not yet narrowed to required.** That needs
+`pnpm run backfill-ledger-kind:prod` run against prod first (take a Convex
+snapshot — the script is idempotent), then a one-line schema edit and the two
+readers flipped to an allow-list. Nothing depends on it; it is hygiene that buys
+safety for a *third* money kind, and doing it now would have meant shipping a
+money feature across two coupled deploys. Deliberately not ticketed as its own
+star — it is a line in this Answer and belongs to whoever next touches the
+Ledger schema.
+
+Also **not** done here and correctly so: the donor-facing widget and the landing
+section are [08](08-build-donation-widget-and-landing-section.md), which this
+unblocks. The widget must state the 10% and the "not a tax-deductible receipt"
+line; `donations.config` serves it the floor, the rate and the fee from the one
+place they are defined, so the copy cannot drift from the constants.
+
+### One thing found on the way
+
+`convex/sales.test.ts` carried a latent flake — it asserted that convex-test
+freezes the clock, which it does not, so two seeded rows straddling a
+millisecond broke a window assertion. It passed alone and failed only under a
+loaded full-suite run. Fixed in its own commit *before* the feature work, so the
+green suite this ticket claims is honestly green.

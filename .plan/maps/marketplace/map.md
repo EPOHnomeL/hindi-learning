@@ -58,6 +58,16 @@ that already ship.
   through the existing Ledger + Payouts tab. **No intent table and no public mutation** — it
   rides on `custom_str1/custom_str2`, so ADR 0013's guarantee holds. One-off only.
   **Decided, not built** — its Handoff section names the build tickets.
+- [Build the donation rail — backend, config and ADR 0027](tickets/07-build-donation-rail-backend.md) —
+  **built and shipped**; [ADR 0027](../../../docs/adr/0027-per-tenant-donation-rail.md) is the
+  record. Money half only — the widget is [08](tickets/08-build-donation-widget-and-landing-section.md),
+  now unblocked. Three deliberate deviations from the ticket, each argued in its Answer: **no
+  tenant-flag backfill** (the flag is optional, because absence *means off* and that is
+  fail-closed), **`kind` left optional** with Sales filtering `!== "donation"` (a required `kind`
+  needs two deploys, and between them `=== "sale"` would drop the whole pre-0027 sales history),
+  and `usdCents` over `usdAmount`. Rate **18.4**, minimum **$5**. One loose end, deliberately not
+  a ticket: run `backfill-ledger-kind:prod`, then narrow `kind` — hygiene that buys safety for a
+  *third* money kind, owed by whoever next touches the Ledger schema.
 
 ## Not yet specified
 
