@@ -33,35 +33,38 @@ export function formatPrice(amount: number, currency: string): string {
   }
 }
 
-// The whole purchase, on one line, at the top of every step of it: Create
-// account → Choose payment method → Pay → Continue to <course>. The funnel is
-// four screens across two components (SignIn, then BuyDialog's chooser and
-// method panel) and a buyer part-way through has no other way to tell how much
-// is left — the diagnosed abandonment is people who can't see the end. Steps
-// behind the current one are ticked, the current one is bold, the rest are
-// quiet; nothing here is clickable, because you can't skip a step or undo a
-// payment. Wraps rather than truncates: a half-legible step is worse than two
-// lines. `courseTitle` is absent on the sign-in screen (no Edition in hand
-// yet), so the last step names the course generically there.
-export function CheckoutSteps({ current, courseTitle }: { current: CheckoutStep; courseTitle?: string }) {
+// The whole purchase on one line, at the top of every step of it: Account →
+// Method → Pay → Course. The funnel is four screens across two components
+// (SignIn, then BuyDialog's chooser and method panel) and a buyer part-way
+// through has no other way to tell how much is left — the diagnosed abandonment
+// is people who can't see the end. Steps behind the current one are ticked, the
+// current one is bold, the rest are quiet; nothing is clickable, because you
+// can't skip a step or undo a payment.
+//
+// The labels are ONE WORD each, and that is load-bearing rather than terse for
+// its own sake: this renders in a 384px sign-in card, and the sentence-length
+// labels it started with ("Choose payment method", "Continue to your course")
+// wrapped onto a second line and read as broken — in French and Hindi they are
+// longer still. Four short labels plus their markers measure ~275px, so the row
+// holds one line in every locale. `whitespace-nowrap` makes a regression here
+// overflow visibly instead of silently re-wrapping.
+export function CheckoutSteps({ current }: { current: CheckoutStep }) {
   const t = useTranslations("Checkout");
-  const steps = [
-    t("stepAccount"),
-    t("stepMethod"),
-    t("stepPay"),
-    t("stepContinue", { course: courseTitle ?? t("yourCourse") }),
-  ];
+  const steps = [t("stepAccount"), t("stepMethod"), t("stepPay"), t("stepCourse")];
   return (
-    <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] leading-tight">
+    <ol className="flex items-center justify-center gap-1 text-[11px] leading-none">
       {steps.map((label, i) => {
         const n = i + 1;
         const done = n < current;
         const active = n === current;
         return (
-          <li key={label} className="flex items-center gap-1.5">
-            {i > 0 && <span className="text-line">›</span>}
+          <li key={label} className="flex items-center gap-1">
+            {/* A hairline instead of a chevron: at this size a "›" glyph sat on
+                a different baseline to the markers and read as punctuation
+                inside the label rather than a separator between steps. */}
+            {i > 0 && <span aria-hidden className="mr-1 h-px w-2.5 bg-line" />}
             <span
-              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
+              className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
                 done
                   ? "bg-accent2/15 text-accent2"
                   : active
@@ -71,7 +74,7 @@ export function CheckoutSteps({ current, courseTitle }: { current: CheckoutStep;
             >
               {done ? <Icon name="check" className="h-2.5 w-2.5" /> : n}
             </span>
-            <span className={active ? "font-semibold text-ink" : "text-soft"}>{label}</span>
+            <span className={`whitespace-nowrap ${active ? "font-semibold text-ink" : "text-soft"}`}>{label}</span>
           </li>
         );
       })}
@@ -262,7 +265,6 @@ function BuyDialog({
       <div className="mb-4 border-b border-line pb-3">
         <CheckoutSteps
           current={checkoutStep({ onEftInstructions: !!eft, redirectingToCard: busy && method === "card" })}
-          courseTitle={courseTitle}
         />
       </div>
       <div className="flex items-start justify-between gap-3">
