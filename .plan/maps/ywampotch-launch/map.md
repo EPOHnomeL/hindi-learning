@@ -53,6 +53,8 @@ history on a repo that now handles real money.
 | 13 | Move the purchase out of `BuyDialog` onto the page | [13](tickets/13-move-purchase-out-of-buydialog.md) | built `f971945` — **operator's walk pending** |
 | 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | **open — next** |
 | 15 | Launch risk — rollback + prod walk-through | [15](tickets/15-checkout-page-launch-risk-and-prod-walk.md) | blocked by 13, 14 |
+| 16 | The EFT dead end — a way out, and somewhere to wait | [16](tickets/16-eft-dead-end-and-awaiting-payment.md) | built `14b3888` — **operator's walk pending** |
+| 17 | The card buyer's payment-complete moment | [17](tickets/17-payment-complete-moment-on-card-return.md) | **open — next** |
 
 The strict sequencing above applied to units 01–06, which shared files and are
 done. The 2026-08-01 additions are a second strand: 09 stood alone (a
@@ -173,6 +175,27 @@ It also needs an acceptance criterion that post-dates the issue — see
   would throw. That is the EFT rail's step 4, the counterpart of PayFast's
   `return_url`. **No purchase was completed and nothing was seen in a browser** —
   the operator's walk in dev is the bar, and it is still owed.
+
+- [The EFT dead end — a way out, and somewhere to wait](./tickets/16-eft-dead-end-and-awaiting-payment.md) —
+  found by the operator's dev walk of 13. The instructions panel had no exit, and
+  a pending EFT buyer was **invisible to the whole app**: no Entitlement means
+  `myPurchases` can't see them, so their course sat under Available at full price
+  after they'd transferred real money. Built `14b3888`: a "Done" CTA to the
+  overview, and an **Awaiting payment** section there (above Purchased, with the
+  reference on the card) fed by a new read-only `eft.myPendingIntents` — which
+  rides the `by_user_topic` userId prefix (no new index) and deliberately returns
+  **no bank details**. Pending courses are filtered out of Available. Clears
+  itself on confirmation, same transaction that mints the Entitlement.
+
+**Correction to [ticket 12](./tickets/12-checkout-page-route-and-step-model.md),
+found by the operator completing a real PayFast purchase.** 12 recorded the
+payment-return landing as "already correct — the reactive `ConfirmingBanner` *is*
+step 4". It isn't: that banner renders **only while the ITN is in flight**, and
+the ITN lands in seconds, so the happy path shows the buyer nothing at all. The
+generic first-open Welcome panel fills the gap instead, saying nothing about
+money. Recorded here rather than by editing 12, whose reasoning was sound on what
+was known then; the fix is [ticket 17](./tickets/17-payment-complete-moment-on-card-return.md),
+and the operator has chosen its shape (a purchase variant of the Welcome panel).
 
 ## Not yet specified
 
