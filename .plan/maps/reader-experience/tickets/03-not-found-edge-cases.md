@@ -1,0 +1,83 @@
+---
+type: task
+blocked_by: []
+---
+
+# Not-found & deep-link edge cases
+
+## Question
+
+**Where it stands:** partial — loading guard + inline 'not found' only; no not-found.tsx / uniform 404
+
+Vocabulary: [`CONTEXT.md`](../../../../CONTEXT.md) (**Topic**/course, **Lesson**, **Reference**, **Viewer**). Spec: `../PRD.md`. Decisions: [ADR 0012](../../../../docs/adr/0012-app-router-url-addressable-navigation.md).
+
+## What to build
+
+Make bad and inaccessible deep links fail clearly, now that any URL can be typed,
+bookmarked, or shared. Build on the routing spine (**01**).
+
+- An unknown course slug, a course the caller can't access (not owner, no
+  **Share**), and an unknown Lesson/Reference `key` within a valid course all
+  render Next's `not-found`.
+- "Doesn't exist" and "you can't see it" produce the **identical** 404, so the app
+  never reveals which private Topics exist (matching the owner-or-Viewer reads,
+  which already return nothing for inaccessible Topics).
+- No silent fallback (e.g. bouncing a bad Lesson key to the first Lesson, or an
+  inaccessible course to the dashboard).
+- Because reads come from client `useQuery` (which is `undefined` while loading),
+  a route shows its loading state while `undefined` and only triggers not-found
+  once the query has **resolved empty** — so a slow load never flashes a 404.
+
+## Acceptance criteria
+
+- [ ] `/courses/<nonexistent>` renders the not-found page.
+- [ ] A course owned by someone else and not shared with the caller renders the same not-found page — indistinguishable from a nonexistent one.
+- [ ] `/courses/[slug]/lessons/<bad-key>` (and the reference equivalent) renders not-found rather than redirecting anywhere.
+- [ ] While the underlying query is in flight, the route shows a loading state, not a flash of not-found.
+
+## Blocked by
+
+- 01 — Routing spine.
+
+## Notes
+
+- The access guarantee itself (a non-Viewer reads nothing) is already enforced and
+  tested server-side by the topic-sharing owner-or-Viewer work; this slice only
+  surfaces that as a 404 in the UI. Verified manually, per repo precedent.
+- If a pure not-found predicate or default-Lesson resolver falls out, give it a
+  small co-located unit test in the style of `lessonSrcDoc.test.ts` — but don't
+  manufacture a seam for router glue.
+
+## Comments
+
+### EPOHnomeL — 2026-07-10
+
+Verified 2026-07-10 (main @ 1b2db94) — still outstanding as written: no `not-found.tsx` anywhere under src/app; only the loading guard + inline "not found" states exist.
+
+## Done when
+
+An unknown slug, an inaccessible course, and an unknown lesson/reference key all render the identical Next `not-found`, with no silent fallback and no not-found flash while the query is still loading.
+
+<!-- Migrated 2026-07-30 from GitHub issue #103 (filed 2026-07-24), when this repo retired
+     its remote tracker; see docs/agents/issue-tracker.md. -->
+<!-- Some links in this ticket were de-linked in the 2026-07-30 migration: their targets
+     (.scratch PRDs, already-resolved sibling tickets, the retired product-direction
+     roadmap) do not exist in the repo. The names are kept as prose for provenance. -->
+
+---
+
+## Context folded from the retired `url-routing` map (2026-08-01)
+
+<!-- was .plan/maps/reader-experience/tickets/03-not-found-edge-cases.md; that single-ticket map was consolidated into reader-experience. Ticket 01 of the original url-routing effort (the routing spine) shipped under ADR 0012; its number is retired. -->
+
+- **The security rule is the interesting part, not the 404:** "doesn't exist" and "you can't
+  see it" must produce the **identical** response, so the app never reveals which private
+  Topics exist. This already matches the owner-or-Viewer reads, which return nothing for an
+  inaccessible Topic — the routing layer must not leak what the data layer protects.
+- **No silent fallbacks.** Bouncing a bad Lesson key to the first Lesson, or an inaccessible
+  course to the dashboard, is explicitly wrong here.
+- **The subtle bug to avoid:** reads come from client `useQuery`, which is `undefined` while
+  loading, so a naive not-found check fires during load. Show the loading state while
+  `undefined`; only trigger not-found on a settled empty result.
+- Skills: `/tdd`, `vercel:nextjs` (App Router `not-found` conventions).
+- **Out of scope:** the routing spine and URL scheme — shipped under ADR 0012.

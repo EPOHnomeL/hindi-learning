@@ -57,7 +57,7 @@ Taking the 2026-07-10 verification above as the real starting point (the roster 
 revoke already ship as `listEditionAccess` / `revokeShare`): `shareTopic` refuses a
 share to the owner's own email, and the topic-delete share cascade is either built
 alongside a topic-delete mutation or explicitly parked until
-[course-delete/01](../../course-delete/tickets/01-delete-button-for-courses.md) lands
+[Delete button for courses](../../course-management/tickets/01-delete-button-for-courses.md) lands
 one. Both covered by Convex-seam tests.
 
 <!-- Migrated 2026-07-30 from GitHub issue #101 (filed 2026-07-24), when this repo retired

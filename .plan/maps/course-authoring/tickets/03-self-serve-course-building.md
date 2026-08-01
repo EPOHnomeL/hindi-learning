@@ -15,7 +15,7 @@ capture is this issue.
 User's framing: *"allowing a user to not just edit but also build (i.e. AI generate and
 Translate and sell) a course — so that ability to do that."*
 
-Distinct from the existing `course-authoring` scope ([course-authoring/01](01-ai-assisted-course-editing.md)/#60), which is about **revising an
+Distinct from the existing `course-authoring` scope ([AI-assisted course editing](01-ai-assisted-course-editing.md)/#60), which is about **revising an
 already-seeded course** (edit-intents against existing content). This is about the **front
 door**: can an ordinary user (not just an operator/admin) go through a self-serve flow that:
 
@@ -31,9 +31,9 @@ door**: can an ordinary user (not just an operator/admin) go through a self-serv
 ## Why this needs scoping, not just building
 
 - Today's course creation ("seed-and-go") assumes a trusted author. Opening it to any user
-  raises the same cost/abuse questions as `paid-marketplace/01` ([paid-marketplace/01](../../paid-marketplace/tickets/01-authoring-cost-and-model-provider-strategy.md), authoring-cost funding
+  raises the same cost/abuse questions as `paid-marketplace/01` ([Authoring-cost funding & model-provider strategy](../../marketplace/tickets/01-authoring-cost-and-model-provider-strategy.md), authoring-cost funding
   & model-provider strategy) — a self-serve generate button is a metered LLM cost per click.
-- Overlaps but is not identical to `course-authoring` ([course-authoring/01](01-ai-assisted-course-editing.md)) — that's post-seed editing;
+- Overlaps but is not identical to `course-authoring` ([AI-assisted course editing](01-ai-assisted-course-editing.md)) — that's post-seed editing;
   this is pre-seed, the build flow itself.
 - Whitelabel/tenant implications: does a self-serve builder create a course scoped to their
   own tenant, the default site, or is tenant assignment part of the flow?
@@ -41,11 +41,11 @@ door**: can an ordinary user (not just an operator/admin) go through a self-serv
 ## Open questions for the grilling / PRD stage
 
 - Who can build: any signed-in user, or still Allowlist/tenant-admin gated?
-- Cost/metering for the generate step — ties into `paid-marketplace/01` ([paid-marketplace/01](../../paid-marketplace/tickets/01-authoring-cost-and-model-provider-strategy.md)).
+- Cost/metering for the generate step — ties into `paid-marketplace/01` ([Authoring-cost funding & model-provider strategy](../../marketplace/tickets/01-authoring-cost-and-model-provider-strategy.md)).
 - Does "translate" happen at build time (bundled) or as a later, separate Edition action?
 - Does "sell" require seller payout details up front (payfast-payments precedent) or can a
   course be built and published free first, monetized later?
-- Relationship to `course-authoring` ([course-authoring/01](01-ai-assisted-course-editing.md)/#60) — same UI surface extended earlier in the
+- Relationship to `course-authoring` ([AI-assisted course editing](01-ai-assisted-course-editing.md)/#60) — same UI surface extended earlier in the
   lifecycle, or a genuinely separate flow?
 
 ## Next step
