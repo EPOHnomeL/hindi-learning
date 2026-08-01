@@ -12,6 +12,33 @@ price, merchant still settles ZAR). If our account qualifies, most of this may
 be configuration rather than a build — and the grilling below is then about
 whether we *want* their conversion or our own fixed price points.
 
+<!-- Note added 2026-08-01 while grilling marketplace/03 (donations). NOT a resolution
+     of this ticket — just facts that arrived early, so nobody re-researches them. -->
+
+**Partial answer on MCP, from the donations grilling.** Checked against
+<https://payfast.io/features/multi-currency-pricing/> and their
+[setup KB](https://support.payfast.co.za/portal/en/kb/articles/how-do-i-set-up-multi-currency-pricing):
+MCP is **ZAR-base only** — the *buyer* picks a display currency from a dropdown at
+checkout, PayFast shows a real-time conversion **out of** ZAR, the buyer accepts, and
+the merchant still settles ZAR. **Visa/Mastercard only, no AMEX.** It sits on
+PayFast's **Aggregation** solution and has a self-serve setup KB article — so
+eligibility looks likelier than ticket 10 could confirm, though the support query is
+still worth sending.
+
+Two things this changes for the grilling below:
+
+- MCP gives *display* currency with **PayFast owning the rate, its freshness and the
+  buyer-acceptance disclosure** — strictly less for us to maintain than operator-set
+  price points. A genuine argument in its favour that ticket 10 could not make.
+- MCP **cannot take a non-ZAR base**. Any design where a number is entered or fixed
+  in USD/EUR and Rand is *derived* must do that conversion itself; MCP only ever
+  converts the other way. This is what pushed
+  [marketplace/03](../../marketplace/tickets/03-donation-link-and-prompt.md) to a
+  committed rate constant with MCP switched **off** — see decision 5 there.
+
+If this ticket lands on MCP while 03 keeps its own constant, **the two must be
+reconciled**: no single transaction should have both conversions in play.
+
 # Regional pricing — how does $10/€10/R100 actually get charged?
 
 ## Question

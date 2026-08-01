@@ -43,15 +43,45 @@ that already ship.
 
 <!-- one line per resolved ticket -->
 
+- [Donation functionality](tickets/03-donation-link-and-prompt.md) — an **in-app rail, not a
+  link** (the 10% cut forces the money through our PayFast account): a flag-gated
+  `#donations` section per tenant, **Guest donor with no email field** (PayFast collects it,
+  the ITN returns it), **USD typed / ZAR charged** at a committed constant with an explicit
+  anti-surprise line, 10% via `splitNet(net, 1000)`, owed to a sys-admin-set `donationPayee`
+  through the existing Ledger + Payouts tab. **No intent table and no public mutation** — it
+  rides on `custom_str1/custom_str2`, so ADR 0013's guarantee holds. One-off only. Needs
+  ADR 0027 + implementation tickets.
+
 ## Not yet specified
 
 - **Ranking, search and filtering** on discover — real questions at scale, meaningless at four
   tenants. Deliberately not ticketed.
 - **BYOK key storage mechanics** (per-owner encrypted, scoped, never logged) — named in
   ADR 0014, only worth ticketing if 01's BYOK branch wins.
+- **Donation rail implementation** — ticket 03 decided the whole shape but this map is
+  planning, so the build is unticketed: ADR 0027 plus the tenant flag + backfill migration,
+  `donationPayee` and its admin UI, the signed-fields query, the ITN donation branch, the
+  `ledger` widening + `kind`, the Sales-tab exclusion, and the landing section. Charts as its
+  own effort when wanted. clears-with: 03
+- **Donation reporting for a payee** — a tenant admin can currently see none of their own
+  donation income; only the sys admin's Payouts tab shows it. Whether that needs a
+  tenant-facing view at all is unclear until money is actually flowing. clears-with: 03
 
 ## Out of scope
 
 - The paygate access mechanics — decided in ADR 0016 and already shipping.
 - The publish mechanics — shipped on [course-publishing](../course-publishing/map.md).
 - Paid-ads and distribution tooling.
+- **Donations in the admin Sales report** ([03](tickets/03-donation-link-and-prompt.md)) — that
+  report is revenue per course per edition; a donation has no course and folding it in corrupts
+  the per-course numbers. Donations surface in Payouts only.
+- **EFT donations** ([03](tickets/03-donation-link-and-prompt.md)) — card-only. The EFT rail's
+  human-typed reference exists to reconcile a *known* price against a bank statement; a
+  donor-chosen arbitrary amount is much harder to match by hand.
+- **A donation popup on Public links** ([03](tickets/03-donation-link-and-prompt.md)) — the
+  ticket's original second idea. It interrupts a Guest mid-lesson, and it is the one place
+  ADR 0013's queries-only Guest seam would need reasoning about again.
+- **Section 18A tax receipts for donors** ([03](tickets/03-donation-link-and-prompt.md)) —
+  structurally impossible under ADR 0026: the operator is merchant of record, so the donation
+  never reaches the tenant's PBO. Fixing it means reversing merchant-of-record for donations,
+  which is its own effort. Flagged for an accountant, not deferred as work.
