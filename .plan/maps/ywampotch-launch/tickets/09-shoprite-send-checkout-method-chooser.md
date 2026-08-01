@@ -90,3 +90,12 @@ the same `market.startCheckout` / `eft.startEftPurchase` mutations as before.
 renders when `eft.eftDetails` returns details, i.e. the rail is configured and
 enabled, which is true on no environment yet. Fold the visual check into
 ticket 07's prod pass — the buyer-facing claim there now includes this screen.
+
+<!-- CORRECTION, 2026-08-01 (later the same day): the paragraph above is stale.
+     The operator enabled the rail in BOTH dev and prod and walked the flow. The
+     chooser has been seen — and the verdict was that the *wording* is fine but
+     the container is wrong: too much popup and dialog for a phone. That is now
+     tickets 12–15, which move checkout onto its own routed page and delete
+     `BuyDialog`. This ticket stays resolved; what it built survives as page
+     sections, not as a dialog. -->
+

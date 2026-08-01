@@ -19,6 +19,14 @@ checkout** (Unlock full course → sign in/up → "How do you want to pay?"
 (RSA EFT / Visa incl. international) → straight to that method's details), and
 **regional pricing** — $10 US, €10 EU, R100 everywhere else.
 
+Extended again 2026-08-01, after the operator walked the live flow: **checkout
+stops being a popup**. It becomes its own mobile-first page — a flight-booking
+wizard, step rail at the top showing what's done and what's left — serving both
+entry paths (share link signed-out, published site signed-in). The step
+*sequence* is right and does not change; the container and the phone treatment
+do. Grilled to this shape before charting: the complaint is *"too much popups
+and dialog"*, not the order of the steps.
+
 ## Build order
 
 Strictly sequential — see [spec § Execution](spec.md). File overlap is high
@@ -40,7 +48,11 @@ history on a repo that now handles real money.
 | 08 | Fix the four known stale facts | [08](tickets/08-fix-known-stale-docs-and-tracker.md) | open |
 | 09 | Shoprite-Send checkout — method chooser + step rail | [09](tickets/09-shoprite-send-checkout-method-chooser.md) | built `27ba5bd` |
 | 10 | Research — non-ZAR charging + buyer geo | [10](tickets/10-research-non-zar-charging-and-geo.md) | answered |
-| 11 | Regional pricing mechanism ($10/€10/R100) | [11](tickets/11-regional-pricing-mechanism.md) | **open — next; grilling, needs the operator** |
+| 11 | Regional pricing mechanism ($10/€10/R100) | [11](tickets/11-regional-pricing-mechanism.md) | **open — grilling, needs the operator** |
+| 12 | Checkout as a page — route + step model | [12](tickets/12-checkout-page-route-and-step-model.md) | **open — next; grilling, decides 13 and 14** |
+| 13 | Move the purchase out of `BuyDialog` onto the page | [13](tickets/13-move-purchase-out-of-buydialog.md) | blocked by 12 |
+| 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | blocked by 12 |
+| 15 | Launch risk — rollback + prod walk-through | [15](tickets/15-checkout-page-launch-risk-and-prod-walk.md) | blocked by 13, 14 |
 
 The strict sequencing above applied to units 01–06, which shared files and are
 done. The 2026-08-01 additions are a second strand: 09 stood alone (a
@@ -48,9 +60,18 @@ presentation reshape of `Paygate.tsx`, `convex/` untouched), 10 was AFK
 research, and 11 now grills on its facts. Regional-pricing *implementation* is
 deliberately not ticketed yet — see Not yet specified.
 
-**Before the rail can take a cent on prod**, a sys admin must open the Payouts tab
-and fill in the EFT collection account, then tick "Offer Pay by EFT to buyers" —
-the rail ships **off**, and the buyer-facing button does not exist until it is on.
+**12–15 are a third strand**, opened the same day: 09 fixed the *wording* of the
+method step but left it in a dialog, and once the operator could actually see it
+the container was the complaint. 12 is the decision the other three hang off;
+13 and 14 are independent of each other and can run in parallel once it closes.
+**11 and 13 land in the same surface** — whichever ships second inherits the
+merge.
+
+**The EFT rail is ON in dev and prod** (operator confirmed 2026-08-01), so the
+chooser, the bank-details panel and the pending state all render today. Earlier
+notes on this map and in ticket 09 said the opposite — that the rail was enabled
+nowhere and "nobody has seen it". That was true when written and is now false;
+corrected here rather than left to mislead the next session.
 
 **Why the first two are on GitHub.** They predate the 2026-07-29 tracker split
 (`docs/agents/issue-tracker.md`) and are already fully specced and labelled
@@ -125,6 +146,25 @@ It also needs an acceptance criterion that post-dates the issue — see
   where the geo signal is read and passed, price-freeze invariant across both
   rails, seller/admin UI for the three price points. Can't be ticketed until
   the mechanism is decided. clears-with: 11
+- **The payment-return landing** — PayFast's return redirect and `CourseShell`'s
+  payment-return banner both assume the buyer came from the dialog. Where a
+  buyer lands coming back from PayFast to a *routed* checkout isn't decidable
+  until the route exists. Ticket 15 checks it doesn't break; making it good may
+  want its own ticket. clears-with: 12
+
+## Out of scope
+
+- **Reshaping the checkout journey itself** — fewer screens, or letting a
+  stranger pay before making an account (which would reopen ADR 0021's
+  auth-first rule). Grilled 2026-08-01 and ruled out: the operator's complaint
+  is the container, not the sequence, and days of runway is the wrong week to
+  reopen a decision that governs the money path.
+- **A design system, shared tokens, a type scale or a breakpoint set** — this
+  strand is bespoke and disposable by decision. [ui-overhaul](../ui-overhaul/map.md)
+  owns the foundation, is foundation-first and planning-only, and ranks
+  Paygate/checkout its **#4 worst surface** already. It will redesign these
+  screens properly later; this strand deliberately does the work twice rather
+  than making a launch wait on buying Mobbin Pro and picking a design system.
 
 ## Rules for this build
 
@@ -135,6 +175,14 @@ It also needs an acceptance criterion that post-dates the issue — see
   phantom-field bug, and it matters most on the EFT path, where a fictional
   fixture means a money bug the tests approve of.
 - **Never touch the PayFast code path.** It holds real money.
+- **Tickets 12–15 judge by the operator's eye, not a checklist.** They walk the
+  flow in dev and say what to change; iterate until they're happy. No reference
+  design to match, no acceptance rubric — taste is the bar and it is theirs.
+- **12–15 are bespoke and disposable.** Style the checkout surfaces well; do not
+  extract shared tokens, scales or breakpoint systems. See Out of scope.
+- **`SignIn` is in scope in full and it leaks.** It renders in `AppGate`,
+  `Landing` and `_landing/YwamPotch.tsx` — restyling it changes every signed-out
+  visitor on every tenant, not just YWAM Potch buyers. Check all three.
 - `git commit --only <paths>` after `git diff` of those paths. Never `git add -A`,
   never `--amend`. Push only when asked — pushing `main` deploys prod.
 
