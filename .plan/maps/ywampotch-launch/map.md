@@ -49,9 +49,9 @@ history on a repo that now handles real money.
 | 09 | Shoprite-Send checkout — method chooser + step rail | [09](tickets/09-shoprite-send-checkout-method-chooser.md) | built `27ba5bd` |
 | 10 | Research — non-ZAR charging + buyer geo | [10](tickets/10-research-non-zar-charging-and-geo.md) | answered |
 | 11 | Regional pricing mechanism ($10/€10/R100) | [11](tickets/11-regional-pricing-mechanism.md) | **open — grilling, needs the operator** |
-| 12 | Checkout as a page — route + step model | [12](tickets/12-checkout-page-route-and-step-model.md) | **open — next; grilling, decides 13 and 14** |
-| 13 | Move the purchase out of `BuyDialog` onto the page | [13](tickets/13-move-purchase-out-of-buydialog.md) | blocked by 12 |
-| 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | blocked by 12 |
+| 12 | Checkout as a page — route + step model | [12](tickets/12-checkout-page-route-and-step-model.md) | answered |
+| 13 | Move the purchase out of `BuyDialog` onto the page | [13](tickets/13-move-purchase-out-of-buydialog.md) | **open — next** |
+| 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | **open — parallel with 13** |
 | 15 | Launch risk — rollback + prod walk-through | [15](tickets/15-checkout-page-launch-risk-and-prod-walk.md) | blocked by 13, 14 |
 
 The strict sequencing above applied to units 01–06, which shared files and are
@@ -139,6 +139,26 @@ It also needs an acceptance criterion that post-dates the issue — see
   multi-currency option and would *reverse* ADR 0026's merchant-of-record
   decision. Geo is `x-vercel-ip-country` in middleware — **Convex cannot see it**
   and must be passed it; absent on localhost, defeated by VPNs.
+- [Checkout as a page — route + step model](./tickets/12-checkout-page-route-and-step-model.md) —
+  **one route, `/checkout/<slug>/<lang>`, inside `(app)`** so `AppGate` renders
+  `SignIn` *at that URL* for free — that is the entire answer for the signed-out
+  share path, and the operator picked it over inlining a sign-in form into the
+  wizard (new auth code on the money surface, in launch week). Sibling of
+  `courses/`, so it inherits **no `CourseShell`** chrome. `lang` is a required
+  **path segment**, because an implicit language is the prod checkout bug.
+  Step state is internal — every step is server-derivable, so back/forward/refresh
+  already work and per-step URLs buy nothing. **`buy=1` and `autoOpenBuy` are both
+  deleted**; `Paygate`'s CTA becomes always a `<Link>` on both paths, and `SignIn`
+  keys its rail off `pathname.startsWith("/checkout")`. Rail carries the four
+  one-word steps and *nothing else* (the labels only fit a phone because it's
+  empty); the summary, method chooser and reference live in the body. **No auth
+  change** — `oauthRedirectUrl` validates host, never path. `convex/` untouched.
+  Also settled **the payment-return landing** (was fog, needed no ticket): the
+  return URL is minted server-side (`convex/market.ts:432`) to `/courses/<slug>`,
+  so a card buyer never re-enters checkout — they land on the course with the
+  reactive `ConfirmingBanner`, which *is* step 4 and is already right from the new
+  route. `cancel_url` drops an abandoning buyer on the bare course index: accepted
+  wart, fixing it would mean touching `convex/`. Ticket 15 still walks it on prod.
 
 ## Not yet specified
 
@@ -146,11 +166,6 @@ It also needs an acceptance criterion that post-dates the issue — see
   where the geo signal is read and passed, price-freeze invariant across both
   rails, seller/admin UI for the three price points. Can't be ticketed until
   the mechanism is decided. clears-with: 11
-- **The payment-return landing** — PayFast's return redirect and `CourseShell`'s
-  payment-return banner both assume the buyer came from the dialog. Where a
-  buyer lands coming back from PayFast to a *routed* checkout isn't decidable
-  until the route exists. Ticket 15 checks it doesn't break; making it good may
-  want its own ticket. clears-with: 12
 
 ## Out of scope
 
