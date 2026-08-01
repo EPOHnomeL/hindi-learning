@@ -83,6 +83,11 @@ export function Dashboard() {
   // dedupes the subscription with SharedSection/PurchasedSection, so it's free.
   const shared = useQuery(api.shares.listSharedTopics);
   const purchased = useQuery(api.market.myPurchases);
+  // A transfer in flight counts as having something here. Without it the buyer
+  // who has just EFT'd is told "No courses yet — a marketplace is coming soon"
+  // directly above the course they paid for, which reads as the payment having
+  // been lost.
+  const pending = useQuery(api.eft.myPendingIntents);
   const { signOut } = useAuthActions();
   const router = useRouter();
   const tc = useTranslations("Common");
@@ -101,6 +106,8 @@ export function Dashboard() {
     shared.length === 0 &&
     purchased !== undefined &&
     purchased.length === 0 &&
+    pending !== undefined &&
+    pending.length === 0 &&
     amAllowlisted === false;
 
   return (
