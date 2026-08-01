@@ -128,6 +128,37 @@ operator who is logged in and opens `#donations` to check their own page will se
 dashboard and think it is broken. Not fixed here (the surface 03 chose is the landing page);
 worth knowing before someone reports it as a bug.
 
+### Revised on contact with the operator, 2026-08-02
+
+Two rounds of feedback on the live page, both worth recording because they reverse
+things written above and in ADR 0027.
+
+1. **The disclosures came out of the widget.** As built it showed the exact rand charge in
+   a callout, the platform's 10%, and the not-a-tax-deductible-receipt line — three
+   disclosures stacked under four chips. The operator's verdict on sight: *"tooo much
+   information… it is a donations widget, it should handle donations"*. All three moved to
+   **terms clause 5 (Donations)**, which now covers the ZAR conversion, the operator's cut,
+   the Section 18A position and the once-off/non-refundable terms; the widget keeps one line
+   linking there and quotes dollars on the button. **This reverses item 3 of the work list
+   and 03's §4**, which called the rand line load-bearing rather than polish — so ADR 0027
+   was edited to say so outright rather than quietly disagree with the code. The donor still
+   sees the rand figure before money moves, on PayFast's own page one click later; what was
+   lost is it appearing one screen earlier. `donateDerive` lost its conversion and
+   `formatZar` with it — `zarCentsFromUsdCents` in `convex/donations.ts` is the one that
+   signs and always was.
+2. **The flag would not switch on in prod, and said "Server Error".** The
+   `isReadySeller` precondition was working exactly as designed; the message was invisible,
+   because **a production Convex deployment redacts a plain `Error` before it reaches the
+   client**. Only `ConvexError`'s data crosses that boundary. So the three refusals on this
+   path (`setTenantFlags`'s donations gate and `setDonationPayee`'s two) are `ConvexError`
+   now, with a `mutationError` helper in the admin panel reading `e.data` first, and a test
+   pinning it — the failure is invisible in dev, so only a test keeps it fixed. **Worth
+   generalising**: every other admin mutation in this codebase throws plain `Error` with a
+   carefully-worded message that prod also swallows. Not swept here; noted on the map.
+   In the same pass the payee text field became a **picker over ready sellers**
+   (`sellers.readySellerEmails` — deliberately not `listSellers`, which is the one read that
+   returns payout bank details), which makes two of those three refusals unreachable.
+
 ### Left for the operator — the live sandbox run
 
 Everything above is verified by tests and a clean build; **the end-to-end sandbox donation

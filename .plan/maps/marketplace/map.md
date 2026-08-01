@@ -84,14 +84,14 @@ that already ship.
   *third* money kind, owed by whoever next touches the Ledger schema.
 - [Build the donation widget and landing section](tickets/08-build-donation-widget-and-landing-section.md) —
   **built and shipped**; the rail is now whole, donor end to end. A flag-gated
-  `<section id="donations">` with $10/$25/$50/custom chips, the ZAR charge figure in its own
-  callout above the button, and the not-a-tax-receipt line — all five locales, floor/rate/10%
-  interpolated from `donations.config` so the copy cannot drift from the constants. Three
-  things it decided that 03 and 07 hadn't: the shared `<Landing/>` carries the section
-  automatically (a bespoke page like ywampotch places it by hand), the ZAR figure is computed
-  client-side from the same committed rate because the disclosure must precede the click that
-  signs, and the PayFast return URL gained the `#donations` anchor so the generic thank-you is
-  actually on screen. One limitation stated not fixed: `/` is the Dashboard when signed in, so
+  `<section id="donations">` with $10/$25/$50/custom chips, in all five locales, placed
+  automatically on the shared `<Landing/>` and by hand on bespoke ywampotch. Two reversals
+  came out of the operator seeing it live (2026-08-02) and both are in the ticket: **the
+  disclosures left the widget for terms clause 5** — the rand callout, the 10% and the
+  not-a-tax-receipt line, reversing 03's "load-bearing" framing, with ADR 0027 edited to say
+  so; and **the prod flag toggle's "Server Error"** turned out to be Convex redacting plain
+  `Error` messages in production, fixed with `ConvexError` on this path plus a payee picker
+  over ready sellers. One limitation stated not fixed: `/` is the Dashboard when signed in, so
   a logged-in operator cannot see their own donate section. **The live sandbox donation is the
   one item not verifiable from a session** — the ticket ends in a six-step operator checklist.
 
@@ -101,6 +101,11 @@ that already ship.
   tenants. Deliberately not ticketed.
 - **BYOK key storage mechanics** (per-owner encrypted, scoped, never logged) — named in
   ADR 0014, only worth ticketing if 01's BYOK branch wins.
+- **Plain `Error` messages are invisible in production, everywhere.** Prod Convex redacts
+  them, so every carefully-worded admin refusal in this codebase reaches the operator as
+  "Server Error"; found the hard way on the donations flag (08), fixed on that path only.
+  A sweep needs someone to decide which messages are *operator instructions* (ConvexError)
+  and which are internal — that judgement call is why it isn't already a ticket.
 - **Donation reporting for a payee** — a tenant admin can currently see none of their own
   donation income; only the sys admin's Payouts tab shows it. Whether that needs a
   tenant-facing view at all is unclear until donations are actually flowing, so there is
