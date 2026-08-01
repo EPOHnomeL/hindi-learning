@@ -49,6 +49,11 @@ export function useWelcomeDismissed(scope: string): [boolean, () => void] {
 // the native `<dialog>`, so Esc, a backdrop click and the X all close it through one
 // path, and the lesson is one dismissal away. Rendered by both readers (CourseShell
 // and PublicReader) so the two stay in step.
+// The purchase variant (ywampotch-launch 17) is this same panel with its opening
+// line swapped: a card buyer back from PayFast is acknowledged HERE rather than by
+// a second surface competing with it. `confirmed: false` is the in-flight ITN — the
+// start CTA is withheld because the content isn't unlocked yet, and
+// `market.checkoutStatus` is reactive, so it appears the moment the grant lands.
 export function Welcome({
   course,
   lessonCount,
@@ -56,10 +61,12 @@ export function Welcome({
   next,
   homeHref,
   onDismiss,
+  purchase,
 }: {
   course: string;
   lessonCount: number;
   mission: string | null;
+  purchase?: { confirmed: boolean } | null;
   // The lesson to start on: `resumeLessonKey`'s target — lesson 1 for a genuinely
   // new reader, their next one if they carry progress. Null when the course has no
   // published lessons, and then there is nothing to offer.
@@ -72,16 +79,34 @@ export function Welcome({
   const t = useTranslations("Welcome");
   const brand = useTenant()?.displayName ?? "My Course";
   const excerpt = missionExcerpt(mission);
+  // Nothing to start while the ITN is in flight — every lesson past the Preview is
+  // still locked, and pointing at a door that won't open is worse than waiting.
+  const start = purchase && !purchase.confirmed ? null : next;
 
   return (
     <Dialog onClose={onDismiss}>
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-hi text-accent">
-            <Icon name="book" className="h-5 w-5" />
+          <span
+            className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+              purchase?.confirmed ? "bg-gold/20 text-gold" : "bg-hi text-accent"
+            }`}
+            aria-busy={purchase && !purchase.confirmed ? true : undefined}
+          >
+            {purchase ? (
+              purchase.confirmed ? (
+                <Icon name="check" className="h-5 w-5" />
+              ) : (
+                <span aria-hidden className="h-2.5 w-2.5 animate-pulse rounded-full bg-gold" />
+              )
+            ) : (
+              <Icon name="book" className="h-5 w-5" />
+            )}
           </span>
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-accent2">{t("eyebrow")}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-accent2">
+              {t(purchase ? (purchase.confirmed ? "paidEyebrow" : "confirmingEyebrow") : "eyebrow")}
+            </p>
             <h2 id="welcome-heading" className="text-lg font-semibold tracking-tight text-accent md:text-xl">
               {course}
             </h2>
@@ -91,16 +116,25 @@ export function Welcome({
         <IconButton icon="x" label={t("dismiss")} variant="ghost" onClick={onDismiss} />
       </div>
 
-      {excerpt && <p className="mt-4 text-sm leading-relaxed text-ink">{excerpt}</p>}
+      {/* The purchase line stands in for the mission excerpt rather than sitting
+          above it: a buyer who has just paid is owed one clear sentence, not a
+          receipt followed by a course blurb. */}
+      {purchase ? (
+        <p className="mt-4 text-sm leading-relaxed text-ink">
+          {t(purchase.confirmed ? "paidBody" : "confirmingBody")}
+        </p>
+      ) : (
+        excerpt && <p className="mt-4 text-sm leading-relaxed text-ink">{excerpt}</p>
+      )}
 
       <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
-        {next && (
+        {start && (
           <Link
-            href={next.href}
+            href={start.href}
             onClick={onDismiss}
             className="inline-flex items-center gap-2 rounded-xl bg-accent px-4 py-2 text-sm font-semibold text-paper transition-opacity hover:opacity-90"
           >
-            {t("start", { seq: next.seq })}
+            {t("start", { seq: start.seq })}
             <Icon name="chevron" className="h-4 w-4 -rotate-90" />
           </Link>
         )}
@@ -109,7 +143,7 @@ export function Welcome({
         </Link>
       </div>
 
-      {next && <p className="mt-2 text-xs text-soft">{next.title}</p>}
+      {start && <p className="mt-2 text-xs text-soft">{start.title}</p>}
     </Dialog>
   );
 }

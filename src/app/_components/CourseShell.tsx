@@ -20,7 +20,7 @@ import { useHideOnScroll } from "./useHideOnScroll";
 import { useResourceUpload } from "./useResourceUpload";
 import { completedKeys, frontierKey, nextLessonKey, resumeLessonKey, seenAfterOpening } from "./readerDerive";
 import { Welcome, useWelcomeDismissed } from "./Welcome";
-import { latchFirstOpen } from "./welcomeDerive";
+import { latchFirstOpen, welcomeVariant } from "./welcomeDerive";
 
 // localStorage key for answered-question ids the learner has already seen.
 const SEEN_KEY = "hindi:answers-seen";
@@ -83,6 +83,10 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const { signOut } = useAuthActions();
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // The card buyer's return marker: PayFast sends them back with
+  // `?purchase=return&mp=<intent token>`, carried through the CourseIndex redirect.
+  const purchaseToken = searchParams.get("purchase") === "return" ? searchParams.get("mp") : null;
   const [menuOpen, setMenuOpen] = useState(false);
   const navHidden = useHideOnScroll();
 
@@ -119,7 +123,13 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   // query — an unlatched check would tear the panel away a beat after it appeared,
   // and on a brand-new course it would pop the panel open the moment lesson 1 lands.
   const [firstOpen, setFirstOpen] = useState<boolean | null>(null);
-  const [dismissed, dismiss] = useWelcomeDismissed(slug);
+  // The payment acknowledgement gets its own dismissal scope, keyed on the intent
+  // token (ywampotch-launch 17). Dismissal is per-tab-session, and buying happens
+  // inside one session: a preview reader who dismissed the orientation panel before
+  // clicking Unlock would otherwise come back from PayFast to a panel already
+  // marked dismissed — the exact silence this ticket exists to end. One token, one
+  // purchase, one dismissal.
+  const [dismissed, dismiss] = useWelcomeDismissed(purchaseToken ? `${slug}:paid:${purchaseToken}` : slug);
   useEffect(() => {
     setFirstOpen((prev) => latchFirstOpen(prev, progress, lessons?.length));
   }, [progress, lessons]);
@@ -158,7 +168,14 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   // Which nav item is active, read from the URL.
   const isRef = pathname.includes("/references/");
   const activeKey = decodeURIComponent(pathname.split("/").pop() ?? "");
-  const showWelcome = firstOpen === true && !dismissed && !isRef;
+
+  // The payment-return landing (ywampotch-launch 17): `checkoutStatus` is reactive
+  // off the intent token, so an in-flight ITN resolves itself in place — no refresh.
+  // Both payment states are variants of the welcome panel rather than a banner
+  // beside it: one surface owns this moment. No timeout/failure branch (ponytail:
+  // the verified norm is seconds; support owns the freak case).
+  const checkout = useQuery(api.market.checkoutStatus, purchaseToken ? { mPaymentId: purchaseToken } : "skip");
+  const variant = welcomeVariant({ purchaseToken, checkout, firstOpen, dismissed, onReference: isRef });
 
   // Selecting a Lesson/Reference navigates; close the mobile drawer when the route
   // changes. Keyed on the route so tapping Resource uploads/links doesn't close it.
@@ -325,14 +342,16 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
         </aside>
 
         <section className="flex min-w-0 flex-1 flex-col md:overflow-hidden md:p-4">
-          <ConfirmingBanner />
-          {/* The first-open welcome (welcome/01). Lessons only — someone deep-linking
-              to a Reference is looking something up, not starting the course. The
-              portal link is a plain "/" here: this route's layout bounces to the
-              course's canonical host (ADR 0022 §3), so "/" already IS its tenant's
-              front door. (The Guest reader has no such bounce, hence tenantHomeHref
-              there.) */}
-          {showWelcome && header && (
+          {/* The one panel that owns the opening moment (welcome/01, reshaped by
+              ywampotch-launch 17): first-open orientation, or the card buyer's
+              payment acknowledgement — `welcomeVariant` picks, and the purchase
+              wins. Orientation is lessons-only (someone deep-linking to a Reference
+              is looking something up); the acknowledgement isn't, because it's a
+              receipt, not orientation. The portal link is a plain "/" here: this
+              route's layout bounces to the course's canonical host (ADR 0022 §3),
+              so "/" already IS its tenant's front door. (The Guest reader has no
+              such bounce, hence tenantHomeHref there.) */}
+          {variant && header && (
             <Welcome
               course={header.title}
               lessonCount={lessons?.length ?? 0}
@@ -340,6 +359,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               next={startLesson && { seq: startLesson.seq, title: startLesson.title, href: withLang(`/courses/${slug}/lessons/${startLesson.key}`, lang) }}
               homeHref="/"
               onDismiss={dismiss}
+              purchase={variant === "first-open" ? null : { confirmed: variant === "purchase-complete" }}
             />
           )}
           <div className="flex min-h-0 flex-1 flex-col">{children}</div>
@@ -351,32 +371,6 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
           lesson switches. */}
       {courseCompleted && <CompletionCelebration topicSlug={slug} />}
     </Ctx.Provider>
-  );
-}
-
-// The payment-return banner (auth-first checkout): PayFast sends the buyer back
-// with `?purchase=return&mp=<intent token>`, carried through the CourseIndex
-// redirect. Until the ITN lands, reassure; `checkoutStatus` is reactive, so the
-// moment the Entitlement writes, this query flips to `granted`, the banner goes,
-// and the content queries unlock in place — no refresh. No timeout/failure
-// branch (ponytail: the sandbox-verified norm is seconds; support owns the freak
-// case).
-function ConfirmingBanner() {
-  const t = useTranslations("Reader");
-  const params = useSearchParams();
-  const mp = params.get("purchase") === "return" ? params.get("mp") : null;
-  const status = useQuery(api.market.checkoutStatus, mp ? { mPaymentId: mp } : "skip");
-  if (!mp || !status || status.state === "granted") return null;
-  return (
-    <div
-      aria-busy
-      className="mb-3 flex items-center gap-2.5 rounded-xl border border-gold/40 bg-card px-4 py-3 text-sm text-soft shadow-sm"
-    >
-      <span aria-hidden className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-gold" />
-      <span>
-        <b className="font-semibold text-ink">{t("confirmingPaymentTitle")}</b> — {t("confirmingPaymentBody")}
-      </span>
-    </div>
   );
 }
 

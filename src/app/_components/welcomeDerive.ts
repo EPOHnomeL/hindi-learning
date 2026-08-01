@@ -69,3 +69,43 @@ export function latchFirstOpen(
   if (progress === undefined || lessonCount === undefined) return null;
   return progress.length === 0 && lessonCount > 0;
 }
+
+// Which panel — if any — owns the reader's opening moment (ywampotch-launch 17).
+// One panel, not two: the card buyer coming back from PayFast used to get a
+// "confirming your payment" *banner* that rendered only while the ITN was in
+// flight, and since the ITN lands in seconds the happy path acknowledged nothing
+// at all — the generic first-open welcome filled the silence with a course intro,
+// having no idea money had just changed hands. So the purchase states are variants
+// OF this panel and they win outright.
+//
+// `checkout` is `market.checkoutStatus`, reactive: undefined while loading, null
+// when the URL's token names no intent, else the intent's state. Undefined holds
+// the panel back a beat rather than guessing "confirming" — the buyer whose
+// payment is already through is the common case and must not see it flash.
+export type WelcomeVariant = "purchase-complete" | "purchase-confirming" | "first-open" | null;
+
+export function welcomeVariant({
+  purchaseToken,
+  checkout,
+  firstOpen,
+  dismissed,
+  onReference,
+}: {
+  // `?mp=` from a `?purchase=return` landing — null when this isn't one.
+  purchaseToken: string | null;
+  checkout: { state: "awaiting-payment" | "granted" } | null | undefined;
+  firstOpen: boolean | null;
+  dismissed: boolean;
+  onReference: boolean;
+}): WelcomeVariant {
+  if (dismissed) return null;
+  if (purchaseToken) {
+    if (checkout === undefined) return null;
+    // Deliberately not gated on `firstOpen` or `onReference`: a buyer who read the
+    // free Preview before paying carries progress, and the acknowledgement is not
+    // orientation — it's a receipt.
+    if (checkout) return checkout.state === "granted" ? "purchase-complete" : "purchase-confirming";
+  }
+  if (onReference) return null;
+  return firstOpen === true ? "first-open" : null;
+}
