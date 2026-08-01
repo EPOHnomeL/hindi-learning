@@ -487,5 +487,24 @@
       "body": "Elke voltooide kursus eindig in ’n sertifikaat — ’n drukbare, deelbare dokument met jou naam daarop, by ’n skakel wat jy vir enigiemand kan gee. Geen rekening nodig om dit te bewonder nie.",
       "hint": "Toe — beweeg jou wyser oor dit."
     }
+  },
+  "Donate": {
+    "heading": "Ondersteun {name}",
+    "body": "Alles hier loop op die vrygewigheid van mense wat in die werk glo. ’n Eenmalige gawe, met kaart, sonder dat jy ’n rekening nodig het.",
+    "amountLabel": "Kies ’n bedrag (Amerikaanse dollar)",
+    "other": "Ander",
+    "customLabel": "Bedrag in Amerikaanse dollar",
+    "customPlaceholder": "bv. 20",
+    "errorInvalid": "Voer ’n bedrag in dollar in, soos 20 of 20.50.",
+    "errorMinimum": "Die kleinste skenking wat ons kan neem, is {min}.",
+    "charge": "Jou kaart word met <b>{zar}</b> (ZAR) gedebiteer. Jou bank bepaal die wisselkoers.",
+    "donate": "Skenk",
+    "donateAmount": "Skenk {zar}",
+    "redirecting": "Ons neem jou na PayFast…",
+    "failed": "Ons kon nie daardie skenking begin nie. Probeer asseblief weer.",
+    "feeNote": "{percent}% dek die bedryf van die platform; die res gaan aan {name}.",
+    "notReceipt": "Hierdie is nie ’n belastingaftrekbare kwitansie nie. PayFast sal vir jou ’n betalingsbevestiging e-pos.",
+    "thanksHeading": "Dankie.",
+    "thanksBody": "PayFast sal vir jou ’n betalingsbevestiging vir jou skenking e-pos. Onthou dat dit nie ’n belastingaftrekbare kwitansie is nie."
   }
 }

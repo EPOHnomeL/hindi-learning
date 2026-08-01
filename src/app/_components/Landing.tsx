@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import { useEffect, useState, type CSSProperties } from "react";
 import { CertificateCard, type CertificateData } from "./Certificate";
+import { DonateSection } from "./DonateSection";
 import { Icon, type IconName } from "./icons";
 import { Brand } from "./Brand";
 import { SignIn } from "./SignIn";
@@ -192,6 +193,14 @@ export function Landing() {
           <DemoCertificate />
         </div>
       </section>
+
+      {/* ── Donations (ADR 0027) — renders itself only on a tenant whose
+             `donations` flag is on, so the default site and every unflagged
+             tenant see nothing here. Placed automatically on this shared page:
+             a bespoke landing (YwamPotch) has to place it by hand, but a tenant
+             that hasn't paid for one shouldn't need a code change to be able to
+             switch the flag on. ── */}
+      <DonateSection />
 
       {/* ── Get started — the existing sign-in flow, embedded on the stage ── */}
       <section id="get-started" className="cert-stage border-t border-line">

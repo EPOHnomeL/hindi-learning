@@ -487,5 +487,24 @@
       "body": "Cada curso completado termina en un certificado — un documento imprimible y compartible con tu nombre, en un enlace que puedes dar a cualquiera. No hace falta cuenta para admirarlo.",
       "hint": "Venga — pasa el puntero por encima."
     }
+  },
+  "Donate": {
+    "heading": "Apoya a {name}",
+    "body": "Todo esto funciona gracias a la generosidad de quienes creen en el trabajo. Un donativo único, con tarjeta y sin necesidad de una cuenta.",
+    "amountLabel": "Elige un importe (dólares estadounidenses)",
+    "other": "Otro",
+    "customLabel": "Importe en dólares estadounidenses",
+    "customPlaceholder": "p. ej. 20",
+    "errorInvalid": "Introduce un importe en dólares, como 20 o 20.50.",
+    "errorMinimum": "El donativo más pequeño que podemos aceptar es {min}.",
+    "charge": "Se cargarán <b>{zar}</b> (ZAR) a tu tarjeta. Tu banco fija el tipo de cambio.",
+    "donate": "Donar",
+    "donateAmount": "Donar {zar}",
+    "redirecting": "Te llevamos a PayFast…",
+    "failed": "No pudimos iniciar ese donativo. Inténtalo de nuevo.",
+    "feeNote": "El {percent}% cubre el funcionamiento de la plataforma; el resto es para {name}.",
+    "notReceipt": "Esto no es un recibo deducible de impuestos. PayFast te enviará por correo la confirmación del pago.",
+    "thanksHeading": "Gracias.",
+    "thanksBody": "PayFast te enviará por correo la confirmación del pago de tu donativo. Recuerda que no es un recibo deducible de impuestos."
   }
 }

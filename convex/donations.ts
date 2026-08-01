@@ -132,7 +132,10 @@ export const checkoutFields = query({
     const fields = buildCheckoutFields({
       merchantId,
       merchantKey,
-      returnUrl: appUrl("/?donation=thanks", tenantSlug),
+      // The anchor matters as much as the marker: the section lives partway down
+      // a long landing page, so a return to `/` alone lands the donor at the
+      // hero with the thank-you off screen, reading as though nothing happened.
+      returnUrl: appUrl("/?donation=thanks#donations", tenantSlug),
       cancelUrl: appUrl(back, tenantSlug),
       notifyUrl: `${process.env.CONVEX_SITE_URL}/payfast/notify`,
       amountCents: zarCents,

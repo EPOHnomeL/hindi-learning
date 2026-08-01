@@ -183,5 +183,8 @@ after the flag went on must not keep collecting.
   by hand) and **a donation popup on Public links** (it interrupts a Guest
   mid-lesson, and it is the one place ADR 0013's queries-only Guest seam would need
   reasoning about again).
-- **The donation take-rate is now stated in two places** — the constant and the
-  widget copy. They must be changed together.
+- **The donation take-rate is stated to the donor, so the copy reads it from the
+  constant rather than repeating it.** The widget interpolates the take-rate, the
+  floor and the rate from the `donations.config` query into its message
+  catalogues, so a deploy that changes a constant changes the copy with it and the
+  two cannot drift.

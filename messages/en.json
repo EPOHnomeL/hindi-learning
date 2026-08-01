@@ -487,5 +487,24 @@
       "body": "Every completed course ends in a certificate — a printable, shareable document with your name on it, at a link you can hand to anyone. No account needed to admire it.",
       "hint": "Go on — run your pointer over it."
     }
+  },
+  "Donate": {
+    "heading": "Support {name}",
+    "body": "Everything here runs on the generosity of people who believe in the work. A one-off gift, by card, with no account needed.",
+    "amountLabel": "Choose an amount (US dollars)",
+    "other": "Other",
+    "customLabel": "Amount in US dollars",
+    "customPlaceholder": "e.g. 20",
+    "errorInvalid": "Enter an amount in dollars, like 20 or 20.50.",
+    "errorMinimum": "The smallest donation we can take is {min}.",
+    "charge": "Your card will be charged <b>{zar}</b> (ZAR). Your bank sets the exchange rate.",
+    "donate": "Donate",
+    "donateAmount": "Donate {zar}",
+    "redirecting": "Taking you to PayFast…",
+    "failed": "We couldn’t start that donation. Please try again.",
+    "feeNote": "{percent}% covers running the platform; the rest goes to {name}.",
+    "notReceipt": "This is not a tax-deductible receipt. PayFast will email you a payment confirmation.",
+    "thanksHeading": "Thank you.",
+    "thanksBody": "PayFast will email you a payment confirmation for your donation. Remember that it is not a tax-deductible receipt."
   }
 }

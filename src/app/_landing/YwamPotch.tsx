@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { Brand } from "../_components/Brand";
+import { DonateSection } from "../_components/DonateSection";
 import { Icon, type IconName } from "../_components/icons";
 import { SignIn } from "../_components/SignIn";
 import { SiteFooter } from "../_components/SiteFooter";
@@ -153,6 +154,14 @@ export function YwamPotch() {
           </div>
         </div>
       </section>
+
+      {/* ── Donations (ADR 0027) — placed BY HAND, because this page is bespoke:
+             the tenant flag controls whether the section renders, not where. It
+             sits after the course CTA and before sign-in, so a visitor who came
+             to buy isn't asked for a gift first. Its copy is the platform's
+             (next-intl), unlike the hand-authored English around it — the
+             section is shared, and the money disclosures in it are ours. ── */}
+      <DonateSection />
 
       {/* ── Sign in ── */}
       <section id="get-started" className="cert-stage border-t border-line">

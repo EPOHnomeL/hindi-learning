@@ -487,5 +487,24 @@
       "body": "Chaque cours terminé se conclut par un certificat — un document imprimable et partageable à votre nom, à un lien que vous pouvez donner à quiconque. Aucun compte nécessaire pour l’admirer.",
       "hint": "Allez-y — passez votre curseur dessus."
     }
+  },
+  "Donate": {
+    "heading": "Soutenir {name}",
+    "body": "Tout ici repose sur la générosité de celles et ceux qui croient en ce travail. Un don unique, par carte, sans avoir besoin d’un compte.",
+    "amountLabel": "Choisissez un montant (dollars américains)",
+    "other": "Autre",
+    "customLabel": "Montant en dollars américains",
+    "customPlaceholder": "ex. 20",
+    "errorInvalid": "Saisissez un montant en dollars, comme 20 ou 20.50.",
+    "errorMinimum": "Le don le plus petit que nous puissions accepter est {min}.",
+    "charge": "Votre carte sera débitée de <b>{zar}</b> (ZAR). Votre banque fixe le taux de change.",
+    "donate": "Faire un don",
+    "donateAmount": "Donner {zar}",
+    "redirecting": "Redirection vers PayFast…",
+    "failed": "Nous n’avons pas pu démarrer ce don. Veuillez réessayer.",
+    "feeNote": "{percent} % couvrent le fonctionnement de la plateforme ; le reste revient à {name}.",
+    "notReceipt": "Ceci n’est pas un reçu fiscal. PayFast vous enverra une confirmation de paiement par e-mail.",
+    "thanksHeading": "Merci.",
+    "thanksBody": "PayFast vous enverra par e-mail une confirmation de paiement pour votre don. Rappelez-vous qu’il ne s’agit pas d’un reçu fiscal."
   }
 }
