@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { readLastAuthMethod, rememberAuthMethod, type AuthMethod } from "./accountLocalState";
 import { useBuyMarker } from "./editionUrl";
 import { Logo } from "./Logo";
+import { CheckoutSteps } from "./Paygate";
 import { useTenant } from "./TenantContext";
 
 // Google's four-colour G. Inline rather than an asset: it must render before any
@@ -80,6 +81,17 @@ export function SignIn() {
             )}
           </div>
         </div>
+        {/* Arrived mid-purchase: show the same four-step rail the buy dialog
+            shows, so the account step reads as one step of a purchase rather
+            than an unexplained wall in front of it. Only with the buy marker —
+            a plain sign-in is not a checkout. */}
+        {buyIntent && (
+          <div className="w-full rounded-xl border border-line bg-card px-4 py-3">
+            {/* Always step 1 by construction: AppGate renders SignIn only to
+                unauthenticated visitors, so there is nothing to derive here. */}
+            <CheckoutSteps current={1} />
+          </div>
+        )}
         <form
           className="flex w-full flex-col gap-3 rounded-2xl border border-line bg-card p-6 shadow-sm"
           onSubmit={async (e) => {

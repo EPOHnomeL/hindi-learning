@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
+import { checkoutStep, type CheckoutStep } from "./checkoutDerive";
 import { Icon } from "./icons";
 import { Dialog } from "./ui";
 
@@ -30,6 +31,52 @@ export function formatPrice(amount: number, currency: string): string {
   } catch {
     return `${major.toFixed(2)} ${currency.toUpperCase()}`;
   }
+}
+
+// The whole purchase, on one line, at the top of every step of it: Create
+// account → Choose payment method → Pay → Continue to <course>. The funnel is
+// four screens across two components (SignIn, then BuyDialog's chooser and
+// method panel) and a buyer part-way through has no other way to tell how much
+// is left — the diagnosed abandonment is people who can't see the end. Steps
+// behind the current one are ticked, the current one is bold, the rest are
+// quiet; nothing here is clickable, because you can't skip a step or undo a
+// payment. Wraps rather than truncates: a half-legible step is worse than two
+// lines. `courseTitle` is absent on the sign-in screen (no Edition in hand
+// yet), so the last step names the course generically there.
+export function CheckoutSteps({ current, courseTitle }: { current: CheckoutStep; courseTitle?: string }) {
+  const t = useTranslations("Checkout");
+  const steps = [
+    t("stepAccount"),
+    t("stepMethod"),
+    t("stepPay"),
+    t("stepContinue", { course: courseTitle ?? t("yourCourse") }),
+  ];
+  return (
+    <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] leading-tight">
+      {steps.map((label, i) => {
+        const n = i + 1;
+        const done = n < current;
+        const active = n === current;
+        return (
+          <li key={label} className="flex items-center gap-1.5">
+            {i > 0 && <span className="text-line">›</span>}
+            <span
+              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
+                done
+                  ? "bg-accent2/15 text-accent2"
+                  : active
+                    ? "bg-accent text-white"
+                    : "border border-line text-soft"
+              }`}
+            >
+              {done ? <Icon name="check" className="h-2.5 w-2.5" /> : n}
+            </span>
+            <span className={active ? "font-semibold text-ink" : "text-soft"}>{label}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
 }
 
 // The locked-content pane both readers render for a Lesson/Reference past the
@@ -136,13 +183,15 @@ export function Paygate({
   );
 }
 
-// The purchase summary → PayFast's hosted checkout. The buyer is the signed-in
-// account (auth-first — checkout derives the email server-side), so this is
-// just the course, the price, and one button: `market.startCheckout` returns
-// the signed field set, auto-submitted as a form POST to the hosted process
-// URL. On PayFast's side the verified ITN grants access — never the return
-// redirect. Falls back to an "unavailable" note if the caller couldn't supply
-// the Edition to buy.
+// The purchase summary → "How do you want to pay?". The buyer is the signed-in
+// account (auth-first — checkout derives the email server-side), so this is the
+// course, the price, and — when the manual EFT rail is on — one method chooser
+// whose options go STRAIGHT to their details: EFT to the bank-details panel,
+// card to PayFast's hosted checkout (`market.startCheckout` returns the signed
+// field set, auto-submitted as a form POST). With the rail off there is no
+// choice to stage, so it stays one card button. On PayFast's side the verified
+// ITN grants access — never the return redirect. Falls back to an "unavailable"
+// note if the caller couldn't supply the Edition to buy.
 function BuyDialog({
   price,
   courseTitle,
@@ -173,9 +222,13 @@ function BuyDialog({
   const startEft = useMutation(api.eft.startEftPurchase);
   const [startedEft, setStartedEft] = useState<{ ref: string; amount: number; bank: typeof eftBank } | null>(null);
   const eft = startedEft ?? pendingEft;
+  // Which method the buyer clicked, so only ITS label shows progress — both
+  // options disable while either is in flight.
+  const [method, setMethod] = useState<"eft" | "card" | null>(null);
 
   const checkout = async () => {
     if (!canBuy) return;
+    setMethod("card");
     setBusy(true);
     setError(null);
     try {
@@ -203,6 +256,15 @@ function BuyDialog({
 
   return (
     <Dialog title={t("unlockThisCourse")} onClose={onClose}>
+      {/* Signed in already (auth-first, ADR 0021), so step 1 is always behind us
+          here; the buyer is choosing a method until they've started one, then
+          paying — at PayFast or into their banking app. */}
+      <div className="mb-4 border-b border-line pb-3">
+        <CheckoutSteps
+          current={checkoutStep({ onEftInstructions: !!eft, redirectingToCard: busy && method === "card" })}
+          courseTitle={courseTitle}
+        />
+      </div>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <b className="block text-[15px] text-ink">{courseTitle ?? t("thisCourse")}</b>
@@ -218,58 +280,33 @@ function BuyDialog({
       </div>
 
       {/* Everything below the course + price is for the buyer who has NOT chosen a
-          method yet. Once they're on the transfer screen, the sales pitch, the
-          PayFast bank guidance and the card reassurance are all noise in front of
-          the numbers they came to copy — so that screen is the panel and nothing
-          else. */}
+          method yet. Once they're on the transfer screen, the sales pitch and the
+          card reassurance are all noise in front of the numbers they came to copy —
+          so that screen is the panel and nothing else. */}
       {!eft && (
-        <>
-          <div className="mt-4 flex items-start gap-3 rounded-xl border border-line bg-hi/40 p-3.5 text-sm leading-relaxed text-soft">
-            <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-accent2" />
-            <span>{t("unlockDialogBody", { edition: editionName ?? t("thisLanguage") })}</span>
-          </div>
-
-          {/* Bank-to-method guidance — the last surface we own before PayFast's
-              hosted picker, which is theirs to word. PayFast advertises 9 Instant
-              EFT banks but renders only 5 on this account (Absa, Standard Bank,
-              Capitec and African Bank are absent), so a buyer at one of those banks
-              picks the tile that sounds right, finds no bank, and abandons. "Credit
-              & Cheque card" is the answer for all of them, so that's all this says.
-              Both tile names are quoted VERBATIM from PayFast's picker and stay
-              English in every locale — a translated label is one the buyer can't
-              find on screen. Deliberately NOT shown on the bank-transfer screen: a
-              buyer who chose to transfer directly is never going to see PayFast's
-              picker, so there it is only clutter about a competing method.
-              ponytail: hardcodes PayFast's CURRENT coverage. If they restore the
-              four banks, delete this note and the `bankGuidance` key rather than
-              editing it. */}
-          <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">
-            {t.rich("bankGuidance", { b: (c) => <b className="font-semibold text-ink">{c}</b> })}
-          </p>
-        </>
+        <div className="mt-4 flex items-start gap-3 rounded-xl border border-line bg-hi/40 p-3.5 text-sm leading-relaxed text-soft">
+          <Icon name="check" className="mt-0.5 h-4 w-4 shrink-0 text-accent2" />
+          <span>{t("unlockDialogBody", { edition: editionName ?? t("thisLanguage") })}</span>
+        </div>
       )}
 
       {eft ? (
         <EftInstructions ref_={eft.ref} amount={eft.amount} bank={eft.bank} currency={"zar"} />
-      ) : (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void checkout();
-          }}
-        >
-          <button
-            type="submit"
-            disabled={!canBuy || busy}
-            className="mt-4 w-full rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {busy ? t("redirecting") : price ? `${t("continueToPayFast")} · ${price}` : t("continueToPayFast")}
-          </button>
-          {eftBank && (
+      ) : eftBank ? (
+        /* Both rails live → one plain question, methods named by what the buyer
+           HAS (their bank, their card), never by gateway brand — a buyer shouldn't
+           need to know what PayFast is to choose. One click goes straight to that
+           method's details: EFT to the bank-details panel, card to the PayFast
+           redirect. The old bankGuidance note ("bank not under Instant EFT → pick
+           Credit & Cheque card") is absorbed by this framing: EFT buyers never see
+           PayFast's picker, card buyers were picking the card tile anyway. */
+        <fieldset disabled={!canBuy || busy} className="mt-4 min-w-0">
+          <legend className="text-sm font-semibold text-ink">{t("howToPay")}</legend>
+          <div className="mt-2 flex flex-col gap-2">
             <button
               type="button"
-              disabled={!canBuy || busy}
               onClick={async () => {
+                setMethod("eft");
                 setBusy(true);
                 setError(null);
                 try {
@@ -280,12 +317,58 @@ function BuyDialog({
                   setBusy(false);
                 }
               }}
-              className="mt-2 w-full rounded-[10px] border border-line px-4 py-2.5 text-sm font-semibold text-ink transition-colors hover:border-gold disabled:cursor-not-allowed disabled:opacity-45"
+              className="w-full rounded-[10px] border border-line px-4 py-3 text-left transition-colors hover:border-gold disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {t("payByEft")}
+              <b className="block text-sm font-semibold text-ink">{t("methodEftTitle")}</b>
+              <span className="mt-0.5 block text-xs leading-relaxed text-soft">{t("methodEftDesc")}</span>
             </button>
-          )}
-        </form>
+            <button
+              type="button"
+              onClick={() => void checkout()}
+              className="w-full rounded-[10px] border border-line px-4 py-3 text-left transition-colors hover:border-gold disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              <b className="block text-sm font-semibold text-ink">
+                {busy && method === "card" ? t("redirecting") : t("methodCardTitle")}
+              </b>
+              <span className="mt-0.5 block text-xs leading-relaxed text-soft">{t("methodCardDesc")}</span>
+            </button>
+          </div>
+        </fieldset>
+      ) : (
+        <>
+          {/* Single rail (EFT off or still loading) — no chooser theatre for a
+              non-choice; today's one-button card flow stands, bank guidance and all.
+
+              Bank-to-method guidance — the last surface we own before PayFast's
+              hosted picker, which is theirs to word. PayFast advertises 9 Instant
+              EFT banks but renders only 5 on this account (Absa, Standard Bank,
+              Capitec and African Bank are absent), so a buyer at one of those banks
+              picks the tile that sounds right, finds no bank, and abandons. "Credit
+              & Cheque card" is the answer for all of them, so that's all this says.
+              Both tile names are quoted VERBATIM from PayFast's picker and stay
+              English in every locale — a translated label is one the buyer can't
+              find on screen. Only in this single-rail branch: with the chooser, a
+              buyer headed to PayFast has already chosen card. ponytail: hardcodes
+              PayFast's CURRENT coverage. If they restore the four banks, delete
+              this note and the `bankGuidance` key rather than editing it. */}
+          <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">
+            {t.rich("bankGuidance", { b: (c) => <b className="font-semibold text-ink">{c}</b> })}
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void checkout();
+            }}
+          >
+            <button
+              type="submit"
+              disabled={!canBuy || busy}
+              className="mt-4 w-full rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {busy ? t("redirecting") : price ? `${t("continueToPayFast")} · ${price}` : t("continueToPayFast")}
+            </button>
+          </form>
+        </>
       )}
       {error ? (
         <p className="mt-2.5 text-center text-xs text-danger">{error}</p>
