@@ -100,7 +100,40 @@ lands.
 3. The map is the memory — anything the next session needs lives in an `## Answer`
    or the map's Notes.
 
+## Malformations chartr will flag (learned the hard way)
+
+Every rule below was a real error chartr raised on a real map (2026-08-01, resolving
+`marketplace/03`). They all come from the same root cause: **the map sections are
+typed by ticket status, and writing a ticket into the wrong one is a lie the
+derivation catches.** Check these before saving a map.
+
+1. **`## Decisions so far` may only reference RESOLVED tickets.** It is the index of
+   the route already walked — one line per ticket with an `## Answer`. Linking an
+   *open* ticket from it (e.g. "…the build is 07 and 08") is a malformation, however
+   useful the pointer feels. Put forward pointers in the resolved ticket's own body,
+   or in the map's `## Notes` — never here.
+2. **A fog patch's `clears-with: NN` must name an OPEN ticket.** The anchor is a
+   promise that resolving NN will sharpen the patch. If NN is already resolved, the
+   patch should have **graduated into a ticket** in that same edit. Resolving a
+   ticket and leaving fog anchored to it is a contradiction.
+3. **A patch with no plausible anchor simply has no `clears-with:`.** Don't invent an
+   anchor to look tidy — genuinely-distant fog ("unclear until real money flows") is
+   allowed to float.
+4. **Decided ≠ built, and one ticket cannot say both.** chartr derives exactly one
+   status per file, so a resolved decision ticket renders as Done — which reads as
+   *shipped* unless the build is its own ticket. Split them: the decision ticket
+   resolves, and a `Build …` ticket `blocked_by` it renders unstarted. That contrast
+   *is* the "planned vs implemented" indicator; there is no separate status for it
+   and chartr (an external binary) can't be extended to add one. Say so explicitly in
+   the decision's Answer too — open its handoff with "decided, NOT built".
+5. **A map that carries build tickets must say so in `## Notes`.** wayfinder's default
+   is plan-don't-do, and it permits an override only in Notes. Unstated, an
+   implementation ticket on a planning map is just off-destination.
+6. **`claimed_at` is full RFC 3339 or it's a parse error** — see above. `date -Iseconds`.
+
 ## Before committing
 
 Every `blocked_by` names a real ticket; each number used once; no stated progress
-counts (they're derived). chartr checks these live when it's driving.
+counts (they're derived); every rule in "Malformations" above holds. chartr checks
+these live when it's driving — if it is open, read its banner before you commit
+rather than after.
