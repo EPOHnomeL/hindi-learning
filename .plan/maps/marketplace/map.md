@@ -38,6 +38,13 @@ that already ship.
   platform? Is the landing paygate section shared or per-tenant
   (`src/app/_landing/registry.ts`)?
 - Skills: `/grilling`, `/ponytail` (02 and 03 may both be far smaller than they sound).
+- **This effort carries its own implementation tickets** — the wayfinder "plan, don't do"
+  default is overridden here, deliberately (2026-08-01). A decision ticket and the build it
+  authorises are **separate tickets**, so the map shows at a glance what is *decided* (a
+  resolved star) versus what is *decided but not yet built* (an unstarted star hanging off
+  it) — chartr derives one status per file, so this split is the only way that difference is
+  visible. Build tickets say so in their title ("Build …") and are always `blocked_by` the
+  decision ticket that authorised them.
 
 ## Decisions so far
 
@@ -49,8 +56,9 @@ that already ship.
   the ITN returns it), **USD typed / ZAR charged** at a committed constant with an explicit
   anti-surprise line, 10% via `splitNet(net, 1000)`, owed to a sys-admin-set `donationPayee`
   through the existing Ledger + Payouts tab. **No intent table and no public mutation** — it
-  rides on `custom_str1/custom_str2`, so ADR 0013's guarantee holds. One-off only. Needs
-  ADR 0027 + implementation tickets.
+  rides on `custom_str1/custom_str2`, so ADR 0013's guarantee holds. One-off only.
+  **Decided, not built** — the build is [07](tickets/07-build-donation-rail-backend.md) and
+  [08](tickets/08-build-donation-widget-and-landing-section.md).
 
 ## Not yet specified
 
@@ -58,14 +66,10 @@ that already ship.
   tenants. Deliberately not ticketed.
 - **BYOK key storage mechanics** (per-owner encrypted, scoped, never logged) — named in
   ADR 0014, only worth ticketing if 01's BYOK branch wins.
-- **Donation rail implementation** — ticket 03 decided the whole shape but this map is
-  planning, so the build is unticketed: ADR 0027 plus the tenant flag + backfill migration,
-  `donationPayee` and its admin UI, the signed-fields query, the ITN donation branch, the
-  `ledger` widening + `kind`, the Sales-tab exclusion, and the landing section. Charts as its
-  own effort when wanted. clears-with: 03
 - **Donation reporting for a payee** — a tenant admin can currently see none of their own
   donation income; only the sys admin's Payouts tab shows it. Whether that needs a
-  tenant-facing view at all is unclear until money is actually flowing. clears-with: 03
+  tenant-facing view at all is unclear until donations are actually flowing, so there is
+  nothing to anchor it to yet.
 
 ## Out of scope
 

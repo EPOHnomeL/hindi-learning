@@ -3,7 +3,7 @@ type: grilling
 blocked_by: []
 ---
 
-# Dontation functionality
+# Donation functionality
 
 ## Question
 
@@ -203,11 +203,15 @@ solution.
   second idea. It interrupts a Guest mid-lesson, and it is the one place ADR 0013's
   queries-only Guest seam would have to be reasoned about again.
 
-### Handoff
+### Handoff — this is decided, NOT built
 
-The build is **not ticketed here** — this map is planning. It needs **ADR 0027**
-(the donation rail) plus implementation tickets covering: the tenant flag +
-backfill migration, `donationPayee` + its sys-admin UI and `isReadySeller` gate,
-the signed-fields query, the ITN donation branch, the `ledger` widening + `kind`,
-the Sales-tab exclusion, and the landing section + its placement in
-`YwamPotch.tsx`. Chart that as its own effort when you want it built.
+**Nothing above exists in code yet.** This ticket is resolved because the *decision* is
+resolved; the build is two separate tickets, deliberately, so the map shows that difference
+at a glance (chartr derives one status per file, so decided-but-unbuilt work can only be
+visible as its own unstarted star):
+
+- [Build the donation rail — backend, config and ADR 0027](07-build-donation-rail-backend.md)
+- [Build the donation widget and landing section](08-build-donation-widget-and-landing-section.md)
+
+Both say to read this Answer first and to **grill rather than invent** where a detail is not
+written here — because a detail not written here was not decided.
