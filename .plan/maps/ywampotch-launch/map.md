@@ -1,4 +1,4 @@
-# Fix the funnel + manual EFT rail
+# YWAM Potch launch — fix the funnel + manual EFT rail
 
 <!-- INDEX, not a store. Each unit lives in its own ticket; this map gists and
      links. Load once per session, zoom into tickets on demand.
