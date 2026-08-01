@@ -26,6 +26,12 @@ file above instead. Context must travel with the repo, not the computer.
   staged files). `--only` still commits the *whole current content* of the paths
   you name, so `git diff <paths>` first and don't name a file another session is
   mid-edit in. Push only when asked.
+- **Map/ticket commits use the `map` type:** any commit that touches `.plan/`
+  (maps, tickets, specs) is `map(<effort>): …` — e.g.
+  `map(ui-overhaul): chart the UI/UX overhaul map`,
+  `map(marketplace): add donation-link ticket`. Not `feat(…)`/`docs(…)`; the
+  scope is the effort directory name under `.plan/maps/`. Keep planning changes
+  in their own commit, separate from code.
 - **`.env` is the user's** — never edit/`sed`/`cp` it; tell the user the exact
   line to change. Reading config at runtime is fine.
 - **Issues have one home: `.plan/maps/`, driven by chartr** (2026-07-30). Every
