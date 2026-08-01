@@ -38,15 +38,15 @@ history on a repo that now handles real money.
 | 06 | ADR for the manual EFT rail (+ glossary term) | [06](tickets/06-adr-manual-eft-rail.md) | built — [ADR 0026](../../../docs/adr/0026-manual-eft-payment-rail.md) |
 | 07 | Prod-verify the security fixes | [07](tickets/07-prod-verify-security-fixes.md) | **open — needs a human on prod** |
 | 08 | Fix the four known stale facts | [08](tickets/08-fix-known-stale-docs-and-tracker.md) | open |
-| 09 | Shoprite-Send checkout — method chooser | [09](tickets/09-shoprite-send-checkout-method-chooser.md) | open |
-| 10 | Research — non-ZAR charging + buyer geo | [10](tickets/10-research-non-zar-charging-and-geo.md) | open (research, AFK) |
-| 11 | Regional pricing mechanism ($10/€10/R100) | [11](tickets/11-regional-pricing-mechanism.md) | open — **grilling, needs the operator**, blocked by 10 |
+| 09 | Shoprite-Send checkout — method chooser + step rail | [09](tickets/09-shoprite-send-checkout-method-chooser.md) | built `27ba5bd` |
+| 10 | Research — non-ZAR charging + buyer geo | [10](tickets/10-research-non-zar-charging-and-geo.md) | answered |
+| 11 | Regional pricing mechanism ($10/€10/R100) | [11](tickets/11-regional-pricing-mechanism.md) | **open — next; grilling, needs the operator** |
 
 The strict sequencing above applied to units 01–06, which shared files and are
-done. The 2026-08-01 additions are a second strand: 09 stands alone (pure
-presentation reshape of `Paygate.tsx`), 10 is AFK research, 11 grills on 10's
-facts. Regional-pricing *implementation* is deliberately not ticketed yet —
-see Not yet specified.
+done. The 2026-08-01 additions are a second strand: 09 stood alone (a
+presentation reshape of `Paygate.tsx`, `convex/` untouched), 10 was AFK
+research, and 11 now grills on its facts. Regional-pricing *implementation* is
+deliberately not ticketed yet — see Not yet specified.
 
 **Before the rail can take a cent on prod**, a sys admin must open the Payouts tab
 and fill in the EFT collection account, then tick "Offer Pay by EFT to buyers" —
@@ -98,6 +98,26 @@ It also needs an acceptance criterion that post-dates the issue — see
   sole merchant-of-record, a manual sale mints a `fee: 0` Ledger row so Sales and
   Payouts stay whole, provenance is `eftRef` vs `pfPaymentId`, and manual per-sale
   reconciliation is the accepted cost. `CONTEXT.md` gained the glossary term.
+- [Shoprite-Send checkout — method chooser + step rail](./tickets/09-shoprite-send-checkout-method-chooser.md) —
+  the dialog now asks **"How do you want to pay?"** with options named by what
+  the buyer *has* (South African bank transfer / Visa card incl. international),
+  one click to each method's details. Gateway brand demoted to fine print. With
+  the rail **off** the old single-button flow is untouched, and it keeps the
+  `bankGuidance` note — with a chooser that note is answering a question already
+  asked. Added the four-step rail (Create account → Choose method → Pay →
+  Continue) on the sign-in screen *with the buy marker* and in the dialog; the
+  rule for "which step" is `checkoutDerive.ts` — **paying begins when a method is
+  started, not chosen**. `convex/` untouched. **Nobody has seen it yet** — it
+  needs the rail enabled, so the visual check folds into ticket 07.
+- [Research — non-ZAR charging + buyer geo](./tickets/10-research-non-zar-charging-and-geo.md) —
+  PayFast is **ZAR-only for charge and settlement but already accepts
+  international cards** (buyer's bank does the FX), so $10/€10 is a *presentment*
+  problem, not a new-rail problem. PayFast markets a **Multi-Currency Pricing**
+  feature — ask support whether our account qualifies **before** designing
+  anything. Stripe is unavailable to SA entities; **Paddle** is the only real
+  multi-currency option and would *reverse* ADR 0026's merchant-of-record
+  decision. Geo is `x-vercel-ip-country` in middleware — **Convex cannot see it**
+  and must be passed it; absent on localhost, defeated by VPNs.
 
 ## Not yet specified
 
@@ -130,5 +150,9 @@ tests, not on localhost:
 > tab and is `owed` to the seller in Payouts. The app is called YWAM Potch
 > throughout.
 
-Plus `pnpm typecheck` and `pnpm test` green — noting the long-standing
-`convex/sales.test.ts` flake that passes in isolation is pre-existing, not yours.
+Plus `pnpm typecheck` and `pnpm test` green — noting **two** pre-existing
+failures that are not yours: the long-standing `convex/sales.test.ts` flake that
+passes in isolation, and `scripts/bundle-authoring-assets.test.ts`, which has
+failed since `d5f3dc2` added the justify media query to `lessons/_partials/`
+without re-running `pnpm bundle:authoring`. The second is a real staleness, not
+a flake — one command fixes it, and it belongs to whoever owns `d5f3dc2`.

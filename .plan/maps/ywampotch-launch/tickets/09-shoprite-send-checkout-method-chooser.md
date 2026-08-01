@@ -49,3 +49,44 @@ details or the PayFast redirect in exactly one click from it; with the rail
 **off** they see no chooser and the card path works as today; no PayFast/EFT
 server code changed (`git diff` shows `convex/` untouched); `pnpm typecheck`
 and `pnpm test` green; all five message files carry the new keys.
+
+## Answer
+
+Built 2026-08-01 (`27ba5bd`) to the scope above, plus a **step rail** the
+operator asked for mid-session.
+
+- **The chooser** (`Paygate.tsx`, `BuyDialog`): with the EFT rail on, one
+  "How do you want to pay?" fieldset with two equal option cards — *EFT — South
+  African bank transfer* and *Visa / card — South Africa & international* — each
+  one click to its details (the existing `EftInstructions` panel, or the existing
+  PayFast form-POST). PayFast is named only in the card option's description, not
+  its title. With the rail off the branch is unchanged from before: `bankGuidance`
+  note plus the single "Continue to PayFast · R100" button. The guidance note
+  moved *into* that single-rail branch — with a chooser, a buyer heading to
+  PayFast has already chosen card, so the note was answering a question they'd
+  been asked properly.
+- **The step rail** — `CheckoutSteps`, exported from `Paygate.tsx` and reused by
+  `SignIn.tsx`: Create account → Choose payment method → Pay → Continue to
+  *<course>*, ticked behind, bold at, quiet ahead. It renders on the sign-in
+  screen **only with the `buy=1` marker** (a plain sign-in is not a checkout) and
+  at the top of the dialog. `SignIn` passes `1` as a constant — AppGate renders it
+  only to unauthenticated visitors, so there's nothing to derive.
+- **`checkoutDerive.ts` + 4 tests** — the one rule the rail needed: **"Pay"
+  begins when a method is *started*, not merely chosen** (bank details on screen,
+  or the browser being handed to the gateway). Extracted as a pure function
+  beside `welcomeDerive`/`readerDerive` because the rail spans two components;
+  the deliberately *un*-extracted part is step 1, which is a constant.
+- **Deleted, not translated:** the `payByEft` key — the chooser's titles replace
+  it. Five new title/description keys plus five step keys in all five locales.
+
+**Money path untouched**, as scoped: `convex/` has no diff, both options call
+the same `market.startCheckout` / `eft.startEftPurchase` mutations as before.
+
+**Verified:** `pnpm typecheck` clean, `pnpm build` clean, `pnpm vitest run`
+746 passed with the 4 new tests. One **pre-existing, unrelated** failure —
+`scripts/bundle-authoring-assets.test.ts` — see the map's note.
+
+**Not verified, and it needs a human:** nobody has *seen* the chooser. It only
+renders when `eft.eftDetails` returns details, i.e. the rail is configured and
+enabled, which is true on no environment yet. Fold the visual check into
+ticket 07's prod pass — the buyer-facing claim there now includes this screen.
