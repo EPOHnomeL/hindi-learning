@@ -126,6 +126,18 @@ course is, how big it is, and the next lesson to click.
   - Should a signed-in learner opening their *very first lesson ever* (any course)
     get extra product-level framing, or is the per-course panel enough? Assumed
     per-course only; the account-level story belongs to [Improve onboarding flow](01-improve-onboarding-flow.md).
+- **The mission excerpt is prose only — headings are dropped, not flattened**
+  (2026-08-01, from the user seeing it live on `prophetic-school`). Missions are
+  authored markdown that typically opens with `# Mission: <course name> — …` and then
+  a paragraph. `missionExcerpt` stripped the marker and collapsed all whitespace to
+  one line, fusing the heading onto the sentence beneath it with no punctuation —
+  "…hearing God's voice Why I want a living, day-to-day walk…". That heading is also
+  usually the course title restated, which the panel already renders in its `<h2>`
+  directly above the excerpt. So `HEADING_LINE` drops whole heading lines and the
+  excerpt is cut from the prose; a mission that is *nothing* but headings falls back
+  to their words, keeping the "no empty gap" criterion above. Fixed in
+  [welcomeDerive.ts](../../../../src/app/_components/welcomeDerive.ts) with unit
+  tests; the mission text itself was never wrong, the derivation was.
 - `mission` is only ever *drafted* by the Routine and published via
   `publish.publishMission` ([publish.ts:53](../../../../convex/content/publish.ts#L53)),
   so a freshly seeded course will legitimately have none for a while — the
