@@ -115,10 +115,28 @@ export function centsFromRand(amount: string): number | null {
 // the caller reads what to grant (topic/lang/buyer) off a value the rules have
 // already vouched for — there is no second, unguarded `if (!intent)` at the call
 // site, and no way to dispatch on a `grant` without one.
+export type ItnPayment = { pfPaymentId: string; gross: number; fee: number; net: number };
+
 export type ItnAcceptance<T> =
-  | { outcome: "grant"; payment: { pfPaymentId: string; gross: number; fee: number; net: number }; intent: T }
+  | { outcome: "grant"; payment: ItnPayment; intent: T }
   | { outcome: "ignore" }
   | { outcome: "refuse"; reason: string };
+
+// The money a signature-verified notification carries, or null if it doesn't
+// parse. Shared by both rails' acceptance rules below — integer cents, never
+// parseFloat at the money boundary, and the fee normalised to positive here
+// (PayFast sends it negative) so no ledger caller has to remember to.
+// `requireMPaymentId` because a SALE must name the checkout-intent it answers;
+// a donation has no intent, so it sends no `m_payment_id` at all (ADR 0027).
+function parsePayment(fields: Record<string, string>, requireMPaymentId: boolean): ItnPayment | null {
+  const pfPaymentId = fields.pf_payment_id;
+  const gross = centsFromRand(fields.amount_gross ?? "");
+  const fee = centsFromRand(fields.amount_fee ?? "");
+  const net = centsFromRand(fields.amount_net ?? "");
+  if (!pfPaymentId || gross === null || fee === null || net === null) return null;
+  if (requireMPaymentId && !fields.m_payment_id) return null;
+  return { pfPaymentId, gross, fee: Math.abs(fee), net };
+}
 
 // THE money-acceptance decision for a PayFast ITN — the rules that used to sit
 // inline in `http.ts`'s payfastNotify, where they were reachable only through the
@@ -143,39 +161,62 @@ export function acceptNotification<T extends { amount: number }>(
 ): ItnAcceptance<T> {
   if (fields.payment_status !== "COMPLETE") return { outcome: "ignore" };
 
-  const pfPaymentId = fields.pf_payment_id;
-  const gross = centsFromRand(fields.amount_gross ?? "");
-  const fee = centsFromRand(fields.amount_fee ?? "");
-  const net = centsFromRand(fields.amount_net ?? "");
-  if (!pfPaymentId || !fields.m_payment_id || gross === null || fee === null || net === null) {
-    return { outcome: "refuse", reason: "malformed notification" };
-  }
+  const payment = parsePayment(fields, true);
+  if (!payment) return { outcome: "refuse", reason: "malformed notification" };
 
   if (!intent) return { outcome: "refuse", reason: "unknown payment reference" };
-  if (intent.amount !== gross) return { outcome: "refuse", reason: "amount mismatch" };
+  if (intent.amount !== payment.gross) return { outcome: "refuse", reason: "amount mismatch" };
 
-  return { outcome: "grant", payment: { pfPaymentId, gross, fee: Math.abs(fee), net }, intent };
+  return { outcome: "grant", payment, intent };
+}
+
+// Whether a signature-verified DONATION notification (`custom_str2 ===
+// "donation"`, ADR 0027) may be recorded, and the money it records. The sale
+// rules' steps 3 and 4 are structurally absent here, and that is the whole
+// difference between the rails: there is no intent to match because a donation
+// has no PRICE. The donor invents the number and we sign what they chose, so
+// there is nothing to freeze at click time and nothing to verify against —
+// which is also why the donation checkout persists nothing and stays a query.
+// What remains is the same COMPLETE-only rule and the same money parse; the
+// caller still does the /eng/query/validate postback before recording, and
+// idempotency is still `payfastEvents` on `pf_payment_id`.
+export function acceptDonation(fields: Record<string, string>): ItnAcceptance<null> {
+  if (fields.payment_status !== "COMPLETE") return { outcome: "ignore" };
+  const payment = parsePayment(fields, false);
+  if (!payment) return { outcome: "refuse", reason: "malformed notification" };
+  // The tenant this donation was solicited for — signed into custom_str1 at
+  // checkout, so a tampered slug fails the signature check before reaching here.
+  if (!fields.custom_str1) return { outcome: "refuse", reason: "donation names no tenant" };
+  return { outcome: "grant", payment, intent: null };
 }
 
 // ---- the checkout field builder --------------------------------------------------
 
-// The signed field set startCheckout returns for the client to form-POST to the
-// hosted process URL. `custom_str1/2` carry what the ITN grants (topicId/lang);
-// `m_payment_id` is our checkout-intent reference. item_name is capped at
-// PayFast's 100-char field limit. Field order below IS the signature order
-// (PayFast's documented attribute order: merchant → buyer → transaction).
+// The signed field set a checkout returns for the client to form-POST to the
+// hosted process URL. `custom_str1/2` carry what the ITN needs to act on it —
+// (topicId, lang) for a sale, (tenantSlug, "donation") for a donation (ADR
+// 0027). item_name is capped at PayFast's 100-char field limit. Field order
+// below IS the signature order (PayFast's documented attribute order: merchant
+// → buyer → transaction).
+//
+// `email` and `mPaymentId` are OPTIONAL and OMITTED when absent, because the
+// donation rail has neither: PayFast collects the donor's email on its own page
+// (there is no account to freeze one from), and a donation has no
+// checkout-intent to reference — it has no price to freeze, so there is nothing
+// to verify a payment against. The sale path passes both exactly as before, so
+// its signed field set is byte-identical to what it has always been.
 export function buildCheckoutFields(opts: {
   merchantId: string;
   merchantKey: string;
   returnUrl: string;
   cancelUrl: string;
   notifyUrl: string;
-  mPaymentId: string;
+  mPaymentId?: string;
   amountCents: number;
   itemName: string;
-  email: string;
-  topicId: string;
-  lang: string;
+  email?: string;
+  custom1: string;
+  custom2: string;
   passphrase: string;
 }): Record<string, string> {
   const fields: Record<string, string> = {
@@ -184,12 +225,12 @@ export function buildCheckoutFields(opts: {
     return_url: opts.returnUrl,
     cancel_url: opts.cancelUrl,
     notify_url: opts.notifyUrl,
-    email_address: opts.email,
-    m_payment_id: opts.mPaymentId,
+    ...(opts.email ? { email_address: opts.email } : {}),
+    ...(opts.mPaymentId ? { m_payment_id: opts.mPaymentId } : {}),
     amount: randFromCents(opts.amountCents),
     item_name: opts.itemName.slice(0, 100),
-    custom_str1: opts.topicId,
-    custom_str2: opts.lang,
+    custom_str1: opts.custom1,
+    custom_str2: opts.custom2,
   };
   return { ...fields, signature: signFields(fields, opts.passphrase) };
 }

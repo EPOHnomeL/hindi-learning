@@ -36,6 +36,14 @@ export const tenantFlagsValidator = v.object({
   publicLinks: v.boolean(),
   qa: v.boolean(),
   seeding: v.boolean(),
+  // The donation rail (ADR 0027) — the sixth flag, and the only OPTIONAL one.
+  // The other five are required because their v1 default was `true` (no
+  // regression from always-on behaviour), which had to be written onto every
+  // row. A donation rail must default OFF — it is a new money destination and
+  // opting in is a deliberate operator act — so ABSENCE already carries the
+  // right meaning and needs no backfill. `assertTenantFlag` reads it truthily,
+  // so an un-set flag is fail-closed, which is exactly what money wants.
+  donations: v.optional(v.boolean()),
 });
 
 // The Hub, as Convex tables (see PRD §4). Local workspace files (lessons/,
@@ -78,6 +86,14 @@ export default defineSchema({
     motto: v.optional(v.string()),
     theme: tenantThemeValidator,
     flags: tenantFlagsValidator,
+    // Who the operator owes this tenant's donation income (ADR 0027). A user id,
+    // not a bank account: settlement rides the existing `sellers.payout` details
+    // and the Payouts tab, because `operatorBank` is global and singular by
+    // decision (ADR 0026) and there is no tenant bank account to invent.
+    // **Sys-admin-only to write** — a money destination is not a subdomain
+    // administrator's call, and letting one set it would open self-dealing
+    // (redirecting the tenant's donation income to any member account).
+    donationPayee: v.optional(v.id("users")),
   }).index("by_slug", ["slug"]),
 
   // The Allowlist (ADR 0011, semantics revised by ADR 0021 — open sign-up): the
@@ -591,16 +607,25 @@ export default defineSchema({
     pfPaymentId: v.string(),
   }).index("by_pf_payment_id", ["pfPaymentId"]),
 
-  // The money **Ledger** (.scratch/payfast-payments): one row per sale, written by
-  // the verified ITN in the same transaction as the Entitlement. All sales settle
-  // into the operator's single PayFast account, so this is the record of what the
-  // operator owes each Seller: the ITN's gross/fee/net (cents) split 50/50 on net
-  // into sellerShare (owed to the Seller) and platformShare. The operator pays out
+  // The money **Ledger** (.scratch/payfast-payments): one row per money event,
+  // written by the verified ITN in the same transaction as whatever it grants.
+  // Everything settles into the operator's single PayFast account, so this is the
+  // record of what the operator owes each payee: the ITN's gross/fee/net (cents)
+  // split on net into sellerShare (owed) and platformShare. The operator pays out
   // by EFT out of band and flips `owed` → `paid` with a reference — `by_status`
-  // is the owed-per-Seller rollup's scan.
+  // is the owed-per-payee rollup's scan.
+  //
+  // ADR 0027 admitted a SECOND kind of money event — a donation, which has no
+  // course and grants nothing — to this shared table, the same move ADR 0026 made
+  // when it widened `pfPaymentId`. That is what `topicId`/`lang` being optional
+  // means: absent on a donation row, always present on a sale.
   ledger: defineTable({
-    topicId: v.id("topics"),
-    lang: v.string(),
+    // The course/Edition this row is revenue for — a SALE row only. Absent on a
+    // donation (ADR 0027): a donation buys no Edition.
+    topicId: v.optional(v.id("topics")),
+    lang: v.optional(v.string()),
+    // Who the operator owes: the course owner on a sale, the tenant's
+    // `donationPayee` on a donation.
     sellerId: v.id("users"),
     buyerEmail: v.string(),
     gross: v.number(),
@@ -616,6 +641,13 @@ export default defineSchema({
     // docs/agents/project-context.md).
     pfPaymentId: v.optional(v.string()),
     eftRef: v.optional(v.string()),
+    // WHAT kind of money event this is (ADR 0027) — explicit, never inferred from
+    // an absent `topicId`: "absent means donation" is an inference every future
+    // reader has to rediscover, and it forecloses a third money source. Optional
+    // only because rows predating ADR 0027 exist; every writer sets it, and
+    // `backfill.backfillLedgerKind` stamps the legacy rows "sale" so it can be
+    // narrowed to required later.
+    kind: v.optional(v.union(v.literal("sale"), v.literal("donation"))),
     status: v.union(v.literal("owed"), v.literal("paid")),
     payoutRef: v.optional(v.string()),
   }).index("by_status", ["status"]),

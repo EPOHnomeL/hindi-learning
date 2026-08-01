@@ -19,6 +19,7 @@ import type * as content_publish from "../content/publish.js";
 import type * as content_reader from "../content/reader.js";
 import type * as content_testHelpers from "../content/testHelpers.js";
 import type * as crons from "../crons.js";
+import type * as donations from "../donations.js";
 import type * as eft from "../eft.js";
 import type * as email from "../email.js";
 import type * as emblem from "../emblem.js";
@@ -68,6 +69,7 @@ declare const fullApi: ApiFromModules<{
   "content/reader": typeof content_reader;
   "content/testHelpers": typeof content_testHelpers;
   crons: typeof crons;
+  donations: typeof donations;
   eft: typeof eft;
   email: typeof email;
   emblem: typeof emblem;

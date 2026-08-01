@@ -3,7 +3,7 @@ import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { auth } from "./auth";
-import { acceptNotification, pfParamString, validateUrl, verifySignature } from "./payfast";
+import { acceptDonation, acceptNotification, pfParamString, validateUrl, verifySignature } from "./payfast";
 
 // Mounts Convex Auth's HTTP routes (sign-in/up, token refresh, etc.).
 const http = httpRouter();
@@ -43,6 +43,12 @@ const payfastNotify = httpAction(async (ctx, request) => {
   if (!passphrase) return new Response("PAYFAST_PASSPHRASE is not set", { status: 500 });
   if (!verifySignature(fields, passphrase)) return new Response("invalid signature", { status: 400 });
 
+  // WHICH rail this notification belongs to, read off the signed custom field
+  // the checkout stamped (ADR 0027). A donation carries `custom_str2 =
+  // "donation"`; anything else is a sale. The value is inside the signature, so
+  // a payment cannot be re-labelled in flight to dodge either rail's rules.
+  if (fields.custom_str2 === "donation") return await notifyDonation(ctx, fields);
+
   // Resolve the Buy click this payment answers (`m_payment_id` is our
   // checkout-intent reference), then let the acceptance rules decide. Both happen
   // before the network hop — cheap rejections first.
@@ -57,20 +63,7 @@ const payfastNotify = httpAction(async (ctx, request) => {
   // The verdict carries the intent it accepted against — what to grant, and to whom.
   const { payment: { pfPaymentId, gross, fee, net }, intent: accepted } = acceptance;
 
-  // Server postback: PayFast must confirm it really sent this notification.
-  // The body is the received fields minus the signature, order preserved.
-  let confirmed = false;
-  try {
-    const res = await fetch(validateUrl(), {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: pfParamString(fields),
-    });
-    confirmed = res.ok && (await res.text()).trim().startsWith("VALID");
-  } catch {
-    confirmed = false;
-  }
-  if (!confirmed) return new Response("validation failed", { status: 400 });
+  if (!(await confirmWithPayfast(fields))) return new Response("validation failed", { status: 400 });
 
   try {
     await ctx.runMutation(internal.market.fulfillPurchase, {
@@ -88,6 +81,60 @@ const payfastNotify = httpAction(async (ctx, request) => {
   }
   return new Response(null, { status: 200 });
 });
+
+// Server postback: PayFast must confirm it really sent this notification. The
+// body is the received fields minus the signature, order preserved. This is the
+// ONE network call on the rail, shared by both branches — a donation is as
+// forgeable as a sale without it.
+async function confirmWithPayfast(fields: Record<string, string>): Promise<boolean> {
+  try {
+    const res = await fetch(validateUrl(), {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: pfParamString(fields),
+    });
+    return res.ok && (await res.text()).trim().startsWith("VALID");
+  } catch {
+    return false;
+  }
+}
+
+// The donation branch of the same verified-ITN path (ADR 0027). Same shape as
+// the sale branch — acceptance rules, then the postback, then one idempotent
+// mutation — with two differences that are the rail, not shortcuts:
+//   - `acceptDonation` has no intent to match, because a donation has no price;
+//   - the mutation mints NO Entitlement, only a `kind: "donation"` Ledger row.
+// The donor's email comes from the notification's `email_address` (PayFast
+// collected it on its own page — there was never an account to freeze one from),
+// and the tenant to credit from the signed `custom_str1`.
+async function notifyDonation(
+  ctx: Parameters<Parameters<typeof httpAction>[0]>[0],
+  fields: Record<string, string>,
+): Promise<Response> {
+  const acceptance = acceptDonation(fields);
+  if (acceptance.outcome === "ignore") return new Response(null, { status: 200 });
+  if (acceptance.outcome === "refuse") return new Response(acceptance.reason, { status: 400 });
+  const { pfPaymentId, gross, fee, net } = acceptance.payment;
+
+  if (!(await confirmWithPayfast(fields))) return new Response("validation failed", { status: 400 });
+
+  try {
+    await ctx.runMutation(internal.donations.fulfillDonation, {
+      pfPaymentId,
+      tenantSlug: fields.custom_str1!,
+      donorEmail: fields.email_address ?? "",
+      gross,
+      fee,
+      net,
+    });
+  } catch {
+    // Includes "the tenant has no ready payee any more" — a genuine payment we
+    // cannot attribute. 500 so PayFast retries and the operator sees it, rather
+    // than banking the money with nobody recorded as owed.
+    return new Response("processing error", { status: 500 });
+  }
+  return new Response(null, { status: 200 });
+}
 
 http.route({ path: "/payfast/notify", method: "POST", handler: payfastNotify });
 

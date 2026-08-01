@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
 import {
+  acceptDonation,
   acceptNotification,
   appUrl,
   buildCheckoutFields,
@@ -114,8 +115,8 @@ test("buildCheckoutFields returns the signed PayFast field set", () => {
     amountCents: 150000,
     itemName: "Hindi — Spanish edition",
     email: "buyer@example.com",
-    topicId: "topic123",
-    lang: "es",
+    custom1: "topic123",
+    custom2: "es",
     passphrase: PASSPHRASE,
   });
   expect(fields).toMatchObject({
@@ -133,6 +134,65 @@ test("buildCheckoutFields returns the signed PayFast field set", () => {
   });
   // The signature is PayFast's own scheme over these fields — verifiable in reverse.
   expect(verifySignature(fields, PASSPHRASE)).toBe(true);
+});
+
+test("buildCheckoutFields OMITS email and m_payment_id when the rail has neither (donations, ADR 0027)", () => {
+  const fields = buildCheckoutFields({
+    merchantId: "10000100",
+    merchantKey: "46f0cd694581a",
+    returnUrl: "https://ywampotch.app.example.com/?donation=thanks",
+    cancelUrl: "https://ywampotch.app.example.com/#donations",
+    notifyUrl: "https://site.convex.site/payfast/notify",
+    amountCents: 92000,
+    itemName: "Donation to YWAM Potch",
+    custom1: "ywampotch",
+    custom2: "donation",
+    passphrase: PASSPHRASE,
+  });
+  // Absent, not blank: an empty `email_address=` would still be signed and sent,
+  // and PayFast would reject the field rather than collect the donor's own.
+  expect("email_address" in fields).toBe(false);
+  expect("m_payment_id" in fields).toBe(false);
+  expect(fields).toMatchObject({ amount: "920.00", custom_str1: "ywampotch", custom_str2: "donation" });
+  expect(verifySignature(fields, PASSPHRASE)).toBe(true);
+});
+
+// ---- the donation acceptance rules (ADR 0027) ---------------------------------
+
+test("acceptDonation takes a COMPLETE donation with no intent, and refuses what it can't record", () => {
+  const donation = (over: Record<string, string> = {}) => ({
+    pf_payment_id: "pf_don_1",
+    payment_status: "COMPLETE",
+    amount_gross: "920.00",
+    amount_fee: "-25.00",
+    amount_net: "895.00",
+    custom_str1: "ywampotch",
+    custom_str2: "donation",
+    ...over,
+  });
+
+  // No m_payment_id and no intent — and that is not a defect: a donation has no
+  // PRICE, so there is nothing to freeze at click time and nothing to match.
+  // The fee comes back normalised positive, like the sale rail's.
+  expect(acceptDonation(donation())).toEqual({
+    outcome: "grant",
+    payment: { pfPaymentId: "pf_don_1", gross: 92000, fee: 2500, net: 89500 },
+    intent: null,
+  });
+
+  // Not COMPLETE → acknowledged and dropped, so PayFast stops re-sending.
+  expect(acceptDonation(donation({ payment_status: "CANCELLED" }))).toEqual({ outcome: "ignore" });
+
+  // Unrecordable: no payment id, garbage money, or no tenant to credit.
+  for (const bad of [{ pf_payment_id: "" }, { amount_net: "R895" }, { custom_str1: "" }]) {
+    expect(acceptDonation(donation(bad)).outcome).toBe("refuse");
+  }
+});
+
+test("splitNet at DONATION_FEE_BPS takes a tenth, not a half", () => {
+  // The whole reason donations get their own constant: at PLATFORM_FEE_BPS
+  // (5000) this same net would hand the platform 44750 instead of 8950.
+  expect(splitNet(89500, 1000)).toEqual({ sellerShare: 80550, platformShare: 8950 });
 });
 
 // ---- the net split (50/50 on amount_net) --------------------------------------

@@ -212,3 +212,35 @@ export const backfillGenerationRuns = internalMutation({
     return { inserted: lessons.length };
   },
 });
+
+// ---- Ledger `kind` backfill (ADR 0027) --------------------------------------
+//
+// Stamp `kind: "sale"` onto every Ledger row written before the donation rail
+// existed. Every row predating ADR 0027 IS a sale — donations postdate the
+// field — so this is a pure labelling pass, not a reclassification.
+//
+// Why it matters even though the readers already cope: `sales.salesOnly` reads
+// "not a donation" precisely BECAUSE legacy rows carry no `kind`, and
+// `ledger.owedPayouts` defaults an absent `kind` to "sale" for the same reason.
+// Once this has run everywhere, `kind` can be narrowed to required in the
+// schema and both readers can test `=== "sale"` — which is what makes a future
+// THIRD money kind safe (an allow-list, not a deny-list).
+//
+// Idempotent: a row that already carries a `kind` is skipped, so re-running is a
+// no-op. Paginated with the cursor threaded by the driver
+// `pnpm run backfill-ledger-kind[:prod]`.
+export const backfillLedgerKind = mutation({
+  args: { secret: v.string(), cursor: v.union(v.string(), v.null()) },
+  returns: v.object({ patched: v.number(), isDone: v.boolean(), cursor: v.union(v.string(), v.null()) }),
+  handler: async (ctx, { secret, cursor }) => {
+    assertAdmin(secret);
+    const page = await ctx.db.query("ledger").paginate({ cursor, numItems: 100 });
+    let patched = 0;
+    for (const row of page.page) {
+      if (row.kind !== undefined) continue;
+      await ctx.db.patch(row._id, { kind: "sale" });
+      patched++;
+    }
+    return { patched, isDone: page.isDone, cursor: page.continueCursor };
+  },
+});

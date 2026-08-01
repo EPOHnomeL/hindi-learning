@@ -10,10 +10,13 @@ import { isCallerAdmin } from "./whitelist";
 // see what's owed to whom (with the bank details to send it to), and record
 // the payout so a row is never double-counted. Both Admin-only.
 
-// What the operator owes each Seller right now: the `owed` Ledger rows grouped
-// per Seller, each Seller's payout bank details (from their sellers row), the
-// total, and the contributing sales (ids feed markPaid). Authors with nothing
-// owed don't appear. Bounded scan: `owed` rows only live until the next manual
+// What the operator owes each payee right now: the `owed` Ledger rows grouped
+// per payee, their payout bank details (from their sellers row), the total, and
+// the contributing rows (ids feed markPaid). Payees with nothing owed don't
+// appear. **Donations are included, untouched** (ADR 0027): this rollup groups
+// by `sellerId` and never looks at a course, so a donation owed to a tenant's
+// `donationPayee` lands here for free — that reuse is exactly why the donation
+// rail shares the Ledger instead of getting a table of its own. Bounded scan: `owed` rows only live until the next manual
 // payout run, so the working set stays small — capped defensively regardless.
 export const owedPayouts = query({
   args: {},
@@ -33,7 +36,13 @@ export const owedPayouts = query({
       sales: v.array(
         v.object({
           id: v.id("ledger"),
-          lang: v.string(),
+          // The Edition sold — **null on a donation** (ADR 0027), which bought no
+          // Edition. Nullable rather than a stand-in string: "Donation" is not a
+          // language code, and inventing one here would put presentation text in
+          // a Convex query and collide with the language-code namespace. `kind`
+          // beside it is what the UI actually branches on.
+          lang: v.union(v.string(), v.null()),
+          kind: v.union(v.literal("sale"), v.literal("donation")),
           buyerEmail: v.string(),
           sellerShare: v.number(),
           at: v.number(),
@@ -68,7 +77,11 @@ export const owedPayouts = query({
           totalOwed: sales.reduce((sum, s) => sum + s.sellerShare, 0),
           sales: sales.map((s) => ({
             id: s._id,
-            lang: s.lang,
+            lang: s.lang ?? null,
+            // A row written before `kind` existed is a sale (donations postdate
+            // the field), so absent reads as "sale" — same reasoning as
+            // sales.ts's salesOnly.
+            kind: s.kind ?? ("sale" as const),
             buyerEmail: s.buyerEmail,
             sellerShare: s.sellerShare,
             at: s._creationTime,

@@ -22,6 +22,8 @@
     "materialise:prod": "tsx scripts/materialise.ts --prod",
     "backfill-quiz-shuffle": "tsx scripts/backfill-quiz-shuffle.ts",
     "backfill-quiz-shuffle:prod": "tsx scripts/backfill-quiz-shuffle.ts --prod",
+    "backfill-ledger-kind": "tsx scripts/backfill-ledger-kind.ts",
+    "backfill-ledger-kind:prod": "tsx scripts/backfill-ledger-kind.ts --prod",
     "backfill-html-blobs": "tsx scripts/backfill-html-blobs.ts",
     "backfill-html-blobs:prod": "tsx scripts/backfill-html-blobs.ts --prod",
     "verify-html-blobs": "tsx scripts/verify-html-blobs.ts",

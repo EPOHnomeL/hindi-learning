@@ -3,6 +3,24 @@ import { query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { isCallerAdmin } from "./whitelist";
 import { translatedTitle } from "./lib";
+import type { Doc } from "./_generated/dataModel";
+
+// The Sales report is revenue PER COURSE PER EDITION, so only sale rows belong
+// in it — a donation has no course, and folding it in corrupts the per-course
+// numbers (ADR 0027). This is also the crash guard: both queries below index by
+// `topicId` and resolve a course title, so a donation row reaching either would
+// be a "(deleted course)" row at best.
+//
+// Written as "not a donation" rather than "is a sale" on purpose: rows written
+// before `kind` existed carry none, and they ARE sales — testing `=== "sale"`
+// would silently drop the entire pre-ADR-0027 history from the report. Once
+// `backfill.backfillLedgerKind` has run everywhere and `kind` is narrowed to
+// required, the two are equivalent. **A third money kind must flip this to an
+// allow-list** — that is the one way this predicate goes wrong.
+type SaleRow = Doc<"ledger"> & { topicId: NonNullable<Doc<"ledger">["topicId"]>; lang: string };
+function salesOnly(rows: Doc<"ledger">[]): SaleRow[] {
+  return rows.filter((r): r is SaleRow => r.kind !== "donation" && r.topicId !== undefined && r.lang !== undefined);
+}
 
 // The admin sales report (.scratch/admin-sales, issue 01): which courses and
 // which editions sold how much over a chosen period. Reads the sales ledger
@@ -14,6 +32,10 @@ import { translatedTitle } from "./lib";
 // by Convex's built-in `by_creation_time` index — so a bounded period reads
 // only the rows in it, not the whole table. An unbounded ("all time") report
 // still walks every row, which is inherent to that request.
+//
+// **Donations are excluded** (ADR 0027, `salesOnly` below) and both queries in
+// this file depend on it structurally, not cosmetically: they group by `topicId`
+// and fetch a course title, and a donation row has neither.
 export const report = query({
   args: {
     // Inclusive lower / exclusive upper bound on the sale time (ms). Either may
@@ -55,7 +77,7 @@ export const report = query({
 
     // topicId -> lang -> running { gross, count }.
     const byCourse = new Map<Id<"topics">, Map<string, { gross: number; count: number }>>();
-    for (const r of inWindow) {
+    for (const r of salesOnly(inWindow)) {
       const editions = byCourse.get(r.topicId) ?? new Map();
       const agg = editions.get(r.lang) ?? { gross: 0, count: 0 };
       agg.gross += r.gross;
@@ -126,11 +148,12 @@ export const byDay = query({
         return q;
       })
       .collect();
-    if (inWindow.length === 0) return [];
+    const sales = salesOnly(inWindow);
+    if (sales.length === 0) return [];
 
     // day index -> lang -> running { gross, count }.
     const byDayLang = new Map<number, Map<string, { gross: number; count: number }>>();
-    for (const r of inWindow) {
+    for (const r of sales) {
       const d = Math.floor(r._creationTime / DAY);
       const langs = byDayLang.get(d) ?? new Map();
       const agg = langs.get(r.lang) ?? { gross: 0, count: 0 };

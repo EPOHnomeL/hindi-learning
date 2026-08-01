@@ -305,6 +305,7 @@ export const fulfillPurchase = internalMutation({
       sellerShare,
       platformShare,
       pfPaymentId,
+      kind: "sale",
       status: "owed",
     });
     return null;
@@ -436,8 +437,11 @@ export const startCheckout = mutation({
       amountCents: listing.amount,
       itemName: `${title} — ${editionName} edition`,
       email,
-      topicId: topic._id,
-      lang,
+      // What the ITN grants, echoed back to us on the notification. `custom_str2`
+      // is also the rail discriminator (ADR 0027) — a language code is never
+      // "donation", so a sale is never mistaken for one.
+      custom1: topic._id,
+      custom2: lang,
       passphrase,
     });
     return { action: processUrl(), fields: Object.entries(fields).map(([name, value]) => ({ name, value })) };

@@ -396,6 +396,7 @@ export const confirmEftPayment = mutation({
       sellerShare,
       platformShare,
       eftRef: ref,
+      kind: "sale",
       status: "owed",
     });
 
