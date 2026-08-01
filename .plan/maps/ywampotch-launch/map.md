@@ -44,7 +44,7 @@ history on a repo that now handles real money.
 | 04 | Admin confirm queue — grant + Ledger row | [04](tickets/04-admin-eft-confirm-queue.md) | built `eb6a836` |
 | 05 | EFT confirmation email | [05](tickets/05-eft-confirmation-email.md) | built `84d793a` |
 | 06 | ADR for the manual EFT rail (+ glossary term) | [06](tickets/06-adr-manual-eft-rail.md) | built — [ADR 0026](../../../docs/adr/0026-manual-eft-payment-rail.md) |
-| 07 | Prod-verify the security fixes | [07](tickets/07-prod-verify-security-fixes.md) | **open — needs a human on prod** |
+| 07 | Prod-verify the security fixes | [07](tickets/07-prod-verify-security-fixes.md) | answered — both checks passed on prod |
 | 08 | Fix the four known stale facts | [08](tickets/08-fix-known-stale-docs-and-tracker.md) | open |
 | 09 | Shoprite-Send checkout — method chooser + step rail | [09](tickets/09-shoprite-send-checkout-method-chooser.md) | built `27ba5bd` |
 | 10 | Research — non-ZAR charging + buyer geo | [10](tickets/10-research-non-zar-charging-and-geo.md) | answered |
@@ -212,6 +212,22 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   `ConfirmingBanner` and its two `Reader` strings deleted, four `Welcome` keys
   added across all five locales. `convex/` untouched. **The operator's walk is
   still owed**, same bar as 13 and 16.
+
+- [Prod-verify the security fixes](./tickets/07-prod-verify-security-fixes.md) —
+  **both checks passed on prod, no failures, no follow-up tickets.** The
+  2026-07-28 tenant-admin authorization batch did not over-tighten: a sys admin
+  still has full function across all five Admin tabs. And `courseAssignment`
+  returns a tenant admin `"available":[]` **in the payload** — read off the Convex
+  WebSocket frame, not the UI, so the leak is closed server-side rather than
+  merely unrendered. Two things worth carrying forward: the ticket's phrasing
+  ("carries no `available` array") is wrong in a way that misleads — the key is
+  always present and the gate empties it, so `[]` is the pass; and the read is
+  *consistent with* the gate rather than proof of it, since prod's pool may be
+  empty anyway (the discriminating sys-admin read wasn't done — see the ticket).
+  **Ride-along:** all six outstanding whitelabel UI checks passed in the same
+  sitting, clearing that map's entire pending list (`ae579ca`);
+  [ticket 01](./tickets/01-brand-continuity-through-the-funnel.md)'s brand check
+  was not done and is still owed.
 
 ## Not yet specified
 
