@@ -335,6 +335,19 @@ function EftInstructions({
         ))}
       </dl>
       <p className="mt-3.5 text-xs leading-relaxed text-soft">{t("eftWait")}</p>
+
+      {/* The way out. Without it this panel is a dead end: the buyer has made the
+          transfer, there is nothing left to do here, and every other route out of
+          checkout belongs to a rail that completes in the browser. The overview
+          is the right destination because that is where the wait is now visible —
+          the course sits there under "Awaiting payment" with this reference until
+          the operator confirms it (`eft.myPendingIntents`). */}
+      <Link
+        href="/"
+        className="mt-4 block rounded-[10px] bg-accent px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-accent/90"
+      >
+        {t("eftDone")}
+      </Link>
     </div>
   );
 }

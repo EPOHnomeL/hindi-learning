@@ -13,7 +13,7 @@ import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { CourseCertMenu } from "./Certificate";
 import { CourseSettingsDialog } from "./CourseSettings";
 import { EditionsDialog } from "./Editions";
-import { withLang } from "./editionUrl";
+import { checkoutLink, withLang } from "./editionUrl";
 import { Icon } from "./icons";
 import { formatPrice } from "./Paygate";
 import { Logo } from "./Logo";
@@ -174,6 +174,10 @@ export function Dashboard() {
         )}
 
         <SharedSection />
+        {/* Above Purchased, deliberately: a transfer you are waiting on is more
+            urgent than the courses you already hold, and it must not sit below
+            the fold on a phone. */}
+        <AwaitingPaymentSection />
         <PurchasedSection />
         <AvailableSection />
       </div>
@@ -555,6 +559,62 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
   );
 }
 
+// Courses with a bank transfer outstanding (manual EFT rail, ADR 0026). A
+// pending buyer holds no Entitlement — access comes only on the operator's
+// confirmation — so they are invisible to `myPurchases` and, until this section
+// existed, their course showed only under "Available" at full price, as though
+// they had never started. Someone who has just moved real money needs the app to
+// say so.
+//
+// Reactive: the intent leaves `pending` in the same transaction that mints the
+// Entitlement, so on confirmation the card disappears from here and reappears
+// under Purchased, with no reload.
+function AwaitingPaymentSection() {
+  const t = useTranslations("Dashboard");
+  const pending = useQuery(api.eft.myPendingIntents);
+  if (!pending || pending.length === 0) return null;
+  return (
+    <section className="mt-12">
+      <h2 className="mb-1 text-lg font-semibold tracking-tight text-accent">{t("awaitingPayment")}</h2>
+      <p className="mb-4 text-sm text-soft">{t("awaitingPaymentSubtitle")}</p>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {pending.map((c) => (
+          <article
+            key={`${c.slug}:${c.lang}`}
+            className="flex flex-col rounded-2xl border border-gold/40 bg-card p-5 shadow-sm"
+          >
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <h2 className="min-w-0 text-lg font-semibold leading-snug text-ink">{c.title}</h2>
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
+                <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-gold" />
+                {t("awaitingBadge")}
+              </span>
+            </div>
+            <p className="text-[13.5px] leading-snug text-soft">
+              {t("awaitingBody", { price: formatPrice(c.amount, "zar"), edition: c.langName })}
+            </p>
+            {/* The reference restated, because it is the one thing the buyer may
+                need again — to check it against what they typed into their bank. */}
+            <div className="mt-3.5 rounded-lg border border-gold/50 bg-gold/10 px-3 py-2">
+              <span className="text-[10.5px] font-semibold uppercase tracking-wide text-accent2">
+                {t("awaitingRef")}
+              </span>
+              <b className="mt-0.5 block select-all text-lg font-bold tracking-[0.1em] text-ink">{c.ref}</b>
+            </div>
+            <div className="min-h-[14px] flex-1" />
+            <Link
+              href={checkoutLink(c.slug, c.lang)}
+              className="mt-3.5 rounded-lg border border-line px-3 py-2 text-center text-sm font-medium text-accent transition-colors hover:border-gold"
+            >
+              {t("awaitingDetails")}
+            </Link>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // Courses I've bought (paid marketplace, ADR 0016) — read-only, full access, my
 // own progress + certificate. Hidden when none. The paid twin of SharedSection.
 function PurchasedSection() {
@@ -663,7 +723,15 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
 // is never written, so scoping on it left every tenant member's catalogue empty.
 function AvailableSection() {
   const t = useTranslations("Dashboard");
-  const available = useQuery(api.catalogue.list, { tenantSlug: useTenantSlug() });
+  const catalogue = useQuery(api.catalogue.list, { tenantSlug: useTenantSlug() });
+  // A course you've already transferred money for is not a course to discover.
+  // It has its own card under "Awaiting payment", with the reference on it —
+  // leaving it here too would offer the buyer its price a second time, which
+  // reads as "your payment didn't count". Convex dedupes the subscription with
+  // AwaitingPaymentSection, so the second read is free.
+  const pending = useQuery(api.eft.myPendingIntents);
+  const awaiting = new Set((pending ?? []).map((p) => p.slug));
+  const available = catalogue?.filter((c) => !awaiting.has(c.slug));
   if (!available || available.length === 0) return null;
   return (
     <section className="mt-12">

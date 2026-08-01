@@ -4,7 +4,7 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { editionPrice, normaliseEmail, SOURCE_LANG, topicBySlug } from "./lib";
+import { editionPrice, normaliseEmail, SOURCE_LANG, topicBySlug, translatedTitle } from "./lib";
 import { langInfo } from "./languages";
 import { appUrl, platformFeeBps, splitNet } from "./payfast";
 import { payoutDetailsValidator } from "./schema";
@@ -225,6 +225,62 @@ export const myEftIntent = query({
     const intent = await pendingIntent(ctx, userId, topic._id, lang);
     if (!intent) return null;
     return { ref: intent.ref, amount: intent.amount, bank: bankOf(row) };
+  },
+});
+
+// Every Edition the caller has a transfer outstanding on, for the signed-in
+// overview. A pending EFT buyer holds NO Entitlement — that is the whole point
+// of the rail, access comes only on confirmation — so `market.myPurchases`
+// cannot see them and the dashboard showed their course under "Available", at
+// full price, as though they had never started. That is the dead end this fixes:
+// having transferred real money, the buyer had nowhere in the app that
+// acknowledged it.
+//
+// Deliberately does NOT return the bank details. This is a list, not the
+// instructions panel; the details live on `/checkout/<slug>/<lang>`, which the
+// card links to, and a query that feeds every dashboard render is the wrong
+// place to hand out the operator's account number.
+//
+// Reactive like `myEftIntent`: the row leaves `pending` in the same transaction
+// that mints the Entitlement, so on confirmation the card vanishes from here and
+// reappears under Purchased with no reload.
+export const myPendingIntents = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      slug: v.string(),
+      title: v.string(),
+      lang: v.string(),
+      langName: v.string(),
+      ref: v.string(),
+      amount: v.number(),
+    }),
+  ),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    // `by_user_topic` on its userId prefix — no new index for a per-buyer read.
+    const rows = await ctx.db
+      .query("eftIntents")
+      .withIndex("by_user_topic", (q) => q.eq("userId", userId))
+      .collect();
+    const cards = await Promise.all(
+      rows
+        .filter((r) => r.status === "pending")
+        .map(async (r) => {
+          const topic = await ctx.db.get(r.topicId);
+          if (!topic) return null;
+          return {
+            slug: topic.slug,
+            title: await translatedTitle(ctx, topic._id, r.lang, topic.title),
+            lang: r.lang,
+            langName: r.lang === SOURCE_LANG ? "English" : langInfo(r.lang).name,
+            ref: r.ref,
+            amount: r.amount,
+          };
+        }),
+    );
+    return cards.filter((c) => c !== null);
   },
 });
 
