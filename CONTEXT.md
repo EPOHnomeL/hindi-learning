@@ -184,3 +184,29 @@ _Avoid_: Free trial, sample, demo, taster
 - Buying is **auth-first** ([ADR 0021](docs/adr/0021-open-signup-allowlist-gates-course-creation.md)): checkout requires a signed-in account and derives the purchase email from it — never from a typed address. A Guest hitting Buy on a Public link is routed into the app to create an account (sign-up is open) before paying; selling remains gated by the *separate* Admin-granted **can-sell** capability.
 - **Guest** / **Public link** semantics **fork by Edition**: a **free** Edition keeps today's per-Edition anonymous read access; a **paid** Edition exposes only its **Preview** through a Public link / to a Guest, and the rest requires an Entitlement for that Edition (which a Guest structurally cannot hold).
 - The **buyer role** is intentionally left unnamed for now — it would collide with the generic "learner" used throughout this glossary. It is defined operationally as "a User holding an Entitlement" until the deferred roles/enrollment work names it.
+
+## Planning process (chartr & wayfinder)
+
+These terms are about *how work on the app is planned*, not the app itself. They live here because they appear constantly in maps, tickets, and commit messages. Mechanics and the file-format contract: [docs/agents/issue-tracker.md](docs/agents/issue-tracker.md).
+
+**chartr**:
+The local, git-native issue tracker and its live dashboard. All state is plain Markdown under `.plan/maps/`; chartr *watches* those files and **derives** everything it shows — progress bars, the blocking graph, the frontier — nothing is ever stored as a status field. The dashboard (the grid of effort cards) is the visual face of the tracker: one card per Map, titled by the map's H1, with resolved/total counts and recency computed live from the ticket files.
+_Avoid_: GitHub issues (retired 2026-07-30), `.scratch/` (retired), "the board" for anything not derived from `.plan/maps/`
+
+**Map**:
+One planning or implementation effort: a directory `.plan/maps/<slug>/` holding a `map.md` (H1 title, Destination, Notes, Decisions so far), optionally a `spec.md`, and its Tickets under `tickets/`. The map is an *index, not a store* — it gists and links; the substance lives in tickets. Implementation efforts get a sibling `<slug>-impl/` map. The map is the cross-session memory: anything a future session needs must land in a ticket's `## Answer` or the map's Notes.
+_Avoid_: Epic, project, milestone; putting maps anywhere but `.plan/maps/` (chartr can't see them)
+
+**Ticket**:
+One unit of work or one open decision: `tickets/NN-slug.md` beside its map, with `## Question`, `## Done when`, and `## Answer` sections plus `blocked_by`/`claimed_by` frontmatter. `NN` is permanent identity — never reused or renumbered. Status is **derived, never written**: prose under `## Answer` means resolved, `## Ruled out` means out of scope, `claimed_by` means in progress, otherwise open.
+_Avoid_: Issue (implies GitHub), `status:` fields, stated progress counts
+
+**Wayfinder**:
+The user-invoked skill (`/wayfinder`) for work too foggy to route in one session: it builds a Map with one Ticket per open decision and resolves them **one per session** — planning, not doing. The test for whether work is wayfinder-sized: if the open questions are sharp and few, use the ordinary grill → spec → tickets → implement pipeline instead; if there is fog you can name but can't yet phrase as questions, it's a map.
+_Avoid_: Invoking it agent-side (it is `disable-model-invocation: true`); plan mode for repo work
+
+**Frontier** _(chartr sense)_:
+The set of open tickets whose `blocked_by` are all resolved — the work that can start *now*. Computed live by chartr; a blocker clears the instant its `## Answer` lands. Collides with the app-domain **Frontier** (a learner's leading-edge Lesson, above) — context disambiguates, but say "the map's frontier" when in doubt.
+
+**`.plan/`**:
+The planning root: `maps/` (everything chartr tracks), plus `handoffs/` and `research/`, which are *not* maps and not tracked by chartr.
