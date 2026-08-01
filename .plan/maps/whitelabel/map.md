@@ -8,22 +8,30 @@ only. This is real open work that "destination reached" hides, so it is recorded
 here rather than left buried in ticket Status lines. Nothing below is a decision;
 none of it reopens the map.
 
-- **UI/browser check pending** (needs an authed sys-admin session on a tenant host):
+**Six of the eight cleared on 2026-08-01** (see the first bullet). What is left is
+[18 cross-host canonical redirect](tickets/18-cross-host-canonical-redirect.md), never
+verified either way, and [23 legacy course tenant backfill](tickets/23-legacy-course-tenant-backfill.md),
+which waits on the operator, not on a browser.
+
+- **UI/browser check PASSED on prod** (operator, 2026-08-01, during the
+  [ywampotch-launch ticket 07](../ywampotch-launch/tickets/07-prod-verify-security-fixes.md)
+  sitting — reported as "up and running, all those things work perfectly for a whitelabel"):
   [11 SSR theme application](tickets/11-ssr-theme-application.md),
   [13 lesson palette override](tickets/13-lesson-tenant-palette-override.md),
   [19 Tenants tab shell](tickets/19-dashboard-tenants-tab-shell.md),
   [20 theme editor](tickets/20-dashboard-theme-editor.md),
   [22 assignment + removal guard](tickets/22-dashboard-assignment-and-removal.md),
   [24 grant/revoke tenant admin](tickets/24-grant-tenant-admin.md).
+  All six of the outstanding UI checks — this bullet is now the whole of that list.
 - **Implemented, no verification recorded either way**:
   [18 cross-host canonical redirect](tickets/18-cross-host-canonical-redirect.md).
 - **Waiting on an operator decision, not on code**:
   [23 legacy course tenant backfill](tickets/23-legacy-course-tenant-backfill.md) — a real
   prod re-bake is the operator's call.
 
-These overlap the live [ywampotch-launch map](../ywampotch-launch/map.md):
-its ticket 07 puts a human on prod against a real tenant host, which is the same
-session that could clear most of the six above. Sequence them together.
+These overlapped the live [ywampotch-launch map](../ywampotch-launch/map.md): its
+ticket 07 put a human on prod against a real tenant host, and that sitting is what
+cleared the six above. Sequencing them together worked; 18 and 23 remain.
 
 ## Destination
 
