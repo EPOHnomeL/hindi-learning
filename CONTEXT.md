@@ -160,8 +160,14 @@ A User the **Admin** has explicitly granted the **can-sell** capability (a per-u
 _Avoid_: Author (collides with the Routine *authoring* Lessons), Vendor, Creator, Merchant, Sponsor (the internal-studio term)
 
 **Ledger**:
-The money record: one row per sale, written by the verified ITN in the same transaction as the Entitlement it mints. Records the sale's gross / PayFast fee / net (cents) and the 50/50 net split into the **Seller's share** (what the operator owes) and the platform's, with a payout status `owed` → `paid`. The Admin's payouts view sums `owed` rows per Seller; marking rows paid records the EFT reference so a sale is never double-counted.
-_Avoid_: Balance, wallet, statement, payouts table (a Ledger row is per-sale, not per-Seller)
+The money record: one row per **money event**, written by the verified ITN in the same transaction as whatever that event grants. Records the event's gross / PayFast fee / net (cents) and the net split into the **payee's share** (what the operator owes) and the platform's, with a payout status `owed` → `paid`. The Admin's payouts view sums `owed` rows per payee; marking rows paid records the EFT reference so a row is never double-counted.
+Two **kinds** share the table, named explicitly by a `kind` field rather than inferred: a **sale** (a course **[[Edition]]**, split 50/50, owed to its **[[Seller]]**) and a **[[Donation]]** (no course, split 90/10, owed to a tenant's payee — [ADR 0027](docs/adr/0027-per-tenant-donation-rail.md)). The **payouts** view spans both; the **sales report** is sales only, because it reports revenue per course per edition and a donation has no course.
+_Avoid_: Balance, wallet, statement, payouts table (a Ledger row is per-event, not per-payee); "sales ledger" (it is no longer only sales)
+
+**Donation**:
+Money given to a tenant with **nothing bought and nothing granted** — no [[Entitlement]], no access, no account ([ADR 0027](docs/adr/0027-per-tenant-donation-rail.md)). Solicited by a flag-gated section on a tenant's landing page, given by a **[[Guest]]** who never signs in: they type an amount in **dollars**, are charged **Rand** at a committed constant, and PayFast collects their email on its own page. The operator is merchant of record (as for every sale — [ADR 0026](docs/adr/0026-manual-eft-payment-rail.md)), keeps **10% of net**, and owes the rest to that tenant's sys-admin-nominated **donation payee** — a User, not a bank account, settled through the same [[Ledger]] and payouts flow a Seller's share is.
+The structural difference from a sale, and the reason it needs so little machinery: a donation **has no price**. The donor invents the number, so there is nothing to freeze at click time — hence no intent row, and hence the only server call is an unauthenticated *query* returning signed PayFast fields.
+_Avoid_: Tip, contribution, pledge, gift; **[[Entitlement]]** or purchase of any kind (a donation buys nothing); "tax-deductible" or Section 18A receipt (structurally impossible while the operator is merchant of record — see the ADR); subscription or recurring giving (ruled out: one-off only)
 
 **EFT Intent**:
 A buyer's stated intention to pay for one **[[Edition]]** by direct bank transfer, and the

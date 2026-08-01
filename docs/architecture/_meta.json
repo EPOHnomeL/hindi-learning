@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-28T20:56:01.397Z",
+  "generatedAt": "2026-08-01T21:24:10.477Z",
   "files": {
     "/docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md": {
       "title": "Asynchronous, hub-mediated teaching loop (no live tutor on the web)",
@@ -202,6 +202,10 @@
           "title": "Paid course marketplace: Sellers sell, platform facilitates via Stripe Connect (not merchant of record)"
         },
         {
+          "path": "/docs/adr/0027-per-tenant-donation-rail.md",
+          "title": "A per-tenant donation rail on the shared Ledger"
+        },
+        {
           "path": "/docs/architecture/contexts/01-hub-content.md",
           "title": "Hub & Content Model"
         },
@@ -279,6 +283,14 @@
       "title": "Paid course marketplace: Sellers sell, platform facilitates via Stripe Connect (not merchant of record)",
       "updated": "2026-07-06T12:45:47+02:00",
       "backlinks": [
+        {
+          "path": "/docs/adr/0026-manual-eft-payment-rail.md",
+          "title": "A manual EFT payment rail beside PayFast"
+        },
+        {
+          "path": "/docs/adr/0027-per-tenant-donation-rail.md",
+          "title": "A per-tenant donation rail on the shared Ledger"
+        },
         {
           "path": "/CONTEXT.md",
           "title": "My Course Glossary"
@@ -358,6 +370,10 @@
           "title": "Tenant & subdomain model (whitelabel v1)"
         },
         {
+          "path": "/docs/adr/0027-per-tenant-donation-rail.md",
+          "title": "A per-tenant donation rail on the shared Ledger"
+        },
+        {
           "path": "/CONTEXT.md",
           "title": "My Course Glossary"
         }
@@ -365,21 +381,29 @@
     },
     "/docs/adr/0022-tenant-subdomain-model.md": {
       "title": "Tenant & subdomain model (whitelabel v1)",
-      "updated": "2026-07-21T12:03:14+02:00",
+      "updated": "2026-07-29T08:44:52+02:00",
       "backlinks": [
         {
           "path": "/docs/adr/0011-allowlist-in-convex-admin-portal.md",
           "title": "The Allowlist lives in Convex and is managed by an in-app Admin, gating sign-up only"
         },
         {
+          "path": "/docs/adr/0025-per-tenant-session-isolation.md",
+          "title": "Per-tenant session isolation"
+        },
+        {
           "path": "/docs/agents/tenant-branding.md",
           "title": "Producing tenant branding from a Claude design system"
+        },
+        {
+          "path": "/CONTEXT.md",
+          "title": "My Course Glossary"
         }
       ]
     },
     "/docs/adr/0023-self-enroll-access-primitive.md": {
       "title": "Self-enroll as a first-class access primitive",
-      "updated": "2026-07-19T15:12:22+02:00",
+      "updated": "2026-07-28T22:57:09+02:00",
       "backlinks": [
         {
           "path": "/docs/adr/0024-publish-at-the-edition-grain.md",
@@ -388,21 +412,71 @@
         {
           "path": "/docs/architecture/contexts/05-access-sharing.md",
           "title": "Access & Sharing"
+        },
+        {
+          "path": "/CONTEXT.md",
+          "title": "My Course Glossary"
         }
       ]
     },
     "/docs/adr/0024-publish-at-the-edition-grain.md": {
       "title": "Publish at the Edition grain, not as a course status",
-      "updated": "2026-07-28T20:52:24.620Z",
+      "updated": "2026-07-28T23:23:27+02:00",
       "backlinks": [
         {
           "path": "/docs/adr/0023-self-enroll-access-primitive.md",
           "title": "Self-enroll as a first-class access primitive"
         },
         {
+          "path": "/docs/adr/0025-per-tenant-session-isolation.md",
+          "title": "Per-tenant session isolation"
+        },
+        {
           "path": "/docs/architecture/contexts/05-access-sharing.md",
           "title": "Access & Sharing"
         },
+        {
+          "path": "/CONTEXT.md",
+          "title": "My Course Glossary"
+        }
+      ]
+    },
+    "/docs/adr/0025-per-tenant-session-isolation.md": {
+      "title": "Per-tenant session isolation",
+      "updated": "2026-07-29T08:44:52+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/adr/0022-tenant-subdomain-model.md",
+          "title": "Tenant & subdomain model (whitelabel v1)"
+        },
+        {
+          "path": "/docs/adr/0026-manual-eft-payment-rail.md",
+          "title": "A manual EFT payment rail beside PayFast"
+        },
+        {
+          "path": "/CONTEXT.md",
+          "title": "My Course Glossary"
+        }
+      ]
+    },
+    "/docs/adr/0026-manual-eft-payment-rail.md": {
+      "title": "A manual EFT payment rail beside PayFast",
+      "updated": "2026-07-29T13:02:14+02:00",
+      "backlinks": [
+        {
+          "path": "/docs/adr/0027-per-tenant-donation-rail.md",
+          "title": "A per-tenant donation rail on the shared Ledger"
+        },
+        {
+          "path": "/CONTEXT.md",
+          "title": "My Course Glossary"
+        }
+      ]
+    },
+    "/docs/adr/0027-per-tenant-donation-rail.md": {
+      "title": "A per-tenant donation rail on the shared Ledger",
+      "updated": "2026-08-01T21:21:48.193Z",
+      "backlinks": [
         {
           "path": "/CONTEXT.md",
           "title": "My Course Glossary"
@@ -415,23 +489,31 @@
       "backlinks": []
     },
     "/docs/agents/issue-template.md": {
-      "title": "<feature-slug>/<NN>: <short imperative title>",
-      "updated": "2026-07-24T15:15:14+02:00",
+      "title": "<short imperative title>",
+      "updated": "2026-07-30T16:15:55+02:00",
+      "backlinks": []
+    },
+    "/docs/agents/issue-tracker.md": {
+      "title": "Issue tracker: chartr (local markdown)",
+      "updated": "2026-08-01T22:40:05+02:00",
       "backlinks": [
         {
-          "path": "/docs/agents/issue-tracker.md",
-          "title": "Issue tracker: GitHub Issues"
+          "path": "/docs/agents/triage-labels.md",
+          "title": "Triage Labels"
+        },
+        {
+          "path": "/CONTEXT.md",
+          "title": "My Course Glossary"
+        },
+        {
+          "path": "/CLAUDE.md",
+          "title": "/CLAUDE.md"
         }
       ]
     },
-    "/docs/agents/issue-tracker.md": {
-      "title": "Issue tracker: GitHub Issues",
-      "updated": "2026-07-27T13:51:20+02:00",
-      "backlinks": []
-    },
     "/docs/agents/project-context.md": {
       "title": "Project context",
-      "updated": "2026-07-23T10:48:15+02:00",
+      "updated": "2026-08-01T23:15:25+02:00",
       "backlinks": [
         {
           "path": "/CLAUDE.md",
@@ -451,7 +533,7 @@
     },
     "/docs/agents/triage-labels.md": {
       "title": "Triage Labels",
-      "updated": "2026-07-10T11:26:41+02:00",
+      "updated": "2026-07-30T16:15:55+02:00",
       "backlinks": []
     },
     "/docs/architecture/contexts/01-hub-content.md": {
@@ -540,7 +622,7 @@
     },
     "/docs/architecture/contexts/05-access-sharing.md": {
       "title": "Access & Sharing",
-      "updated": "2026-07-13T17:10:19+02:00",
+      "updated": "2026-07-28T22:57:09+02:00",
       "backlinks": [
         {
           "path": "/docs/architecture/contexts/01-hub-content.md",
@@ -664,7 +746,7 @@
     },
     "/docs/translation-routine-prompt.md": {
       "title": "The translate Routine — canonical Instructions",
-      "updated": "2026-07-28T11:16:40+02:00",
+      "updated": "2026-07-29T08:19:57+02:00",
       "backlinks": [
         {
           "path": "/docs/translation.md",
@@ -674,7 +756,7 @@
     },
     "/docs/translation.md": {
       "title": "Course translation (Editions) — operational runbook",
-      "updated": "2026-07-28T11:13:46+02:00",
+      "updated": "2026-07-29T08:19:57+02:00",
       "backlinks": [
         {
           "path": "/docs/translation-model-trial.md",
@@ -688,7 +770,7 @@
     },
     "/CONTEXT.md": {
       "title": "My Course Glossary",
-      "updated": "2026-07-28T15:34:32+02:00",
+      "updated": "2026-08-01T11:31:12+02:00",
       "backlinks": [
         {
           "path": "/docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md",
@@ -710,7 +792,7 @@
     },
     "/CLAUDE.md": {
       "title": "/CLAUDE.md",
-      "updated": "2026-07-27T13:51:20+02:00",
+      "updated": "2026-08-01T11:46:10+02:00",
       "backlinks": [
         {
           "path": "/docs/agents/project-context.md",
