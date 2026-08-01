@@ -125,3 +125,102 @@ User invokes with a map (URL or number). A ticket is **optional** — without on
 5. Add newly-surfaced tickets (create-then-wire); graduate any fog the answer has made specifiable, clearing each graduated patch from **Not yet specified** so it lives only as its new ticket. If the answer reveals a ticket — this one or another — sits beyond the destination, **rule it out of scope** rather than resolving it on the route. If the decision invalidates other parts of the map, update or delete those tickets.
 
 The user may run unblocked tickets in parallel, so expect other sessions to be editing the tracker concurrently.
+
+## The reader's contract — write only what chartr can read
+
+Everything above describes intent. This section describes **what the reader actually
+parses**, derived from chartr's `internal/mapscan/mapscan.go`, `internal/wayfinder/parse.go`
+and `internal/wayfinder/lint.go`. The reader is the authority: a map is what it says it is,
+and anything it cannot parse either vanishes or is surfaced as a malformation. Write to this
+contract, not to the spirit of the sections above.
+
+### Discovery — where a map may live
+
+- **`.plan/` is the one fixed point.** Anything outside it is invisible to the reader,
+  whatever it is named.
+- **A map is any directory under `.plan/` that *directly* contains a `map.md`.** Discovery is
+  a recursive walk, so depth does not matter: `.plan/<slug>/` and `.plan/maps/<slug>/` are
+  both found, and so is any other nesting.
+- **Finding a `map.md` stops the descent into that directory.** A map therefore cannot
+  contain another map — a stray `map.md` under a map's `tickets/` or `assets/` is invisible.
+- **A directory with no `map.md` is simply not a map**, which is the only reason
+  `.plan/handoffs/` and `.plan/research/` stay off the board. There is no exclusion list.
+- **Corollary — you cannot retire a map by relocating it inside `.plan/`.** Moving a finished
+  effort to `.plan/maps-done/<slug>/` still leaves a discoverable `map.md` under `.plan/`, so
+  it stays on the board. Only moving it out of `.plan/` entirely removes it.
+- The **slug** is the directory's basename. The **name** is the map's first `# ` heading,
+  falling back to the slug.
+
+### Tickets — what counts as one
+
+- Tickets are read from `<map>/tickets/*.md`, **non-recursively**; subdirectories are ignored.
+- **The filename must match `NN-slug.md`** (`^(\d+)-(.+)\.md$`). Anything else is not a
+  ticket: it is reported as a malformation and **dropped from the map entirely** — it will
+  not count toward progress, will not satisfy a `blocked_by`, and will not appear anywhere.
+- Leading zeros are stripped, so `01` and `1` are the same number. Two files claiming one
+  number is an error.
+- A map with **no `tickets/` directory at all is normal** (a freshly charted map) and yields
+  no complaint.
+
+### Ticket frontmatter
+
+- Frontmatter is a `---` delimited block whose **opening `---` must be the very first line of
+  the file**, with a closing `---` below it. If line 1 is anything else — a stray key, a
+  comment, a blank line — the block is not parsed at all and the file silently falls back to
+  a legacy regex mode that only recognises `Type:`, `Status:` and `Blocked by:`. **A
+  `claimed_by` written above the opening `---` does not exist**, and the ticket reads as
+  unclaimed and untyped.
+- Recognised keys: `type`, `claimed_by`, `claimed_at`, `assets`, `blocked_by`,
+  `undermined_by`, and the deprecated `status`. Unknown keys are ignored silently.
+- `type` must be exactly one of `research | prototype | grilling | task`.
+- `blocked_by` / `undermined_by` take a bracketed or bare comma list; empty or `none` means
+  none. **A non-numeric entry fails the parse and drops the whole ticket.**
+- `claimed_at` must be RFC 3339. A claim older than 72h is flagged as a probable dead session.
+- **Never write `status:`** — it is derived. A stored one that disagrees with the body is an
+  error, and one that agrees is still a warning to delete it.
+- An H1 title is required; the skill refers to tickets by name.
+
+### Status is derived, in this precedence
+
+1. `## Answer` **with prose under it** → resolved
+2. `## Ruled out` **with prose under it** → out_of_scope
+3. a non-empty `claimed_by` → claimed
+4. otherwise → open
+
+- **A closing heading with nothing under it resolves nothing** and is an error — it reads as
+  a session that died mid-write, not as a finished ticket.
+- Headings match the **exact trimmed string** `## Answer` / `## Ruled out`. `### Answer`,
+  `## Answer:` and `## answer` do not match and settle nothing. Any other heading — a
+  `## Proposed Answer`, say — is unknown to the reader and leaves the ticket open.
+- Carrying both closing headings is an error: a ticket is a step on the route or a boundary
+  of it, never both.
+- **Fenced code blocks are blanked before structure is detected**, so a ticket may quote this
+  format without resolving itself.
+- Out-of-scope is closed, but **only `resolved` satisfies a `blocked_by` edge** — a ticket
+  blocked by one that was ruled out can never unblock, and is warned about.
+
+### The frontier
+
+Open tickets whose every `blocked_by` names an existing ticket that is **resolved**. A
+`blocked_by` pointing at a missing ticket, at itself, or forming a cycle is an error.
+
+### The map body
+
+- **`## Destination` is required and must be non-empty.**
+- **`## Decisions so far` is a load-bearing index, not prose.** Every resolved ticket must be
+  linked from it as `(tickets/NN-…)` or `(./tickets/NN-…)`; a resolved ticket missing from it
+  errors with *"the map is the index and it now lies"*. A link here to a ticket that is not
+  resolved is equally an error, and listing one twice is a warning.
+- Every out-of-scope ticket must likewise be linked from **`## Out of scope`**.
+- **`## Not yet specified`** holds fog as top-level `- ` bullets. Each needs a **bolded lead
+  title** (`- **Title** — …`) or it has no identity to render. A fog title that matches a live
+  ticket's title case-insensitively is an error — the same question tracked twice. An optional
+  `clears-with: NN` must name a ticket that is not yet resolved.
+- Section bodies run from the heading to the next `## `, so heading order and exact spelling
+  matter.
+
+### What "finished" means
+
+A map is finished when it has at least one ticket and **all** of them are closed. Finished
+maps sort last in the sidebar automatically — that segregation is already done for you, so
+a completed effort left in place is not clutter the reader is failing to handle.
