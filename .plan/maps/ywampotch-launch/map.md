@@ -14,6 +14,11 @@ Driven by two diagnosed funnel leaks: **checkout abandonment** and **sign-up
 friction**. PayFast itself is live and working (5 real purchases); the rail is
 not the problem and must not be touched.
 
+Extended 2026-08-01 with two more essentials: a **Shoprite-Send-simple
+checkout** (Unlock full course → sign in/up → "How do you want to pay?"
+(RSA EFT / Visa incl. international) → straight to that method's details), and
+**regional pricing** — $10 US, €10 EU, R100 everywhere else.
+
 ## Build order
 
 Strictly sequential — see [spec § Execution](spec.md). File overlap is high
@@ -33,6 +38,15 @@ history on a repo that now handles real money.
 | 06 | ADR for the manual EFT rail (+ glossary term) | [06](tickets/06-adr-manual-eft-rail.md) | built — [ADR 0026](../../../docs/adr/0026-manual-eft-payment-rail.md) |
 | 07 | Prod-verify the security fixes | [07](tickets/07-prod-verify-security-fixes.md) | **open — needs a human on prod** |
 | 08 | Fix the four known stale facts | [08](tickets/08-fix-known-stale-docs-and-tracker.md) | open |
+| 09 | Shoprite-Send checkout — method chooser | [09](tickets/09-shoprite-send-checkout-method-chooser.md) | open |
+| 10 | Research — non-ZAR charging + buyer geo | [10](tickets/10-research-non-zar-charging-and-geo.md) | open (research, AFK) |
+| 11 | Regional pricing mechanism ($10/€10/R100) | [11](tickets/11-regional-pricing-mechanism.md) | open — **grilling, needs the operator**, blocked by 10 |
+
+The strict sequencing above applied to units 01–06, which shared files and are
+done. The 2026-08-01 additions are a second strand: 09 stands alone (pure
+presentation reshape of `Paygate.tsx`), 10 is AFK research, 11 grills on 10's
+facts. Regional-pricing *implementation* is deliberately not ticketed yet —
+see Not yet specified.
 
 **Before the rail can take a cent on prod**, a sys admin must open the Payouts tab
 and fill in the EFT collection account, then tick "Offer Pay by EFT to buyers" —
@@ -84,6 +98,13 @@ It also needs an acceptance criterion that post-dates the issue — see
   sole merchant-of-record, a manual sale mints a `fee: 0` Ledger row so Sales and
   Payouts stay whole, provenance is `eftRef` vs `pfPaymentId`, and manual per-sale
   reconciliation is the accepted cost. `CONTEXT.md` gained the glossary term.
+
+## Not yet specified
+
+- **Regional pricing implementation** — schema shape for per-region amounts,
+  where the geo signal is read and passed, price-freeze invariant across both
+  rails, seller/admin UI for the three price points. Can't be ticketed until
+  the mechanism is decided. clears-with: 11
 
 ## Rules for this build
 
