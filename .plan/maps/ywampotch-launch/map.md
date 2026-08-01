@@ -45,16 +45,17 @@ history on a repo that now handles real money.
 | 05 | EFT confirmation email | [05](tickets/05-eft-confirmation-email.md) | built `84d793a` |
 | 06 | ADR for the manual EFT rail (+ glossary term) | [06](tickets/06-adr-manual-eft-rail.md) | built — [ADR 0026](../../../docs/adr/0026-manual-eft-payment-rail.md) |
 | 07 | Prod-verify the security fixes | [07](tickets/07-prod-verify-security-fixes.md) | answered — both checks passed on prod |
-| 08 | Fix the four known stale facts | [08](tickets/08-fix-known-stale-docs-and-tracker.md) | open |
+| 08 | Fix the four known stale facts | [08](tickets/08-fix-known-stale-docs-and-tracker.md) | answered — four of five already fixed |
 | 09 | Shoprite-Send checkout — method chooser + step rail | [09](tickets/09-shoprite-send-checkout-method-chooser.md) | built `27ba5bd` |
 | 10 | Research — non-ZAR charging + buyer geo | [10](tickets/10-research-non-zar-charging-and-geo.md) | answered |
 | 11 | Regional pricing mechanism ($10/€10/R100) | [11](tickets/11-regional-pricing-mechanism.md) | **open — grilling, needs the operator** |
 | 12 | Checkout as a page — route + step model | [12](tickets/12-checkout-page-route-and-step-model.md) | answered |
 | 13 | Move the purchase out of `BuyDialog` onto the page | [13](tickets/13-move-purchase-out-of-buydialog.md) | built `f971945` — **operator's walk pending** |
 | 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | built — **operator's walk pending** |
-| 15 | Launch risk — rollback + prod walk-through | [15](tickets/15-checkout-page-launch-risk-and-prod-walk.md) | blocked by 13, 14 |
+| 15 | Launch risk — rollback + prod walk-through | [15](tickets/15-checkout-page-launch-risk-and-prod-walk.md) | answered — no rollback armed; walk split to 18 |
 | 16 | The EFT dead end — a way out, and somewhere to wait | [16](tickets/16-eft-dead-end-and-awaiting-payment.md) | built `14b3888` — **operator's walk pending** |
 | 17 | The card buyer's payment-complete moment | [17](tickets/17-payment-complete-moment-on-card-return.md) | built `f8b55c3` — **operator's walk pending** |
+| 18 | The operator's prod walk — both paths, both rails | [18](tickets/18-operators-prod-walk.md) | open — collects the four pending walks |
 
 The strict sequencing above applied to units 01–06, which shared files and are
 done. The 2026-08-01 additions are a second strand: 09 stood alone (a
@@ -250,6 +251,46 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   owed — named in prose, not linked, because a second link to 01 in this section
   reads as a second Decisions-so-far entry for it.
 
+- [Launch risk — rollback and the prod walk-through](./tickets/15-checkout-page-launch-risk-and-prod-walk.md) —
+  the ticket's premise was stale: **the checkout page has been on prod since
+  2026-08-01 afternoon** (`f971945`, `14b3888`, `f8b55c3` all rode the push that
+  built `344c933`); only ticket 14's `00c78c5` is unpushed. **Decided: no rollback
+  is armed, forward-fix is the policy** — the operator's call. The hatch is written
+  down anyway: **Vercel instant rollback**, whose *only* candidate is
+  `dpl_A2qJk7…` = `ae3f1d3` (pre-strand, dialog-era), safe against Convex because
+  the strand's entire backend surface is one additive read-only query — but it
+  retreats to *known-degraded*, reinstating the EFT dead end and dropping the
+  payment moment. A `git revert` (4 commits, `convex/` dirty from a concurrent
+  session) is morning cleanup, not a 9pm undo; a `BuyDialog` flag is strictly
+  dominated by the rollback. **The PayFast return needs no change** — it's minted
+  server-side to `/courses/<slug>` and never mentioned checkout; the params survive
+  the deeper resume-lesson redirect and 17's panel fires after it. **Corrects
+  ticket 12**: `cancel_url` lands on the *course page* with the Preview readable,
+  not the "bare course index" — a smaller wart than recorded, needing no fix.
+  14's `SignIn` diff is class strings only, so the other-tenant leak cannot be
+  functional. The prod walk itself is the operator's and is split out as ticket
+  18, The operator's prod walk — named in prose, not linked, because a
+  `tickets/NN` link in a Decisions-so-far bullet reads to the parser as an entry
+  for that ticket, and 18 is open. It is linked from the Build order table above.
+
+- [Fix the four known stale facts](./tickets/08-fix-known-stale-docs-and-tracker.md) —
+  **four of the five were already fixed, and the ticket had itself gone stale.** The
+  `project-context.md` PayFast block was corrected by `8c7d29c` on 2026-07-29, the day
+  *before* this ticket was transcribed from the spec; #52 and #53 were closed on GitHub
+  on 2026-07-30. No operator confirmation was needed — the live facts were already
+  written down. The two that were real had **moved house**: the 2026-07-30 GitHub
+  retirement migrated #113 and #46 into `.plan/` and deleted them, so "close #113" was
+  never possible. #113 is now
+  [the onboarding map's welcome-panel ticket](../onboarding/tickets/02-first-open-welcome-panel.md),
+  which had sat open on a panel shipped 2026-07-28 — **resolved there on the evidence**.
+  #46 is that map's *Improve Onboarding Flow*, **scoped rather than closed** (its
+  Destination hangs off it) into a concrete cold-sign-up walk — named in prose, not
+  linked, because it is open. No ADR edited. Two hazards carried forward: any surviving
+  `#NN` in `.plan/` points at a deleted issue and must be chased through the
+  `<!-- Migrated … -->` footer instead, and this ticket's own handoff target
+  `.scratch/docs-reconciliation/HANDOFF.md` is **not git-tracked**, so the systematic
+  sweep it defers to is invisible to a fresh clone.
+
 ## Not yet specified
 
 - **Regional pricing implementation** — schema shape for per-region amounts,
@@ -280,9 +321,10 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   phantom-field bug, and it matters most on the EFT path, where a fictional
   fixture means a money bug the tests approve of.
 - **Never touch the PayFast code path.** It holds real money.
-- **Tickets 12–15 judge by the operator's eye, not a checklist.** They walk the
-  flow in dev and say what to change; iterate until they're happy. No reference
-  design to match, no acceptance rubric — taste is the bar and it is theirs.
+- **Tickets 12–18 judge by the operator's eye, not a checklist.** They walk the
+  flow and say what to change; iterate until they're happy. No reference design
+  to match, no acceptance rubric — taste is the bar and it is theirs. Ticket 18
+  is that walk, on prod, collecting the four that stand pending.
 - **12–15 are bespoke and disposable.** Style the checkout surfaces well; do not
   extract shared tokens, scales or breakpoint systems. See Out of scope.
 - **`SignIn` is in scope in full and it leaks.** It renders in `AppGate`,
@@ -290,6 +332,15 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   visitor on every tenant, not just YWAM Potch buyers. Check all three.
 - `git commit --only <paths>` after `git diff` of those paths. Never `git add -A`,
   never `--amend`. Push only when asked — pushing `main` deploys prod.
+- **No rollback is armed; forward-fix.** Standing decision from ticket 15, the
+  operator's. The checkout page is *already on prod* — a session that finds a
+  fault fixes it forward rather than reaching for an undo. The one hatch that
+  exists (Vercel instant rollback to `ae3f1d3`) is documented in 15's Answer and
+  retreats to known-degraded, so it is an emergency, not a workflow.
+- **Ticket 14's `00c78c5` is unpushed and pushing it deploys prod.** The operator
+  chose to walk prod as-is first and push after (ticket 18). Before any push,
+  note the Vercel rollback target and re-check it survived the build — 15 found
+  exactly one candidate, and it is the whole hatch.
 
 ## Done when
 
