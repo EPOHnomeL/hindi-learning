@@ -108,6 +108,53 @@ never edit it; ask for the exact value or have the user run the command.
 - The rendered `st-ZA` Edition was opened in a browser and spot-checked — not
   merely written and declared done.
 
+## Progress, 2026-08-02 — the three open questions are closed, nothing written yet
+
+Prep session. **No prod read and no prod write has happened**; everything below is from
+reading the tree. The two artifacts are
+[assets/06-orthography-rules.md](../assets/06-orthography-rules.md) (rules, decisions,
+evidence) and [assets/06-st-za-rewrite.ts](../assets/06-st-za-rewrite.ts) (the script:
+`--clone`, dry run, `--publish`).
+
+**Answers to the three open questions below:**
+
+1. **`publishTranslation` is the right seam** — it does *not* skip on an unchanged English
+   source ([convex/translate.ts:612-624](../../../convex/translate.ts#L612-L624)). Better,
+   it **dissolves the shared-blob trap**: its row literal has no `htmlStorageId` and it
+   lands via `ctx.db.replace`, so publishing over a cloned blob-backed row drops the
+   inherited storage id and stores the body inline. No purpose-built mutation needed.
+2. **Script, not an LLM pass** — the alphabet is shared, so most words don't change and the
+   change set is enumerable. That is what makes ticket 06's "review before write" tractable:
+   the review artifact is a **word ledger**, not a 56-document diff. Local and free, as asked.
+3. **Nothing else keys off `st`** — still to confirm against prod data.
+
+**Two things this session found that the ticket above gets wrong or misses:**
+
+- The `li-` → `di-` row in the table undersells the rule. It is `l` → `d` before `i`/`u`
+  generally (`lumela` → `dumela`, `Molimo` → `Modimo`), and it must not fire inside `hl`/`tl`/
+  `kl`. And the table is **missing `oe` → `we`** (`Loetse` → `Lwetse`) — caught by hand-checking
+  `khoeli`, which came back `kgoedi` instead of `kgwedi`.
+- **A cloned row that is never published keeps the shared `htmlStorageId`.** So the
+  "no `st-ZA` row shares an `htmlStorageId` with an `st` row" criterion fails on precisely
+  the rows the transform left unchanged. Every body-bearing row must be published, changed
+  or not.
+
+**Access is solved — do not use the Convex CLI.** The dev `CONVEX_DEPLOY_KEY` in `.env.local`
+beats `--prod`, which is what made the earlier session's reads land on
+`dev:judicious-marmot-580`. Every prod script in this repo already sidesteps it:
+`ConvexHttpClient(convexUrl(true))` reads `CONVEX_PROD_URL` and never touches the CLI
+([scripts/_env.ts:26](../../../scripts/_env.ts#L26)). The script does the same, and picks up
+`PUBLISH_SECRET` through the same loader, so nobody has to handle the secret.
+
+### Next session picks up here
+
+1. Copy the script to `scripts/st-za-rewrite.ts` (the `../` imports assume repo root).
+2. Find the YWAM Potch **topic slug** — unknown; `topicArg()` defaults to `hindi`.
+3. Confirm on prod that `st` is `ready` and `st-ZA` has no job yet, then `--clone`.
+4. Dry run → read `ledger.tsv` **and** `untouched.tsv` → fill `OVERRIDES` → repeat.
+5. `--publish`, treating any `SKIPPED` as a failure, then open it in a browser.
+6. Verify `st` is untouched, and that no `st-ZA` row still shares a blob.
+
 ## Open questions for the resolving session
 
 - **Is `publishTranslation` the right write seam?** It is `PUBLISH_SECRET`-
