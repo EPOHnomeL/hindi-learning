@@ -60,3 +60,5 @@ yarn-error.log*
 # agent handoff docs — transient session-to-session execution notes, not durable
 # repo context (that lives in CLAUDE.md / docs/). Matches at any depth.
 HANDOFF*.md
+# Review output of scripts/st-za-rewrite.ts — regenerable, 114 HTML files.
+/st-za-review/
