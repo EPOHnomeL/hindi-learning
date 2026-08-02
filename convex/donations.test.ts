@@ -95,7 +95,19 @@ test("checkoutFields signs a Guest donation with the tenant + donation custom fi
   // tenant slug cannot be swapped in flight to redirect the money.
   expect(verifySignature(fields, PASSPHRASE)).toBe(true);
   expect(res.action).toBe("https://sandbox.payfast.co.za/eng/process");
-  expect(fields.return_url).toMatch(/^https:\/\/ywampotch\.app\.example\.com\//);
+
+  // Both round-trip URLs land on the DEDICATED /donate page, on the tenant's own
+  // host (ADR 0025 makes sessions host-only, so the return must not cross hosts).
+  //
+  // **They used to carry `#donations` and point at `/`, and that was a live bug**
+  // (spec-donate-route.md, 2026-08-02): the donor came back to a landing page
+  // where <DonateSection/> mounts only after its queries resolve, so the browser
+  // found no anchor and never scrolled — and the thank-you lives INSIDE that
+  // section. A donor who had just paid saw the hero and assumed nothing happened.
+  // Signed in it was worse: `/` is the Dashboard, which has no section at all.
+  // A dedicated page has nothing to scroll to, which is exactly why it works.
+  expect(fields.return_url).toBe("https://ywampotch.app.example.com/donate?donation=thanks");
+  expect(fields.cancel_url).toBe("https://ywampotch.app.example.com/donate");
 
   // The whole point of it being a QUERY: nothing was persisted before the money
   // is real, so an anonymous caller has no junk-row abuse surface.

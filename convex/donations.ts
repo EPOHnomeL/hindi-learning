@@ -126,16 +126,21 @@ export const checkoutFields = query({
     }
 
     const zarCents = zarCentsFromUsdCents(usdCents);
-    // Back to the tenant's own landing section — under ADR 0025 sessions are
-    // host-only per subdomain, so the return must ride the tenant's own host.
-    const back = "/#donations";
+    // Back to the tenant's own DEDICATED donate page — under ADR 0025 sessions
+    // are host-only per subdomain, so the return must ride the tenant's own host.
+    const back = "/donate";
     const fields = buildCheckoutFields({
       merchantId,
       merchantKey,
-      // The anchor matters as much as the marker: the section lives partway down
-      // a long landing page, so a return to `/` alone lands the donor at the
-      // hero with the thank-you off screen, reading as though nothing happened.
-      returnUrl: appUrl("/?donation=thanks#donations", tenantSlug),
+      // **This used to be `/?donation=thanks#donations`, and the anchor was the
+      // bug** (spec-donate-route.md, 2026-08-02). The reasoning was sound — the
+      // section sits partway down a long landing page, so a bare `/` leaves the
+      // thank-you off screen — but the fix didn't work: <DonateSection/> renders
+      // null until its queries resolve, so the anchor had no target when the
+      // browser looked for it, and signed in `/` is the Dashboard, which has no
+      // section at all. Either way a donor who had just paid saw no
+      // acknowledgement. A dedicated page needs no anchor, which is the point.
+      returnUrl: appUrl("/donate?donation=thanks", tenantSlug),
       cancelUrl: appUrl(back, tenantSlug),
       notifyUrl: `${process.env.CONVEX_SITE_URL}/payfast/notify`,
       amountCents: zarCents,
