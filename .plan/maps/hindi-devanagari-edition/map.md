@@ -50,15 +50,23 @@ Verified in the tree while charting, so no ticket need re-derive it:
 
 <!-- one line per resolved ticket -->
 
+- [Which model, through which existing client, and what does one Edition cost?](tickets/01-conversion-model-client-and-cost.md)
+  — `gemini-3.1-flash-lite` via the native `geminiComplete` client, called from a standalone
+  `pnpm tsx` script (~$1/Edition; `gemini-3.5-flash` behind it at ~$6). Not a Convex action:
+  `collectForTranslation` is English-source-driven and skips the cloned rows as fresh, so the
+  in-Convex path *cannot* read `hi-Latn` at all. The saving is the tier drop, nothing else.
+
 ## Not yet specified
 
 - **Inherited defects of the source Edition** — the conversion pass can only be as good as
-  `hi-Latn`, and `hi-Latn` has known holes: in the eval sample the John 16:13 scripture
-  block was left in **English**, untranslated
-  ([hi-Latn.packet.md](../../../topics/prophetic-school/eval/judge/hi-Latn.packet.md)).
-  A converter told to change script would faithfully carry that English into the
-  Devanagari Edition. Whether the pass repairs such holes, flags them, or ships them is a
-  real call, but how many there are isn't known yet. clears-with: 02
+  `hi-Latn`, and the shipped `hi-Latn` has known holes: a coined `"naye vachisth (new
+  covenant)"`, a garbled Luke 11:13, English glosses left in prose (`"tauba (repent)"`), and
+  untranslated UI labels (`Check`, `Sources`, `Glossary`)
+  ([hi-Latn.verdict.json](../../../topics/prophetic-school/eval/judge/hi-Latn.verdict.json),
+  candidate C = the shipped Gemini edition per `eval/judge-map.json`). A converter told to
+  change script would faithfully carry all of it into the Devanagari Edition. Whether the
+  pass repairs such holes, flags them, or ships them is a real call, but how many there are
+  across 56 lessons isn't known yet. clears-with: 02
 
 ## Out of scope
 
