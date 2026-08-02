@@ -171,3 +171,12 @@ Luke 11:13, English glosses left in prose (`"tauba (repent)"`, `"ek prerana (pro
 and untranslated UI labels (`Check`, `Sources`, `Glossary`, and the reference-section titles).
 The patch has been rewritten on the map to say this. The *question* it raises — repair, flag,
 or ship — is unchanged and still clears with 02.
+
+<!-- Correction, 2026-08-02, from ticket 02 (which pulled the real prod row rather than the
+     eval packet): `"naye vachisth (new covenant)"` is NOT in the shipped Edition. The stored
+     `hi-Latn` row for lesson 0001 reads `nayi vacha (new covenant)` — ordinary, correct Hindi.
+     `naye vachisth` exists only in `topics/prophetic-school/eval/gemini/hi-Latn.html`; prod
+     diverged from the trial artifact after the trial. The untranslated UI labels are real and
+     confirmed. General lesson for anyone reading this ticket: the eval packet is not the
+     Edition — grade against `readEditionBodies`. -->
+

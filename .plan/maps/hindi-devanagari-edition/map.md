@@ -55,18 +55,21 @@ Verified in the tree while charting, so no ticket need re-derive it:
   `pnpm tsx` script (~$1/Edition; `gemini-3.5-flash` behind it at ~$6). Not a Convex action:
   `collectForTranslation` is English-source-driven and skips the cloned rows as fresh, so the
   in-Convex path *cannot* read `hi-Latn` at all. The saving is the tier drop, nothing else.
+- [Does a naturalizing conversion prompt actually hold up on a real lesson?](tickets/02-does-naturalizing-conversion-hold.md)
+  — **It holds**, proven by four live runs over the real stored prod row. Feed **one whole
+  `swapOutStatic`-stripped lesson per call**: 402/402 tags and 434/434 text nodes intact 4/4,
+  quiz guard passes, orthography and register both good. Measured **$0.61** for the Edition,
+  ~15 s/lesson. Two carry-forwards: the model **snaps scripture to the canonical Hindi Bible**
+  even when told not to change meaning, and it **ships the source's untranslated English**
+  rather than repairing it — a prompt rule ordering repair does not work.
 
 ## Not yet specified
 
-- **Inherited defects of the source Edition** — the conversion pass can only be as good as
-  `hi-Latn`, and the shipped `hi-Latn` has known holes: a coined `"naye vachisth (new
-  covenant)"`, a garbled Luke 11:13, English glosses left in prose (`"tauba (repent)"`), and
-  untranslated UI labels (`Check`, `Sources`, `Glossary`)
-  ([hi-Latn.verdict.json](../../../topics/prophetic-school/eval/judge/hi-Latn.verdict.json),
-  candidate C = the shipped Gemini edition per `eval/judge-map.json`). A converter told to
-  change script would faithfully carry all of it into the Devanagari Edition. Whether the
-  pass repairs such holes, flags them, or ships them is a real call, but how many there are
-  across 56 lessons isn't known yet. clears-with: 02
+<!-- The "Inherited defects" patch graduated on 2026-08-02 when 02 resolved; it lives on as
+     ticket 06. Nothing else is in the fog — the route to the spec is fully ticketed. -->
+
+- ~~**Inherited defects of the source Edition**~~ — graduated into
+  [The English the source never translated: repair it, flag it, or ship it?](tickets/06-inherited-english-repair-flag-or-ship.md).
 
 ## Out of scope
 
