@@ -4,9 +4,9 @@
 //
 // Three modes, meant to be run in this order, each a separate human decision:
 //
-//   pnpm tsx <this> --topic <slug> --clone            # st → st-ZA via cloneEdition (prod)
-//   pnpm tsx <this> --topic <slug>                    # DRY RUN: read st-ZA, transform, write review/
-//   pnpm tsx <this> --topic <slug> --publish          # publish review/**/*.html back to st-ZA
+//   pnpm tsx <this> --topic prophetic-school --clone            # st → st-ZA via cloneEdition (prod)
+//   pnpm tsx <this> --topic prophetic-school                    # DRY RUN: read st-ZA, transform, write review/
+//   pnpm tsx <this> --topic prophetic-school --publish          # publish review/**/*.html back to st-ZA
 //
 // The dry run writes `st-za-review/` and touches nothing remote. `--publish` re-reads those
 // same files off disk, so the bytes a human approved are the bytes that ship. Between the

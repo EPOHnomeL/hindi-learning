@@ -149,7 +149,8 @@ beats `--prod`, which is what made the earlier session's reads land on
 ### Next session picks up here
 
 1. Copy the script to `scripts/st-za-rewrite.ts` (the `../` imports assume repo root).
-2. Find the YWAM Potch **topic slug** — unknown; `topicArg()` defaults to `hindi`.
+2. The YWAM Potch **topic slug is `prophetic-school`** (from the user, 2026-08-02). Pass it —
+   `topicArg()` defaults to `hindi`, so every mode needs `--topic prophetic-school`.
 3. Confirm on prod that `st` is `ready` and `st-ZA` has no job yet, then `--clone`.
 4. Dry run → read `ledger.tsv` **and** `untouched.tsv` → fill `OVERRIDES` → repeat.
 5. `--publish`, treating any `SKIPPED` as a failure, then open it in a browser.
