@@ -39,18 +39,40 @@ for the spec.
 
 ## Answer
 
-**It holds.** Resolved 2026-08-02 by *running it* — four live `gemini-3.1-flash-lite` calls
-over the real stored prod row for lesson `0001-learning-to-listen`, pulled through
-`readEditionBodies`, not the eval packet. This is evidence, not inference; every number below
-was measured.
+**It holds — and the converter is this Claude Code harness, not an API model.** Resolved
+2026-08-02 by running the conversion twice over the same input: once on
+`gemini-3.1-flash-lite` (four calls), then again by the Claude Code session itself after the
+user ruled Gemini out on cost. Both were graded by the same checks against the real stored
+prod row for lesson `0001-learning-to-listen`, pulled through `readEditionBodies` — not the
+eval packet. Every number below was measured.
+
+**The Claude Code conversion is the recommendation.** It beat the API run on every axis and
+costs nothing per Edition, which is what the user asked for.
 
 Assets:
 
-- [02-conversion-prompt.md](../assets/02-conversion-prompt.md) — the prompt verbatim, plus the
-  call shape and the one rule in it that does **not** work.
+- [02-conversion-prompt.md](../assets/02-conversion-prompt.md) — the instructions verbatim, plus the two amendments the run established.
 - [02-lesson-0001.hi-Latn.source.html](../assets/02-lesson-0001.hi-Latn.source.html) — the input, the real row.
-- [02-lesson-0001.hi.converted.html](../assets/02-lesson-0001.hi.converted.html) — the graded output.
-- [02-convert-harness.ts](../assets/02-convert-harness.ts) — the measuring harness; the build should reuse its checks.
+- [02-lesson-0001.hi.converted-by-claude-code.html](../assets/02-lesson-0001.hi.converted-by-claude-code.html) — **the graded output, and the one to build from.**
+- [02-lesson-0001.hi.converted-by-gemini.html](../assets/02-lesson-0001.hi.converted-by-gemini.html) — the recorded comparison.
+- [02-split-harness.ts](../assets/02-split-harness.ts) + [02-check-harness.ts](../assets/02-check-harness.ts) — strip-and-grade, no API; **the build reuses these per item.**
+- [02-gemini-convert-harness.ts](../assets/02-gemini-convert-harness.ts) — the API harness, kept as the record of the comparison run.
+
+### Head to head, same input, same checks
+
+| | Claude Code (pick) | `gemini-3.1-flash-lite` |
+| --- | --- | --- |
+| tag sequence (402) | 402 = 402 | 402 = 402, 4/4 runs |
+| text nodes (436) / non-empty (172) | 436 / 172 | 436 / 172, 4/4 runs |
+| `class` 84 · `data-k` 9 · `href` 4 · `data-correct` 3 · `<mark>` 4 | all exact | all exact |
+| `&nbsp;` (32) | 32 | 32 in 3 runs, **22 in one** |
+| `§` 4 · `•` 1 · placeholders 2 | all exact | all exact |
+| `quizStructureMatches` / `swapBackStatic` | pass / ok | pass / ok, 4/4 |
+| rule 3 — repair the source's English | **all of it repaired** | obeyed once, on `<title>`, 4/4 |
+| API cost per Edition | **$0** | ~$0.61 measured |
+
+The one structural instability found anywhere — a run that dropped 10 of 32 `&nbsp;` — was
+Gemini's. The Claude Code conversion had none.
 
 ### 1. Orthography — good, and better than the source deserved
 
@@ -62,80 +84,80 @@ misspellings in the romanization rather than transliterating them faithfully: `s
 संक्षेप, `nichae` → नीचे, `thae` → थे, `dhyan lgaein` → ध्यान लगाएँ, `1 yuhanaa` → 1 यूहन्ना, and
 `Luka (luke) 11:13` → लूका (Luke) 11:13. Nothing in the file reads as misspelt Devanagari.
 
-### 2. Register — naturalized as asked, with one real caveat
+### 2. Register — naturalized as asked. Scripture snapping is *intended*, not drift.
 
-The register call the map made is what happened. `Lesson 1 · …` → पाठ 1 · …, `tareeqa` →
-तरीका, `pathyakram` → पाठ्यक्रम, `parakh` → परख. It neither transliterated letter-for-letter
-nor drifted into re-translation: read the paragraphs side by side and the sentences say what
-they said. (`Sabak` does not occur in this lesson, so that exact example is untested; the
-equivalent — English `Lesson` → पाठ — is.)
+The register call the map made is what happened, in both runs. `Lesson 1 · …` → पाठ 1 · …,
+`tareeqa` → तरीका, `pathyakram` → पाठ्यक्रम, `parakh` → परख. Neither run transliterated
+letter-for-letter, and neither drifted into re-translation — read the paragraphs side by side
+and the sentences say what they said. (`Sabak` does not occur in this lesson, so the map's
+exact example is untested; the equivalent — English `Lesson` → पाठ — is.)
 
-The caveat is **scripture-snapping**. The source's John 16:13 reads `jo kuch sunega wahi
-karega` — "whatever he hears, that he will *do*", a slip. The output reads `जो कुछ सुनेगा वही
-कहेगा` — "…that he will *speak*", the canonical Hindi Bible wording. That is a meaning change
-the prompt forbade, and it happened anyway because the model recognised the verse. Here it
-improved the text. It is still the failure mode to watch: on scripture the model will reach
-for what it remembers over what it was given. The quality gate (04) should read the verse
-blocks specifically.
+**Correction to my own first reading.** I flagged scripture-snapping as a risk after the
+Gemini run: the source's John 16:13 reads `wahi karega` ("that he will *do*"), a slip, and the
+output read वही कहेगा ("that he will *speak*"), the published Hindi wording. On checking the
+repo before repeating it, that is the **stated intent** of this project's translate path, not
+a failure — [convex/translate.ts:773](../../../../convex/translate.ts#L773) instructs the run
+to "substitute the exact wording of a widely-used published Hindi Bible (Bible Society of
+India / HHBD Devanagari text) VERBATIM … so the learner meets Scripture in its familiar
+published form". The Claude Code conversion therefore snaps deliberately, on all four verses
+(John 16:13, Luke 11:13, John 3:16, 1 John 4:1–2), and the instruction set has been amended to
+say so instead of forbidding it. 04's gate should check the verses **match** the published
+text, not that they match the romanized source.
 
-One infelicity: the label `Zariya :` (source) → `ज़रिए :` — an oblique form where ज़रिया was
-wanted. Cosmetic, one occurrence.
+One infelicity in the Gemini run, absent from the Claude Code one: `Zariya :` → `ज़रिए :`, an
+oblique form where ज़रिया was wanted.
 
 ### 3. Markup — the whole document survives. Chunk = one whole lesson.
 
-This is the strongest result and it settles the feeding strategy: **feed one entire
-`swapOutStatic`-stripped lesson per call, no sectioning.** 4 runs out of 4:
+This settles the feeding strategy: **one entire `swapOutStatic`-stripped lesson per
+conversion, no sectioning.** The Claude Code conversion is exact on every counted property —
+402/402 tags in order, 436/436 text nodes, 172/172 non-empty, `class` 84, `data-k` 9, `href`
+4, `data-correct` 3, `data-answer` 1, `data-alt` 1, `<mark>` 4, `&nbsp;` 32, `§` 4, `•` 1,
+both `<!--⟦N⟧-->` placeholders once each; `quizStructureMatches` true and `swapBackStatic`
+non-null (31,033 chars restored). See the head-to-head table above for Gemini's numbers.
 
-| check | result |
-| --- | --- |
-| tag sequence (402 openers/closers, in order) | 402 = 402, identical, every run |
-| text nodes / non-empty text nodes | 434 = 434 / 172 = 172, every run |
-| `id` / `class` / `href` / `data-correct` / `data-answer` / `data-k` counts | no drift, every run |
-| `<!--⟦N⟧-->` static placeholders | both reproduced exactly once, every run |
-| `quizStructureMatches(stripped, out)` | true, every run |
-| `swapBackStatic(out, blocks)` | non-null, every run |
-| `§` and `•` markers | preserved, every run |
+Attribute *values* are converted where they hold prose — the quiz `data-ok` / `data-no`
+feedback strings come back in Devanagari while `data-correct="a"` stays `a`. That is correct,
+and it means "attributes must be byte-identical" is the wrong guard; use the counts.
 
-The only instability found in 4 runs: one run dropped 10 of 32 `&nbsp;` entities (the other
-three kept all 32). Cosmetic spacing, not structural — but it is the reason the build should
-still run the guards per item rather than trusting the model, and 01 already requires that.
+**Except `data-answer` / `data-alt`, which must stay Latin.** Quiz 4 is a fill-in;
+[lessons/_partials/foot.html:36](../../../../lessons/_partials/foot.html#L36) compares the
+learner's typed string to those two attributes, and translate.ts:773 deliberately keeps such
+answers in the source language. So `peace`/`Peace` and the `p‑e‑a‑c‑e` hint are preserved
+verbatim while the sentence around them converts. Whether a Devanagari reader should be typing
+a Latin word at all is a real question — it goes to 06, not to the conversion.
 
-Attribute *values* are translated where they hold prose — the quiz `data-ok` / `data-no`
-feedback strings come back in Devanagari while `data-correct="a"` stays `a`. That is correct
-behaviour, and it means the naive "attributes must be byte-identical" check is the wrong
-guard; use the counts above.
+Throughput, which is now the binding cost instead of dollars: one lesson is ~20.5 K chars in
+and ~19 K out. There are 59 items. That is a few hours of agent sessions rather than the
+~2 minutes an 8-way API fan-out would take. The trade is deliberate and it is the honest risk
+in this approach — 03 has to say how the run is split and resumed.
 
-Measured, so the build can plan: **7,210 in / 5,943 out tokens, `thoughts=0`, ~15 s** for one
-lesson. Scaled to 57 lesson-equivalents that is ~411 K in / ~339 K out → **$0.61 for the
-whole Edition** at 0.25→1.50, tightening 01's ~$1. ~14 min serial, ~2 min at 8-way.
+### 4. Leaks — repaired here, shipped by Gemini
 
-### 4. Leaks — the source's English survives, and the prompt cannot talk it out
+No invented content and no Latin-script Hindi left unconverted in either run. The difference
+is what happened to the English the *source Edition* never translated:
+`<button>Check</button>`, the `Sources — Scripture: …` footer, the `Glossary` link text, the
+`Lesson 2 ke liye tayyar` heading and the two `Source: Vorster, …` citations. These are
+genuine source defects — authored English at
+`topics/prophetic-school/lessons/0001-learning-to-listen.html` lines 307, 343, 347 that the
+original English→hi-Latn run failed to translate, so they are English in the shipped hi-Latn
+Edition today.
 
-No invented content, no Latin-script Hindi left unconverted. Every Latin word remaining in
-the body is one of: a deliberate parenthetical gloss the prompt was told to keep
-(`(new covenant)`, `(skill)`, `(recap)`, `(repent)`, `(prompting)`, `(circumstances)`), a
-scripture book name (`John`, `Luke`), or — the finding — **English the source Edition never
-translated**.
+- **Claude Code repaired all of them** — जाँचें, स्रोत — पवित्रशास्त्र:, शब्दावली, पाठ 2, स्रोत:,
+  अध्याय, पृ. — while correctly leaving author names and cited-work titles (`Wikus Vorster`,
+  *Holy Spirit Course*, `"Ways God can speak"`, `YWAM Potchefstroom`) in Latin, which
+  translate.ts:773 explicitly requires.
+- **Gemini repaired one**, the `<title>`, and shipped the rest in 4 runs out of 4.
 
-Rule 3 of the prompt explicitly ordered those repaired. It obeyed exactly once, on the
-`<title>`. It left all of these English in all four runs:
+Everything Latin still standing in the Claude Code output is deliberate: parenthetical glosses
+the source itself carries (`(new covenant)`, `(skill)`, `(recap)`, `(repent)`,
+`(circumstances)`), scripture book names (`John`, `Luke`), proper nouns and work titles, and
+the fill-in answer key.
 
-- `<button>Check</button>` (the quiz submit label)
-- `Sources — Scripture: John 16:13; Luke 11:13; 1 John 4:1–2 …` (the whole footer line)
-- `<a …>Glossary</a>` link text
-- `<h3>Lesson 2 ke liye tayyar</h3>` → `<h3>Lesson 2 के लिए तैयार</h3>` — half-converted
-- the two `Source: Vorster, Holy Spirit Course …` citations, incl. `"Ways God can speak"`
-
-**These are genuine source defects, not chrome.** All three of `Check`, `Sources — Scripture`
-and `Glossary` are authored English text in
-`topics/prophetic-school/lessons/0001-learning-to-listen.html` (lines 307, 343, 347) that the
-original English→hi-Latn translate run failed to translate — so they are equally English in
-the shipped hi-Latn Edition today, and the conversion pass faithfully carried them across.
-
-So the fog patch's question answers itself for the *conversion* pass: **it ships them.**
-Asking it to repair them in the same breath as converting does not work, and the spec should
-either drop rule 3 or make repair a separate, targeted pass over a known list of strings.
-That is a real call and it is now sharp enough to be its own ticket — see 06.
+This mostly answers 06's question before 06 is worked — repair *is* achievable, in the same
+pass, at no extra cost — but 06 still has to settle whether repairing is in scope at all (it
+makes the Devanagari Edition better than its source), and whether the same defect should be
+handed upstream to the English→X path. 06 has been narrowed accordingly rather than closed.
 
 ### A stale claim in 01, corrected
 
@@ -149,7 +171,31 @@ after the trial. Corrected on the map and noted on 01 on 2026-08-02. The lesson 
 
 ### Verdict
 
-The approach holds on `gemini-3.1-flash-lite` at whole-lesson granularity. No better model is
-needed for the proof. Two things the spec must carry forward that this run exposed: the
-scripture-snapping risk (watch it, don't try to prompt it away), and the fact that inherited
-English is shipped, not repaired.
+The approach holds, at whole-lesson granularity, with **the Claude Code session as the
+converter** — no API model, no per-Edition cost, and a cleaner result than the API run on
+every axis measured. `gemini-3.1-flash-lite` also holds and is recorded as the fallback if
+throughput ever beats cost; it is not the pick, because the user ruled paid API calls out on
+2026-08-02 and the free path also happens to be better here.
+
+Three things the spec must carry forward:
+
+1. **Scripture is snapped to the published HHBD wording deliberately** (translate.ts:773), so
+   04's gate checks verses against the published text, not against the romanized source.
+2. **`data-answer` / `data-alt` stay Latin** or quiz 4 stops working; every other attribute
+   holding prose converts.
+3. **Throughput replaced dollars as the cost.** 59 items × ~20 K chars is agent-session work,
+   not a two-minute fan-out. 03 must say how the run is split, checkpointed and resumed.
+
+<!-- Superseded reading: this ticket first resolved on 2026-08-02 recommending
+     gemini-3.1-flash-lite at ~$0.61/Edition. The user ruled out paid API calls the same day;
+     the conversion was re-run by the Claude Code harness and re-graded by the same checks,
+     and the Answer above rewritten around that result. The Gemini numbers are kept because
+     they are the only measured comparison anyone has, not because they are the plan. -->
+
+<!-- Evidence, stated plainly (CLAUDE.md: say which you had). Both conversions were RUN, and
+     graded mechanically by the harnesses linked above. The orthography and register verdicts
+     are a careful side-by-side reading of source vs output, not a native speaker's review and
+     not a browser walk-through — nothing here has been rendered in the reader. That is 04's
+     job, and the fact that nobody on this project necessarily reads Devanagari is a live
+     constraint 04 already names. -->
+

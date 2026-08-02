@@ -36,6 +36,40 @@ directly or reuses a Convex action, and why.
 
 ## Answer
 
+> **SUPERSEDED, 2026-08-02 — same day, later. There is no model and no API cost.**
+>
+> The user ruled out paid API calls outright: *"That costs money. Rather use claude locally on
+> my laptop here in claude code — I want you as my claude code harness to translate it from
+> latin → devanagari."* So the converter is **the Claude Code session itself**, and this
+> ticket's whole question — which model, through which client, at what cost — is moot.
+> Answered instead: **no model, no client, $0 per Edition.**
+>
+> That was not taken on faith. 02 re-ran the conversion by hand through this harness and
+> re-graded it with the same checks: it was **exact on every counted structural property**
+> where Gemini had one instability, and it **repaired the source's untranslated English**
+> where Gemini shipped it. The free path is also the better path here. See
+> [02's Answer](02-does-naturalizing-conversion-hold.md#answer).
+>
+> What survives from this ticket and is still load-bearing:
+>
+> - **The corpus numbers** — 59 items, 1.68 MB English source, ~1.03 M chars of romanized
+>   HTML in / ~0.83 M chars of Devanagari out. Unchanged, and now they size *sessions*
+>   instead of dollars: at ~20 K chars per lesson this is hours of agent work, which is the
+>   new binding cost and 03's problem.
+> - **The write path** — `readEditionBodies` → disk → `publishTranslation`, both
+>   `PUBLISH_SECRET`-guarded, plus the finding that the in-Convex `translateTopic` path
+>   **structurally cannot** read `hi-Latn`. All still true and still the plan; only the middle
+>   step changed from "call Gemini" to "convert in-session".
+> - **The guards** — `swapOutStatic` / `swapBackStatic` / `quizStructureMatches` must run per
+>   item regardless of who converts.
+>
+> What is dead: the model table, the pricing, the `geminiComplete` call shape, the
+> `GOOGLE_AI_API_KEY`-in-`.env.local` prerequisite, and the batch-API note. `gemini-3.5-flash`
+> remains prod's *translate* default and is untouched by any of this — the ban is scoped to
+> this conversion effort.
+>
+> The original answer is left intact below as the record of what was decided and why.
+
 **Decided, NOT built.** Resolved 2026-08-02 by reading the tree and checking Google's live
 pricing page; no call was made and no script was run.
 

@@ -31,6 +31,20 @@ Four things were settled with the user while charting, before any ticket existed
 - **prophetic-school only**, as a proof. Other topics and other `-Latn` pairs are out of scope.
 - **A one-shot script against prod**, not a Convex action and not a UI affordance.
 
+Settled with the user on **2026-08-02, after 01 and 02 had already resolved**, and it
+supersedes part of both:
+
+- **No paid API calls. The converter is the Claude Code harness itself.** The user's words:
+  *"That costs money. Rather use claude locally on my laptop here in claude code — I want you
+  as my claude code harness to translate it from latin → devanagari."* So 01's model/client/cost
+  question is moot ($0), and 02 was re-run and re-graded through this harness — which turned
+  out to be the better converter as well as the free one. The ban is scoped to **this effort**;
+  prod's English→X translate path stays on `gemini-3.5-flash`, untouched.
+- The consequence: **"a script" now means a script that moves content and checks it, with the
+  conversion done in-session between the pulls and the pushes.** Throughput, not money, is the
+  cost — 59 items × ~20 K chars is hours of agent sessions, so how the run splits and resumes
+  is a real design question and belongs to 03.
+
 Verified in the tree while charting, so no ticket need re-derive it:
 
 - **"Call it hindi" is already done.** `hi` is in the picker as `Hindi` / `हिन्दी`
@@ -51,17 +65,22 @@ Verified in the tree while charting, so no ticket need re-derive it:
 <!-- one line per resolved ticket -->
 
 - [Which model, through which existing client, and what does one Edition cost?](tickets/01-conversion-model-client-and-cost.md)
-  — `gemini-3.1-flash-lite` via the native `geminiComplete` client, called from a standalone
-  `pnpm tsx` script (~$1/Edition; `gemini-3.5-flash` behind it at ~$6). Not a Convex action:
-  `collectForTranslation` is English-source-driven and skips the cloned rows as fresh, so the
-  in-Convex path *cannot* read `hi-Latn` at all. The saving is the tier drop, nothing else.
+  — **superseded the same day: there is no model and no API cost.** It first picked
+  `gemini-3.1-flash-lite` via `geminiComplete` from a `pnpm tsx` script (~$1/Edition); the user
+  then ruled out paid API calls and the converter became the Claude Code harness itself. What
+  survives: the corpus numbers, the guards, and the finding that the in-Convex `translateTopic`
+  path **structurally cannot** read `hi-Latn`, so the write path is `readEditionBodies` → disk
+  → `publishTranslation`.
 - [Does a naturalizing conversion prompt actually hold up on a real lesson?](tickets/02-does-naturalizing-conversion-hold.md)
-  — **It holds**, proven by four live runs over the real stored prod row. Feed **one whole
-  `swapOutStatic`-stripped lesson per call**: 402/402 tags and 434/434 text nodes intact 4/4,
-  quiz guard passes, orthography and register both good. Measured **$0.61** for the Edition,
-  ~15 s/lesson. Two carry-forwards: the model **snaps scripture to the canonical Hindi Bible**
-  even when told not to change meaning, and it **ships the source's untranslated English**
-  rather than repairing it — a prompt rule ordering repair does not work.
+  — **It holds, converted by this Claude Code harness.** Proven on the real stored prod row and
+  graded against a Gemini run of the same input: exact on every counted structural property
+  (402/402 tags, 436/436 text nodes, all attribute counts, quiz guard, static-block round-trip)
+  where Gemini had one instability, and it **repaired the source's untranslated English** where
+  Gemini shipped it. Chunk = **one whole `swapOutStatic`-stripped lesson**. Three
+  carry-forwards: scripture is snapped to the published HHBD wording *deliberately*
+  ([translate.ts:773](../../../convex/translate.ts#L773)); `data-answer`/`data-alt` must stay
+  Latin or quiz 4 breaks; and **throughput replaced dollars as the cost** — 59 items of agent
+  work, which is now 03's problem.
 
 ## Not yet specified
 
