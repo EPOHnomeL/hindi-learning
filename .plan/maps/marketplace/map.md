@@ -110,7 +110,12 @@ that already ship.
   never saw the acknowledgement.** Round-trip URLs now point at `/donate`;
   `?donation=thanks` **replaces** the widget rather than banner-ing above it; the flag-off
   gate 404s and pointedly does *not* reuse `getTenantView()`, whose deliberate error-swallow
-  would 404 a working page on a Convex blip. Spec: [A dedicated `/donate` route](spec-donate-route.md).
+  would 404 a working page on a Convex blip. **Deployed and walked on live prod the same day**:
+  `/donate` 200s on ywampotch, 404s on flag-off yknot and on the apex, and the live rail's
+  round-trip URLs now point at `/donate`. Two things the ticket records rather than hides — the
+  rendered widget still hasn't been seen by a human (curl can't run the client queries), and
+  `id="donations"` is absent from the SSR HTML, so the page shows a brief empty gap before the
+  widget hydrates. Spec: [A dedicated `/donate` route](spec-donate-route.md).
 - [Fix the legacy `#donations` link in both auth states](tickets/11-fix-legacy-donations-anchor.md) —
   **built and shipped** in the same commit. Signed out, `DonateSection` scrolls itself into
   view once it has *actually mounted* — the existing mount effect couldn't do it, because

@@ -72,12 +72,55 @@ notes below are the things a reader of the spec alone wouldn't know.
   `ywampotch.localhost` → **404**, which *is* the gate working, because no tenant in the dev
   deployment has the `donations` flag on (checked all four: upf, ywampotch,
   almighty-warriors, yknot — absent on every one).
+
+  **⚠ A caution this ticket earned the hard way.** Mid-session I reported the flag as off in
+  *production* too. That was wrong, and the reason is already written down in
+  [project-context.md](../../../docs/agents/project-context.md): `.env.local` pins a **dev**
+  `CONVEX_DEPLOY_KEY`, the env var **beats `--prod`**, and the CLI reads it from the file — so
+  `convex run … --prod` and even `env -u CONVEX_DEPLOY_KEY convex run … --prod` both answered
+  for dev while looking exactly like a prod answer. Prod is `capable-barracuda-769`; dev is
+  `judicious-marmot-580`. The unambiguous read, when the deploy key is in play, is to bypass
+  the CLI entirely:
+
+  ```sh
+  curl -s -X POST https://capable-barracuda-769.eu-west-1.convex.cloud/api/query \
+    -H "Content-Type: application/json" \
+    -d '{"path":"tenants:getTheme","args":{"slug":"ywampotch"},"format":"json"}'
+  ```
+
+  That returns `donations: true` — **prod has the flag and a payee set**
+  (`ywampotchtpm@gmail.com`), which is what made the bug reportable in the first place.
 - **Test:** `convex/donations.test.ts` asserts both round-trip URLs exactly. 785 tests pass.
 - **Build:** `pnpm build` clean; `/donate` registered as a dynamic route. This is what proves
   the server/client boundary — `SiteFooter` had only ever been rendered from client
   components before.
-- **NOT walked: the happy path.** Nobody has seen this page render its widget. Doing so needs
-  the flag on in dev, which needs a `donationPayee` who `isReadySeller` (the toggle refuses
-  otherwise, by ADR 0027), i.e. mutating the operator's dev data — out of scope for a session
-  that wasn't asked to. **Prod has the flag on for ywampotch** (that is why the bug was
-  reported at all), so the first real render will be the post-deploy check.
+### Walked on LIVE PRODUCTION, 2026-08-02, after deploy
+
+Pushed to `main` (Vercel auto-deploys prod) and checked against the real thing:
+
+| Check | Result |
+|---|---|
+| `ywampotch.my-course.app/donate` — flag **on** | **200** |
+| `yknot.my-course.app/donate` — flag **off** | **404** — the gate working on real data |
+| apex → `www.my-course.app/donate` — no tenant | **404** |
+| prod `donations:checkoutFields` `return_url` | `https://ywampotch.my-course.app/donate?donation=thanks` |
+| prod `cancel_url` | `https://ywampotch.my-course.app/donate` |
+| $10 at rate 18.4 | `R184.00`, item `Donation to YWAM Potch` |
+
+**The third break — a donor who paid and saw no acknowledgement — is structurally dead on the
+live rail**, since the round-trip no longer depends on an anchor resolving.
+
+### Still not seen by a human, and one thing worth a follow-up
+
+`curl` proves the route, the gate and the signed fields. It cannot prove the **rendered
+widget**, the scroll, the signed-in redirect or the thank-you swap: `DonateSection` is a
+client component whose Convex queries resolve after hydration.
+
+That last point is itself a finding: **`id="donations"` is absent from `/donate`'s
+server-rendered HTML.** Not a regression — the landing section always behaved this way, and it
+is *why* the anchor never worked — but alone on a dedicated page it shows as a brief empty gap
+between header and footer before the widget appears. Worth fixing only if it looks bad in
+practice, and the fix isn't free: the flag is already known server-side here, but
+`donations.config` would also have to be fetched server-side and threaded in as props, which
+means splitting the component. Deliberately not done in this ticket; recorded so whoever sees
+the flash knows it is understood, not missed.
