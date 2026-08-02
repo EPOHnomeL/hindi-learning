@@ -90,12 +90,27 @@ export const LANGUAGES: LanguageInfo[] = [
   // the source Edition; South African Sign Language has no written form to
   // translate prose into, so both are omitted here), then other widely-spoken
   // African languages. English names carry the alternate/anglicised form so the
-  // picker's search finds them ("venda", "zulu", "sotho", …).
+  // picker's search finds them ("venda", "zulu", "sotho", …). Where one language
+  // is standardised differently across borders it gets one Edition per
+  // orthography, distinguished by region subtag — see Sesotho below.
   { code: "af", name: "Afrikaans", native: "Afrikaans" },
   { code: "zu", name: "Zulu (isiZulu)", native: "isiZulu" },
   { code: "xh", name: "Xhosa (isiXhosa)", native: "isiXhosa" },
   { code: "nso", name: "Northern Sotho (Sepedi)", native: "Sepedi" },
-  { code: "st", name: "Southern Sotho (Sesotho)", native: "Sesotho" },
+  // Sesotho is one language with two standard orthographies, and they look
+  // different enough on the page that a reader in one country reads the other as
+  // misspelt: Lesotho writes li-/oa/ea (Lesotho, hoa hae), South Africa writes
+  // di-/wa/ya (Lesotho, wa hae). So they are two Editions, not one. `st` stays
+  // the Lesotho Edition — it is what already shipped under that code, and
+  // existing Editions store the code — and South Africa gets the region subtag.
+  // The name IS the translate instruction (see `langName` in translate.ts), so
+  // each names its orthography outright rather than just its country.
+  { code: "st", name: "Southern Sotho (Sesotho, Lesotho orthography)", native: "Sesotho (Lesotho)" },
+  {
+    code: "st-ZA",
+    name: "Southern Sotho (Sesotho, South African orthography)",
+    native: "Sesotho (Afrika Borwa)",
+  },
   { code: "tn", name: "Tswana (Setswana)", native: "Setswana" },
   { code: "ts", name: "Tsonga (Xitsonga)", native: "Xitsonga" },
   { code: "ss", name: "Swati (siSwati)", native: "siSwati" },
