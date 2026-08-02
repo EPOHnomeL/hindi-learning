@@ -48,6 +48,33 @@ Pick one direction (this is a product call):
 
 Verified 2026-07-10 (main @ 1b2db94) — still outstanding as written: the Mission is enumerated into every translation job (translate.ts:53) and billed per Edition, but no read path serves the translated Mission — every surface returns raw English `topic.mission` (content.ts:93,134; shares.ts:295). Tellingly, the shared-feed query resolves the *title* per-Edition (shares.ts:282-289) but never the mission. The product decision (stop translating vs start reading) is still untaken.
 
+### Correction — 2026-08-02: "never read" is no longer true
+
+The headline claim above is **stale**, and the 2026-07-10 comment with it. A read seam for
+the translated mission exists now: `loadEdition(...).mission()`
+([convex/lib.ts:393-397](../../../convex/lib.ts#L393-L397)) point-reads the `mission` row and
+falls back to `topic.mission`, and the reader serves it —
+[convex/public.ts:200](../../../convex/public.ts#L200) returns `mission: await ed.mission()`
+into the welcome panel. So a Viewer on a translated Edition *does* see the translated
+mission in the reader, and the "wire it through" direction is largely already taken.
+
+Found while shipping the `st-ZA` Edition (06), whose mission converted correctly and is
+served — so this was verified against a real Edition, not only by reading the code.
+
+**What genuinely remains is narrower than this ticket describes** — the surfaces that still
+render raw English:
+
+- **The catalogue card**: [convex/catalogue.ts:118](../../../convex/catalogue.ts#L118) uses
+  `topic.mission` directly, with no per-Edition lookup, even though the very next lines
+  resolve each listed language for `langs`.
+- The shared-feed / dashboard surfaces named in the 2026-07-10 comment need re-checking the
+  same way before anyone acts on them; `shares.ts` has moved since.
+
+So the product call is no longer "drop vs wire through" — it is the much smaller "should the
+catalogue card show a per-Edition mission, given a card can list several Editions at once?"
+Re-scope this ticket before working it, and re-verify each surface: the comment above proves
+how quickly this one goes out of date.
+
 ## Done when
 
 One direction is picked — drop the mission from translation, or wire the translated mission through the read seams — and the chosen change ships with tests.
