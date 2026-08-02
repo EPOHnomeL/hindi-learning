@@ -33,15 +33,16 @@ get written. Five things have to come out of this, and they interact:
    conversion entirely. Say what the intended re-translate behaviour for this Edition even is.
 5. **Idempotency and abort.** The script hits prod. What happens on a half-finished run — resume,
    or tear down and restart? What's the teardown?
-6. **Splitting the run across sessions — new, and now the hard one.** 02 resolved the converter
-   to be the **Claude Code harness itself**, not an API call (01 is superseded), so there is no
-   fan-out and no 15-second-per-lesson throughput. 59 items at ~20 K chars in and ~19 K out is
-   hours of agent work spread over multiple sessions. That makes checkpointing a first-class
-   part of the write path, not an afterthought: decide whether converted lessons land on disk
-   first and publish in a batch, or publish item-by-item as each is converted; how a fresh
-   session knows what is already done; and whether a partially-converted Edition may sit in
-   prod between sessions. Point 5's "resume or restart" is no longer hypothetical — resume is
-   the normal case.
+6. **Fan-out and context discipline — new.** 02 resolved the converter to be the **Claude Code
+   harness itself**, not an API call (01 is superseded). Per lesson that is only ~7 K in /
+   ~6 K out tokens, so the run fans out — one subagent per lesson, ~10 concurrent, ~10–20
+   minutes for all 59 in a single session. The constraint is context, not time: ~900 K tokens
+   of Devanagari cannot pass through the orchestrating session, so **subagents must write to
+   disk and the parent must never read the converted documents back** — it orchestrates, runs
+   `02-check-harness.ts` per item, and sees only pass/fail. Decide the disk layout that makes
+   that work, whether publishing happens per item as it passes or in one batch at the end, and
+   how a re-run skips what already passed (point 5's resume, which is now cheap rather than
+   the normal case).
 
 ## Done when
 
@@ -49,4 +50,5 @@ Each of the six has a decision with its reasoning, concrete enough that the buil
 writes the script without reopening any of them. Names the specific functions and tables touched,
 and states what the script must **not** touch (`publicLinks`, `enrollments`, `entitlements`,
 `listings` are already excluded by `cloneEdition` — confirm that's still right here). The
-session-splitting decision is concrete enough that a fresh session can pick the run up cold.
+fan-out decision names the disk layout and states plainly what the orchestrating session is
+forbidden to read.

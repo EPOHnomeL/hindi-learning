@@ -41,9 +41,10 @@ supersedes part of both:
   out to be the better converter as well as the free one. The ban is scoped to **this effort**;
   prod's English→X translate path stays on `gemini-3.5-flash`, untouched.
 - The consequence: **"a script" now means a script that moves content and checks it, with the
-  conversion done in-session between the pulls and the pushes.** Throughput, not money, is the
-  cost — 59 items × ~20 K chars is hours of agent sessions, so how the run splits and resumes
-  is a real design question and belongs to 03.
+  conversion done in-session between the pulls and the pushes.** Per lesson that is only ~7 K
+  in / ~6 K out tokens, so the Edition fans out — one subagent per lesson, ~10 concurrent,
+  **10–20 minutes for all 59 in one session**. The binding constraint is context, not time:
+  the orchestrating session must never read the converted documents back. That is 03's.
 
 Verified in the tree while charting, so no ticket need re-derive it:
 
@@ -79,8 +80,8 @@ Verified in the tree while charting, so no ticket need re-derive it:
   Gemini shipped it. Chunk = **one whole `swapOutStatic`-stripped lesson**. Three
   carry-forwards: scripture is snapped to the published HHBD wording *deliberately*
   ([translate.ts:773](../../../convex/translate.ts#L773)); `data-answer`/`data-alt` must stay
-  Latin or quiz 4 breaks; and **throughput replaced dollars as the cost** — 59 items of agent
-  work, which is now 03's problem.
+  Latin or quiz 4 breaks; and the run **fans out one subagent per lesson** with the parent
+  never reading the output back — 10–20 minutes for the Edition, and 03's to design.
 
 ## Not yet specified
 

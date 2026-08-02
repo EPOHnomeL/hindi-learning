@@ -127,10 +127,19 @@ answers in the source language. So `peace`/`Peace` and the `p‑e‑a‑c‑e` h
 verbatim while the sentence around them converts. Whether a Devanagari reader should be typing
 a Latin word at all is a real question — it goes to 06, not to the conversion.
 
-Throughput, which is now the binding cost instead of dollars: one lesson is ~20.5 K chars in
-and ~19 K out. There are 59 items. That is a few hours of agent sessions rather than the
-~2 minutes an 8-way API fan-out would take. The trade is deliberate and it is the honest risk
-in this approach — 03 has to say how the run is split and resumed.
+Throughput, which replaces dollars as the cost — and it is **cheaper than it first looks.**
+Per lesson: 7,210 in / 5,943 out tokens (measured on this exact document by the API run). That
+is a small unit of work, so the corpus fans out rather than queues: **one subagent per lesson**,
+each reading its source from disk and writing its output to disk, ~10 at a time → about six
+waves → **10–20 minutes wall clock in a single session**. Not the "few hours of sessions" this
+answer first claimed; that estimate assumed one session converting all 59 serially, which is
+not how it would be run.
+
+The constraint that *is* real: 59 × ~19 K chars of Devanagari is ~900 K tokens of output, so
+no single context may hold the converted documents. The orchestrating session must never read
+them back — subagents write to disk, and the parent sees only pass/fail from
+[02-check-harness.ts](../assets/02-check-harness.ts). That keeps the parent's context flat
+whatever the corpus size, and it is a design requirement on 03, not a nice-to-have.
 
 ### 4. Leaks — repaired here, shipped by Gemini
 
@@ -183,8 +192,9 @@ Three things the spec must carry forward:
    04's gate checks verses against the published text, not against the romanized source.
 2. **`data-answer` / `data-alt` stay Latin** or quiz 4 stops working; every other attribute
    holding prose converts.
-3. **Throughput replaced dollars as the cost.** 59 items × ~20 K chars is agent-session work,
-   not a two-minute fan-out. 03 must say how the run is split, checkpointed and resumed.
+3. **Fan out, and never read the output back.** One subagent per lesson (~13 K tokens each),
+   ~10 concurrent → 10–20 minutes for the whole Edition in one session. The parent orchestrates
+   and checks; it must not load the converted documents into its own context. 03 owns that.
 
 <!-- Superseded reading: this ticket first resolved on 2026-08-02 recommending
      gemini-3.1-flash-lite at ~$0.61/Edition. The user ruled out paid API calls the same day;
