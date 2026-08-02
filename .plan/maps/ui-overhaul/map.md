@@ -24,7 +24,23 @@ sibling `ui-overhaul-impl` map is resolved. This effort runs **before** the
 - Structure: **foundation first** — the design-system decision lands before any
   surface redesign ticket opens.
 - Planning only: implementation is handed off to `ui-overhaul-impl` once `spec.md`
-  exists.
+  exists. **One stated exception** — tickets 07–11 provision and wire **PostHog**,
+  which does rather than decides. They earn their place as wayfinder `task` tickets:
+  ticket 13 ("which flows are actually clunky") cannot be decided without real usage
+  data, and the data does not exist until the instrumentation ships. Same shape as
+  ticket 01 buying Mobbin. Nothing else on this map builds.
+- **Measurement strand (grilled 2026-08-02).** PostHog Cloud **EU**, one project with
+  `tenant` as a property and a group, product analytics **+ session replay**, no
+  surveys/flags/experiments (those serve the fix, not the diagnosis). **No consent
+  banner** — POPIA legitimate interest, carried by aggressive masking (ticket 09) and
+  a privacy-policy disclosure (ticket 11), which is a hard precondition for replay in
+  prod. `identify()` sends the **Convex user id only** — no email, name or phone.
+  Browser `posthog-js` plus `posthog-node` in the ITN handler for money events, since
+  purchase truth lands server-side and asynchronously.
+- **Volume reality:** lifetime sales are around **ten**. Funnel percentages are
+  statistically meaningless here; the value is replay, few enough to watch every
+  session individually. Any ticket that reasons from a drop-off *rate* is reasoning
+  from noise.
 - Skills: `/grilling`, `/prototype`, `/ponytail`.
 
 ## Decisions so far
@@ -41,10 +57,14 @@ sibling `ui-overhaul-impl` map is resolved. This effort runs **before** the
 - **Per-surface redesign directions** — one direction ticket per surface, in the
   inventory's priority order, cut once the foundation and the collapse plan exist.
   clears-with: 06
-- **Flow fixes** — which journeys are actually clunky and what they should become. The
-  inventory names candidates (authoring composer stuffed in a dashboard grid cell;
-  pricing, payouts and access control sharing one modal; `/admin` role-branching on a
-  single route) but choosing among them needs real usage input. clears-with: 03
+- **Flow fix directions** — what the clunky journeys should *become*, one patch per
+  flow once they are named. The "which journeys are clunky" half of this patch
+  graduated on 2026-08-02 into the PostHog strand (07–13): the "real usage input" it
+  was waiting on is session replay, and ticket 13 names and ranks the flows from it.
+  What remains here is the redesign direction for each, which cannot be written until
+  there is a ranked list to write it against. (This patch previously read
+  `clears-with: 03` — the design-foundation ticket, which could never have cleared it;
+  corrected 2026-08-02.) clears-with: 13
 - **Mobile-readiness bar** — what "good on a phone" means per surface, and the single
   breakpoint scale to replace the current `md:`-only ad-hockery. Feeds the pwa effort
   that follows. clears-with: 03
