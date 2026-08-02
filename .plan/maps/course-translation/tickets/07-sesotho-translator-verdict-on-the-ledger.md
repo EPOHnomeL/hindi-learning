@@ -121,9 +121,11 @@ inference.
 
 ## Notes for whoever relays this
 
-- **`st-ZA` is already live on prod holding LESOTHO text** (the clone step ran). It has one
-  share and no public link or listing. If the translator will be a while, consider whether
-  to leave it visible or tear it down with `removeEdition` and re-clone later.
+- **`st-ZA` is already PUBLISHED on prod** (2026-08-02) with the converted text, ahead of
+  this review — the user's call, to be corrected afterwards rather than held. So this is not
+  a gate on shipping; it is a correction pass on something live. Applying the verdict is
+  cheap: edit the rules, re-run the dry run, `--publish` again. The transform is idempotent,
+  so re-publishing unchanged rows is a no-op.
 - The translator does not need the repo. The ledger is a TSV — open it in a spreadsheet, and
   the `example` column gives each word in context.
 - Don't paraphrase Q3 into "check the apostrophes". The nasal/quote split is the specific

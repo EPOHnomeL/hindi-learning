@@ -146,7 +146,48 @@ beats `--prod`, which is what made the earlier session's reads land on
 ([scripts/_env.ts:26](../../../scripts/_env.ts#L26)). The script does the same, and picks up
 `PUBLISH_SECRET` through the same loader, so nobody has to handle the secret.
 
-### Superseded, 2026-08-02 (later the same day) — steps 1–4 are DONE
+### PUBLISHED to prod, 2026-08-02, on the user's explicit instruction
+
+All 59 `st-ZA` rows are live: 56 lessons, 1 reference, title and mission. Zero `SKIPPED`
+(the quiz guard rejected nothing). The user chose to publish ahead of
+[07](07-sesotho-translator-verdict-on-the-ledger.md) and to raise any corrections the
+translator finds afterwards — so **this ticket's "reviewed by the user before the write"
+condition was deliberately waived, not met.** Re-running `--publish` after editing the rules
+is cheap and idempotent, which is what makes that a safe trade.
+
+Verified on prod after the write, by marker count rather than by a local snapshot:
+
+| | rows | Lesotho markers | SA markers |
+|---|---|---|---|
+| `st` | 59 | 2075 | 405 |
+| `st-ZA` | 59 | **3** | 2477 |
+
+`st` is untouched — still Lesotho, and the publish path only ever writes `lang: "st-ZA"`.
+(`st` already contained 405 SA spellings before any of this; the source was never purely
+Lesotho.) The transform is now **idempotent** — a second dry run produces byte-identical
+output — and 57/57 documents are structurally intact.
+
+**Three defects found after the first publish, all fixed and republished:**
+
+- **`title` and `mission` were never converted.** The script skipped text-only rows, so the
+  Edition read Lesotho at every entry point — switcher, course card — and South African only
+  once you were inside a lesson. Both now go through the same transform and review files.
+- **Rule 1 was wrong on adjacent `li` syllables.** `(^|[^htk])l([iu])` *consumed* the
+  preceding character, so the first match ate the slot the second needed: `liliba` became
+  `diliba`, not `didiba`. A negative lookbehind consumes nothing and converts overlapping
+  occurrences in one pass. This is why the first publish was not idempotent.
+- The verification script itself lied twice — it compared against `before/`, which every dry
+  run regenerates, and it read text-only rows through `r.html` (always `undefined`, so
+  `undefined === undefined` reported "identical"). Replaced with a snapshot-free marker count.
+
+**The 3 residual Lesotho words are a source-data defect, not a transform bug.** A `data-no`
+quiz-feedback attribute in the source contains an unescaped `"`, which terminates the
+attribute early and leaves the rest parsed as garbage attribute names
+(`lentsoe="" dunamis,="" moo=""`). Nothing downstream can transform text in that position —
+and the same malformation is already in `st` and in the English source, where it presumably
+renders the quiz feedback wrongly too. Worth its own ticket if anyone cares about 3 words.
+
+### Superseded, 2026-08-02 (earlier the same day) — steps 1–4 are DONE
 
 The build ran. `scripts/st-za-rewrite.ts` exists, `st-ZA` is **cloned on prod** (59 rows, 1
 share) and the transform is clean over all 57 documents — 57/57 structurally intact,
