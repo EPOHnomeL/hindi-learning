@@ -54,11 +54,14 @@ that already ship.
   it) — chartr derives one status per file, so this split is the only way that difference is
   visible. Build tickets say so in their title ("Build …") and are always `blocked_by` the
   decision ticket that authorised them.
-- **The donation rail's remaining half is the widget** —
-  [Build the donation widget and landing section](tickets/08-build-donation-widget-and-landing-section.md),
-  unblocked since 07 shipped the money half. The pointer lives here rather than beside 07's
-  line in Decisions-so-far: that section indexes the route already walked, so naming an open
-  ticket from it is a malformation chartr catches (and did, twice).
+- ~~**The donation rail's remaining half is the widget**~~ — stale as of 2026-08-02; 08
+  shipped, and so did 10 and 11. **The donation rail has no open tickets.** It is built end
+  to end and reachable at `<tenant>.my-course.app/donate`; what remains is not code but
+  *observation* — nobody has yet watched a real donation complete (08's operator checklist,
+  10's happy path). The forward-pointer convention that bullet demonstrated still holds and
+  is worth keeping: an OPEN ticket is named from Notes, never from Decisions-so-far, which
+  indexes only the route already walked — naming an open ticket there is a malformation
+  chartr catches (and did, twice).
 
 ## Decisions so far
 
@@ -91,9 +94,30 @@ that already ship.
   not-a-tax-receipt line, reversing 03's "load-bearing" framing, with ADR 0027 edited to say
   so; and **the prod flag toggle's "Server Error"** turned out to be Convex redacting plain
   `Error` messages in production, fixed with `ConvexError` on this path plus a payee picker
-  over ready sellers. One limitation stated not fixed: `/` is the Dashboard when signed in, so
-  a logged-in operator cannot see their own donate section. **The live sandbox donation is the
-  one item not verifiable from a session** — the ticket ends in a six-step operator checklist.
+  over ready sellers. ~~One limitation stated not fixed: `/` is the Dashboard when signed in,
+  so a logged-in operator cannot see their own donate section.~~ **That limitation became a
+  user-visible bug and is fixed** — see [Build the `/donate` route](tickets/10-build-donate-route.md)
+  below. **The live sandbox donation is the one item not verifiable from a session** — the
+  ticket ends in a six-step operator checklist.
+- [Build the `/donate` route](tickets/10-build-donate-route.md) — **built and shipped**; the
+  rail is now *reachable*. An ungated `/donate` outside `(app)` (the `(legal)` posture) whose
+  whole body is `<DonateSection/>`, **coexisting** with the landing section rather than
+  replacing it, so an already-shared link works and the passive ask survives. Prompted by a
+  bug report whose two suspected causes were both wrong — the anchor id was always correct
+  and nothing redirects. One root cause explained everything: the section isn't in the
+  document when the browser acts on the hash. That included **a third break nobody reported —
+  the PayFast `returnUrl` was `/?donation=thanks#donations`, so a donor who had just paid
+  never saw the acknowledgement.** Round-trip URLs now point at `/donate`;
+  `?donation=thanks` **replaces** the widget rather than banner-ing above it; the flag-off
+  gate 404s and pointedly does *not* reuse `getTenantView()`, whose deliberate error-swallow
+  would 404 a working page on a Convex blip. Spec: [A dedicated `/donate` route](spec-donate-route.md).
+- [Fix the legacy `#donations` link in both auth states](tickets/11-fix-legacy-donations-anchor.md) —
+  **built and shipped** in the same commit. Signed out, `DonateSection` scrolls itself into
+  view once it has *actually mounted* — the existing mount effect couldn't do it, because
+  hooks run before the early return and it fired while the component still rendered `null`.
+  Signed in, `/` client-redirects to `/donate`, which **must** be client-side: a fragment is
+  never sent to the server. Both are asserted from code rather than walked (no component-test
+  harness in this repo), so the ticket ends in a three-step post-deploy check.
 
 ## Not yet specified
 

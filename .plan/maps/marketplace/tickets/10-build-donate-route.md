@@ -1,8 +1,6 @@
 ---
 type: task
 blocked_by: [03, 08]
-claimed_by: donate-route-session
-claimed_at: 2026-08-02T09:52:32+02:00
 ---
 
 # Build the `/donate` route
@@ -44,3 +42,42 @@ Scope, as decided:
 - The landing section still renders where ticket 08 put it — this ticket adds a surface, it
   removes none.
 - `pnpm test` and the type check pass; the Convex tests assert the new return/cancel URLs.
+
+## Answer
+
+**Built and shipped 2026-08-02** (`feat(donations): give the rail its own /donate page…`).
+`src/app/donate/page.tsx` is a server component outside the `(app)` group; it resolves the
+slug, fetches the tenant, `notFound()`s unless `flags.donations`, and renders `<Brand/>` →
+`<DonateSection/>` → `<SiteFooter/>`. Everything the spec decided landed as decided; the
+notes below are the things a reader of the spec alone wouldn't know.
+
+- **The gate does not reuse `getTenantView()`, and this was the one real trap.** That helper
+  catches Convex errors and returns `null` on purpose ("a theme read is best-effort branding,
+  never access control"). Correct for a palette, wrong for a gate: it would have made a
+  transient Convex blip render as a 404 on a live donation page — a fault that looks exactly
+  like a misconfigured flag and would have cost an operator hours. `/donate` calls
+  `fetchQuery` directly so a failure surfaces as a 500.
+- **The thank-you swap is uniform, not `/donate`-only.** `?donation=thanks` hides the widget
+  wherever `DonateSection` renders, including the landing page. One branch instead of a
+  prop threaded through two call sites, and it isn't wrong on the landing page either — a
+  donor who just paid shouldn't be re-asked there either. No new i18n keys: the page header's
+  brand link is the way onward, so nothing needed translating into five locales.
+- **`DonateSection`'s own header comment was stale the moment this shipped** — it asserted
+  "the anchor IS the requirement". Rewritten in the same commit to say the component now
+  renders in two places and that the anchor is no longer load-bearing.
+
+### Verified, and how — the distinction matters here
+
+- **Walked (curl, dev server):** `/donate` on the apex → **404**; `/donate` on
+  `ywampotch.localhost` → **404**, which *is* the gate working, because no tenant in the dev
+  deployment has the `donations` flag on (checked all four: upf, ywampotch,
+  almighty-warriors, yknot — absent on every one).
+- **Test:** `convex/donations.test.ts` asserts both round-trip URLs exactly. 785 tests pass.
+- **Build:** `pnpm build` clean; `/donate` registered as a dynamic route. This is what proves
+  the server/client boundary — `SiteFooter` had only ever been rendered from client
+  components before.
+- **NOT walked: the happy path.** Nobody has seen this page render its widget. Doing so needs
+  the flag on in dev, which needs a `donationPayee` who `isReadySeller` (the toggle refuses
+  otherwise, by ADR 0027), i.e. mutating the operator's dev data — out of scope for a session
+  that wasn't asked to. **Prod has the flag on for ywampotch** (that is why the bug was
+  reported at all), so the first real render will be the post-deploy check.
