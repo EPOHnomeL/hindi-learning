@@ -24,6 +24,11 @@ Edition-lifecycle cleanups. This map finishes shipped work rather than charting 
 - Ticket 04's removal race and error-clear already landed (`a255df8`); what remains is the
   dead index and recording the `setTopicPublic` decision. Verify before rebuilding.
 - Skills: `convex:convex-expert`, `/tdd` (all three are testable seams).
+- **The `st-ZA` Edition (06) is built but not published, and is waiting on a person.** The
+  transform is clean over all 57 documents; what it cannot do is check its own Sesotho, so
+  [07](tickets/07-sesotho-translator-verdict-on-the-ledger.md) puts the word ledger to a
+  translator and 06 is blocked on it. Note `st-ZA` **already exists on prod holding Lesotho
+  text** — the clone step ran — with one share and no public link.
 
 ## Decisions so far
 

@@ -1,6 +1,6 @@
 ---
 type: task
-blocked_by: []
+blocked_by: [07]
 ---
 
 # Build the South African Sesotho Edition by cloning the Lesotho one
@@ -146,7 +146,31 @@ beats `--prod`, which is what made the earlier session's reads land on
 ([scripts/_env.ts:26](../../../scripts/_env.ts#L26)). The script does the same, and picks up
 `PUBLISH_SECRET` through the same loader, so nobody has to handle the secret.
 
-### Next session picks up here
+### Superseded, 2026-08-02 (later the same day) — steps 1–4 are DONE
+
+The build ran. `scripts/st-za-rewrite.ts` exists, `st-ZA` is **cloned on prod** (59 rows, 1
+share) and the transform is clean over all 57 documents — 57/57 structurally intact,
+tag-for-tag identical outside the whitelisted content attributes. **Nothing is published.**
+
+Prod contradicted this ticket's central ⚠️: **`st` holds zero blob-backed rows**, all 59
+inline, so the shared-`_storage` trap cannot arise for this Edition (`af` is the one with 56
+blobs). The code reasoning was right; this Edition isn't shaped that way.
+
+Five defects the real data exposed that reading the code could not — all fixed, all
+described in `scripts/st-za-rewrite.ts`: `oe → we` over-firing on the `bo-`/`mo-` class
+prefixes (133 × `boemo` alone); the rules mauling `st`'s inherited untranslated English
+(`Christ → Tjhrist`); the leading apostrophe being ambiguous between syllabic nasal and
+quote mark (`'Molimo → Mmodimo`, `'Nna → Nnna`); lost capitals on quote-initial words; and a
+`[A-Za-z]` word regex that **split words at accented letters**, whose fragments then read as
+English and were waved through, so `khōlō` shipped unconverted while looking clean in both
+artifacts. Every missed-rule finding came from `untouched.tsv`, none from the ledger.
+
+**What remains is [ticket 07](07-sesotho-translator-verdict-on-the-ledger.md)** — the rules
+were inferred by an agent that does not read Sesotho, and this ticket's own gate requires a
+human review before the write. On the verdict: edit `RULES`/`SYLLABIC`/`OVERRIDES`, re-run
+the dry run, then `--publish` (treat any `SKIPPED` as a failure) and open it in a browser.
+
+### The original pickup list (1–4 now historical)
 
 1. Copy the script to `scripts/st-za-rewrite.ts` (the `../` imports assume repo root).
 2. The YWAM Potch **topic slug is `prophetic-school`** (from the user, 2026-08-02). Pass it —
