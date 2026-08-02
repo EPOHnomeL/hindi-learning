@@ -8,7 +8,7 @@ const RULES = [
   [/kh/g, "kg"],
   [/ea/g, "ya"],
   [/oa/g, "wa"], [/oe/g, "we"],
-  [/(^|[^htk])l([iu])/g, "$1d$2"],
+  [/(?<![htk])l([iu])/g, "d$1"],
 ];
 const OVERRIDES = {};
 function rewriteWord(word) {

@@ -65,7 +65,12 @@ const RULES: [RegExp, string][] = [
   // passive -tsoe → -tswe, boloetse → bolwetse and khoeli → kgwedi still fire. Measured on
   // the real Edition: without the lookbehind this rule was wrong on 133 `boemo` alone.
   [/(?<!^[bm])oe/g, "we"],
-  [/(^|[^htk])l([iu])/g, "$1d$2"], //      1  l → d before i/u, never inside hl/tl/kl
+  // 1  l → d before i/u, never inside hl/tl/kl. The negative LOOKBEHIND matters: the earlier
+  // `(^|[^htk])l([iu])` consumed the preceding character, so in a word with two adjacent
+  // `li` syllables the first match ate the slot the second one needed — "liliba" came out
+  // "diliba" instead of "didiba", and only a second pass finished the job. Lookbehind
+  // consumes nothing, so overlapping occurrences all convert in one pass.
+  [/(?<![htk])l([iu])/g, "d$1"],
 ];
 
 // The `st` Edition carries untranslated ENGLISH — scripture quotations, headings, the
@@ -210,14 +215,23 @@ if (process.argv.includes("--clone")) {
   process.exit(0);
 }
 
-type Item = { kind: "lesson" | "reference"; key: string; title?: string; file: string };
+// A document row carries `file` (its HTML); a text-only row (`title`, `mission`) carries
+// `text`. The Edition's own title and mission are NOT optional extras — they are what the
+// language switcher and the course card show, so an Edition converted without them reads as
+// Lesotho at every entry point and South African only once you are inside a lesson.
+type Item =
+  | { kind: "lesson" | "reference"; key: string; title?: string; file: string }
+  | { kind: "title" | "mission"; key: string; text: string };
 
 if (process.argv.includes("--publish")) {
   const owner = ownerEmail();
   if (!existsSync(OUT + "/after")) throw new Error("No reviewed output at " + OUT + "/after — run the dry run first.");
   const manifest: Item[] = JSON.parse(readFileSync(OUT + "/manifest.json", "utf8"));
   for (const item of manifest) {
-    const html = readFileSync(OUT + "/after/" + item.file, "utf8");
+    const body =
+      "file" in item
+        ? { title: item.title, html: readFileSync(OUT + "/after/" + item.file, "utf8") }
+        : { text: item.text };
     const res = await client.mutation(api.translate.publishTranslation, {
       secret,
       ownerEmail: owner,
@@ -225,8 +239,7 @@ if (process.argv.includes("--publish")) {
       lang: TO,
       kind: item.kind,
       key: item.key,
-      title: item.title,
-      html,
+      ...body,
     });
     // `skipped` means the quiz guard rejected it and the reader falls back to ENGLISH for
     // this lesson. That is a failure, not noise — do not let it scroll past.
@@ -246,10 +259,20 @@ mkdirSync(OUT + "/after", { recursive: true });
 const manifest: Item[] = [];
 let blobBacked = 0;
 for (const r of rows) {
+  if (r.kind === "title" || r.kind === "mission") {
+    // Plain text, no markup — straight through rewriteText, and into the same review files
+    // so the diff and the ledger cover them like everything else.
+    if (r.text === undefined) continue;
+    const next = rewriteText(r.text);
+    writeFileSync(OUT + "/before/" + r.kind + ".txt", r.text);
+    writeFileSync(OUT + "/after/" + r.kind + ".txt", next);
+    manifest.push({ kind: r.kind, key: r.key, text: next });
+    console.log(r.kind + ": " + JSON.stringify(r.text) + "\n" + " ".repeat(r.kind.length) + "→ " + JSON.stringify(next));
+    continue;
+  }
   if (r.kind !== "lesson" && r.kind !== "reference") {
-    // title / mission / question carry `text`/`reply`, not markup, and no blob. Reported so
-    // the build decides deliberately rather than by omission — see the rules doc.
-    console.log("(skipping " + r.kind + ' "' + r.key + '" — text-only row, handle separately)');
+    // `question`/`reply` are learner Q&A, not course content — left for a separate decision.
+    console.log("(skipping " + r.kind + ' "' + r.key + '" — handle separately)');
     continue;
   }
   // A blob-backed row is one still sharing an _storage object with the LESOTHO edition.
