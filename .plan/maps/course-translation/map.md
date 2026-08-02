@@ -31,6 +31,35 @@ Edition-lifecycle cleanups. This map finishes shipped work rather than charting 
   translator and corrections get republished afterwards. That is only safe because the
   transform is idempotent — re-running `--publish` costs nothing.
 
+## Where this stands, 2026-08-02
+
+The `st-ZA` work (06) took over this map. State at end of session, all verified against prod:
+
+| ticket | state |
+|---|---|
+| **06** `st-ZA` from the `st` clone | **published** — 59 rows live, `st` verified untouched. Two conditions of its own Done-when are **unmet**: the pre-write review (waived by the user) and the browser spot-check (nobody has seen a rendered page). |
+| **07** translator's verdict | **the frontier.** Rules were inferred by an agent that does not read Sesotho. Waiting on a person; corrections republish cheaply because the transform is idempotent. |
+| **08** a cloned Edition is unreachable | **the other frontier, and needs the owner.** `st-ZA` is invisible to learners — no `publishedEditions` row, no price, no public link. `setEditionPublished`/`setEditionPrice` are owner-auth, so no agent can do it. |
+| **09** unescaped `"` in quiz feedback | source defect, present in English too; the learner-visible impact is unestablished. |
+| **02** mission translated but unread | headline claim **corrected** — it *is* read now; what remains is only the catalogue card. Re-scope before working. |
+| 03, 04, 05 | untouched this session. |
+
+Tooling that now exists and should be reused, not rebuilt: `scripts/st-za-rewrite.ts`
+(`--clone` / dry run / `--publish`, idempotent), `scripts/_verify-st-za.ts` (structural),
+`scripts/_verify-prod-st.ts` (marker counts on prod). Assets: the rule reasoning is in
+`assets/06-orthography-rules.md`, the 1569-row review ledger in `assets/06-ledger.tsv`, and
+a 19-case rule check in `assets/06-rules-check.mjs`.
+
+**Two traps this session paid for, worth not re-paying:**
+
+- **Never use the Convex CLI against prod here.** A dev `CONVEX_DEPLOY_KEY` in `.env.local`
+  beats `--prod` and answers for dev while looking identical. Use
+  `ConvexHttpClient(convexUrl(true))`, as every script in `scripts/` already does.
+- **A verification script can lie.** Ours compared prod against a directory the dry run
+  regenerates, and read text-only rows through `r.html` (always `undefined`), so it reported
+  both a false alarm and a false pass in the same run. Prefer checks that need no local
+  snapshot.
+
 ## Decisions so far
 
 <!-- one line per resolved ticket -->
