@@ -119,7 +119,10 @@ Shipping the code is the *next* effort, not this map.
 <!-- ruled beyond the destination; never graduates -->
 
 - **RTL handling.** All 5 target languages are left-to-right; ticket 01's "RTL is app-wide" decision
-  is retired. Returns only if an RTL language is later wanted (a fresh effort).
+  is retired. Returns only if an RTL language is later wanted (a fresh effort). **That happened on
+  2026-08-04** — the operator asked for Urdu in settings, and the fresh effort is
+  [urdu-chrome-locale](../urdu-chrome-locale/map.md). This bullet stays out of scope: that map
+  consumes this one's architecture and owns the RTL question itself.
 - **Tenant default chrome language.** App-language is personal-only; tenants don't steer it.
 - **Admin / authoring / studio surface localisation.** Operated by a small English-working owner set;
   localising them is speculative. Architecture must not *preclude* it, but it's off the route.
