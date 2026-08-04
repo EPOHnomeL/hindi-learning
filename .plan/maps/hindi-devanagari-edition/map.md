@@ -46,6 +46,20 @@ supersedes part of both:
   **10–20 minutes for all 59 in one session**. The binding constraint is context, not time:
   the orchestrating session must never read the converted documents back. That is 03's.
 
+**The conversion half of the build already ran, on 2026-08-02, ahead of the spec.** An
+out-of-band session (driven by a temp `HANDOFF-devanagari-conversion.md`, gitignored) converted
+all **59 items** — 56 lessons + glossary to HTML, plus title and mission as plain strings — with
+this harness as the converter. 57/57 HTML items pass `check.ts`'s full acceptance battery
+(tag-for-tag fidelity, quiz `data-answer`/`data-alt` byte-identity, placeholder/entity counts,
+`swapBackStatic` round-trip); 17 first-pass failures were each re-run through a *fresh* subagent,
+never hand-patched. Output and scripts live at `topics/_devanagari/` — **gitignored and
+uncommitted** (`.gitignore:49` ignores all of `topics/`), so it is machine-local and one `clean`
+away from gone. Nothing was written to prod: no `publishTranslation`, no `cloneEdition`, no `.env`
+touched. This does **not** make the map a build map — 03, 04 and 06 are still undecided, and the
+destination is still `spec.md`. It does mean those three now have real artifacts to reason from
+rather than estimates: 06 can *count* the inherited English instead of guessing, and 03's point 6
+(fan-out and context discipline) has been walked once in practice.
+
 Verified in the tree while charting, so no ticket need re-derive it:
 
 - **"Call it hindi" is already done.** `hi` is in the picker as `Hindi` / `हिन्दी`
