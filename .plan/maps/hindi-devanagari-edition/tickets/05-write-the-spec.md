@@ -24,3 +24,24 @@ prompt, the model and how it's reached, chunking, the per-row write procedure, i
 teardown, the mechanical checks, the judgement step, and the rollback. Every decision links the
 ticket that made it rather than restating its reasoning. The map's Decisions-so-far indexes
 every resolved ticket.
+
+## Ruled out of scope (2026-08-04)
+
+**Not resolved — closed as out of scope.** This ticket exists to hand a spec to "a single fresh
+session with no memory of this map" that would "write the script, run it against prod, judge the
+result, and pull it if bad". **That session no longer exists**: the user chose to finish in-session
+instead, so the script was written and run, the Edition is live and `ready`, and the judgement step
+is the owner's own read. A spec whose only reader was a build session that already happened would
+be documentation of the past written in the future tense.
+
+What the spec was for is preserved where it belongs, per "the map is an index, not a store":
+
+- the script that actually published, at [assets/03-publish.ts](../assets/03-publish.ts), with its
+  ordering constraints and the two owner/redaction traps written into its header comment;
+- the check harness, at [assets/03-check-harness-relaxed.ts](../assets/03-check-harness-relaxed.ts);
+- the per-row write procedure, idempotency and teardown in [03](03-the-write-path.md); the gate and
+  rollback in [04](04-quality-gate-and-rollback.md); the prompt and chunk size in
+  [02](02-does-naturalizing-conversion-hold.md).
+
+This is a scope boundary, not a step on the route, so it stays out of Decisions-so-far. Note it did
+**not** satisfy a blocking edge: nothing was blocked on 05 — it was the leaf.

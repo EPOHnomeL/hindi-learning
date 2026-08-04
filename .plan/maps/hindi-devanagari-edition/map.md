@@ -5,10 +5,21 @@
 
 ## Destination
 
-A spec sharp enough that **one** session builds and runs a one-shot script which stands
-up the `hi` (Devanagari) Edition of **prophetic-school** from its existing `hi-Latn`
-Edition — by a cheap AI *script-conversion* pass, not a fresh English→Hindi translate run.
-The map ends at `spec.md`; it does not run the script.
+**Reached 2026-08-04 — this map is DONE.** The `hi` (Devanagari) Edition of **prophetic-school**
+is live on prod and reported `ready`: 59/59 rows, 0 skipped, converted from the existing `hi-Latn`
+Edition by a script-conversion pass rather than a fresh English→Hindi translate run.
+
+The destination as originally charted was *a spec* — "the map ends at `spec.md`; it does not run
+the script". It ended one step further along instead: the user chose to publish in-session, so the
+script was written and run here and [05](tickets/05-write-the-spec.md) was ruled out of scope
+because the spec's only reader was a build session that no longer needed to exist. Recorded rather
+than rewritten, since a destination that moved is worth seeing.
+
+**One thing a reader must not mistake:** the Edition ships with **15,074 user-visible English
+words** still in it — inherited from the romanized source, decided in
+[06](tickets/06-inherited-english-repair-flag-or-ship.md) to be repaired, and then deliberately
+**not** repaired when the owner chose to publish and read it themselves. The quality read is the
+gate and it is outstanding. Rollback is `removeEdition`, owner-authed, no new code needed.
 
 ## Notes
 
@@ -108,15 +119,48 @@ Verified in the tree while charting, so no ticket need re-derive it:
   sequences, so converting answer keys needs a one-line `.normalize('NFC')` in `foot.html`; and the
   real guard against attribute edits is `check.ts`'s **tag-for-tag** comparison, not the
   `data-answer` count check 02 named, so that comparison has to be relaxed to mask quiz-attribute
-  values. The pipeline defect went to its own effort.
+  values. The pipeline defect went to its own effort. **Then reversed in execution**: the repair was
+  prepared and not run — the user chose to publish as-is and read it themselves, so the Edition
+  shipped with all 15,074 words of English. The ticket records what survives (counted basis,
+  whitelist, term table, brief, the two unenforced check gates) and the cheaper middle path not taken.
+- [The write path: clone-then-mutate, blobs, which fields, and what `sourceHash` means](tickets/03-the-write-path.md)
+  — **Resolved by executing it.** Clone is *forced* (`publishTranslation` skips without a
+  `translationJobs` row, and `cloneEdition` alone creates one), so the romanized window was accepted;
+  it copied 59 rows and **2 real shares**. Blobs were never at risk — `publishTranslation` replaces
+  the row inline and clears `htmlStorageId`, and neither it nor `removeEdition` touches `_storage`
+  (verified `blobBacked=0`). Publish from `restored/`, never `converted/` — the latter still holds
+  `⟦N⟧` placeholders. `sourceHash` re-stamps from current English, which conveniently makes a `hi`
+  re-translate skip these rows, and a `hi` re-translate must never run. Two traps cost a round-trip
+  each: the owner is `ywampotchtpm@gmail.com` (not the operator, not `OWNER_EMAIL`), and Convex
+  redacts prod error messages so it surfaced only as `Server Error`.
+- [How do we know the Edition is fit to read, and how do we pull it if it isn't?](tickets/04-quality-gate-and-rollback.md)
+  — **The gate is the owner's own read, and it happens *after* publication.** No automated judge; the
+  existing eval harness ranks translations of English and doesn't transfer to a script conversion.
+  Sample is everything. Mechanical checks passed and prove structure only, not that the Hindi reads
+  well. Rollback exists, is safe for `hi-Latn`, and needs owner auth rather than the admin secret.
 
 ## Not yet specified
 
-<!-- The "Inherited defects" patch graduated on 2026-08-02 when 02 resolved; it lives on as
-     ticket 06. Nothing else is in the fog — the route to the spec is fully ticketed. -->
+<!-- Empty by completion, not by neglect: every ticket is closed and the destination is reached.
+     The fog cleared on 2026-08-04. -->
 
-- ~~**Inherited defects of the source Edition**~~ — graduated into
+Nothing. The map is done.
+
+- ~~**Inherited defects of the source Edition**~~ — graduated on 2026-08-02 into
   [The English the source never translated: repair it, flag it, or ship it?](tickets/06-inherited-english-repair-flag-or-ship.md).
+
+**Two things left open by choice, which are work rather than fog** — named here so they are not
+mistaken for having been forgotten, and neither belongs to this map:
+
+- **The owner's quality read of the live Edition.** The gate from
+  [04](tickets/04-quality-gate-and-rollback.md), outstanding by design. If it fails, roll back with
+  `removeEdition` as the signed-in owner. A good place to start is
+  `52-lesson-0051-the-trumpet-already-sounded` — a converting subagent self-reported repairing a
+  dropped `</i>` mid-generation there, and it passed mechanically.
+- **The repair of the 15,074 inherited English words**, decided in
+  [06](tickets/06-inherited-english-repair-flag-or-ship.md) and consciously not run. Resumable from
+  the brief and harness the ticket names. This is now a defect in a *shipped* Edition, so if it is
+  picked up it is a fresh effort with its own map, not a resumption of this one.
 
 ## Out of scope
 
@@ -125,4 +169,11 @@ Verified in the tree while charting, so no ticket need re-derive it:
 - **An owner-facing "derive Devanagari" affordance** in the Editions panel. A one-shot
   admin script was chosen deliberately; productising it is not on this route.
 - **Re-translating English → Hindi** through the existing pipeline. Highest quality and
-  full token cost — the thing this effort exists to avoid.
+  full token cost — the thing this effort exists to avoid. Now additionally *unsafe*: the published
+  `hi` rows carry a current `sourceHash`, so a re-translate would skip them — and if forced, would
+  overwrite the conversion.
+- **Writing `spec.md`** — [05](tickets/05-write-the-spec.md), ruled out of scope on 2026-08-04. The
+  spec's only reader was a build session that the in-session publish made unnecessary. Not a
+  decision, so it stays out of Decisions-so-far; it blocked nothing, being the leaf.
+- **The English→X pipeline defect** that put the English there in the first place — handed to
+  [english-source-untranslated-chrome](../english-source-untranslated-chrome/map.md) on 2026-08-04.

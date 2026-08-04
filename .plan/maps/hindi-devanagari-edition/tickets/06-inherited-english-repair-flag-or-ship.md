@@ -105,16 +105,16 @@ specified, checked step.
 
 ### The three decisions
 
-1. **Footer citations — translate the quoted English too** (the 49.7%). Author names, organisation
+1. **Footer citations — translate the quoted English too** (6,720 words). Author names, organisation
    names and cited-work titles stay Latin (`Kris Vallotton`, `Wikus Vorster`, `YWAM Potchefstroom`,
    *Basic Training for Prophetic Ministry*, *Walking in Power*); the quoted sentences and the labels
    around them become Devanagari. The cost accepted knowingly: the quote is then *our* translation
    of a published English line, no longer verbatim. Chosen because a Devanagari-only reader
    otherwise cannot read half of every lesson's footer, which is teaching content, not apparatus.
-2. **Lesson prose and chrome — repair** (the 46.8%), same rule: proper nouns and work titles stay
+2. **Lesson prose and chrome — repair** (6,329 words), same rule: proper nouns and work titles stay
    Latin, everything else converts. `L<N>` cross-reference tags (`L1`, `L15`, …) convert to the
    Devanagari lesson label form used elsewhere in the item.
-3. **Quiz fill-ins — convert the quote *and* the answer key** (the 3.6%), so a Devanagari reader
+3. **Quiz fill-ins — convert the quote *and* the answer key** (482 words, plus the 1,595 in quiz feedback), so a Devanagari reader
    types Devanagari. This is the one decision that changes what the learner *does*, and it
    deliberately departs from upstream: `data-answer` stays Latin by design at
    [translate.ts:773](../../../convex/translate.ts#L773). Two consequences the build session
@@ -164,3 +164,46 @@ effort still repairs its own Edition — it does not wait on that one.
   ([translate.ts:945](../../../convex/translate.ts#L945)) needs no change: it counts markers only.
 - The whitelist of keep-Latin proper nouns is itself a deliverable of the repair pass, not an
   afterthought: ~12 names and work titles carry most of the legitimately-Latin volume.
+
+### What actually shipped — the decision above was reversed in execution (2026-08-04)
+
+**The repair was decided, prepared, and then not run.** Recorded here rather than rewritten above,
+because the reasoning above is still the reasoning, and what happened next is a separate fact.
+
+When the cost of "translate the footer quotes too" was made concrete, the user asked why every
+lesson needed repairing. The honest split of the 15,074 user-visible Latin words was:
+
+| Portion | Words | What it needed |
+|---|---|---|
+| Proper nouns, author names, work titles | 2,634 | nothing — stays Latin by this decision |
+| Closed-set chrome (`Check`, `Glossary`, `Sources`, `Lesson N`, `L<N>`, …) | 1,026 | a deterministic replace table |
+| Per-lesson prose (footer quotes, quiz feedback, fill-ins) | 11,026 | per-lesson judgement — 1,520 runs, 336 of ≥8 words |
+
+So the 57-agent pass was **not** needed for the chrome; it was needed only because of the
+footer-quote decision, which is 73% of the work. That connection should have been made when the
+question was asked — the choice was not only "which reads better" but "table or fan-out", and it
+was presented as the former alone.
+
+The user then chose to **publish as-is and read it themselves**. So:
+
+- **No repair ran.** The Edition shipped with all 15,074 user-visible English words intact,
+  matching `hi-Latn`. In effect the outcome is the "ship it" option this ticket rejected — reached
+  by a scope decision at publish time, not by reversing the reasoning.
+- **What survives from the decision:** the counted basis; the whitelist; the term table and repair
+  brief (`topics/_devanagari/REPAIR-BRIEF.md`, gitignored); the relaxed check harness with its two
+  new gates at [assets/03-check-harness-relaxed.ts](../assets/03-check-harness-relaxed.ts), written
+  but never enforced; and the finding that the original conversion repaired English **unevenly**
+  (`Glossary` survives in 39 of 57 items, `Check` in 21, and the `Check` button has five different
+  Hindi renderings) — which is now a live defect in a shipped Edition, not a hypothetical.
+- **The one part that did ship:** the `.normalize('NFC')` fix to both quiz normalizers
+  (commit `b1f14c8`), which was found while establishing that Devanagari answer keys are
+  technically possible. It ships as a robustness fix for all nine Editions and is unrelated to
+  whether this Edition's keys were ever converted — they were not; they remain Latin, so a
+  Devanagari reader still types English to pass a fill-in quiz.
+- **57 row titles *were* converted** as part of publishing, because `db.replace` would otherwise
+  have wiped them — see [03](03-the-write-path.md). That was necessity, not repair.
+
+**If the repair is picked up later**, the brief and harness make it a resumable job, and the
+cheaper middle path identified but not taken was: chrome table + quiz feedback + fill-ins
+(~3,100 words, the parts a learner interacts with), leaving the bibliography in the language its
+sources were published in.
