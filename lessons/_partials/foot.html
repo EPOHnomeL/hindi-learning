@@ -32,7 +32,13 @@ document.querySelectorAll('.quiz.fill').forEach(function(q){
   // letter, so a learner typing "Blessed" must still match an authored "blessed".
   // Mirrors the reader's QUIZ_BRIDGE scoring (lessonSrcDoc.ts) so what the learner
   // SEES and what gets captured back agree.
-  function norm(s){return (s||'').replace(/\s+/g,' ').trim().toLowerCase();}
+  // NFC before comparing, or a non-Latin Edition's answer key is unanswerable: in
+  // Devanagari the nukta consonants (ड़ ज़ फ़ …) have BOTH a precomposed codepoint and a
+  // consonant+U+093C pair, they look identical, and NFC keeps the pair (the precomposed
+  // forms are Unicode composition exclusions). An IME emitting the precomposed form
+  // would never equal an authored pair, so the learner types the visibly correct word
+  // and is told they are wrong. toLowerCase() is a no-op on Devanagari and harmless.
+  function norm(s){return (s||'').normalize('NFC').replace(/\s+/g,' ').trim().toLowerCase();}
   var ans=norm(q.getAttribute('data-answer')), alt=norm(q.getAttribute('data-alt'));
   function check(){
     var v=norm(input.value);

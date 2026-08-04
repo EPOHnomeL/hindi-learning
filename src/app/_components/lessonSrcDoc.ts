@@ -51,7 +51,7 @@ const QUIZ_BRIDGE = `<script>(function(){
   });
   // Case- and whitespace-insensitive, matching the in-lesson visual layer
   // (foot.html) so what the learner SEES and what we capture always agree.
-  function normFill(s){ return (s||'').replace(/\\s+/g,' ').trim().toLowerCase(); }
+  function normFill(s){ return (s||'').normalize('NFC').replace(/\\s+/g,' ').trim().toLowerCase(); }
   document.querySelectorAll('.quiz.fill[data-answer]').forEach(function(quiz,i){
     var id = quiz.id || ('fill-'+i);
     var answer = normFill(quiz.getAttribute('data-answer'));
