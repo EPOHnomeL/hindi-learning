@@ -73,11 +73,20 @@ Counting visible text only — markup, attributes and `⟦N⟧` static placehold
 deliberately-Latin `data-answer`/`href`/`class` don't pollute it — **13,531 Latin word-instances
 remain across the 57 converted HTML items**, in 1,646 distinct runs. Partitioned by where they sit:
 
-| Where | Latin words | Share | Items affected |
-|---|---|---|---|
-| `<footer>` "Sources — Scripture / Teaching" citation block | 6,720 | 49.7% | 57 of 57 |
-| Fill-in-the-blank quiz quote fragments | 482 | 3.6% | 51 of 57 |
-| Lesson prose and chrome | 6,329 | 46.8% | 57 of 57 |
+| Where | Latin words | Items affected |
+|---|---|---|
+| `<footer>` "Sources — Scripture / Teaching" citation block | 6,720 | 57 of 57 |
+| Lesson prose and chrome | 6,329 | 57 of 57 |
+| `data-ok` / `data-no` / `data-ex` quiz feedback attributes | 1,595 | 56 of 57 |
+| Fill-in-the-blank quiz quote fragments | 482 | 51 of 57 |
+| **Total user-visible** | **15,126** | **57 of 57** |
+
+**Correction, same session:** the first pass at this table counted 13,531 and omitted the quiz
+feedback attributes, on the reasoning that attributes are markup. That was wrong — `data-ok` and
+`data-no` are *rendered to the learner* as the response to their answer
+([foot.html:24](../../../lessons/_partials/foot.html#L24) writes them into the feedback element),
+so 448 of them carrying 1,595 English words is user-visible text, not markup. The true figure is
+**15,126** across 57 items.
 
 **It is not a small closed set, and the ticket's lesson-1 hypothesis was wrong at Edition scale.**
 1,120 of the 1,646 runs occur in exactly one file, and 349 distinct runs are six words or longer —
@@ -137,11 +146,21 @@ effort still repairs its own Edition — it does not wait on that one.
 - **03 (write path):** the repair is a second pass over the 57 already-converted files, so the disk
   layout needs a `repaired/` stage between `converted/` and publish, and the resume logic keys off
   it. Nothing publishes pre-repair.
-- **04 (quality gate):** the mechanical check list gains "no Latin-script run in visible text
-  outside the proper-noun whitelist", which is now a *measurable* gate with a baseline of 13,531 —
-  and **loses** `data-answer`/`data-alt` byte-identity, which the answer-key decision invalidates.
-  `check.ts`'s quiz guard must be rewritten to assert *round-trip answerability* (key matches
-  `data-alt` under `norm()`) rather than byte-identity, or all 57 items will fail a check that is
-  now testing the wrong thing.
+- **04 (quality gate):** the mechanical check list gains "no Latin-script run in visible text or in
+  `data-ok`/`data-no`/`data-ex` outside the proper-noun whitelist", now a *measurable* gate with a
+  baseline of 15,126.
+- **`check.ts` must be relaxed, and it is the central guard that loosens.** 02's carry-forward
+  described the constraint as "quiz `data-answer`/`data-alt` byte-identity"; that check does not
+  exist. What exists is stronger and broader: `check.ts` compares the two documents **tag-for-tag
+  as whole strings** ([check.ts:14-17](../../../topics/_devanagari/check.ts#L14-L17)), and every
+  quiz attribute lives *inside* a tag — so translating `data-answer`, `data-alt`, `data-ok` or
+  `data-no` trips `firstDrift` on all 57 items. The named `data-answer=`/`data-alt=` entries in the
+  battery are mere **count** checks, which the repair preserves untouched. So the change needed is
+  to the tag comparison: compare tags with the translatable quiz attribute *values* masked out,
+  keeping byte-identity for every other attribute and for tag names and order. Note honestly what
+  that costs — the acceptance battery gets weaker precisely where the repair is changing content,
+  so the `norm()`-answerability assertion (key matches `data-alt` after normalization) has to be
+  added in its place rather than as a nicety. `quizStructureMatches`
+  ([translate.ts:945](../../../convex/translate.ts#L945)) needs no change: it counts markers only.
 - The whitelist of keep-Latin proper nouns is itself a deliverable of the repair pass, not an
   afterthought: ~12 names and work titles carry most of the legitimately-Latin volume.

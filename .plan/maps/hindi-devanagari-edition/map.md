@@ -98,14 +98,17 @@ Verified in the tree while charting, so no ticket need re-derive it:
   never reading the output back — 10–20 minutes for the Edition, and 03's to design.
 - [The English the source never translated: repair it, flag it, or ship it?](tickets/06-inherited-english-repair-flag-or-ship.md)
   — **Repair, all of it, including the answer keys.** Counted on the converted output (the source is
-  romanized, so English is unmeasurable there): **13,531 Latin word-instances** remain across 57
-  items — 49.7% in the `<footer>` citation block, 46.8% in prose/chrome, 3.6% in fill-in quizzes —
-  **not a closed set** (1,120 of 1,646 runs are single-file; 349 runs are ≥6 words). Proper nouns and
-  cited-work titles stay Latin; everything else converts. Two supersessions: 02's "`data-answer` must
-  stay Latin or quiz 4 breaks" is **wrong** (`norm()` lowercases, which is a no-op on Devanagari), but
-  `norm()` does no `.normalize()` and the output holds 4,513 *decomposed* nukta sequences, so
-  converting answer keys needs a one-line `.normalize('NFC')` in `foot.html`. The pipeline defect is
-  handed to its own effort. 04's mechanical checks change shape as a result — see the ticket.
+  romanized, so English is unmeasurable there): **15,126 user-visible Latin words** remain across 57
+  items — 6,720 in the `<footer>` citation block, 6,329 in prose/chrome, 1,595 in the `data-ok`/
+  `data-no` quiz feedback the learner is shown, 482 in fill-in quiz quotes — and it is **not a closed
+  set** (1,120 of 1,646 runs are single-file; 349 runs are ≥6 words), so no find-and-replace table
+  does it. Proper nouns and cited-work titles stay Latin; everything else converts. Two supersessions
+  of 02: "`data-answer` must stay Latin or quiz 4 breaks" is **wrong** — `norm()` lowercases, a no-op
+  on Devanagari — but `norm()` never normalizes and the output holds 4,513 *decomposed* nukta
+  sequences, so converting answer keys needs a one-line `.normalize('NFC')` in `foot.html`; and the
+  real guard against attribute edits is `check.ts`'s **tag-for-tag** comparison, not the
+  `data-answer` count check 02 named, so that comparison has to be relaxed to mask quiz-attribute
+  values. The pipeline defect went to its own effort.
 
 ## Not yet specified
 
