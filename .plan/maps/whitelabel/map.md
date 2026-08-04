@@ -69,6 +69,10 @@ issue per session in dependency order) is the next work — not another `/wayfin
     token override, per ticket 01's premise).
 - Prod carries the real tenant accounts; dev only operator accounts — data checks go through
   `pnpm *:prod` CLIs.
+- **Added after closure (2026-08-04):**
+  [25 colour-coded tenant pill on a course card](tickets/25-course-card-tenant-pill.md) — an
+  operator ask that falls out of the pinned "default site lists all courses" policy. A small
+  build ticket, not a reopening of the destination; it needs no new decision from this map.
 
 ## Decisions so far
 
