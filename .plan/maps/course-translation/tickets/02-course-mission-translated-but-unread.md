@@ -81,3 +81,27 @@ One direction is picked — drop the mission from translation, or wire the trans
 
 <!-- Migrated 2026-07-30 from GitHub issue #65 (filed 2026-07-24), when this repo retired
      its remote tracker; see docs/agents/issue-tracker.md. -->
+
+## Ruled out
+
+**Ruled out of scope 2026-08-04 — the effort closed with the ticket's own premise already
+falsified, and the residue too small to hold the map open.**
+
+This ticket exists to resolve "the mission is translated and billed but never read". That is
+no longer true, and has not been since before 2026-08-02: `loadEdition(...).mission()`
+([convex/lib.ts:393-397](../../../convex/lib.ts#L393-L397)) point-reads the `mission` row with
+an English fallback, and [convex/public.ts:200](../../../convex/public.ts#L200) serves it into
+the reader's welcome panel — verified against the real `st-ZA` Edition, whose mission
+converted and renders. The "wire it through" direction was effectively taken without this
+ticket.
+
+What remains is one surface: the **catalogue card** renders `topic.mission` directly
+([convex/catalogue.ts:118](../../../convex/catalogue.ts#L118)) with no per-Edition lookup. That
+is not the question this ticket asks, and it is a genuinely different one — a card can list
+several Editions at once, so "show the per-Edition mission" has no single answer there.
+
+Out of scope rather than resolved, because no product decision was taken: the mismatch
+dissolved on its own. If the catalogue card is worth doing it should be charted fresh, scoped
+to the card, not resumed from a ticket whose framing is stale. The shared-feed and dashboard
+surfaces named in the 2026-07-10 comment were never re-verified and should not be trusted
+either way.

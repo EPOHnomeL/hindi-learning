@@ -51,6 +51,28 @@ They are different and both worth deciding:
 - A decision recorded on whether `cloneEdition` should copy `publishedEditions`, warn, or
   keep its current silence — with the reasoning.
 
+## Answer
+
+**Resolved 2026-08-04 — `st-ZA` is reachable, and the owner has seen it render.**
+
+The owner flipped Publish for `st-ZA` in the Editions panel and opened the rendered Edition
+in a browser. That is **walked, not inferred** — the standard this ticket's Done-when asked
+for, and it also discharges ticket 06's one outstanding condition ("the rendered `st-ZA`
+Edition was opened in a browser and spot-checked"), which nothing until now had done.
+
+Reported by the user, not verified by an agent: `catalogue.list` is auth-gated
+(`getAuthUserId` → returns `[]` when signed out, [convex/catalogue.ts:96](../../../convex/catalogue.ts#L96)),
+and `setEditionPublished` / `setEditionPrice` are owner-auth, so there is no agent-reachable
+seam to confirm it from. That was the whole point of the ticket.
+
+**The general question is closed unanswered.** Whether `cloneEdition` should copy
+`publishedEditions`, warn its caller, or keep its current silence was *not* decided — the
+effort ended first. The silence remains: the next cloned Edition will also land
+finished-but-invisible, exactly as `st-ZA` did. That is a known, accepted gap, not a fixed
+one, and it is the single most likely way this bites again. If a second clone is ever made,
+decide it then — the argument is already written up under "The immediate need, and the
+general one" above.
+
 ## Notes
 
 - Check `st`'s own price and published state before matching it; don't assume it is free.

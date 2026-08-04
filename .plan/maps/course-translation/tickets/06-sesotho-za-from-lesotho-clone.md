@@ -235,3 +235,36 @@ the dry run, then `--publish` (treat any `SKIPPED` as a failure) and open it in 
   user asked for **local, on their PC** — weigh that first.
 - **Does anything else key off `st`?** Shares, the public link and the price were
   cloned; confirm nothing downstream assumes one Sesotho Edition per course.
+
+## Answer
+
+**Resolved 2026-08-04 — `st-ZA` is live on prod, and has now been seen rendering.**
+
+Published 2026-08-02: 59 rows derived from the `st` (Lesotho) Edition by
+[scripts/st-za-rewrite.ts](../../../../scripts/st-za-rewrite.ts), with **no English→Sesotho
+run fired** — the core constraint of the ticket. `st` was verified byte-untouched, and no
+`st-ZA` row shares an `htmlStorageId` with an `st` row.
+
+Both of the Done-when conditions that were still outstanding at the end of that session have
+now been settled, though **only one of them by being met**:
+
+- **Browser spot-check — met, 2026-08-04.** The owner published `st-ZA` (see
+  [ticket 08](08-a-cloned-edition-is-not-reachable.md)) and opened the rendered Edition. Until
+  that point nobody had seen a single `st-ZA` page.
+- **Pre-write review by a Sesotho speaker — waived, and now permanently so.** It was waived on
+  the user's call to ship, on the understanding that
+  [ticket 07](07-sesotho-translator-verdict-on-the-ledger.md) would put the rules to a
+  translator afterwards. 07 has since resolved *reactively*: the review is not being run at
+  all, and errors get corrected if a reader hits them. So this Edition's orthography rests on
+  agent inference that no Sesotho speaker has checked. That is the accepted state, not an
+  oversight — and it is safe only because the transform is idempotent, so a correction is a
+  rules edit and a re-`--publish`.
+
+Tooling and assets to reuse rather than rebuild: `scripts/st-za-rewrite.ts`
+(`--clone` / dry run / `--publish`), `scripts/_verify-st-za.ts`, `scripts/_verify-prod-st.ts`,
+plus [assets/06-orthography-rules.md](../assets/06-orthography-rules.md),
+[assets/06-ledger.tsv](../assets/06-ledger.tsv) and
+[assets/06-rules-check.mjs](../assets/06-rules-check.mjs).
+
+The three "open questions for the resolving session" above were all closed during the build
+and are left standing as the record of how it was decided.

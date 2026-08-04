@@ -119,6 +119,39 @@ in [scripts/st-za-rewrite.ts](../../../../scripts/st-za-rewrite.ts) without re-a
 "yes, all correct" is a complete answer — it just has to come from a person, not an
 inference.
 
+## Answer
+
+**Resolved 2026-08-04 — reactive, not proactive: the ledger review is not being run.**
+
+The user's call, taken with `st-ZA` already live on prod: nobody sits a translator down in
+front of the 1569-row ledger. The Sesotho speaker will raise problems **if and when he comes
+across them** in the course itself, and those corrections get applied then.
+
+Q1–Q5 therefore go unanswered on purpose. This ticket's Done-when — "each have an answer from
+someone who reads Sesotho" — is **deliberately unmet**, not overlooked.
+
+Why this is defensible rather than a corner cut:
+
+- **Applying a late verdict is cheap.** The transform is idempotent: edit `RULES` / `SYLLABIC`
+  / `OVERRIDES` in [scripts/st-za-rewrite.ts](../../../../scripts/st-za-rewrite.ts), re-run the
+  dry run, `--publish` again. Re-publishing unchanged rows is a no-op, so there is no
+  penalty for correcting in six months instead of today.
+- **Reading the course is a better detector than reading a ledger.** A word list stripped of
+  context asks a reviewer to adjudicate 1569 decisions cold; a reader hits the wrong ones in
+  the sentences that make them wrong.
+- **The downside is bounded.** The rules were inferred, so errors are possible — but they are
+  orthographic, in an Edition that otherwise would not exist at all.
+
+What survives for whoever picks up a correction later: the rule reasoning in
+[assets/06-orthography-rules.md](../assets/06-orthography-rules.md), the ledger in
+[assets/06-ledger.tsv](../assets/06-ledger.tsv), and the 19-case check in
+[assets/06-rules-check.mjs](../assets/06-rules-check.mjs). None of that needs the review to
+have happened.
+
+The shared-defect note above still stands: if a repair pass ever *is* run, decide it together
+with [hindi-devanagari-edition/06](../../hindi-devanagari-edition/tickets/06-inherited-english-repair-flag-or-ship.md)
+rather than twice.
+
 ## Notes for whoever relays this
 
 - **`st-ZA` is already PUBLISHED on prod** (2026-08-02) with the converted text, ahead of

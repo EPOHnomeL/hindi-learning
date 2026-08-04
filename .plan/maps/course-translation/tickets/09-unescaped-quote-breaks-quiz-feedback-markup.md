@@ -50,3 +50,29 @@ the stray quote — in every Edition including English. Nobody has looked.
   `grep -oh 'lentsoe=""[^>]*' st-za-review/prophetic-school/after/*.html`.
 - Low urgency by word count (3), potentially not low urgency by learner impact — settle the
   rendered behaviour first, and let that decide the priority.
+
+## Ruled out
+
+**Ruled out of scope 2026-08-04 — this is an authoring/content defect in the English source,
+not a translation defect, and it outlived the effort that happened to find it.**
+
+Found while verifying the `st-ZA` rewrite, which is the only reason it sits on this map. But
+the stray `"` is in the **authored English**, so every Edition inherits it and translation is
+neither cause nor cure. Fixing it here would mean this map owning a content-authoring bug on a
+sold course.
+
+Closed with its central question still unanswered: **nobody has opened the affected question
+in the reader**, so whether the wrong-answer feedback is visibly truncated for a learner is
+still unestablished — the ticket's own first Done-when condition. It was never a tidiness
+issue *or* a confirmed live bug; it was never looked at. Three words by word count, unknown by
+impact.
+
+Anyone picking this up should treat the whole Done-when list as still standing — establish the
+rendered behaviour first, then grep the authored source for `"` inside `data-no` / `data-ok` /
+`data-answer` / `data-alt` values across **all** lessons, since a hand-authored quote can
+appear anywhere. Reproduce with the two commands under Notes above.
+
+Worth knowing for that session: `publishTranslation`'s quiz-structure guard is currently **off**
+for blob-backed sources (see [ticket 05](05-drop-inline-html-contract.md)), which is plausibly
+how this survived authoring, translation into several languages, and a full orthography pass
+without anything complaining.

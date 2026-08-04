@@ -62,3 +62,32 @@ The dead `by_topic_email_lang` index is dropped and the `setTopicPublic` decisio
 
 <!-- Migrated 2026-07-30 from GitHub issue #67 (filed 2026-07-24), when this repo retired
      its remote tracker; see docs/agents/issue-tracker.md. -->
+
+## Answer
+
+**Resolved 2026-08-04 — the race shipped; the "dead index" premise turned out to be false;
+the `setTopicPublic` call is closed undecided.**
+
+Item by item, each verified 2026-08-04 rather than carried over from the 2026-07-10 comment:
+
+1. **Removal race + error-clear — shipped.** Landed in `a255df8` (2026-07-06,
+   *"fix(translation): validate target language, guard re-entrancy, gate public links"*).
+
+2. **"Drop the dead `by_topic_email_lang` index" — nothing to drop. The claim was wrong.**
+   The index is **live**: `cloneEdition` queries it at
+   [convex/translate.ts:477](../../../convex/translate.ts#L477) to dedupe `pendingShares` when
+   copying them to the new language, and it is the only index that can serve that
+   `(topicId, email, lang)` point-read. It sits at
+   [convex/schema.ts:361](../../../convex/schema.ts#L361), not `schema.ts:238` as the
+   2026-07-10 comment says — the file has moved under the claim.
+
+   The claim was true when written and was falsified by `cloneEdition` being built after it,
+   for the `st-ZA` work in [ticket 06](06-sesotho-za-from-lesotho-clone.md). Dropping this
+   index on the strength of the acceptance criterion would have broken Edition cloning. It is
+   a clean illustration of the repo's own rule: verify the claim before you reason from it.
+
+3. **`setTopicPublic`'s fate — not decided.** It remains valid and tested but exercised only
+   by tests ([convex/public.test.ts](../../../convex/public.test.ts)); the UI routes English
+   public links through `setEditionPublic(lang="en")`. Keep-vs-fold-in was never settled and
+   is closed here unsettled — a live, tested, unused-in-production mutation. Low stakes, but
+   it is dead weight in the public API surface until someone rules on it.

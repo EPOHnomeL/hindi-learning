@@ -62,3 +62,29 @@ The reader chrome flips direction for an RTL Edition, and a partially-ready Edit
 
 <!-- Migrated 2026-07-30 from GitHub issue #66 (filed 2026-07-24), when this repo retired
      its remote tracker; see docs/agents/issue-tracker.md. -->
+
+## Ruled out
+
+**Ruled out of scope 2026-08-04 — no RTL Edition is in play, and the retry affordance is
+polish the effort closed without.**
+
+Both halves, separately:
+
+- **RTL reader chrome.** The Edition `dir` still reaches only the sandboxed iframe; the
+  chrome containers in `CourseShell.tsx` never get it. But nothing currently ships that would
+  show the difference — the sibling [app-language-i18n](../../app-language-i18n/map.md) map
+  ruled RTL out of scope because all five target chrome languages are LTR, and the Editions
+  actually built by this effort (`st`, `st-ZA`, and the rest of the translation set) are LTR
+  too. This is real work with, today, no user. It belongs with whoever ships the first RTL
+  Edition — Urdu was the example — so the direction handling is designed once against a live
+  case, not twice against a hypothetical.
+
+- **Re-translate affordance for `ready · N failed` Editions.** The mechanism is already wired;
+  `RetryTranslation` just renders only in the `status === "failed"` branch, so a partially
+  failed Edition strands its failed items on the English fallback with no way back. Genuinely
+  a gap, genuinely small — and closed unbuilt with the effort. An owner can still recover by
+  removing and re-adding the language, at the cost of re-billing every item rather than the
+  failed ones.
+
+Out of scope rather than resolved: nothing was decided here and nothing was built. Either half
+can return as a fresh ticket the moment it has a real case.

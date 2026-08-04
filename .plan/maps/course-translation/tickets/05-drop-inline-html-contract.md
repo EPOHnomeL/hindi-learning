@@ -88,3 +88,35 @@ Verified 2026-07-10 (main @ 1b2db94) — accurate as written: lessons + referenc
   `/tdd`.
 - **Out of scope:** any change to what the content route serves to a reader — this is storage
   shape only.
+
+## Answer
+
+**Resolved 2026-08-04 — lessons and references are blob-only; `translations.html` stays
+inline, and the dual read shape is the accepted end state.**
+
+What shipped: `lessons` and `references` carry `htmlStorageId` only — the dominant, hottest
+tables (132 + 23 prod rows, the largest bodies). That was the bulk of the win.
+
+What is **not** done, and is now being closed rather than built: this ticket's own Done-when
+asked that `translations.html` move to blob storage "so the read path drops its dual shape".
+It has not. Verified 2026-08-04 by reading the tree:
+
+- [convex/schema.ts:438](../../../convex/schema.ts#L438) — `html: v.optional(v.string())` is
+  still on `translations`, alongside `htmlStorageId`.
+- `pickContentBody` ([convex/lib.ts:108](../../../convex/lib.ts#L108)) still resolves either
+  shape, and the client `useContentHtml` still handles both.
+
+**The decision is to keep it.** The dual shape costs one branch in one helper, and it is
+exercised constantly rather than rotting in a corner — every new translation writes inline
+`html`, so the "fallback" is in fact the live path for the whole `translations` table.
+Migrating it would buy a narrower schema at the price of a widen-migrate-narrow across a
+table that is still being written to daily, plus the two-commit push sequencing Convex forces
+on a field drop.
+
+**One real cost carries forward, unfixed:** with source Lesson bodies in blobs, markup is not
+readable inside a mutation, so `publishTranslation`'s **quiz-structure guard no longer runs**
+for a blob-backed source. That guard is simply off, and nothing replaced it — which is
+plausibly how the malformed-attribute defect in
+[ticket 09](09-unescaped-quote-breaks-quiz-feedback-markup.md) survived authoring and several
+translation passes without anything complaining. Anyone restoring it should validate in the
+driver, or make `publishTranslation` an action that fetches the blob.
