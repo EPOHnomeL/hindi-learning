@@ -65,13 +65,25 @@ Reported by the user, not verified by an agent: `catalogue.list` is auth-gated
 and `setEditionPublished` / `setEditionPrice` are owner-auth, so there is no agent-reachable
 seam to confirm it from. That was the whole point of the ticket.
 
-**The general question is closed unanswered.** Whether `cloneEdition` should copy
-`publishedEditions`, warn its caller, or keep its current silence was *not* decided — the
-effort ended first. The silence remains: the next cloned Edition will also land
-finished-but-invisible, exactly as `st-ZA` did. That is a known, accepted gap, not a fixed
-one, and it is the single most likely way this bites again. If a second clone is ever made,
-decide it then — the argument is already written up under "The immediate need, and the
-general one" above.
+**The general question is now decided too (2026-08-04): warn, don't copy — and it is built.**
+
+`cloneEdition` still creates no `publishedEditions` row, and deliberately so. Copying one
+would be actively worse than the silence: `listings` is not copied either, and **the presence
+of a listing row is what makes an Edition paid** ([convex/schema.ts:551](../../../convex/schema.ts#L551)),
+with `freePublishedLangs` defined as `livePublishedLangs` minus the priced ones. A clone that
+inherited `published: true` without a price would be a **free copy of a paid course**. So
+publishing stays an owner-auth act, on purpose.
+
+What changed is the silence. `cloneEdition` now returns `reachable: false` alongside
+`sourcePublished` and `sourcePrice` — the state the owner has to reproduce by hand — and both
+callers print it as an explicit next step:
+[scripts/clone-edition.ts](../../../scripts/clone-edition.ts) and
+[scripts/st-za-rewrite.ts](../../../scripts/st-za-rewrite.ts). Covered by two tests in
+`convex/translate.test.ts`: one asserting the caller is told, one asserting the clone is
+neither published nor priced.
+
+Worth recording: **`cloneEdition` had no tests at all** before this. The `st-ZA` clone ran on
+an untested mutation.
 
 ## Notes
 

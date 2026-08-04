@@ -44,19 +44,29 @@ Assets: [assets/06-orthography-rules.md](assets/06-orthography-rules.md) (rule r
   regenerates, and read text-only rows through `r.html` (always `undefined`), so it reported
   both a false alarm and a false pass in the same run. Prefer checks that need no local snapshot.
 
-### Known gaps left open on purpose
+### Two gaps closed after the map, 2026-08-04
 
-Recorded here because they are live conditions, not unfinished tickets:
+Both were recorded as "closed undecided" when the map closed; the user then called for them to
+be fixed, and they were:
 
-- **`cloneEdition` still lands a new Edition finished-but-invisible** — it creates no
-  `publishedEditions` row and says nothing about it. That is exactly how `st-ZA` sat unreachable
-  without anyone noticing. Undecided, not fixed ([08](tickets/08-a-cloned-edition-is-not-reachable.md)).
-- **`publishTranslation`'s quiz-structure guard does not run for blob-backed sources.** Turned
-  off by the lessons/references blob move and never replaced
-  ([05](tickets/05-drop-inline-html-contract.md)).
+- **`cloneEdition` no longer lands a clone in silence.** It still creates no `publishedEditions`
+  row — copying one would publish a paid course's clone *for free*, since the presence of a
+  `listings` row is what makes an Edition paid — but it now returns `reachable: false`,
+  `sourcePublished` and `sourcePrice`, and both scripts print the owner-only next step
+  ([08](tickets/08-a-cloned-edition-is-not-reachable.md)).
+- **The quiz-structure guard works again for blob-backed sources**, via a new
+  `publishTranslationChecked` action that re-reads the source blob. `translateTopic` already had
+  its own check; the unguarded callers were the teach CLI and `st-za-rewrite.ts`, both now routed
+  through the action ([05](tickets/05-drop-inline-html-contract.md)).
+
+### Known gap left open on purpose
+
 - **A malformed `data-no` attribute is in the authored English** and inherited by every Edition;
   its learner-visible impact was never established
-  ([09](tickets/09-unescaped-quote-breaks-quiz-feedback-markup.md)).
+  ([09](tickets/09-unescaped-quote-breaks-quiz-feedback-markup.md)). Note the new guard would not
+  have caught it — it is upstream of translation, in the source.
+- Related, and unchanged by the above: the 59 `st-ZA` rows already on prod were published before
+  the guard existed, so they were never structurally checked.
 
 ## Decisions so far
 

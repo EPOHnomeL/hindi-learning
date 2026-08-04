@@ -113,10 +113,28 @@ Migrating it would buy a narrower schema at the price of a widen-migrate-narrow 
 table that is still being written to daily, plus the two-commit push sequencing Convex forces
 on a field drop.
 
-**One real cost carries forward, unfixed:** with source Lesson bodies in blobs, markup is not
-readable inside a mutation, so `publishTranslation`'s **quiz-structure guard no longer runs**
-for a blob-backed source. That guard is simply off, and nothing replaced it — which is
-plausibly how the malformed-attribute defect in
-[ticket 09](09-unescaped-quote-breaks-quiz-feedback-markup.md) survived authoring and several
-translation passes without anything complaining. Anyone restoring it should validate in the
-driver, or make `publishTranslation` an action that fetches the blob.
+**The one real cost — the dead quiz-structure guard — was fixed 2026-08-04.**
+
+The problem, precisely: with source Lesson bodies in blobs, `readSource` returns only an
+`htmlStorageId`, so the guard's own condition (`src.html !== undefined`) is never true for a
+lesson and **the check never fired**. It was dead code, not a disabled feature.
+
+It was narrower than first recorded, though. `translateTopic` — the LLM run, and by far the
+highest-volume caller — already ran `quizStructureMatches` itself in the action, where it holds
+the blob text ([convex/translate.ts](../../../convex/translate.ts)). The unguarded callers were
+everything *else*: the teach CLI and `scripts/st-za-rewrite.ts`, which published 59 `st-ZA` rows
+with no structural check at all.
+
+The fix took the second of the two options sketched here — an action that fetches the blob —
+without disturbing the mutation:
+
+- **`publishTranslationChecked`** (action) re-reads the source blob via a new `sourceBlobId`
+  internal query, runs `quizStructureMatches`, and delegates to the existing mutation. An
+  unreadable blob refuses rather than passes, since a silent pass is how this broke the first time.
+- Both script callers now publish through it.
+- The bare mutation keeps its (unreachable-for-lessons) branch as a last line of defence, and a
+  test pins that hole open on purpose so it cannot quietly widen.
+
+This does **not** retroactively validate the 59 `st-ZA` rows already on prod, and it would not
+have caught [ticket 09](09-unescaped-quote-breaks-quiz-feedback-markup.md)'s defect either —
+that is a malformed attribute in the *English source*, upstream of any translation guard.
