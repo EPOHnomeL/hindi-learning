@@ -212,6 +212,12 @@ if (process.argv.includes("--clone")) {
   });
   console.log("cloned " + FROM + " → " + TO + " on PROD:", res);
   console.log("\n! " + TO + " now exists holding LESOTHO text. Dry-run, get the ledger read, then --publish.");
+  console.log(
+    "! " + TO + " is NOT reachable by any learner — a clone is never published.\n" +
+      "  Source " + FROM + " was " + (res.sourcePublished ? "PUBLISHED" : "not published") +
+      (res.sourcePrice ? " at " + res.sourcePrice.amount + " " + res.sourcePrice.currency : " and unpriced") + ".\n" +
+      "  After --publish, the OWNER must flip Publish (and set a price to match) in the Editions panel.",
+  );
   process.exit(0);
 }
 
@@ -232,7 +238,10 @@ if (process.argv.includes("--publish")) {
       "file" in item
         ? { title: item.title, html: readFileSync(OUT + "/after/" + item.file, "utf8") }
         : { text: item.text };
-    const res = await client.mutation(api.translate.publishTranslation, {
+    // `…Checked`, not the bare mutation: the mutation's quiz guard is dead code for
+    // blob-backed sources, so the 2026-08-02 run of this script published 59 rows
+    // with no structural check at all. The action re-reads the source blob.
+    const res = await client.action(api.translate.publishTranslationChecked, {
       secret,
       ownerEmail: owner,
       topicSlug: slug,

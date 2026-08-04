@@ -28,3 +28,16 @@ const client = new ConvexHttpClient(convexUrl(PROD));
 console.log(`Cloning "${slug}" ${fromLang} → ${toLang} on ${PROD ? "PROD" : "dev"}…`);
 const result = await client.mutation(api.translate.cloneEdition, { secret, topicSlug: slug, fromLang, toLang });
 console.log(`translations=${result.translations} shares=${result.shares} pendingShares=${result.pendingShares}`);
+
+// A clone is never published, so it is invisible to every learner until an owner
+// says otherwise — that silence is how st-ZA sat finished-and-unreachable on prod
+// for two days. Say it loudly, and say what the source carried so the owner knows
+// what to match: publishing a clone of a PAID Edition without its price would give
+// the course away.
+console.log(
+  `\n! ${toLang} is NOT reachable by any learner yet — no catalogue card, no price, no public link.` +
+    `\n  Source ${fromLang}: ${result.sourcePublished ? "published" : "not published"}` +
+    `${result.sourcePrice ? `, priced ${result.sourcePrice.amount} ${result.sourcePrice.currency}` : ", unpriced"}.` +
+    `\n  Next step is OWNER-ONLY (agents and scripts cannot do it): open the Editions panel,` +
+    `\n  flip Publish for ${toLang}${result.sourcePrice ? " and set its price to match" : ""}.`,
+);

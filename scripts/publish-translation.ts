@@ -33,7 +33,11 @@ const client = new ConvexHttpClient(convexUrl(PROD));
 console.log(`Publishing "${slug}" → ${lang} from ${base}/ to ${PROD ? "PROD" : "dev"}…`);
 
 async function publish(kind: "title" | "mission" | "lesson" | "reference", key: string, fields: { title?: string; html?: string; text?: string }) {
-  const res = await client.mutation(api.translate.publishTranslation, { secret, ownerEmail: owner, topicSlug: slug, lang: lang!, kind, key, ...fields });
+  // `…Checked`, not the bare mutation: the mutation's quiz-structure guard is dead
+  // code for blob-backed sources (it cannot read the source body), so publishing
+  // through it skips the check entirely. The action re-reads the source blob and
+  // rejects a body whose quiz markers drifted.
+  const res = await client.action(api.translate.publishTranslationChecked, { secret, ownerEmail: owner, topicSlug: slug, lang: lang!, kind, key, ...fields });
   console.log(`${kind.padEnd(9)} ${key || "(course)"} — ${res.status}`);
 }
 

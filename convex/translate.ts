@@ -131,8 +131,10 @@ async function readSource(
       .unique();
     if (!l || l.supersededBy) return null;
     // The source body now lives in a content blob (no inline `html`), so the
-    // quiz-structure guard downstream is skipped for it (see publishTranslation);
-    // the blob id lets an action read the bytes to translate the body.
+    // guard inside `publishTranslation` cannot fire for it — publish through
+    // `publishTranslationChecked` (an action, so it can read the blob) to get the
+    // quiz-structure check. The blob id is also what lets an action read the bytes
+    // to translate the body.
     return { title: l.title, htmlStorageId: l.htmlStorageId, hash: itemHash("lesson", l) };
   }
   if (kind === "reference") {
@@ -407,9 +409,33 @@ export const removeEdition = mutation({
 // purchase) that don't make sense to blindly duplicate. Refuses if `toLang`
 // already has a job (never overwrites an existing Edition) or `fromLang` isn't
 // `ready`.
+//
+// It also creates no `publishedEditions` row, so **the clone is unreachable by
+// any learner until an owner publishes it** — no catalogue card, no price, no
+// public link. That silence is what let `st-ZA` sit finished-and-invisible on
+// prod from 2026-08-02 to 2026-08-04, so the return value now says it outright
+// (`reachable: false`) and reports what the SOURCE Edition carried, which is the
+// thing the owner has to match by hand.
+//
+// Copying `publishedEditions` would be worse than the silence: `listings` is
+// deliberately not copied, and the PRESENCE of a listing row is what makes an
+// Edition paid (schema.ts). A clone that inherited `published: true` without a
+// price would be a *free* copy of a paid course — `freePublishedLangs` is
+// `livePublishedLangs` minus the priced ones. So the clone stays unpublished and
+// the caller is told; publishing remains an owner-auth act, deliberately.
 export const cloneEdition = mutation({
   args: { secret: v.string(), topicSlug: v.string(), fromLang: v.string(), toLang: v.string() },
-  returns: v.object({ translations: v.number(), shares: v.number(), pendingShares: v.number() }),
+  returns: v.object({
+    translations: v.number(),
+    shares: v.number(),
+    pendingShares: v.number(),
+    // Always false — a fresh clone is never published. Named as a field rather
+    // than left implicit so a caller has to look at it.
+    reachable: v.boolean(),
+    // What `fromLang` carried, so the caller can echo the exact next step.
+    sourcePublished: v.boolean(),
+    sourcePrice: v.union(v.object({ amount: v.number(), currency: v.string() }), v.null()),
+  }),
   handler: async (ctx, { secret, topicSlug, fromLang, toLang }) => {
     assertAdmin(secret);
     if (!isKnownLang(toLang)) throw new Error("unsupported target language");
@@ -481,7 +507,92 @@ export const cloneEdition = mutation({
       pendingCopied++;
     }
 
-    return { translations: rows.length, shares: sharesCopied, pendingShares: pendingCopied };
+    // What the source Edition carried. Read after the copy so the caller gets the
+    // state it must reproduce by hand — neither is cloned, on purpose (see above).
+    const srcPublished = await ctx.db
+      .query("publishedEditions")
+      .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", fromLang))
+      .unique();
+    const srcListing = await ctx.db
+      .query("listings")
+      .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", fromLang))
+      .unique();
+
+    return {
+      translations: rows.length,
+      shares: sharesCopied,
+      pendingShares: pendingCopied,
+      reachable: false,
+      sourcePublished: srcPublished?.published ?? false,
+      sourcePrice: srcListing ? { amount: srcListing.amount, currency: srcListing.currency } : null,
+    };
+  },
+});
+
+// The source Lesson/Reference blob id for one item, so an ACTION can fetch the
+// bytes the quiz guard needs. `publishTranslation` runs in a mutation and cannot
+// read blobs, which is precisely why its own guard went dead.
+export const sourceBlobId = internalQuery({
+  args: { secret: v.string(), topicSlug: v.string(), kind: kindV, key: v.string() },
+  returns: v.union(v.id("_storage"), v.null()),
+  handler: async (ctx, { secret, topicSlug, kind, key }) => {
+    assertAdmin(secret);
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return null;
+    const src = await readSource(ctx, topic._id, kind, key);
+    return src?.htmlStorageId ?? null;
+  },
+});
+
+// The guarded front door to `publishTranslation`, for every caller that isn't
+// `translateTopic`.
+//
+// The quiz-structure guard inside the mutation is dead code for Lessons: since
+// source bodies moved to content blobs, `readSource` returns only an
+// `htmlStorageId`, so `src.html !== undefined` is never true and the check never
+// fires. `translateTopic` is unaffected — it holds the blob text already and runs
+// `quizStructureMatches` itself before publishing. Everything else — the teach
+// CLI (`scripts/publish-translation.ts`), the st-ZA rewrite that published 59
+// unchecked rows — had no structural check at all.
+//
+// An action CAN read the blob, so the guard lives here: reject a translated body
+// whose data-correct/data-answer/data-k counts drifted from the source, leaving
+// the English fallback rather than shipping a quiz the reader would mis-score.
+export const publishTranslationChecked = action({
+  args: {
+    secret: v.string(),
+    ownerEmail: v.string(),
+    topicSlug: v.string(),
+    lang: v.string(),
+    kind: kindV,
+    key: v.string(),
+    title: v.optional(v.string()),
+    html: v.optional(v.string()),
+    text: v.optional(v.string()),
+    reply: v.optional(v.string()),
+  },
+  returns: v.object({ status: v.union(v.literal("saved"), v.literal("skipped"), v.literal("unchanged")) }),
+  handler: async (ctx, a): Promise<{ status: "saved" | "skipped" | "unchanged" }> => {
+    const html = a.html !== undefined ? stripFence(a.html) : undefined;
+    // Only a Lesson body carries quiz markers; a title/mission has no source
+    // markup to compare against, so there is nothing to guard.
+    if (a.kind === "lesson" && html !== undefined) {
+      const sid = await ctx.runQuery(internal.translate.sourceBlobId, {
+        secret: a.secret,
+        topicSlug: a.topicSlug,
+        kind: a.kind,
+        key: a.key,
+      });
+      if (sid) {
+        const blob = await ctx.storage.get(sid);
+        const body = blob ? await blob.text() : null;
+        // An unreadable source blob is not a licence to skip the check — refuse,
+        // the same way a marker mismatch does. Silently publishing here is how
+        // the guard stopped protecting the first time.
+        if (body === null || !quizStructureMatches(body, html)) return { status: "skipped" };
+      }
+    }
+    return await ctx.runMutation(api.translate.publishTranslation, a);
   },
 });
 
@@ -616,9 +727,14 @@ export const publishTranslation = mutation({
 
     const html = a.html !== undefined ? stripFence(a.html) : undefined;
     // A structural drift in a Lesson's quiz markers would break positional scoring
-    // — skip it (English fallback) rather than ship a broken quiz. The guard needs
-    // the source markup; once the source body is a content blob it isn't readable
-    // in a mutation, so the check is skipped (the run is trusted, secret-guarded).
+    // — skip it (English fallback) rather than ship a broken quiz.
+    //
+    // NOTE this branch is unreachable for a Lesson today: source bodies are content
+    // blobs, so `readSource` returns no `html` and a mutation cannot fetch one. It
+    // is kept for non-blob sources and as the last line of defence. The live guard
+    // for blob-backed sources is in the two callers that CAN read the blob —
+    // `translateTopic` (holds the body already) and `publishTranslationChecked`
+    // (re-reads it). Publish through one of those, never this mutation directly.
     if (a.kind === "lesson" && html !== undefined && src.html !== undefined && !quizStructureMatches(src.html, html)) {
       return { status: "skipped" };
     }

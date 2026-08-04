@@ -369,7 +369,10 @@ test("claim → publish → report round-trips one Edition, and the reader serve
   });
 });
 
-test("publishTranslation no longer quiz-guards a blob-backed source (body unreadable in a mutation) — it saves the row", async () => {
+// Documents the hole, so it can't quietly widen again: the bare mutation still
+// does not guard a blob-backed source. That is why every caller outside
+// `translateTopic` must publish through `publishTranslationChecked` (below).
+test("publishTranslation still does NOT quiz-guard a blob-backed source — the guarded door is publishTranslationChecked", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
   const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
@@ -606,6 +609,139 @@ test("removeEdition drops the Edition's translations, job, shares, and public li
     shares: (await ctx.db.query("shares").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()).length,
   }));
   expect(left).toEqual({ translations: 0, jobs: true, links: 0, shares: 0 });
+});
+
+// ---- cloneEdition: the clone is never reachable, and says so ---------------
+
+// `st-ZA` was cloned onto prod on 2026-08-02 and sat invisible to every learner
+// until 2026-08-04, because `cloneEdition` creates no `publishedEditions` row and
+// said nothing about it. It still creates no row — copying one would publish the
+// clone with NO `listings` price, and the presence of a listing row is what makes
+// an Edition paid, so a paid course's clone would be readable for free. The fix is
+// to make the caller's next step unmissable instead.
+
+test("cloneEdition tells its caller the clone is unreachable, and reports what the source carried", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi");
+  await addReadyJob(t, topicId, "es");
+  await addTranslation(t, topicId, "es", "title", "", { text: "Hindi (es)" });
+  // The source Edition is both catalogue-listed AND priced.
+  await t.run((ctx) => ctx.db.insert("publishedEditions", { topicId, lang: "es", published: true }));
+  await t.run((ctx) => ctx.db.insert("listings", { topicId, lang: "es", amount: 15000, currency: "ZAR" }));
+
+  const res = await t.mutation(api.translate.cloneEdition, {
+    secret: "test-secret",
+    topicSlug: "hindi",
+    fromLang: "es",
+    toLang: "fr",
+  });
+
+  expect(res).toMatchObject({
+    translations: 1,
+    reachable: false,
+    sourcePublished: true,
+    sourcePrice: { amount: 15000, currency: "ZAR" },
+  });
+});
+
+test("cloneEdition does NOT publish or price the clone — a paid Edition's clone must not become a free one", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi");
+  await addReadyJob(t, topicId, "es");
+  await addTranslation(t, topicId, "es", "title", "", { text: "Hindi (es)" });
+  await t.run((ctx) => ctx.db.insert("publishedEditions", { topicId, lang: "es", published: true }));
+  await t.run((ctx) => ctx.db.insert("listings", { topicId, lang: "es", amount: 15000, currency: "ZAR" }));
+
+  await t.mutation(api.translate.cloneEdition, { secret: "test-secret", topicSlug: "hindi", fromLang: "es", toLang: "fr" });
+
+  const clone = await t.run(async (ctx) => ({
+    published: await ctx.db.query("publishedEditions").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "fr")).unique(),
+    listing: await ctx.db.query("listings").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "fr")).unique(),
+  }));
+  expect(clone).toEqual({ published: null, listing: null });
+});
+
+// ---- publishTranslationChecked: the quiz guard, restored for blob sources ---
+
+// The mutation's guard went dead when Lesson bodies moved to blobs: `readSource`
+// returns only an `htmlStorageId`, so `src.html !== undefined` is never true for a
+// lesson and the check never fires. `translateTopic` has its own check (it holds
+// the blob text already), but every OTHER caller — the teach CLI, the st-ZA
+// rewrite that published 59 unchecked rows — had none. This action is the door
+// those callers use: it can read the blob, so it can guard.
+
+test("publishTranslationChecked rejects a translation that dropped a quiz marker from a blob-backed source", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  const sid = await t.run((ctx) => ctx.storage.store(new Blob(['<div data-correct="a"></div>'], { type: "text/html" })));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1", htmlStorageId: sid }));
+  await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" });
+
+  expect(
+    await t.action(api.translate.publishTranslationChecked, {
+      secret: "test-secret",
+      ownerEmail: "alice@example.com",
+      topicSlug: "hindi",
+      lang: "es",
+      kind: "lesson",
+      key: "0001",
+      title: "L1",
+      html: "<div></div>", // the data-correct marker is gone — positional scoring would break
+    }),
+  ).toEqual({ status: "skipped" });
+
+  const row = await t.run((ctx) =>
+    ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "es").eq("kind", "lesson").eq("key", "0001"))
+      .unique(),
+  );
+  expect(row).toBeNull(); // nothing written: the reader keeps the English fallback
+});
+
+test("publishTranslationChecked saves a translation whose quiz markers survived", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  const sid = await t.run((ctx) => ctx.storage.store(new Blob(['<div data-correct="a"></div>'], { type: "text/html" })));
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1", htmlStorageId: sid }));
+  await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" });
+
+  expect(
+    await t.action(api.translate.publishTranslationChecked, {
+      secret: "test-secret",
+      ownerEmail: "alice@example.com",
+      topicSlug: "hindi",
+      lang: "es",
+      kind: "lesson",
+      key: "0001",
+      title: "L1",
+      html: '<div data-correct="a">sí</div>',
+    }),
+  ).toEqual({ status: "saved" });
+});
+
+test("publishTranslationChecked passes non-lesson items straight through (no source markup to guard)", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
+  await addLesson(t, topicId, "0001", 1);
+  await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" });
+
+  expect(
+    await t.action(api.translate.publishTranslationChecked, {
+      secret: "test-secret",
+      ownerEmail: "alice@example.com",
+      topicSlug: "hindi",
+      lang: "es",
+      kind: "title",
+      key: "",
+      text: "Hindi (es)",
+    }),
+  ).toEqual({ status: "saved" });
 });
 
 // ---- Certificate: Edition snapshot -----------------------------------------
