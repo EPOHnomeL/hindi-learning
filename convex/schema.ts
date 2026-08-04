@@ -431,10 +431,12 @@ export default defineSchema({
     ),
     key: v.string(),
     title: v.optional(v.string()),
-    // The translated lesson/reference body. Still stored inline (`html`) for new
-    // translations — migrating the translation write-path to blobs is a follow-up.
+    // The translated lesson/reference body. Stored inline (`html`) for new
+    // translations, and that is now the settled shape — the 2026-08-04 decision
+    // was to keep the dual read path rather than migrate this table to blobs
+    // (.plan/maps/course-translation/tickets/05-drop-inline-html-contract.md).
     // Rows migrated by the one-shot backfill carry `htmlStorageId`; the reader
-    // serves whichever is present (see .scratch/html-blob-storage).
+    // serves whichever is present.
     html: v.optional(v.string()),
     htmlStorageId: v.optional(v.id("_storage")),
     text: v.optional(v.string()),
