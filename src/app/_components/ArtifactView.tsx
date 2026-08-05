@@ -541,6 +541,7 @@ function LessonView({
         {canEdit && editing && (
           <ContentEditor
             topicSlug={topicSlug}
+            editionLang={lang ?? undefined}
             html={html}
             theme={theme}
             dir={dir}
@@ -600,6 +601,7 @@ function LessonView({
 // References; the caller supplies the kind-specific `commit`.
 function ContentEditor({
   topicSlug,
+  editionLang,
   html,
   theme,
   themeCss,
@@ -610,6 +612,10 @@ function ContentEditor({
   commit,
 }: {
   topicSlug: string;
+  // The Edition being edited, for the upload-URL guard (owner or THIS Edition's
+  // Editor, ADR 0020). Absent ≡ the English source. Distinct from `lang` below,
+  // which is display-only.
+  editionLang?: string;
   html: string;
   theme: Theme;
   // Inject the dark palette for items that don't ship their own (References) —
@@ -643,7 +649,7 @@ function ContentEditor({
     setError(null);
     try {
       const edited = replaceBodyInner(html, doc.body.innerHTML);
-      const url = await generateUploadUrl({ topicSlug });
+      const url = await generateUploadUrl({ topicSlug, lang: editionLang });
       const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/html" }, body: edited });
       if (!res.ok) throw new Error(t("uploadFailed"));
       const { storageId } = (await res.json()) as { storageId: string };

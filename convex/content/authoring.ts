@@ -100,19 +100,30 @@ export const renameTopic = mutation({
 
 // ---- Owner prose edit (course-content-editing 01) --------------------------
 
-// Mint an upload URL for the owner reader's in-place edit: the client PUTs the
-// edited Lesson body straight to storage and passes the resulting storageId to
+// Mint an upload URL for the reader's in-place edit: the client PUTs the edited
+// Lesson body straight to storage and passes the resulting storageId to
 // `editLesson`, so the HTML never rides through a Convex function (mirrors the
-// teach CLI's `generateContentUploadUrl`, but owner-guarded instead of
-// secret-guarded). Owner-scoped to the Topic being edited so only its owner can
-// mint an upload URL — the blob still does nothing until `editLesson` accepts it.
+// teach CLI's `generateContentUploadUrl`, but caller-guarded instead of
+// secret-guarded). Scoped to the Topic+Edition being edited — the blob still does
+// nothing until the write path accepts it.
+//
+// The guard MUST be the same one the write paths use (`getEditableTopic`: owner
+// OR that Edition's Editor, ADR 0020) and NOT owner-only. It was `getOwnedTopic`
+// until 2026-08-05, which made every Editor's save die here — the reader shows
+// the pencil on the server's `canEdit` (owner or Editor) and `editLesson` /
+// `editTranslatedLesson` / `editReference` all accept an Editor, so an Editor
+// could open the editor, type, press Save, and get a bare "Server Error" from
+// this mutation before any write path was reached.
 export const generateEditUploadUrl = mutation({
-  args: { topicSlug: v.string() },
+  args: { topicSlug: v.string(), lang: v.optional(v.string()) },
   returns: v.string(),
-  handler: async (ctx, { topicSlug }) => {
+  handler: async (ctx, { topicSlug, lang }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
-    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    // `lang` is the Edition being edited (absent ≡ the English source), so an
+    // Editor of lang X can't mint an upload URL against lang Y — the same
+    // per-Edition boundary `applyTranslatedLessonEdit` enforces on the write.
+    const topic = await getEditableTopic(ctx, userId, topicSlug, lang);
     if (!topic) throw new Error("topic not found");
     return await ctx.storage.generateUploadUrl();
   },

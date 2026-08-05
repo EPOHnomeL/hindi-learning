@@ -570,6 +570,38 @@ test("editor enforcement: a plain Viewer, a wrong-lang Editor, and a stranger ar
   });
 });
 
+// The save is TWO calls — mint an upload URL, then the write — and until
+// 2026-08-05 only the write was covered here, so `generateEditUploadUrl` sat
+// owner-only and every Editor's save died at the FIRST call with a bare "Server
+// Error". Guard the mint with the same trust boundary as the write.
+test("edit upload URL: an Editor of the Edition can mint one; a Viewer, a wrong-lang Editor and a stranger cannot", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const enEditor = await seedUser(t, "eneditor@example.com");
+  const afEditor = await seedUser(t, "afeditor@example.com");
+  const viewer = await seedUser(t, "viewer@example.com");
+  const stranger = await seedUser(t, "stranger@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  await seedLesson(t, topicId, "0001", await storeHtml(t, QUIZ_BODY));
+  await seedEditorShare(t, topicId, enEditor, "en");
+  await seedEditorShare(t, topicId, afEditor, "af");
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: viewer, lang: "en" }));
+
+  const mint = api.content.authoring.generateEditUploadUrl;
+  // Owner, on the source (no `lang`) and on a translated Edition.
+  expect(await asUser(t, owner).mutation(mint, { topicSlug: "hindi" })).toEqual(expect.any(String));
+  expect(await asUser(t, owner).mutation(mint, { topicSlug: "hindi", lang: "af" })).toEqual(expect.any(String));
+  // Each Editor on their OWN Edition — this is what the bug broke.
+  expect(await asUser(t, enEditor).mutation(mint, { topicSlug: "hindi" })).toEqual(expect.any(String));
+  expect(await asUser(t, afEditor).mutation(mint, { topicSlug: "hindi", lang: "af" })).toEqual(expect.any(String));
+  // …and not on anyone else's: the mint is per-Edition, like the write.
+  await expect(asUser(t, enEditor).mutation(mint, { topicSlug: "hindi", lang: "af" })).rejects.toThrow();
+  await expect(asUser(t, afEditor).mutation(mint, { topicSlug: "hindi" })).rejects.toThrow();
+  await expect(asUser(t, viewer).mutation(mint, { topicSlug: "hindi" })).rejects.toThrow();
+  await expect(asUser(t, stranger).mutation(mint, { topicSlug: "hindi" })).rejects.toThrow();
+  await expect(t.mutation(mint, { topicSlug: "hindi" })).rejects.toThrow();
+});
+
 test("editor enforcement: the quiz-structure guard still rejects a structural change made by an Editor", async () => {
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
