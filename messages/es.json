@@ -265,6 +265,7 @@
     "saving": "Guardando…",
     "save": "Guardar",
     "uploadFailed": "Error al subir — inténtalo de nuevo.",
+    "saveFailed": "No se pudo guardar esa edición — inténtalo de nuevo.",
     "generating": "Generando la siguiente lección…",
     "caughtUpTitle": "Tu profesor no tiene nada nuevo en cola todavía.",
     "caughtUp": "✨ Todo al día",

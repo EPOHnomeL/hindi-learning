@@ -265,6 +265,7 @@
     "saving": "Enregistrement…",
     "save": "Enregistrer",
     "uploadFailed": "Échec de l’envoi — veuillez réessayer.",
+    "saveFailed": "Impossible d’enregistrer cette modification — veuillez réessayer.",
     "generating": "Génération de la leçon suivante…",
     "caughtUpTitle": "Votre enseignant n’a rien de nouveau en file d’attente pour l’instant.",
     "caughtUp": "✨ Tout est à jour",

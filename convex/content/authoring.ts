@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { action, internalMutation, internalQuery, mutation, type ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
@@ -182,6 +182,28 @@ async function blobText(ctx: ActionCtx, id: Id<"_storage">): Promise<string | nu
   return blob ? await blob.text() : null;
 }
 
+// The refusals below are instructions to the person editing ("reword without
+// adding an option", "refresh and try again"), and the editor shows them inline.
+//
+// They MUST be ConvexError: a **production** deployment redacts a plain Error's
+// message before it reaches the client, so `e.message` becomes "[CONVEX
+// A(content/authoring:editLesson)] … Server Error" and every one of these
+// sentences was replaced by that noise on the live site — the same trap the
+// donation-flag precondition fell into (see `convex/tenants.ts`). Only
+// ConvexError's `data` crosses the wire in prod.
+//
+// The *guard* failures above (`unauthenticated`, `topic not found`, `lesson not
+// found`) stay plain Errors deliberately: they aren't instructions, and being
+// redacted is the right outcome for an authorisation detail.
+const REFUSAL = {
+  unreadableUpload: "The edited lesson couldn't be read back. Please try saving again.",
+  unreadableCurrent: "Couldn't check this edit against the current lesson. Please refresh and try again.",
+  unreadableSource: "Couldn't check this edit against the source lesson. Please refresh and try again.",
+  quizStructure:
+    "This edit changes the lesson's quiz structure, so it can't be saved. Reword the text without adding or removing quiz options or answers.",
+  unreadableReference: "The edited reference couldn't be read back. Please try saving again.",
+} as const;
+
 // Owner corrects a source Lesson's body in place (amends ADR 0003): the client
 // uploads the edited HTML (generateEditUploadUrl) and passes its storageId here.
 // A Lesson stays structurally immutable — a save that changes the quiz's marker
@@ -200,7 +222,7 @@ export const editLesson = action({
     // upload (a bogus/consumed storageId): that would patch the lesson to a dead
     // blob and then delete the good previous body — silent, unrecoverable loss.
     const newHtml = await blobText(ctx, storageId);
-    if (newHtml === null) throw new Error("The edited lesson couldn't be read back. Please try saving again.");
+    if (newHtml === null) throw new ConvexError(REFUSAL.unreadableUpload);
     // A lesson with a current body must keep its quiz-marker counts unchanged
     // (scoring is positional). If the current body can't be read, the edit can't
     // be verified against it — refuse rather than accept a possibly-structural
@@ -209,11 +231,7 @@ export const editLesson = action({
       const oldHtml = await blobText(ctx, target.storageId);
       if (oldHtml === null || !quizStructureMatches(oldHtml, newHtml)) {
         await ctx.storage.delete(storageId);
-        throw new Error(
-          oldHtml === null
-            ? "Couldn't check this edit against the current lesson. Please refresh and try again."
-            : "This edit changes the lesson's quiz structure, so it can't be saved. Reword the text without adding or removing quiz options or answers.",
-        );
+        throw new ConvexError(oldHtml === null ? REFUSAL.unreadableCurrent : REFUSAL.quizStructure);
       }
     }
     // Guard passed. If the swap itself fails (e.g. the lesson was superseded in the
@@ -324,9 +342,7 @@ export const editReference = mutation({
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
       .unique();
     if (!ref) throw new Error("reference not found");
-    if (!(await ctx.db.system.get(storageId))) {
-      throw new Error("The edited reference couldn't be read back. Please try saving again.");
-    }
+    if (!(await ctx.db.system.get(storageId))) throw new ConvexError(REFUSAL.unreadableReference);
     const old = ref.htmlStorageId;
     await ctx.db.patch(ref._id, { htmlStorageId: storageId });
     if (old && old !== storageId) await ctx.storage.delete(old);
@@ -413,16 +429,12 @@ export const editTranslatedLesson = action({
   handler: async (ctx, { topicSlug, key, lang, storageId }): Promise<null> => {
     const target = await ctx.runQuery(internal.content.authoring.translatedLessonEditTarget, { topicSlug, key, lang });
     const newHtml = await blobText(ctx, storageId);
-    if (newHtml === null) throw new Error("The edited lesson couldn't be read back. Please try saving again.");
+    if (newHtml === null) throw new ConvexError(REFUSAL.unreadableUpload);
     if (target.sourceStorageId) {
       const srcHtml = await blobText(ctx, target.sourceStorageId);
       if (srcHtml === null || !quizStructureMatches(srcHtml, newHtml)) {
         await ctx.storage.delete(storageId);
-        throw new Error(
-          srcHtml === null
-            ? "Couldn't check this edit against the source lesson. Please refresh and try again."
-            : "This edit changes the lesson's quiz structure, so it can't be saved. Reword the text without adding or removing quiz options or answers.",
-        );
+        throw new ConvexError(srcHtml === null ? REFUSAL.unreadableSource : REFUSAL.quizStructure);
       }
     }
     try {

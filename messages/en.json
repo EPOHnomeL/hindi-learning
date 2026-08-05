@@ -265,6 +265,7 @@
     "saving": "Saving…",
     "save": "Save",
     "uploadFailed": "Upload failed — please try again.",
+    "saveFailed": "Couldn't save that edit — please try again.",
     "generating": "Generating next lesson…",
     "caughtUpTitle": "Your teacher has nothing new queued yet.",
     "caughtUp": "✨ All caught up",

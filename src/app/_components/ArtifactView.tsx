@@ -1,6 +1,7 @@
 "use client";
 
 import { useAction, useMutation, useQuery } from "convex/react";
+import { ConvexError } from "convex/values";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -588,6 +589,23 @@ function LessonView({
   );
 }
 
+// What to show the editor when a save refuses.
+//
+// **A production Convex deployment redacts a plain `Error`'s message**, so
+// `e.message` there is the useless "[CONVEX A(…)] [Request ID: …] Server Error"
+// string — which is exactly what an Editor saw in place of every one of the write
+// path's carefully worded refusals until 2026-08-05. Only `ConvexError`'s `data`
+// survives the trip, so read that first; anything else (a genuinely local failure
+// like the storage PUT, or a redacted guard error nobody should be reading) gets
+// the caller's own localised fallback rather than Convex's internals. Mirrors
+// `mutationError` in AdminPanel.
+function saveError(e: unknown, fallback: string): string {
+  if (e instanceof ConvexError && typeof e.data === "string") return e.data;
+  // A local throw carries its own message (the upload PUT), and it is already localised.
+  if (e instanceof Error && !/\[CONVEX/.test(e.message)) return e.message;
+  return fallback;
+}
+
 // The owner's in-place prose editor (course-content-editing). A modal holding an
 // edit iframe that renders the item with its authored CSS/layout — the same
 // visual surface the reader shows, minus the reader's bridge scripts. The iframe
@@ -657,7 +675,7 @@ function ContentEditor({
       await commit(storageId as Id<"_storage">);
       onClose(); // live for every reader on the next reactive tick — no publish step.
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(saveError(e, t("saveFailed")));
     } finally {
       setSaving(false);
     }

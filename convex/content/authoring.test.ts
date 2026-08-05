@@ -217,6 +217,46 @@ test("editLesson: rejects a structural change, cleans up the rejected blob, and 
   expect(await t.run((ctx) => ctx.db.system.get(badSid))).toBeNull();
 });
 
+// `toThrow(/quiz/i)` above passes for a plain Error too, and a plain Error's
+// message is REDACTED to "Server Error" by a production deployment — so every
+// refusal below reached the live editor as noise instead of the instruction it
+// was written to be. Assert the carrier, not just the wording: only a
+// ConvexError's `data` crosses the wire in prod.
+test("edit refusals travel as ConvexError, so their text survives a production deployment", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const topicId = await seedTopic(t, alice, "hindi", "Hindi", 1);
+  await seedLesson(t, topicId, "0001", await storeHtml(t, QUIZ_BODY));
+  await seedTranslatedLesson(t, topicId, "af", "0001", await storeHtml(t, QUIZ_BODY));
+  await seedReference(t, topicId, "grammar", await storeHtml(t, "<p>ref</p>"));
+
+  // A structural change to the source Lesson…
+  const badSid = await storeHtml(t, QUIZ_BODY.replace("</div>", '<span class="opt" data-k="c">z</span></div>'));
+  await expect(
+    asUser(t, alice).action(api.content.authoring.editLesson, { topicSlug: "hindi", key: "0001", storageId: badSid }),
+  ).rejects.toMatchObject({ data: expect.stringContaining("quiz structure") });
+
+  // …the same change to a translated Edition…
+  const badTrSid = await storeHtml(t, QUIZ_BODY.replace("</div>", '<span class="opt" data-k="c">z</span></div>'));
+  await expect(
+    asUser(t, alice).action(api.content.authoring.editTranslatedLesson, { topicSlug: "hindi", key: "0001", lang: "af", storageId: badTrSid }),
+  ).rejects.toMatchObject({ data: expect.stringContaining("quiz structure") });
+
+  // …and a Reference save whose upload can't be read back.
+  const deadSid = await storeHtml(t, "<p>gone</p>");
+  await t.run((ctx) => ctx.storage.delete(deadSid));
+  await expect(
+    asUser(t, alice).mutation(api.content.authoring.editReference, { topicSlug: "hindi", key: "grammar", storageId: deadSid }),
+  ).rejects.toMatchObject({ data: expect.stringContaining("try saving again") });
+
+  // A guard failure is NOT an instruction — it stays a plain Error (no `data`),
+  // so prod redacting it is the intended outcome.
+  const bob = await seedUser(t, "bob@example.com");
+  await expect(
+    asUser(t, bob).action(api.content.authoring.editLesson, { topicSlug: "hindi", key: "0001", storageId: badSid }),
+  ).rejects.not.toHaveProperty("data");
+});
+
 test("editLesson: accepts a prose-only edit that preserves the quiz markers", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
