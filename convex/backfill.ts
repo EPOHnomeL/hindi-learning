@@ -2,8 +2,9 @@ import { v } from "convex/values";
 import { action, internalMutation, internalQuery, mutation } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { assertAdmin } from "./lib";
+import { assertAdmin, topicBySlug } from "./lib";
 import { shuffleQuizOptions } from "./quizShuffle";
+import { quizStructureMatches } from "./translate";
 
 // One-shot, secret-gated backfill: reshuffle the option order of every stored
 // quiz so the correct answer is no longer clustered at the first position (the
@@ -210,6 +211,110 @@ export const backfillGenerationRuns = internalMutation({
       });
     }
     return { inserted: lessons.length };
+  },
+});
+
+// ---- One-off wording sweep across a Topic's source Lessons ------------------
+//
+// Replace a literal string in every non-superseded source Lesson body of ONE
+// Topic — the bulk twin of the owner's hover-pencil edit, for a wording change
+// that would otherwise mean opening every lesson by hand (the first use:
+// "Vehicle:" → "Scripture:" in the header pill of a Bible course, which the
+// authoring template had wrong; the template is fixed for future lessons, this
+// fixes the ones already published).
+//
+// Deliberately literal, not a regex: the caller names exact bytes, so there is no
+// pattern to get wrong across dozens of live lessons. `quizStructureMatches`
+// guards each body the same way the owner's edit path does, so a replacement that
+// somehow disturbed a quiz marker is refused per-lesson rather than shipped —
+// scoring is positional. `dryRun` reports what WOULD change and writes nothing;
+// run it first.
+//
+// Secret-gated (PUBLISH_SECRET), like the teach CLI's publish seams that already
+// write arbitrary Lesson bodies. Idempotent: once `from` is gone, a re-run is a
+// no-op. Driver: `pnpm run sweep-lesson-text[:prod]`.
+//
+// NOTE for the caller: patching a source body changes the Lesson's
+// `htmlStorageId`, which is the staleness key `itemHash` uses — so every
+// translated Edition row for a swept lesson goes stale and a later re-translate
+// will regenerate it (overwriting a manual translation edit of that lesson). That
+// is true of the owner's own in-place edit too; it is not new here.
+export const sweepLessonText = action({
+  args: {
+    secret: v.string(),
+    topicSlug: v.string(),
+    from: v.string(),
+    to: v.string(),
+    dryRun: v.boolean(),
+  },
+  returns: v.object({
+    scanned: v.number(),
+    changed: v.array(v.object({ key: v.string(), hits: v.number() })),
+    refused: v.array(v.string()),
+  }),
+  handler: async (
+    ctx,
+    { secret, topicSlug, from, to, dryRun },
+  ): Promise<{ scanned: number; changed: Array<{ key: string; hits: number }>; refused: string[] }> => {
+    assertAdmin(secret);
+    if (!from) throw new Error("`from` must not be empty");
+    const rows: Array<{ id: Id<"lessons">; key: string; storageId: Id<"_storage"> }> = await ctx.runQuery(
+      internal.backfill.sweepableLessons,
+      { topicSlug },
+    );
+    const changed: Array<{ key: string; hits: number }> = [];
+    const refused: string[] = [];
+    for (const r of rows) {
+      const blob = await ctx.storage.get(r.storageId);
+      const html = blob ? await blob.text() : null;
+      // An unreadable body is reported, never rewritten from nothing.
+      if (html === null) {
+        refused.push(r.key);
+        continue;
+      }
+      const hits = html.split(from).length - 1;
+      if (hits === 0) continue;
+      const next = html.split(from).join(to);
+      if (!quizStructureMatches(html, next)) {
+        refused.push(r.key);
+        continue;
+      }
+      changed.push({ key: r.key, hits });
+      if (dryRun) continue;
+      const storageId = await ctx.storage.store(new Blob([next], { type: "text/html" }));
+      await ctx.runMutation(internal.backfill.swapLessonBody, { id: r.id, storageId, old: r.storageId });
+    }
+    return { scanned: rows.length, changed, refused };
+  },
+});
+
+// The Lessons a sweep may touch: one Topic's live (non-superseded) bodies. A
+// curriculum is tens of rows, so one pass is fine.
+export const sweepableLessons = internalQuery({
+  args: { topicSlug: v.string() },
+  returns: v.array(v.object({ id: v.id("lessons"), key: v.string(), storageId: v.id("_storage") })),
+  handler: async (ctx, { topicSlug }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) throw new Error(`no topic ${topicSlug}`);
+    const lessons = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id))
+      .collect();
+    return lessons
+      .filter((l) => !l.supersededBy && l.htmlStorageId)
+      .map((l) => ({ id: l._id, key: l.key, storageId: l.htmlStorageId! }));
+  },
+});
+
+// Point a Lesson at its rewritten body and delete the one it replaces (no orphan
+// — same discipline as `applyLessonEdit`).
+export const swapLessonBody = internalMutation({
+  args: { id: v.id("lessons"), storageId: v.id("_storage"), old: v.id("_storage") },
+  returns: v.null(),
+  handler: async (ctx, { id, storageId, old }) => {
+    await ctx.db.patch(id, { htmlStorageId: storageId });
+    if (old !== storageId) await ctx.storage.delete(old);
+    return null;
   },
 });
 

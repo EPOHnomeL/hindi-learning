@@ -26,6 +26,8 @@
     "backfill-ledger-kind:prod": "tsx scripts/backfill-ledger-kind.ts --prod",
     "backfill-html-blobs": "tsx scripts/backfill-html-blobs.ts",
     "backfill-html-blobs:prod": "tsx scripts/backfill-html-blobs.ts --prod",
+    "sweep-lesson-text": "tsx scripts/sweep-lesson-text.ts",
+    "sweep-lesson-text:prod": "tsx scripts/sweep-lesson-text.ts --prod",
     "verify-html-blobs": "tsx scripts/verify-html-blobs.ts",
     "verify-html-blobs:prod": "tsx scripts/verify-html-blobs.ts --prod",
     "review": "tsx scripts/review.ts",
