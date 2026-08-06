@@ -43,5 +43,3 @@ A seller can set $ and € prices on an Edition; a buyer whose country resolves 
 the checkout page, and a base-region buyer sees today's Rand price unchanged;
 EFT is absent outside ZA. `pnpm typecheck` and `pnpm test` green. The operator
 has walked it and is happy.
-
-## Answer

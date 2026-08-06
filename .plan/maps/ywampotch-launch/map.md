@@ -361,8 +361,15 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
 
 ## Not yet specified
 
-- ~~**Regional pricing implementation**~~ — graduated 2026-08-06 when 11 resolved;
-  it lives on as tickets 20 and 21 in the Build order table.
+<!-- Empty, and correctly so. The one patch this map carried — Regional pricing
+     implementation — graduated 2026-08-06 when ticket 11 resolved, and lives on
+     as tickets 20 and 21 in the Build order table. A struck-through bullet was
+     left here first; chartr flagged it, because a graduated patch has no
+     identity left to render and the strike hid its lead title. Deleted rather
+     than restyled: the graduation is recorded in Decisions so far, which is
+     where it belongs. Nothing else about this map is foggy — what remains is
+     the operator's two walks (18, 19) and the regional-pricing surfaces (21). -->
+
 
 ## Out of scope
 
