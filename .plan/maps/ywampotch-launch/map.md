@@ -57,7 +57,7 @@ history on a repo that now handles real money.
 | 17 | The card buyer's payment-complete moment | [17](tickets/17-payment-complete-moment-on-card-return.md) | built `f8b55c3` — **operator's walk pending** |
 | 18 | The operator's prod walk — both paths, both rails | [18](tickets/18-operators-prod-walk.md) | open — collects the four pending walks |
 | 19 | One real EFT sale, end to end, on prod | [19](tickets/19-real-eft-sale-end-to-end-on-prod.md) | open — blocked by 18; the map's Done-when |
-| 20 | Build regional pricing — backend + geo header | [20](tickets/20-regional-pricing-backend.md) | open — blocked by 11 |
+| 20 | Build regional pricing — backend + geo | [20](tickets/20-regional-pricing-backend.md) | built `35eb877` |
 | 21 | Build regional pricing — seller + buyer surfaces | [21](tickets/21-regional-pricing-surfaces.md) | open — blocked by 20 |
 
 The strict sequencing above applied to units 01–06, which shared files and are
@@ -317,6 +317,29 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   both rails already freeze from `editionPrice()`, so only the number reaching that
   insert changes, and the server computes it from the `country` argument — the client
   never sends an amount. **Decided, NOT built**; the build is tickets 20 and 21.
+
+- [Build regional pricing — backend + geo](./tickets/20-regional-pricing-backend.md) —
+  built `35eb877`, and **it is far smaller than 11 implied**: two pure functions
+  (`convex/regions.ts`) plus one optional `country` argument on each rail. No new
+  table, no index, no migration, no backfill — `listings` grew two optional
+  foreign-currency fields and an unset one falls back to the base price, so every
+  listing that predates the feature keeps working untouched. Both rails already
+  froze the shown price from one chokepoint, so only the number reaching that
+  insert changed. **`USD_ZAR_RATE` now lives in `convex/rates.ts`**, moved out of
+  the donation rail and re-exported: ADR 0027 had *shipped* while 11 was still
+  open, which is what made ticket 11's shared-constant reconciliation real rather
+  than aspirational. **Two deviations from the ticket, both simplifications.**
+  There is **no middleware change and the ticket was wrong to ask for one** —
+  `x-vercel-ip-country` is already on the incoming request and Vercel overwrites
+  it at the edge, so a server component reads it from `headers()` directly; the
+  delete-and-restamp was cargo-culted from `x-tenant-slug`, which needs it only
+  because it is *derived* from Host. A comment in `src/middleware.ts` records
+  that so it doesn't get re-added. And **the EFT gate asks "is this buyer paying
+  the base price?", not "is this country ZA"** — same arbitrage closed, but it
+  cannot drift from the pricing rule, and a no-header caller still gets through,
+  which matters because localhost sends no country and the operator's dev walk of
+  that rail is owed. 13 new tests, 813/813 green, `git diff convex/payfast.ts`
+  empty. **Nothing is buyer-visible yet** — that is ticket 21.
 
 - [Fix the four known stale facts](./tickets/08-fix-known-stale-docs-and-tracker.md) —
   **four of the five were already fixed, and the ticket had itself gone stale.** The
