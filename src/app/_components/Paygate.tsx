@@ -6,7 +6,9 @@ import Link from "next/link";
 import { type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
 import { type CheckoutStep } from "./checkoutDerive";
+import { useCountry } from "./CountryContext";
 import { Icon } from "./icons";
+import { priceView } from "./priceDerive";
 
 // The paygate (paid marketplace, ADR 0016 / PayFast rail). A caller reading a
 // PAID Edition they don't hold gets the free Preview (the first Lesson); every
@@ -16,7 +18,17 @@ import { Icon } from "./icons";
 // everything here does is name the price and link to it. One CTA, one target,
 // signed in or out: signed out the link lands on `SignIn` at that same URL.
 
-export type Paywall = { amount: number; currency: string; previewKey: string | null };
+// `usdAmount` / `eurAmount` are the seller's optional regional price points, in
+// the FOREIGN currency's minor units (ticket 11 §4) — absent means that region
+// pays the base Rand `amount`. Which of the three a given buyer sees is
+// `priceView()`; nothing here picks it.
+export type Paywall = {
+  amount: number;
+  currency: string;
+  previewKey: string | null;
+  usdAmount?: number;
+  eurAmount?: number;
+};
 
 // Minor units → a localised currency string (e.g. 120000 "zar" → "R 1 200,00").
 // Assumes a 2-decimal currency (ZAR is); `Intl` renders the symbol and grouping
@@ -28,6 +40,26 @@ export function formatPrice(amount: number, currency: string): string {
   } catch {
     return `${major.toFixed(2)} ${currency.toUpperCase()}`;
   }
+}
+
+// What this buyer is quoted, formatted: their own currency's figure, plus the
+// Rand that will actually hit their card when the two differ (ticket 11 §3 —
+// "$10.00", then "charged as R184.00 (ZAR)"). Null for a free Edition.
+//
+// A hook rather than a component because the two money surfaces frame the same
+// two strings very differently — a 2xl figure beside a CTA on the locked card, a
+// gold pill in the checkout summary — while the rule for WHICH figure must be
+// one rule. The Rand is `priceView`'s, which is `chargeCents`, which is what
+// `startCheckout` freezes: the disclosed number is provably the charged number.
+export function useDisplayPrice(paywall: Paywall | null | undefined): { main: string; charged: string | null } | null {
+  const view = priceView(paywall, useCountry());
+  if (!view) return null;
+  return {
+    main: formatPrice(view.amount, view.currency),
+    // Absent for a base-region buyer: they are quoted Rand and charged Rand, so
+    // there is nothing to disclose and the line would only add noise.
+    charged: view.chargedZarCents === null ? null : formatPrice(view.chargedZarCents, "zar"),
+  };
 }
 
 // The whole purchase on one line, at the top of every step of it: Account →
@@ -122,7 +154,7 @@ export function Paygate({
   checkoutHref: string;
 }) {
   const t = useTranslations("Checkout");
-  const price = paywall ? formatPrice(paywall.amount, paywall.currency) : null;
+  const price = useDisplayPrice(paywall);
   // A pending bank transfer (manual EFT rail): an EFT clears in hours or days, so
   // a buyer who comes back before the operator confirms must see that we're
   // waiting for their money — the bare paygate reappearing reads as "my payment
@@ -154,7 +186,16 @@ export function Paygate({
             which is the desktop shape this card already had. */}
         <div className="mt-5 flex flex-col gap-3 sm:flex-row-reverse sm:items-center sm:justify-end sm:gap-4">
           {price && (
-            <span className="text-2xl font-semibold tabular-nums text-ink">{price}</span>
+            <div className="sm:text-right">
+              <span className="text-2xl font-semibold tabular-nums text-ink">{price.main}</span>
+              {/* The anti-surprise line (ticket 11 §3). A buyer quoted $10 whose
+                  statement then reads Rand is a chargeback waiting to happen, and
+                  the same tenant's donation widget already discloses its Rand
+                  line — omitting it here would have one site saying both things. */}
+              {price.charged && (
+                <span className="block text-xs text-soft">{t("chargedAs", { price: price.charged })}</span>
+              )}
+            </div>
           )}
           <Link href={checkoutHref} className={ctaClass}>
             {t("unlockFullCourse")}

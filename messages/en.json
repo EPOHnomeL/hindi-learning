@@ -233,6 +233,7 @@
     "eftBranchCode": "Branch code",
     "eftWait": "Your access opens as soon as we've matched the transfer — usually within one working day. We'll email you the moment it's live.",
     "eftPendingNote": "We're waiting for your bank transfer (reference {ref}). Your access opens as soon as it's matched.",
+    "chargedAs": "charged as {price} (ZAR)",
     "eftFailed": "Couldn't start the bank transfer — please try again."
   },
   "Settings": {
@@ -353,6 +354,9 @@
     "setAPrice": "Set a price",
     "priceZar": "Price (ZAR)",
     "pricePlaceholder": "0.00",
+    "priceUsd": "Price (USD)",
+    "priceEur": "Price (EUR)",
+    "regionalPriceHint": "Leave USD or EUR blank and buyers there pay the Rand price. Cards are always charged in Rand.",
     "save": "Save",
     "stopSelling": "Stop selling — make this edition free",
     "eachLanguagePriced": "Each language is priced on its own — sell some editions, keep others free.",

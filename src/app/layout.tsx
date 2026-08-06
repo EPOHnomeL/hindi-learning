@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { ConvexClientProvider } from "./ConvexClientProvider";
+import { headers } from "next/headers";
 import { getTenantSlug, getTenantView } from "~/lib/tenant-server";
 import { buildTenantThemeCss } from "~/design/tokens";
 import { isDevanagari } from "../../convex/languages";
@@ -47,6 +48,20 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // pre-paint <style> so a tenant host renders in its own skin with no flash.
   const slug = await getTenantSlug();
   const tenant = await getTenantView();
+  // The buyer's country for regional pricing (ticket 21), read here and handed
+  // down for the same reason as the slug: one resolution point, and the client
+  // cannot see the header at all.
+  //
+  // Read straight off the request, with no middleware restamp: Vercel sets
+  // `x-vercel-ip-country` at the edge and OVERWRITES it there, so an inbound
+  // value from a client can't survive to be read here. (The tenant slug needs
+  // stamping only because it is *derived* from Host — see the note in
+  // `src/middleware.ts`, left by ticket 20 so this doesn't get re-added.)
+  //
+  // **Null off Vercel**, which is every local dev run, and `regionForCountry`
+  // reads that as the base ZAR price — failing to the cheapest price, whose cost
+  // is margin rather than an overcharge to defend.
+  const country = (await headers()).get("x-vercel-ip-country");
   const themeCss = tenant ? buildTenantThemeCss(tenant.theme) : null;
 
   // The active chrome locale, resolved from the cookie by getRequestConfig
@@ -88,7 +103,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               config (getRequestConfig) — no props needed; the provider inherits
               them server-side. Server Components use getTranslations directly. */}
           <NextIntlClientProvider>
-            <ConvexClientProvider tenantSlug={slug}>{children}</ConvexClientProvider>
+            <ConvexClientProvider tenantSlug={slug} country={country}>
+              {children}
+            </ConvexClientProvider>
           </NextIntlClientProvider>
         </body>
       </html>

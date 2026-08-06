@@ -201,6 +201,7 @@
     "eftBranchCode": "Código de sucursal",
     "eftWait": "Tu acceso se abre en cuanto localicemos la transferencia, normalmente en un día laborable. Te enviaremos un correo en cuanto esté activo.",
     "eftPendingNote": "Estamos esperando tu transferencia bancaria (referencia {ref}). Tu acceso se abrirá en cuanto la localicemos.",
+    "chargedAs": "se cobrará {price} (ZAR)",
     "eftFailed": "No se pudo iniciar la transferencia bancaria: inténtalo de nuevo."
   },
   "Settings": {
@@ -353,6 +354,9 @@
     "setAPrice": "Poner un precio",
     "priceZar": "Precio (ZAR)",
     "pricePlaceholder": "0.00",
+    "priceUsd": "Precio (USD)",
+    "priceEur": "Precio (EUR)",
+    "regionalPriceHint": "Deja USD o EUR en blanco y quienes compren allí pagarán el precio en rands. Las tarjetas siempre se cobran en rands.",
     "save": "Guardar",
     "stopSelling": "Dejar de vender — hacer esta edición gratuita",
     "eachLanguagePriced": "Cada idioma tiene su propio precio — vende algunas ediciones y deja otras gratis.",

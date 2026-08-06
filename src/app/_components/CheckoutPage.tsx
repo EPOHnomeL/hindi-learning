@@ -6,10 +6,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
+import { eftAllowed, regionForCountry } from "../../../convex/regions";
 import { checkoutStep } from "./checkoutDerive";
+import { useCountry } from "./CountryContext";
 import { withLang } from "./editionUrl";
 import { Icon } from "./icons";
-import { CheckoutSteps, formatPrice } from "./Paygate";
+import { CheckoutSteps, formatPrice, useDisplayPrice } from "./Paygate";
 import { postToPayFast } from "./payfastPost";
 
 // The whole purchase, as a page (ywampotch-launch/12–13): `/checkout/<slug>/<lang>`.
@@ -34,6 +36,12 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
   const t = useTranslations("Checkout");
   const header = useQuery(api.content.reader.courseHeader, { topicSlug, lang });
   const startCheckout = useMutation(api.market.startCheckout);
+  // Regional pricing (ticket 21). The country came from the edge header via the
+  // root layout; it is an ARGUMENT to both rails because Convex runs off Vercel
+  // and can never read the header itself. **Only the country crosses** — the
+  // amount is derived server-side, so nothing here can name its own price.
+  const country = useCountry();
+  const price = useDisplayPrice(header?.paywall);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,7 +64,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
     setBusy(true);
     setError(null);
     try {
-      const { action, fields } = await startCheckout({ topicSlug, lang });
+      const { action, fields } = await startCheckout({ topicSlug, lang, country: country ?? undefined });
       postToPayFast(action, fields);
     } catch {
       setError(t("checkoutFailed"));
@@ -82,7 +90,6 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
   // under them. That is step 4 arriving live, which is the whole argument for a
   // page over a dialog.
   const entitled = header.role !== "preview";
-  const price = header.paywall ? formatPrice(header.paywall.amount, header.paywall.currency) : null;
   const editionName = header.lang !== "en" ? langInfo(header.lang).native : undefined;
   const courseHref = withLang(`/courses/${topicSlug}`, header.lang);
 
@@ -112,9 +119,19 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
           </span>
         </div>
         {price && (
-          <span className="shrink-0 rounded-full bg-gold/15 px-2.5 py-1 text-xs font-bold tabular-nums text-gold">
-            {price}
-          </span>
+          <div className="shrink-0 text-right">
+            <span className="inline-block rounded-full bg-gold/15 px-2.5 py-1 text-xs font-bold tabular-nums text-gold">
+              {price.main}
+            </span>
+            {/* The anti-surprise line (ticket 11 §3), on the last screen before
+                the buyer commits: a $10 quote that lands on the statement as
+                Rand is the dispute this string exists to prevent. */}
+            {price.charged && (
+              <span className="mt-1 block text-[11px] leading-tight text-soft">
+                {t("chargedAs", { price: price.charged })}
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -146,8 +163,16 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
 
           {eft ? (
             <EftInstructions ref_={eft.ref} amount={eft.amount} bank={eft.bank} currency={"zar"} />
-          ) : eftBank ? (
-            /* Both rails live → one plain question, methods named by what the buyer
+          ) : eftBank && eftAllowed(regionForCountry(country)) ? (
+            /* Both rails live AND this buyer is paying the base price. Outside
+               that, EFT simply isn't offered (ticket 11 §6): it is a South
+               African bank rail, and a buyer quoted $10 by card who could
+               transfer R100 instead would be taking a 45% discount for clicking
+               the other button. `startEftPurchase` refuses it too — this is the
+               polish, that is the gate. With the option gone the chooser
+               collapses to the single-rail branch below, unchanged.
+
+               Both rails live → one plain question, methods named by what the buyer
                HAS (their bank, their card), never by gateway brand — a buyer shouldn't
                need to know what PayFast is to choose. One click goes straight to that
                method's details: EFT to the bank-details panel, card to the PayFast
@@ -164,7 +189,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
                     setBusy(true);
                     setError(null);
                     try {
-                      setStartedEft(await startEft({ topicSlug, lang }));
+                      setStartedEft(await startEft({ topicSlug, lang, country: country ?? undefined }));
                     } catch {
                       setError(t("eftFailed"));
                     } finally {
@@ -190,7 +215,8 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
             </fieldset>
           ) : (
             <>
-              {/* Single rail (EFT off or still loading) — no chooser theatre for a
+              {/* Single rail (EFT off, still loading, or a buyer outside the base
+                  price region) — no chooser theatre for a
                   non-choice; today's one-button card flow stands, bank guidance and all.
                   This is what every tenant but YWAM Potch sees.
 
@@ -205,10 +231,17 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
                   find on screen. Only in this single-rail branch: with the chooser, a
                   buyer headed to PayFast has already chosen card. ponytail: hardcodes
                   PayFast's CURRENT coverage. If they restore the four banks, delete
-                  this note and the `bankGuidance` key rather than editing it. */}
-              <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">
-                {t.rich("bankGuidance", { b: (c) => <b className="font-semibold text-ink">{c}</b> })}
-              </p>
+                  this note and the `bankGuidance` key rather than editing it.
+
+                  Base region only: it names South African banks and PayFast's
+                  Instant EFT tile, so to a US or EU buyer — who reaches this
+                  branch precisely BECAUSE EFT was withheld from them — it is
+                  advice about a rail they were never offered. */}
+              {eftAllowed(regionForCountry(country)) && (
+                <p className="mt-3 rounded-xl border border-gold/40 bg-gold/10 p-3 text-xs leading-relaxed text-soft">
+                  {t.rich("bankGuidance", { b: (c) => <b className="font-semibold text-ink">{c}</b> })}
+                </p>
+              )}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -220,7 +253,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
                   disabled={busy}
                   className="mt-4 w-full rounded-[10px] bg-accent px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-45"
                 >
-                  {busy ? t("redirecting") : price ? `${t("continueToPayFast")} · ${price}` : t("continueToPayFast")}
+                  {busy ? t("redirecting") : price ? `${t("continueToPayFast")} · ${price.main}` : t("continueToPayFast")}
                 </button>
               </form>
             </>

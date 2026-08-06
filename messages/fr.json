@@ -201,6 +201,7 @@
     "eftBranchCode": "Code d'agence",
     "eftWait": "Votre accès s'ouvre dès que nous avons rapproché le virement, généralement sous un jour ouvré. Nous vous enverrons un e-mail dès qu'il est actif.",
     "eftPendingNote": "Nous attendons votre virement bancaire (référence {ref}). Votre accès s'ouvrira dès qu'il sera rapproché.",
+    "chargedAs": "débité {price} (ZAR)",
     "eftFailed": "Impossible de démarrer le virement bancaire — veuillez réessayer."
   },
   "Settings": {
@@ -353,6 +354,9 @@
     "setAPrice": "Fixer un prix",
     "priceZar": "Prix (ZAR)",
     "pricePlaceholder": "0.00",
+    "priceUsd": "Prix (USD)",
+    "priceEur": "Prix (EUR)",
+    "regionalPriceHint": "Laissez USD ou EUR vide et les acheteurs de ces régions paieront le prix en rands. Les cartes sont toujours débitées en rands.",
     "save": "Enregistrer",
     "stopSelling": "Arrêter la vente — rendre cette édition gratuite",
     "eachLanguagePriced": "Chaque langue a son propre prix — vendez certaines éditions, gardez les autres gratuites.",

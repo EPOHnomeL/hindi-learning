@@ -201,6 +201,7 @@
     "eftBranchCode": "Takkode",
     "eftWait": "Jou toegang open sodra ons die oorbetaling opgespoor het — gewoonlik binne een werksdag. Ons stuur jou 'n e-pos sodra dit lewendig is.",
     "eftPendingNote": "Ons wag vir jou bankoorbetaling (verwysing {ref}). Jou toegang open sodra dit opgespoor is.",
+    "chargedAs": "gehef as {price} (ZAR)",
     "eftFailed": "Kon nie die bankoorbetaling begin nie — probeer asseblief weer."
   },
   "Settings": {
@@ -353,6 +354,9 @@
     "setAPrice": "Stel ’n prys",
     "priceZar": "Prys (ZAR)",
     "pricePlaceholder": "0.00",
+    "priceUsd": "Prys (USD)",
+    "priceEur": "Prys (EUR)",
+    "regionalPriceHint": "Los USD of EUR leeg en kopers daar betaal die Rand-prys. Kaarte word altyd in Rand gehef.",
     "save": "Stoor",
     "stopSelling": "Hou op verkoop — maak hierdie uitgawe gratis",
     "eachLanguagePriced": "Elke taal word op sy eie geprys — verkoop sommige uitgawes, hou ander gratis.",

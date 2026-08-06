@@ -683,6 +683,13 @@ function SellEdition({
   const current = pricing?.find((p) => p.lang === lang) ?? null;
   const [open, setOpen] = useState(false);
   const [amount, setAmount] = useState("");
+  // The two REGIONAL prices (ticket 11 §4), typed in the foreign currency —
+  // $10.00, not its Rand equivalent, because the round foreign number is the
+  // whole point of the ask and deriving it from Rand would drift it to "$9.87"
+  // as the rate constant ages. Blank means that region pays the base Rand price,
+  // extending the blank-means-not-priced behaviour this control already had.
+  const [usd, setUsd] = useState("");
+  const [eur, setEur] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -734,8 +741,14 @@ function SellEdition({
 
   // Ready Seller: the price control. Header shows the current state + a toggle to
   // the editor; the editor sets/updates the price or stops selling.
+  const major = (minor: number | undefined) => (minor === undefined ? "" : (minor / 100).toFixed(2));
   const openEditor = () => {
     setAmount(current ? (current.amount / 100).toFixed(2) : "");
+    // Re-open on what was last saved: a save writes all three fields, so a form
+    // that opened blank would silently withdraw the regional prices whenever the
+    // seller edited the Rand one.
+    setUsd(major(current?.usdAmount));
+    setEur(major(current?.eurAmount));
     setError(null);
     setOpen((o) => !o);
   };
@@ -745,11 +758,27 @@ function SellEdition({
       setError(t("priceGreaterThanZero"));
       return;
     }
+    // Blank → `undefined` → that region falls back to the base Rand price, and
+    // an already-set price is cleared. Anything typed must be a real price:
+    // silently dropping a fat-fingered "1o.00" would sell at R100 in New York.
+    const regional = (raw: string): number | undefined | "bad" => {
+      if (!raw.trim()) return undefined;
+      const cents = Math.round(parseFloat(raw) * 100);
+      return Number.isFinite(cents) && cents > 0 ? cents : "bad";
+    };
+    const usdAmount = regional(usd);
+    const eurAmount = regional(eur);
+    if (usdAmount === "bad" || eurAmount === "bad") {
+      setError(t("priceGreaterThanZero"));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      // ZAR-only (PayFast settles in Rand) — the server enforces the same.
-      await setPrice({ topicSlug, lang, amount: minor, currency: "ZAR" });
+      // The BASE price is ZAR-only (PayFast settles in Rand) — the server
+      // enforces the same. `currency` describes that base price only; the
+      // regional amounts are quoted in USD/EUR and still charged as Rand.
+      await setPrice({ topicSlug, lang, amount: minor, currency: "ZAR", usdAmount, eurAmount });
       setOpen(false);
     } catch {
       setError(t("savePriceError"));
@@ -814,19 +843,27 @@ function SellEdition({
       {open && (
         <div className="mt-3 flex flex-col gap-3 border-t border-line pt-3">
           <div className="flex flex-wrap items-end gap-2.5">
-            <label className="flex flex-col gap-1">
-              <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{t("priceZar")}</span>
-              <input
-                value={amount}
-                inputMode="decimal"
-                onChange={(e) => {
-                  setAmount(e.target.value);
-                  setError(null);
-                }}
-                placeholder={t("pricePlaceholder")}
-                className="w-32 rounded-lg border border-line bg-card px-3 py-2 text-sm tabular-nums focus:border-gold focus:outline-none"
-              />
-            </label>
+            {(
+              [
+                [t("priceZar"), amount, setAmount],
+                [t("priceUsd"), usd, setUsd],
+                [t("priceEur"), eur, setEur],
+              ] as const
+            ).map(([label, value, set]) => (
+              <label key={label} className="flex flex-col gap-1">
+                <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{label}</span>
+                <input
+                  value={value}
+                  inputMode="decimal"
+                  onChange={(e) => {
+                    set(e.target.value);
+                    setError(null);
+                  }}
+                  placeholder={t("pricePlaceholder")}
+                  className="w-24 rounded-lg border border-line bg-card px-3 py-2 text-sm tabular-nums focus:border-gold focus:outline-none sm:w-32"
+                />
+              </label>
+            ))}
             <button
               type="button"
               disabled={busy}
@@ -836,6 +873,9 @@ function SellEdition({
               {busy ? t("saving") : t("save")}
             </button>
           </div>
+          {/* Blank is a real answer here, and an unexplained blank field on a
+              money form reads as one you forgot to fill in. */}
+          <p className="text-xs text-soft">{t("regionalPriceHint")}</p>
           {error && <p className="text-xs text-danger">{error}</p>}
           {current ? (
             <button
