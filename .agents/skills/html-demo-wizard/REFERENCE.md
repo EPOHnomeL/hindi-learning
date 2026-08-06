@@ -63,3 +63,68 @@ To implement tooltips tracking mouse coordinates on line charts:
      tooltip.style.opacity = "1";
    }
    ```
+
+---
+
+## 4. Canvas UI shader effects over live demos
+
+[Canvas UI](https://canvasui.dev/docs) ([repo](https://github.com/DavidHDev/canvas-ui)) runs
+GPU shaders over **real, interactive HTML** using the experimental `html-in-canvas` API: the canvas
+lays out and paints live DOM content, and that painted output becomes a texture the shader samples.
+No screenshots, no iframes, no image conversion — the elements stay in the DOM, so pointer events,
+keyboard focus, accessibility, and text searchability all survive the effect.
+
+### Installing an effect
+
+Components are distributed through a shadcn-compatible registry — the CLI copies a single
+standalone source file into the project, so effects are versioned assets in the repo, not a runtime
+dependency:
+
+```bash
+npx shadcn@latest add @canvas-ui/<component>-<framework>
+```
+
+`<framework>` is one of `react`, `solid`, `preact`, `vue`, `svelte`, or `vanilla`. For the
+standalone demo pages this skill produces, use `vanilla`. Because a registry backs it, an agent
+with the shadcn MCP server wired up can browse the catalogue and install a component by name.
+
+### Effect catalogue (40+ components)
+
+| Category | Examples | Good for |
+| --- | --- | --- |
+| Distortion / glitch | `vhs`, `glitch`, `displacement`, `ripple` | Retro or "system under load" framing |
+| Fluid | `liquid`, `droplets` | Rain / water passes over a hero shot |
+| Surface | `glass`, `frost` | Frosted overlays on modals and side panels |
+| Destructive | `shatter`, `flame-wrap`, `particle-reveal` | Transitions between demo views |
+
+Many are pure 3D/shader work and run in every browser today; only the ones that sample DOM content
+need `html-in-canvas`.
+
+### Browser support and graceful degradation
+
+`html-in-canvas` is an experimental Chrome feature in origin trial. Components detect support at
+runtime: without it, the content renders as ordinary HTML and whatever part of the effect can still
+run, does. Rules for demos:
+
+1. Never put demo-critical information (labels, numbers, CTAs) *only* in the shader layer.
+2. Screenshot the demo with effects disabled and confirm it still reads as a finished product.
+3. Assume the client's browser is the unsupported one — the fallback is the real deliverable.
+
+---
+
+## 5. Rendering the demo as video, in code
+
+Combine section 4 with a programmatic video renderer (Remotion, Hyperframes) to *code* the demo
+video rather than record it. This makes the output deterministic and cheap to regenerate whenever
+the UI changes.
+
+- **Reuse the timeline as the storyboard.** The `timeline` array from SKILL.md step 3 already has
+  step durations; convert them to frame ranges at the render fps (e.g. 3000 ms at 30 fps = 90
+  frames) instead of maintaining a second sequence.
+- **Drive the cursor from frame number, not wall clock.** Replace `requestAnimationFrame` timing
+  with the renderer's current-frame value so each frame is reproducible under parallel rendering.
+- **Keep effects declarative.** A shader pass configured by props is a diffable parameter, so
+  iterating on look-and-feel is a code edit and a re-render, not a manual re-edit.
+- **Verify shader support in the render environment.** Headless capture may lack the origin-trial
+  flag; if the effect matters to the cut, confirm it renders in a test frame before rendering the
+  whole timeline.
