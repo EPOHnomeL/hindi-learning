@@ -58,7 +58,7 @@ history on a repo that now handles real money.
 | 18 | The operator's prod walk — both paths, both rails | [18](tickets/18-operators-prod-walk.md) | open — collects the four pending walks |
 | 19 | One real EFT sale, end to end, on prod | [19](tickets/19-real-eft-sale-end-to-end-on-prod.md) | open — blocked by 18; the map's Done-when |
 | 20 | Build regional pricing — backend + geo | [20](tickets/20-regional-pricing-backend.md) | built `35eb877` |
-| 21 | Build regional pricing — seller + buyer surfaces | [21](tickets/21-regional-pricing-surfaces.md) | open — blocked by 20 |
+| 21 | Build regional pricing — seller + buyer surfaces | [21](tickets/21-regional-pricing-surfaces.md) | built `dc9db73` — **unpushed; operator's walk pending** |
 
 The strict sequencing above applied to units 01–06, which shared files and are
 done. The 2026-08-01 additions are a second strand: 09 stood alone (a
@@ -75,8 +75,9 @@ the container was the complaint. 12 is the decision the other three hang off;
 **11 and 13 land in the same surface** — whichever ships second inherits the
 merge.
 
-**18 and 19 are what is left**, and they are the same person's afternoon in two
-sittings: 18 is the buyer's half (taste, on a phone, stopping at Awaiting
+**18 and 19 are what is left** (21's build landed 2026-08-06 and left only its
+walk, which 18 now names as a fifth), and they are the same person's afternoon
+in two sittings: 18 is the buyer's half (taste, on a phone, stopping at Awaiting
 payment), 19 is the operator's half and the map's Done-when (a real transfer,
 confirm, email, Sales, Payouts). 19 was **missed at charting** — 02–05 built the
 whole confirm side and every one of them was verified by tests and code-reading
@@ -340,6 +341,29 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   which matters because localhost sends no country and the operator's dev walk of
   that rail is owed. 13 new tests, 813/813 green, `git diff convex/payfast.ts`
   empty. **Nothing is buyer-visible yet** — that is ticket 21.
+
+- [Build regional pricing — seller + buyer surfaces](./tickets/21-regional-pricing-surfaces.md) —
+  built `9b35b26` + `dc9db73`, 823/823 green. **The ticket didn't ask the hard
+  question and the build had to answer it: a reactive Convex query has no
+  country**, because the country lives on the HTTP request and a subscription
+  outlives it. So `buildPaywall` ships **all three price points** and the client
+  picks with a new pure `priceView()`; the *charge* stays server-derived from the
+  `country` argument, and the disclosed Rand is `chargeCents` itself, so quote and
+  charge cannot diverge. The country is read once in the root layout and rides a
+  **context** beside the tenant slug — `Paygate` renders inside both readers, so a
+  prop chain would have touched every component in between to reach one line.
+  Buyer sees `$10.00` with **charged as R184.00 (ZAR)** under it on the Paygate
+  card and the checkout summary; a base-region buyer sees today's R100 and no
+  second line. Outside the base region **EFT is not offered and neither is the
+  `bankGuidance` note** — it names South African banks to a buyer who reached that
+  branch *because* EFT was withheld. Seller gets two optional foreign-currency
+  fields; blank means that region pays the base price. Four strings × five
+  locales. **Two facts that decide whether this is visible at all:** nothing
+  changes until a seller types the prices (no existing Edition has them), and the
+  header is absent on localhost and reads `ZA` in Potchefstroom — so the $10 view
+  needs a deployed URL *and* a VPN. **Unpushed, and the operator's walk is owed**
+  — the same bar as 13, 14, 16 and 17, and 18 does not cover it while it is off
+  prod.
 
 - [Fix the four known stale facts](./tickets/08-fix-known-stale-docs-and-tracker.md) —
   **four of the five were already fixed, and the ticket had itself gone stale.** The
