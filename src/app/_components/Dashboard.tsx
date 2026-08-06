@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
+import { tenantPill } from "~/design/tenantPill";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { CourseCertMenu } from "./Certificate";
 import { CourseSettingsDialog } from "./CourseSettings";
@@ -31,6 +32,9 @@ type Course = {
   status: "seeded" | "active" | "completed";
   mission: string | null;
   publicToken: string | null;
+  // The course's owning tenant (`null` = default-site-only). Only ever rendered on
+  // the default host, as the tenant pill (whitelabel ticket 25).
+  tenantSlug: string | null;
   lessonCount: number;
   completedCount: number;
   // The soft "~N lessons" estimate of the course's eventual size (owner-only;
@@ -265,6 +269,28 @@ function PaidPill({ pricing }: { pricing: { amount: number; currency: string }[]
   );
 }
 
+// Which tenant a course belongs to, as a small colour-coded pill (whitelabel
+// ticket 25). Renders ONLY on the default host, where the catalogue spans every
+// tenant; `tenantPill` holds that whole decision (and is tested), so this component
+// is just its paint. The colour arrives as a hex from the deterministic slug→colour
+// map rather than as a design token, so it rides inline styles: `color-mix` tints
+// the same hex into a background that works on the light and the dark card.
+function TenantPill({ tenantSlug }: { tenantSlug: string | null }) {
+  const pill = tenantPill(useTenantSlug(), tenantSlug);
+  if (!pill) return null;
+  return (
+    <span
+      className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide"
+      style={{
+        color: pill.colour,
+        backgroundColor: `color-mix(in oklab, ${pill.colour} 16%, transparent)`,
+      }}
+    >
+      {pill.label}
+    </span>
+  );
+}
+
 function CourseCard({ course }: { course: Course }) {
   const t = useTranslations("Dashboard");
   const [showMission, setShowMission] = useState(false);
@@ -309,7 +335,12 @@ function CourseCard({ course }: { course: Course }) {
     >
       <div className="mb-2.5 flex items-start justify-between gap-2.5">
         <h2 className="min-w-0 text-lg font-semibold leading-snug tracking-tight text-ink">{course.title}</h2>
-        {priced ? <PaidPill pricing={priced} /> : <StatusPill course={course} />}
+        {/* Tenant (default host only) sits before the state pill: whose course it is
+            reads before what state it's in, and the two never conflict for the slot. */}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          <TenantPill tenantSlug={course.tenantSlug} />
+          {priced ? <PaidPill pricing={priced} /> : <StatusPill course={course} />}
+        </div>
       </div>
 
       {course.mission ? (

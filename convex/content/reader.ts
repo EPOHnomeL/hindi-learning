@@ -102,6 +102,11 @@ export const dashboard = query({
           // "Public" badge and the SharePanel's link controls. Owner-only query,
           // so this is never exposed to anyone but the owner.
           publicToken: t.publicToken ?? null,
+          // The course's owning tenant, at the top level (it was previously only
+          // reachable nested inside `courseHeader`'s `publicLink`). Drives the
+          // card's tenant pill on the default host, where the catalogue spans
+          // every tenant (whitelabel ticket 25). `null` = default-site-only.
+          tenantSlug: t.tenantSlug ?? null,
           estimatedLessons,
           editions,
           seq: t.seq,
