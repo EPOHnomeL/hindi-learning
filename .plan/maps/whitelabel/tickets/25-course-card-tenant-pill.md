@@ -3,6 +3,10 @@ type: task
 blocked_by: []
 ---
 
+## Status
+
+**Resolved:** 2026-08-06 — built.
+
 # Colour-coded tenant pill on a course card (default host only)
 
 ## Question
@@ -52,3 +56,55 @@ shows a colour-coded pill naming its tenant, with a distinct colour per tenant a
 rendered for an untenanted course; on a tenant subdomain no pill renders at all. Covered by a
 test on whatever pure seam decides pill-or-no-pill and its colour, so the host rule is not
 only asserted by eye.
+
+## Answer
+
+Built 2026-08-06. The whole pill-or-no-pill decision is one pure function,
+`tenantPill(host, courseTenant)` in [src/design/tenantPill.ts](../../../../src/design/tenantPill.ts),
+tested in `tenantPill.test.ts` (5 tests). The card component is only its paint.
+
+The three open questions, as settled:
+
+- **Colour source: (b), the deterministic map** — `TENANT_PILLS` in the same file, four
+  hand-picked hues (`upf` teal `#0f9b8e`, `ywampotch` indigo `#5b5bd6`,
+  `almighty-warriors` magenta `#c2367f`, `yknot` orange `#c96a1e`). (a) was not cheap:
+  `getTheme` is single-tenant and host-keyed ([11](11-ssr-theme-application.md)), so a
+  four-tenant grid needed a new list-shaped read — and a tenant's real accent is exactly
+  the value two tenants are free to pick alike, which defeats the pill's one job. A test
+  pins the colours distinct. Labels mirror `scripts/seed-tenants.ts`'s display names
+  (`YWAM Potch`, not `ywampotch`) — static, so no query.
+- **Surfaces: the owner grid only** (`CourseCard` in `src/app/_components/Dashboard.tsx`).
+  Shared and purchased cards deliberately skipped: those are courses someone else owns, so
+  the operator's "which of *my* tenants is this" question doesn't arise there, and neither
+  list carries `tenantSlug` today. The admin Tenants tab already groups by tenant
+  ([19](19-dashboard-tenants-tab-shell.md)), as the ticket predicted.
+- **Untenanted courses: no pill.** `tenantPill` returns `null` for a `null`/empty slug, and
+  the same for an *unknown* slug — a course carrying a slug retired from `TENANT_SLUGS`
+  degrades to no pill rather than to `undefined.colour`.
+
+Two implementation notes worth keeping:
+
+- **The host premise held.** `useTenantSlug()` is `null` on the default host, and
+  `www.my-course.app → null` was already pinned by an existing case in
+  `src/lib/tenant.test.ts` — no new verification needed, and nothing to change in
+  [10](10-tenant-resolution-middleware.md).
+- **The colour rides inline styles, not a design token, and that is deliberate.** A hex
+  from a static map has no token to live in, and `gold`/`accent2` already mean "paid"/
+  "public" on this same card. `color-mix(in oklab, <hex> 16%, transparent)` tints the one
+  hex into a background that reads on both the light and the dark card, so the pill needs
+  no dark-mode variant.
+
+**One stale claim in this ticket, corrected:** the plumbing note said the field should be
+"added to the returns validator" of `content.reader.dashboard`. That query has **no**
+`returns` validator (unlike `courseHeader`, which does) — adding `tenantSlug: t.tenantSlug ?? null`
+to the returned card object was the whole backend change, plus the field on `Dashboard.tsx`'s
+local `Course` type.
+
+**Verification: static gates only** — `pnpm typecheck` clean across `src/` and `convex/`
+(pre-existing errors in `topics/_devanagari/` are untouched and unrelated), `pnpm vitest run`
+green on both suites (`src/` 208, `convex/` 567). **Not walked in a browser**, so the
+rendered pill's placement and legibility on the dark card are unverified by eye — that
+belongs on the map's outstanding-verification list.
+
+Unchanged from the ticket: until [23](23-legacy-course-tenant-backfill.md) runs, prod courses
+predating the tenant field will legitimately show no pill. That is the backfill's problem.

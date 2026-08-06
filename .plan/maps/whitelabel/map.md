@@ -24,7 +24,10 @@ which waits on the operator, not on a browser.
   [24 grant/revoke tenant admin](tickets/24-grant-tenant-admin.md).
   All six of the outstanding UI checks — this bullet is now the whole of that list.
 - **Implemented, no verification recorded either way**:
-  [18 cross-host canonical redirect](tickets/18-cross-host-canonical-redirect.md).
+  [18 cross-host canonical redirect](tickets/18-cross-host-canonical-redirect.md), and — added
+  2026-08-06 — [25 course-card tenant pill](tickets/25-course-card-tenant-pill.md), which went
+  green on typecheck + unit tests only. Its rendered placement and dark-card legibility want an
+  eye on `my-course.app`.
 - **Waiting on an operator decision, not on code**:
   [23 legacy course tenant backfill](tickets/23-legacy-course-tenant-backfill.md) — a real
   prod re-bake is the operator's call.
@@ -234,6 +237,14 @@ issue per session in dependency order) is the next work — not another `/wayfin
   deliberately not the scoped check** the other member mutations use, because minting a tenant admin
   is a platform privilege rather than a tenant one. Revoke **keeps** `tenantSlug` — it demotes to
   member rather than unassigning — and an admin row cannot be unassigned directly: demote first.
+- [Colour-coded tenant pill on a course card](tickets/25-course-card-tenant-pill.md) — the colour is
+  a **deterministic slug→colour map** in `src/design/tenantPill.ts`, not the tenant's real
+  `theme.light.accent`: `getTheme` is single-tenant and host-keyed, and two tenants may pick
+  near-identical accents — the one thing a distinguishing pill must not do. `tenantPill(host,
+  courseTenant)` is the whole pill-or-no-pill decision, pure and tested, so the invisible half of
+  the rule (**no pill on a tenant subdomain**) is asserted rather than eyeballed on one host. **No
+  pill** for an untenanted *or* unknown slug. **Owner grid only** — shared/purchased cards are
+  someone else's courses, so the operator's question doesn't arise there.
 
 ## Not yet specified
 
