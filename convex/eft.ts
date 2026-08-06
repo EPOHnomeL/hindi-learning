@@ -7,6 +7,7 @@ import { internal } from "./_generated/api";
 import { editionPrice, normaliseEmail, SOURCE_LANG, topicBySlug, translatedTitle } from "./lib";
 import { langInfo } from "./languages";
 import { appUrl, platformFeeBps, splitNet } from "./payfast";
+import { eftAllowed, regionForCountry } from "./regions";
 import { payoutDetailsValidator } from "./schema";
 import { isReadySeller } from "./sellerStatus";
 import { isCallerAdmin } from "./whitelist";
@@ -152,13 +153,28 @@ async function pendingIntent(ctx: MutationCtx | QueryCtx, userId: Doc<"users">["
 // rather than minting a competing one. Two references for one buyer and one
 // Edition is how a real transfer ends up matched to the wrong row, or to none.
 export const startEftPurchase = mutation({
-  args: { topicSlug: v.string(), lang: v.string() },
+  args: {
+    topicSlug: v.string(),
+    lang: v.string(),
+    // The buyer's country, for the base-price gate below (ticket 11 §6).
+    country: v.optional(v.string()),
+  },
   returns: v.object({ ref: v.string(), amount: v.number(), bank: payoutDetailsValidator }),
-  handler: async (ctx, { topicSlug, lang }) => {
+  handler: async (ctx, { topicSlug, lang, country }) => {
     const row = await getRow(ctx);
     // The rail's own toggle governs — deliberately NOT PayFast's `sellingEnabled()`.
     // The point of this rail is to sell when the gateway is the obstacle.
     if (!row?.enabled) throw new Error("EFT payment isn't available right now");
+    // **EFT is base-price only** (regional pricing, ticket 11 §6). It is a South
+    // African bank rail, and leaving it open to a buyer quoted $10 by card would
+    // hand them a 45% discount for clicking the other button. Gated on the
+    // REGION rather than on `country === "ZA"` so the arbitrage closes by
+    // construction and a no-header caller still gets through — localhost sends
+    // no country, and the operator walking this rail in dev must not be locked
+    // out of it. The UI hides the option too; this is the gate, that is polish.
+    if (!eftAllowed(regionForCountry(country))) {
+      throw new Error("EFT is for South African bank accounts — please pay by card");
+    }
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("sign in to pay by EFT — a purchase attaches to your account");
     const topic = await topicBySlug(ctx, topicSlug);

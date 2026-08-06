@@ -27,6 +27,14 @@ export default convexAuthNextjsMiddleware(
     // path + query when it swaps the host. Cheap and additive; consumed only there.
     headers.set("x-url", request.url);
 
+    // NOTE for regional pricing (ywampotch-launch ticket 11): the buyer's
+    // country needs NO stamp here. Unlike `x-tenant-slug` (derived from Host)
+    // and `x-url` (invisible to server components), `x-vercel-ip-country` is
+    // already on the incoming request and Vercel overwrites it at the edge, so
+    // a checkout server component reads it straight from `headers()` and passes
+    // it to Convex as an argument — Convex runs off Vercel and can never see it
+    // itself. Absent on localhost, which resolves to the base price by design.
+
     // Cookie-writer #3 (app-language-i18n ticket 03 §3): first visit, nothing
     // stored → resolve an offered locale ONCE and persist it so the negotiation
     // never re-runs. Stamping the forwarded Cookie header makes it visible to THIS

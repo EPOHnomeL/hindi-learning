@@ -5,6 +5,7 @@ import type { Doc } from "./_generated/dataModel";
 import { normaliseEmail } from "./lib";
 import { isReadySeller } from "./sellerStatus";
 import { appUrl, buildCheckoutFields, processUrl, randFromCents, sellingEnabled, splitNet } from "./payfast";
+import { USD_ZAR_RATE, zarCentsFromUsdCents } from "./rates";
 
 // The **donation rail** (ADR 0027) — the other way money enters the platform.
 // A Guest on a tenant's landing page types a dollar amount, is charged Rand
@@ -35,29 +36,18 @@ import { appUrl, buildCheckoutFields, processUrl, randFromCents, sellingEnabled,
 // take-rate is stated in the widget copy — it cannot drift per deployment.
 export const DONATION_FEE_BPS = 1000;
 
-// The USD→ZAR rate the donor's typed dollars are charged in. The donor types
-// dollars; PayFast charges Rand; this is the only bridge between them, so it is
-// shown to the donor before they commit ("you will be charged R920.00 (ZAR)").
-//
-// A committed constant, and it WILL go stale if nobody watches it — that cost
-// was accepted knowingly (see the follow-up ticket, Live USD→ZAR rate). It errs
-// slightly under the market rate so the Rand charge never exceeds what a
-// donor's own mental conversion of the dollar figure would suggest.
-export const USD_ZAR_RATE = 18.4;
+// The USD→ZAR rate the donor's typed dollars are charged in — **moved to
+// `convex/rates.ts`** (ywampotch-launch ticket 20) once regional pricing needed
+// the same bridge for seller-set $ prices. One number per currency in the repo,
+// so no transaction can ever carry two different dollar figures. Re-exported
+// here because this rail's callers and tests already name it.
 
 // The floor on a donation, in US cents. Not cosmetic: PayFast's per-transaction
 // fee comes off the gross before the split, so a $1 donation is mostly fee and
 // the payee's 90% of what's left is noise. The floor protects the payee's cut.
 export const MIN_DONATION_USD_CENTS = 500;
 
-// US cents → the ZAR cents PayFast is asked to charge. Integer math at the
-// money boundary; the rounding is the last float in the chain and lands on a
-// whole cent. Exported because the widget shows the ZAR figure this returns —
-// the anti-surprise line must quote the number actually charged, not its own
-// second conversion of the same dollars.
-export function zarCentsFromUsdCents(usdCents: number): number {
-  return Math.round(usdCents * USD_ZAR_RATE);
-}
+export { USD_ZAR_RATE, zarCentsFromUsdCents };
 
 // The tenant a donation is solicited for, and the payee it would be owed to —
 // or a reason it cannot be taken. **The same gate the flag toggle enforces**

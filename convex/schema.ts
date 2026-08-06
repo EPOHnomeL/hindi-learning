@@ -548,11 +548,21 @@ export default defineSchema({
   // currency; .scratch/payfast-payments). One row per Edition — `by_topic_lang`
   // is the price lookup the access resolver consults; `by_topic` lists a Topic's
   // priced Editions (and cascades on Topic delete).
+  //
+  // `usdAmount` / `eurAmount` are the **regional** price points (regional
+  // pricing, ywampotch-launch ticket 11), in the FOREIGN currency's minor units
+  // — US cents and euro cents, NOT ZAR. The seller types them; the ZAR actually
+  // charged derives from them at intent time via `regions.chargeCents` and is
+  // frozen onto the intent. Both optional, and absent means that region simply
+  // pays the base `amount` — which is what lets every listing predating the
+  // feature keep working with no backfill.
   listings: defineTable({
     topicId: v.id("topics"),
     lang: v.string(),
     amount: v.number(),
     currency: v.string(),
+    usdAmount: v.optional(v.number()),
+    eurAmount: v.optional(v.number()),
   })
     .index("by_topic", ["topicId"])
     .index("by_topic_lang", ["topicId", "lang"]),

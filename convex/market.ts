@@ -18,6 +18,7 @@ import { topicLessonCounts } from "./progressCounts";
 import { langInfo } from "./languages";
 import { appUrl, buildCheckoutFields, platformFeeBps, processUrl, sellingEnabled, splitNet } from "./payfast";
 import { isCallerAdmin } from "./whitelist";
+import { chargeCents, regionForCountry } from "./regions";
 
 // Paid marketplace (ADR 0016, PayFast rail — .scratch/payfast-payments) — the
 // Edition **listing** (price) and **Entitlement** grants. A listing's PRESENCE
@@ -37,9 +38,19 @@ import { isCallerAdmin } from "./whitelist";
 // (the source language or a ready translation). Setting a price is a pure DB
 // write (the flag the access resolver reads) — no gateway call.
 export const setEditionPrice = mutation({
-  args: { topicSlug: v.string(), lang: v.string(), amount: v.number(), currency: v.string() },
+  args: {
+    topicSlug: v.string(),
+    lang: v.string(),
+    amount: v.number(),
+    currency: v.string(),
+    // The **regional** price points (ticket 11), in the FOREIGN currency's minor
+    // units. Omitting one is how a seller withdraws that regional price — it is
+    // never read as "leave what was there", or a price could never be un-set.
+    usdAmount: v.optional(v.number()),
+    eurAmount: v.optional(v.number()),
+  },
   returns: v.null(),
-  handler: async (ctx, { topicSlug, lang, amount, currency }) => {
+  handler: async (ctx, { topicSlug, lang, amount, currency, usdAmount, eurAmount }) => {
     // Selling must be live before a listing can exist — either the deployment's
     // PayFast rail isn't configured, or PAYFAST_MODE=off has paused it. A listing
     // that checkout can't sell must never come into being. Env is read at call
@@ -63,16 +74,27 @@ export const setEditionPrice = mutation({
     // A bounded positive integer in minor units. `Number.isInteger` rejects NaN,
     // Infinity, and fractions; the ceiling keeps a stray value from becoming an
     // absurd price (R1,000,000 — well above any real course).
-    if (!Number.isInteger(amount) || amount <= 0 || amount > 100_000_000) {
+    // A bounded positive integer in minor units — the same rule for the base
+    // ZAR price and for each regional one, since all three end up as money.
+    const bounded = (n: number) => Number.isInteger(n) && n > 0 && n <= 100_000_000;
+    if (!bounded(amount)) {
       throw new Error("amount must be a positive integer in the currency's minor units");
     }
+    if ((usdAmount !== undefined && !bounded(usdAmount)) || (eurAmount !== undefined && !bounded(eurAmount))) {
+      throw new Error("a regional price must be a positive integer in that currency's minor units");
+    }
     // ZAR-only (.scratch/payfast-payments): PayFast settles in Rand, so a price
-    // in any other currency would be a lie the checkout can't honour.
+    // in any other currency would be a lie the checkout can't honour. `currency`
+    // describes the BASE price only — the regional amounts above are quoted in
+    // USD/EUR but still charged as Rand (ticket 11: presentment, not a new rail).
     const cur = currency.trim().toLowerCase();
     if (cur !== "zar") throw new Error("prices are in South African Rand (ZAR) only");
     const existing = await editionPrice(ctx, topic._id, lang);
-    if (existing) await ctx.db.patch(existing._id, { amount, currency: cur });
-    else await ctx.db.insert("listings", { topicId: topic._id, lang, amount, currency: cur });
+    // `usdAmount`/`eurAmount` are written on every save, undefined included, so
+    // an omitted field clears the regional price rather than silently keeping it.
+    const row = { amount, currency: cur, usdAmount, eurAmount };
+    if (existing) await ctx.db.patch(existing._id, row);
+    else await ctx.db.insert("listings", { topicId: topic._id, lang, ...row });
     return null;
   },
 });
@@ -385,12 +407,22 @@ export const checkoutIntentByRef = internalQuery({
 // from us, so the intent write and the field build are one transaction (a
 // rejected checkout writes nothing).
 export const startCheckout = mutation({
-  args: { topicSlug: v.string(), lang: v.string() },
+  args: {
+    topicSlug: v.string(),
+    lang: v.string(),
+    // The buyer's `x-vercel-ip-country`, read from `headers()` in the checkout
+    // server component and passed through — Convex runs off Vercel and can never
+    // see the header itself (ticket 10). **Only the country crosses this
+    // boundary, never an amount**: the price is derived here, or a client could
+    // name its own. Optional because localhost sends no header, and absent
+    // resolves to the base price.
+    country: v.optional(v.string()),
+  },
   // `fields` is an ORDERED list of pairs, not a record: Convex sorts object
   // keys, and PayFast's signature is computed over the field order — the client
   // must POST them in exactly this order.
   returns: v.object({ action: v.string(), fields: v.array(v.object({ name: v.string(), value: v.string() })) }),
-  handler: async (ctx, { topicSlug, lang }) => {
+  handler: async (ctx, { topicSlug, lang, country }) => {
     // Selling can be paused platform-wide (PAYFAST_MODE=off) even with the rail
     // provisioned — e.g. while the merchant account is blocked. No checkout may
     // start, so no buyer is ever sent to a gateway that would 400 them.
@@ -420,9 +452,13 @@ export const startCheckout = mutation({
     }
 
     const mPaymentId = mintToken();
+    // The **regional** charge (ticket 11), derived here from the country and
+    // never accepted from the caller. For a base-region buyer this is exactly
+    // `listing.amount` and nothing about the rail changes.
+    const amountCents = chargeCents(listing, regionForCountry(country));
     // The intent freezes the price SHOWN at this Buy click — what the ITN's
     // amount match verifies against, so a later re-price never strands the payment.
-    await ctx.db.insert("checkoutIntents", { mPaymentId, email, topicId: topic._id, lang, amount: listing.amount });
+    await ctx.db.insert("checkoutIntents", { mPaymentId, email, topicId: topic._id, lang, amount: amountCents });
 
     const title = await translatedTitle(ctx, topic._id, lang, topic.title);
     const editionName = lang === SOURCE_LANG ? "English" : langInfo(lang).name;
@@ -434,7 +470,7 @@ export const startCheckout = mutation({
       cancelUrl: appUrl(back, topic.tenantSlug),
       notifyUrl: `${process.env.CONVEX_SITE_URL}/payfast/notify`,
       mPaymentId,
-      amountCents: listing.amount,
+      amountCents,
       itemName: `${title} — ${editionName} edition`,
       email,
       // What the ITN grants, echoed back to us on the notification. `custom_str2`
