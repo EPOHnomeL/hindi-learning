@@ -48,7 +48,7 @@ history on a repo that now handles real money.
 | 08 | Fix the four known stale facts | [08](tickets/08-fix-known-stale-docs-and-tracker.md) | answered — four of five already fixed |
 | 09 | Shoprite-Send checkout — method chooser + step rail | [09](tickets/09-shoprite-send-checkout-method-chooser.md) | built `27ba5bd` |
 | 10 | Research — non-ZAR charging + buyer geo | [10](tickets/10-research-non-zar-charging-and-geo.md) | answered |
-| 11 | Regional pricing mechanism ($10/€10/R100) | [11](tickets/11-regional-pricing-mechanism.md) | **open — grilling, needs the operator** |
+| 11 | Regional pricing mechanism ($10/€10/R100) | [11](tickets/11-regional-pricing-mechanism.md) | answered — decided, **not built** |
 | 12 | Checkout as a page — route + step model | [12](tickets/12-checkout-page-route-and-step-model.md) | answered |
 | 13 | Move the purchase out of `BuyDialog` onto the page | [13](tickets/13-move-purchase-out-of-buydialog.md) | built `f971945` — **operator's walk pending** |
 | 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | built — **operator's walk pending** |
@@ -57,12 +57,16 @@ history on a repo that now handles real money.
 | 17 | The card buyer's payment-complete moment | [17](tickets/17-payment-complete-moment-on-card-return.md) | built `f8b55c3` — **operator's walk pending** |
 | 18 | The operator's prod walk — both paths, both rails | [18](tickets/18-operators-prod-walk.md) | open — collects the four pending walks |
 | 19 | One real EFT sale, end to end, on prod | [19](tickets/19-real-eft-sale-end-to-end-on-prod.md) | open — blocked by 18; the map's Done-when |
+| 20 | Build regional pricing — backend + geo header | [20](tickets/20-regional-pricing-backend.md) | open — blocked by 11 |
+| 21 | Build regional pricing — seller + buyer surfaces | [21](tickets/21-regional-pricing-surfaces.md) | open — blocked by 20 |
 
 The strict sequencing above applied to units 01–06, which shared files and are
 done. The 2026-08-01 additions are a second strand: 09 stood alone (a
 presentation reshape of `Paygate.tsx`, `convex/` untouched), 10 was AFK
-research, and 11 now grills on its facts. Regional-pricing *implementation* is
-deliberately not ticketed yet — see Not yet specified.
+research, and 11 grilled on its facts. **11 resolved 2026-08-06** and graduated
+its implementation into **20 and 21**, which run strictly in that order (21
+renders 20's chokepoint). 21 lands in the same surfaces as ticket 13, so it
+inherits that merge.
 
 **12–15 are a third strand**, opened the same day: 09 fixed the *wording* of the
 method step but left it in a dialog, and once the operator could actually see it
@@ -151,6 +155,9 @@ It also needs an acceptance criterion that post-dates the issue — see
   multi-currency option and would *reverse* ADR 0026's merchant-of-record
   decision. Geo is `x-vercel-ip-country` in middleware — **Convex cannot see it**
   and must be passed it; absent on localhost, defeated by VPNs.
+  **Superseded 2026-08-06 on one point:** do *not* send the PayFast support query.
+  Ticket 11 established MCP cannot express three different prices at all, so
+  eligibility is irrelevant — see its entry below.
 - [Checkout as a page — route + step model](./tickets/12-checkout-page-route-and-step-model.md) —
   **one route, `/checkout/<slug>/<lang>`, inside `(app)`** so `AppGate` renders
   `SignIn` *at that URL* for free — that is the entire answer for the signed-out
@@ -282,6 +289,35 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   `tickets/NN` link in a Decisions-so-far bullet reads to the parser as an entry
   for that ticket, and 18 is open. It is linked from the Build order table above.
 
+- [Regional pricing mechanism ($10/€10/R100)](./tickets/11-regional-pricing-mechanism.md) —
+  **the $10 is price discrimination, not a translation**: R100 ≈ $5.50, so "$10 for
+  US buyers" is roughly *double* the base price, and the operator confirmed that is
+  the intent. Everything follows. **Charge stays ZAR on PayFast** — $10 is a display
+  price, the bank does the FX, Paddle rejected (reverses ADR 0026, weeks, launch
+  week), **so no ADR is needed**. The **PayFast support query ticket 10 ordered is
+  dead and must not be sent**: MCP is *structurally* incapable of this, not merely
+  maybe-ineligible — it converts *out of* a ZAR base at a live rate, so R100 shows a
+  US buyer ≈$5.50, and it can only ever restate one price, never hold three. MCP
+  stays off, matching marketplace/03, so exactly one conversion is ever in play.
+  **Prices live per-listing**: `listings` grows optional `usdAmount`/`eurAmount` in
+  the **foreign** currency's minor units, seller-typed, absent = fall back to base
+  (no backfill). Global constants were rejected for a concrete bug — they would make
+  a second seller's R500 course also $10 in the US. The foreign side is exact and
+  Rand derives at intent time from a **committed rate constant shared with
+  marketplace/03**, which is the reconciliation this ticket demanded. **Geo is
+  `x-vercel-ip-country`, absent → base price** — failing to the *cheapest* price is
+  the safe direction; a VPN defeats it and that is accepted, with no region picker
+  (it would hand everyone the cheap price). **"EU" is Western Europe** — the 27 plus
+  GB/CH/NO/IS, all in euros; a £ point was declined. **EFT is hidden outside ZA**,
+  server-enforced, because "EFT stays R100" would hand a US buyer a 45% discount for
+  clicking the other button. The **anti-surprise line is in** — "$10.00 — charged as
+  R180.00 (ZAR)" — reversed from the operator's first answer on a re-ask, because the
+  donation widget on the same tenant landing page already discloses its Rand line and
+  the two would have contradicted. The freeze invariant needs **no new mechanism**:
+  both rails already freeze from `editionPrice()`, so only the number reaching that
+  insert changes, and the server computes it from the `country` argument — the client
+  never sends an amount. **Decided, NOT built**; the build is tickets 20 and 21.
+
 - [Fix the four known stale facts](./tickets/08-fix-known-stale-docs-and-tracker.md) —
   **four of the five were already fixed, and the ticket had itself gone stale.** The
   `project-context.md` PayFast block was corrected by `8c7d29c` on 2026-07-29, the day
@@ -302,10 +338,8 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
 
 ## Not yet specified
 
-- **Regional pricing implementation** — schema shape for per-region amounts,
-  where the geo signal is read and passed, price-freeze invariant across both
-  rails, seller/admin UI for the three price points. Can't be ticketed until
-  the mechanism is decided. clears-with: 11
+- ~~**Regional pricing implementation**~~ — graduated 2026-08-06 when 11 resolved;
+  it lives on as tickets 20 and 21 in the Build order table.
 
 ## Out of scope
 
