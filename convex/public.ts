@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { buildPaywall, editionAccessLevel, lessonsToc, loadEdition, readLesson, readReference, referencesToc, SOURCE_LANG, type EditionAccess } from "./lib";
+import { buildPaywall, editionAccessLevel, lessonsToc, paywallValidator, loadEdition, readLesson, readReference, referencesToc, SOURCE_LANG, type EditionAccess } from "./lib";
 import { langInfo } from "./languages";
 
 // The Guest read seam (issue 07 / ADR 0013). Every function here authorizes by
@@ -126,9 +126,7 @@ export const publicCourse = query({
       // Present only on a PAID Edition (paid marketplace): the price and which
       // Lesson is the free Preview, so a Guest sees the paygate. On a free
       // Edition it is absent and the Guest reads everything, exactly as today.
-      paywall: v.optional(
-        v.object({ amount: v.number(), currency: v.string(), previewKey: v.union(v.string(), v.null()) }),
-      ),
+      paywall: v.optional(paywallValidator),
     }),
   ),
   handler: async (ctx, { token }) => {

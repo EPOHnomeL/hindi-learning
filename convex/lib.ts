@@ -1,3 +1,4 @@
+import { v } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 
@@ -612,11 +613,41 @@ export async function previewLessonKey(ctx: QueryCtx, topicId: Id<"topics">): Pr
 // Preview, or undefined when the Edition is free. Built in one place so both
 // readers' course-header queries (content.courseHeader / public.publicCourse)
 // render the paywall identically.
-export type Paywall = { amount: number; currency: string; previewKey: string | null };
+//
+// It carries all THREE price points — the base ZAR amount and the seller's
+// optional `usdAmount` / `eurAmount` (ticket 11 §4) — rather than the one this
+// buyer will pay, because the buyer's country cannot reach a Convex query: it
+// arrives as an argument on the mutations, and a reactive subscription has no
+// such argument (ticket 10). So the surface picks, from `priceView()`, using the
+// country its server component read; the charge itself is still derived
+// server-side at intent time and never accepted from a client.
+export type Paywall = {
+  amount: number;
+  currency: string;
+  previewKey: string | null;
+  usdAmount?: number;
+  eurAmount?: number;
+};
+// One validator for both readers' `paywall` field — they render the same card
+// from the same builder, so a field added here (the regional prices were) must
+// never reach one surface and not the other.
+export const paywallValidator = v.object({
+  amount: v.number(),
+  currency: v.string(),
+  previewKey: v.union(v.string(), v.null()),
+  usdAmount: v.optional(v.number()),
+  eurAmount: v.optional(v.number()),
+});
 export async function buildPaywall(ctx: QueryCtx, topicId: Id<"topics">, lang: string): Promise<Paywall | undefined> {
   const price = await editionPrice(ctx, topicId, lang);
   if (!price) return undefined;
-  return { amount: price.amount, currency: price.currency, previewKey: await previewLessonKey(ctx, topicId) };
+  return {
+    amount: price.amount,
+    currency: price.currency,
+    previewKey: await previewLessonKey(ctx, topicId),
+    usdAmount: price.usdAmount,
+    eurAmount: price.eurAmount,
+  };
 }
 
 // Whether a Lesson body is withheld from this caller: only on a PAID Edition they

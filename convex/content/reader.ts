@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, type QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { buildPaywall, getEditableTopic, heldLangs, lessonsToc, loadEdition, readLesson, readReference, referencesToc, resolveEdition, SOURCE_LANG, topicBySlug } from "../lib";
+import { buildPaywall, getEditableTopic, paywallValidator, heldLangs, lessonsToc, loadEdition, readLesson, readReference, referencesToc, resolveEdition, SOURCE_LANG, topicBySlug } from "../lib";
 import { topicLessonCounts } from "../progressCounts";
 import { langInfo } from "../languages";
 
@@ -159,11 +159,9 @@ export const courseHeader = query({
       // The served Edition's mission (translated, English fallback) — pre-fills
       // the edition title/mission edit dialog. Null when the course has none.
       mission: v.union(v.string(), v.null()),
-      // Present only for a `preview` caller: the paid Edition's price and which
-      // Lesson is the free Preview, so the reader can render the paygate.
-      paywall: v.optional(
-        v.object({ amount: v.number(), currency: v.string(), previewKey: v.union(v.string(), v.null()) }),
-      ),
+      // Present only for a `preview` caller: the paid Edition's price(s) and
+      // which Lesson is the free Preview, so the reader can render the paygate.
+      paywall: v.optional(paywallValidator),
       // The course's public `/share/<token>` link when it's publicly shared, else
       // null (reference-cards/03). Drives the per-card share affordance in the reader
       // — only offered when there's a public page a stranger can open. The token is

@@ -237,6 +237,38 @@ test("setEditionPrice — clearing a regional price returns that region to the b
   expect(listing.eurAmount).toBeUndefined();
 });
 
+test("editionPricing — the seller's editor can read the foreign prices back", async () => {
+  const t = convexTest(schema, modules);
+  await fixture(t);
+
+  // Without these on the payload the seller's form re-opens blank and a save
+  // silently withdraws the regional prices they set last week.
+  expect(await t.query(api.market.editionPricing, { topicSlug: "tswana" })).toEqual([
+    { lang: "en", amount: 10_000, currency: "zar", usdAmount: 1000, eurAmount: 1000 },
+  ]);
+});
+
+// ---- the buyer's surfaces are told the foreign prices -----------------------
+
+test("courseHeader — the paygate payload carries the foreign prices, so the buyer can be quoted", async () => {
+  const t = convexTest(schema, modules);
+  const { bob } = await fixture(t);
+
+  // The country cannot reach Convex through a reactive query subscription
+  // (ticket 10), so the header ships all three price points and the surface
+  // picks — `priceView()` in `src/app/_components/priceDerive.ts`.
+  const hdr = await asUser(t, bob).query(api.content.reader.courseHeader, { topicSlug: "tswana", lang: "en" });
+  expect(hdr!.paywall).toMatchObject({ amount: 10_000, currency: "zar", usdAmount: 1000, eurAmount: 1000 });
+});
+
+test("courseHeader — an edition with no regional prices carries neither field", async () => {
+  const t = convexTest(schema, modules);
+  const { bob } = await fixture(t, false);
+
+  const hdr = await asUser(t, bob).query(api.content.reader.courseHeader, { topicSlug: "tswana", lang: "en" });
+  expect(hdr!.paywall).toEqual({ amount: 10_000, currency: "zar", previewKey: "0001" });
+});
+
 test("setEditionPrice — a foreign amount gets the same bounds as the ZAR one", async () => {
   const t = convexTest(schema, modules);
   const { alice } = await fixture(t, false);

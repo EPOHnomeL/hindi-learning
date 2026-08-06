@@ -120,7 +120,18 @@ export const clearEditionPrice = mutation({
 // the demo. Not secret — the price is what a prospective buyer needs to see.
 export const editionPricing = query({
   args: { topicSlug: v.string() },
-  returns: v.array(v.object({ lang: v.string(), amount: v.number(), currency: v.string() })),
+  // The regional price points ride along so the seller's editor can re-open on
+  // what they last saved: a save writes all three, so a form that couldn't read
+  // the foreign two back would withdraw them on every edit of the Rand price.
+  returns: v.array(
+    v.object({
+      lang: v.string(),
+      amount: v.number(),
+      currency: v.string(),
+      usdAmount: v.optional(v.number()),
+      eurAmount: v.optional(v.number()),
+    }),
+  ),
   handler: async (ctx, { topicSlug }) => {
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return [];
@@ -129,7 +140,7 @@ export const editionPricing = query({
       .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
       .collect();
     return rows
-      .map((r) => ({ lang: r.lang, amount: r.amount, currency: r.currency }))
+      .map((r) => ({ lang: r.lang, amount: r.amount, currency: r.currency, usdAmount: r.usdAmount, eurAmount: r.eurAmount }))
       .sort((a, b) => a.lang.localeCompare(b.lang));
   },
 });
