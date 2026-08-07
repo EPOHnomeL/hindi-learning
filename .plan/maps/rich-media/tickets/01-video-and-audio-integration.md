@@ -198,18 +198,43 @@ uploads** — but that's a decision to record (likely an ADR), not assume.
 
 ## Questions to answer
 
-- Verify the hard numbers: Convex per-file upload limit, range-request support on signed URLs
-  (seek/scrub needs it), and storage + egress pricing at plausible video sizes. This kills or
-  keeps the "just use Convex storage" option factually.
-- External rails, cost/effort compared: unlisted YouTube (free hosting + captions, owner does
-  the upload, ToS questions for a paid product), Cloudflare Stream, Mux, R2 + CDN with
+<!-- The rail question below was CLOSED FROM OUTSIDE this map on 2026-08-07 — see the
+     "Which rail" note under the struck bullets. Struck, not deleted, so the next reader
+     can see what was asked and why it is no longer being asked here. -->
+
+- ~~Verify the hard numbers: Convex per-file upload limit, range-request support on signed
+  URLs (seek/scrub needs it), and storage + egress pricing at plausible video sizes. This
+  kills or keeps the "just use Convex storage" option factually.~~
+- ~~External rails, cost/effort compared: unlisted YouTube (free hosting + captions, owner
+  does the upload, ToS questions for a paid product), Cloudflare Stream, Mux, R2 + CDN with
   client-side `<video>`. Which fits the paid-marketplace economics (50/50 on net) when a
-  course carries hours of video?
+  course carries hours of video?~~
 - What's the **demand signal** that unlocks building uploads at all? (Gated-phases: someone
   who can't use a link.) Until then, is "upload your video to YouTube unlisted and paste the
   link" an acceptable documented workflow?
-- If a rail is chosen later: where do transcripts come from for uploaded files (no YouTube
-  captions — forces ticket 05)?
+- ~~If a rail is chosen later:~~ **A rail is chosen.** Where do transcripts come from for
+  uploaded files (no YouTube captions — forces ticket 05)?
+
+### Which rail: decided 2026-08-07, from outside this map
+
+**Mux, product-wide.** Chosen in
+[Scope the product onboarding + marketing video](../../media-generation/tickets/03-scope-onboarding-and-marketing-video.md)
+and deliberately at full reach — all product video, marketing and learner-facing alike, not
+just the marketing clip that prompted it. The reach was flagged during that session as
+pre-empting this ticket, and taken knowingly.
+
+Read this honestly before building on it: **the paid-marketplace economics this bullet asked
+for were never costed.** The decision was made on the strength of one ~50s marketing clip and
+an intent to do video properly, not on egress pricing at hours-of-course-video scale. The ADR
+that records it —
+[media-generation/04](../../media-generation/tickets/04-adr-mux-as-the-video-rail.md) — is
+required to say so, and to state the number that would make it the wrong call. Mux is **not
+yet provisioned** (no account, no keys, no `mux` in `package.json` or the env as of
+2026-08-07).
+
+What survives here: the **demand signal** for building uploads at all, the links-first
+workflow question, and transcripts for uploaded files. Those are untouched by the rail
+choice — picking Mux says where bytes live, not whether uploads are worth building yet.
 
 ## Out of scope
 
@@ -218,8 +243,15 @@ uploads** — but that's a decision to record (likely an ADR), not assume.
 
 ## Deliverable
 
-An ADR draft: links-first vs. an upload rail, with the verified Convex numbers, the comparison
-table, and the unlock criterion for revisiting.
+~~An ADR draft: links-first vs. an upload rail, with the verified Convex numbers, the
+comparison table, and the unlock criterion for revisiting.~~
+
+**Narrowed 2026-08-07.** The rail half is decided (Mux, see above) and its ADR is owed by
+[media-generation/04](../../media-generation/tickets/04-adr-mux-as-the-video-rail.md), not by
+this ticket. What this ticket still owes: **links-first vs. uploads** — whether "upload to
+YouTube unlisted and paste the link" stays the documented workflow, and what demand signal
+unlocks building an upload path onto the chosen rail. The Convex-storage numbers no longer
+need verifying, since Convex storage is no longer a candidate.
 
 ---
 
