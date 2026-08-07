@@ -111,3 +111,129 @@ The audience/moment, one-artifact-or-two, which-flow, interactive-page-vs-video,
 - Skills: `html-demo-wizard`, `/grilling`, `/prototype`.
 - **Out of scope:** paid-ads or distribution tooling; **actually building it** — the
   deliverable is the decision set.
+
+---
+
+## Prototype walked 2026-08-06 — evidence for four of the seven questions
+
+A full learner-path demo was built with `html-demo-wizard` and rendered to video, as a
+**prototype to answer this ticket**, not as the shipped artifact. Ticket stays open:
+three questions below are still unanswered, and they are the ones that decide the build.
+
+Artifacts (in the working tree, uncommitted as of writing):
+[`public/ywampotch-walkthrough-demo.html`](../../../../public/ywampotch-walkthrough-demo.html)
+and [`scripts/record-demo.mjs`](../../../../scripts/record-demo.mjs).
+
+**Answered by walking it:**
+
+- **Which flow → the learner path**, and it holds up: YWAM Potch landing → Google sign-in
+  → dashboard → lesson 1 as the free Preview → paygate on lesson 2 → checkout page →
+  PayFast → unlocked. Nine beats, **~50s** of footage. Long enough to tell the story,
+  short enough for a landing-page embed.
+- **Interactive page vs video file → both, and the page is the source.** The HTML page
+  *is* the storyboard; the mp4 is a render of it, so there is no second sequence to
+  maintain. `scripts/record-demo.mjs` drives a real Chromium via Playwright and emits
+  WebM + H.264 MP4 in one command.
+- **The ffmpeg constraint does not bind here.** This map's unifying wall is "Convex
+  actions cannot run ffmpeg" — but this artifact is hand-authored and rendered
+  **locally/at build time**, never at runtime from course data. The wall is real for
+  [the trailer](01-scope-course-trailer.md), which is generated per-course; it does not
+  constrain this ticket at all. That distinction should be reflected in the map's Notes.
+- **Whitelabel is cheaper than feared — for the styling.** The tenant palette is applied
+  as CSS custom properties, so re-skinning to another tenant is a variable swap, not a
+  rebuild. But the *content* (course title, lesson names, price, landing copy) is
+  hand-authored per tenant. So: **one build for four tenants only if the demo is
+  data-driven**; hand-authored means four. That is the real fork, and it is narrower
+  than "one build or four" implied.
+
+**Still open — these decide the build:**
+
+- **Audience/moment** and **onboarding vs marketing, one artifact or two.** The prototype
+  is a *marketing* demo aimed at a stranger. It says nothing about the signed-in
+  first-run case.
+- **Hosting/shipping.** The prototype sits in `public/` and deploys with the app, which
+  was convenient, not decided.
+
+**Staleness is confirmed as the real risk, with a number.** Building against the live
+components, the demo was wrong about the dashboard **twice in one session** — invented
+card thumbnails that don't exist, and put the course under "Your courses" when a new
+buyer actually sees it under "Available courses" with a price badge. Both were caught
+only by reading `Dashboard.tsx`. A hand-authored demo drifts *immediately*, not
+eventually. Price the guided-tour-over-the-real-app alternative seriously before
+committing to hand-authoring four of these.
+
+**Unrelated product bug found while building** (belongs to whoever owns the dashboard,
+not to this map): `emptyLibrary` at `src/app/_components/Dashboard.tsx:106-115` ignores
+the catalogue, so a new tenant learner sees "No courses yet — a marketplace is coming
+soon" rendered directly above a live "Available courses" section containing a buyable
+R100 course. **Filed 2026-08-07** as
+[Dashboard empty state contradicts the catalogue below it](../../onboarding/tickets/03-dashboard-empty-state-ignores-catalogue.md);
+re-verified live in that session, and the onboarding map's "already shipped, different
+audience" out-of-scope line corrected in the same edit.
+
+## Answer
+
+**Decided 2026-08-07, NOT built.** One demo ships: the learner-path walkthrough already
+prototyped, as a **Mux-hosted mp4 embedded on the YWAM Potch landing page**. Nothing below
+is implemented; building it stays out of this map's scope, so the implementation ticket is
+owed elsewhere.
+
+- **One artifact, not two.** The learner-path walkthrough is the whole deliverable. No
+  owner-path demo and no signed-in first-run demo. Signed-in first-run is not a video
+  problem and stays with
+  [Improve onboarding flow](../../onboarding/tickets/01-improve-onboarding-flow.md): a user
+  who already has an account should be touching the real UI, not watching a cartoon of it.
+- **Audience and moment: the pre-signup stranger** on the YWAM Potch landing page. This is
+  marketing, aimed at the comprehension half of the funnel leak that
+  [ywampotch-launch](../../ywampotch-launch/map.md) left unattacked.
+- **Which flow: the learner path**, validated by walking the prototype. Nine beats, ~50s:
+  landing → Google sign-in → dashboard → lesson 1 as the free Preview → paygate on lesson 2
+  → checkout → PayFast → unlocked.
+- **Interactive page vs file: a file.** The mp4 is the deliverable; the HTML page is the
+  **toolchain** that produces it, not a surface a visitor ever meets. A stranger reads a
+  self-driving HTML page as a UI that is not responding to their clicks; they read a video
+  as a video. A file is also the only form WhatsApp and social can carry, which was the
+  original reason to want one.
+- **Hosting: Mux** — see the rail decision below. The HTML source **moves out of `public/`**
+  (proposed `demos/`): anything in `public/` is served on every tenant host, so both demo
+  pages are currently live and unlinked on `upf`, `almighty-warriors` and `yknot`, which have
+  nothing to do with them. `.tmp/` stays the render scratch and stays gitignored; no mp4 is
+  committed.
+- **Whitelabel: `ywampotch` only.** It is the only tenant with a bespoke landing page
+  (`src/app/_landing/registry.ts`) and the only one with a diagnosed comprehension leak. The
+  palette is CSS custom properties so a re-skin is cheap, but the *content* is hand-authored,
+  and with drift accepted (below) a data-driven demo has lost its main justification. The
+  other three tenants are ruled out of scope on the map.
+- **Staleness: accept the drift, date-stamp the video.** No manifest, no CI gate, no
+  recording harness.
+
+**The guided-tour-over-the-real-app alternative was priced, and it lost on a reason this
+ticket did not anticipate.** Verified 2026-08-07: the repo has **no e2e harness at all** (no
+`playwright.config.*`, no `e2e/`, `playwright` is a dependency only because
+`scripts/record-demo.mjs` uses it) and **no course seeder** (`scripts/seed-tenants.ts` seeds
+tenants, nothing else). Decisively, **two of the nine beats are third-party redirects**:
+Google OAuth and PayFast cannot be driven unattended. A tour of the real app would have to
+stub exactly the two moments carrying the most persuasive weight, so it would be a partly
+faked film *and* cost a harness plus a seeder plus two provider stubs. Hand-authoring stays
+cheaper and is no less honest.
+
+**Also verified while resolving** (facts the ticket predates):
+`scripts/record-demo.mjs` is already generic (`--page`, `--out`, `--fps`, `--audio`), so it
+is a reusable renderer rather than a one-off; its deterministic virtual-clock mode is
+**broken in this environment** and documented as such at `scripts/record-demo.mjs:41-47`, so
+realtime is the working default and nobody should promise a judder-free render without
+fixing it first.
+
+### Mux is the product-wide video rail
+
+Chosen here deliberately and at full reach, not just for this clip: **all product video,
+including learner-facing course video, goes to Mux.** This settles the hosting half of
+[Video & audio integration](../../rich-media/tickets/01-video-and-audio-integration.md),
+whose deliverable was exactly that comparison (Convex storage vs unlisted YouTube vs
+Cloudflare Stream vs Mux vs R2+CDN); that ticket has been narrowed accordingly. The reach
+was flagged during grilling and taken knowingly.
+
+Because it reaches past this map, it is owed an ADR, which is
+[Record the ADR: Mux is the product-wide video rail](04-adr-mux-as-the-video-rail.md). Mux
+is **not yet provisioned** — no account, no keys, no `mux` reference anywhere in
+`package.json` or the env as of 2026-08-07.
