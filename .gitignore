@@ -62,3 +62,8 @@ yarn-error.log*
 HANDOFF*.md
 # Review output of scripts/st-za-rewrite.ts — regenerable, 114 HTML files.
 /st-za-review/
+
+# Rendered demo video (scripts/record-demo.mjs) — multi-MB binaries that are
+# regenerable from the HTML page in one command, so the page is the source of
+# record, not the .mp4.
+/.tmp/

@@ -96,6 +96,10 @@
     flex:0 0 30px; height:30px; border-radius:50%; background:var(--accent); color:#fff;
     display:grid; place-items:center; font-size:13px; font-weight:700;
   }
+  .caption .credit { display:none; }
+  body.video-mode .caption .credit { display:block; margin-left:auto; align-self:flex-end;
+    flex:0 0 auto; font-size:10px; letter-spacing:.02em; color:var(--soft); opacity:.75;
+    white-space:nowrap; padding-left:16px; }
   .caption .txt h3 { margin:0; font-size:14.5px; color:var(--ink); }
   .caption .txt p { margin:3px 0 0; font-size:13px; line-height:1.5; color:var(--soft); }
   .progress { display:flex; gap:5px; width:100%; }
@@ -370,6 +374,22 @@
     box-shadow:0 10px 30px rgba(30,39,64,.35); }
   .toast.show { opacity:1; visibility:visible; transform:translate(-50%,0); }
   .toast .tick { color:#8fe0ac; }
+
+  /* ── ?video=1 — full-bleed capture mode ──
+     The page furniture (background wash, heading, rounded frame, outer padding)
+     is right for a browser tab and wrong for a video: it bakes a border into
+     every frame that an editor then has to crop back out. In video mode the
+     browser frame fills the viewport edge to edge and the caption becomes a
+     solid bottom bar, so a 1920×1080 capture is already the finished shot. */
+  body.video-mode { padding:0; gap:0; background:var(--paper); height:100vh; overflow:hidden; }
+  body.video-mode .stage { max-width:none; height:100vh; gap:0; }
+  body.video-mode .stage-head { display:none; }
+  body.video-mode .browser { flex:1; aspect-ratio:auto; min-height:0; border-radius:0;
+    border:none; box-shadow:none; }
+  body.video-mode .caption { border-radius:0; border-left:none; border-right:none;
+    border-bottom:none; box-shadow:none; flex:0 0 auto; }
+  body.video-mode .progress { flex:0 0 auto; gap:0; }
+  body.video-mode .progress i { border-radius:0; height:5px; }
 
   @media (max-width:760px) {
     .browser { aspect-ratio:auto; height:70vh; min-height:0; }
@@ -696,6 +716,11 @@
   <div class="caption">
     <span class="no" id="cap-no">1</span>
     <span class="txt"><h3 id="cap-title">…</h3><p id="cap-body">…</p></span>
+    <!-- CC BY 4.0 attribution for the music bed muxed in by scripts/record-demo.mjs.
+         Shown only in ?video=1 mode, because that is the only output the track
+         ends up in — and the video is what gets distributed away from this repo,
+         so the credit has to be burned into the frame to travel with it. -->
+    <span class="credit" id="music-credit">Music: “Soft Corporate” by MusicLFiles — CC BY 4.0</span>
   </div>
   <div class="progress" id="progress"></div>
 </div>
@@ -1097,14 +1122,31 @@
     return p;
   }
 
-  // autoplay, forever
+  // `?video=1` strips the page furniture for capture (see the CSS block).
+  if (/[?&]video=1\b/.test(location.search)) document.body.classList.add("video-mode");
+
+  // autoplay, forever. Each completed pass announces itself, so a capture script
+  // records exactly one loop instead of guessing a duration and trimming a tail.
+  // `window.__demoLoops` is the same signal for a poller that attached late.
+  window.__demoLoops = 0;
   function loop() {
     resetUI();
-    run().then(function () { wait(900).then(loop); });
+    run().then(function () {
+      window.__demoLoops++;
+      window.dispatchEvent(new CustomEvent("demo:loop-complete", { detail: { loops: window.__demoLoops } }));
+      wait(900).then(loop);
+    });
   }
 
-  window.addEventListener("load", loop);
-  if (document.readyState === "complete") loop();
+  // `?manual=1` holds the timeline until the driver asks for it. The deterministic
+  // recorder needs the page fully loaded (webfonts settled) BEFORE it takes over
+  // the clock — if the demo auto-started, it would already be seconds in by the
+  // time frame capture began, and those seconds would be missing from the video.
+  window.__demoStart = loop;
+  if (!/[?&]manual=1\b/.test(location.search)) {
+    window.addEventListener("load", loop);
+    if (document.readyState === "complete") loop();
+  }
 })();
 </script>
 </body>
