@@ -605,15 +605,33 @@ html[data-theme="dark"] .cert-card--showcase {
   animation-delay: var(--d, 0ms);
 }
 @supports (animation-timeline: view()) {
-  .land-reveal {
+  .land-reveal,
+  .land-reveal-mid,
+  .land-reveal-late {
     animation: land-rise linear both;
     animation-timeline: view();
+  }
+  .land-reveal {
     animation-range: entry 0% entry 60%;
+  }
+  /* The cascade for a ROW of peers (the phone mockups, the capability tiles), one
+     habit worth taking from spoorpet.com: siblings that arrive together read as a
+     single slab, siblings that arrive a beat apart read as composed. A later
+     `animation-range` start is how you stagger a scroll-driven animation —
+     `animation-delay` does nothing on a view() timeline, because the timeline is
+     scroll position and there is no clock to delay against. */
+  .land-reveal-mid {
+    animation-range: entry 12% entry 72%;
+  }
+  .land-reveal-late {
+    animation-range: entry 24% entry 84%;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .land-rise,
-  .land-reveal {
+  .land-reveal,
+  .land-reveal-mid,
+  .land-reveal-late {
     animation: none;
   }
 }
