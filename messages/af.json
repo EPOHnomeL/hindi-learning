@@ -439,7 +439,7 @@
     "hero": {
       "eyebrow": "’n KI-kursusstudio",
       "headline": "Leer enigiets, gegrond in <em>jou</em> leeswerk.",
-      "subhead": "Saai ’n onderwerp met die bronne wat jy vertrou, en ’n KI-outeur skryf vir jou ’n interaktiewe kursus — les vir les, soos jy leer — heelpad tot by ’n sertifikaat.",
+      "subhead": "Saai ’n onderwerp met die bronne wat jy vertrou, en ’n KI-outeur skryf vir jou ’n interaktiewe kursus — les vir les, soos jy leer.",
       "getStarted": "Kom aan die gang",
       "seeHow": "Sien hoe dit werk"
     },
@@ -457,7 +457,7 @@
       },
       "advance": {
         "title": "Leer, vra, vorder",
-        "body": "Voltooi ’n les en die volgende een word vir jou geskryf. Die kursus ontvou teen jou eie tempo, heelpad tot by ’n sertifikaat."
+        "body": "Voltooi ’n les en die volgende een word vir jou geskryf. Die kursus ontvou teen jou eie tempo, so ver as wat jy dit wil neem."
       }
     },
     "features": {
@@ -487,11 +487,77 @@
         "body": "Deel ’n kursus met iemand per e-pos — leesalleen of met redigeerregte — of skep ’n anonieme openbare skakel wat enigiemand kan open."
       }
     },
-    "certificates": {
-      "eyebrow": "Sertifikate",
-      "heading": "Voltooi die kursus. Hou die bewys.",
-      "body": "Elke voltooide kursus eindig in ’n sertifikaat — ’n drukbare, deelbare dokument met jou naam daarop, by ’n skakel wat jy vir enigiemand kan gee. Geen rekening nodig om dit te bewonder nie.",
-      "hint": "Toe — beweeg jou wyser oor dit."
+    "mocks": {
+      "heading": "Hoe ’n les werklik lyk",
+      "body": "Nie ’n video om deur te sit nie. ’n Bladsy wat uit jou bronne geskryf is, met die vrae — en die antwoorde — op dieselfde plek waar jy gelees het.",
+      "lesson": {
+        "title": "’n Les, geskryf uit jou leeswerk",
+        "body": "Prosa, uitgewerkte voorbeelde en uitligkassies, saamgestel uit die bronne wat jy opgelaai het en nooit daaroor heen nie."
+      },
+      "quiz": {
+        "title": "Vrae wat seker maak jy het dit",
+        "body": "Kort toetse binne die les, nagesien soos jy vorder, sodat jy die gaping vind voordat jy daarby verbygaan."
+      },
+      "ask": {
+        "title": "Vra waar jy vasgeval het",
+        "body": "Jou vraag word inlyn geantwoord, in die les waar jy dit gevra het — nie in ’n forum wat jy moet gaan soek nie."
+      },
+      "phone": {
+        "courseTitle": "Die Naghemel, uit Jou Veldgids",
+        "lessonProgress": "Les 4 van 24",
+        "askCta": "Vra hieroor",
+        "quizQuestion": "Watter een hiervan is ’n gasreus?",
+        "quizOptionA": "Jupiter",
+        "quizOptionB": "Mercurius",
+        "quizOptionC": "Mars",
+        "askedQuestion": "Waarom is Mercurius nie ’n gasreus nie?",
+        "askedReply": "Goeie vraag — dit kom neer op massa.",
+        "navLessons": "Lesse",
+        "navReferences": "Verwysings",
+        "navAsk": "Vra",
+        "askedFollowUp": "So massa is die hele storie?"
+      }
+    },
+    "capabilities": {
+      "heading": "In Suid-Afrika gebou, vir waar jy ook al lees",
+      "body": "’n Klein studio, plaaslike ondersteuning, en ’n kursus wat saamreis — na ’n ander taal, na ’n foon, na wie jy ook al die skakel stuur.",
+      "t1v": "1:1",
+      "t1l": "Vra tydens ’n les, inlyn geantwoord",
+      "t2v": "100+",
+      "t2l": "Tale waarin ’n kursus herskryf kan word",
+      "t3v": "5",
+      "t3l": "Tale wat die app self praat",
+      "t4v": "SA",
+      "t4l": "Ontwerp en gebou"
+    },
+    "founder": {
+      "quote": "",
+      "byline": ""
+    },
+    "faq": {
+      "heading": "Vrae, geantwoord.",
+      "q1": "Word die kursus deur KI of deur ’n mens geskryf?",
+      "a1": "Deur KI, en ons maak nie of dit anders is nie. Wat dit anders máák, is wat dit mag gebruik: die bronne wat jy oplaai is die sillabus, en ’n les word daaruit geskryf eerder as uit wat die model toevallig onthou. As dit nie in jou leeswerk is nie, kom dit nie in die les nie.",
+      "q2": "Wat moet ek oplaai?",
+      "a2": "Wat jy in elk geval sou studeer — ’n handboek, ’n skrif, ’n stel klasnotas, jou eie skryfwerk. Een bron is genoeg om te begin, en jy kan later meer byvoeg.",
+      "q3": "Kry ek die hele kursus gelyk?",
+      "a3": "Nee. Die eerste les word geskryf wanneer jy die kursus saai, en die volgende wanneer jy die vorige klaarmaak. Dit is doelbewus: die outeur sien wat jy reg gekry het en wat jy gevra het voordat dit die volgende een skryf.",
+      "q4": "Kan ek in ’n ander taal as Engels leer?",
+      "a4": "Ja. ’n Kursus kan in ’n volledige uitgawe in ’n ander taal omskep word — dieselfde lesse herskryf, nie masjien-vertaal nie — en jy kan enige tyd tussen uitgawes wissel.",
+      "q5": "Kan ek ’n kursus met iemand anders deel?",
+      "a5": "Op drie maniere: per e-pos as ’n leesalleen-kyker, per e-pos met redigeerregte, of as ’n anonieme openbare skakel wat enigiemand sonder ’n rekening kan oopmaak."
+    },
+    "interest": {
+      "heading": "Nog nie gereed om een te begin nie?",
+      "body": "Los jou adres en ons skryf wanneer daar iets is wat die moeite werd is om te vertel. Een veld, en geen nuusbrief-trapmeul nie.",
+      "placeholder": "jy@epos.com",
+      "submit": "Hou my op hoogte",
+      "submitting": "Voeg jou by…",
+      "invalid": "Dit lyk nie na ’n adres waarby ons jou kan bereik nie.",
+      "failed": "Dit het nie deurgekom nie. Probeer asseblief weer.",
+      "doneTitle": "Jy is op die lys.",
+      "doneBody": "Ons skryf wanneer daar iets is wat jou tyd werd is — en gee nooit jou adres vir iemand anders nie.",
+      "fieldLabel": "E-posadres"
     }
   },
   "Donate": {

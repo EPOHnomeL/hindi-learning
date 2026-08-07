@@ -1,11 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useState, type CSSProperties } from "react";
-import { CertificateCard, type CertificateData } from "./Certificate";
+import { type CSSProperties } from "react";
 import { DonateSection } from "./DonateSection";
 import { Icon, type IconName } from "./icons";
 import { Brand } from "./Brand";
+import { InterestForm, type InterestFormCopy } from "./InterestForm";
+import { CapabilityBand, Faq, FounderQuote, type CapabilityTile, type FaqItem } from "./LandingSections";
+import { PhoneMockRow, type PhoneMockCopy } from "./PhoneMocks";
 import { SignIn } from "./SignIn";
 import { SiteFooter } from "./SiteFooter";
 import { useTheme } from "./ThemeContext";
@@ -15,6 +17,23 @@ import { useTheme } from "./ThemeContext";
 // and reuses the certificate stage's aurora + gold-fleck atmosphere (globals.css
 // `.cert-stage`) so it reads as the same product. All motion is CSS (`.land-*`),
 // suppressed under prefers-reduced-motion; no motion.dev dependency.
+//
+// **Restructured 2026-08-07** against spoorpet.com as a brief, which converts
+// strangers well. What was taken from it:
+//   - device mockups **built in CSS**, so they can't go stale like a screenshot;
+//   - a band of **capability tiles** (its `24/7 · GPS · Weeks · SA`) — note those
+//     are capabilities, not traction numbers, which is why the section works on a
+//     page with no crowd yet;
+//   - a **founder quote** as the trust anchor;
+//   - an **objection-first FAQ**, hardest question at the top;
+//   - **one** email-capture form, and its success state replaces it.
+// What was deliberately NOT taken: its form sits above the fold because it has
+// nothing to sell. Ours is below sign-in, because sign-in is the conversion here
+// and the address is the fallback (see InterestForm).
+//
+// **The certificate is no longer a section.** It used to have half a page and a
+// live demo card; it is a PNG with no compliance weight behind it, so leading on
+// it oversold the product. It still exists, it just isn't the pitch.
 
 // Display copy lives in the "Landing" namespace; the constants hold only the
 // stable per-item keys (step index, feature icon) and copy is resolved with
@@ -29,28 +48,6 @@ const FEATURE_KEYS: { icon: IconName; key: string }[] = [
   { icon: "globe", key: "language" },
   { icon: "link", key: "share" },
 ];
-
-// A finished-course certificate with demo data, so the landing shows the real
-// artefact (tilt, foil and all) instead of a mock-up. Fixed timestamp — the demo
-// is a specimen, not a live document.
-const DEMO_CERT: CertificateData = {
-  learnerName: "Asha Patel",
-  courseTitle: "The Night Sky, from Your Field Guide",
-  lessonCount: 24,
-  issuedAt: Date.UTC(2026, 5, 21),
-  lang: "en",
-  emblem: { kind: "glyph", glyph: "🔭" },
-};
-
-// The demo certificate renders dates via toLocaleDateString, which can disagree
-// between the server and a non-US visitor's browser — mount-gate it so it only
-// ever renders client-side and can't cause a hydration mismatch.
-function DemoCertificate() {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  if (!mounted) return <div className="min-h-104" aria-hidden />;
-  return <CertificateCard {...DEMO_CERT} />;
-}
 
 // Icon-only light/dark toggle for the landing nav (ADR 0011) — the same compact
 // per-surface copy the Dashboard, CourseShell and PublicReader headers carry.
@@ -83,6 +80,47 @@ export function Landing() {
     title: t(`features.${key}.title`),
     body: t(`features.${key}.body`),
   }));
+
+  const phoneCopy: PhoneMockCopy = {
+    courseTitle: t("mocks.phone.courseTitle"),
+    lessonProgress: t("mocks.phone.lessonProgress"),
+    askCta: t("mocks.phone.askCta"),
+    quizQuestion: t("mocks.phone.quizQuestion"),
+    quizOptions: [t("mocks.phone.quizOptionA"), t("mocks.phone.quizOptionB"), t("mocks.phone.quizOptionC")],
+    askedQuestion: t("mocks.phone.askedQuestion"),
+    askedReply: t("mocks.phone.askedReply"),
+    askedFollowUp: t("mocks.phone.askedFollowUp"),
+    navLessons: t("mocks.phone.navLessons"),
+    navReferences: t("mocks.phone.navReferences"),
+    navAsk: t("mocks.phone.navAsk"),
+  };
+
+  const tiles: CapabilityTile[] = [1, 2, 3, 4].map((n) => ({
+    v: t(`capabilities.t${n}v`),
+    l: t(`capabilities.t${n}l`),
+  }));
+
+  const faqItems: FaqItem[] = [1, 2, 3, 4, 5].map((n) => ({ q: t(`faq.q${n}`), a: t(`faq.a${n}`) }));
+
+  const interestCopy: InterestFormCopy = {
+    heading: t("interest.heading"),
+    body: t("interest.body"),
+    placeholder: t("interest.placeholder"),
+    submit: t("interest.submit"),
+    submitting: t("interest.submitting"),
+    invalid: t("interest.invalid"),
+    failed: t("interest.failed"),
+    doneTitle: t("interest.doneTitle"),
+    doneBody: t("interest.doneBody"),
+    fieldLabel: t("interest.fieldLabel"),
+  };
+
+  // The founder quote is the operator's own words or it is nothing. `founder.quote`
+  // ships EMPTY (messages/*.json) precisely so this section can't render invented
+  // origin-story prose: writing the quote turns the section on, and no code change
+  // is needed to do it.
+  const founderQuote = t("founder.quote");
+
   return (
     <div className="min-h-screen">
       {/* ── Hero — the certificate stage's aurora + gold flecks as atmosphere ── */}
@@ -122,13 +160,13 @@ export function Landing() {
           >
             <a
               href="#get-started"
-              className="rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
+              className="rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
             >
               {t("hero.getStarted")}
             </a>
             <a
               href="#how"
-              className="rounded-xl border border-line bg-card px-6 py-3 text-sm font-semibold text-ink transition-colors hover:border-gold hover:text-accent"
+              className="rounded-lg border border-line bg-card px-6 py-3 text-sm font-semibold text-ink transition-colors hover:border-gold hover:text-accent"
             >
               {t("hero.seeHow")}
             </a>
@@ -138,12 +176,13 @@ export function Landing() {
 
       {/* ── How it works ── */}
       <section id="how" className="mx-auto w-full max-w-5xl scroll-mt-8 px-6 py-20">
-        <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-          {t("how.heading")}
-        </h2>
+        <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{t("how.heading")}</h2>
         <div className="mt-12 grid gap-8 sm:grid-cols-3">
           {steps.map((step, i) => (
-            <div key={step.key} className="land-reveal flex flex-col items-center text-center">
+            <div
+              key={step.key}
+              className={`${["land-reveal", "land-reveal-mid", "land-reveal-late"][i]} flex flex-col items-center text-center`}
+            >
               <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gold/20 text-base font-semibold text-accent">
                 {i + 1}
               </span>
@@ -154,44 +193,57 @@ export function Landing() {
         </div>
       </section>
 
-      {/* ── Features ── */}
+      {/* ── The product itself, in CSS phone frames — the section that replaced
+             the certificate showcase. A lesson, a quiz inside it, and a question
+             answered where it was asked. ── */}
       <section className="border-y border-line bg-card/60">
         <div className="mx-auto w-full max-w-5xl px-6 py-20">
-          <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-            {t("features.heading")}
-          </h2>
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((f) => (
-              <div
-                key={f.key}
-                className="land-reveal rounded-2xl border border-line bg-card p-6 shadow-sm transition-colors hover:border-gold/60"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gold/15 text-accent">
-                  <Icon name={f.icon} className="h-5 w-5" />
-                </span>
-                <h3 className="mt-4 font-semibold text-ink">{f.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-soft">{f.body}</p>
-              </div>
-            ))}
+          <div className="land-reveal mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{t("mocks.heading")}</h2>
+            <p className="mt-3 leading-relaxed text-soft">{t("mocks.body")}</p>
           </div>
+          <PhoneMockRow
+            copy={phoneCopy}
+            captions={[
+              { title: t("mocks.lesson.title"), body: t("mocks.lesson.body") },
+              { title: t("mocks.quiz.title"), body: t("mocks.quiz.body") },
+              { title: t("mocks.ask.title"), body: t("mocks.ask.body") },
+            ]}
+          />
         </div>
       </section>
 
-      {/* ── Certificate showcase — the real card, demo data ── */}
-      <section className="mx-auto grid w-full max-w-5xl items-center gap-12 px-6 py-20 lg:grid-cols-2">
-        <div className="land-reveal">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-accent2">{t("certificates.eyebrow")}</p>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-            {t("certificates.heading")}
-          </h2>
-          <p className="mt-4 leading-relaxed text-soft">
-            {t("certificates.body")}
-          </p>
-          <p className="mt-3 text-sm italic text-soft">{t("certificates.hint")}</p>
+      {/* ── Features ── */}
+      <section className="mx-auto w-full max-w-5xl px-6 py-20">
+        <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+          {t("features.heading")}
+        </h2>
+        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((f) => (
+            <div
+              key={f.key}
+              className="land-reveal rounded-lg border border-line bg-card p-6 shadow-sm transition-colors hover:border-gold/60"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gold/15 text-accent">
+                <Icon name={f.icon} className="h-5 w-5" />
+              </span>
+              <h3 className="mt-4 font-semibold text-ink">{f.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-soft">{f.body}</p>
+            </div>
+          ))}
         </div>
-        <div className="land-reveal mx-auto w-full max-w-md">
-          <DemoCertificate />
-        </div>
+      </section>
+
+      {/* ── Capability tiles ── */}
+      <CapabilityBand heading={t("capabilities.heading")} body={t("capabilities.body")} tiles={tiles} />
+
+      {/* ── Founder quote — renders only once the operator has written one ── */}
+      {founderQuote !== "" && <FounderQuote quote={founderQuote} byline={t("founder.byline")} />}
+
+      {/* ── FAQ, hardest objection first ── */}
+      <section className="mx-auto w-full max-w-3xl px-6 py-20">
+        <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{t("faq.heading")}</h2>
+        <Faq items={faqItems} />
       </section>
 
       {/* ── Donations (ADR 0027) — renders itself only on a tenant whose
@@ -206,6 +258,13 @@ export function Landing() {
       <section id="get-started" className="cert-stage border-t border-line">
         <div className="relative z-10">
           <SignIn />
+        </div>
+      </section>
+
+      {/* ── The softer ask, for whoever scrolled past sign-in (ADR 0028) ── */}
+      <section className="border-t border-line bg-card/60">
+        <div className="mx-auto w-full max-w-xl px-6 py-16">
+          <InterestForm source="landing-footer" copy={interestCopy} />
         </div>
       </section>
 

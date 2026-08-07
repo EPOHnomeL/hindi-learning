@@ -439,7 +439,7 @@
     "hero": {
       "eyebrow": "Un studio de cours par IA",
       "headline": "Apprenez n’importe quoi, ancré dans <em>vos</em> lectures.",
-      "subhead": "Amorcez un sujet avec les sources auxquelles vous faites confiance, et un auteur IA vous rédige un cours interactif — leçon après leçon, à mesure que vous apprenez — jusqu’au certificat.",
+      "subhead": "Amorcez un sujet avec les sources auxquelles vous faites confiance, et un auteur IA vous rédige un cours interactif — leçon après leçon, à mesure que vous apprenez.",
       "getStarted": "Commencer",
       "seeHow": "Voir comment ça marche"
     },
@@ -457,7 +457,7 @@
       },
       "advance": {
         "title": "Apprenez, questionnez, avancez",
-        "body": "Terminez une leçon et la suivante est écrite pour vous. Le cours se déploie à votre rythme, jusqu’au certificat."
+        "body": "Terminez une leçon et la suivante est écrite pour vous. Le cours se déploie à votre rythme, aussi loin que vous voulez le mener."
       }
     },
     "features": {
@@ -487,11 +487,77 @@
         "body": "Partagez un cours avec quelqu’un par e-mail — en lecture seule ou avec droits de modification — ou créez un lien public anonyme que tout le monde peut ouvrir."
       }
     },
-    "certificates": {
-      "eyebrow": "Certificats",
-      "heading": "Terminez le cours. Gardez la preuve.",
-      "body": "Chaque cours terminé se conclut par un certificat — un document imprimable et partageable à votre nom, à un lien que vous pouvez donner à quiconque. Aucun compte nécessaire pour l’admirer.",
-      "hint": "Allez-y — passez votre curseur dessus."
+    "mocks": {
+      "heading": "À quoi ressemble vraiment une leçon",
+      "body": "Pas une vidéo à subir. Une page rédigée à partir de vos sources, avec les questions — et les réponses — à l'endroit même où vous lisiez.",
+      "lesson": {
+        "title": "Une leçon écrite à partir de vos lectures",
+        "body": "Du texte, des exemples résolus et des encadrés, assemblés depuis les sources que vous avez déposées et jamais par-dessus elles."
+      },
+      "quiz": {
+        "title": "Des questions qui vérifient que c'est acquis",
+        "body": "De courts contrôles dans la leçon, corrigés au fil de l'eau, pour repérer la lacune avant de passer à la suite."
+      },
+      "ask": {
+        "title": "Demandez là où vous avez buté",
+        "body": "Votre question reçoit une réponse en ligne, dans la leçon où vous l'avez posée, et non dans un forum qu'il faudrait aller chercher."
+      },
+      "phone": {
+        "courseTitle": "Le ciel nocturne, d'après votre guide de terrain",
+        "lessonProgress": "Leçon 4 sur 24",
+        "askCta": "Poser une question",
+        "quizQuestion": "Laquelle de ces planètes est une géante gazeuse ?",
+        "quizOptionA": "Jupiter",
+        "quizOptionB": "Mercure",
+        "quizOptionC": "Mars",
+        "askedQuestion": "Pourquoi Mercure n'est-elle pas une géante gazeuse ?",
+        "askedReply": "Bonne question — tout se joue sur la masse.",
+        "navLessons": "Leçons",
+        "navReferences": "Références",
+        "navAsk": "Demander",
+        "askedFollowUp": "Donc tout se résume à la masse ?"
+      }
+    },
+    "capabilities": {
+      "heading": "Conçu en Afrique du Sud, pour partout où vous lisez",
+      "body": "Un petit studio, un support local, et un cours qui voyage : vers une autre langue, sur un téléphone, vers quiconque reçoit le lien.",
+      "t1v": "1:1",
+      "t1l": "Demandez en pleine leçon, réponse en ligne",
+      "t2v": "100+",
+      "t2l": "Langues dans lesquelles un cours peut être réécrit",
+      "t3v": "5",
+      "t3l": "Langues que parle l'application elle-même",
+      "t4v": "SA",
+      "t4l": "Conçu et développé"
+    },
+    "founder": {
+      "quote": "",
+      "byline": ""
+    },
+    "faq": {
+      "heading": "Vos questions, nos réponses.",
+      "q1": "Le cours est-il écrit par une IA ou par une personne ?",
+      "a1": "Par une IA, et nous n'allons pas prétendre le contraire. Ce qui change, c'est ce qu'elle a le droit d'utiliser : vos sources déposées sont le programme, et une leçon s'écrit à partir d'elles plutôt qu'à partir de ce dont le modèle se souvient par hasard. Si ce n'est pas dans vos lectures, cela n'entre pas dans la leçon.",
+      "q2": "Que dois-je déposer ?",
+      "a2": "Ce que vous auriez étudié de toute façon : un manuel, une écriture, des notes de cours, vos propres textes. Une seule source suffit pour commencer, et vous pourrez en ajouter en chemin.",
+      "q3": "Est-ce que je reçois tout le cours d'un coup ?",
+      "a3": "Non. La première leçon est écrite quand vous amorcez le cours, la suivante quand vous terminez la précédente. C'est voulu : l'auteur voit ce que vous avez réussi et ce que vous avez demandé avant d'écrire la suite.",
+      "q4": "Puis-je apprendre dans une autre langue que l'anglais ?",
+      "a4": "Oui. Un cours peut devenir une édition complète dans une autre langue — les mêmes leçons réécrites, pas traduites à la machine — et vous passez d'une édition à l'autre quand vous voulez.",
+      "q5": "Puis-je partager un cours avec quelqu'un ?",
+      "a5": "De trois façons : par e-mail en lecture seule, par e-mail avec droits de modification, ou via un lien public anonyme que n'importe qui peut ouvrir sans compte."
+    },
+    "interest": {
+      "heading": "Pas encore prêt à en lancer un ?",
+      "body": "Laissez votre adresse et nous écrirons quand il y aura quelque chose à raconter. Un seul champ, et pas de tapis roulant à newsletters.",
+      "placeholder": "vous@email.com",
+      "submit": "Tenez-moi au courant",
+      "submitting": "Ajout en cours…",
+      "invalid": "Cela ne ressemble pas à une adresse où nous pourrions vous joindre.",
+      "failed": "L'envoi a échoué. Merci de réessayer.",
+      "doneTitle": "Vous êtes sur la liste.",
+      "doneBody": "Nous écrirons quand cela vaudra votre temps, et ne confierons jamais votre adresse à personne.",
+      "fieldLabel": "Adresse e-mail"
     }
   },
   "Donate": {

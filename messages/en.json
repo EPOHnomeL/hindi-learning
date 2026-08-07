@@ -439,7 +439,7 @@
     "hero": {
       "eyebrow": "An AI course studio",
       "headline": "Learn anything, grounded in <em>your</em> reading.",
-      "subhead": "Seed a topic with the sources you trust, and an AI author writes you an interactive course — lesson by lesson, as you learn — all the way to a certificate.",
+      "subhead": "Seed a topic with the sources you trust, and an AI author writes you an interactive course — lesson by lesson, as you learn.",
       "getStarted": "Get started",
       "seeHow": "See how it works"
     },
@@ -457,7 +457,7 @@
       },
       "advance": {
         "title": "Learn, ask, advance",
-        "body": "Finish a lesson and the next one is written for you. The course unfolds at your pace, all the way to a certificate."
+        "body": "Finish a lesson and the next one is written for you. The course unfolds at your pace, as far as you want to take it."
       }
     },
     "features": {
@@ -487,11 +487,77 @@
         "body": "Share a course with someone by email — read-only or with editing rights — or mint an anonymous public link anyone can open."
       }
     },
-    "certificates": {
-      "eyebrow": "Certificates",
-      "heading": "Finish the course. Keep the proof.",
-      "body": "Every completed course ends in a certificate — a printable, shareable document with your name on it, at a link you can hand to anyone. No account needed to admire it.",
-      "hint": "Go on — run your pointer over it."
+    "mocks": {
+      "heading": "What a lesson actually looks like",
+      "body": "Not a video to sit through. A page written from your sources, with the questions — and the answers — in the same place you were reading.",
+      "lesson": {
+        "title": "A lesson, written from your reading",
+        "body": "Prose, worked examples and pull-outs, assembled from the sources you uploaded and never over them."
+      },
+      "quiz": {
+        "title": "Questions that check you got it",
+        "body": "Short checks inside the lesson, marked as you go, so you find the gap before you move past it."
+      },
+      "ask": {
+        "title": "Ask where you got stuck",
+        "body": "Your question is answered inline, in the lesson where you asked it — not in a forum you'd have to go find."
+      },
+      "phone": {
+        "courseTitle": "The Night Sky, from Your Field Guide",
+        "lessonProgress": "Lesson 4 of 24",
+        "askCta": "Ask about this",
+        "quizQuestion": "Which of these is a gas giant?",
+        "quizOptionA": "Jupiter",
+        "quizOptionB": "Mercury",
+        "quizOptionC": "Mars",
+        "askedQuestion": "Why isn't Mercury a gas giant?",
+        "askedReply": "Good question — it comes down to mass.",
+        "navLessons": "Lessons",
+        "navReferences": "References",
+        "navAsk": "Ask",
+        "askedFollowUp": "So mass is the whole story?"
+      }
+    },
+    "capabilities": {
+      "heading": "Built in South Africa, for wherever you're reading",
+      "body": "A small studio, local support, and a course that travels — into another language, onto a phone, to whoever you send the link to.",
+      "t1v": "1:1",
+      "t1l": "Ask mid-lesson, answered inline",
+      "t2v": "100+",
+      "t2l": "Languages a course can be re-authored in",
+      "t3v": "5",
+      "t3l": "Languages the app itself speaks",
+      "t4v": "SA",
+      "t4l": "Designed and built"
+    },
+    "founder": {
+      "quote": "",
+      "byline": ""
+    },
+    "faq": {
+      "heading": "Questions, answered.",
+      "q1": "Is the course written by AI, or by a person?",
+      "a1": "By AI, and we won't pretend otherwise. What makes it different is what it's allowed to use: your uploaded sources are the syllabus, and a lesson is written from them rather than from whatever the model happens to remember. If it isn't in your reading, it doesn't go in the lesson.",
+      "q2": "What do I need to upload?",
+      "a2": "Whatever you'd have studied anyway — a handbook, a scripture, a set of lecture notes, your own writing. One source is enough to start, and you can add more as the course goes on.",
+      "q3": "Do I get the whole course at once?",
+      "a3": "No. The first lesson is written when you seed the course, and the next when you finish the last. That's deliberate: the author sees what you got right and what you asked about before it writes what comes next.",
+      "q4": "Can I learn in a language other than English?",
+      "a4": "Yes. A course can be turned into a full edition in another language — the same lessons re-authored, not machine-glossed — and you can switch between editions whenever you like.",
+      "q5": "Can I share a course with someone else?",
+      "a5": "Three ways: by email as a read-only viewer, by email with editing rights, or as an anonymous public link anyone can open without an account."
+    },
+    "interest": {
+      "heading": "Not ready to start one yet?",
+      "body": "Leave your address and we'll write when there's something worth telling you about. One field, and no newsletter treadmill.",
+      "placeholder": "you@email.com",
+      "submit": "Keep me posted",
+      "submitting": "Adding you…",
+      "invalid": "That doesn't look like an address we could reach you at.",
+      "failed": "That didn't go through. Please try again.",
+      "doneTitle": "You're on the list.",
+      "doneBody": "We'll write when there's something worth your time — and never hand your address to anyone else.",
+      "fieldLabel": "Email address"
     }
   },
   "Donate": {
