@@ -38,5 +38,11 @@
     "**/*.js",
     ".next/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "generated", "**/*.test.ts"]
+  // `topics/` is the transient per-run teaching workspace (ADR 0009): gitignored in
+  // its entirety, materialised from Convex at run time, and imported by nothing in
+  // `src/`, `convex/`, `scripts/` or `tooling/`. Because `include` is `**/*.ts`, any
+  // local scratch script left in there was failing `next build` for whoever had one —
+  // a break that could not be fixed in git, since the files are never committed.
+  // Excluded so the build depends only on what the repo actually contains.
+  "exclude": ["node_modules", "generated", "topics", "**/*.test.ts"]
 }
