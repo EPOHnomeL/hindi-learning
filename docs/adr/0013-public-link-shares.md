@@ -1,5 +1,11 @@
 # Public link shares (anonymous, read-only Topic links)
 
+> **Narrowed by [ADR 0028](0028-landing-interest-list-first-public-mutation.md)
+> (2026-08-07).** The Decision below states "there are _no_ public mutations."
+> That is now scoped to the **content graph** — still exactly true of everything a
+> Guest can reach — but the landing interest list added one public mutation
+> outside it. The decision text stands as written; read 0028 for the narrowing.
+
 A Topic owner can mint an unguessable **Public link** that lets *anyone* — with
 no account — read the whole Topic on the web. This is a second, capability-based
 form of read access alongside the existing account-bound **Share**, and it
