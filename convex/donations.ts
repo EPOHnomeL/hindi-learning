@@ -18,9 +18,15 @@ import { USD_ZAR_RATE, zarCentsFromUsdCents } from "./rates";
 //   - `checkoutFields` — an UNAUTHENTICATED QUERY. Not a mutation, not an
 //     action. `buildCheckoutFields` is pure (no ctx, no network), and a
 //     donation has no price to freeze, so there is no intent row to write and
-//     therefore nothing to persist before the money is real. ADR 0013's
-//     structural "there are no public mutations" guarantee survives intact, and
-//     an anonymous caller has no junk-row abuse surface to reach.
+//     therefore nothing to persist before the money is real. An anonymous caller
+//     has no junk-row abuse surface to reach.
+//
+//     This used to add "and ADR 0013's structural 'there are no public mutations'
+//     guarantee survives intact." Still true of THIS rail, but no longer true of
+//     the platform: on 2026-08-07 the landing interest list added the first public
+//     mutation (`interest.register`), and ADR 0028 narrows 0013's invariant to the
+//     content graph. Nothing here changed — the donation rail still persists
+//     nothing before the verified ITN.
 //   - `fulfillDonation` — the verified-ITN write, called only from http.ts.
 //
 // All three numbers below are committed constants, changed by deploy —

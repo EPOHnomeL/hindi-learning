@@ -735,4 +735,32 @@ export default defineSchema({
     userId: v.id("users"),
     locale: v.optional(v.string()),
   }).index("by_user", ["userId"]),
+
+  // An **interest lead** (ADR 0028) — a visitor who gave us an email address on a
+  // landing page instead of signing in. Grants NOTHING: no account, no
+  // Entitlement, no access. It is a marketing list and only ever that.
+  //
+  // Written by the only PUBLIC MUTATION in the codebase (`interest.register`),
+  // which is why the row is as small as it can be: an anonymous caller can set
+  // three bounded fields and nothing else, and a repeat submit PATCHES the
+  // existing row rather than inserting, so one email can never grow the table.
+  // See ADR 0028 for why the anonymous write is accepted here when ADR 0013
+  // refused one for the Guest reader.
+  //
+  // `source` is the CTA that converted (e.g. "landing-footer", "ywampotch-footer"),
+  // so the operator can tell which ask worked — the one habit worth copying from
+  // spoorpet.com's interest page. `tenantSlug` scopes the list per site, because
+  // a lead on ywampotch.my-course.app belongs to that ministry, not the platform.
+  // Admin-readable only; never returned by an unauthenticated query.
+  interestLeads: defineTable({
+    email: v.string(),
+    tenantSlug: v.string(),
+    source: v.string(),
+    // Bumped on every re-submit of the same address, so a duplicate is visible as
+    // enthusiasm rather than lost or counted twice.
+    submissions: v.number(),
+    lastSubmittedAt: v.number(),
+  })
+    .index("by_email_and_tenant", ["email", "tenantSlug"])
+    .index("by_tenant", ["tenantSlug"]),
 });
