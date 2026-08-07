@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { type CSSProperties } from "react";
 import { Brand } from "../_components/Brand";
 import { DonateSection } from "../_components/DonateSection";
 import { Icon, type IconName } from "../_components/icons";
+import { InterestForm, type InterestFormCopy } from "../_components/InterestForm";
+import {
+  CapabilityBand,
+  Faq,
+  FounderQuote,
+  type CapabilityTile,
+  type FaqItem,
+} from "../_components/LandingSections";
+import { PhoneMockRow, type PhoneMockCopy } from "../_components/PhoneMocks";
 import { SignIn } from "../_components/SignIn";
 import { SiteFooter } from "../_components/SiteFooter";
 import { useTheme } from "../_components/ThemeContext";
@@ -13,7 +22,14 @@ import { useTheme } from "../_components/ThemeContext";
 // than the generic marketing copy — hand-authored per-tenant, hardcoded English
 // (no next-intl namespace): this is one ministry's own copy, not a translatable
 // platform surface, so a new i18n namespace would be pure overhead.
-const PUBLIC_LINK = "https://ywampotch.my-course.app/share/997211aaa328aa8e9a94fd20dc4c7369703b1f32aaa21ae88a89e64f8dd29348";
+//
+// **Restructured 2026-08-07** alongside <Landing/>, against the same spoorpet.com
+// brief: the product shown in CSS phone frames, a band of capability tiles, the
+// founders as the trust anchor, an objection-first FAQ, and one email capture
+// below sign-in. The sections themselves are shared components; only the words
+// here are the ministry's.
+const PUBLIC_LINK =
+  "https://ywampotch.my-course.app/share/997211aaa328aa8e9a94fd20dc4c7369703b1f32aaa21ae88a89e64f8dd29348";
 
 const FOCUS_AREAS: { icon: IconName; title: string; body: string }[] = [
   {
@@ -32,6 +48,73 @@ const FOCUS_AREAS: { icon: IconName; title: string; body: string }[] = [
     body: "Practical mercy ministry among displaced and marginalised communities — showing God's love in tangible ways.",
   },
 ];
+
+// The three phone frames, in the ministry's own words: a Prophetic School lesson,
+// a check inside it, and a question answered where it was asked.
+const PHONE_COPY: PhoneMockCopy = {
+  courseTitle: "Prophetic School",
+  lessonProgress: "Lesson 4 of 12",
+  askCta: "Ask about this",
+  quizQuestion: "What does it mean to test a prophetic word?",
+  quizOptions: [
+    "Weigh it against Scripture",
+    "Act on it immediately",
+    "Keep it to yourself",
+  ],
+  askedQuestion: "How do I know it's God's voice and not my own?",
+  askedReply: "A fair question, and the honest answer starts with Scripture.",
+  askedFollowUp: "And if I get it wrong?",
+  navLessons: "Lessons",
+  navReferences: "References",
+  navAsk: "Ask",
+};
+
+// Capabilities, not traction numbers — the same discipline as the shared landing,
+// and the reason the band works on a page with no crowd yet.
+const TILES: CapabilityTile[] = [
+  { v: "2013", l: "Serving from Potchefstroom" },
+  { v: "3", l: "Ministries on the base" },
+  { v: "1:1", l: "Ask mid-lesson, answered inline" },
+  { v: "SA", l: "Local, and sent out" },
+];
+
+// Objection first. The hardest question about a self-paced ministry course is
+// whether it replaces the base, so that is question one.
+const FAQ_ITEMS: FaqItem[] = [
+  {
+    q: "Does the course replace coming to the base?",
+    a: "No, and it isn't meant to. Prophetic School as a course is for whoever can't be in Potchefstroom — a different town, a different country, a season that won't allow it. If you can come, come; the course is for the rest of the time.",
+  },
+  {
+    q: "Do I need to be part of YWAM to do it?",
+    a: "No. It's open to anyone who wants to grow in hearing God's voice, whatever church you're part of or aren't.",
+  },
+  {
+    q: "How long does it take?",
+    a: "As long as you need. It's self-paced: the next lesson is written when you finish the last one, so it moves at whatever speed your week allows rather than to a timetable.",
+  },
+  {
+    q: "Can I do it on my phone?",
+    a: "Yes. Lessons, the questions inside them, and asking your own are all built for a phone first — which is the device most people actually study on.",
+  },
+  {
+    q: "What if I have a question mid-lesson?",
+    a: "Ask it right there. It's answered inline, in the lesson where you asked it, so the answer stays attached to the thing that prompted it.",
+  },
+];
+
+const INTEREST_COPY: InterestFormCopy = {
+  heading: "Not ready to start yet?",
+  body: "Leave your address and we'll let you know as new schools and courses open. One field, and we won't crowd your inbox.",
+  placeholder: "you@email.com",
+  submit: "Keep me posted",
+  submitting: "Adding you…",
+  invalid: "That doesn't look like an address we could reach you at.",
+  failed: "That didn't go through. Please try again.",
+  doneTitle: "You're on the list.",
+  doneBody: "We'll write when there's a school or a course worth telling you about — and never hand your address to anyone else.",
+  fieldLabel: "Email address",
+};
 
 function ThemeToggle() {
   const { theme, toggle } = useTheme();
@@ -90,13 +173,13 @@ export function YwamPotch() {
           >
             <a
               href={PUBLIC_LINK}
-              className="rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
+              className="rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
             >
               Get Prophetic School
             </a>
             <a
               href="#focus"
-              className="rounded-xl border border-line bg-card px-6 py-3 text-sm font-semibold text-ink transition-colors hover:border-gold hover:text-accent"
+              className="rounded-lg border border-line bg-card px-6 py-3 text-sm font-semibold text-ink transition-colors hover:border-gold hover:text-accent"
             >
               Our focus areas
             </a>
@@ -113,12 +196,12 @@ export function YwamPotch() {
           Founded in 2013 by Wikus and Christien Vorster, our base currently focuses on three ministries.
         </p>
         <div className="mt-12 grid gap-6 sm:grid-cols-3">
-          {FOCUS_AREAS.map((f) => (
+          {FOCUS_AREAS.map((f, i) => (
             <div
               key={f.title}
-              className="land-reveal rounded-2xl border border-line bg-card p-6 shadow-sm transition-colors hover:border-gold/60"
+              className={`${["land-reveal", "land-reveal-mid", "land-reveal-late"][i]} rounded-lg border border-line bg-card p-6 shadow-sm transition-colors hover:border-gold/60`}
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-gold/15 text-accent">
+              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gold/15 text-accent">
                 <Icon name={f.icon} className="h-5 w-5" />
               </span>
               <h3 className="mt-4 font-semibold text-ink">{f.title}</h3>
@@ -128,31 +211,64 @@ export function YwamPotch() {
         </div>
       </section>
 
-      {/* ── Prophetic School — the buy CTA ── */}
+      {/* ── Prophetic School — the buy CTA. Replaced the lone 40×40 award medallion
+             that used to sit beside it: an icon the size of a dinner plate said
+             nothing about what you get, where the phone frames below show it. ── */}
       <section className="border-y border-line bg-card/60">
-        <div className="mx-auto grid w-full max-w-5xl items-center gap-12 px-6 py-20 lg:grid-cols-2">
-          <div className="land-reveal">
+        <div className="mx-auto w-full max-w-5xl px-6 py-20">
+          <div className="land-reveal mx-auto max-w-2xl text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.35em] text-accent2">Prophetic School</p>
             <h2 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
               Growing in the Holy Spirit
             </h2>
             <p className="mt-4 leading-relaxed text-soft">
               A self-paced course to help you hear God's voice with confidence and grow in prophetic
-              ministry — study anywhere, at your own pace, with a certificate at the end.
+              ministry — study anywhere, at your own pace, and ask your questions as they come.
             </p>
             <a
               href={PUBLIC_LINK}
-              className="mt-6 inline-flex rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
+              className="mt-6 inline-flex rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
             >
               Get the course
             </a>
           </div>
-          <div className="land-reveal flex justify-center">
-            <span className="flex h-40 w-40 items-center justify-center rounded-full bg-gold/15 text-accent">
-              <Icon name="award" className="h-16 w-16" />
-            </span>
-          </div>
+          <PhoneMockRow
+            copy={PHONE_COPY}
+            captions={[
+              {
+                title: "A lesson you can sit with",
+                body: "Teaching, Scripture and worked examples on one page, written to be read rather than watched.",
+              },
+              {
+                title: "Checks that make it stick",
+                body: "Short questions inside the lesson, marked as you go, so you notice what hasn't landed yet.",
+              },
+              {
+                title: "Ask where you got stuck",
+                body: "Your question is answered inline, in the lesson where you asked it, and stays there for next time.",
+              },
+            ]}
+          />
         </div>
+      </section>
+
+      {/* ── Capability tiles ── */}
+      <CapabilityBand
+        heading="A base in Potchefstroom, a course that travels"
+        body="Trained and sent from the North West since 2013 — and now teaching wherever there's a phone and a reason to grow."
+        tiles={TILES}
+      />
+
+      {/* ── The founders, as the trust anchor ── */}
+      <FounderQuote
+        quote="“We started YWAM Potch in 2013 with a conviction that hearing God's voice isn't reserved for a few people with a platform. It's your creation design. Most of what we do is helping someone hear it for the first time and then believe what they heard.”"
+        byline="Wikus and Christien Vorster, founders, YWAM Potchefstroom"
+      />
+
+      {/* ── FAQ, hardest objection first ── */}
+      <section className="mx-auto w-full max-w-3xl px-6 py-20">
+        <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Questions, answered.</h2>
+        <Faq items={FAQ_ITEMS} />
       </section>
 
       {/* ── Donations (ADR 0027) — placed BY HAND, because this page is bespoke:
@@ -170,7 +286,14 @@ export function YwamPotch() {
         </div>
       </section>
 
-      <p className="mx-auto -mt-4 max-w-5xl px-6 pb-4 text-center text-xs text-soft">
+      {/* ── The softer ask, for whoever scrolled past sign-in (ADR 0028) ── */}
+      <section className="border-t border-line bg-card/60">
+        <div className="mx-auto w-full max-w-xl px-6 py-16">
+          <InterestForm source="ywampotch-footer" copy={INTEREST_COPY} />
+        </div>
+      </section>
+
+      <p className="mx-auto max-w-5xl px-6 pb-4 text-center text-xs text-soft">
         Questions? Reach us at{" "}
         <a href="mailto:ywampotch@gmail.com" className="hover:text-accent">
           ywampotch@gmail.com
