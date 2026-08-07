@@ -36,6 +36,10 @@ vague aspiration.
   (the pre-signup pitch) and
   [Review session management](../auth-sessions/tickets/02-review-session-management.md)
   (having to sign in repeatedly, which is onboarding friction every single visit).
+- **This map carries one fix ticket, deliberately** (wayfinder's default is plan-don't-do):
+  [Dashboard empty state contradicts the catalogue below it](tickets/03-dashboard-empty-state-ignores-catalogue.md)
+  is a verified bug with nothing to decide, filed here 2026-08-07 rather than left as prose
+  in another map's ticket. It renders as unstarted work because it *is* unstarted work.
 - Skills: `/grilling`, `/run` (walk the real app — this map is worthless from the armchair).
 
 ## Decisions so far
@@ -66,4 +70,9 @@ vague aspiration.
 ## Out of scope
 
 - Checkout mechanics — owned by the launch work and [marketplace](../marketplace/map.md).
-- The dashboard empty state (`EmptyLibrary`) — already shipped, different audience.
+- ~~The dashboard empty state (`EmptyLibrary`) — already shipped, different audience.~~
+  **Corrected 2026-08-07: it is shipped and broken, and the audience is this map's.**
+  `emptyLibrary` ignores the site catalogue, so a new tenant learner is told "a marketplace
+  is coming soon" directly above a buyable course. "Different audience" was true when a
+  tenant had no catalogue; tenants have one now. Back in scope as
+  [ticket 03](tickets/03-dashboard-empty-state-ignores-catalogue.md).
