@@ -350,9 +350,14 @@ function itemTitle(row: { title?: string } | null | undefined, sourceTitle: stri
   return decodeEntities(row?.title ?? sourceTitle);
 }
 
-// A loaded snapshot of one Edition's translated rows (`${kind}:${key}` → row),
-// with sync accessors for the list queries. Titles decode; question text/reply
-// stay raw (learner-typed, never generated-HTML-derived).
+// The five kinds a translation row can be. `lesson` and `reference` rows carry
+// the fat inline `html` body; `title`/`mission`/`question` rows are text-only.
+// That asymmetry is why `map()` takes the kinds it needs — see below.
+export type EditionKind = "lesson" | "reference" | "mission" | "title" | "question";
+
+// A loaded snapshot of one Edition's translated rows (keyed by `key` within each
+// requested kind), with sync accessors for the list queries. Titles decode;
+// question text/reply stay raw (learner-typed, never generated-HTML-derived).
 export type EditionSnapshot = {
   title(topic: { title: string }): string;
   lessonTitle(lesson: Doc<"lessons">): string;
@@ -365,17 +370,23 @@ export type EditionReader = {
   mission(): Promise<string | null>;
   lesson(lesson: Doc<"lessons">): Promise<{ title: string; body: ContentBody }>;
   reference(reference: Doc<"references">): Promise<{ title: string; body: ContentBody }>;
-  map(): Promise<EditionSnapshot>;
+  // The caller declares which kinds it will read, and pays for those rows ONLY.
+  // Not a micro-optimisation: a `lesson`/`reference` row carries a whole inline
+  // HTML body, so a snapshot that loaded all five kinds made `myQuestions` read
+  // every lesson body in the Edition to return a line of learner-typed text.
+  // That one mistake was 1.15 GB of the 3.62 GB on the Jul 8 – Aug 7 2026 bill
+  // (`myQuestions`, `listLessons` and `listReferences` were 95% of it together).
+  // Accessing a kind you did not request throws rather than silently falling
+  // back to the source-language text, which would look like a missing
+  // translation instead of a bug.
+  map(kinds: readonly EditionKind[]): Promise<EditionSnapshot>;
 };
 
 export function loadEdition(ctx: QueryCtx, topic: Doc<"topics">, lang: string): EditionReader {
   const source = lang === SOURCE_LANG;
 
   // One point-read of a single translated row (skipped for the source language).
-  const one = async (
-    kind: "lesson" | "reference" | "mission" | "title" | "question",
-    key: string,
-  ): Promise<Doc<"translations"> | null> => {
+  const one = async (kind: EditionKind, key: string): Promise<Doc<"translations"> | null> => {
     if (source) return null;
     return await ctx.db
       .query("translations")
@@ -385,7 +396,28 @@ export function loadEdition(ctx: QueryCtx, topic: Doc<"topics">, lang: string): 
       .unique();
   };
 
-  let snapshot: Promise<EditionSnapshot> | null = null;
+  // One indexed collect per kind, memoised so a caller that reads two kinds
+  // (the Guest bundle reads all four) still pays each at most once. The `kind`
+  // prefix of `by_topic_lang_kind_key` makes each of these a range scan over
+  // just that kind's rows, never the whole Edition.
+  const perKind = new Map<EditionKind, Promise<Map<string, Doc<"translations">>>>();
+  const rowsOf = (kind: EditionKind): Promise<Map<string, Doc<"translations">>> => {
+    let pending = perKind.get(kind);
+    if (!pending) {
+      pending = (async () => {
+        if (source) return new Map<string, Doc<"translations">>();
+        const rows = await ctx.db
+          .query("translations")
+          .withIndex("by_topic_lang_kind_key", (q) =>
+            q.eq("topicId", topic._id).eq("lang", lang).eq("kind", kind),
+          )
+          .collect();
+        return new Map(rows.map((r) => [r.key, r]));
+      })();
+      perKind.set(kind, pending);
+    }
+    return pending;
+  };
 
   return {
     // Course title uses the shared `translatedTitle` primitive (the `text` field),
@@ -404,27 +436,27 @@ export function loadEdition(ctx: QueryCtx, topic: Doc<"topics">, lang: string): 
       const row = await one("reference", reference.key);
       return { title: itemTitle(row, reference.title), body: pickContentBody(row, reference) };
     },
-    map: () => {
-      // Memoise the single collect: list queries may touch it many times.
-      snapshot ??= (async () => {
-        const rows = source
-          ? []
-          : await ctx.db
-              .query("translations")
-              .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", lang))
-              .collect();
-        const byKey = new Map(rows.map((r) => [`${r.kind}:${r.key}`, r]));
-        return {
-          title: (tp) => decodeEntities(byKey.get("title:")?.text ?? tp.title),
-          lessonTitle: (lesson) => itemTitle(byKey.get(`lesson:${lesson.key}`), lesson.title),
-          referenceTitle: (reference) => itemTitle(byKey.get(`reference:${reference.key}`), reference.title),
-          question: (q) => {
-            const row = byKey.get(`question:${q._id}`);
-            return { text: row?.text ?? q.text, reply: (q.reply ? (row?.reply ?? q.reply) : null) ?? null };
-          },
-        };
-      })();
-      return snapshot;
+    map: async (kinds) => {
+      const loaded = new Map<EditionKind, Map<string, Doc<"translations">>>(
+        await Promise.all(kinds.map(async (k) => [k, await rowsOf(k)] as const)),
+      );
+      // A kind the caller didn't declare is a programming error, not a missing
+      // translation — throw instead of returning the source text, which would
+      // read as "untranslated" in the UI and hide the mistake.
+      const need = (kind: EditionKind): Map<string, Doc<"translations">> => {
+        const rows = loaded.get(kind);
+        if (!rows) throw new Error(`Edition snapshot: kind "${kind}" read but not requested`);
+        return rows;
+      };
+      return {
+        title: (tp) => decodeEntities(need("title").get("")?.text ?? tp.title),
+        lessonTitle: (lesson) => itemTitle(need("lesson").get(lesson.key), lesson.title),
+        referenceTitle: (reference) => itemTitle(need("reference").get(reference.key), reference.title),
+        question: (q) => {
+          const row = need("question").get(q._id);
+          return { text: row?.text ?? q.text, reply: (q.reply ? (row?.reply ?? q.reply) : null) ?? null };
+        },
+      };
     },
   };
 }

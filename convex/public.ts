@@ -142,7 +142,8 @@ export const publicCourse = query({
     // One Edition reader for both profiles: `map()` (memoised, backs the TOC lists)
     // and the single-item `mission()` point-read.
     const ed = loadEdition(ctx, topic, lang);
-    const m = await ed.map();
+    // The Guest bundle is a full mirror: course title, both TOCs and the Q&A.
+    const m = await ed.map(["title", "lesson", "reference", "question"]);
 
     // The table of contents uses the shared TOC projections (edition-deepening/04);
     // the resources/progress/questions full-mirror below stays Guest-only, behind

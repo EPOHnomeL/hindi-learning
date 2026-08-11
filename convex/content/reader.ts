@@ -220,7 +220,7 @@ export const listLessons = query({
     // re-deriving it from `paywall.previewKey` (architecture-deepening/03).
     const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return [];
-    return await lessonsToc(ctx, topic, await loadEdition(ctx, topic, effLang).map(), level);
+    return await lessonsToc(ctx, topic, await loadEdition(ctx, topic, effLang).map(["lesson"]), level);
   },
 });
 
@@ -252,7 +252,7 @@ export const listReferences = query({
     // role. `none` is not-found.
     const { lang: effLang, level } = await resolveEdition(ctx, topic, userId, lang ?? null);
     if (level === "none") return [];
-    return await referencesToc(ctx, topic, await loadEdition(ctx, topic, effLang).map(), level);
+    return await referencesToc(ctx, topic, await loadEdition(ctx, topic, effLang).map(["reference"]), level);
   },
 });
 

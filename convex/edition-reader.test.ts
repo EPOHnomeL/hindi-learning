@@ -119,7 +119,7 @@ test("map(): one collect backs list titles (decoded) and question text (raw)", a
     const lesson = (await ctx.db.query("lessons").withIndex("by_topic_key", (q) => q.eq("topicId", id).eq("key", "0001")).unique())!;
     const reference = (await ctx.db.query("references").withIndex("by_topic_key", (q) => q.eq("topicId", id).eq("key", "g")).unique())!;
     const question = (await ctx.db.get(qid))!;
-    const m = await loadEdition(ctx, topic, "es").map();
+    const m = await loadEdition(ctx, topic, "es").map(["title", "lesson", "reference", "question"]);
     expect(m.title(topic)).toBe("Título");
     expect(m.lessonTitle(lesson)).toBe("Trad & L1"); // decoded
     expect(m.referenceTitle(reference)).toBe("Src & Ref"); // untranslated → source, decoded
@@ -140,8 +140,35 @@ test("map().question(): a translated reply is suppressed when the source questio
   const topic = await getTopic(t, id);
   await t.run(async (ctx) => {
     const question = (await ctx.db.get(qid))!;
-    const q = (await loadEdition(ctx, topic, "es").map()).question(question);
+    const q = (await loadEdition(ctx, topic, "es").map(["question"])).question(question);
     expect(q.text).toBe("Trad Q");
     expect(q.reply).toBeNull(); // source has no reply → translated reply withheld
+  });
+});
+
+// The cost guarantee (Jul 8 – Aug 7 2026 bill): a snapshot must read ONLY the
+// kinds its caller declared. `lesson`/`reference` rows carry a whole inline HTML
+// body, so a list query that over-declares silently pays for every lesson body
+// in the Edition — that was 95% of that month's Database I/O. There is no I/O
+// counter to assert on in convex-test, so we pin the guard that makes
+// over-reading impossible to do by accident instead: an undeclared kind throws
+// rather than falling back to the source text (which would look like a missing
+// translation, not a bug).
+test("map(): reading a kind that was not requested throws, it does not fall back", async () => {
+  const t = convexTest(schema, modules);
+  const id = await seedTopic(t, "T");
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId: id, key: "0001", seq: 1, title: "Src L1" }));
+  await tr(t, id, "es", "lesson", "0001", { title: "Trad L1" });
+  const topic = await getTopic(t, id);
+  await t.run(async (ctx) => {
+    const lesson = (await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", id).eq("key", "0001"))
+      .unique())!;
+    const questionsOnly = await loadEdition(ctx, topic, "es").map(["question"]);
+    expect(() => questionsOnly.lessonTitle(lesson)).toThrow(/not requested/);
+    // ...and the kind it DID declare still resolves.
+    const lessonsOnly = await loadEdition(ctx, topic, "es").map(["lesson"]);
+    expect(lessonsOnly.lessonTitle(lesson)).toBe("Trad L1");
   });
 });

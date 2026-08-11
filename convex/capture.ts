@@ -116,7 +116,7 @@ export const myQuestions = query({
       .collect();
     // Translated Q&A for the current Edition (question text/reply else source),
     // via the shared Edition reader.
-    const m = await loadEdition(ctx, topic, effLang).map();
+    const m = await loadEdition(ctx, topic, effLang).map(["question"]);
     return rows
       .sort((a, b) => b._creationTime - a._creationTime)
       .map((q) => {
