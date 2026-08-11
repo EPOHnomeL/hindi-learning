@@ -1,6 +1,9 @@
 # admin-sales/02: Sales tab + Payouts as its own tab (AdminPanel)
 
-**Status:** open
+**Status:** shipped. Corrected 2026-08-11: this was still marked open while built.
+`SalesManager`, `SalesDayChart` and a standalone Payouts tab are all live in
+`src/app/_components/AdminPanel.tsx`, with chart helpers in `salesChart.ts` /
+`dayChart.ts`. Read the code, not this file.
 
 Frontend in `src/app/_components/AdminPanel.tsx`.
 

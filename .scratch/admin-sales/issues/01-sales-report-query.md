@@ -1,6 +1,8 @@
 # admin-sales/01: Sales report query (`sales.report`)
 
-**Status:** open
+**Status:** shipped. Corrected 2026-08-11: this was still marked open while built.
+`sales.report` and a second query `sales.byDay` (per-UTC-day buckets split by edition
+language) both live in `convex/sales.ts`. Read the code, not this file.
 
 Admin-only Convex query aggregating the `ledger` into a sales report.
 

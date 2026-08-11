@@ -1,6 +1,7 @@
 # Admin sales report + payouts as its own tab
 
-**Status:** in progress
+**Status:** shipped. Corrected 2026-08-11: both issues under this PRD were still marked
+open/in-progress while built (`convex/sales.ts`, `AdminPanel.tsx`).
 **Date:** 2026-07-23
 
 ## Problem
