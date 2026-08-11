@@ -58,7 +58,21 @@ Verified 2026-07-10 (main @ 1b2db94) — accurate as written: lessons + referenc
 
 ## Done when
 
-`translations.html` moves to blob storage so the read path drops its dual shape, and the quiz-structure guard that a blob-backed source currently bypasses is restored.
+**Resolved 2026-08-04 — and NOT as this line originally read.** The old text said
+`translations.html` moves to blob storage; it does not, and that half was dropped
+deliberately, not deferred. What actually closed the ticket was restoring the
+quiz-structure guard via the `publishTranslationChecked` action (see the map's
+"Two gaps closed after the map" note). `translations.html` **stays inline** and the
+read path **keeps** its dual shape — `convex/schema.ts` records that as the settled
+decision, same day.
+
+Corrected 2026-08-11, after a session read this line and nearly migrated the table
+to blobs on the strength of it, reversing a week-old decision. If the cost of the
+fat rows is what brought you here: the fix that does *not* touch this decision is to
+move `html` into its own table, keyed by the same `(topicId, lang, kind, key)` tuple,
+so the row the reader collects is slim while the body stays inline where it lives.
+Partly addressed already in `784eb70`, which stopped list queries reading kinds they
+never use (95% of the Jul 8 – Aug 7 2026 Database I/O bill).
 
 <!-- Migrated 2026-07-30 from GitHub issue #69 (filed 2026-07-24), when this repo retired
      its remote tracker; see docs/agents/issue-tracker.md. -->
