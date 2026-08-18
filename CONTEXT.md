@@ -186,6 +186,35 @@ error. Provenance for a manual sale is the intent's reference (`eftRef`), exactl
 card sale carries a PayFast payment id.
 _Avoid_: Order, invoice, pending purchase (nothing is owed by us), reservation; **[[Publishing|Publish]]** has no relation; "checkout intent" (that is the PayFast rail's own `checkoutIntents` row — a deliberately separate table)
 
+**Voucher**:
+A single-use code that mints an **[[Entitlement]]** for one **[[Edition]]** when redeemed by a
+signed-in User, with no payment at redemption time — the money was paid by the organisation that
+bought its **[[Voucher Batch]]**. Belongs to exactly one batch and one Edition, is live from the
+moment the batch is created, and **never expires**. A redeemed Voucher records *that* it was used
+and *when* — **never by whom** ([ADR 0029](docs/adr/0029-seller-minted-voucher-rail.md)), which is
+why a voucher-granted Entitlement is deliberately indistinguishable from an Admin comp. Redeeming
+for an Edition the caller can already read is **refused without consuming the code**, so a seat is
+never spent granting nothing.
+_Avoid_: Coupon, discount code, promo code (a Voucher does not reduce a price — it grants the whole
+Edition), gift card (there is no balance), licence key, seat, invite or **[[Share]]** (a Share is
+granted by an owner to a known person; a Voucher is redeemed by whoever holds the code), token
+
+**Voucher Batch**:
+N **[[Voucher]]**s a **[[Seller]]** mints for one **[[Edition]]** of their own course, sold to an
+organisation that will not disclose its members' email addresses — the reason the rail exists at
+all ([ADR 0029](docs/adr/0029-seller-minted-voucher-rail.md)). The Seller owns the commercial
+relationship: they set the total, and the organisation transfers it into the **operator's** account
+(sole merchant of record, unchanged — [ADR 0026](docs/adr/0026-manual-eft-payment-rail.md)), where
+the **sysadmin** logs the reference against the batch. That log is **bookkeeping, not a gate**: the
+codes work from creation, so an unpaid batch has already granted its seats. Creation writes one
+**[[Ledger]]** row for the whole batch — the money event is the batch, not the redemption — held
+**unpaid** and excluded from payouts until the reference is logged. The buying organisation exists
+only as a name and a billing contact on the batch: it holds no account, and **[[Voucher]]** counts
+are all it is ever shown.
+_Avoid_: Order, bulk purchase, seat pool, licence pack, organisation or team (there is no
+organisation entity, deliberately), **[[EFT Intent]]** (an intent grants nothing until confirmed; a
+batch grants everything at creation — the opposite), campaign
+
 **Preview**:
 On a paid **Edition**, the free first Lesson *in that Edition's language* — readable without an Entitlement by anyone, including a Guest. The teaser that sits before the paygate; continuing past it requires a buyer account and an Entitlement for that Edition.
 _Avoid_: Free trial, sample, demo, taster
