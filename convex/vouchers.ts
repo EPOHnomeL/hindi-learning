@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { publishedLangs, topicBySlug } from "./lib";
 import { platformFeeBps, splitNet } from "./payfast";
@@ -360,3 +360,109 @@ export const logBatchPayment = mutation({
     return null;
   },
 });
+
+// ---- The Seller's own view (ticket 05) -----------------------------------------
+
+// The caller's own batches: what they sold, to whom, how many seats have been
+// taken up, and whether the money has been logged yet.
+//
+// **The count is derived**, by counting voucher rows that carry a `redeemedAt`.
+// There is no counter field anywhere, so there is nothing to drift out of step
+// with the codes themselves.
+//
+// The payment state is here and stated plainly rather than implied, because a
+// Seller looking at a batch whose cash has not been logged should understand that
+// their share is not payable yet and why - otherwise the first thing they do is
+// file a support question about a missing payout.
+//
+// Note what this deliberately CANNOT answer: **who** redeemed. It is not recorded
+// (ADR 0029), so there is nothing to return - and a well-meaning join onto
+// `entitlements` by Edition would approximate it, which is exactly the query that
+// must never be written.
+export const myBatches = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      batchId: v.id("voucherBatches"),
+      topicSlug: v.string(),
+      courseTitle: v.string(),
+      lang: v.string(),
+      seats: v.number(),
+      redeemed: v.number(),
+      total: v.number(),
+      orgName: v.string(),
+      orgContact: v.string(),
+      voided: v.boolean(),
+      // The bank reference the sysadmin logged, or null while the transfer has not
+      // been matched yet - which is the whole of "is my share payable".
+      paymentRef: v.union(v.string(), v.null()),
+      at: v.number(),
+    }),
+  ),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return [];
+    const batches = await ctx.db
+      .query("voucherBatches")
+      .withIndex("by_seller", (q) => q.eq("sellerId", userId))
+      .take(200);
+    const rows = await Promise.all(
+      batches.map(async (b) => {
+        const [topic, codes] = await Promise.all([
+          ctx.db.get(b.topicId),
+          ctx.db
+            .query("vouchers")
+            .withIndex("by_batch", (q) => q.eq("batchId", b._id))
+            .collect(),
+        ]);
+        return {
+          batchId: b._id,
+          topicSlug: topic?.slug ?? "",
+          courseTitle: topic?.title ?? "(deleted course)",
+          lang: b.lang,
+          seats: b.seats,
+          redeemed: codes.filter((c) => c.redeemedAt !== undefined).length,
+          total: b.total,
+          orgName: b.orgName,
+          orgContact: b.orgContact,
+          voided: b.voided,
+          paymentRef: b.paymentRef ?? null,
+          at: b._creationTime,
+        };
+      }),
+    );
+    // Newest first: the batch a Seller is dealing with is the one they just minted.
+    return rows.sort((a, b) => b.at - a.at);
+  },
+});
+
+// The codes of ONE batch the caller minted - the CSV's source, and the only place
+// codes ever leave the platform. The Seller hands them to the organisation, which
+// distributes them however it already talks to its people; the platform sends
+// nothing to anyone, because it has no member addresses and that is the point.
+//
+// `redeemed` is a boolean, not a person: a spent code is spent, and who spent it
+// was never recorded.
+export const batchCodes = query({
+  args: { batchId: v.id("voucherBatches") },
+  returns: v.array(v.object({ code: v.string(), redeemed: v.boolean() })),
+  handler: async (ctx, { batchId }) => {
+    const batch = await ownBatch(ctx, batchId);
+    const codes = await ctx.db
+      .query("vouchers")
+      .withIndex("by_batch", (q) => q.eq("batchId", batch._id))
+      .collect();
+    return codes.map((c) => ({ code: c.code, redeemed: c.redeemedAt !== undefined }));
+  },
+});
+
+// The caller's own batch, or a throw. Codes are the one thing in this rail that a
+// Seller could use against another Seller, so ownership is checked server-side on
+// every read of them rather than by which batches a page happens to list.
+async function ownBatch(ctx: QueryCtx, batchId: Id<"voucherBatches">): Promise<Doc<"voucherBatches">> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) throw new Error("sign in to see your batches");
+  const batch = await ctx.db.get(batchId);
+  if (!batch || batch.sellerId !== userId) throw new Error("that batch isn't yours");
+  return batch;
+}

@@ -401,3 +401,66 @@ test("logging the cash makes the share payable, is idempotent, and touches no co
   const member = await seedUser(t, "member@example.com");
   await asUser(t, member).mutation(api.vouchers.redeem, { code: before[0]! });
 });
+
+// ---- The Seller's own view (ticket 05) -----------------------------------------
+
+test("a Seller sees their own batches with a derived take-up count and the payment state", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, MINT);
+  const codes = await codesOf(t, batchId);
+
+  let mine = await asUser(t, seller).query(api.vouchers.myBatches, {});
+  expect(mine).toHaveLength(1);
+  expect(mine[0]).toMatchObject({
+    batchId,
+    topicSlug: "hindi",
+    courseTitle: "hindi",
+    lang: "en",
+    seats: 3,
+    redeemed: 0,
+    total: 500000,
+    orgName: "The Party",
+    orgContact: "billing@party.example.org",
+    voided: false,
+    // Not payable yet, and the Seller can see exactly why.
+    paymentRef: null,
+  });
+
+  // The count is DERIVED from the codes, so it cannot drift: redeem one and it
+  // moves without anything having incremented a counter.
+  const member = await seedUser(t, "member@example.com");
+  await asUser(t, member).mutation(api.vouchers.redeem, { code: codes[0]! });
+  mine = await asUser(t, seller).query(api.vouchers.myBatches, {});
+  expect(mine[0]).toMatchObject({ seats: 3, redeemed: 1 });
+
+  await asUser(t, admin).mutation(api.vouchers.logBatchPayment, { batchId, reference: "FNB-993" });
+  mine = await asUser(t, seller).query(api.vouchers.myBatches, {});
+  expect(mine[0]).toMatchObject({ paymentRef: "FNB-993" });
+
+  // Nothing anywhere in this view says WHO redeemed - it was never recorded, and
+  // the member's account must not be inferable from it.
+  expect(JSON.stringify(mine)).not.toContain("member@example.com");
+});
+
+test("a Seller sees nothing of another Seller's batches, and cannot read their codes", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const other = await seedSeller(t, admin, "other@example.com", "urdu");
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, MINT);
+
+  expect(await asUser(t, other.seller).query(api.vouchers.myBatches, {})).toEqual([]);
+  // The server-side negative that matters: codes are the one thing a Seller could
+  // use against another Seller, so ownership is checked on the read itself.
+  await expect(asUser(t, other.seller).query(api.vouchers.batchCodes, { batchId })).rejects.toThrow();
+  await expect(t.query(api.vouchers.batchCodes, { batchId })).rejects.toThrow();
+  // Even the sysadmin, who logs the money, has no path to a code.
+  await expect(asUser(t, admin).query(api.vouchers.batchCodes, { batchId })).rejects.toThrow();
+
+  const own = await asUser(t, seller).query(api.vouchers.batchCodes, { batchId });
+  expect(own).toHaveLength(3);
+  expect(own.every((c) => c.redeemed === false)).toBe(true);
+  expect(own.map((c) => c.code).sort()).toEqual((await codesOf(t, batchId)).sort());
+});

@@ -791,13 +791,13 @@ function EftQueueRow({ intent }: { intent: FunctionReturnType<typeof api.eft.pen
 
 // The voucher batches whose transfer has not been logged yet (vouchers ticket 04,
 // ADR 0029). Beside the EFT queue deliberately: to the operator this is the same
-// job — money on a bank statement that has to be matched to something in the app —
+// job - money on a bank statement that has to be matched to something in the app -
 // and a queue that looks like a stranger is a queue that gets missed.
 //
 // Two things this is NOT. It is not an approval: the batch's codes have been
 // working since the Seller minted them, so logging the reference changes nothing
 // for the organisation and only makes the Seller's 50% payable. And it never shows
-// a code — `pendingBatches` cannot return one, so the boundary between the money
+// a code - `pendingBatches` cannot return one, so the boundary between the money
 // role and the selling role is server-side, not this component's restraint.
 function BatchQueue() {
   const pending = useQuery(api.vouchers.pendingBatches);
@@ -807,7 +807,7 @@ function BatchQueue() {
       <div className="mb-4">
         <h2 className="text-xl font-semibold tracking-tight text-accent">Voucher batches awaiting payment</h2>
         <p className="mt-0.5 text-sm text-soft">
-          Check the total against what landed, then log the reference — that makes the seller&apos;s share payable
+          Check the total against what landed, then log the reference - that makes the seller&apos;s share payable
         </p>
       </div>
       {pending === undefined ? (
@@ -857,7 +857,7 @@ function BatchQueueRow({ batch }: { batch: FunctionReturnType<typeof api.voucher
           try {
             await log({ batchId: batch.batchId, reference });
           } catch (err) {
-            setError(mutationError(err, "Failed — retry"));
+            setError(mutationError(err, "Failed - retry"));
             setBusy(false);
           }
         }}

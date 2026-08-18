@@ -1,6 +1,6 @@
 "use client";
 
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useConvex, useMutation, useQuery } from "convex/react";
 import { type FunctionReturnType } from "convex/server";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
@@ -301,6 +301,9 @@ function EditionPanel({
       <PublishToggle topicSlug={topicSlug} lang={edition.lang} published={edition.published} />
       <PublicLinkToggle topicSlug={topicSlug} lang={edition.lang} publicToken={edition.publicToken} />
       <SellEdition topicSlug={topicSlug} lang={edition.lang} name={edition.name} completed={completed} />
+      {completed && (
+        <VoucherBatches topicSlug={topicSlug} lang={edition.lang} name={edition.name} published={edition.published} />
+      )}
       <div className="flex flex-col items-start gap-3 border-t border-line pt-4">
         <AccessRoster topicSlug={topicSlug} lang={edition.lang} />
         {/* Destructive actions (regenerate link, re-translate, remove) live behind a
@@ -897,6 +900,223 @@ function SellEdition({
 
 // Retry a failed translation — re-runs startTranslation, which only reschedules
 // the items that changed/failed.
+// The Seller's batch section (voucher rail, ADR 0029, vouchers ticket 05): mint a
+// batch of codes for THIS Edition, see take-up, download the codes, and void a
+// batch whose deal went wrong. It sits under the price control because it is the
+// same act - selling this Edition - reached the other way round: the paygate sells
+// one seat to whoever turns up, a batch sells N seats to an organisation that will
+// not tell anyone who its people are.
+//
+// **The platform sends nothing to anyone.** It has no member addresses, which is
+// the whole point of the feature, so delivery is the organisation's job and the
+// Seller's hand-off is a download.
+//
+// Note what a Seller cannot see here, and do not add it out of helpfulness: WHO
+// redeemed. It is not recorded, so there is nothing to show - and a well-meaning
+// join onto entitlements by Edition would approximate it, which is precisely the
+// thing the organisation was promised does not exist.
+function VoucherBatches({ topicSlug, lang, name, published }: { topicSlug: string; lang: string; name: string; published: boolean }) {
+  const t = useTranslations("Editions");
+  const status = useQuery(api.sellers.sellerStatus);
+  const batches = useQuery(api.vouchers.myBatches);
+  const [open, setOpen] = useState(false);
+
+  const mine = (batches ?? []).filter((b) => b.topicSlug === topicSlug && b.lang === lang);
+
+  // The same two gates minting itself enforces (a can-sell grant plus payout
+  // details). SellEdition directly above already explains how to clear them, so
+  // repeating that here would be a second set-up prompt for one set-up.
+  if (status !== "ready") return null;
+
+  return (
+    <div className="rounded-xl border border-line bg-card p-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-hi text-soft">
+            <Icon name="users" className="h-4.5 w-4.5" />
+          </span>
+          <div className="min-w-0">
+            <b className="block text-[13.5px] font-semibold text-ink">{t("batchesTitle")}</b>
+            <span className="text-[11.5px] text-soft">{t("batchesBlurb")}</span>
+          </div>
+        </div>
+        {published && (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+          >
+            {open ? t("batchClose") : t("batchNew")}
+          </button>
+        )}
+      </div>
+
+      {/* Minting needs a PUBLISHED Edition (the server refuses otherwise), so say
+          so here rather than offering a form that always fails. */}
+      {!published && <p className="mt-2.5 text-[11.5px] text-soft">{t("batchesPublishFirst")}</p>}
+
+      {open && <MintBatchForm topicSlug={topicSlug} lang={lang} onMinted={() => setOpen(false)} />}
+
+      {mine.length > 0 && (
+        <ul className="mt-3 flex flex-col gap-2">
+          {mine.map((b) => (
+            <BatchRow key={b.batchId} batch={b} editionName={name} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// The mint form. Four fields, because the batch IS four facts: how many seats, the
+// total the Seller negotiated, and who they negotiated it with. There is no
+// discount machinery and no approval step - the Seller states the total, which is
+// exactly why a bulk price needs neither (ADR 0029).
+function MintBatchForm({ topicSlug, lang, onMinted }: { topicSlug: string; lang: string; onMinted: () => void }) {
+  const t = useTranslations("Editions");
+  const mint = useMutation(api.vouchers.mintBatch);
+  const [seats, setSeats] = useState("");
+  const [total, setTotal] = useState("");
+  const [orgName, setOrgName] = useState("");
+  const [orgContact, setOrgContact] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const field = (label: string, value: string, set: (v: string) => void, placeholder: string, mode?: "numeric") => (
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{label}</span>
+      <input
+        value={value}
+        inputMode={mode}
+        placeholder={placeholder}
+        onChange={(e) => {
+          set(e.target.value);
+          setError(null);
+        }}
+        className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+      />
+    </label>
+  );
+
+  return (
+    <form
+      className="mt-3 flex flex-col gap-2.5 border-t border-line pt-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const count = Number(seats);
+        // Rand in, cents out - the same major/minor conversion the price control
+        // does, and the server re-checks both bounds.
+        const cents = Math.round(parseFloat(total) * 100);
+        if (!Number.isInteger(count) || count < 1 || !Number.isFinite(cents) || cents <= 0) {
+          setError(t("batchError"));
+          return;
+        }
+        setBusy(true);
+        setError(null);
+        try {
+          await mint({ topicSlug, lang, seats: count, total: cents, orgName, orgContact });
+          onMinted();
+        } catch {
+          setError(t("batchError"));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        {field(t("batchSeatsLabel"), seats, setSeats, "100", "numeric")}
+        {field(t("batchTotalLabel"), total, setTotal, "0.00", "numeric")}
+        {field(t("batchOrgLabel"), orgName, setOrgName, t("batchOrgPlaceholder"))}
+        {field(t("batchContactLabel"), orgContact, setOrgContact, t("batchContactPlaceholder"))}
+      </div>
+      {/* The one thing a Seller must not be surprised by: the codes are live at
+          once, and the money is a separate, later, manual event. */}
+      <p className="text-[11.5px] leading-relaxed text-soft">{t("batchMintHint")}</p>
+      <button
+        type="submit"
+        disabled={busy}
+        className="self-start rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+      >
+        {busy ? t("batchMinting") : t("batchMint")}
+      </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </form>
+  );
+}
+
+// One batch: who bought it, take-up, payment state, and the download.
+function BatchRow({
+  batch,
+  editionName,
+}: {
+  batch: FunctionReturnType<typeof api.vouchers.myBatches>[number];
+  editionName: string;
+}) {
+  const t = useTranslations("Editions");
+  const convex = useConvex();
+  const [busy, setBusy] = useState(false);
+
+  // ponytail: a CSV is a string with commas and newlines, and the download is a
+  // blob - no library, no route, no server-rendered file. The codes are fetched on
+  // the click rather than subscribed to, because a page that holds every code of
+  // every batch open is a page that leaks them into a screen-share.
+  const download = async () => {
+    setBusy(true);
+    try {
+      const codes = await convex.query(api.vouchers.batchCodes, { batchId: batch.batchId });
+      // The course and language ride along so a printed card can say what the code
+      // unlocks - a bare column of codes is unmail-mergeable and unprintable.
+      const rows = [
+        ["code", "course", "language"],
+        ...codes.map((c) => [c.code, batch.courseTitle, editionName]),
+      ];
+      const csv = rows.map((r) => r.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\r\n");
+      const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${batch.orgName.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase() || "batch"}-codes.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <li className={`rounded-lg border px-3 py-2.5 ${batch.voided ? "border-line bg-hi/40" : "border-line bg-hi"}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <b className="block truncate text-[13px] font-semibold text-ink">{batch.orgName}</b>
+          <span className="text-[11.5px] text-soft">
+            {t("batchTakeUp", { redeemed: batch.redeemed, seats: batch.seats })} · {formatPrice(batch.total, "ZAR")}
+          </span>
+        </div>
+        {batch.voided && (
+          <span className="shrink-0 rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-danger">
+            {t("batchVoidedBadge")}
+          </span>
+        )}
+      </div>
+      {/* Stated plainly, not implied: a Seller looking at an unlogged batch should
+          know their share is not payable yet and why, instead of filing a support
+          question about a missing payout. */}
+      <p className="mt-1.5 text-[11.5px] leading-relaxed text-soft">
+        {batch.paymentRef ? t("batchPaymentLogged", { reference: batch.paymentRef }) : t("batchAwaitingPayment")}
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void download()}
+          className="rounded-lg border border-line px-2.5 py-1 text-[11.5px] font-medium text-ink transition-colors hover:border-accent hover:text-accent disabled:opacity-60"
+        >
+          {t("batchDownload")}
+        </button>
+      </div>
+    </li>
+  );
+}
+
 function RetryTranslation({ topicSlug, lang }: { topicSlug: string; lang: string }) {
   const t = useTranslations("Editions");
   const retry = useAction(api.translate.startTranslation);
