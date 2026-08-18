@@ -39,11 +39,26 @@ Built and reachable, with the money recorded and the Seller payable only once th
 - Skills: `/tdd` (every ticket has its assertions written out), `/ponytail` (05 and 06 are both
   smaller than they sound - a CSV is a string, and `/redeem` is a form).
 
+## Decisions so far
+
+<!-- the index over resolved tickets: one line each, zoom the link for the detail.
+     Six build tickets (02 to 07) are still open and are found by query, not listed here. -->
+
+- [Widen the Ledger for a third money source](tickets/01-widen-ledger-for-a-third-money-source.md)
+  - `ledger.status` is now `unpaid | owed | paid` and `ledger.kind` accepts `"batch"`, so a batch's
+  money event can exist from the moment the codes do. The payout guard came for free:
+  `ledger.owedPayouts` reads the `by_status` index for `"owed"` and its handler is untouched, and
+  `markPaid` already refused anything but an `owed` row. No table, no field, no migration. It also
+  flipped `sales.ts`'s `salesOnly` from "not a donation" to an allow-list, which that predicate's own
+  comment had asked for: unlike a donation, a batch row has a `topicId` and a `lang`, so an unpaid
+  batch would have been counted as ordinary revenue the moment ticket 02 wrote its first row.
+
 ## Not yet specified
 
 - **Nobody has watched a real batch complete.** The same gap the donation rail has: the code can
   be green end to end and the first live batch will still be the first time money, a CSV and a
   stranger's sign-up meet. Worth an operator walkthrough ticket once 06 lands.
+  clears-with: 06
 - **Does a confirmed batch count as revenue in the sales report?** Ticket 01 excluded batch rows
   from it outright, which is the fail-closed answer and the one `salesOnly`'s own comment asked
   for: an `unpaid` batch is money that has not arrived, and counting it would overstate revenue.
