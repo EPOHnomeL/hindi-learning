@@ -49,24 +49,37 @@ const FOCUS_AREAS: { icon: IconName; title: string; body: string }[] = [
   },
 ];
 
-// The three phone frames, in the ministry's own words: a Prophetic School lesson,
-// a check inside it, and a question answered where it was asked.
+// The two phone frames, in the ministry's own words: a Prophetic School lesson,
+// and a check inside it. The words are the ones the reader actually shows —
+// lesson title, section heading, prose, the verse pull-out — because a frame full
+// of grey bars advertises a mockup rather than the course (2026-08-18).
+//
+// **No third "ask" frame.** The reader's Q&A is real, but on a course that's
+// already written the questions arrive rarely, and a landing page that leads with
+// an answer service promises a conversation the Guest mostly won't have. The
+// `askCta`/`asked*` fields are what the shared row would need for it, and are
+// deliberately left off — bar the `asked*` trio the type still requires.
 const PHONE_COPY: PhoneMockCopy = {
   courseTitle: "Prophetic School",
   lessonProgress: "Lesson 4 of 12",
-  askCta: "Ask about this",
+  lessonTitle: "Testing what you hear",
+  nextLesson: "Next lesson",
+  lessonSection: "Weighing a word",
+  lessonBody: [
+    "Hearing God is not the end of the matter — what you do with what you heard is. Scripture never asks you to accept a word because of who carried it, or how strongly it landed.",
+    "So we test. Not to be suspicious of God, but because a word that survives testing can be trusted, and one that doesn't has cost you nothing.",
+  ],
+  verse: "“Do not treat prophecies with contempt but test them all; hold on to what is good.” — 1 Thessalonians 5:20–21",
   quizQuestion: "What does it mean to test a prophetic word?",
   quizOptions: [
     "Weigh it against Scripture",
     "Act on it immediately",
     "Keep it to yourself",
   ],
+  quizFeedback: "That's it — Scripture is the measure a word is held against, never the other way round.",
   askedQuestion: "How do I know it's God's voice and not my own?",
   askedReply: "A fair question, and the honest answer starts with Scripture.",
   askedFollowUp: "And if I get it wrong?",
-  navLessons: "Lessons",
-  navReferences: "References",
-  navAsk: "Ask",
 };
 
 // Capabilities, not traction numbers — the same discipline as the shared landing,
@@ -187,6 +200,21 @@ export function YwamPotch() {
         </div>
       </header>
 
+      {/* ── The softer ask (ADR 0028), at the TOP by the ministry's call
+             (2026-08-18). ADR 0028 argued for it below sign-in, on the grounds
+             that a visitor who scrolled past sign-in has told us they're not
+             ready — that reasoning still holds for the shared landing, which is
+             unchanged. Here the address is wanted from the visitor who never
+             scrolls, so it sits directly under the hero, and is tagged
+             `ywampotch-hero` so the two placements stay comparable. Still exactly
+             ONE form on the page: two would mean two places a half-typed address
+             can be stranded. ── */}
+      <section className="border-b border-line bg-card/60">
+        <div className="mx-auto w-full max-w-xl px-6 py-12">
+          <InterestForm source="ywampotch-hero" copy={INTEREST_COPY} />
+        </div>
+      </section>
+
       {/* ── Focus areas ── */}
       <section id="focus" className="mx-auto w-full max-w-5xl scroll-mt-8 px-6 py-20">
         <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
@@ -243,10 +271,6 @@ export function YwamPotch() {
                 title: "Checks that make it stick",
                 body: "Short questions inside the lesson, marked as you go, so you notice what hasn't landed yet.",
               },
-              {
-                title: "Ask where you got stuck",
-                body: "Your question is answered inline, in the lesson where you asked it, and stays there for next time.",
-              },
             ]}
           />
         </div>
@@ -283,13 +307,6 @@ export function YwamPotch() {
       <section id="get-started" className="cert-stage border-t border-line">
         <div className="relative z-10">
           <SignIn />
-        </div>
-      </section>
-
-      {/* ── The softer ask, for whoever scrolled past sign-in (ADR 0028) ── */}
-      <section className="border-t border-line bg-card/60">
-        <div className="mx-auto w-full max-w-xl px-6 py-16">
-          <InterestForm source="ywampotch-footer" copy={INTEREST_COPY} />
         </div>
       </section>
 
