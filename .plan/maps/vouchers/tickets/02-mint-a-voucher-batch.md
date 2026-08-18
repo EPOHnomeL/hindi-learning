@@ -48,3 +48,40 @@ irrelevant to a batch.
 - No UI in this ticket, and nothing redeems yet. The batch is verifiable by test alone.
 - The minted Ledger row does **not** appear in `owedPayouts` - the guard from 01, now exercised by
   a real writer.
+
+## Answer
+
+**Done 2026-08-18. Verified by reading the code and by a green test suite** (854 tests, 73 files,
+`pnpm typecheck` and `pnpm build` clean) - not walked in a browser, which this ticket has no
+surface for; the batch is verifiable by test alone, as planned.
+
+`voucherBatches` and `vouchers` landed with the indexes the later tickets need, and
+`convex/vouchers.ts` exists with `mintBatch` writing the batch, its N codes and exactly ONE Ledger
+row in a single mutation: `kind: "batch"`, `status: "unpaid"`, `fee: 0`, `gross` = the stated
+total, the 50/50 split through `splitNet`, `sellerId` = the caller, `buyerEmail` = the
+organisation's billing contact. Ticket 01's guard needed no help from this ticket: there is a test
+that a freshly minted batch leaves `owedPayouts` empty, and it passes because `unpaid` simply is
+not `owed`.
+
+**The unpaid-queue index is an absent field, not a second status.** The sysadmin's queue reads
+`by_payment_ref` for `q.eq("paymentRef", undefined)` - the reference the sysadmin logs in ticket 04
+is the only thing that leaves the queue. A `paid: boolean` on the batch was the obvious
+alternative and was rejected: the payment state already lives on the Ledger row, and a second copy
+of it on the batch is a thing that can disagree with the first.
+
+**The code format is `MYC-XXXX-XXXX` with a fixed prefix.** The spec's example (`MYC-7K4Q-2XR9`)
+has three groups but only two of them can carry entropy at that shape, so `MYC` is literal: it
+makes a code recognisable as one when it turns up out of context in a group chat, and the 8 random
+characters over the 32-character alphabet give ~1.1e12 codes. Collisions retry on insert, bounded
+at five - five clashes in a row is a broken RNG, not bad luck, and looping on that would hang the
+mutation.
+
+Two small things the ticket did not name and the build wanted anyway: a **seat cap of 1000**,
+because a batch is one Convex transaction and a mistyped seat count should be a refusal rather than
+an unusable mutation; and a **non-blank organisation name and contact**, because the contact is the
+Ledger row's `buyerEmail` and a blank one would put an anonymous money event in the payouts view.
+
+The authorisation gates are the existing ones verbatim - a `sellers` row plus saved payout details,
+via `sellerStatusOf` - with Topic ownership and a PUBLISHED Edition on top. Every negative is a
+server-side throw with a test: no `sellers` row, a row with no payout details, another Seller's
+course, an unpublished Edition, the sysadmin, and a Guest.

@@ -46,3 +46,36 @@ member knows to pass it on.
 - Verified in the real app, not only by test - walk it signed out, in a browser, and say so in the
   Answer. The distinction between "read the code" and "walked it" matters on this ticket more than
   any other on the map.
+
+## Answer
+
+**Done 2026-08-18. Walked in a browser, signed out, which is what this ticket asked for** -
+Playwright driving `pnpm dev` against a dev deployment seeded with a real batch (the seeding module
+was temporary and is deleted; the seeded rows were removed afterwards). Not merely read.
+
+What was actually walked, in order: `/redeem` signed out; the code typed the way it comes off a
+card (`myc k8b8 t98k`, lower case, spaces for separators) and normalised in the field to
+`MYC-K8B8-T98K`; Continue; an account created mid-flow on the same URL; the page coming back with
+the code and redeeming it automatically; "You're in. Opus 4.8 is on your account now"; and the
+"Open the course" link landing in the reader at `/courses/opus-4-8?lang=en`, signed in, lessons
+listed. Then three refusals, each in the browser: the same account on a second code of the same
+batch ("you already have access... we haven't used your code"), a different new account on the
+spent code ("already been used"), and an unknown code ("check it for a typo").
+
+**The page lives outside the (app) group.** Inside it, `AppGate` would have shown a bare sign-in
+wall to somebody who arrived holding a code and no idea what this site is. Outside, the code box is
+the first thing they see and sign-up happens inside the flow. There is no tenant flag anywhere near
+it.
+
+**The code is carried two ways, because the two fail in different places.** `?code=` in the URL
+survives a re-render, a reload and a back button; `localStorage` survives the Google OAuth hop,
+which leaves the origin entirely. Redemption then fires once on the authenticated side, guarded by
+a ref so a double-fired effect can never report the member's own fresh seat back to them as
+"already used".
+
+Two supporting changes: `SignIn` now opens on "Create account" on `/redeem` as well as
+`/checkout` - a member handed a code has almost certainly never been here - but deliberately NOT
+with `buyIntent`'s four-step checkout rail, which would describe a purchase that is not happening.
+And `normaliseCode` moved to a plain `convex/voucherCode.ts` (the `sellerStatus.ts` pattern) so the
+page can echo the normalised code back as they type without pulling a server module into the
+browser bundle.

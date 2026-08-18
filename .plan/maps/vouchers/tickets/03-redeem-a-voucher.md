@@ -53,3 +53,34 @@ the code in those cases would spend a seat the organisation paid for in exchange
 - `convex/lib.ts`'s grant walk is **unchanged** - a voucher mints an ordinary Entitlement and the
   walk already treats its presence as access. Editing the walk means the design has drifted.
 - No UI in this ticket; `/redeem` is ticket 06.
+
+## Answer
+
+**Done 2026-08-18. Verified by reading the code, by a green suite, and - once ticket 06 landed the
+page - by walking a real redemption in a browser** against a seeded dev batch.
+
+`vouchers.redeem` takes a code and nothing else, reads the caller from `ctx.auth`, and mints an
+ordinary Entitlement for `(caller, topicId, lang)` while setting `redeemedAt` on the voucher. It
+returns where the member has just been let in (`topicSlug`, `lang`, `courseTitle`) so `/redeem` can
+send them into the Edition rather than leaving them on a success message with nowhere to go.
+
+**The privacy assertions are positive, as asked.** The test pins the minted Entitlement's key set
+to exactly `_creationTime, _id, lang, topicId, userId` and the voucher row's to
+`_creationTime, _id, batchId, code, redeemedAt`, so adding provenance to either - a `batchId`, a
+redeemer - fails a test rather than quietly ending the feature. `convex/lib.ts`'s grant walk is
+untouched, which is the sign the design sits on the existing grain.
+
+Refuse-without-consuming is asserted three ways (Entitlement, Enrollment, ownership), each leaving
+`redeemedAt` unset, and the test then spends the same code on somebody who actually needs it. There
+is a test that a code works while its batch is `unpaid`, because the opposite is the intuitive
+assumption.
+
+**The refusal messages changed shape mid-ticket, and the reason matters.** They started as plain
+`Error`s carrying a human sentence. A production Convex deployment redacts a plain `Error`'s
+message to "Server Error" - only a `ConvexError`'s `data` crosses the wire (the same lesson
+`tenants.ts` records) - so every one of the carefully distinguished messages would have arrived at
+the member as an identical blank. They are now `ConvexError`s carrying a stable tag
+(`voucher/code-unknown`, `voucher/code-used`, `voucher/batch-voided`,
+`voucher/already-have-access`, `voucher/sign-in-required`) which `/redeem` turns into a translated
+sentence. A tag rather than the sentence for a second reason too: the member may not be reading the
+app in English.

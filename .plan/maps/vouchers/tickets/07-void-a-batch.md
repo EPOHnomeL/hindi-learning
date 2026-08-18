@@ -36,3 +36,26 @@ two would make void a refund mechanism, which this platform does not have.
 - The Seller's batch view offers void, shows a batch as voided, and states in plain words that
   voiding stops unused codes only and cannot take back access already granted.
 - Voiding is not presented anywhere as a refund, a cancellation, or a way to recover seats.
+
+## Answer
+
+**Done 2026-08-18. Verified by reading the code and by a green suite**; the void control and its
+confirm were not clicked in a browser, though the Editions dialog they sit in was open in the dev
+app during ticket 06's walk.
+
+`vouchers.voidBatch` marks the caller's own batch voided and refuses another Seller, a Guest and
+the sysadmin. Redeeming an unredeemed code from a voided batch throws `voucher/batch-voided`, and
+`/redeem` turns that into "that code has been cancelled - ask your organisation about it", which is
+a different sentence from "already used" on purpose.
+
+The surprising half is asserted, because it is the half a reader will assume is a bug: after a
+void, the seat already granted is still there, and it cannot even be found - the Entitlement
+carries no batch provenance and the voucher records no user. The Ledger row is untouched in both
+directions: a batch whose cash was logged stays `owed` and still appears in `owedPayouts` at the
+right share, and an unpaid one stays `unpaid` and stays on the sysadmin's queue. Voiding is a
+statement about codes, never about money.
+
+The batch row carries a plain-words line about what void does not do, and the confirm dialog says
+it again at the moment of the click: unused codes stop, granted seats keep working and cannot be
+taken back because nobody is recorded as holding them, and this is not a refund. Nowhere in the UI
+is void presented as a cancellation or a way to recover seats.

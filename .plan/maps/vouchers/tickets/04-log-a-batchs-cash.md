@@ -44,3 +44,29 @@ a queue that gets missed.
   reference. It shows the total and seat count so the sysadmin can check the figure against what
   landed before committing.
 - Nothing in this ticket reads, writes, generates or invalidates a voucher code.
+
+## Answer
+
+**Done 2026-08-18. Verified by reading the code and by a green suite**, including the end-to-end
+assertion in `convex/ledger.test.ts` that a batch minted by `mintBatch` is invisible to
+`owedPayouts` until `logBatchPayment` runs and then appears under the minting Seller at the right
+50% share. The admin surface was **not** walked in a browser - it renders beside a queue that is,
+and nothing on it is new machinery.
+
+`vouchers.pendingBatches` returns the Edition, the Seller, the seat count, the total and the
+organisation's details, and **no codes** - guaranteed by the returns validator, which is the point:
+the boundary between the money role and the selling role cannot be undone by a UI change. There is
+a test that asserts the queue's serialised output does not contain any of the batch's codes, and
+that a Seller, a Guest and the sysadmin all get what they should (the first two refused, the last
+served).
+
+`vouchers.logBatchPayment` records the reference and flips the Ledger row `unpaid` -> `owed`. It is
+idempotent on the reference already being present, so a second click keeps the ORIGINAL reference -
+the one that reconciles the statement line - and moves nothing twice. A Seller trying to log their
+own batch's payment is refused, which is the interesting negative. Nothing in the mutation reads,
+writes, generates or invalidates a code, and the test proves a code still redeems afterwards.
+
+The queue lands in the Payouts tab under "Voucher batches awaiting payment", directly beside the
+pending EFT intents, with the total and seat count shown so the figure can be checked against what
+landed before committing. Shaped after that queue deliberately: to the operator this is the same
+job, and a queue that looks like a stranger is a queue that gets missed.

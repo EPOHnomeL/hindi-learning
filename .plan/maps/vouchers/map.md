@@ -52,13 +52,53 @@ Built and reachable, with the money recorded and the Seller payable only once th
   flipped `sales.ts`'s `salesOnly` from "not a donation" to an allow-list, which that predicate's own
   comment had asked for: unlike a donation, a batch row has a `topicId` and a `lang`, so an unpaid
   batch would have been counted as ordinary revenue the moment ticket 02 wrote its first row.
+- [Mint a Voucher Batch](tickets/02-mint-a-voucher-batch.md)
+  - `voucherBatches` + `vouchers` and `convex/vouchers.ts`'s `mintBatch`, which writes the batch,
+  its N codes and ONE `unpaid` Ledger row in a single mutation. The unpaid queue is an ABSENT
+  `paymentRef` on the batch (`by_payment_ref`, `eq(undefined)`), not a second status beside the
+  Ledger's - one copy of the payment state, so there is nothing to disagree with. Codes are
+  `MYC-XXXX-XXXX`: the prefix is literal, the 8 random characters carry the ~1.1e12 of entropy.
+- [Redeem a Voucher](tickets/03-redeem-a-voucher.md)
+  - `redeem` takes a code and nothing else, mints an ordinary Entitlement onto the signed-in
+  caller, and refuses without consuming whenever it would grant nothing. The privacy is pinned by
+  asserting the Entitlement's and the voucher's exact key sets, so adding provenance back fails a
+  test. Its refusals had to become **tagged `ConvexError`s**: a production deployment redacts a
+  plain `Error` to "Server Error", so the carefully distinguished messages would have reached the
+  member as one blank.
+- [Log a batch's cash](tickets/04-log-a-batchs-cash.md)
+  - `pendingBatches` (no codes, enforced in the returns validator) and `logBatchPayment`, which
+  records the reference and flips the Ledger row to `owed`. Idempotent, and it touches no code at
+  all. The queue sits beside the pending EFT intents in the Payouts tab, because to the operator it
+  is the same job.
+- [The Seller's batch view and CSV](tickets/05-the-sellers-batch-view-and-csv.md)
+  - `myBatches` with a derived take-up count and the payment state in a full sentence, and
+  `batchCodes` refusing anybody but the minting Seller. The batch section lives under the price
+  control in the Editions dialog; the CSV is a client-side blob with no library and no route, and
+  the codes are fetched on the click rather than subscribed to, so a page never holds every code of
+  every batch open.
+- [The /redeem page](tickets/06-the-redeem-page.md)
+  - One route on every host, outside the (app) group so a stranger meets the code box rather than a
+  sign-in wall. The code is carried in the URL **and** localStorage because those fail in different
+  places, and redemption fires once on the authenticated side. **Walked signed out in a browser**,
+  including the sign-up round trip and all three refusals.
+- [Void a batch](tickets/07-void-a-batch.md)
+  - `voidBatch` stops unredeemed codes and nothing else. Granted seats keep working and cannot be
+  found, the Ledger row is untouched in both directions, and the UI says so in plain words at the
+  batch and again at the confirm. Void is never presented as a refund.
 
 ## Not yet specified
 
-- **Nobody has watched a real batch complete.** The same gap the donation rail has: the code can
-  be green end to end and the first live batch will still be the first time money, a CSV and a
-  stranger's sign-up meet. Worth an operator walkthrough ticket once 06 lands.
-  clears-with: 06
+- **Nobody has watched a real batch complete, end to end, with real money.** Ticket 06 closed half
+  of this on 2026-08-18: the redemption journey WAS walked in a browser, signed out, through
+  sign-up and into the reader. What has still never been walked by a person is the other half - a
+  Seller minting a batch through the form, handing over the CSV, and the sysadmin matching a real
+  bank line and logging it. Those two surfaces are test-covered and read correct, and neither has
+  been clicked. Worth an operator walkthrough before the first live batch.
+- **Nothing tells a Seller that `/redeem` exists.** They mint a batch, download a CSV of codes, and
+  the platform never says where those codes are typed - so the URL reaches the organisation only if
+  the Seller thinks to include it. Probably a line on the CSV or beside the download; it needs
+  five minutes of thought about what a printed card should say, which is why it is here and not a
+  ticket.
 - **Does a confirmed batch count as revenue in the sales report?** Ticket 01 excluded batch rows
   from it outright, which is the fail-closed answer and the one `salesOnly`'s own comment asked
   for: an `unpaid` batch is money that has not arrived, and counting it would overstate revenue.
