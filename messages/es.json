@@ -600,5 +600,23 @@
     "agreement": "Al donar aceptas nuestros <terms>términos</terms>.",
     "thanksHeading": "Gracias.",
     "thanksBody": "PayFast te enviará por correo la confirmación del pago de tu donativo."
+  },
+  "Redeem": {
+    "title": "Canjea tu código",
+    "blurb": "Introduce el código que te dio tu organización. Desbloquea un curso para siempre, en la cuenta con la que inicies sesión.",
+    "codeLabel": "Tu código",
+    "codePlaceholder": "MYC-XXXX-XXXX",
+    "continue": "Continuar",
+    "submit": "Canjear",
+    "working": "Comprobando…",
+    "codeKept": "Hemos guardado tu código ({code}). Crea una cuenta abajo y lo desbloqueamos enseguida.",
+    "successTitle": "Ya estás dentro.",
+    "successBody": "{course} ya está en tu cuenta, y ahí se queda.",
+    "openCourse": "Abrir el curso",
+    "errUnknown": "No reconocemos ese código. Revisa si hay una errata e inténtalo de nuevo.",
+    "errUsed": "Ese código ya se ha usado. Pide otro a tu organización.",
+    "errVoided": "Ese código ha sido anulado. Consulta a tu organización.",
+    "errAlreadyHaveAccess": "Ya tienes acceso a este curso, así que no hemos usado tu código. Pásaselo a quien lo necesite.",
+    "errGeneric": "Algo ha salido mal. Inténtalo de nuevo."
   }
 }

@@ -273,13 +273,13 @@ test("redemption is refused for a Guest, an unknown code and a spent one", async
   // is the hole ADR 0021 closed and this rail must not reopen.
   await expect(t.mutation(api.vouchers.redeem, { code: code! })).rejects.toThrow();
   // A dud code, distinguishable from a spent one so a typo is diagnosable.
-  await expect(asUser(t, member).mutation(api.vouchers.redeem, { code: "MYC-AAAA-BBBB" })).rejects.toThrow(/typo/);
+  await expect(asUser(t, member).mutation(api.vouchers.redeem, { code: "MYC-AAAA-BBBB" })).rejects.toThrow(/voucher\/code-unknown/);
 
   await asUser(t, member).mutation(api.vouchers.redeem, { code: code! });
 
   // A second redemption of the same code changes nothing - and who spent it is
   // permanently unanswerable, by design.
-  await expect(asUser(t, other).mutation(api.vouchers.redeem, { code: code! })).rejects.toThrow(/already been used/);
+  await expect(asUser(t, other).mutation(api.vouchers.redeem, { code: code! })).rejects.toThrow(/voucher\/code-used/);
   const seats = await t.run((ctx) => ctx.db.query("entitlements").take(50));
   expect(seats).toHaveLength(1);
 });
@@ -299,17 +299,17 @@ test("redemption refuses WITHOUT consuming when the caller already has access", 
     topicSlug: "hindi",
     lang: "en",
   });
-  await expect(asUser(t, buyer).mutation(api.vouchers.redeem, { code: codes[0]! })).rejects.toThrow(/NOT been used/);
+  await expect(asUser(t, buyer).mutation(api.vouchers.redeem, { code: codes[0]! })).rejects.toThrow(/voucher\/already-have-access/);
   expect(await unspent(codes[0]!)).toBeUndefined();
 
   // 2. A grandfathered Enrollment on that Edition - they joined while it was free.
   const joiner = await seedUser(t, "joiner@example.com");
   await t.run((ctx) => ctx.db.insert("enrollments", { userId: joiner, topicId, lang: "en" }));
-  await expect(asUser(t, joiner).mutation(api.vouchers.redeem, { code: codes[1]! })).rejects.toThrow(/NOT been used/);
+  await expect(asUser(t, joiner).mutation(api.vouchers.redeem, { code: codes[1]! })).rejects.toThrow(/voucher\/already-have-access/);
   expect(await unspent(codes[1]!)).toBeUndefined();
 
   // 3. The owner of the course, who cannot buy a seat on their own Edition.
-  await expect(asUser(t, seller).mutation(api.vouchers.redeem, { code: codes[2]! })).rejects.toThrow(/NOT been used/);
+  await expect(asUser(t, seller).mutation(api.vouchers.redeem, { code: codes[2]! })).rejects.toThrow(/voucher\/already-have-access/);
   expect(await unspent(codes[2]!)).toBeUndefined();
 
   // Every seat is still there for somebody who actually needs one: the
@@ -490,7 +490,7 @@ test("voiding stops the unused codes and leaves everything else exactly alone", 
 
   // An unredeemed code stops working.
   const latecomer = await seedUser(t, "latecomer@example.com");
-  await expect(asUser(t, latecomer).mutation(api.vouchers.redeem, { code: codes[1]! })).rejects.toThrow(/cancelled/);
+  await expect(asUser(t, latecomer).mutation(api.vouchers.redeem, { code: codes[1]! })).rejects.toThrow(/voucher\/batch-voided/);
 
   // The surprising half, and the one to assert: the seat already granted is
   // untouched. It cannot even be found - the Entitlement carries no batch

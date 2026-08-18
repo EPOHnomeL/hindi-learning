@@ -600,5 +600,23 @@
     "agreement": "Deur te skenk stem jy in tot ons <terms>bepalings</terms>.",
     "thanksHeading": "Dankie.",
     "thanksBody": "PayFast sal vir jou ’n betalingsbevestiging vir jou skenking e-pos."
+  },
+  "Redeem": {
+    "title": "Los jou kode in",
+    "blurb": "Voer die kode in wat jou organisasie vir jou gegee het. Dit ontsluit een kursus vir altyd, op die rekening waarmee jy aanmeld.",
+    "codeLabel": "Jou kode",
+    "codePlaceholder": "MYC-XXXX-XXXX",
+    "continue": "Gaan voort",
+    "submit": "Los in",
+    "working": "Kontroleer tans…",
+    "codeKept": "Ons het jou kode gestoor ({code}). Skep hieronder ’n rekening en ons ontsluit dit dadelik.",
+    "successTitle": "Jy is in.",
+    "successBody": "{course} is nou op jou rekening, en dit bly daar.",
+    "openCourse": "Maak die kursus oop",
+    "errUnknown": "Ons herken nie daardie kode nie. Kontroleer dit vir ’n tikfout en probeer weer.",
+    "errUsed": "Daardie kode is reeds gebruik. Vra jou organisasie vir ’n ander een.",
+    "errVoided": "Daardie kode is gekanselleer. Vra jou organisasie daaroor.",
+    "errAlreadyHaveAccess": "Jy het reeds toegang tot hierdie kursus, so ons het nie jou kode gebruik nie. Gee dit aan iemand wat dit nodig het.",
+    "errGeneric": "Iets het verkeerd geloop. Probeer asseblief weer."
   }
 }

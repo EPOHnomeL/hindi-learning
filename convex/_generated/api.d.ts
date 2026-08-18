@@ -52,6 +52,7 @@ import type * as tenants from "../tenants.js";
 import type * as translate from "../translate.js";
 import type * as userPrefs from "../userPrefs.js";
 import type * as users from "../users.js";
+import type * as voucherCode from "../voucherCode.js";
 import type * as vouchers from "../vouchers.js";
 import type * as whitelist from "../whitelist.js";
 
@@ -106,6 +107,7 @@ declare const fullApi: ApiFromModules<{
   translate: typeof translate;
   userPrefs: typeof userPrefs;
   users: typeof users;
+  voucherCode: typeof voucherCode;
   vouchers: typeof vouchers;
   whitelist: typeof whitelist;
 }>;

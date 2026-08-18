@@ -600,5 +600,23 @@
     "agreement": "By donating you agree to our <terms>terms</terms>.",
     "thanksHeading": "Thank you.",
     "thanksBody": "PayFast will email you a payment confirmation for your donation."
+  },
+  "Redeem": {
+    "title": "Redeem your code",
+    "blurb": "Enter the code your organisation gave you. It unlocks one course for good, on the account you sign in with.",
+    "codeLabel": "Your code",
+    "codePlaceholder": "MYC-XXXX-XXXX",
+    "continue": "Continue",
+    "submit": "Redeem",
+    "working": "Checking…",
+    "codeKept": "We've kept your code ({code}). Create an account below and we'll unlock it straight away.",
+    "successTitle": "You're in.",
+    "successBody": "{course} is on your account now, and it stays there.",
+    "openCourse": "Open the course",
+    "errUnknown": "We don't recognise that code. Check it for a typo and try again.",
+    "errUsed": "That code has already been used. Ask your organisation for another one.",
+    "errVoided": "That code has been cancelled. Ask your organisation about it.",
+    "errAlreadyHaveAccess": "You already have access to this course, so we haven't used your code. Pass it on to somebody who needs it.",
+    "errGeneric": "Something went wrong. Please try again."
   }
 }

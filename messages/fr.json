@@ -600,5 +600,23 @@
     "agreement": "En faisant un don, vous acceptez nos <terms>conditions</terms>.",
     "thanksHeading": "Merci.",
     "thanksBody": "PayFast vous enverra par e-mail une confirmation de paiement pour votre don."
+  },
+  "Redeem": {
+    "title": "Utilisez votre code",
+    "blurb": "Saisissez le code que votre organisation vous a remis. Il débloque un cours définitivement, sur le compte avec lequel vous vous connectez.",
+    "codeLabel": "Votre code",
+    "codePlaceholder": "MYC-XXXX-XXXX",
+    "continue": "Continuer",
+    "submit": "Valider",
+    "working": "Vérification…",
+    "codeKept": "Nous avons gardé votre code ({code}). Créez un compte ci-dessous et nous le débloquons aussitôt.",
+    "successTitle": "C'est bon.",
+    "successBody": "{course} est désormais sur votre compte, et y reste.",
+    "openCourse": "Ouvrir le cours",
+    "errUnknown": "Nous ne reconnaissons pas ce code. Vérifiez qu'il n'y a pas de faute de frappe et réessayez.",
+    "errUsed": "Ce code a déjà été utilisé. Demandez-en un autre à votre organisation.",
+    "errVoided": "Ce code a été annulé. Renseignez-vous auprès de votre organisation.",
+    "errAlreadyHaveAccess": "Vous avez déjà accès à ce cours, nous n'avons donc pas utilisé votre code. Transmettez-le à quelqu'un qui en a besoin.",
+    "errGeneric": "Une erreur est survenue. Veuillez réessayer."
   }
 }

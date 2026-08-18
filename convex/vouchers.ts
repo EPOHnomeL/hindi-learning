@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
@@ -6,6 +6,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { publishedLangs, topicBySlug } from "./lib";
 import { platformFeeBps, splitNet } from "./payfast";
 import { getSeller, sellerStatusOf } from "./sellerStatus";
+import { mintCode, normaliseCode } from "./voucherCode";
 import { isCallerAdmin } from "./whitelist";
 
 // The **seller-minted voucher rail** (ADR 0029, the vouchers map's spec.md). An
@@ -32,40 +33,6 @@ import { isCallerAdmin } from "./whitelist";
 //
 // The grant walk in `lib.ts` is deliberately untouched: a voucher mints an
 // ordinary Entitlement and the walk already treats its presence as access.
-
-// ---- Codes -------------------------------------------------------------------
-
-// 32 characters: A-Z and 2-9 minus `O`, `I`, `0` and `1`. A code is read down a
-// phone, copied off a printed card, and typed by somebody who has never seen this
-// platform - so the pairs that collide by sight are simply not in the alphabet.
-const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-// `MYC-7K4Q-2XR9` - one fixed group and two random ones. The prefix is not
-// entropy; it makes a code recognisable as one when it turns up out of context in
-// a group chat. 32^8 is about 1.1e12 codes, so a collision is vanishingly
-// unlikely - and minting retries on one anyway rather than throwing, because a
-// clash is the platform's problem and must never cost the Seller their batch.
-const CODE_PREFIX = "MYC";
-
-function mintCode(): string {
-  const bytes = new Uint8Array(8);
-  crypto.getRandomValues(bytes);
-  const chars = Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]);
-  return `${CODE_PREFIX}-${chars.slice(0, 4).join("")}-${chars.slice(4).join("")}`;
-}
-
-// Fold whatever the member typed into the stored form: upper-cased, with the
-// separators re-derived rather than trusted, so `myc7k4q2xr9`, `myc 7k4q 2xr9` and
-// `MYC-7K4Q-2XR9` are all one code. They are reading it off a card or a phone
-// screen with no instructions, and a code that "does not exist" because of a
-// stray space is indistinguishable to them from a dud one.
-//
-// Exported for the `/redeem` page, which echoes the normalised form back as they
-// type so that the thing they see is the thing being looked up.
-export function normaliseCode(raw: string): string {
-  const bare = raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  return [bare.slice(0, 3), bare.slice(3, 7), bare.slice(7, 11)].filter((g) => g.length > 0).join("-");
-}
 
 // ---- Minting (ticket 02) ------------------------------------------------------
 
@@ -211,6 +178,15 @@ async function freshCode(ctx: MutationCtx): Promise<string> {
 // Returns where the member has just been let in, so `/redeem` can send them
 // straight into the Edition instead of leaving them on a success message with
 // nowhere to go.
+//
+// **Every refusal is a `ConvexError` carrying a stable `voucher/...` tag**, and
+// `/redeem` turns the tag into a translated sentence. Two reasons it is a tag
+// rather than the sentence itself: a PRODUCTION deployment redacts a plain
+// `Error`'s message to "Server Error" (only a ConvexError's `data` survives the
+// trip, see `tenants.ts`), and the member reading it may not be reading the app
+// in English. The distinctions matter more here than anywhere else in the rail -
+// "already used", "no such code" and "you already have this" send the member to
+// three different places, and one blurred message sends them to none.
 export const redeem = mutation({
   args: { code: v.string() },
   returns: v.object({ topicSlug: v.string(), lang: v.string(), courseTitle: v.string() }),
@@ -218,7 +194,7 @@ export const redeem = mutation({
     const userId = await getAuthUserId(ctx);
     // Not a UI concern: an Entitlement has always attributed to an account, and a
     // code redeemed by nobody would grant nothing to nobody.
-    if (!userId) throw new Error("sign in or create an account to redeem your code");
+    if (!userId) throw new ConvexError("voucher/sign-in-required");
 
     const voucher = await ctx.db
       .query("vouchers")
@@ -227,35 +203,33 @@ export const redeem = mutation({
     // Distinguishable from "already used" on purpose: a member who mistyped needs
     // to try again, and a member holding a dud needs to go back to whoever gave it
     // to them. One message for both is the one that helps neither.
-    if (!voucher) throw new Error("we don't recognise that code - check it for a typo");
+    if (!voucher) throw new ConvexError("voucher/code-unknown");
     // Permanently unanswerable, by design (ADR 0029): nothing records who used it.
-    if (voucher.redeemedAt !== undefined) {
-      throw new Error("that code has already been used - ask your organisation for another one");
-    }
+    if (voucher.redeemedAt !== undefined) throw new ConvexError("voucher/code-used");
 
     const batch = await ctx.db.get(voucher.batchId);
-    if (!batch) throw new Error("that code is no longer valid");
+    if (!batch) throw new ConvexError("voucher/code-unknown");
     // Voiding stops UNREDEEMED codes only (ticket 07). A seat already granted is
     // untouched by this branch, because nothing here can find one.
-    if (batch.voided) throw new Error("that code has been cancelled - ask your organisation about it");
+    if (batch.voided) throw new ConvexError("voucher/batch-voided");
 
     const topic = await ctx.db.get(batch.topicId);
-    if (!topic) throw new Error("that code is no longer valid");
+    if (!topic) throw new ConvexError("voucher/code-unknown");
 
     // Refuse without consuming, three ways. Each leaves `redeemedAt` unset, so the
     // code stays redeemable by somebody who actually needs it.
-    const alreadyHas = "you already have access to this course - your code has NOT been used, so you can pass it on";
-    if (topic.ownerId === userId) throw new Error(alreadyHas);
+    const alreadyHas = new ConvexError("voucher/already-have-access");
+    if (topic.ownerId === userId) throw alreadyHas;
     const held = await ctx.db
       .query("entitlements")
       .withIndex("by_topic_user", (q) => q.eq("topicId", batch.topicId).eq("userId", userId))
       .collect();
-    if (held.some((e) => e.lang === batch.lang)) throw new Error(alreadyHas);
+    if (held.some((e) => e.lang === batch.lang)) throw alreadyHas;
     const enrolled = await ctx.db
       .query("enrollments")
       .withIndex("by_topic_user", (q) => q.eq("topicId", batch.topicId).eq("userId", userId))
       .collect();
-    if (enrolled.some((e) => e.lang === batch.lang)) throw new Error(alreadyHas);
+    if (enrolled.some((e) => e.lang === batch.lang)) throw alreadyHas;
 
     // The seat. **No provenance of any kind** - no batch id, no voucher id, no
     // `pfPaymentId`, no `eftRef` - so this row is byte-identical to an Admin comp

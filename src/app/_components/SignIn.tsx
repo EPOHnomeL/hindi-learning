@@ -54,8 +54,16 @@ export function SignIn() {
   // trigger says what it means. The common path is a NEW buyer, so the form opens
   // on "Create account" with purchase-flavoured copy; the toggle still reaches
   // sign-in. Anywhere else the default stays "Sign in".
-  const buyIntent = !!usePathname()?.startsWith("/checkout");
-  const [flow, setFlow] = useState<"signIn" | "signUp">(buyIntent ? "signUp" : "signIn");
+  const path = usePathname();
+  const buyIntent = !!path?.startsWith("/checkout");
+  // A member arriving with a voucher code (`/redeem`, ADR 0029) has almost
+  // certainly never been here - their organisation bought the seats and handed
+  // them a code - so the form opens on "Create account" for them too. NOT
+  // `buyIntent` though: they are not mid-purchase, so the four-step checkout rail
+  // and its copy would be describing something that is not happening.
+  const [flow, setFlow] = useState<"signIn" | "signUp">(
+    buyIntent || path?.startsWith("/redeem") ? "signUp" : "signIn",
+  );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Read in an effect, not during render: localStorage doesn't exist on the server,
