@@ -1060,6 +1060,12 @@ function BatchRow({
   const voidBatch = useMutation(api.vouchers.voidBatch);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  // Collapsed by default. A batch row carries six blocks - who bought it, take-up,
+  // payment state, two buttons and two explanatory paragraphs - and a Seller with a
+  // handful of batches was reading a wall to find the one they came for. The
+  // summary line is the part they scan (who, how many, how much), so that stays and
+  // the rest opens on a click, the same disclosure the Edition rows above use.
+  const [open, setOpen] = useState(false);
   // Where the codes get typed. Read after mount, not during render, because
   // `window` does not exist on the server - the same mount-gating RedeemPanel uses
   // for the code it recovers from the URL. It is the CURRENT host on purpose:
@@ -1105,19 +1111,32 @@ function BatchRow({
 
   return (
     <li className={`rounded-lg border px-3 py-2.5 ${batch.voided ? "border-line bg-hi/40" : "border-line bg-hi"}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      {/* The whole summary is the toggle, not a separate chevron target: it is the
+          biggest thing in the row and a Seller aiming at a 16px glyph on a phone
+          misses. Its accessible name is the organisation, which is what the row is. */}
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full flex-wrap items-center justify-between gap-2 text-left"
+      >
         <div className="min-w-0">
           <b className="block truncate text-[13px] font-semibold text-ink">{batch.orgName}</b>
           <span className="text-[11.5px] text-soft">
             {t("batchTakeUp", { redeemed: batch.redeemed, seats: batch.seats })} · {formatPrice(batch.total, "ZAR")}
           </span>
         </div>
-        {batch.voided && (
-          <span className="shrink-0 rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-danger">
-            {t("batchVoidedBadge")}
-          </span>
-        )}
-      </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {batch.voided && (
+            <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-danger">
+              {t("batchVoidedBadge")}
+            </span>
+          )}
+          <Icon name="chevron" className={`h-4 w-4 shrink-0 text-soft transition-transform ${open ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+      {open && (
+        <>
       {/* Stated plainly, not implied: a Seller looking at an unlogged batch should
           know their share is not payable yet and why, instead of filing a support
           question about a missing payout. */}
@@ -1156,6 +1175,8 @@ function BatchRow({
           so the Seller is never surprised by it. It stops unused codes; it cannot
           take back a seat already granted, and it is not a refund. */}
       {!batch.voided && <p className="mt-1.5 text-[11px] leading-relaxed text-soft">{t("batchVoidHint")}</p>}
+        </>
+      )}
       {confirming && (
         <ConfirmDialog
           title={t("batchVoidConfirmTitle")}
