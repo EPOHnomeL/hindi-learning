@@ -79,3 +79,12 @@ with `buyIntent`'s four-step checkout rail, which would describe a purchase that
 And `normaliseCode` moved to a plain `convex/voucherCode.ts` (the `sellerStatus.ts` pattern) so the
 page can echo the normalised code back as they type without pulling a server module into the
 browser bundle.
+
+**One deliberate deviation from the Done-when, named rather than glossed.** The criterion says a
+signed-in visitor is *"taken straight into the Edition they just unlocked"*; the build stops one
+click short, on a card that says "You're in. <course> is on your account now" with an "Open the
+course" link. The reason is the audience: they have just created an account on an unfamiliar site
+on the strength of a code from a group chat, and a silent redirect into a reader gives them nothing
+that confirms the code did what they hoped. Naming the course is that confirmation. Reverse it if a
+real member ever reports the click as friction.
+

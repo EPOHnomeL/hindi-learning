@@ -106,6 +106,18 @@ Built and reachable, with the money recorded and the Seller payable only once th
   invisible to the per-course report while sitting in payouts. Including it needs an answer to a
   second question first - a bulk total for N seats is not the same price as a single sale, so a
   report that sums both reads as one number covering two different things.
+- **A Share holder redeeming a code still burns it.** `redeem` refuses without consuming for the
+  three cases the spec enumerates - Entitlement, Enrollment, ownership - and a **[[Share]]** is
+  deliberately not among them. That is arguably right (a Share can be revoked by its owner, so the
+  Entitlement a code mints is genuinely more than the reader already had) and arguably a wasted
+  seat. It was built as specified rather than widened on the day; if it is wrong it is a one-line
+  change plus a fourth assertion, but it is a decision about what "already has access" means and it
+  wants deciding rather than drifting.
+- **Three modules now answer "does this account already hold this Edition?" separately.** The walk
+  in `lib.ts`, the entitlements check in `eft.ts`'s confirm, and the three-way check in
+  `vouchers.redeem`. One `hasGrant(ctx, topicId, userId, lang)` would serve all three, and the
+  reason it was not written today is that hoisting it edits a live, money-adjacent confirm path for
+  no behaviour change. Worth doing on the next change that touches that path for its own reasons.
 - **What the organisation is told, and by whom.** The Seller reports take-up by hand today. If
   that becomes tedious it wants a shareable read-only count - but that is the first step towards
   the organisation entity this design deliberately refused, so it needs its own decision.
