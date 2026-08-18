@@ -42,5 +42,3 @@ the download does not need a route if a client-side blob will do.
 - The CSV opens in a spreadsheet and mail-merges: one code per row, with the course and language so
   a printed card can say what it unlocks.
 - No query anywhere in this ticket returns or infers who redeemed a code.
-
-## Answer

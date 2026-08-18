@@ -36,5 +36,3 @@ two would make void a refund mechanism, which this platform does not have.
 - The Seller's batch view offers void, shows a batch as voided, and states in plain words that
   voiding stops unused codes only and cannot take back access already granted.
 - Voiding is not presented anywhere as a refund, a cancellation, or a way to recover seats.
-
-## Answer

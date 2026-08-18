@@ -53,5 +53,3 @@ the code in those cases would spend a seat the organisation paid for in exchange
 - `convex/lib.ts`'s grant walk is **unchanged** - a voucher mints an ordinary Entitlement and the
   walk already treats its presence as access. Editing the walk means the design has drifted.
 - No UI in this ticket; `/redeem` is ticket 06.
-
-## Answer

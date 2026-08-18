@@ -44,5 +44,3 @@ a queue that gets missed.
   reference. It shows the total and seat count so the sysadmin can check the figure against what
   landed before committing.
 - Nothing in this ticket reads, writes, generates or invalidates a voucher code.
-
-## Answer

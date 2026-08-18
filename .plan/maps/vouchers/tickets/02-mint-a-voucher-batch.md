@@ -48,5 +48,3 @@ irrelevant to a batch.
 - No UI in this ticket, and nothing redeems yet. The batch is verifiable by test alone.
 - The minted Ledger row does **not** appear in `owedPayouts` - the guard from 01, now exercised by
   a real writer.
-
-## Answer

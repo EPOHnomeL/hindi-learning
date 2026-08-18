@@ -42,7 +42,7 @@ Built and reachable, with the money recorded and the Seller payable only once th
 ## Decisions so far
 
 <!-- the index over resolved tickets: one line each, zoom the link for the detail.
-     Six build tickets (02 to 07) are still open and are found by query, not listed here. -->
+     Open build tickets are never listed here; the frontier is derived, not written. -->
 
 - [Widen the Ledger for a third money source](tickets/01-widen-ledger-for-a-third-money-source.md)
   - `ledger.status` is now `unpaid | owed | paid` and `ledger.kind` accepts `"batch"`, so a batch's

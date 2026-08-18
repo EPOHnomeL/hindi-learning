@@ -46,5 +46,3 @@ member knows to pass it on.
 - Verified in the real app, not only by test - walk it signed out, in a browser, and say so in the
   Answer. The distinction between "read the code" and "walked it" matters on this ticket more than
   any other on the map.
-
-## Answer
