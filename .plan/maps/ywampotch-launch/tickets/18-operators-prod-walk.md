@@ -66,11 +66,14 @@ On a **real phone**, on `ywampotch.my-course.app`:
    still say "My Course" with the book logo. Steps 1–6 already put you on three of
    the four — this is mostly a look, not a separate trip.
 
-### A fifth pending walk, added 2026-08-06, and it has a precondition
+### A fifth pending walk, added 2026-08-06 — its precondition has since cleared
 
 [21](./21-regional-pricing-surfaces.md) built the regional-pricing surfaces and
-is owed the same look. It is **not on prod** — its two commits are unpushed — so
-it is not part of the walk above until someone pushes. Two things make it
+is owed the same look. **Correction, 2026-08-18: it is on prod.** The two commits
+recorded here as unpushed (`dc9db73`, *show the buyer their regional price, and
+the Rand it charges*, and the paygate-payload commit before it) are ancestors of
+`origin/main`, and `main` is level with `origin/main` at `bf04257`. So this is
+**step 9 of the one walk**, not a separate trip waiting on a push. Two things make it
 awkward and neither is a bug: nothing shows a foreign price until a seller types
 one into `SellEdition`, and `x-vercel-ip-country` is absent on localhost and
 reads `ZA` in Potchefstroom, so **seeing the $10 view takes a deployed URL and a
