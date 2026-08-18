@@ -266,10 +266,9 @@ export const setShareRole = mutation({
       ).find((s) => shareLang(s) === lang);
       if (share) {
         await ctx.db.patch(share._id, { role });
-        // Email the new role — but only for an accepted Share (the person has an
-        // account). A pending invite (below) is not emailed on role change: they
-        // haven't signed up, already got the invite email, and their role is
-        // carried through at sign-up.
+        // Email the new role. The account exists, so "role-changed" deep-links
+        // into the Edition. (A pending invite is emailed too, below, but as an
+        // "invited" — it must link to sign-up, not a course it can't open.)
         const owner = await ctx.db.get(userId);
         await scheduleInvite(ctx, { to: addr, kind: "role-changed", topic, editionLang: lang, inviterEmail: owner?.email ?? "", role });
         return null;
@@ -280,6 +279,12 @@ export const setShareRole = mutation({
     ).find((p) => (p.lang ?? SOURCE_LANG) === lang);
     if (invite) {
       await ctx.db.patch(invite._id, { role });
+      // A role change on a pending invite is emailed too (2026-08-18): being made
+      // an Editor is news whether or not you've signed up yet. Kind is "invited",
+      // not "role-changed" — with no account the only useful link is sign-up, and
+      // the copy states the access the new role gives them once they join.
+      const owner = await ctx.db.get(userId);
+      await scheduleInvite(ctx, { to: addr, kind: "invited", topic, editionLang: lang, inviterEmail: owner?.email ?? "", role });
       return null;
     }
     throw new Error("no such access to update");

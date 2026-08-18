@@ -193,7 +193,7 @@ test("promoting an accepted Share schedules a 'role-changed' email with the new 
   });
 });
 
-test("a role change on a PENDING invite schedules no email", async () => {
+test("a role change on a PENDING invite schedules an 'invited' email", async () => {
   process.env.SITE_URL = "https://app.example.com";
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
@@ -207,7 +207,15 @@ test("a role change on a PENDING invite schedules no email", async () => {
     role: "editor",
   });
 
-  expect(await scheduledInvites(t)).toEqual([]);
+  const invites = await scheduledInvites(t);
+  expect(invites.length).toBe(1);
+  // No account yet → the sign-up link, and the new role's access in the copy.
+  expect(invites[0]).toMatchObject({
+    to: "future@example.com",
+    kind: "invited",
+    role: "editor",
+    link: "https://app.example.com/",
+  });
 });
 
 test("revokeShare schedules no email", async () => {
