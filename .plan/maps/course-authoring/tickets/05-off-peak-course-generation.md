@@ -7,7 +7,10 @@ blocked_by: []
 
 ## Question
 
-**Where it stands:** needs-triage (to-scope — captured 2026-07-08; not built)
+**Where it stands (corrected 2026-08-18):** the on-demand half is **built and live**; only the
+*scheduled, off-peak* half is open, and whether it is still wanted is the open question. The
+"not built" line below was already wrong when this ticket was migrated — see the 2026-07-10
+comment, which the migration carried in without reconciling the header against it.
 
 Vocabulary: [`CONTEXT.md`](../../../../CONTEXT.md) (Routine, Frontier, Topic, Completion, Mission, Admin). Relates to [ADR 0001](../../../../docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md) (async hub-mediated loop), [ADR 0008](../../../../docs/adr/0008-next-lesson-routine-gate-in-convex.md) (next-lesson Routine gate — daily cron + on-demand button), [`convex/crons.ts`](../../../../convex/crons.ts) (the daily `dailyFire` cron at 04:23 UTC), [`convex/routine.ts`](../../../../convex/routine.ts), and the roadmap Costing section.
 
@@ -36,7 +39,7 @@ The Routine authors a **buffer of one**: both the daily `dailyFire` cron (04:23 
 ## Notes
 
 - This intentionally **inverts** the buffer-of-one throttle, which is exactly why it's admin-gated and cost-bounded.
-- To-scope only; not built.
+- To-scope only; not built. **(Stale — corrected 2026-08-18: the on-demand finisher is built. Only the off-peak scheduling is open.)**
 
 ## Comments
 
@@ -50,7 +53,17 @@ Already shipped as the admin fire-and-pray course finisher (fa38e45, 92e353b, 80
 
 ## Done when
 
-An Admin can mark a Topic for off-peak full generation with a per-run Lesson cap; ordinary owners cannot; the Frontier bypass is admin-gated and tested.
+**Superseded 2026-08-18 — the original condition was already met.** It read: *"An Admin can mark
+a Topic for off-peak full generation with a per-run Lesson cap; ordinary owners cannot; the
+Frontier bypass is admin-gated and tested."* Everything in that sentence except the words *off-peak*
+ships today, re-verified on `main` @ `bf04257`: `finishGenerating` (`convex/routine.ts:782`) is
+admin-gated via `callerIsAdmin` (`routine.ts:650`), bypasses the buffer-of-one Frontier gate, and
+carries a per-run Lesson cap.
+
+The condition that actually remains: **a decision on whether the scheduled half is still wanted**
+now that the on-demand finisher exists — and if it is, an off-peak trigger for `finishGenerating`.
+`convex/crons.ts` still registers exactly one job, the gated `dailyFire` at 04:23 UTC; nothing
+schedules the finisher. Ruling the scheduled half out of scope is a legitimate outcome here.
 
 <!-- Migrated 2026-07-30 from GitHub issue #100 (filed 2026-07-24), when this repo retired
      its remote tracker; see docs/agents/issue-tracker.md. -->
