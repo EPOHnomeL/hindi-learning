@@ -38,8 +38,8 @@ code, and gains permanent access to that Edition. The organisation never sees wh
 does the operator. The only thing anyone can see is a count.
 
 The money follows the rail that already exists. The organisation transfers the total into the
-**operator's** account — the operator remains sole merchant of record
-([ADR 0026](../../../docs/adr/0026-manual-eft-payment-rail.md)) — and the **sysadmin** logs the
+**operator's** account - the operator remains sole merchant of record
+([ADR 0026](../../../docs/adr/0026-manual-eft-payment-rail.md)) - and the **sysadmin** logs the
 reference against the batch, which is what makes the Seller's 50% payable. The sysadmin never sees
 or touches a code.
 
@@ -127,13 +127,13 @@ or touches a code.
 - A batch row holds the Edition it sells (`topicId` plus `lang`), the Seller who minted it, the
   seat count, the agreed total in cents, the buying organisation's name and billing contact as
   plain strings, its `ledgerId`, and a voided marker. There is **no organisation entity** and no
-  redemption counter — counts are derived by counting voucher rows.
+  redemption counter - counts are derived by counting voucher rows.
 - A voucher row holds its `batchId`, its `code`, and an optional `redeemedAt`. It holds **no user
   id**. Absent `redeemedAt` means unredeemed; that is the whole state machine.
 - Indexes: vouchers `by_code` (the redeem lookup, unique in practice) and `by_batch` (the CSV and
   the count); batches `by_seller` (the Seller's list) and one for the sysadmin's unpaid queue.
 
-**One new Convex module, `convex/vouchers.ts`** — the single new seam. Its surface:
+**One new Convex module, `convex/vouchers.ts`** - the single new seam. Its surface:
 
 | Function | Caller | What it does |
 | --- | --- | --- |
@@ -147,7 +147,7 @@ or touches a code.
 
 **The Ledger gains a third status, not a new field.** `ledger.status` becomes
 `unpaid | owed | paid`. `ledger.owedPayouts` reads the `by_status` index for `"owed"`, so an
-unpaid batch is excluded from payouts **with no change to that query's logic** — only its `kind`
+unpaid batch is excluded from payouts **with no change to that query's logic** - only its `kind`
 returns-validator widens. This is why the guard is a schema widening rather than a filter someone
 could later forget to apply.
 
@@ -160,7 +160,7 @@ Seller, and `buyerEmail` equal to the **organisation's** billing contact. It car
 
 **Minting authorisation** reuses the existing two gates verbatim: a `sellers` row must exist (the
 Admin's can-sell grant) **and** it must carry saved `payout` details. Plus the Seller must own the
-Topic, and the Edition must be **published**. It need not be **priced** — the Seller states the
+Topic, and the Edition must be **published**. It need not be **priced** - the Seller states the
 total, so a listing price is irrelevant to a batch.
 
 **Redemption is auth-first and takes no email.** `redeem` accepts only a code and reads the caller
@@ -173,7 +173,7 @@ course. The code stays redeemable. This mirrors `grantEntitlement`, which alread
 duplicate as a no-op.
 
 **The minted Entitlement carries no voucher provenance.** No batch id, no voucher id, no
-`pfPaymentId`, no `eftRef` — the same shape an Admin comp writes. This is load-bearing, not an
+`pfPaymentId`, no `eftRef` - the same shape an Admin comp writes. This is load-bearing, not an
 omission: it is what makes the anonymity a property of the data. See ADR 0029 for the costs
 accepted in exchange.
 
@@ -199,15 +199,15 @@ routing through sign-up and returning to the entered code.
 **What makes a good test here.** Assert only what a caller can observe through the Convex function
 boundary: what a query returns, whether a mutation throws, and what rows exist afterwards. Never
 assert on how a code was generated, how the mutation is structured internally, or on component
-markup. Every authorisation rule is asserted as a **server-side negative** — the test proves the
+markup. Every authorisation rule is asserted as a **server-side negative** - the test proves the
 mutation throws for the wrong caller, not that a button is hidden, which is the pattern
 `convex/eft.test.ts` states explicitly for the operator bank editor.
 
 **Prior art to follow: `convex/eft.test.ts`.** It uses `convexTest` with `import.meta.glob`,
 `t.withIdentity({ subject: "<userId>|session" })` to act as a user, and seeds fixtures **only as
-production writes them** — `users` rows as auth writes them, `whitelist` rows as
+production writes them** - `users` rows as auth writes them, `whitelist` rows as
 `whitelist.seedEmail` / `scopeToTenant` write them (sys admin is `isAdmin` with no slug, tenant
-admin is `isAdmin` plus a slug) — and never hand-seeds a row that a mutation is the sole writer of.
+admin is `isAdmin` plus a slug) - and never hand-seeds a row that a mutation is the sole writer of.
 A voucher test must never hand-insert a `vouchers` row: it mints a batch through `mintBatch` and
 reads the codes back, so the test exercises the only writer that exists.
 
@@ -219,15 +219,15 @@ reads the codes back, so the test exercises the only writer that exists.
 - Minting negatives: no `sellers` row; a `sellers` row with no payout details; not the Topic's
   owner; an unpublished Edition; a sysadmin attempting it.
 - Redeeming happy path mints an Entitlement for the caller, and that Entitlement has **no**
-  `pfPaymentId`, **no** `eftRef` and no voucher field — asserted positively, because it is the
+  `pfPaymentId`, **no** `eftRef` and no voucher field - asserted positively, because it is the
   privacy promise and a future refactor that adds provenance must fail a test.
 - Redeeming sets only `redeemedAt`, and the voucher row holds no user id.
 - Redeeming as a Guest throws.
 - A second redemption of the same code throws and changes nothing.
 - Redeeming an Edition the caller already holds (Entitlement, then Enrollment, then ownership)
-  throws **and leaves `redeemedAt` unset** — the refuse-without-consuming rule, three ways.
+  throws **and leaves `redeemedAt` unset** - the refuse-without-consuming rule, three ways.
 - A voided batch's unredeemed codes throw; already-redeemed seats are untouched.
-- Codes work regardless of the batch's payment state — the cash log is not a gate.
+- Codes work regardless of the batch's payment state - the cash log is not a gate.
 - `batchCodes` refuses a Seller asking for another Seller's batch; `pendingBatches` returns no
   codes and refuses a non-sysadmin; `logBatchPayment` refuses a Seller.
 
