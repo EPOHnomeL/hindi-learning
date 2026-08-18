@@ -160,3 +160,40 @@ Claude Code can write durable Resource links into Lesson prose; the reader mints
 <!-- Some links in this ticket were de-linked in the 2026-07-30 migration: their targets
      (.scratch PRDs, already-resolved sibling tickets, the retired product-direction
      roadmap) do not exist in the repo. The names are kept as prose for provenance. -->
+
+## Answer
+
+**Specced *and* built before this ticket was migrated — resolved 2026-08-18 by reading the tree.**
+Verified by evidence (code, tests and skill docs), not by walking a browser.
+
+Two commits on 2026-07-19, eleven days before the GitHub backlog was migrated into this map,
+shipped the spec above essentially as written:
+
+- **`95d28f0`** *feat(teach): expose Resource id + readerPath to the workspace* —
+  `scripts/materialise.ts:72-84` writes each Resource's `id` and a precomputed
+  `readerPath: /courses/<slug>/resources/<id>` into `resources/_index.json`, with a comment
+  naming it as the link the teach skill copies verbatim. `AUTHORING.md:113` tells Claude Code to
+  copy it verbatim, and `:130` steers a `.cite` `<a>` at the owned Resource — the substantive half
+  of this ticket, per its own Further Notes.
+- **`b347f76`** *feat(reader): open Resource links from lesson & reference bodies* —
+  `resolveArtifactClick` and `resourceOpenMode` in `src/app/_components/readerDerive.ts`, both
+  pure and both covered in `readerDerive.test.ts` (including the Guest `/share/<token>` rewrite
+  case). `ArtifactView.tsx:311-330` dispatches the `resource` action through `resourceTarget`,
+  whose comment cites this ticket by name for the graceful no-op.
+
+Each durability rule holds as specced:
+
+- **Addressed by stable id, never a baked-in URL.** The href carries `resources/<id>`;
+  `listResources` (`convex/resources.ts:252-275`) mints `ctx.storage.getUrl(...)` fresh on every
+  reactive read, and the reader resolves the click against that in-bundle list. Nothing expiring
+  is ever written into Lesson HTML.
+- **Survives immutable Lesson HTML and translation.** No code was needed: the href is an
+  attribute the translate `html` pass preserves, and Resources are Topic-scoped, so one id
+  resolves across every Edition.
+- **Graceful no-op** when the id is absent from the bundle — a withheld paid-Preview Resource or
+  a deleted one — `resourceTarget` returns `null` and the click does nothing.
+- **No backend read-seam changes**, as the spec predicted: `public.ts`, `resources.ts` and the
+  `/content` route are untouched.
+
+Not shipped, and correctly out of scope here: fragment anchors (`#page=N`, `#t=`), which is what
+[ticket 12](12-book-screenshots-and-direct-references.md) exists to reopen.

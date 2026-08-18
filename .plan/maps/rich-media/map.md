@@ -37,11 +37,11 @@ files are hosted, and how a Lesson cites the course's own Resources.
   cared about were **not** costed, and Mux is not yet provisioned. It also relieves the ffmpeg
   wall for hosted video specifically — Mux transcodes, so no Convex action has to.
 - **Ticket 11 (Resource links) is the odd one out and deliberately un-merged** — it is about
-  linking into the course's *own uploaded documents* from Lesson prose, not media playback. It
-  is the most specified thing on this map (labelled ready-for-agent on GitHub) and is
-  independently takeable. Its durability rule matters: address the Resource by stable id and
-  mint a fresh signed URL at click time, **never** bake in an expiring URL, so the link
-  survives immutable Lesson HTML and translation.
+  linking into the course's *own uploaded documents* from Lesson prose, not media playback.
+  **Resolved 2026-08-18: it was already built when it was migrated here** (`95d28f0` + `b347f76`,
+  2026-07-19). Its durability rule is the one still worth carrying forward for any later media
+  link: address the Resource by stable id and mint a fresh signed URL at click time, **never**
+  bake in an expiring URL, so the link survives immutable Lesson HTML and translation.
 - **Ticket 12 asks whether it is time to un-defer page-level precision.** Whole-resource
   linking was the deliberate cut; "see p. 42" is exactly the precision that was deferred.
   Blocked on 01.
@@ -51,6 +51,13 @@ files are hosted, and how a Lesson cites the course's own Resources.
 ## Decisions so far
 
 <!-- one line per resolved ticket -->
+
+- [Resource links — spec](tickets/11-resource-links-spec.md) — **specced and built,** and both had
+  already happened when the ticket was migrated in on 2026-07-30. A Lesson cites an owned Resource
+  as `/courses/<slug>/resources/<id>`; `resolveArtifactClick` + `resourceOpenMode` (pure, tested)
+  give the click sidebar parity; the signed URL is minted per read, so the link survives immutable
+  HTML and translation; an unresolvable id is a silent no-op. Fragment anchors stayed out of scope
+  and are ticket 12's question.
 
 ## Not yet specified
 
