@@ -24,6 +24,10 @@ marketing demo** — each ending in an approach, lifecycle and format spec, not 
   rendered locally at build time; a prototype walked on 2026-08-06 renders HTML → mp4 with
   Playwright + ffmpeg on a developer machine, never in a Convex action. The map still holds,
   but on the shared *audience/format* question, not on a constraint two of the three share.
+- **Ticket 03's Mux choice is owed an ADR, and that is [ticket 04](tickets/04-adr-mux-as-the-video-rail.md)**
+  — open as of 2026-08-18, and no Mux code exists on `main` yet (nothing under `src/` or
+  `convex/` references it). The pointer lives here rather than in Decisions-so-far, which may
+  only index resolved tickets.
 - **The audiences genuinely differ and must not be collapsed:**
   [the trailer](tickets/01-scope-course-trailer.md) is marketing, outward, per-course,
   generated from course data; [course audio](tickets/02-scope-course-audio.md) is pedagogy,
@@ -73,8 +77,7 @@ marketing demo** — each ending in an approach, lifecycle and format spec, not 
   the toolchain, so the page moves out of `public/` (where it is currently served on all four
   tenant hosts). Drift is accepted and date-stamped: the guided-tour alternative is blocked by
   Google OAuth and PayFast, which cannot be driven unattended. **Mux was chosen at full reach
-  as the product-wide video rail**, which is why [04](tickets/04-adr-mux-as-the-video-rail.md)
-  exists.
+  as the product-wide video rail**, and that reach is what the ADR ticket carries.
 
 ## Not yet specified
 
