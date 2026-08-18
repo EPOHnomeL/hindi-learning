@@ -1,5 +1,8 @@
 ---
-status: proposed
+# Built 2026-08-18 (the vouchers map, tickets 01-07): every decision below is in the
+# code and under test. Only the status line changed - an ADR is never rewritten to
+# correct it; a stale one gets a superseding ADR.
+status: accepted
 ---
 
 # Seller-minted voucher batches, and redemptions that record nobody
