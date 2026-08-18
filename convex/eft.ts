@@ -4,7 +4,7 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { editionPrice, normaliseEmail, SOURCE_LANG, topicBySlug, translatedTitle } from "./lib";
+import { editionPrice, hasEntitlement, normaliseEmail, SOURCE_LANG, topicBySlug, translatedTitle } from "./lib";
 import { langInfo } from "./languages";
 import { appUrl, platformFeeBps, splitNet } from "./payfast";
 import { eftAllowed, regionForCountry } from "./regions";
@@ -384,11 +384,7 @@ export const confirmEftPayment = mutation({
     const topic = await ctx.db.get(intent.topicId);
     if (!topic?.ownerId) throw new Error(`the course behind ${ref} has no owner to owe`);
 
-    const held = await ctx.db
-      .query("entitlements")
-      .withIndex("by_topic_user", (q) => q.eq("topicId", intent.topicId).eq("userId", intent.userId))
-      .collect();
-    if (!held.some((e) => e.lang === intent.lang)) {
+    if (!(await hasEntitlement(ctx, intent.topicId, intent.userId, intent.lang))) {
       await ctx.db.insert("entitlements", {
         userId: intent.userId,
         topicId: intent.topicId,

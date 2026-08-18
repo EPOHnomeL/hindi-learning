@@ -6,6 +6,7 @@ import type { Id } from "./_generated/dataModel";
 import {
   editionPrice,
   getOwnedTopic,
+  hasEntitlement,
   heldLangs,
   mintToken,
   normaliseEmail,
@@ -223,11 +224,7 @@ export const grantEntitlement = mutation({
       .withIndex("email", (q) => q.eq("email", normaliseEmail(email)))
       .unique();
     if (!user) throw new Error(`no account for ${email} — the buyer must sign up first`);
-    const existing = await ctx.db
-      .query("entitlements")
-      .withIndex("by_topic_user", (q) => q.eq("topicId", topic._id).eq("userId", user._id))
-      .collect();
-    if (!existing.some((e) => e.lang === lang)) {
+    if (!(await hasEntitlement(ctx, topic._id, user._id, lang))) {
       await ctx.db.insert("entitlements", { userId: user._id, topicId: topic._id, lang });
     }
     return null;
@@ -315,11 +312,7 @@ export const fulfillPurchase = internalMutation({
       .withIndex("email", (q) => q.eq("email", email))
       .unique();
     if (!user) throw new Error(`no account for intent email — cannot fulfil ${pfPaymentId}`);
-    const existing = await ctx.db
-      .query("entitlements")
-      .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", user._id))
-      .collect();
-    if (!existing.some((e) => e.lang === lang)) {
+    if (!(await hasEntitlement(ctx, topicId, user._id, lang))) {
       await ctx.db.insert("entitlements", { userId: user._id, topicId, lang, pfPaymentId });
     }
     // The Ledger row — what this sale means in money. A throw here rolls back
@@ -374,12 +367,8 @@ export const checkoutStatus = query({
       .query("users")
       .withIndex("email", (q) => q.eq("email", intent.email))
       .unique();
-    if (user) {
-      const ents = await ctx.db
-        .query("entitlements")
-        .withIndex("by_topic_user", (q) => q.eq("topicId", intent.topicId).eq("userId", user._id))
-        .collect();
-      if (ents.some((e) => e.lang === intent.lang)) return { lang: intent.lang, state: "granted" as const };
+    if (user && (await hasEntitlement(ctx, intent.topicId, user._id, intent.lang))) {
+      return { lang: intent.lang, state: "granted" as const };
     }
     return { lang: intent.lang, state: "awaiting-payment" as const };
   },

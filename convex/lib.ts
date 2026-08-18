@@ -232,6 +232,33 @@ export async function grantsFor(
   return grants;
 }
 
+// Does this account already hold a paid grant on ONE Edition? The narrow question
+// `grantsFor` above does not answer: it walks every grant kind and returns a
+// badge per lang, and four callers only ever needed "is there an `entitlements`
+// row for this lang". They each wrote the same index read plus the same
+// `.some(e => e.lang === lang)`, and one of them is the PayFast fulfilment path,
+// so the shape had to stay identical rather than drift a fifth way.
+//
+// **It reads `entitlements` and nothing else, deliberately.** A Share, a free
+// published Edition or a grandfathered Enrollment are all access without an
+// Entitlement, and every caller here is about to WRITE an Entitlement (or refuse
+// to spend a seat that would write one) - so widening this to "has any access"
+// would suppress grants that the buyer has paid for. `vouchers.redeem` asks the
+// wider question by checking enrollments and ownership beside this call, where
+// the wider question stays visible.
+export async function hasEntitlement(
+  ctx: QueryCtx,
+  topicId: Id<"topics">,
+  userId: Id<"users">,
+  lang: string,
+): Promise<boolean> {
+  const held = await ctx.db
+    .query("entitlements")
+    .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
+    .collect();
+  return held.some((e) => e.lang === lang);
+}
+
 // The Editions a course has listed in its tenant's catalogue
 // (`publishedEditions`, course-publishing): `published: true` rows only — an
 // absent row and `published: false` both read as unlisted.
