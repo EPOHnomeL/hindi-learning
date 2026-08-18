@@ -25,9 +25,16 @@ teardown, the mechanical checks, the judgement step, and the rollback. Every dec
 ticket that made it rather than restating its reasoning. The map's Decisions-so-far indexes
 every resolved ticket.
 
-## Ruled out of scope (2026-08-04)
+## Ruled out
 
-**Not resolved — closed as out of scope.** This ticket exists to hand a spec to "a single fresh
+**Ruled out of scope 2026-08-04. Not resolved — closed as a scope boundary.**
+
+<!-- Heading corrected 2026-08-18: this section read `## Ruled out of scope (2026-08-04)`, and
+     the reader matches the exact trimmed string `## Ruled out`, so the ticket had been reading
+     as OPEN since 2026-08-04 — and this map as unfinished — despite the commit that closed it.
+     The date moved into the prose below, where it does not break the match. -->
+
+This ticket exists to hand a spec to "a single fresh
 session with no memory of this map" that would "write the script, run it against prod, judge the
 result, and pull it if bad". **That session no longer exists**: the user chose to finish in-session
 instead, so the script was written and run, the Edition is live and `ready`, and the judgement step
