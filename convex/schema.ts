@@ -737,6 +737,70 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_user_topic", ["userId", "topicId"]),
 
+  // ---- Vouchers (the seller-minted voucher rail, ADR 0029) -------------------
+
+  // A **Voucher Batch**: N single-use codes for ONE Edition, minted by the Seller
+  // who owns the course and sold to an organisation at a total the SELLER
+  // negotiated (vouchers ticket 02). It exists because every other way to grant
+  // access needs the holder named up front, and the buying organisation will not
+  // disclose its members' addresses.
+  //
+  // The **organisation is two strings** - `orgName` and `orgContact` - and
+  // deliberately not an entity: it holds no account, has no login, and the only
+  // thing it is ever shown is a count. Resist the pull towards a table (ADR 0029).
+  //
+  // There is **no redemption counter**: take-up is derived by counting `vouchers`
+  // rows with a `redeemedAt` over `by_batch`, so nothing can drift out of step
+  // with the codes themselves.
+  //
+  // `ledgerId` points at the batch's single money event - ONE row for the whole
+  // batch however many seats it carries, written `unpaid` at mint. `paymentRef` is
+  // the bank reference the sysadmin logs once the transfer lands (ticket 04); its
+  // ABSENCE is the unpaid queue, which is what `by_payment_ref` is indexed for
+  // (`q.eq("paymentRef", undefined)`). The payment state itself lives on the
+  // Ledger row, not here - this field is the reference, not a second status to
+  // drift out of step with it. `voided` stops UNREDEEMED codes only (ticket 07):
+  // a granted seat cannot be found, by design.
+  voucherBatches: defineTable({
+    topicId: v.id("topics"),
+    lang: v.string(),
+    sellerId: v.id("users"),
+    seats: v.number(),
+    // The negotiated total for the WHOLE batch, in cents (ZAR) - not a per-seat
+    // price. A bulk deal needs no discount machinery precisely because the Seller
+    // states this number, so the Edition's listing price is irrelevant to it.
+    total: v.number(),
+    orgName: v.string(),
+    orgContact: v.string(),
+    ledgerId: v.id("ledger"),
+    voided: v.boolean(),
+    paymentRef: v.optional(v.string()),
+  })
+    .index("by_seller", ["sellerId"])
+    .index("by_payment_ref", ["paymentRef"]),
+
+  // One **Voucher**: a single-use code belonging to a batch. `by_code` is the
+  // redeem lookup (unique in practice - minting retries on collision), `by_batch`
+  // backs the CSV and the derived count.
+  //
+  // **There is no user field, and that is the whole feature** (ADR 0029). A
+  // redemption records that it happened (`redeemedAt`) and nothing about who; the
+  // Entitlement it mints carries no batch or voucher provenance either, so a
+  // voucher seat is byte-identical to an Admin comp. Adding a `userId` here - or a
+  // `batchId` to `entitlements` - would let the operator name the redeemers by
+  // elimination and would silently end the anonymity the organisation bought.
+  // Reversing this needs a superseding ADR, not a patch.
+  //
+  // Absent `redeemedAt` means unredeemed. That is the entire state machine: no
+  // expiry, no reservation, no status union.
+  vouchers: defineTable({
+    batchId: v.id("voucherBatches"),
+    code: v.string(),
+    redeemedAt: v.optional(v.number()),
+  })
+    .index("by_code", ["code"])
+    .index("by_batch", ["batchId"]),
+
   // A signed-in user's personal preferences (app-language-i18n ticket 03 §1).
   // One row per user, minted on their first app-language pick. `locale` is a
   // free-form BCP-47 chrome-language code (e.g. "es"); absent = never picked.
