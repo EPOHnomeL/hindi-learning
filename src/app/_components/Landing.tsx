@@ -90,9 +90,6 @@ export function Landing() {
     askedQuestion: t("mocks.phone.askedQuestion"),
     askedReply: t("mocks.phone.askedReply"),
     askedFollowUp: t("mocks.phone.askedFollowUp"),
-    navLessons: t("mocks.phone.navLessons"),
-    navReferences: t("mocks.phone.navReferences"),
-    navAsk: t("mocks.phone.navAsk"),
   };
 
   const tiles: CapabilityTile[] = [1, 2, 3, 4].map((n) => ({
