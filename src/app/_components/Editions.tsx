@@ -1060,6 +1060,14 @@ function BatchRow({
   const voidBatch = useMutation(api.vouchers.voidBatch);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  // Where the codes get typed. Read after mount, not during render, because
+  // `window` does not exist on the server - the same mount-gating RedeemPanel uses
+  // for the code it recovers from the URL. It is the CURRENT host on purpose:
+  // `/redeem` is served on every host (vouchers ticket 06), so a Seller working on
+  // their own whitelabel domain hands their organisation their own domain.
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
+  const redeemUrl = origin ? `${origin}/redeem` : "";
 
   // ponytail: a CSV is a string with commas and newlines, and the download is a
   // blob - no library, no route, no server-rendered file. The codes are fetched on
@@ -1071,9 +1079,17 @@ function BatchRow({
       const codes = await convex.query(api.vouchers.batchCodes, { batchId: batch.batchId });
       // The course and language ride along so a printed card can say what the code
       // unlocks - a bare column of codes is unmail-mergeable and unprintable.
+      //
+      // **And the link, one per row, with the code already in it.** Without it the
+      // CSV never says where a code is typed, and the URL reaches the organisation
+      // only if the Seller happens to think of it - which is how a member ends up
+      // holding a valid code and no way to use it. A per-row link is what makes the
+      // file mail-mergeable: the organisation sends one line and the member clicks
+      // once. Headers stay English like the two above: this is a data file the
+      // organisation processes, not a page anybody reads in their own language.
       const rows = [
-        ["code", "course", "language"],
-        ...codes.map((code) => [code, batch.courseTitle, editionName]),
+        ["code", "course", "language", "redeem at"],
+        ...codes.map((code) => [code, batch.courseTitle, editionName, `${origin}/redeem?code=${code}`]),
       ];
       const csv = rows.map((r) => r.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\r\n");
       const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
@@ -1128,6 +1144,14 @@ function BatchRow({
           </button>
         )}
       </div>
+      {/* The Seller is the only person who can tell the organisation where the
+          codes are typed - the platform has no member addresses and sends nothing
+          to anybody. So say the URL here, in full and copyable, beside the button
+          that produces the codes, for the Seller printing a card rather than
+          mail-merging the CSV's per-row link. */}
+      {redeemUrl && (
+        <p className="mt-1.5 text-[11px] leading-relaxed text-soft">{t("batchRedeemHint", { url: redeemUrl })}</p>
+      )}
       {/* Say what void does and does not do, here rather than only in the confirm,
           so the Seller is never surprised by it. It stops unused codes; it cannot
           take back a seat already granted, and it is not a refund. */}

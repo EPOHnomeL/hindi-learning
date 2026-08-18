@@ -406,6 +406,7 @@
     "batchAwaitingPayment": "El pago aún no está registrado: tu parte se podrá cobrar cuando el operador registre la transferencia.",
     "batchPaymentLogged": "Pago registrado ({reference}): tu parte entra en el próximo pago.",
     "batchDownload": "Descargar códigos (CSV)",
+    "batchRedeemHint": "Los miembros canjean su codigo en {url}. El CSV incluye un enlace listo para cada codigo, asi puedes enviar una linea por persona.",
     "batchVoidedBadge": "Anulado",
     "batchVoid": "Anular lote",
     "batchVoidHint": "Anular detiene los códigos que nadie ha usado todavía. No puede retirar el acceso ya concedido y no es un reembolso.",

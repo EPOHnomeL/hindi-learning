@@ -406,6 +406,7 @@
     "batchAwaitingPayment": "Betaling nog nie aangeteken nie - jou deel word betaalbaar sodra die operateur die oorbetaling aanteken.",
     "batchPaymentLogged": "Betaling aangeteken ({reference}) - jou deel is in die volgende uitbetaling.",
     "batchDownload": "Laai kodes af (CSV)",
+    "batchRedeemHint": "Lede los hul kode in by {url}. Die CSV het 'n klaargemaakte skakel vir elke kode, sodat jy een reel per persoon kan stuur.",
     "batchVoidedBadge": "Gekanselleer",
     "batchVoid": "Kanselleer groep",
     "batchVoidHint": "Kansellasie stop kodes wat nog niemand gebruik het nie. Dit kan nie toegang wat reeds gegee is terugvat nie, en dit is nie ’n terugbetaling nie.",

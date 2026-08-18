@@ -406,6 +406,7 @@
     "batchAwaitingPayment": "Payment not logged yet - your share becomes payable once the operator records the transfer.",
     "batchPaymentLogged": "Payment logged ({reference}) - your share is in the next payout run.",
     "batchDownload": "Download codes (CSV)",
+    "batchRedeemHint": "Members redeem at {url}. The CSV has a ready-made link for each code, so you can send one line per person.",
     "batchVoidedBadge": "Voided",
     "batchVoid": "Void batch",
     "batchVoidHint": "Voiding stops codes nobody has used yet. It cannot take back access already granted, and it is not a refund.",
