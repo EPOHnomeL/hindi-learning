@@ -146,9 +146,6 @@ Verified in the tree while charting, so no ticket need re-derive it:
 
 Nothing. The map is done.
 
-- ~~**Inherited defects of the source Edition**~~ — graduated on 2026-08-02 into
-  [The English the source never translated: repair it, flag it, or ship it?](tickets/06-inherited-english-repair-flag-or-ship.md).
-
 **Two things left open by choice, which are work rather than fog** — named here so they are not
 mistaken for having been forgotten, and neither belongs to this map:
 

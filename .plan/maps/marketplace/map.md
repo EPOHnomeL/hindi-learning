@@ -96,7 +96,7 @@ that already ship.
   `Error` messages in production, fixed with `ConvexError` on this path plus a payee picker
   over ready sellers. ~~One limitation stated not fixed: `/` is the Dashboard when signed in,
   so a logged-in operator cannot see their own donate section.~~ **That limitation became a
-  user-visible bug and is fixed** — see [Build the `/donate` route](tickets/10-build-donate-route.md)
+  user-visible bug and is fixed** — see the **Build the `/donate` route** entry
   below. **The live sandbox donation is the one item not verifiable from a session** — the
   ticket ends in a six-step operator checklist.
 - [Build the `/donate` route](tickets/10-build-donate-route.md) — **built and shipped**; the
