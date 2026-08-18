@@ -86,6 +86,22 @@ Built and reachable, with the money recorded and the Seller payable only once th
   found, the Ledger row is untouched in both directions, and the UI says so in plain words at the
   batch and again at the confirm. Void is never presented as a refund.
 
+- [Tell the Seller where the codes get typed](tickets/08-tell-the-seller-where-codes-get-typed.md)
+  - The CSV gained a `redeem at` column carrying `<origin>/redeem?code=<code>` per row, and the
+  batch row states the bare URL beside the download. Two distribution shapes, two answers: mail
+  merge wants a link per person, a printed card wants a short URL to set in type. The origin is the
+  browser's own, read after mount, so a whitelabel Seller hands out their own domain.
+- [What a Share holder gets for a code](tickets/09-what-a-share-holder-gets-for-a-code.md)
+  - Behaviour unchanged, now decided and pinned: a Share holder redeeming DOES spend the code. The
+  rule is that the three refusals are the PERMANENT holdings - ownership, Entitlement, Enrollment -
+  and a Share or a free published Edition is access the owner can withdraw, so converting it into
+  an Entitlement is worth a seat. Phrased as a rule so the next grant kind decides itself.
+- [One answer to "does this account hold this Edition?"](tickets/10-one-answer-to-does-this-account-hold-this-edition.md)
+  - `lib.hasEntitlement` replaces the same seven lines in five places, two of them money paths, with
+  no test edited. Narrower than the `hasGrant` this map proposed and deliberately so: every caller
+  is about to write an Entitlement, so "has any access" would have suppressed grants somebody paid
+  for. `grantsFor` stays the wide walk.
+
 ## Not yet specified
 
 - **Nobody has watched a real batch complete, end to end, with real money.** Ticket 06 closed half
@@ -93,12 +109,9 @@ Built and reachable, with the money recorded and the Seller payable only once th
   sign-up and into the reader. What has still never been walked by a person is the other half - a
   Seller minting a batch through the form, handing over the CSV, and the sysadmin matching a real
   bank line and logging it. Those two surfaces are test-covered and read correct, and neither has
-  been clicked. Worth an operator walkthrough before the first live batch.
-- **Nothing tells a Seller that `/redeem` exists.** They mint a batch, download a CSV of codes, and
-  the platform never says where those codes are typed - so the URL reaches the organisation only if
-  the Seller thinks to include it. Probably a line on the CSV or beside the download; it needs
-  five minutes of thought about what a printed card should say, which is why it is here and not a
-  ticket.
+  been clicked - including ticket 08's new `redeem at` CSV column and the redeem URL beside the
+  download, which are the Seller's only means of telling the organisation where a code is typed.
+  Worth an operator walkthrough before the first live batch.
 - **Does a confirmed batch count as revenue in the sales report?** Ticket 01 excluded batch rows
   from it outright, which is the fail-closed answer and the one `salesOnly`'s own comment asked
   for: an `unpaid` batch is money that has not arrived, and counting it would overstate revenue.
@@ -106,18 +119,6 @@ Built and reachable, with the money recorded and the Seller payable only once th
   invisible to the per-course report while sitting in payouts. Including it needs an answer to a
   second question first - a bulk total for N seats is not the same price as a single sale, so a
   report that sums both reads as one number covering two different things.
-- **A Share holder redeeming a code still burns it.** `redeem` refuses without consuming for the
-  three cases the spec enumerates - Entitlement, Enrollment, ownership - and a **[[Share]]** is
-  deliberately not among them. That is arguably right (a Share can be revoked by its owner, so the
-  Entitlement a code mints is genuinely more than the reader already had) and arguably a wasted
-  seat. It was built as specified rather than widened on the day; if it is wrong it is a one-line
-  change plus a fourth assertion, but it is a decision about what "already has access" means and it
-  wants deciding rather than drifting.
-- **Three modules now answer "does this account already hold this Edition?" separately.** The walk
-  in `lib.ts`, the entitlements check in `eft.ts`'s confirm, and the three-way check in
-  `vouchers.redeem`. One `hasGrant(ctx, topicId, userId, lang)` would serve all three, and the
-  reason it was not written today is that hoisting it edits a live, money-adjacent confirm path for
-  no behaviour change. Worth doing on the next change that touches that path for its own reasons.
 - **What the organisation is told, and by whom.** The Seller reports take-up by hand today. If
   that becomes tedious it wants a shareable read-only count - but that is the first step towards
   the organisation entity this design deliberately refused, so it needs its own decision.
