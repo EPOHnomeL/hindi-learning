@@ -11,15 +11,25 @@ import type { Doc } from "./_generated/dataModel";
 // `topicId` and resolve a course title, so a donation row reaching either would
 // be a "(deleted course)" row at best.
 //
-// Written as "not a donation" rather than "is a sale" on purpose: rows written
-// before `kind` existed carry none, and they ARE sales — testing `=== "sale"`
-// would silently drop the entire pre-ADR-0027 history from the report. Once
-// `backfill.backfillLedgerKind` has run everywhere and `kind` is narrowed to
-// required, the two are equivalent. **A third money kind must flip this to an
-// allow-list** — that is the one way this predicate goes wrong.
+// This WAS written as "not a donation", because rows written before `kind` existed
+// carry none and they ARE sales, so `=== "sale"` would have dropped the whole
+// pre-ADR-0027 history. That comment ended by naming its own failure mode: **a third
+// money kind must flip this to an allow-list**. Vouchers are that third kind
+// (ADR 0029), so it is now an allow-list - `sale` or absent, nothing else.
+//
+// A batch row would have slipped through the old predicate: unlike a donation it has
+// a `topicId` and a `lang`, so it looks exactly like a sale of that Edition. Two
+// reasons it does not belong here. An `unpaid` batch is money that has not arrived,
+// so counting it overstates revenue; and a batch's gross is a negotiated bulk total
+// for N seats, so folding it into per-Edition revenue silently mixes two different
+// prices for the same Edition. Whether a *confirmed* batch should appear as revenue
+// is a real question and deliberately still open - see the vouchers map.
 type SaleRow = Doc<"ledger"> & { topicId: NonNullable<Doc<"ledger">["topicId"]>; lang: string };
 function salesOnly(rows: Doc<"ledger">[]): SaleRow[] {
-  return rows.filter((r): r is SaleRow => r.kind !== "donation" && r.topicId !== undefined && r.lang !== undefined);
+  return rows.filter(
+    (r): r is SaleRow =>
+      (r.kind === undefined || r.kind === "sale") && r.topicId !== undefined && r.lang !== undefined,
+  );
 }
 
 // The admin sales report (.scratch/admin-sales, issue 01): which courses and

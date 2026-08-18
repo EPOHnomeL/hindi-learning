@@ -103,3 +103,73 @@ test("markPaid is Admin-only, flips owed→paid with a reference, and never doub
   owed = await asUser(t, admin).query(api.ledger.owedPayouts, {});
   expect(owed).toEqual([]);
 });
+
+// A Voucher Batch's money event (vouchers ticket 01, ADR 0029): a batch is sold
+// BEFORE the cash arrives and its codes work immediately, so its Ledger row exists
+// from creation at `unpaid` and must be invisible to payouts until the sysadmin logs
+// the transfer. The guard is the `by_status` index this query already reads: `unpaid`
+// simply isn't `owed`, so no filter has to remember to exclude it.
+async function seedBatchRow(
+  t: ReturnType<typeof convexTest>,
+  status: "unpaid" | "owed",
+): Promise<{ author: Id<"users">; row: Id<"ledger"> }> {
+  const author = await seedUser(t, "author@example.com");
+  await t.run((ctx) => ctx.db.insert("sellers", { userId: author, payout: PAYOUT }));
+  const topicId = await t.run((ctx) =>
+    ctx.db.insert("topics", { ownerId: author, slug: "hindi", title: "Hindi", status: "completed" as const }),
+  );
+  const row = await t.run((ctx) =>
+    ctx.db.insert("ledger", {
+      topicId,
+      lang: "en",
+      sellerId: author,
+      // The BUYING ORGANISATION's billing contact, not a member's - a batch is one
+      // commercial event with one buyer, however many seats it carries.
+      buyerEmail: "billing@party.example.org",
+      gross: 500000,
+      fee: 0, // no gateway took a cut
+      net: 500000,
+      sellerShare: 250000,
+      platformShare: 250000,
+      kind: "batch" as const,
+      status,
+    }),
+  );
+  return { author, row };
+}
+
+test("an unpaid batch row is invisible to owedPayouts; logging the cash makes it payable", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const { row } = await seedBatchRow(t, "unpaid");
+
+  // Nobody is owed anything yet - the seats are live but the money hasn't landed.
+  expect(await asUser(t, admin).query(api.ledger.owedPayouts, {})).toEqual([]);
+
+  // The sysadmin logs the transfer (vouchers ticket 04 does this through a mutation;
+  // here the flip stands in for it, since no writer exists yet).
+  await t.run((ctx) => ctx.db.patch(row, { status: "owed" }));
+
+  const owed = await asUser(t, admin).query(api.ledger.owedPayouts, {});
+  expect(owed).toHaveLength(1);
+  expect(owed[0]).toMatchObject({ email: "author@example.com", payout: PAYOUT, totalOwed: 250000 });
+  expect(owed[0]!.sales[0]).toMatchObject({
+    id: row,
+    kind: "batch",
+    lang: "en",
+    buyerEmail: "billing@party.example.org",
+    sellerShare: 250000,
+  });
+});
+
+test("markPaid never pays out an unpaid batch row", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const { row } = await seedBatchRow(t, "unpaid");
+
+  // Even asked directly, an `unpaid` row cannot be marked paid: the money hasn't
+  // arrived, so there is nothing to pay out and no reference to record.
+  await asUser(t, admin).mutation(api.ledger.markPaid, { ids: [row], reference: "EFT-oops" });
+  expect(await t.run((ctx) => ctx.db.get(row))).toMatchObject({ status: "unpaid" });
+  expect(await t.run((ctx) => ctx.db.get(row))).not.toHaveProperty("payoutRef");
+});

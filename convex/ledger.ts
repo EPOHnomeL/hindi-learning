@@ -42,7 +42,10 @@ export const owedPayouts = query({
           // a Convex query and collide with the language-code namespace. `kind`
           // beside it is what the UI actually branches on.
           lang: v.union(v.string(), v.null()),
-          kind: v.union(v.literal("sale"), v.literal("donation")),
+          // A **batch** row is a Voucher Batch's single money event (ADR 0029) - it
+          // reaches this view only once the sysadmin has logged the transfer, since
+          // an unpaid batch is not `owed` and this query reads the `owed` index.
+          kind: v.union(v.literal("sale"), v.literal("donation"), v.literal("batch")),
           buyerEmail: v.string(),
           sellerShare: v.number(),
           at: v.number(),

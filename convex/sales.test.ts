@@ -203,3 +203,41 @@ test("filters by the sale timestamp; all-time returns everything", async () => {
     count: 2,
   });
 });
+
+// A Voucher Batch's money event must NOT reach the sales report (vouchers ticket 01,
+// ADR 0029). A batch row carries a topicId and a lang, so the old "not a donation"
+// predicate would have admitted it - and an `unpaid` batch is money that has not
+// arrived, so the report would have overstated revenue the moment batches shipped.
+// This is the allow-list `salesOnly`'s own comment asked for.
+test("a voucher batch row is excluded from the sales report", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const author = await seedUser(t, "author@example.com");
+  const hindi = await t.run((ctx) =>
+    ctx.db.insert("topics", { ownerId: author, slug: "hindi", title: "Hindi", status: "completed" as const }),
+  );
+
+  // One ordinary sale, and one batch for the same Edition at ten times the money.
+  await seedSale(t, { topicId: hindi, sellerId: author, lang: "en", gross: 10000, pf: "h1" });
+  await t.run((ctx) =>
+    ctx.db.insert("ledger", {
+      topicId: hindi,
+      lang: "en",
+      sellerId: author,
+      buyerEmail: "billing@party.example.org",
+      gross: 100000,
+      fee: 0,
+      net: 100000,
+      sellerShare: 50000,
+      platformShare: 50000,
+      kind: "batch" as const,
+      status: "unpaid" as const,
+    }),
+  );
+
+  const report = await asUser(t, admin).query(api.sales.report, {});
+  // Only the real sale counts - the batch's 100000 is absent, not folded in.
+  expect(report).toHaveLength(1);
+  expect(report[0]).toMatchObject({ topicId: hindi, gross: 10000, count: 1 });
+  expect(report[0]!.editions).toEqual([{ lang: "en", title: "Hindi", gross: 10000, count: 1 }]);
+});

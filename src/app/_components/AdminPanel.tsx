@@ -927,8 +927,15 @@ function PayoutRow({ owed }: { owed: FunctionReturnType<typeof api.ledger.owedPa
         {owed.sales.length} item{owed.sales.length === 1 ? "" : "s"} ·{" "}
         {/* A donation has no Edition, so the query hands back a null `lang` and
             the kind to label it with (ADR 0027) — donations settle through this
-            same tab, alongside the payee's sales. */}
-        {owed.sales.map((s) => `${s.kind === "donation" ? "donation" : s.lang} ${formatRand(s.sellerShare)}`).join(", ")}
+            same tab, alongside the payee's sales. A voucher batch DOES have an
+            Edition, so it needs the kind too or it reads as an ordinary sale of
+            that language at a bulk price (ADR 0029). */}
+        {owed.sales
+          .map((s) => {
+            const what = s.kind === "donation" ? "donation" : s.kind === "batch" ? `${s.lang} batch` : s.lang;
+            return `${what} ${formatRand(s.sellerShare)}`;
+          })
+          .join(", ")}
       </p>
       <form
         className="mt-2.5 flex flex-wrap items-center gap-2"

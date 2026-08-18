@@ -659,8 +659,22 @@ export default defineSchema({
     // only because rows predating ADR 0027 exist; every writer sets it, and
     // `backfill.backfillLedgerKind` stamps the legacy rows "sale" so it can be
     // narrowed to required later.
-    kind: v.optional(v.union(v.literal("sale"), v.literal("donation"))),
-    status: v.union(v.literal("owed"), v.literal("paid")),
+    // A **[[Voucher Batch]]** is the third kind, and the one the explicit union was
+    // kept open for (vouchers ticket 01, ADR 0029). It is ONE row for the whole
+    // batch however many seats it carries - the money event is the batch, not a
+    // redemption - written by the Seller minting it, at `fee: 0` (no gateway took a
+    // cut) with the BUYING ORGANISATION's billing contact as `buyerEmail`. It
+    // carries neither `pfPaymentId` nor `eftRef`: its provenance is the batch row
+    // that points back at it, and the seats it grants deliberately record nothing.
+    kind: v.optional(v.union(v.literal("sale"), v.literal("donation"), v.literal("batch"))),
+    // `unpaid` is a batch row that has been AGREED but not received (ADR 0029): a
+    // batch's codes work from creation, so its row exists before the cash lands.
+    // This is the whole payout guard, and it is a status rather than a boolean on
+    // purpose - `ledger.owedPayouts` reads the `by_status` index for `owed`, so an
+    // unpaid row is excluded with no filter that a later edit could forget to apply.
+    // `markPaid` only ever touches `owed` rows, so unpaid money cannot be paid out.
+    // Only a batch is ever `unpaid`; both payment rails record cash already taken.
+    status: v.union(v.literal("unpaid"), v.literal("owed"), v.literal("paid")),
     payoutRef: v.optional(v.string()),
   }).index("by_status", ["status"]),
 
