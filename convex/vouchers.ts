@@ -466,3 +466,32 @@ async function ownBatch(ctx: QueryCtx, batchId: Id<"voucherBatches">): Promise<D
   if (!batch || batch.sellerId !== userId) throw new Error("that batch isn't yours");
   return batch;
 }
+
+// ---- Voiding (ticket 07) --------------------------------------------------------
+
+// A deal went wrong - the organisation never paid, or the relationship ended - so
+// the Seller stops the batch. Voiding stops UNREDEEMED codes and nothing else.
+//
+// **Already-granted seats keep working, and this is not a limitation to engineer
+// around.** A redemption records nothing about who redeemed and the Entitlement
+// carries no batch provenance (ADR 0029), so those seats genuinely cannot be
+// found. An agent who sets out to make voiding retroactive will end up adding the
+// provenance back and quietly destroying the feature.
+//
+// **The Ledger row is untouched.** If the cash was logged the Seller is still
+// owed their share; if it was not, the row stays `unpaid`. Voiding is a statement
+// about codes, not about money - collapsing the two would make it a refund
+// mechanism, which this platform does not have.
+//
+// Void is also why vouchers need no expiry: the stop is a deliberate human act
+// with a person behind it, not a clock that silently voids seats the organisation
+// paid for.
+export const voidBatch = mutation({
+  args: { batchId: v.id("voucherBatches") },
+  returns: v.null(),
+  handler: async (ctx, { batchId }) => {
+    const batch = await ownBatch(ctx, batchId);
+    if (!batch.voided) await ctx.db.patch(batch._id, { voided: true });
+    return null;
+  },
+});

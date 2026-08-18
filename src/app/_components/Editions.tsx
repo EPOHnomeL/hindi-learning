@@ -1054,7 +1054,9 @@ function BatchRow({
 }) {
   const t = useTranslations("Editions");
   const convex = useConvex();
+  const voidBatch = useMutation(api.vouchers.voidBatch);
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   // ponytail: a CSV is a string with commas and newlines, and the download is a
   // blob - no library, no route, no server-rendered file. The codes are fetched on
@@ -1112,7 +1114,37 @@ function BatchRow({
         >
           {t("batchDownload")}
         </button>
+        {!batch.voided && (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setConfirming(true)}
+            className="rounded-lg border border-line px-2.5 py-1 text-[11.5px] font-medium text-soft transition-colors hover:border-danger hover:text-danger disabled:opacity-60"
+          >
+            {t("batchVoid")}
+          </button>
+        )}
       </div>
+      {/* Say what void does and does not do, here rather than only in the confirm,
+          so the Seller is never surprised by it. It stops unused codes; it cannot
+          take back a seat already granted, and it is not a refund. */}
+      {!batch.voided && <p className="mt-1.5 text-[11px] leading-relaxed text-soft">{t("batchVoidHint")}</p>}
+      {confirming && (
+        <ConfirmDialog
+          title={t("batchVoidConfirmTitle")}
+          body={t("batchVoidConfirmBody")}
+          confirmLabel={t("batchVoid")}
+          confirmDisabled={busy}
+          onConfirm={() => {
+            setBusy(true);
+            void voidBatch({ batchId: batch.batchId }).finally(() => {
+              setBusy(false);
+              setConfirming(false);
+            });
+          }}
+          onClose={() => setConfirming(false)}
+        />
+      )}
     </li>
   );
 }

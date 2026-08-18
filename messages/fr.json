@@ -406,7 +406,11 @@
     "batchAwaitingPayment": "Paiement non encore enregistré - votre part deviendra payable une fois que l’opérateur aura enregistré le virement.",
     "batchPaymentLogged": "Paiement enregistré ({reference}) - votre part figure dans le prochain versement.",
     "batchDownload": "Télécharger les codes (CSV)",
-    "batchVoidedBadge": "Annulé"
+    "batchVoidedBadge": "Annulé",
+    "batchVoid": "Annuler le lot",
+    "batchVoidHint": "L’annulation arrête les codes que personne n’a encore utilisés. Elle ne peut pas retirer un accès déjà accordé, et ce n’est pas un remboursement.",
+    "batchVoidConfirmTitle": "Annuler ce lot ?",
+    "batchVoidConfirmBody": "Les codes inutilisés cessent de fonctionner immédiatement. Les places déjà utilisées continuent de fonctionner et ne peuvent pas être reprises, car personne n’est enregistré comme les détenant. Ce n’est pas un remboursement : l’argent de ce lot reste inchangé."
   },
   "Certificate": {
     "eyebrow": "Certificat de réussite",

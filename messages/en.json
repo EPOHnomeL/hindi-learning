@@ -406,7 +406,11 @@
     "batchAwaitingPayment": "Payment not logged yet - your share becomes payable once the operator records the transfer.",
     "batchPaymentLogged": "Payment logged ({reference}) - your share is in the next payout run.",
     "batchDownload": "Download codes (CSV)",
-    "batchVoidedBadge": "Voided"
+    "batchVoidedBadge": "Voided",
+    "batchVoid": "Void batch",
+    "batchVoidHint": "Voiding stops codes nobody has used yet. It cannot take back access already granted, and it is not a refund.",
+    "batchVoidConfirmTitle": "Void this batch?",
+    "batchVoidConfirmBody": "Unused codes stop working right away. Seats that have already been redeemed keep working and cannot be taken back, because nobody is recorded as holding them. This is not a refund: the money on this batch is unchanged."
   },
   "Certificate": {
     "eyebrow": "Certificate of Completion",

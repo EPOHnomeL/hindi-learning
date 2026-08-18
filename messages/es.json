@@ -406,7 +406,11 @@
     "batchAwaitingPayment": "El pago aún no está registrado: tu parte se podrá cobrar cuando el operador registre la transferencia.",
     "batchPaymentLogged": "Pago registrado ({reference}): tu parte entra en el próximo pago.",
     "batchDownload": "Descargar códigos (CSV)",
-    "batchVoidedBadge": "Anulado"
+    "batchVoidedBadge": "Anulado",
+    "batchVoid": "Anular lote",
+    "batchVoidHint": "Anular detiene los códigos que nadie ha usado todavía. No puede retirar el acceso ya concedido y no es un reembolso.",
+    "batchVoidConfirmTitle": "¿Anular este lote?",
+    "batchVoidConfirmBody": "Los códigos sin usar dejan de funcionar de inmediato. Las plazas ya canjeadas siguen funcionando y no se pueden retirar, porque no se registra quién las tiene. Esto no es un reembolso: el dinero de este lote no cambia."
   },
   "Certificate": {
     "eyebrow": "Certificado de finalización",

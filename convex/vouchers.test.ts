@@ -464,3 +464,65 @@ test("a Seller sees nothing of another Seller's batches, and cannot read their c
   expect(own.every((c) => c.redeemed === false)).toBe(true);
   expect(own.map((c) => c.code).sort()).toEqual((await codesOf(t, batchId)).sort());
 });
+
+// ---- Voiding (ticket 07) --------------------------------------------------------
+
+test("voiding stops the unused codes and leaves everything else exactly alone", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const other = await seedSeller(t, admin, "other@example.com", "urdu");
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, MINT);
+  const codes = await codesOf(t, batchId);
+
+  // One seat is taken up before the deal goes wrong.
+  const member = await seedUser(t, "member@example.com");
+  await asUser(t, member).mutation(api.vouchers.redeem, { code: codes[0]! });
+  await asUser(t, admin).mutation(api.vouchers.logBatchPayment, { batchId, reference: "FNB-993" });
+
+  // Only the Seller who minted it may void it.
+  await expect(asUser(t, other.seller).mutation(api.vouchers.voidBatch, { batchId })).rejects.toThrow();
+  await expect(t.mutation(api.vouchers.voidBatch, { batchId })).rejects.toThrow();
+  await expect(asUser(t, admin).mutation(api.vouchers.voidBatch, { batchId })).rejects.toThrow();
+
+  await asUser(t, seller).mutation(api.vouchers.voidBatch, { batchId });
+  expect((await asUser(t, seller).query(api.vouchers.myBatches, {}))[0]).toMatchObject({ voided: true });
+
+  // An unredeemed code stops working.
+  const latecomer = await seedUser(t, "latecomer@example.com");
+  await expect(asUser(t, latecomer).mutation(api.vouchers.redeem, { code: codes[1]! })).rejects.toThrow(/cancelled/);
+
+  // The surprising half, and the one to assert: the seat already granted is
+  // untouched. It cannot even be found - the Entitlement carries no batch
+  // provenance and the voucher records no user (ADR 0029).
+  const held = await t.run((ctx) =>
+    ctx.db
+      .query("entitlements")
+      .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", member))
+      .collect(),
+  );
+  expect(held).toHaveLength(1);
+
+  // And the money is untouched: voiding is a statement about codes, never a
+  // refund. The share logged before the void is still owed.
+  expect((await ledgerRows(t))[0]).toMatchObject({ status: "owed", gross: 500000 });
+  const owed = await asUser(t, admin).query(api.ledger.owedPayouts, {});
+  expect(owed[0]).toMatchObject({ email: "author@example.com", totalOwed: 250000 });
+
+  // Voiding twice is a no-op rather than an error.
+  await asUser(t, seller).mutation(api.vouchers.voidBatch, { batchId });
+  expect((await asUser(t, seller).query(api.vouchers.myBatches, {}))[0]).toMatchObject({ voided: true });
+});
+
+test("voiding an unpaid batch leaves its ledger row unpaid - void is not a refund", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, MINT);
+
+  await asUser(t, seller).mutation(api.vouchers.voidBatch, { batchId });
+
+  expect((await ledgerRows(t))[0]).toMatchObject({ status: "unpaid" });
+  // Still on the sysadmin's queue: the codes stopped, the invoice did not.
+  expect(await asUser(t, admin).query(api.vouchers.pendingBatches, {})).toHaveLength(1);
+});

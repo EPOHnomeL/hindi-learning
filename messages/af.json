@@ -406,7 +406,11 @@
     "batchAwaitingPayment": "Betaling nog nie aangeteken nie - jou deel word betaalbaar sodra die operateur die oorbetaling aanteken.",
     "batchPaymentLogged": "Betaling aangeteken ({reference}) - jou deel is in die volgende uitbetaling.",
     "batchDownload": "Laai kodes af (CSV)",
-    "batchVoidedBadge": "Gekanselleer"
+    "batchVoidedBadge": "Gekanselleer",
+    "batchVoid": "Kanselleer groep",
+    "batchVoidHint": "Kansellasie stop kodes wat nog niemand gebruik het nie. Dit kan nie toegang wat reeds gegee is terugvat nie, en dit is nie ’n terugbetaling nie.",
+    "batchVoidConfirmTitle": "Kanselleer hierdie groep?",
+    "batchVoidConfirmBody": "Ongebruikte kodes hou dadelik op werk. Sitplekke wat reeds gebruik is, bly werk en kan nie teruggevat word nie, want niemand word aangeteken as houer daarvan nie. Dit is nie ’n terugbetaling nie: die geld op hierdie groep bly onveranderd."
   },
   "Certificate": {
     "eyebrow": "Sertifikaat van Voltooiing",
