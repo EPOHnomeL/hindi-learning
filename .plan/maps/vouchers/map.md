@@ -119,6 +119,13 @@ Built and reachable, with the money recorded and the Seller payable only once th
   invisible to the per-course report while sitting in payouts. Including it needs an answer to a
   second question first - a bulk total for N seats is not the same price as a single sale, so a
   report that sums both reads as one number covering two different things.
+- **Should the voucher CODE be the credential?** Proposed on 2026-08-18: store a member's progress
+  against their code, so they retype it on a new phone and are back in. It is good UX and it is the
+  one thing ticket 11's guest design cannot do. It also needs a code to account link, and the
+  Seller holds the code list, so the organisation could map every code to a person's progress -
+  exactly what `batchCodes` refuses to disclose. **Reversing that needs a superseding ADR, not a
+  code change**, and the ADR has to weigh a real convenience against the promise the rail was built
+  to keep. Until it is written, ticket 11 builds guest access without the link.
 - **What the organisation is told, and by whom.** The Seller reports take-up by hand today. If
   that becomes tedious it wants a shareable read-only count - but that is the first step towards
   the organisation entity this design deliberately refused, so it needs its own decision.
