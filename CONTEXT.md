@@ -152,7 +152,7 @@ _Avoid_: Self-hosted, free tier, self-serve (BYOK is about the key, not the host
 These name the concepts of the **paid course marketplace** built on top of the free-distribution model: vetted **Sellers** list finished courses, buyers purchase one-time lifetime **Entitlements**, and every sale is processed on the **operator's single PayFast (South Africa) account** — the operator is the sole **merchant of record**; Sellers never register a payment account of their own. Since [ADR 0026](docs/adr/0026-manual-eft-payment-rail.md) there is a **second rail beside the card one**: a buyer may instead transfer the price straight into the operator's account against an **[[EFT Intent]]** reference, and the operator confirms it by hand — same merchant of record, same Ledger, no gateway. Each sale's net (after the gateway's fee, which is zero on the manual rail) is split 50/50 between the Seller and the platform in the **Ledger**, and the operator pays Sellers out manually by EFT. Pricing is **ZAR-only**. This is the first time the platform charges for *consuming* content. What is sold is an **Edition** — a `(Topic, language)` pair, the unit of content access introduced by the course-translation feature — so a course is bought and priced *in a specific language*.
 
 **Entitlement**:
-An account's purchased, permanent right to read a paid **Edition** — a `(Topic, language)` pair — past its free first Lesson (the **Preview**), including that Edition's References. One per (buyer, Topic, language), created when a purchase succeeds and never expiring (one-time, lifetime). **Four writers mint one** (corrected 2026-08-18; this line used to claim "minted only by the verified PayFast **ITN**", which stopped being true when the manual EFT rail shipped): the verified PayFast **ITN** on the card rail, the operator confirming an **[[EFT Intent]]**, an Admin granting one by hand (`market.grantEntitlement` — comps and support), and a redeemed **[[Voucher]]**. What the ITN claim was really protecting is still true and still matters: access is *never* minted by the client redirect, and never attaches to a **typed** email — only to the signed-in caller or an Admin-resolved account ([ADR 0021](docs/adr/0021-open-signup-allowlist-gates-course-creation.md)). The presence of the row *is* the access; it attributes to an account (like a Certificate) and never to a Guest. It is the **paid counterpart to a language-scoped Share** — bought, not granted — and, like a Share, is scoped to one Edition: buying the Spanish Edition does not unlock the Urdu one.
+An account's purchased, permanent right to read a paid **Edition** — a `(Topic, language)` pair — past its free first Lesson (the **Preview**), including that Edition's References. One per (buyer, Topic, language), created when a purchase succeeds and never expiring (one-time, lifetime). **Four writers mint one** (corrected 2026-08-18; this line used to claim "minted only by the verified PayFast **ITN**", which stopped being true when the manual EFT rail shipped): the verified PayFast **ITN** on the card rail, the operator confirming an **[[EFT Intent]]**, an Admin granting one by hand (`market.grantEntitlement` - comps and support), and a redeemed **[[Voucher]]**. What the ITN claim was really protecting is still true and still matters: access is *never* minted by the client redirect, and never attaches to a **typed** email - only to the signed-in caller or an Admin-resolved account ([ADR 0021](docs/adr/0021-open-signup-allowlist-gates-course-creation.md)). The presence of the row *is* the access; it attributes to an account (like a Certificate) and never to a Guest. It is the **paid counterpart to a language-scoped Share** - bought, not granted - and, like a Share, is scoped to one Edition: buying the Spanish Edition does not unlock the Urdu one.
 _Avoid_: Purchase, licence, subscription (it is one-time, not recurring), access grant; **[[Enrollment]]** (a distinct, now-built primitive — the *free* self-join, not the paid right)
 
 **Enrollment**:
@@ -188,32 +188,32 @@ _Avoid_: Order, invoice, pending purchase (nothing is owed by us), reservation; 
 
 **Voucher**:
 A single-use code that mints an **[[Entitlement]]** for one **[[Edition]]** when redeemed by a
-signed-in User, with no payment at redemption time — the money was paid by the organisation that
+signed-in User, with no payment at redemption time - the money was paid by the organisation that
 bought its **[[Voucher Batch]]**. Belongs to exactly one batch and one Edition, is live from the
 moment the batch is created, and **never expires**. A redeemed Voucher records *that* it was used
-and *when* — **never by whom** ([ADR 0029](docs/adr/0029-seller-minted-voucher-rail.md)), which is
+and *when* - **never by whom** ([ADR 0029](docs/adr/0029-seller-minted-voucher-rail.md)), which is
 why a voucher-granted Entitlement is deliberately indistinguishable from an Admin comp. Redeeming
 for an Edition the caller can already read is **refused without consuming the code**, so a seat is
 never spent granting nothing.
-_Avoid_: Coupon, discount code, promo code (a Voucher does not reduce a price — it grants the whole
+_Avoid_: Coupon, discount code, promo code (a Voucher does not reduce a price - it grants the whole
 Edition), gift card (there is no balance), licence key, seat, invite or **[[Share]]** (a Share is
 granted by an owner to a known person; a Voucher is redeemed by whoever holds the code), token
 
 **Voucher Batch**:
 N **[[Voucher]]**s a **[[Seller]]** mints for one **[[Edition]]** of their own course, sold to an
-organisation that will not disclose its members' email addresses — the reason the rail exists at
+organisation that will not disclose its members' email addresses - the reason the rail exists at
 all ([ADR 0029](docs/adr/0029-seller-minted-voucher-rail.md)). The Seller owns the commercial
 relationship: they set the total, and the organisation transfers it into the **operator's** account
-(sole merchant of record, unchanged — [ADR 0026](docs/adr/0026-manual-eft-payment-rail.md)), where
+(sole merchant of record, unchanged - [ADR 0026](docs/adr/0026-manual-eft-payment-rail.md)), where
 the **sysadmin** logs the reference against the batch. That log is **bookkeeping, not a gate**: the
 codes work from creation, so an unpaid batch has already granted its seats. Creation writes one
-**[[Ledger]]** row for the whole batch — the money event is the batch, not the redemption — held
+**[[Ledger]]** row for the whole batch - the money event is the batch, not the redemption - held
 **unpaid** and excluded from payouts until the reference is logged. The buying organisation exists
 only as a name and a billing contact on the batch: it holds no account, and **[[Voucher]]** counts
 are all it is ever shown.
 _Avoid_: Order, bulk purchase, seat pool, licence pack, organisation or team (there is no
 organisation entity, deliberately), **[[EFT Intent]]** (an intent grants nothing until confirmed; a
-batch grants everything at creation — the opposite), campaign
+batch grants everything at creation - the opposite), campaign
 
 **Preview**:
 On a paid **Edition**, the free first Lesson *in that Edition's language* — readable without an Entitlement by anyone, including a Guest. The teaser that sits before the paygate; continuing past it requires a buyer account and an Entitlement for that Edition.

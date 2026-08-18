@@ -9,7 +9,7 @@ Decided 2026-08-18.
 ## Context
 
 An organisation wants to buy course access for its people and **will not hand over a list of their
-email addresses** — the first prospect being a political party. Every access path the platform had
+email addresses** - the first prospect being a political party. Every access path the platform had
 requires knowing the holder in advance: `market.grantEntitlement` takes an email per person, both
 payment rails derive the buyer's email from a signed-in account
 ([ADR 0021](0021-open-signup-allowlist-gates-course-creation.md)), and a **Share** is granted to a
@@ -28,11 +28,11 @@ deliberate and each one is the surprising choice:
    party negotiating.
 2. **Codes are live at creation; the cash log is bookkeeping, not a gate.** An **EFT Intent** grants
    nothing until the operator confirms it; a batch is the exact opposite. Creation writes one Ledger
-   row for the whole batch — the money event is the *batch*, not the redemption — held **unpaid** and
+   row for the whole batch - the money event is the *batch*, not the redemption - held **unpaid** and
    excluded from `ledger.owedPayouts` until the reference is logged, so no Seller is ever shown owed
    a share of money nobody received.
 3. **A redemption records that it happened, and nothing about who.** The Voucher stores `redeemedAt`
-   and no user id, *and* the minted Entitlement carries no voucher provenance — no batch id, no code
+   and no user id, *and* the minted Entitlement carries no voucher provenance - no batch id, no code
    id, neither `pfPaymentId` nor `eftRef`. A voucher seat is byte-identical to an Admin comp.
 
 The organisation is **not an entity**: it is a name and a billing contact on the batch. It holds no
@@ -69,5 +69,5 @@ These are accepted, not overlooked:
   seats and that 43 codes were spent; nothing connects a specific learner to the organisation that
   paid for them.
 - **A fourth Entitlement writer exists** and is invisible in the data. Anyone auditing entitlements
-  by provenance will find voucher seats filed under "Admin grant or legacy row" — which is why this
+  by provenance will find voucher seats filed under "Admin grant or legacy row" - which is why this
   ADR exists, so the next reader does not "fix" it by adding the provenance field back.
