@@ -401,7 +401,7 @@
     "batchMintHint": "Los códigos funcionan en cuanto los creas. El dinero se registra aparte: tu parte se podrá cobrar cuando el operador registre la transferencia.",
     "batchMint": "Crear códigos",
     "batchMinting": "Creando…",
-    "batchError": "No se pudo crear el lote: revisa los datos e inténtalo de nuevo.",
+    "batchError": "No se pudo crear el lote. Revisa las plazas (1-1000), el total y los dos campos de la organización, e inténtalo de nuevo.",
     "batchTakeUp": "{redeemed} de {seats} canjeados",
     "batchAwaitingPayment": "El pago aún no está registrado: tu parte se podrá cobrar cuando el operador registre la transferencia.",
     "batchPaymentLogged": "Pago registrado ({reference}): tu parte entra en el próximo pago.",

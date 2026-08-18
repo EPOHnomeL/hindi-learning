@@ -401,7 +401,7 @@
     "batchMintHint": "The codes work the moment you create them. The money is logged separately - your share becomes payable once the operator records the transfer.",
     "batchMint": "Mint codes",
     "batchMinting": "Minting…",
-    "batchError": "Couldn’t mint the batch - check the details and try again.",
+    "batchError": "Couldn't mint the batch. Check the seats (1-1000), the total, and both organisation fields, then try again.",
     "batchTakeUp": "{redeemed} of {seats} redeemed",
     "batchAwaitingPayment": "Payment not logged yet - your share becomes payable once the operator records the transfer.",
     "batchPaymentLogged": "Payment logged ({reference}) - your share is in the next payout run.",

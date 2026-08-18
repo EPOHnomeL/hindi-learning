@@ -442,6 +442,14 @@ test("a Seller sees their own batches with a derived take-up count and the payme
   // Nothing anywhere in this view says WHO redeemed - it was never recorded, and
   // the member's account must not be inferable from it.
   expect(JSON.stringify(mine)).not.toContain("member@example.com");
+
+  // And the code list is codes, with no per-code spent flag. The platform never
+  // learns who redeemed, but the ORGANISATION knows which code it handed to which
+  // of its people - so a spent/unspent list handed back to them reconstructs
+  // exactly the who that the derived count exists to avoid. Take-up is a number.
+  const codeList = await asUser(t, seller).query(api.vouchers.batchCodes, { batchId });
+  expect(codeList).toEqual(expect.arrayContaining([expect.any(String)]));
+  expect(codeList.every((c) => typeof c === "string")).toBe(true);
 });
 
 test("a Seller sees nothing of another Seller's batches, and cannot read their codes", async () => {
@@ -461,8 +469,7 @@ test("a Seller sees nothing of another Seller's batches, and cannot read their c
 
   const own = await asUser(t, seller).query(api.vouchers.batchCodes, { batchId });
   expect(own).toHaveLength(3);
-  expect(own.every((c) => c.redeemed === false)).toBe(true);
-  expect(own.map((c) => c.code).sort()).toEqual((await codesOf(t, batchId)).sort());
+  expect([...own].sort()).toEqual((await codesOf(t, batchId)).sort());
 });
 
 // ---- Voiding (ticket 07) --------------------------------------------------------
@@ -523,6 +530,9 @@ test("voiding an unpaid batch leaves its ledger row unpaid - void is not a refun
   await asUser(t, seller).mutation(api.vouchers.voidBatch, { batchId });
 
   expect((await ledgerRows(t))[0]).toMatchObject({ status: "unpaid" });
-  // Still on the sysadmin's queue: the codes stopped, the invoice did not.
-  expect(await asUser(t, admin).query(api.vouchers.pendingBatches, {})).toHaveLength(1);
+  // Still on the sysadmin's queue, and MARKED: the codes stopped, the invoice did
+  // not, so cash for the collapsed deal can still land and still has to be matched.
+  const queue = await asUser(t, admin).query(api.vouchers.pendingBatches, {});
+  expect(queue).toHaveLength(1);
+  expect(queue[0]).toMatchObject({ voided: true });
 });

@@ -401,7 +401,7 @@
     "batchMintHint": "Die kodes werk sodra jy hulle skep. Die geld word apart aangeteken - jou deel word betaalbaar sodra die operateur die oorbetaling aanteken.",
     "batchMint": "Skep kodes",
     "batchMinting": "Besig om te skep…",
-    "batchError": "Kon nie die groep skep nie - kontroleer die besonderhede en probeer weer.",
+    "batchError": "Kon nie die groep skep nie. Kontroleer die sitplekke (1-1000), die totaal en albei organisasievelde, en probeer weer.",
     "batchTakeUp": "{redeemed} van {seats} gebruik",
     "batchAwaitingPayment": "Betaling nog nie aangeteken nie - jou deel word betaalbaar sodra die operateur die oorbetaling aanteken.",
     "batchPaymentLogged": "Betaling aangeteken ({reference}) - jou deel is in die volgende uitbetaling.",

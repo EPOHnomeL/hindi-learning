@@ -401,7 +401,7 @@
     "batchMintHint": "Les codes fonctionnent dès leur création. L’argent est enregistré séparément : votre part devient payable une fois que l’opérateur a enregistré le virement.",
     "batchMint": "Créer les codes",
     "batchMinting": "Création…",
-    "batchError": "Impossible de créer le lot - vérifiez les informations et réessayez.",
+    "batchError": "Impossible de créer le lot. Vérifiez les places (1-1000), le total et les deux champs de l'organisation, puis réessayez.",
     "batchTakeUp": "{redeemed} sur {seats} utilisés",
     "batchAwaitingPayment": "Paiement non encore enregistré - votre part deviendra payable une fois que l’opérateur aura enregistré le virement.",
     "batchPaymentLogged": "Paiement enregistré ({reference}) - votre part figure dans le prochain versement.",

@@ -41,13 +41,20 @@ import { isCallerAdmin } from "./whitelist";
 // be. Raise it when a real deal needs more, not before.
 const MAX_SEATS = 1000;
 
-// The Edition a batch may be minted for, or a thrown explanation. The two Seller
+// How many of a Seller's batches the batch list reads at once. Small because that
+// list COUNTS by reading (see `myBatches`), so this number multiplies by the seat
+// cap above. A Seller with more than this many batches has outgrown a flat list
+// and wants paging, which is a different ticket than raising a constant.
+const MAX_BATCHES_LISTED = 50;
+
+// The Topic a batch may be minted against for this Edition, or a thrown
+// explanation. (It returns the TOPIC - the Edition is that topic plus `lang`.) The two Seller
 // gates are the existing ones verbatim - a `sellers` row IS the Admin's can-sell
 // grant, and it must carry saved payout details - because the platform must never
 // issue a seat it cannot pay anybody for. On top of them: the caller owns the
 // Topic, and the Edition is PUBLISHED. It need not be PRICED: the Seller states
 // the total, so a listing price is irrelevant to a batch.
-async function sellableEdition(
+async function sellableTopic(
   ctx: MutationCtx,
   userId: Id<"users">,
   topicSlug: string,
@@ -90,7 +97,7 @@ export const mintBatch = mutation({
   handler: async (ctx, { topicSlug, lang, seats, total, orgName, orgContact }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("sign in to mint a batch");
-    const topic = await sellableEdition(ctx, userId, topicSlug, lang);
+    const topic = await sellableTopic(ctx, userId, topicSlug, lang);
 
     if (!Number.isInteger(seats) || seats < 1 || seats > MAX_SEATS) {
       throw new Error(`a batch is between 1 and ${MAX_SEATS} seats`);
@@ -196,10 +203,13 @@ export const redeem = mutation({
     // code redeemed by nobody would grant nothing to nobody.
     if (!userId) throw new ConvexError("voucher/sign-in-required");
 
+    // `.unique()`, not `.first()`: minting retries until a code is unused, so two
+    // rows sharing one code is an invariant violation. Throwing loudly beats
+    // silently redeeming whichever row happened to be first.
     const voucher = await ctx.db
       .query("vouchers")
       .withIndex("by_code", (q) => q.eq("code", normaliseCode(code)))
-      .first();
+      .unique();
     // Distinguishable from "already used" on purpose: a member who mistyped needs
     // to try again, and a member holding a dud needs to go back to whoever gave it
     // to them. One message for both is the one that helps neither.
@@ -270,6 +280,12 @@ export const pendingBatches = query({
       total: v.number(),
       orgName: v.string(),
       orgContact: v.string(),
+      // A VOIDED batch stays on this queue, marked. Voiding stops codes, never
+      // money (ticket 07), so a batch whose deal collapsed may still have cash
+      // in flight - dropping it here would hide a transfer that lands afterwards.
+      // Flagged rather than silently listed, so the sysadmin chasing a missing
+      // payment knows which conversation they are actually in.
+      voided: v.boolean(),
       at: v.number(),
     }),
   ),
@@ -295,6 +311,7 @@ export const pendingBatches = query({
           total: b.total,
           orgName: b.orgName,
           orgContact: b.orgContact,
+          voided: b.voided,
           at: b._creationTime,
         };
       }),
@@ -376,10 +393,17 @@ export const myBatches = query({
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return [];
+    // Bounded on BOTH axes, because this query counts by reading. The count is
+    // derived on purpose - a counter field is a second truth that drifts away
+    // from the codes (see `schema.ts`) - and the cost of that choice is that a
+    // subscription tick reads every voucher of every batch listed. So the batch
+    // list is capped tight, and each batch's codes are capped at the seat ceiling
+    // minting enforces, which puts a hard ceiling on the read rather than leaving
+    // it to grow with the Seller's history.
     const batches = await ctx.db
       .query("voucherBatches")
       .withIndex("by_seller", (q) => q.eq("sellerId", userId))
-      .take(200);
+      .take(MAX_BATCHES_LISTED);
     const rows = await Promise.all(
       batches.map(async (b) => {
         const [topic, codes] = await Promise.all([
@@ -387,7 +411,7 @@ export const myBatches = query({
           ctx.db
             .query("vouchers")
             .withIndex("by_batch", (q) => q.eq("batchId", b._id))
-            .collect(),
+            .take(MAX_SEATS),
         ]);
         return {
           batchId: b._id,
@@ -415,18 +439,22 @@ export const myBatches = query({
 // distributes them however it already talks to its people; the platform sends
 // nothing to anyone, because it has no member addresses and that is the point.
 //
-// `redeemed` is a boolean, not a person: a spent code is spent, and who spent it
-// was never recorded.
+// **Codes only, with no per-code spent flag** - deliberately, and this is the
+// subtle one. The platform never learns who redeemed, but the ORGANISATION knows
+// which code it handed to which of its people; a list of codes marked spent or
+// unspent, handed back to them, reconstructs exactly the who that the derived
+// count exists to avoid disclosing. Take-up is a NUMBER (`myBatches.redeemed`),
+// and it stays one.
 export const batchCodes = query({
   args: { batchId: v.id("voucherBatches") },
-  returns: v.array(v.object({ code: v.string(), redeemed: v.boolean() })),
+  returns: v.array(v.string()),
   handler: async (ctx, { batchId }) => {
     const batch = await ownBatch(ctx, batchId);
     const codes = await ctx.db
       .query("vouchers")
       .withIndex("by_batch", (q) => q.eq("batchId", batch._id))
       .collect();
-    return codes.map((c) => ({ code: c.code, redeemed: c.redeemedAt !== undefined }));
+    return codes.map((c) => c.code);
   },
 });
 

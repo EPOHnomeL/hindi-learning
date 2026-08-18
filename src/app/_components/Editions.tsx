@@ -1017,6 +1017,9 @@ function MintBatchForm({ topicSlug, lang, onMinted }: { topicSlug: string; lang:
           await mint({ topicSlug, lang, seats: count, total: cents, orgName, orgContact });
           onMinted();
         } catch {
+          // The server's own refusals are plain Errors, which a production
+          // deployment redacts - so this says what a Seller can actually check
+          // rather than pretending to relay a message that never arrives.
           setError(t("batchError"));
         } finally {
           setBusy(false);
@@ -1070,7 +1073,7 @@ function BatchRow({
       // unlocks - a bare column of codes is unmail-mergeable and unprintable.
       const rows = [
         ["code", "course", "language"],
-        ...codes.map((c) => [c.code, batch.courseTitle, editionName]),
+        ...codes.map((code) => [code, batch.courseTitle, editionName]),
       ];
       const csv = rows.map((r) => r.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")).join("\r\n");
       const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));

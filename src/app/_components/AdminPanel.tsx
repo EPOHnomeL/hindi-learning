@@ -843,9 +843,20 @@ function BatchQueueRow({ batch }: { batch: FunctionReturnType<typeof api.voucher
           </span>
           <span className="block text-xs text-soft">{batch.orgContact}</span>
         </div>
-        <span className="shrink-0 rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
-          {formatRand(batch.total)}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Voided batches stay on this queue: voiding stops codes, never money,
+              so cash for a collapsed deal can still land and still has to be
+              matched. Marked, so the sysadmin knows which conversation they are
+              in before they chase the transfer. */}
+          {batch.voided && (
+            <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-danger">
+              Voided
+            </span>
+          )}
+          <span className="rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
+            {formatRand(batch.total)}
+          </span>
+        </div>
       </div>
       <form
         className="mt-2.5 flex flex-wrap items-center gap-2"
