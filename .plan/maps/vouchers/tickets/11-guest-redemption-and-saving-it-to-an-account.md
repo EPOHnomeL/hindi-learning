@@ -70,7 +70,3 @@ about.
 - The privacy assertions in `convex/vouchers.test.ts` are untouched and still green: a guest's
   Entitlement carries the same five keys as everyone else's, and the voucher row still records
   nothing but `redeemedAt`.
-
-## Answer
-
-<!-- open -->
