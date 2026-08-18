@@ -187,7 +187,8 @@
     "password": "Password",
     "toggleToSignUp": "No account? Sign up",
     "toggleToSignIn": "Already have an account? Sign in",
-    "termsAgreement": "By creating an account you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>."
+    "termsAgreement": "By creating an account you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
+    "voucherPrompt": "Got a code from your organisation? <redeem>Redeem your voucher</redeem>."
   },
   "Checkout": {
     "referenceLockedTitle": "This reference is part of the full course",
@@ -537,9 +538,6 @@
         "quizOptionC": "Mars",
         "askedQuestion": "Why isn't Mercury a gas giant?",
         "askedReply": "Good question — it comes down to mass.",
-        "navLessons": "Lessons",
-        "navReferences": "References",
-        "navAsk": "Ask",
         "askedFollowUp": "So mass is the whole story?"
       }
     },

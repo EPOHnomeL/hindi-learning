@@ -43,7 +43,13 @@ function LastUsedPill({ label }: { label: string }) {
   );
 }
 
-export function SignIn() {
+// `embedded` is for a page that has ALREADY introduced itself - `/redeem` shows
+// its own brand header and an explanation of what the code does before this
+// appears. Rendered whole in there, the screen showed the brand twice with a
+// screenful of dead space between them, because this component is otherwise a
+// standalone page: it centres itself in the viewport and leads with the logo.
+// Embedded, it is just the form card.
+export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
   const { signIn } = useAuthActions();
   const t = useTranslations("Auth");
   const tc = useTranslations("Common");
@@ -82,8 +88,9 @@ export function SignIn() {
     // taller than a small phone, and without it the logo is clipped at the top
     // rather than scrolled to. `gap-5` on a phone: `gap-6` between four stacked
     // blocks is most of a thumb's worth of scrolling for nothing.
-    <div className="grid min-h-svh place-items-center px-4 py-8">
-      <div className="flex w-full max-w-sm flex-col items-center gap-5 sm:gap-6">
+    <div className={embedded ? "w-full" : "grid min-h-svh place-items-center px-4 py-8"}>
+      <div className={`flex w-full flex-col items-center gap-5 sm:gap-6 ${embedded ? "" : "max-w-sm"}`}>
+        {!embedded && (
         <div className="flex flex-col items-center gap-2 text-center">
           {tenant?.logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- Convex storage URL, not a static asset.
@@ -98,6 +105,7 @@ export function SignIn() {
             )}
           </div>
         </div>
+        )}
         {/* Arrived mid-purchase: show the same four-step rail the checkout page
             shows, so the account step reads as one step of a purchase rather
             than an unexplained wall in front of it. Only on a checkout path —
@@ -202,6 +210,22 @@ export function SignIn() {
             </p>
           )}
         </form>
+        {/* Somebody holding a voucher code who arrived at the front door rather
+            than following their organisation's link has, until now, had no way to
+            find `/redeem` at all - the platform never mentions it anywhere else.
+            Not shown on `/redeem` itself, where it would point at the page they
+            are standing on. */}
+        {!embedded && !path?.startsWith("/redeem") && (
+          <p className="text-center text-sm text-soft">
+            {t.rich("voucherPrompt", {
+              redeem: (c) => (
+                <Link href="/redeem" className="text-accent2 underline-offset-2 hover:underline">
+                  {c}
+                </Link>
+              ),
+            })}
+          </p>
+        )}
       </div>
     </div>
   );

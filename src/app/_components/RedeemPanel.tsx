@@ -4,6 +4,7 @@ import { Authenticated, AuthLoading, Unauthenticated, useMutation } from "convex
 import { ConvexError } from "convex/values";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { normaliseCode } from "../../../convex/voucherCode";
@@ -47,9 +48,16 @@ export function RedeemPanel() {
   // server, so reading inline would be a hydration mismatch. Same mount-gating the
   // SignIn screen's "last used" pill uses.
   const [code, setCode] = useState("");
+  // Whether the code arrived WITH them rather than being typed. A member who
+  // followed `?code=` from the CSV has already handed the code over by clicking
+  // the link, so asking them to confirm it in a form is a step that exists only
+  // because the page could not tell the two cases apart. Null while the effect
+  // below has not run, so nothing decides on a half-read URL.
+  const [linked, setLinked] = useState<boolean | null>(null);
   useEffect(() => {
     const fromUrl = new URLSearchParams(window.location.search).get("code") ?? "";
     setCode(normaliseCode(fromUrl || unstash()));
+    setLinked(!!normaliseCode(fromUrl));
   }, []);
 
   return (
@@ -62,7 +70,11 @@ export function RedeemPanel() {
       </AuthLoading>
 
       <Unauthenticated>
-        <SignedOutRedeem code={code} setCode={setCode} />
+        {linked === null ? (
+          <div className="mt-6 h-32 animate-pulse rounded-2xl border border-line bg-card" />
+        ) : (
+          <SignedOutRedeem code={code} setCode={setCode} linked={linked} />
+        )}
       </Unauthenticated>
 
       <Authenticated>
@@ -75,9 +87,17 @@ export function RedeemPanel() {
 // Signed out: take the code FIRST, then ask for an account. The other order is
 // what loses people - a stranger who is shown a sign-up wall before anything has
 // acknowledged their code has no reason to believe this is the right site.
-function SignedOutRedeem({ code, setCode }: { code: string; setCode: (c: string) => void }) {
+function SignedOutRedeem({ code, setCode, linked }: { code: string; setCode: (c: string) => void; linked: boolean }) {
   const t = useTranslations("Redeem");
-  const [handedOver, setHandedOver] = useState(false);
+  // A code that came in on the link is already handed over: they clicked it. Only
+  // somebody typing off a card starts on the form.
+  const [handedOver, setHandedOver] = useState(linked);
+  // Stash it on arrival too, not only on submit - the member who followed a link
+  // never presses the button that used to do this, and the OAuth round trip can
+  // come back to a bare path.
+  useEffect(() => {
+    if (linked && code) stash(code);
+  }, [linked, code]);
 
   if (handedOver) {
     return (
@@ -87,7 +107,7 @@ function SignedOutRedeem({ code, setCode }: { code: string; setCode: (c: string)
         <p className="rounded-xl border border-gold/40 bg-card px-4 py-3 text-sm leading-relaxed text-ink">
           {t("codeKept", { code })}
         </p>
-        <SignIn />
+        <SignIn embedded />
       </div>
     );
   }
@@ -116,6 +136,7 @@ function SignedOutRedeem({ code, setCode }: { code: string; setCode: (c: string)
 function SignedInRedeem({ code, setCode }: { code: string; setCode: (c: string) => void }) {
   const t = useTranslations("Redeem");
   const redeem = useMutation(api.vouchers.redeem);
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ topicSlug: string; lang: string; courseTitle: string } | null>(null);
@@ -148,13 +169,25 @@ function SignedInRedeem({ code, setCode }: { code: string; setCode: (c: string) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
+  // The language is always explicit in the URL: left implicit, the reader can
+  // resolve to a different free Edition of the same course.
+  useEffect(() => {
+    if (done) router.replace(withLang(`/courses/${done.topicSlug}`, done.lang));
+  }, [done, router]);
+
   if (done) {
+    // Straight into the course, not a button offering to go there. The seat is
+    // granted and permanent by this point, so the panel was a dead end asking for
+    // one more click before anything happened - and the course's own welcome
+    // dialog is the right first thing to meet. `replace`, not `push`: going Back
+    // from the reader must not land on a redeem form whose code is now spent.
     return (
       <div className="mt-6 flex flex-col items-start gap-3 rounded-2xl border border-gold/40 bg-card px-5 py-4">
         <b className="text-base font-semibold text-accent">{t("successTitle")}</b>
         <p className="text-sm leading-relaxed text-soft">{t("successBody", { course: done.courseTitle })}</p>
-        {/* The language is always explicit in the link: left implicit, the reader
-            can resolve to a different free Edition of the same course. */}
+        {/* A fallback, not the way through: the effect below is already navigating.
+            It stays because a blocked or slow client-side push would otherwise
+            leave a member who has just spent their code with nowhere to click. */}
         <Link
           href={withLang(`/courses/${done.topicSlug}`, done.lang)}
           className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90"

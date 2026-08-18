@@ -155,7 +155,8 @@
     "password": "Mot de passe",
     "toggleToSignUp": "Pas de compte ? Inscrivez-vous",
     "toggleToSignIn": "Vous avez déjà un compte ? Connectez-vous",
-    "termsAgreement": "En créant un compte, vous acceptez les <terms>Conditions</terms> et la <privacy>Politique de confidentialité</privacy>."
+    "termsAgreement": "En créant un compte, vous acceptez les <terms>Conditions</terms> et la <privacy>Politique de confidentialité</privacy>.",
+    "voucherPrompt": "Vous avez un code de votre organisation ? <redeem>Utilisez votre bon</redeem>."
   },
   "Checkout": {
     "referenceLockedTitle": "Cette référence fait partie du cours complet",
@@ -537,9 +538,6 @@
         "quizOptionC": "Mars",
         "askedQuestion": "Pourquoi Mercure n'est-elle pas une géante gazeuse ?",
         "askedReply": "Bonne question — tout se joue sur la masse.",
-        "navLessons": "Leçons",
-        "navReferences": "Références",
-        "navAsk": "Demander",
         "askedFollowUp": "Donc tout se résume à la masse ?"
       }
     },

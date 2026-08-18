@@ -155,7 +155,8 @@
     "password": "पासवर्ड",
     "toggleToSignUp": "कोई खाता नहीं? साइन अप करें",
     "toggleToSignIn": "पहले से खाता है? साइन इन करें",
-    "termsAgreement": "खाता बनाकर आप <terms>नियमों</terms> और <privacy>गोपनीयता नीति</privacy> से सहमत होते हैं।"
+    "termsAgreement": "खाता बनाकर आप <terms>नियमों</terms> और <privacy>गोपनीयता नीति</privacy> से सहमत होते हैं।",
+    "voucherPrompt": "अपने संगठन से कोड मिला है? <redeem>अपना वाउचर भुनाएं</redeem>।"
   },
   "Checkout": {
     "referenceLockedTitle": "यह संदर्भ पूर्ण कोर्स का हिस्सा है",
@@ -537,9 +538,6 @@
         "quizOptionC": "मंगल",
         "askedQuestion": "बुध गैस दानव क्यों नहीं है?",
         "askedReply": "अच्छा सवाल — बात द्रव्यमान की है।",
-        "navLessons": "पाठ",
-        "navReferences": "संदर्भ",
-        "navAsk": "पूछें",
         "askedFollowUp": "तो पूरी बात द्रव्यमान की ही है?"
       }
     },

@@ -155,7 +155,8 @@
     "password": "Contraseña",
     "toggleToSignUp": "¿No tienes cuenta? Regístrate",
     "toggleToSignIn": "¿Ya tienes una cuenta? Inicia sesión",
-    "termsAgreement": "Al crear una cuenta aceptas los <terms>Términos</terms> y la <privacy>Política de privacidad</privacy>."
+    "termsAgreement": "Al crear una cuenta aceptas los <terms>Términos</terms> y la <privacy>Política de privacidad</privacy>.",
+    "voucherPrompt": "¿Tienes un código de tu organización? <redeem>Canjea tu vale</redeem>."
   },
   "Checkout": {
     "referenceLockedTitle": "Esta referencia forma parte del curso completo",
@@ -537,9 +538,6 @@
         "quizOptionC": "Marte",
         "askedQuestion": "¿Por qué Mercurio no es un gigante gaseoso?",
         "askedReply": "Buena pregunta: todo se reduce a la masa.",
-        "navLessons": "Lecciones",
-        "navReferences": "Referencias",
-        "navAsk": "Preguntar",
         "askedFollowUp": "¿Entonces todo es cuestión de masa?"
       }
     },
