@@ -692,6 +692,7 @@ function PayoutsManager() {
       )}
 
       <EftQueue />
+      <BatchQueue />
       <OperatorBankForm />
     </div>
   );
@@ -784,6 +785,98 @@ function EftQueueRow({ intent }: { intent: FunctionReturnType<typeof api.eft.pen
         </button>
         {error && <span className="text-xs text-danger">Failed — retry</span>}
       </div>
+    </li>
+  );
+}
+
+// The voucher batches whose transfer has not been logged yet (vouchers ticket 04,
+// ADR 0029). Beside the EFT queue deliberately: to the operator this is the same
+// job — money on a bank statement that has to be matched to something in the app —
+// and a queue that looks like a stranger is a queue that gets missed.
+//
+// Two things this is NOT. It is not an approval: the batch's codes have been
+// working since the Seller minted them, so logging the reference changes nothing
+// for the organisation and only makes the Seller's 50% payable. And it never shows
+// a code — `pendingBatches` cannot return one, so the boundary between the money
+// role and the selling role is server-side, not this component's restraint.
+function BatchQueue() {
+  const pending = useQuery(api.vouchers.pendingBatches);
+  if (pending !== undefined && pending.length === 0) return null;
+  return (
+    <section className="mt-12">
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold tracking-tight text-accent">Voucher batches awaiting payment</h2>
+        <p className="mt-0.5 text-sm text-soft">
+          Check the total against what landed, then log the reference — that makes the seller&apos;s share payable
+        </p>
+      </div>
+      {pending === undefined ? (
+        <ul className="flex flex-col gap-2" aria-busy>
+          {[0, 1].map((i) => (
+            <li key={i} className="h-16 animate-pulse rounded-xl border border-line bg-card" />
+          ))}
+        </ul>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {pending.map((b) => (
+            <BatchQueueRow key={b.batchId} batch={b} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function BatchQueueRow({ batch }: { batch: FunctionReturnType<typeof api.vouchers.pendingBatches>[number] }) {
+  const log = useMutation(api.vouchers.logBatchPayment);
+  const [reference, setReference] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <li className="rounded-xl border border-gold/40 bg-card px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <b className="block truncate text-sm font-semibold text-ink">{batch.orgName}</b>
+          <span className="text-xs text-soft">
+            {batch.seats} seats · {batch.courseTitle} · {batch.lang} · {batch.sellerEmail}
+          </span>
+          <span className="block text-xs text-soft">{batch.orgContact}</span>
+        </div>
+        <span className="shrink-0 rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
+          {formatRand(batch.total)}
+        </span>
+      </div>
+      <form
+        className="mt-2.5 flex flex-wrap items-center gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!reference.trim()) return;
+          setBusy(true);
+          setError(null);
+          try {
+            await log({ batchId: batch.batchId, reference });
+          } catch (err) {
+            setError(mutationError(err, "Failed — retry"));
+            setBusy(false);
+          }
+        }}
+      >
+        <input
+          value={reference}
+          onChange={(e) => setReference(e.target.value)}
+          placeholder="Bank reference / transaction id"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-hi px-2.5 py-1.5 text-sm focus:border-gold focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={busy || !reference.trim()}
+          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+        >
+          {busy ? "Working…" : "Log payment"}
+        </button>
+        {error && <span className="text-xs text-danger">{error}</span>}
+      </form>
     </li>
   );
 }

@@ -334,3 +334,70 @@ test("a code works whatever the batch's payment state - the cash log is not a ga
   await asUser(t, member).mutation(api.vouchers.redeem, { code: code! });
   expect(await voucherByCode(t, code!)).toMatchObject({ redeemedAt: expect.any(Number) });
 });
+
+// ---- The sysadmin's cash log (ticket 04) ---------------------------------------
+
+test("the pending queue shows the sysadmin everything but the codes", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, MINT);
+
+  const pending = await asUser(t, admin).query(api.vouchers.pendingBatches, {});
+  expect(pending).toHaveLength(1);
+  expect(pending[0]).toMatchObject({
+    batchId,
+    courseTitle: "hindi",
+    lang: "en",
+    sellerEmail: "author@example.com",
+    seats: 3,
+    total: 500000,
+    orgName: "The Party",
+    orgContact: "billing@party.example.org",
+  });
+  // The separation between the money role and the selling role is what this query
+  // CAN say, not what a page chooses to render: the returns validator has no code
+  // field, so no UI change can leak one.
+  const codes = await codesOf(t, batchId);
+  expect(JSON.stringify(pending)).not.toContain(codes[0]);
+
+  // The Seller, and anybody else, is refused - reconciling money is not their job.
+  await expect(asUser(t, seller).query(api.vouchers.pendingBatches, {})).rejects.toThrow();
+  await expect(t.query(api.vouchers.pendingBatches, {})).rejects.toThrow();
+});
+
+test("logging the cash makes the share payable, is idempotent, and touches no code", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, MINT);
+  const before = await codesOf(t, batchId);
+
+  // The interesting negative: the Seller cannot log their own batch's payment, so
+  // the boundary between selling and being paid is server-enforced.
+  await expect(
+    asUser(t, seller).mutation(api.vouchers.logBatchPayment, { batchId, reference: "FNB-993" }),
+  ).rejects.toThrow();
+  // And a blank reference is refused - the whole point is the statement line.
+  await expect(
+    asUser(t, admin).mutation(api.vouchers.logBatchPayment, { batchId, reference: "  " }),
+  ).rejects.toThrow();
+  expect(await asUser(t, admin).query(api.vouchers.pendingBatches, {})).toHaveLength(1);
+
+  await asUser(t, admin).mutation(api.vouchers.logBatchPayment, { batchId, reference: "FNB-993" });
+  expect(await t.run((ctx) => ctx.db.get(batchId))).toMatchObject({ paymentRef: "FNB-993" });
+  // Off the queue, and now payable.
+  expect(await asUser(t, admin).query(api.vouchers.pendingBatches, {})).toEqual([]);
+  expect((await ledgerRows(t))[0]).toMatchObject({ status: "owed" });
+
+  // Logging twice keeps the ORIGINAL reference and moves nothing a second time.
+  await asUser(t, admin).mutation(api.vouchers.logBatchPayment, { batchId, reference: "FNB-OOPS" });
+  expect(await t.run((ctx) => ctx.db.get(batchId))).toMatchObject({ paymentRef: "FNB-993" });
+  expect(await ledgerRows(t)).toHaveLength(1);
+
+  // Nothing in the cash log reads, writes or invalidates a code: the seats have
+  // been live since minting and are unaffected either way.
+  expect(await codesOf(t, batchId)).toEqual(before);
+  const member = await seedUser(t, "member@example.com");
+  await asUser(t, member).mutation(api.vouchers.redeem, { code: before[0]! });
+});

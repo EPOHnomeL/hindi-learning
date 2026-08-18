@@ -1,11 +1,12 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { publishedLangs, topicBySlug } from "./lib";
 import { platformFeeBps, splitNet } from "./payfast";
 import { getSeller, sellerStatusOf } from "./sellerStatus";
+import { isCallerAdmin } from "./whitelist";
 
 // The **seller-minted voucher rail** (ADR 0029, the vouchers map's spec.md). An
 // organisation buys N seats on one Edition and will not hand over its members'
@@ -267,5 +268,95 @@ export const redeem = mutation({
     await ctx.db.patch(voucher._id, { redeemedAt: Date.now() });
 
     return { topicSlug: topic.slug, lang: batch.lang, courseTitle: topic.title };
+  },
+});
+
+// ---- The sysadmin's cash log (ticket 04) ---------------------------------------
+
+// The batches whose transfer has not been logged yet - the sysadmin's queue,
+// shaped after `eft.pendingEftIntents` because the habit for "unmatched money
+// waiting on me" is already formed and a queue that looks like a stranger is a
+// queue that gets missed. Resolved batches are absent by construction: this is a
+// to-do list, not a log.
+//
+// **It returns no codes, and the returns validator is where that is enforced** -
+// not a page that chooses not to render them. The money role and the selling role
+// are separated by what the query can say, so a later UI change cannot undo it.
+// Everything here is what the sysadmin needs to match a statement line: who sold
+// it, what for, how many seats and for how much, and who the organisation is.
+export const pendingBatches = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      batchId: v.id("voucherBatches"),
+      courseTitle: v.string(),
+      lang: v.string(),
+      sellerEmail: v.string(),
+      seats: v.number(),
+      total: v.number(),
+      orgName: v.string(),
+      orgContact: v.string(),
+      at: v.number(),
+    }),
+  ),
+  handler: async (ctx) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    // An ABSENT `paymentRef` is the queue - the same shape the Ledger row's
+    // `unpaid` status has, read from the side that the sysadmin acts on. Indexed
+    // rather than filtered, and capped anyway: a hand-reconciled queue is small by
+    // definition, and one that is not is a signal rather than a page to paginate.
+    const rows = await ctx.db
+      .query("voucherBatches")
+      .withIndex("by_payment_ref", (q) => q.eq("paymentRef", undefined))
+      .take(500);
+    return await Promise.all(
+      rows.map(async (b) => {
+        const [seller, topic] = await Promise.all([ctx.db.get(b.sellerId), ctx.db.get(b.topicId)]);
+        return {
+          batchId: b._id,
+          courseTitle: topic?.title ?? "(deleted course)",
+          lang: b.lang,
+          sellerEmail: seller?.email ?? "(unknown)",
+          seats: b.seats,
+          total: b.total,
+          orgName: b.orgName,
+          orgContact: b.orgContact,
+          at: b._creationTime,
+        };
+      }),
+    );
+  },
+});
+
+// The organisation's transfer landed: record the reference against the batch and
+// flip its Ledger row `unpaid` -> `owed`, which is what makes the Seller's share
+// payable in the ordinary payout run. Sys admin only.
+//
+// **This is bookkeeping, not a gate.** The codes have been working since the batch
+// was minted, and nothing in here reads, writes, generates or invalidates one -
+// the sysadmin never sees a code at all.
+//
+// Idempotent on the reference already being recorded, like `confirmEftPayment`:
+// a second click must never move a second Ledger row or overwrite the reference
+// that reconciles the statement line.
+export const logBatchPayment = mutation({
+  args: { batchId: v.id("voucherBatches"), reference: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { batchId, reference }) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const ref = reference.trim();
+    // The whole point is being able to point at the bank statement line later.
+    if (!ref) throw new Error("the bank reference or transaction id is required");
+    const batch = await ctx.db.get(batchId);
+    if (!batch) throw new Error("that batch does not exist");
+    if (batch.paymentRef !== undefined) return null;
+
+    await ctx.db.patch(batchId, { paymentRef: ref });
+    // Only an `unpaid` row moves. A batch whose row was somehow already `owed` or
+    // `paid` keeps its state rather than being re-owed, which is the same posture
+    // `markPaid` takes from the other end of the same lifecycle.
+    const row = await ctx.db.get(batch.ledgerId);
+    if (row?.status === "unpaid") await ctx.db.patch(batch.ledgerId, { status: "owed" });
+    return null;
   },
 });

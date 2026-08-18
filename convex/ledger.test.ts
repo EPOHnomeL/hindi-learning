@@ -173,3 +173,45 @@ test("markPaid never pays out an unpaid batch row", async () => {
   expect(await t.run((ctx) => ctx.db.get(row))).toMatchObject({ status: "unpaid" });
   expect(await t.run((ctx) => ctx.db.get(row))).not.toHaveProperty("payoutRef");
 });
+
+// The same guard, now driven end to end by the rail's own writers rather than a
+// hand-seeded row (vouchers ticket 04). The batch's Ledger row is written by
+// `vouchers.mintBatch` and moved by `vouchers.logBatchPayment`, so this asserts
+// the actual lifecycle the sysadmin walks: mint, nothing owed, log the transfer,
+// the Seller's 50% owed under their own name.
+test("a logged batch payment makes the minting Seller's share payable", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+
+  const seller = await seedUser(t, "author@example.com");
+  await t.run((ctx) =>
+    ctx.db.insert("topics", { ownerId: seller, slug: "hindi", title: "Hindi", status: "completed" as const }),
+  );
+  await asUser(t, admin).mutation(api.sellers.grantCanSell, { email: "author@example.com" });
+  await asUser(t, seller).mutation(api.sellers.savePayoutDetails, PAYOUT);
+  await asUser(t, seller).mutation(api.catalogue.setEditionPublished, {
+    topicSlug: "hindi",
+    lang: "en",
+    published: true,
+  });
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, {
+    topicSlug: "hindi",
+    lang: "en",
+    seats: 100,
+    total: 500000,
+    orgName: "The Party",
+    orgContact: "billing@party.example.org",
+  });
+
+  // The seats are live, and nobody is owed anything: the money has not arrived.
+  expect(await asUser(t, admin).query(api.ledger.owedPayouts, {})).toEqual([]);
+
+  await asUser(t, admin).mutation(api.vouchers.logBatchPayment, { batchId, reference: "FNB-993" });
+
+  const owed = await asUser(t, admin).query(api.ledger.owedPayouts, {});
+  expect(owed).toHaveLength(1);
+  expect(owed[0]).toMatchObject({ email: "author@example.com", payout: PAYOUT, totalOwed: 250000 });
+  // One row for the whole batch, however many seats it carries.
+  expect(owed[0]!.sales).toHaveLength(1);
+  expect(owed[0]!.sales[0]).toMatchObject({ kind: "batch", lang: "en", buyerEmail: "billing@party.example.org" });
+});
