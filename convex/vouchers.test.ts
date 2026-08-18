@@ -188,3 +188,149 @@ test("minting refuses a nonsense seat count, total or organisation", async () =>
   expect(await voucherRows(t)).toEqual([]);
   expect(await ledgerRows(t)).toEqual([]);
 });
+
+// ---- Redemption (ticket 03) ---------------------------------------------------
+
+// The codes of a batch, straight from the table. Reading them back is how every
+// redemption test gets a code: `vouchers` rows are never hand-inserted, so the
+// only writer exercised is the real one.
+async function codesOf(t: ReturnType<typeof convexTest>, batchId: Id<"voucherBatches">) {
+  const rows = await t.run((ctx) =>
+    ctx.db
+      .query("vouchers")
+      .withIndex("by_batch", (q) => q.eq("batchId", batchId))
+      .collect(),
+  );
+  return rows.map((r) => r.code);
+}
+async function voucherByCode(t: ReturnType<typeof convexTest>, code: string) {
+  return await t.run((ctx) =>
+    ctx.db
+      .query("vouchers")
+      .withIndex("by_code", (q) => q.eq("code", code))
+      .first(),
+  );
+}
+
+test("redeeming mints an Entitlement that records nothing about the redeemer", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, MINT);
+  const [code] = await codesOf(t, batchId);
+  const member = await seedUser(t, "member@example.com");
+
+  const where = await asUser(t, member).mutation(api.vouchers.redeem, { code: code! });
+  expect(where).toEqual({ topicSlug: "hindi", lang: "en", courseTitle: "hindi" });
+
+  const held = await t.run((ctx) =>
+    ctx.db
+      .query("entitlements")
+      .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", member))
+      .collect(),
+  );
+  expect(held).toHaveLength(1);
+  expect(held[0]).toMatchObject({ userId: member, topicId, lang: "en" });
+  // **The privacy promise, asserted positively** (ADR 0029). A voucher seat is
+  // byte-identical to an Admin comp: no payment provenance and no voucher
+  // provenance, so nobody can list the redeemers by elimination. A refactor that
+  // adds a `batchId` back here must fail this test - it is not redundant.
+  expect(held[0]).not.toHaveProperty("pfPaymentId");
+  expect(held[0]).not.toHaveProperty("eftRef");
+  expect(Object.keys(held[0]!).sort()).toEqual(["_creationTime", "_id", "lang", "topicId", "userId"]);
+
+  // The voucher records that it was spent and nothing else - no user id.
+  const spent = await voucherByCode(t, code!);
+  expect(spent!.redeemedAt).toEqual(expect.any(Number));
+  expect(Object.keys(spent!).sort()).toEqual(["_creationTime", "_id", "batchId", "code", "redeemedAt"]);
+});
+
+test("a code is accepted however it was typed off a card", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, MINT);
+  const [code] = await codesOf(t, batchId);
+  const member = await seedUser(t, "member@example.com");
+
+  // Lower case, stray spaces and missing separators are all the same code: they
+  // read it off a printed card or a phone screen with no instructions.
+  const mangled = "  " + code!.toLowerCase().replace(/-/g, " ") + " ";
+  await asUser(t, member).mutation(api.vouchers.redeem, { code: mangled });
+  expect((await voucherByCode(t, code!))!.redeemedAt).toEqual(expect.any(Number));
+});
+
+test("redemption is refused for a Guest, an unknown code and a spent one", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, MINT);
+  const [code] = await codesOf(t, batchId);
+  const member = await seedUser(t, "member@example.com");
+  const other = await seedUser(t, "other@example.com");
+
+  // A Guest: redemption is auth-first and mints onto the signed-in account, which
+  // is the hole ADR 0021 closed and this rail must not reopen.
+  await expect(t.mutation(api.vouchers.redeem, { code: code! })).rejects.toThrow();
+  // A dud code, distinguishable from a spent one so a typo is diagnosable.
+  await expect(asUser(t, member).mutation(api.vouchers.redeem, { code: "MYC-AAAA-BBBB" })).rejects.toThrow(/typo/);
+
+  await asUser(t, member).mutation(api.vouchers.redeem, { code: code! });
+
+  // A second redemption of the same code changes nothing - and who spent it is
+  // permanently unanswerable, by design.
+  await expect(asUser(t, other).mutation(api.vouchers.redeem, { code: code! })).rejects.toThrow(/already been used/);
+  const seats = await t.run((ctx) => ctx.db.query("entitlements").take(50));
+  expect(seats).toHaveLength(1);
+});
+
+test("redemption refuses WITHOUT consuming when the caller already has access", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, MINT);
+  const codes = await codesOf(t, batchId);
+  const unspent = async (code: string) => (await voucherByCode(t, code))!.redeemedAt;
+
+  // 1. Already entitled - bought the Edition, or was comped it.
+  const buyer = await seedUser(t, "buyer@example.com");
+  await asUser(t, admin).mutation(api.market.grantEntitlement, {
+    email: "buyer@example.com",
+    topicSlug: "hindi",
+    lang: "en",
+  });
+  await expect(asUser(t, buyer).mutation(api.vouchers.redeem, { code: codes[0]! })).rejects.toThrow(/NOT been used/);
+  expect(await unspent(codes[0]!)).toBeUndefined();
+
+  // 2. A grandfathered Enrollment on that Edition - they joined while it was free.
+  const joiner = await seedUser(t, "joiner@example.com");
+  await t.run((ctx) => ctx.db.insert("enrollments", { userId: joiner, topicId, lang: "en" }));
+  await expect(asUser(t, joiner).mutation(api.vouchers.redeem, { code: codes[1]! })).rejects.toThrow(/NOT been used/);
+  expect(await unspent(codes[1]!)).toBeUndefined();
+
+  // 3. The owner of the course, who cannot buy a seat on their own Edition.
+  await expect(asUser(t, seller).mutation(api.vouchers.redeem, { code: codes[2]! })).rejects.toThrow(/NOT been used/);
+  expect(await unspent(codes[2]!)).toBeUndefined();
+
+  // Every seat is still there for somebody who actually needs one: the
+  // organisation paid for three and still has three.
+  const member = await seedUser(t, "member@example.com");
+  await asUser(t, member).mutation(api.vouchers.redeem, { code: codes[0]! });
+  expect(await unspent(codes[0]!)).toEqual(expect.any(Number));
+});
+
+test("a code works whatever the batch's payment state - the cash log is not a gate", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, MINT);
+  const [code] = await codesOf(t, batchId);
+  const member = await seedUser(t, "member@example.com");
+
+  // The money has not arrived: the Ledger row is `unpaid` and nobody is owed a
+  // thing. The seat is live anyway, which is the opposite of the EFT rail and of
+  // the intuitive assumption - hence this test.
+  expect((await ledgerRows(t))[0]).toMatchObject({ status: "unpaid" });
+  await asUser(t, member).mutation(api.vouchers.redeem, { code: code! });
+  expect(await voucherByCode(t, code!)).toMatchObject({ redeemedAt: expect.any(Number) });
+});

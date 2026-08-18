@@ -187,3 +187,85 @@ async function freshCode(ctx: MutationCtx): Promise<string> {
   }
   throw new Error("could not mint a unique code");
 }
+
+// ---- Redemption (ticket 03) ---------------------------------------------------
+
+// Turn a code into permanent access, recording nothing about who redeemed it.
+// This is the function the whole feature exists for, and it is defined as much by
+// what it refuses to write as by what it grants.
+//
+// **Auth-first, and it takes no email.** The caller comes from `ctx.auth` and a
+// Guest is refused. There is deliberately no email argument: accepting one would
+// rebuild the impersonation hole ADR 0021 closed by deleting `pendingEntitlements`
+// and claim-on-sign-up. The member signs up with an address of their own choosing,
+// which is exactly how the organisation's list stays undisclosed.
+//
+// **It refuses WITHOUT consuming whenever it would grant nothing** - the caller
+// already holds an Entitlement for the Edition, holds a grandfathered Enrollment
+// on it, or owns the course. Burning the code there would spend a seat the
+// organisation paid for in exchange for nothing, and `market.grantEntitlement`
+// already treats a duplicate as a no-op, so this is the house style rather than a
+// special case.
+//
+// Returns where the member has just been let in, so `/redeem` can send them
+// straight into the Edition instead of leaving them on a success message with
+// nowhere to go.
+export const redeem = mutation({
+  args: { code: v.string() },
+  returns: v.object({ topicSlug: v.string(), lang: v.string(), courseTitle: v.string() }),
+  handler: async (ctx, { code }) => {
+    const userId = await getAuthUserId(ctx);
+    // Not a UI concern: an Entitlement has always attributed to an account, and a
+    // code redeemed by nobody would grant nothing to nobody.
+    if (!userId) throw new Error("sign in or create an account to redeem your code");
+
+    const voucher = await ctx.db
+      .query("vouchers")
+      .withIndex("by_code", (q) => q.eq("code", normaliseCode(code)))
+      .first();
+    // Distinguishable from "already used" on purpose: a member who mistyped needs
+    // to try again, and a member holding a dud needs to go back to whoever gave it
+    // to them. One message for both is the one that helps neither.
+    if (!voucher) throw new Error("we don't recognise that code - check it for a typo");
+    // Permanently unanswerable, by design (ADR 0029): nothing records who used it.
+    if (voucher.redeemedAt !== undefined) {
+      throw new Error("that code has already been used - ask your organisation for another one");
+    }
+
+    const batch = await ctx.db.get(voucher.batchId);
+    if (!batch) throw new Error("that code is no longer valid");
+    // Voiding stops UNREDEEMED codes only (ticket 07). A seat already granted is
+    // untouched by this branch, because nothing here can find one.
+    if (batch.voided) throw new Error("that code has been cancelled - ask your organisation about it");
+
+    const topic = await ctx.db.get(batch.topicId);
+    if (!topic) throw new Error("that code is no longer valid");
+
+    // Refuse without consuming, three ways. Each leaves `redeemedAt` unset, so the
+    // code stays redeemable by somebody who actually needs it.
+    const alreadyHas = "you already have access to this course - your code has NOT been used, so you can pass it on";
+    if (topic.ownerId === userId) throw new Error(alreadyHas);
+    const held = await ctx.db
+      .query("entitlements")
+      .withIndex("by_topic_user", (q) => q.eq("topicId", batch.topicId).eq("userId", userId))
+      .collect();
+    if (held.some((e) => e.lang === batch.lang)) throw new Error(alreadyHas);
+    const enrolled = await ctx.db
+      .query("enrollments")
+      .withIndex("by_topic_user", (q) => q.eq("topicId", batch.topicId).eq("userId", userId))
+      .collect();
+    if (enrolled.some((e) => e.lang === batch.lang)) throw new Error(alreadyHas);
+
+    // The seat. **No provenance of any kind** - no batch id, no voucher id, no
+    // `pfPaymentId`, no `eftRef` - so this row is byte-identical to an Admin comp
+    // (ADR 0029). Both halves of the anonymity are needed: with provenance here the
+    // operator could list the redeemers by elimination, and the promise the
+    // organisation bought would be theatre. `vouchers.test.ts` asserts these
+    // absences positively; do not delete that assertion as redundant.
+    await ctx.db.insert("entitlements", { userId, topicId: batch.topicId, lang: batch.lang });
+    // The whole state machine: the code is spent, and the row says nothing else.
+    await ctx.db.patch(voucher._id, { redeemedAt: Date.now() });
+
+    return { topicSlug: topic.slug, lang: batch.lang, courseTitle: topic.title };
+  },
+});
