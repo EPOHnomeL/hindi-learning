@@ -319,6 +319,34 @@ test("redemption refuses WITHOUT consuming when the caller already has access", 
   expect(await unspent(codes[0]!)).toEqual(expect.any(Number));
 });
 
+test("a Share holder redeeming DOES spend the code, and gains something by it", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const batchId = await asUser(t, seller).mutation(api.vouchers.mintBatch, MINT);
+  const [code] = await codesOf(t, batchId);
+
+  // Somebody the owner shared the Edition with. They can read it today and the
+  // owner can take that away tomorrow, which is exactly why this is NOT one of the
+  // three refusals: redeeming converts revocable access into a permanent
+  // Entitlement, so the seat buys them something real (settled 2026-08-18).
+  const viewer = await seedUser(t, "viewer@example.com");
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: viewer, lang: "en" }));
+
+  await asUser(t, viewer).mutation(api.vouchers.redeem, { code: code! });
+
+  expect(await voucherByCode(t, code!)).toMatchObject({ redeemedAt: expect.any(Number) });
+  const held = await t.run((ctx) =>
+    ctx.db
+      .query("entitlements")
+      .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", viewer))
+      .collect(),
+  );
+  expect(held).toHaveLength(1);
+  // Still no provenance, exactly as for any other redeemer. The Share is untouched.
+  expect(Object.keys(held[0]!).sort()).toEqual(["_creationTime", "_id", "lang", "topicId", "userId"]);
+});
+
 test("a code works whatever the batch's payment state - the cash log is not a gate", async () => {
   const t = convexTest(schema, modules);
   const admin = await seedSysAdmin(t, "admin@example.com");

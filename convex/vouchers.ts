@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { publishedLangs, topicBySlug } from "./lib";
+import { hasEntitlement, publishedLangs, topicBySlug } from "./lib";
 import { platformFeeBps, splitNet } from "./payfast";
 import { getSeller, sellerStatusOf } from "./sellerStatus";
 import { mintCode, normaliseCode } from "./voucherCode";
@@ -228,13 +228,19 @@ export const redeem = mutation({
 
     // Refuse without consuming, three ways. Each leaves `redeemedAt` unset, so the
     // code stays redeemable by somebody who actually needs it.
+    //
+    // **The three are the PERMANENT holdings, and that is the whole rule** (settled
+    // 2026-08-18, see the vouchers map). A Share and a free published Edition are
+    // both access the caller has TODAY and can lose tomorrow - the owner revokes
+    // the Share, or unpublishes or prices the Edition - so redeeming a code as a
+    // Share holder converts revocable access into an Entitlement that nobody can
+    // take away. That is not nothing, so the seat is not wasted and the code is
+    // spent. Ownership, an Entitlement and a grandfathered Enrollment are the
+    // three that already survive anything the owner does, and redeeming on top of
+    // one of those really would buy the member nothing.
     const alreadyHas = new ConvexError("voucher/already-have-access");
     if (topic.ownerId === userId) throw alreadyHas;
-    const held = await ctx.db
-      .query("entitlements")
-      .withIndex("by_topic_user", (q) => q.eq("topicId", batch.topicId).eq("userId", userId))
-      .collect();
-    if (held.some((e) => e.lang === batch.lang)) throw alreadyHas;
+    if (await hasEntitlement(ctx, batch.topicId, userId, batch.lang)) throw alreadyHas;
     const enrolled = await ctx.db
       .query("enrollments")
       .withIndex("by_topic_user", (q) => q.eq("topicId", batch.topicId).eq("userId", userId))
