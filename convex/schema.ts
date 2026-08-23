@@ -263,7 +263,13 @@ export default defineSchema({
     topicId: v.id("topics"),
     lessonKey: v.string(),
     status: v.union(v.literal("opened"), v.literal("completed")),
-  }).index("by_topic_user_lesson", ["topicId", "userId", "lessonKey"]),
+    // When this lesson was last opened, stamped on every setProgress write. Powers
+    // the app tab bar's cross-topic resume point (myLastRead). Optional: rows from
+    // before 2026-08-23 have no stamp and sort oldest, which is correct.
+    lastReadAt: v.optional(v.number()),
+  })
+    .index("by_topic_user_lesson", ["topicId", "userId", "lessonKey"])
+    .index("by_user_lastReadAt", ["userId", "lastReadAt"]),
 
   // The next-lesson Routine's single-flight lock, one row per Topic (see ADR
   // 0008). `frontierKey` is the lesson the in-flight (or last) run fired for;

@@ -55,13 +55,44 @@ export const setProgress = mutation({
       .query("progress")
       .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id).eq("userId", userId).eq("lessonKey", lessonKey))
       .unique();
-    // Never downgrade completed → opened.
+    // Never downgrade completed → opened, but every write is still a read of
+    // the lesson, so the resume stamp always moves (see myLastRead).
     if (existing) {
-      if (existing.status === "completed") return;
-      await ctx.db.patch(existing._id, { status });
+      if (existing.status === "completed") {
+        await ctx.db.patch(existing._id, { lastReadAt: Date.now() });
+        return;
+      }
+      await ctx.db.patch(existing._id, { status, lastReadAt: Date.now() });
       return;
     }
-    await ctx.db.insert("progress", { userId, topicId: topic._id, lessonKey, status });
+    await ctx.db.insert("progress", { userId, topicId: topic._id, lessonKey, status, lastReadAt: Date.now() });
+  },
+});
+
+// The caller's most recent read across ALL their topics: the app tab bar's
+// "Course" tab and the Home resume card (mobile bottom nav, 2026-08-23). Ordered
+// by lastReadAt via by_user_lastReadAt; rows without a stamp (pre-migration)
+// sort oldest, so they still resolve when they're all the caller has. Each
+// candidate re-passes the owner-or-Viewer gate: a topic that was deleted or
+// un-shared since the read must not come back as a resume point.
+export const myLastRead = query({
+  args: {},
+  returns: v.union(v.object({ topicSlug: v.string(), lessonKey: v.string() }), v.null()),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const rows = await ctx.db
+      .query("progress")
+      .withIndex("by_user_lastReadAt", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(5);
+    for (const row of rows) {
+      const topic = await ctx.db.get(row.topicId);
+      if (!topic) continue;
+      const viewable = await getViewableTopic(ctx, userId, topic.slug);
+      if (viewable) return { topicSlug: topic.slug, lessonKey: row.lessonKey };
+    }
+    return null;
   },
 });
 
