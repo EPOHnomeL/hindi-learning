@@ -32,6 +32,12 @@ file above instead. Context must travel with the repo, not the computer.
   `map(marketplace): add donation-link ticket`. Not `feat(…)`/`docs(…)`; the
   scope is the effort directory name under `.plan/maps/`. Keep planning changes
   in their own commit, separate from code.
+- **Never stop the dev server.** The user runs `pnpm dev` themselves, often while
+  you work. To check a route, curl an already-listening port 3000; if nothing is
+  listening, skip the check and say so. Do **not** start a server and then kill
+  "whatever is on 3000" (and never `taskkill /IM node.exe`): that repeatedly
+  killed the user's own server on 2026-08-23. `pnpm typecheck` is the cheap
+  verification that needs no server at all.
 - **`.env` is the user's** — never edit/`sed`/`cp` it; tell the user the exact
   line to change. Reading config at runtime is fine.
 - **Issues have one home: `.plan/maps/`, driven by chartr** (2026-07-30). Every
