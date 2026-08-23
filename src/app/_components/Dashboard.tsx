@@ -21,9 +21,10 @@ import { Logo } from "./Logo";
 import { Markdown } from "./MarkdownView";
 import { missionPreview } from "./markdown";
 import { SettingsDialog } from "./SettingsDialog";
+import { CourseCardActions } from "./CourseCardActions";
 import { SiteFooter } from "./SiteFooter";
 import { useTenant, useTenantSlug } from "./TenantContext";
-import { Dialog, IconButton, Menu, MenuItem } from "./ui";
+import { Dialog } from "./ui";
 import { useResourceUpload } from "./useResourceUpload";
 
 type Course = {
@@ -138,7 +139,10 @@ export function Dashboard() {
               )}
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-1">
+          {/* On a phone the header keeps only the brand (mobile bottom nav,
+              2026-08-23): Admin is a tab in the bar, and the account controls
+              (gear, sign out) live on the /settings page. Desktop keeps them. */}
+          <div className="flex shrink-0 items-center gap-1 max-md:hidden">
             <button
               onClick={() => setPrefsOpen(true)}
               aria-label={ts("title")}
@@ -391,9 +395,11 @@ function CourseCard({ course }: { course: Course }) {
 
       <div className="min-h-[14px] flex-1" />
 
-      {/* Actions. A seeded course only offers "Set up now"; otherwise: Open
-          (primary) + Edit (settings) + Editions (globe), plus a ⋯ overflow that
-          holds the certificate once the course is complete. */}
+      {/* Actions. A seeded course only offers "Set up now"; otherwise one row of
+          three targets (mobile bottom nav, 2026-08-23): Open, the reading
+          language, and one kebab holding the certificate, Course settings,
+          Editions & sharing and the admin generation controls. The card had
+          grown five targets, including two identical kebabs side by side. */}
       <div className="flex items-center gap-2">
         {seeded ? (
           <button
@@ -410,27 +416,17 @@ function CourseCard({ course }: { course: Course }) {
                   : t("setUpNow")}
           </button>
         ) : (
-          <>
-            <Link
-              href={`/courses/${course.slug}`}
-              className="flex-1 rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
-            >
-              {t("openCourse")}
-            </Link>
-            <IconButton icon="edit" label={t("editCourse", { title: course.title })} title={t("edit")} onClick={() => setSettingsOpen(true)} />
-            <IconButton
-              icon="globe"
-              label={t("editionsSharingFor", { title: course.title })}
-              title={t("editions")}
-              onClick={() => setEditionsOpen(true)}
-            />
-            {complete && <CourseCertMenu topicSlug={course.slug} />}
-          </>
+          <CourseCardActions
+            slug={course.slug}
+            title={course.title}
+            openHref={`/courses/${course.slug}`}
+            openLabel={t("openCourse")}
+            editions={editions}
+            courseCompleted={complete}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenEditions={() => setEditionsOpen(true)}
+          />
         )}
-        {/* Admin "fire and pray": generate the whole remaining curriculum in one
-            go, without waiting for the learner to finish each lesson. Hidden for
-            everyone but the Admin (self-gated), and never on a completed course. */}
-        {!complete && <AdminCourseMenu slug={course.slug} title={course.title} />}
       </div>
 
       {showMission && course.mission && (
@@ -443,55 +439,6 @@ function CourseCard({ course }: { course: Course }) {
         <EditionsDialog topicSlug={course.slug} title={course.title} onClose={() => setEditionsOpen(false)} />
       )}
     </article>
-  );
-}
-
-// The Admin-only ⋯ on a course card (fire and pray). Self-hides for non-admins,
-// so a plain learner never sees a ⋯ on their own cards. "Finish generating" kicks
-// off the back-to-back authoring loop; while it runs, the live generation status
-// relabels the item ("Generating…") and flags a failed run with a dot on the ⋯.
-function AdminCourseMenu({ slug, title }: { slug: string; title: string }) {
-  const t = useTranslations("Dashboard");
-  const amAdmin = useQuery(api.whitelist.amIAdmin);
-  const status = useQuery(api.routine.generationStatus, { topicSlug: slug });
-  const finish = useAction(api.routine.finishGenerating);
-  const cancel = useAction(api.routine.cancelFinishGenerating);
-  const [busy, setBusy] = useState(false);
-  if (!amAdmin) return null;
-
-  const generating = busy || status?.status === "generating";
-  const cancelling = status?.cancelRequested === true;
-  const failed = status?.status === "failed";
-
-  return (
-    <Menu triggerLabel={t("adminActionsFor", { title })} dot={failed}>
-      {(close) =>
-        generating ? (
-          // A run is in flight — offer to stop it (fire-and-pray can loop).
-          <MenuItem
-            icon="x"
-            onClick={() => {
-              close();
-              if (cancelling) return;
-              void cancel({ topicSlug: slug });
-            }}
-          >
-            {cancelling ? t("cancelling") : t("cancelGeneration")}
-          </MenuItem>
-        ) : (
-          <MenuItem
-            icon="refresh"
-            onClick={() => {
-              close();
-              setBusy(true);
-              void finish({ topicSlug: slug }).finally(() => setBusy(false));
-            }}
-          >
-            {failed ? t("finishGeneratingRetry") : t("finishGenerating")}
-          </MenuItem>
-        )
-      }
-    </Menu>
   );
 }
 
