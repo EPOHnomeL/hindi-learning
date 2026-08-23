@@ -11,6 +11,13 @@
     "close": "Maak toe",
     "cancel": "Kanselleer"
   },
+  "Tabs": {
+    "home": "Tuis",
+    "course": "Kursus",
+    "settings": "Instellings",
+    "admin": "Admin",
+    "pickUp": "Gaan voort waar jy opgehou het"
+  },
   "Dashboard": {
     "complete": "Voltooi",
     "publicLinkLive": "’n Openbare skakel is regstreeks",
@@ -74,7 +81,9 @@
     "attachFiles": "+ Heg lêers aan (PDF of Markdown)",
     "creating": "Skep tans…",
     "create": "Skep",
-    "cancel": "Kanselleer"
+    "cancel": "Kanselleer",
+    "readingLanguageFor": "Leestaal vir {title}",
+    "moreActionsFor": "Meer aksies vir {title}"
   },
   "Footer": {
     "origin": "Gebore uit die onderrig van Hindi — <deva>नमस्ते</deva> — gebou om enigiets te leer.",
@@ -214,7 +223,13 @@
     "dark": "Donker",
     "save": "Stoor",
     "saving": "Stoor tans…",
-    "saved": "Gestoor"
+    "saved": "Gestoor",
+    "account": "Rekening",
+    "signedInAs": "Aangemeld as",
+    "appearance": "Voorkoms",
+    "appLanguage": "Programtaal",
+    "support": "Ondersteuning",
+    "notSet": "Nie gestel nie"
   },
   "CourseSettings": {
     "title": "Kursusinstellings",
@@ -286,7 +301,12 @@
     "teacher": "Onderwyser",
     "viewQa": "⤢ Bekyk",
     "waitingReply": "Wag vir jou onderwyser — jou vraag sal beantwoord word sodra die volgende les gegenereer is.",
-    "close": "Maak toe"
+    "close": "Maak toe",
+    "completeAndContinue": "Voltooi en gaan voort",
+    "next": "Volgende",
+    "lastLessonTitle": "Dit is die laaste les",
+    "lastLessonBody": "Nog niks verder in hierdie kursus nie.",
+    "finishCourse": "Voltooi kursus"
   },
   "Editions": {
     "dialogTitle": "Uitgawes en deel",

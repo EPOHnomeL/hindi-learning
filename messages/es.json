@@ -11,6 +11,13 @@
     "close": "Cerrar",
     "cancel": "Cancelar"
   },
+  "Tabs": {
+    "home": "Inicio",
+    "course": "Curso",
+    "settings": "Ajustes",
+    "admin": "Admin",
+    "pickUp": "Continúa donde lo dejaste"
+  },
   "Dashboard": {
     "complete": "Completado",
     "publicLinkLive": "Hay un enlace público activo",
@@ -74,7 +81,9 @@
     "attachFiles": "+ Adjuntar archivos (PDF o Markdown)",
     "creating": "Creando…",
     "create": "Crear",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "readingLanguageFor": "Idioma de lectura de {title}",
+    "moreActionsFor": "Más acciones para {title}"
   },
   "Footer": {
     "origin": "Nacido enseñando hindi — <deva>नमस्ते</deva> — creado para enseñar cualquier cosa.",
@@ -214,7 +223,13 @@
     "dark": "Oscuro",
     "save": "Guardar",
     "saving": "Guardando…",
-    "saved": "Guardado"
+    "saved": "Guardado",
+    "account": "Cuenta",
+    "signedInAs": "Sesión iniciada como",
+    "appearance": "Apariencia",
+    "appLanguage": "Idioma de la aplicación",
+    "support": "Soporte",
+    "notSet": "Sin definir"
   },
   "CourseSettings": {
     "title": "Configuración del curso",
@@ -286,7 +301,12 @@
     "teacher": "Profesor",
     "viewQa": "⤢ Ver",
     "waitingReply": "Esperando a tu profesor — tu pregunta se responderá cuando se genere la siguiente lección.",
-    "close": "Cerrar"
+    "close": "Cerrar",
+    "completeAndContinue": "Completar y continuar",
+    "next": "Siguiente",
+    "lastLessonTitle": "Esta es la última lección",
+    "lastLessonBody": "Todavía no hay nada más en este curso.",
+    "finishCourse": "Terminar el curso"
   },
   "Editions": {
     "dialogTitle": "Ediciones y uso compartido",

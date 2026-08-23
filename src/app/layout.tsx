@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { ConvexClientProvider } from "./ConvexClientProvider";
+import { AppTabs } from "./_components/AppTabs";
 import { headers } from "next/headers";
 import { getTenantSlug, getTenantView } from "~/lib/tenant-server";
 import { buildTenantThemeCss } from "~/design/tokens";
@@ -105,6 +106,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <NextIntlClientProvider>
             <ConvexClientProvider tenantSlug={slug} country={country}>
               {children}
+              {/* The app-level bottom tab bar (mobile, signed in only). This is
+                  the one mount point present on Home, in the reader and on
+                  /admin alike; it also appends the spacer that keeps the fixed
+                  bar off the last row of every page. */}
+              <AppTabs />
             </ConvexClientProvider>
           </NextIntlClientProvider>
         </body>

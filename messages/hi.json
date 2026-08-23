@@ -11,6 +11,13 @@
     "close": "बंद करें",
     "cancel": "रद्द करें"
   },
+  "Tabs": {
+    "home": "होम",
+    "course": "कोर्स",
+    "settings": "सेटिंग्स",
+    "admin": "एडमिन",
+    "pickUp": "जहाँ छोड़ा था वहीं से आगे बढ़ें"
+  },
   "Dashboard": {
     "complete": "पूर्ण",
     "publicLinkLive": "एक सार्वजनिक लिंक सक्रिय है",
@@ -74,7 +81,9 @@
     "attachFiles": "+ फ़ाइलें संलग्न करें (PDF या Markdown)",
     "creating": "बनाया जा रहा है…",
     "create": "बनाएँ",
-    "cancel": "रद्द करें"
+    "cancel": "रद्द करें",
+    "readingLanguageFor": "{title} की पठन भाषा",
+    "moreActionsFor": "{title} के लिए और कार्रवाइयाँ"
   },
   "Footer": {
     "origin": "हिंदी सिखाने से जन्मा — <deva>नमस्ते</deva> — कुछ भी सिखाने के लिए बनाया गया।",
@@ -214,7 +223,13 @@
     "dark": "डार्क",
     "save": "सहेजें",
     "saving": "सहेजा जा रहा है…",
-    "saved": "सहेजा गया"
+    "saved": "सहेजा गया",
+    "account": "खाता",
+    "signedInAs": "इस रूप में साइन इन",
+    "appearance": "दिखावट",
+    "appLanguage": "ऐप की भाषा",
+    "support": "सहायता",
+    "notSet": "सेट नहीं"
   },
   "CourseSettings": {
     "title": "कोर्स सेटिंग्स",
@@ -286,7 +301,12 @@
     "teacher": "शिक्षक",
     "viewQa": "⤢ देखें",
     "waitingReply": "आपके शिक्षक की प्रतीक्षा है — अगला पाठ जनरेट होने पर आपके प्रश्न का उत्तर दिया जाएगा।",
-    "close": "बंद करें"
+    "close": "बंद करें",
+    "completeAndContinue": "पूरा करें और आगे बढ़ें",
+    "next": "अगला",
+    "lastLessonTitle": "यह आख़िरी पाठ है",
+    "lastLessonBody": "इस कोर्स में अभी और कुछ नहीं है।",
+    "finishCourse": "कोर्स पूरा करें"
   },
   "Editions": {
     "dialogTitle": "संस्करण और साझाकरण",

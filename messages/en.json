@@ -11,6 +11,13 @@
     "close": "Close",
     "cancel": "Cancel"
   },
+  "Tabs": {
+    "home": "Home",
+    "course": "Course",
+    "settings": "Settings",
+    "admin": "Admin",
+    "pickUp": "Pick up where you left off"
+  },
   "CourseSettings": {
     "title": "Course settings",
     "detailsHeading": "Details",
@@ -106,7 +113,9 @@
     "attachFiles": "+ Attach files (PDF or Markdown)",
     "creating": "Creating…",
     "create": "Create",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "readingLanguageFor": "Reading language for {title}",
+    "moreActionsFor": "More actions for {title}"
   },
   "Footer": {
     "origin": "Born teaching Hindi — <deva>नमस्ते</deva> — built to teach anything.",
@@ -246,7 +255,13 @@
     "dark": "Dark",
     "save": "Save",
     "saving": "Saving…",
-    "saved": "Saved"
+    "saved": "Saved",
+    "account": "Account",
+    "signedInAs": "Signed in as",
+    "appearance": "Appearance",
+    "appLanguage": "App language",
+    "support": "Support",
+    "notSet": "Not set"
   },
   "Artifact": {
     "copied": "Copied — paste it anywhere ✓",
@@ -286,7 +301,12 @@
     "teacher": "Teacher",
     "viewQa": "⤢ View",
     "waitingReply": "Waiting for your teacher — your question will be answered once the next lesson is generated.",
-    "close": "Close"
+    "close": "Close",
+    "completeAndContinue": "Complete and continue",
+    "next": "Next",
+    "lastLessonTitle": "That's the last lesson",
+    "lastLessonBody": "Nothing further in this course yet.",
+    "finishCourse": "Finish course"
   },
   "Editions": {
     "dialogTitle": "Editions & sharing",
