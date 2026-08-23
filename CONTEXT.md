@@ -135,6 +135,15 @@ _Avoid_: Client, customer, organisation, workspace, brand (that is the *styling*
 A per-**[[Tenant]]** on/off switch for a capability, stored as one of five flat required booleans on `tenants.flags` — `certificates`, `translations`, `publicLinks`, `qa`, `seeding` (course creation). Enforced explicitly by `assertTenantFlag(ctx, tenantSlug, flag)` called from each gated mutation, never woven into the access resolvers (`getOwnedTopic` / `getViewableTopic` stay flag-agnostic). **Frozen, not revoked**: turning a flag off blocks *new* grants and actions but never destroys what already exists — an issued [[Certificate]] stays valid, a live [[Public link]] stays live. A flag added after the v1 migration defaults `false`.
 _Avoid_: Toggle, setting, permission, entitlement (that is the paid access row), plan/tier
 
+**App Icon** _(planned - [installable-app](.plan/maps/installable-app/spec.md); decided 2026-08-23, NOT built)_:
+The square, opaque mark a **[[Tenant]]**'s installed app shows on a device home screen and splash screen. **Derived, never uploaded**: composited at request time from the tenant's logo, contained with padding, onto an opaque square of that tenant's own palette, at the four sizes the platforms demand (192, 512, a maskable variant, and 180 for `apple-touch-icon`). Opaque because iOS renders transparency as solid black, and padded because Android crops a maskable icon to a circle. Distinct from the tenant's **logo** (app chrome, arbitrary aspect, uploaded), its **favicon** (browser tab, uploaded) and a Topic's **[[Emblem]]** (snapshotted onto a [[Certificate]], [ADR 0017](docs/adr/0017-topic-emblem-on-certificates.md)). No tenant uploads one and none is asked to: see [ADR 0030](docs/adr/0030-installable-per-tenant-app.md) for why a fourth uploaded brand asset was rejected.
+_Avoid_: Logo, favicon, app image, launcher icon
+
+**Offline Catalogue** _(planned - [installable-app](.plan/maps/installable-app/spec.md); decided 2026-08-23, NOT built)_:
+The device-local copy of the course lists a reader last saw: the **[[Tenant]]**'s public [[Catalogue]], and their own dashboard list when signed in. Rendered whenever the live Convex query has not resolved, which offline is *always* (Convex is a WebSocket, so it never connects and the query sits at `undefined` rather than erroring). **Lists only, never [[Lesson]] bodies** ([ADR 0030](docs/adr/0030-installable-per-tenant-app.md) §3) - offline reading of content needs a time-boxed lease and an offline [[Response]] queue, which is a separate unbuilt decision. Per-device, kept under the `hindi:` prefix so signing out clears it; a cached dashboard list may therefore show slightly stale [[Progress]] until the live query lands.
+_Avoid_: Download, downloaded course, offline course (all three imply content), cache (too general)
+
+
 ## Productisation (proposed — [ADR 0014](docs/adr/0014-provider-agnostic-teaching-runtime-two-lines.md))
 
 These two terms are the canonical names for the two commercial lines that ride the same provider-agnostic teaching runtime. Proposed, not yet built; the internal alpha is effectively the **Managed line** running on the operator's own key.
