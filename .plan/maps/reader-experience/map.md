@@ -32,13 +32,23 @@ either backfilled or knowingly left alone.
   Nothing shipped. So ticket 02 is not "offline on top of a PWA"; it is the PWA question and
   the offline question together, and it must decide whether the app becomes installable at
   all before it can decide what "download the course" means.
-- **Ticket 02 is sequenced behind the UI overhaul** — [ui-overhaul](../ui-overhaul/map.md)
-  runs first by that map's own Destination, and it is the effort that will settle the
-  installable-shell and mobile questions this ticket depends on.
-- **The offline decision is an access decision, not a service-worker one.** Lesson bodies live
-  in Convex blobs behind a content route; caching them locally puts a copy of paid content on
-  a device an Entitlement revocation cannot reach. Immutable Lessons (ADR 0003) at least mean
-  cached content cannot go stale underneath a learner.
+- **Ticket 02 was sequenced behind the UI overhaul, and that sequencing was overridden**
+  ([ui-overhaul](../ui-overhaul/map.md) runs first by its own Destination and was to settle the
+  installable-shell and mobile questions underneath 02). Overridden on the user's instruction
+  2026-08-23: 02 is resolved and the build is [installable-app](../installable-app/spec.md). The
+  accepted cost is that the install sheet is a new UI surface built before the design foundation
+  (ui-overhaul ticket 03) that would govern it, so expect to restyle one component later.
+- **The offline decision was an access decision, and the access premise was wrong** (corrected
+  2026-08-23). This bullet used to read: *"Lesson bodies live in Convex blobs behind a content
+  route; caching them locally puts a copy of paid content on a device an Entitlement revocation
+  cannot reach."* True, but not a consequence of caching: `GET /content?id=<storageId>` already
+  serves Lesson bodies with **no authentication**, `Access-Control-Allow-Origin: *` and
+  `max-age=31536000, immutable`, so that copy is reachable today by anyone holding the URL.
+  Caching would only make it convenient. The exposure is now
+  [marketplace/12](../marketplace/tickets/12-content-route-is-an-open-bearer-url.md); the thing
+  that would actually make offline content revocable is a **time-boxed lease**, in
+  [ticket 05](tickets/05-offline-lesson-content-under-a-lease.md). Immutable Lessons (ADR 0003)
+  still mean cached content cannot go stale underneath a learner.
 - **The routing ticket's interesting half is security, not the 404:** "doesn't exist" and "you
   can't see it" must be *identical* responses, so the routing layer never leaks what the data
   layer protects. No silent fallbacks. Watch the `useQuery`-is-`undefined`-while-loading trap.
@@ -52,10 +62,20 @@ either backfilled or knowingly left alone.
 
 <!-- one line per resolved ticket -->
 
+- [Download course for offline](tickets/02-download-course-for-offline.md) (formerly "Implement
+  PWA") - the app becomes installable **per tenant** with a derived App Icon and our own branded
+  prompt, and offline is scoped to the **Offline Catalogue** (lists) and explicitly not Lesson
+  bodies ([ADR 0030](../../../docs/adr/0030-installable-per-tenant-app.md)). Decided, **not
+  built**: the build is [installable-app](../installable-app/spec.md). The grilling found that
+  `/content` is already an open bearer URL, so the long-standing "revocation cannot reach a cached
+  copy" objection described the present, not the risk of caching.
+
 ## Not yet specified
 
-- **Offline Progress and quiz answers.** If a learner works offline their Responses have to
-  queue and reconcile. Real, and unspecifiable until the offline-content decision lands.
+<!-- The "offline Progress and quiz answers" fog patch graduated into a ticket on 2026-08-23:
+     it is now reader-experience/05, which names the reconciliation problem precisely (the quiz
+     bridge posts answers to the parent, which writes to Convex, and first-answer-only is enforced
+     server-side). Nothing else on this map is fog. -->
 
 ## Out of scope
 

@@ -11,7 +11,16 @@ Add a download course feature to allow users to download and not need to log in 
 
 ## Done when
 
-The download/offline want is grilled into a decision — what "download" means (credential persistence vs offline content), what it needs beyond the PWA work already closed — and implementation tickets exist.
+The download/offline want is grilled into a decision (what "download" means: credential
+persistence vs offline content, and what it needs beyond **what actually exists**), and
+implementation tickets exist.
+
+<!-- Stale-claim correction, 2026-08-23: this Done-when originally read "beyond the PWA work
+     already closed". That was false when it was transcribed from GitHub #44 on 2026-07-30, and it
+     is corrected in place per CLAUDE.md rather than left to mislead a future session. Nothing had
+     shipped. See the 2026-08-01 premise correction below, re-verified 2026-08-23 by searching the
+     whole tree for manifest / serviceWorker / PWA / beforeinstallprompt: zero hits in src/ or
+     convex/. -->
 
 <!-- Migrated 2026-07-30 from GitHub issue #44 (filed 2026-07-24), when this repo retired
      its remote tracker; see docs/agents/issue-tracker.md. -->
@@ -50,3 +59,64 @@ The download/offline want is grilled into a decision — what "download" means (
   to queue and reconcile. Real, and unspecifiable until the offline-content decision lands.
 - **Out of scope:** session lifetime itself —
   [auth-sessions](../../auth-sessions/map.md).
+
+---
+
+## Answer
+
+**Decided 2026-08-23 by a /grilling session. DECIDED, NOT BUILT.** The build is
+[installable-app](../../installable-app/spec.md) tickets 01-05, which render unstarted until each
+lands its own Answer. Full decision record:
+[ADR 0030](../../../../docs/adr/0030-installable-per-tenant-app.md).
+
+The ticket asked three things at once, and all three are now separated.
+
+**1. Credential persistence: already solved, and not this ticket's business.** Sessions run
+365 days total with a 60-day rolling inactivity window, and the auth cookie carries a matching
+`maxAge` (`src/lib/sessionLifetime.ts`). The "logs me out all the time" complaint was the missing
+`cookieConfig` bug, fixed. Nothing further needed here.
+
+**2. The installable shell: decided and specified.** The app becomes installable per tenant, which
+costs nothing structurally because host-based tenancy (ADR 0022) plus a host-only session cookie
+(ADR 0025) already make every subdomain its own origin. A per-tenant `/manifest.webmanifest` route
+handler, an **App Icon derived at request time** from the tenant Logo via `next/og` (no new
+dependency, no per-tenant design chore), a hand-rolled service worker on three caching rules, and
+our own branded bottom sheet on `/` rather than the browser's prompt. Both platforms, because iOS
+has no `beforeinstallprompt` and never will, so it gets instructions instead of a button that
+cannot work.
+
+**3. Offline: scoped to lists, and the content half re-filed.** What ships is the **Offline
+Catalogue**, the last course lists the reader saw. Lesson bodies are not cached.
+
+The reason is not the one this ticket assumed, and the assumption is worth correcting because it
+would otherwise be re-derived. This ticket says caching content *"means a copy of paid content
+sitting on a device that an Entitlement revocation cannot reach"*. **That is already true today.**
+`GET /content?id=<storageId>` serves Lesson bodies with no authentication,
+`Access-Control-Allow-Origin: *`, and `max-age=31536000, immutable`; the paygate sits only on the
+query that hands out the id. Every learner who has opened a Lesson holds a permanent,
+revocation-proof, world-readable URL to it. Caching would not introduce that exposure, only make it
+convenient.
+
+Which also disposes of the encryption question raised during the grilling: encrypting an offline
+cache would be **strictly weaker** than the URL the learner can already save, since the key must
+reach their device and lands in their IndexedDB. Encryption without a lease delivers zero
+revocation; a lease without encryption delivers revocation within one lease period. The lease is
+the mechanism; encryption is optional decoration on it.
+
+Content was deferred because its real cost is the **writes**, not the cache: the quiz bridge
+`postMessage`s answers to the parent, which writes them to Convex, and first-answer-only is
+enforced server-side, so offline answers must queue and reconcile against a rule that assumes it
+saw the first attempt. That is the fog this ticket listed, now named precisely and given its own
+home.
+
+**Two tickets carry the remainder:**
+
+- [reader-experience/05](05-offline-lesson-content-under-a-lease.md) - offline Lesson content, the
+  lease, and the Response/Progress queue.
+- [marketplace/12](../../marketplace/tickets/12-content-route-is-an-open-bearer-url.md) - the
+  `/content` bearer-URL exposure, which may block 05.
+
+**The ui-overhaul sequencing was deliberately jumped.** This ticket said it was sequenced behind
+that effort, which is at 2 of 13 tickets with its design foundation unresolved. Overridden on the
+user's instruction 2026-08-23. The accepted cost is one component (the install sheet) probably
+needing a restyle when the foundation lands.
