@@ -8,10 +8,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-import { CertificateControl } from "./Certificate";
 import { LockedPane, Paygate } from "./Paygate";
 import { checkoutLink, publicCourseUrl, useEditionLang, withLang } from "./editionUrl";
 import { buildEditDoc, buildSrcDoc, replaceBodyInner, scrollToCardMessage, themeMessage, type Theme } from "./lessonSrcDoc";
+import { LessonFootCard } from "./LessonFoot";
 import { Markdown } from "./MarkdownView";
 import { MarkdownResourceDialog } from "./ResourceItem";
 import { cardIdFromHash, composeCardShare, resolveArtifactClick, resourceTarget } from "./readerDerive";
@@ -23,6 +23,13 @@ import { useHideOnScroll } from "./useHideOnScroll";
 // Mirror of the server's stale threshold (convex/routine.ts STALE_MS): a run
 // stuck "generating" past this is treated as crashed and offered for retry.
 const STALE_MS = 10 * 60 * 1000;
+
+// Lesson titles are stored as "Title <em dash> subtitle"; chrome shows the head,
+// mirroring CourseShell's sidebar rows.
+const TITLE_SEP = String.fromCharCode(8212);
+function headTitle(title: string): string {
+  return title.split(TITLE_SEP)[0]!.trim();
+}
 
 // Mirror of routine.ts DAY_MS: the on-demand cap is one manual fire per user per
 // day. This mirror is per-Topic (the viewed course's own fire), a proactive hint
@@ -406,6 +413,9 @@ function LessonView({
   const lang = useEditionLang();
   const navHidden = useHideOnScroll();
   const lesson = useQuery(api.content.reader.getLesson, { topicSlug, key: lessonKey, lang: lang ?? undefined });
+  // The same subscription CourseShell already holds (deduped by Convex), for the
+  // end-of-lesson card's next-lesson number and title.
+  const lessons = useQuery(api.content.reader.listLessons, { topicSlug, lang: lang ?? undefined });
   // The Topic's Resources, so a Resource link in the lesson opens with sidebar
   // parity (rich-media/11). Same query the sidebar holds — deduped by Convex.
   const resources = useQuery(api.resources.listResources, { topicSlug });
@@ -425,6 +435,8 @@ function LessonView({
 
   // The caller's own completion — an owner's, or a Viewer's own on a shared course.
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
+  // The next lesson's row (for the end-of-lesson card's number and title).
+  const nextLesson = nextLessonKey ? (lessons?.find((l) => l.key === nextLessonKey) ?? null) : null;
 
   // In-place prose edit (course-content-editing / ADR 0020). Editing the source
   // (English) edition patches the Lesson blob (`editLesson`); editing a translated
@@ -493,11 +505,15 @@ function LessonView({
             {!readOnly && !courseCompleted && isFrontier && completed && (
               <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />
             )}
-            {/* On a completed course, offer the Certificate (claim / view) in its
-                place — for owner and Viewer alike. Self-hides until eligible. */}
-            {courseCompleted && <CertificateControl topicSlug={topicSlug} />}
+            {/* No certificate pill here: Home carries the certificate on every
+                card kind (mobile-reader-todos 01), and on a phone this bar has
+                no room for anything beside the title. */}
             {/* Mark complete writes the caller's own Progress — owner or Viewer.
-                A `preview` caller holds no Progress, so it's hidden for them. */}
+                A `preview` caller holds no Progress, so it's hidden for them. On
+                the last lesson of a COMPLETED course the click is what makes the
+                certificate claimable, so the label says "Finish course"; on an
+                active course's Frontier it stays "Mark complete", since another
+                lesson may be drafted tomorrow (mobile-reader-todos 02). */}
             {!preview && (
               <button
                 onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
@@ -508,7 +524,11 @@ function LessonView({
                     : "border-accent text-accent hover:bg-hi"
                 }`}
               >
-                {completed ? t("completed") : t("markComplete")}
+                {completed
+                  ? t("completed")
+                  : courseCompleted && !nextLessonKey
+                    ? t("finishCourse")
+                    : t("markComplete")}
               </button>
             )}
             {/* A Viewer also gets plain navigation to the next lesson. */}
@@ -556,6 +576,25 @@ function LessonView({
             }
           />
         )}
+        {/* The end-of-lesson Next card (mobile): the reader's forward
+            navigation, which also marks this lesson complete on advance. Waits
+            for the lessons list so a loading beat never renders as a false
+            "last lesson" card. */}
+        {!preview && lessons && (
+          <LessonFootCard
+            next={
+              nextLesson
+                ? {
+                    href: withLang(`/courses/${topicSlug}/lessons/${nextLesson.key}`, lang),
+                    seq: nextLesson.seq,
+                    title: headTitle(nextLesson.title),
+                  }
+                : null
+            }
+            completed={completed}
+            onAdvance={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
+          />
+        )}
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
             scrolling, no slide-up trigger. Desktop uses the side column instead.
             Hidden for a `preview` caller: Q&A is past the paygate. */}
@@ -571,18 +610,22 @@ function LessonView({
           <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} readOnly={readOnly} />
         </aside>
       )}
-      {/* Mobile green floating action button for "Mark complete" */}
-      {!preview && !completed && (
+      {/* Mobile "Mark complete" FAB. Retired wherever the end-of-lesson card can
+          do its job (any lesson with a next lesson); it survives only on the
+          last lesson and the Frontier, lifted clear of the app tab bar. On the
+          last lesson of a COMPLETED course it reads "Finish course": that tap
+          is what makes the certificate claimable (mobile-reader-todos 02). */}
+      {!preview && !completed && !nextLessonKey && (
         <button
           onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
-          className={`fixed bottom-6 right-6 z-30 md:hidden flex items-center gap-1.5 rounded-full shadow-lg bg-good-b hover:bg-good-b/90 text-white px-4 py-3 text-sm font-semibold transition-all duration-300 transform ${
+          className={`fixed bottom-[6.25rem] right-6 z-30 md:hidden flex items-center gap-1.5 rounded-full shadow-lg bg-good-b hover:bg-good-b/90 text-white px-4 py-3 text-sm font-semibold transition-all duration-300 transform ${
             navHidden ? "translate-y-24 opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
           }`}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <span>Mark complete</span>
+          <span>{courseCompleted ? t("finishCourse") : t("markComplete")}</span>
         </button>
       )}
     </div>

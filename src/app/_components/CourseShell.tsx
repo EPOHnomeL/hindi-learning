@@ -9,11 +9,10 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { api } from "../../../convex/_generated/api";
 import { Brand } from "./Brand";
 import { CompletionCelebration } from "./Certificate";
-import { CourseSettingsDialog } from "./CourseSettings";
 import { Icon } from "./icons";
 import { NavItem } from "./NavItem";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
-import { LANG_KEY, useEditionLang, withLang } from "./editionUrl";
+import { useEditionLang, withLang } from "./editionUrl";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
@@ -196,23 +195,27 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
     >
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
         {/* Mobile top bar: hamburger opens the lesson selector. Slides away on
-            scroll-down for a fuller-screen read (useHideOnScroll). */}
+            scroll-down for a fuller-screen read (useHideOnScroll). The app tab
+            bar's Home tab owns "back to the library" (mobile bottom nav,
+            2026-08-23), so the old back arrow is a hamburger: both it and the
+            course title open the lesson drawer. */}
         <header
           className={`sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 transition-transform duration-300 md:hidden ${
             navHidden ? "-translate-y-full" : "translate-y-0"
           }`}
         >
-          <Link
-            href="/"
-            aria-label={t("backToCoursesLabel") ?? "Back to courses"}
-            title={t("backToCoursesLabel") ?? "Back to courses"}
+          <button
+            onClick={() => setMenuOpen((prev) => !prev)}
+            aria-label={t("lessons")}
+            aria-expanded={menuOpen}
             className="rounded-lg p-1.5 text-soft hover:bg-hi hover:text-accent"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="19" y1="12" x2="5" y2="12" />
-              <polyline points="12 19 5 12 12 5" />
+              <line x1="4" y1="7" x2="20" y2="7" />
+              <line x1="4" y1="12" x2="20" y2="12" />
+              <line x1="4" y1="17" x2="20" y2="17" />
             </svg>
-          </Link>
+          </button>
           <button
             onClick={() => setMenuOpen((prev) => !prev)}
             className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-accent hover:text-accent/80 active:scale-98 transition-transform"
@@ -316,27 +319,11 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             <ResourcesSection topicSlug={slug} canWrite={canWrite} />
           </nav>
 
-          {/* "Course settings" (UI redesign): Details (following the Edition
-              being viewed), the certificate emblem (ADR 0017), and the completion
-              lifecycle (ADR 0015) consolidated into one dialog. For the owner —
-              or, on a translated Edition, its Editor, who gets Details only
-              (edition-title-edit 02). Absent for plain Viewers and while still
-              `seeded` (a course that hasn't drafted a Lesson can't be completed). */}
-          {header && header.status !== "seeded" && (canWrite || (header.lang !== "en" && header.canEdit)) && (
-            <CourseSettingsButton slug={slug} owner={canWrite} header={header} />
-          )}
-
-          {/* Edition switcher + theme toggle, pinned together at the sidebar
-              bottom. Shown to anyone holding more than one Edition — an owner
-              (English + each ready translation) or a Viewer shared several
-              languages, who may now switch among the editions they hold (a Viewer
-              with a single shared edition still sees no switcher). `header.editions`
-              is already scoped to the caller's held languages server-side, so the
-              switcher only ever offers editions they may read. */}
+          {/* The drawer is lessons, references and resources, nothing else
+              (mobile bottom nav, 2026-08-23): Course settings and the Edition
+              switcher moved to the course card on Home (the kebab and the globe),
+              where the owner already had a second door to both. */}
           <div className="mt-auto flex flex-col gap-2 pt-2">
-            {header && header.editions.length > 1 && (
-              <LanguageSwitcher editions={header.editions} current={header.lang} />
-            )}
             <ThemeToggle />
           </div>
         </aside>
@@ -389,93 +376,6 @@ function ThemeToggle() {
       <span>{dark ? tc("darkMode") : tc("lightMode")}</span>
       <Icon name={dark ? "moon" : "sun"} className="h-4 w-4" />
     </button>
-  );
-}
-
-// The Edition switcher (course-translation): swap the reader between the Editions
-// the caller holds. Selecting one navigates the current page with `?lang=<code>`
-// — English included: an explicit pick pins the Edition (editionUrl.ts) — and
-// remembers the choice per-device, so reopening a course lands back in that
-// language. Rendered next to ThemeToggle; only mounted when there's more than
-// one Edition.
-function LanguageSwitcher({
-  editions,
-  current,
-}: {
-  editions: { lang: string; name: string; native: string; rtl: boolean }[];
-  current: string;
-}) {
-  const t = useTranslations("Reader");
-  const router = useRouter();
-  const pathname = usePathname();
-  return (
-    <div className="flex items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft">
-      <label htmlFor="edition-lang" className="shrink-0">{t("language")}</label>
-      <select
-        id="edition-lang"
-        value={current}
-        onChange={(e) => {
-          const code = e.target.value;
-          try {
-            localStorage.setItem(LANG_KEY, code);
-          } catch {
-            /* storage disabled — the switch still applies for this session */
-          }
-          router.push(withLang(pathname, code));
-        }}
-        className="min-w-0 flex-1 rounded-md border border-line bg-card px-2 py-1 text-sm text-ink focus:border-gold focus:outline-none"
-      >
-        {editions.map((ed) => (
-          <option key={ed.lang} value={ed.lang} dir={ed.rtl ? "rtl" : "ltr"}>
-            {ed.native}
-            {ed.rtl ? " (RTL)" : ""}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
-// Sidebar entry to the consolidated "Course settings" dialog (UI redesign).
-// Details follows the Edition being read: on a translated Edition the dialog
-// edits that Edition's title & mission (edition-title-edit 02), on English the
-// owner's source texts. Gated at the call site — owner always, an Edition's
-// Editor only on their translated Edition (they then see Details alone).
-function CourseSettingsButton({
-  slug,
-  owner,
-  header,
-}: {
-  slug: string;
-  owner: boolean;
-  header: {
-    status: "seeded" | "active" | "completed";
-    lang: string;
-    title: string;
-    mission: string | null;
-    editions: { lang: string; native: string }[];
-  };
-}) {
-  const t = useTranslations("Reader");
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className="mt-2 flex items-center justify-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:border-transparent hover:bg-hi hover:text-accent"
-      >
-        <Icon name="settings" className="h-4 w-4" /> {t("courseSettings")}
-      </button>
-      {open && (
-        <CourseSettingsDialog
-          topicSlug={slug}
-          status={header.status}
-          owner={owner}
-          lang={header.lang}
-          onClose={() => setOpen(false)}
-        />
-      )}
-    </>
   );
 }
 

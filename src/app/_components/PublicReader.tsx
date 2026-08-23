@@ -11,6 +11,7 @@ import { langInfo } from "../../../convex/languages";
 import { Frame, useCardTarget, useContentHtml } from "./ArtifactView";
 import { Brand } from "./Brand";
 import { checkoutLink } from "./editionUrl";
+import { LessonFootCard } from "./LessonFoot";
 import { NavItem } from "./NavItem";
 import { Markdown } from "./MarkdownView";
 import { LockedPane, Paygate } from "./Paygate";
@@ -325,7 +326,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
   const t = useTranslations("Reader");
   const { theme } = useTheme();
   const navHidden = useHideOnScroll();
-  const { course, markComplete } = useGuestCourse();
+  const { course, completed, markComplete } = useGuestCourse();
   const lesson = useQuery(api.public.publicLesson, { token, key: lessonKey });
   const html = useContentHtml(lesson);
   const qa = course.questions.filter((q) => q.lessonKey === lessonKey);
@@ -375,6 +376,14 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
             Resource links open from the in-bundle list (rich-media/11); a paid
             Preview withholds Resources, so those links no-op. */}
         <Frame html={html} withBridge theme={theme} dir={course.dir} lang={course.lang} resources={course.resources} />
+        {/* The end-of-lesson Next card, mirroring the authed reader (they are
+            deliberate twins until ui-overhaul 06 rules on collapsing them).
+            Advancing ticks the Guest's per-device done set, like the top-bar
+            Next link. Not on a paid Preview: the next lesson there is locked,
+            and the top-bar link already carries the paygate hop. */}
+        {!preview && (
+          <GuestLessonFoot course={course} lessonKey={lessonKey} completed={completed} markComplete={markComplete} token={token} />
+        )}
         {/* Q&A sits past the paygate — withheld from a paid-Edition Guest. */}
         {!preview && (
           <div className="p-3 md:hidden">
@@ -388,6 +397,43 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
         </aside>
       )}
     </div>
+  );
+}
+
+// Lesson titles are stored as "Title <em dash> subtitle"; chrome shows the head.
+const TITLE_SEP = String.fromCharCode(8212);
+
+// The Guest flavour of the end-of-lesson card: next from the course bundle,
+// completion in the per-device done set.
+function GuestLessonFoot({
+  course,
+  lessonKey,
+  completed,
+  markComplete,
+  token,
+}: {
+  course: GuestCourse;
+  lessonKey: string;
+  completed: ReadonlySet<string>;
+  markComplete: (lessonKey: string) => void;
+  token: string;
+}) {
+  const nextKey = nextLessonKey(course.lessons, lessonKey);
+  const next = nextKey ? course.lessons.find((l) => l.key === nextKey) : undefined;
+  return (
+    <LessonFootCard
+      next={
+        next
+          ? {
+              href: `/share/${token}/lessons/${next.key}`,
+              seq: next.seq,
+              title: next.title.split(TITLE_SEP)[0]!.trim(),
+            }
+          : null
+      }
+      completed={completed.has(lessonKey)}
+      onAdvance={() => markComplete(lessonKey)}
+    />
   );
 }
 
