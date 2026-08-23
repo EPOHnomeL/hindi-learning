@@ -67,7 +67,11 @@ sibling `ui-overhaul-impl` map is resolved. This effort runs **before** the
   corrected 2026-08-02.) clears-with: 13
 - **Mobile-readiness bar** — what "good on a phone" means per surface, and the single
   breakpoint scale to replace the current `md:`-only ad-hockery. Feeds the pwa effort
-  that follows. clears-with: 03
+  that follows. One anchor already exists (2026-08-23): the app-level bottom tab bar
+  shipped; the full prototype record and verdict live in
+  [assets/mobile-bottom-nav.md](assets/mobile-bottom-nav.md), including the open
+  question of what the in-course lesson list becomes underneath it, which belongs
+  to this patch. clears-with: 03
 - **Spec assembly** — folding the resolved decisions into `spec.md` and charting
   `ui-overhaul-impl`; the last patch to clear.
 
