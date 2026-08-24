@@ -642,5 +642,10 @@
     "lead": "Añade {name} a tu pantalla de inicio para acceder rápido.",
     "install": "Instalar",
     "notNow": "Ahora no"
+  },
+  "Offline": {
+    "note": "Sin conexión. Mostrando la última lista guardada.",
+    "needsConnection": "Las lecciones necesitan conexión. Reconéctate e inténtalo de nuevo.",
+    "nothingSaved": "Sin conexión y aún no hay nada guardado en este dispositivo."
   }
 }

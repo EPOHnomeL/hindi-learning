@@ -642,5 +642,10 @@
     "lead": "Ajoutez {name} à votre écran d'accueil pour un accès rapide.",
     "install": "Installer",
     "notNow": "Pas maintenant"
+  },
+  "Offline": {
+    "note": "Vous êtes hors ligne. Affichage de la dernière liste enregistrée.",
+    "needsConnection": "Les leçons nécessitent une connexion. Reconnectez-vous et réessayez.",
+    "nothingSaved": "Vous êtes hors ligne et rien n'est encore enregistré sur cet appareil."
   }
 }

@@ -642,5 +642,10 @@
     "lead": "Add {name} to your home screen for quick access.",
     "install": "Install",
     "notNow": "Not now"
+  },
+  "Offline": {
+    "note": "You are offline. Showing the last saved list.",
+    "needsConnection": "Lessons need a connection. Reconnect and try again.",
+    "nothingSaved": "You are offline and nothing is saved on this device yet."
   }
 }

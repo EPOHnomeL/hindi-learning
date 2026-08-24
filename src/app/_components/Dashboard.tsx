@@ -6,11 +6,12 @@ import { type FunctionReturnType } from "convex/server";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
 import { tenantPill } from "~/design/tenantPill";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
+import { catalogueCacheKey, DASHBOARD_CACHE_KEY, writeCache } from "./offlineCache";
 import { CourseCertMenu } from "./Certificate";
 import { CourseSettingsDialog } from "./CourseSettings";
 import { EditionsDialog } from "./Editions";
@@ -99,6 +100,24 @@ export function Dashboard() {
   const ts = useTranslations("Settings");
   const tenant = useTenant();
   const [prefsOpen, setPrefsOpen] = useState(false);
+
+  // Keep the Offline Catalogue's last-known-good list (installable-app 05):
+  // every resolve overwrites the cache, so what OfflineHome renders offline is
+  // exactly the last list this browser saw. Trimmed to the rendered fields so
+  // the cached shape stays stable as this query grows.
+  useEffect(() => {
+    if (courses === undefined) return;
+    writeCache(
+      window.localStorage,
+      DASHBOARD_CACHE_KEY,
+      courses.map((c) => ({
+        slug: c.slug,
+        title: c.title,
+        lessonCount: c.lessonCount,
+        completedCount: c.completedCount,
+      })),
+    );
+  }, [courses]);
 
   // A learner with nothing to their name who also can't author (open sign-up
   // admits everyone; the Allowlist gates creation, not existence — ADR 0021).
@@ -708,7 +727,19 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
 // is never written, so scoping on it left every tenant member's catalogue empty.
 function AvailableSection() {
   const t = useTranslations("Dashboard");
-  const catalogue = useQuery(api.catalogue.list, { tenantSlug: useTenantSlug() });
+  const tenantSlug = useTenantSlug();
+  const catalogue = useQuery(api.catalogue.list, { tenantSlug });
+  // The public catalogue's last-known-good copy, per tenant (installable-app
+  // 05). Written where the query lives; today that is only this signed-in
+  // section, so the cache fills from signed-in browsing.
+  useEffect(() => {
+    if (catalogue === undefined) return;
+    writeCache(
+      window.localStorage,
+      catalogueCacheKey(tenantSlug),
+      catalogue.map((c) => ({ slug: c.slug, title: c.title })),
+    );
+  }, [catalogue, tenantSlug]);
   // A course you've already transferred money for is not a course to discover.
   // It has its own card under "Awaiting payment", with the reference on it —
   // leaving it here too would offer the buyer its price a second time, which

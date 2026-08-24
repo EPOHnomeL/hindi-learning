@@ -59,6 +59,20 @@ describe("clearAccountLocalState", () => {
     expect(storage.getItem("hindi:lang")).toBeNull();
   });
 
+  it("clears the Offline Catalogue caches: the dashboard list is per-account", () => {
+    const storage = fakeStorage({
+      "hindi:cache:dashboard": "[]",
+      "hindi:cache:catalogue:ywampotch": "[]",
+      "hindi:theme": "dark",
+    });
+
+    clearAccountLocalState(storage);
+
+    expect(storage.getItem("hindi:cache:dashboard")).toBeNull();
+    expect(storage.getItem("hindi:cache:catalogue:ywampotch")).toBeNull();
+    expect(storage.getItem("hindi:theme")).toBe("dark");
+  });
+
   it("leaves other apps' keys untouched", () => {
     const storage = fakeStorage({ "other:thing": "keep", "hindi:lang": "xh" });
 

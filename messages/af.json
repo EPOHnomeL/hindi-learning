@@ -642,5 +642,10 @@
     "lead": "Voeg {name} by jou tuisskerm vir vinnige toegang.",
     "install": "Installeer",
     "notNow": "Nie nou nie"
+  },
+  "Offline": {
+    "note": "Jy is vanlyn. Wys die laaste gestoorde lys.",
+    "needsConnection": "Lesse benodig 'n verbinding. Koppel weer en probeer weer.",
+    "nothingSaved": "Jy is vanlyn en niks is nog op hierdie toestel gestoor nie."
   }
 }
