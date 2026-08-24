@@ -48,3 +48,39 @@ cross-tenant cache sharing is possible, which is the correct behaviour for free.
 - Convex still connects normally online; the worker is not in that path.
 
 ## Answer
+
+Built 2026-08-24. `public/sw.js` (~90 lines with the rules documented in-file), hand-rolled
+as specified, no next-pwa/Serwist. The routing decision is a pure `route(url, mode)` the
+worker exposes as `self.__route`, pinned by `src/lib/sw.test.ts` (6 tests, run in a
+`node:vm` with stubbed worker globals): static cache-first, navigations network-first,
+everything else network only, with `?_rsc=` refused even on a navigate-mode request and
+cross-origin (Convex) never touched. Versioned `shell-v1`/`static-v1` caches purged on
+activate; `skipWaiting()`/`clients.claim()`. A successful online render of `/` refreshes
+the cached shell, so the offline fallback tracks the latest deploy the device saw.
+
+Registration is `src/app/_components/RegisterServiceWorker.tsx`, mounted in the root
+layout, after the window load event so it never competes with first paint, and
+**production builds only**: dev chunks under `/_next/static/` are NOT content-hashed, so
+the cache-first rule would serve stale HMR chunks and wreck the dev loop. NODE_ENV is
+inlined at build time, so the dev bundle carries no registration at all. That constraint
+is not in the ticket but is load-bearing; it means the worker is only ever testable
+against `next build` + `next start`, never `pnpm dev`.
+
+**Evidence, and which kind: walked in a real (headless Chromium, Playwright) browser**
+against a production build on a local `next start`:
+
+- Worker registers and takes control; Cache Storage shows exactly `shell-v1,static-v1`,
+  20 static entries and the cached `/`; **zero `?_rsc=` URLs ever cached**.
+- **Offline reload renders the shell**, not the browser error page.
+- **Version bump walked**: with caches primed at v1, editing the live `sw.js` to v2 and
+  reloading left exactly `shell-v2,static-v2`, the v1 caches purged by activate.
+- **Deploy-skew walked**: primed the caches, stopped the server, rebuilt with a marker
+  change, restarted, reloaded online. The learner got the NEW document (marker present),
+  no blank screen, no missing-chunk console errors, no failed requests.
+- Convex connects normally online (the walk's pages loaded live data; cross-origin is
+  outside the worker per the unit-pinned rules).
+
+**Not claimed:** Chrome's "installable" verdict. `beforeinstallprompt` did not fire in
+headless Chromium within 15s (headless suppresses the app-banner pipeline), so
+DevTools -> Application "installable" remains for a human check in a real browser; ticket
+03 captures that same event on a real Chrome, where this resolves itself either way.
