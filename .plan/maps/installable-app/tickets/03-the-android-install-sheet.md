@@ -60,3 +60,33 @@ with no work.
 - Nothing appears on a desktop browser that never fires the event.
 
 ## Answer
+
+Built 2026-08-24. `src/app/_components/InstallSheet.tsx`, mounted in `src/app/page.tsx`
+outside the auth gates so it lives on `/` in both auth states and nowhere else. Exactly
+the specified mechanism: `beforeinstallprompt` is `preventDefault()`ed and kept; the
+sheet renders only when the event has fired AND ~3s have passed AND not standalone
+(`display-mode: standalone` media query plus `navigator.standalone`) AND not dismissed;
+Install replays the kept event; "Not now" writes `hindi:install-dismissed` as a
+`Date.now()` string. The 30-day window is a pure function
+(`installPromptDerive.ts`, 4 tests: fresh, within, expired, corrupt), and the key is in
+the `KEEP` set with a sweep-survival test beside the existing `accountLocalState`
+tests. Content is the existing `Brand` lockup, the `displayName` in one line of copy,
+and the two buttons; strings are a `next-intl` `Install` namespace in all five locale
+files. Styling is the token palette (`bg-card`/`border-line`/`bg-accent`); per ADR 0030
+this surface may be restyled once ui-overhaul 03 lands.
+
+**Evidence, and which kind.** The sheet's behaviour was **walked in a browser**
+(headless Chromium, production build, synthetic `beforeinstallprompt` since the real
+one requires Android Chrome's install pipeline): hidden before the 3s delay, visible
+and branded after; Install calls `prompt()` on the kept event and closes the sheet;
+"Not now" writes the key and the sheet stays hidden across reloads; clearing the key
+brings it back; with no event fired, nothing ever appears (the desktop case). Sign-out
+survival is pinned by the unit test.
+
+**Verified by reading the code only**, because they need a physical Android device or
+real tenant hosts: the OS dialog actually installing with the tenant icon and name, the
+chrome-less launch into `/`, the sheet's absence inside the installed app (the
+standalone guard is code-read, its media query untestable headless), and per-tenant
+dismissal isolation (structural: tenant subdomains are separate origins, so separate
+localStorage; there is nothing to get wrong in code). These fall out of the release
+gate walk on a real device (ticket 04's gate covers the install-and-sign-in pass).
