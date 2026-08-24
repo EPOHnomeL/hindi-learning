@@ -637,5 +637,10 @@
     "errVoided": "Daardie kode is gekanselleer. Vra jou organisasie daaroor.",
     "errAlreadyHaveAccess": "Jy het reeds toegang tot hierdie kursus, so ons het nie jou kode gebruik nie. Gee dit aan iemand wat dit nodig het.",
     "errGeneric": "Iets het verkeerd geloop. Probeer asseblief weer."
+  },
+  "Install": {
+    "lead": "Voeg {name} by jou tuisskerm vir vinnige toegang.",
+    "install": "Installeer",
+    "notNow": "Nie nou nie"
   }
 }

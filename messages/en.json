@@ -637,5 +637,10 @@
     "errVoided": "That code has been cancelled. Ask your organisation about it.",
     "errAlreadyHaveAccess": "You already have access to this course, so we haven't used your code. Pass it on to somebody who needs it.",
     "errGeneric": "Something went wrong. Please try again."
+  },
+  "Install": {
+    "lead": "Add {name} to your home screen for quick access.",
+    "install": "Install",
+    "notNow": "Not now"
   }
 }

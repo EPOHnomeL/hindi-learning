@@ -637,5 +637,10 @@
     "errVoided": "Ese código ha sido anulado. Consulta a tu organización.",
     "errAlreadyHaveAccess": "Ya tienes acceso a este curso, así que no hemos usado tu código. Pásaselo a quien lo necesite.",
     "errGeneric": "Algo ha salido mal. Inténtalo de nuevo."
+  },
+  "Install": {
+    "lead": "Añade {name} a tu pantalla de inicio para acceder rápido.",
+    "install": "Instalar",
+    "notNow": "Ahora no"
   }
 }

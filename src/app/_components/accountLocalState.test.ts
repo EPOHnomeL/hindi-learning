@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clearAccountLocalState, LAST_AUTH_KEY } from "./accountLocalState";
+import { clearAccountLocalState, INSTALL_DISMISSED_KEY, LAST_AUTH_KEY } from "./accountLocalState";
 
 // A minimal in-memory Storage stand-in — the helper only touches
 // length/key/removeItem, but a full setItem/getItem keeps the test readable.
@@ -47,6 +47,15 @@ describe("clearAccountLocalState", () => {
     clearAccountLocalState(storage);
 
     expect(storage.getItem(LAST_AUTH_KEY)).toBe("google");
+    expect(storage.getItem("hindi:lang")).toBeNull();
+  });
+
+  it("keeps the install dismissal: sign-out must not re-nag the learner to install", () => {
+    const storage = fakeStorage({ [INSTALL_DISMISSED_KEY]: "1756000000000", "hindi:lang": "xh" });
+
+    clearAccountLocalState(storage);
+
+    expect(storage.getItem(INSTALL_DISMISSED_KEY)).toBe("1756000000000");
     expect(storage.getItem("hindi:lang")).toBeNull();
   });
 

@@ -637,5 +637,10 @@
     "errVoided": "Ce code a été annulé. Renseignez-vous auprès de votre organisation.",
     "errAlreadyHaveAccess": "Vous avez déjà accès à ce cours, nous n'avons donc pas utilisé votre code. Transmettez-le à quelqu'un qui en a besoin.",
     "errGeneric": "Une erreur est survenue. Veuillez réessayer."
+  },
+  "Install": {
+    "lead": "Ajoutez {name} à votre écran d'accueil pour un accès rapide.",
+    "install": "Installer",
+    "notNow": "Pas maintenant"
   }
 }

@@ -3,6 +3,7 @@
 import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
 import { Dashboard } from "~/app/_components/Dashboard";
 import { DonationHashRedirect } from "~/app/_components/DonationHashRedirect";
+import { InstallSheet } from "~/app/_components/InstallSheet";
 import { Landing } from "~/app/_components/Landing";
 import { useTenantSlug } from "~/app/_components/TenantContext";
 import { landingFor } from "~/app/_landing/registry";
@@ -31,6 +32,9 @@ export default function HomePage() {
         <DonationHashRedirect />
         <Dashboard />
       </Authenticated>
+      {/* The install sheet lives on "/" only, in BOTH auth states, so it mounts
+          outside the auth gates (installable-app ticket 03). */}
+      <InstallSheet />
     </main>
   );
 }

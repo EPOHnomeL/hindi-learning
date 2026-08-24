@@ -18,12 +18,19 @@
 // actually use.
 export const LAST_AUTH_KEY = "hindi:last-auth";
 
+// When the learner tapped "Not now" on the install sheet (installable-app
+// ticket 03) as a Date.now() string; the sheet stays away for 30 days from it.
+// A device preference like the theme, so it survives the sign-out sweep. The
+// Offline Catalogue keys are deliberately NOT kept: the dashboard list is
+// per-account, so the sweep clearing those is what handles a shared browser.
+export const INSTALL_DISMISSED_KEY = "hindi:install-dismissed";
+
 // Survives the sign-out sweep below, deliberately. The hint is worthless if it is
 // wiped by the very act it describes — and unlike an Edition language or guest
 // progress it names a *method*, not an identity: it reveals nothing about the
 // account that just left, so the shared-browser leak the sweep exists to prevent
 // doesn't apply.
-const KEEP = new Set(["hindi:theme", LAST_AUTH_KEY]);
+const KEEP = new Set(["hindi:theme", LAST_AUTH_KEY, INSTALL_DISMISSED_KEY]);
 const PREFIX = "hindi:";
 
 export type AuthMethod = "google" | "password";
