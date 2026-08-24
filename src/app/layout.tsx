@@ -7,6 +7,7 @@ import { getLocale } from "next-intl/server";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { AppTabs } from "./_components/AppTabs";
+import { RegisterServiceWorker } from "./_components/RegisterServiceWorker";
 import { headers } from "next/headers";
 import { getTenantSlug, getTenantView } from "~/lib/tenant-server";
 import { buildTenantThemeCss } from "~/design/tokens";
@@ -131,6 +132,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
                   /admin alike; it also appends the spacer that keeps the fixed
                   bar off the last row of every page. */}
               <AppTabs />
+              <RegisterServiceWorker />
             </ConvexClientProvider>
           </NextIntlClientProvider>
         </body>
