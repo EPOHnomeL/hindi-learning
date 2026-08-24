@@ -648,6 +648,7 @@
   "Offline": {
     "note": "You are offline. Showing the last saved list.",
     "needsConnection": "Lessons need a connection. Reconnect and try again.",
-    "nothingSaved": "You are offline and nothing is saved on this device yet."
+    "nothingSaved": "You are offline and nothing is saved on this device yet.",
+    "retry": "Retry"
   }
 }

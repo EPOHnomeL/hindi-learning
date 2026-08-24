@@ -10,6 +10,12 @@
 // beside the sweep's own).
 export const DASHBOARD_CACHE_KEY = "hindi:cache:dashboard";
 
+// The tenant's display name, so the offline header doesn't read "My Course" on
+// a whitelabel host (seen on ywampotch, 2026-08-24). Branding, not account
+// state, but it rides the same sweep as the lists: worst case after sign-out is
+// the default name, not a wrong list.
+export const TENANT_NAME_CACHE_KEY = "hindi:cache:tenant-name";
+
 export function catalogueCacheKey(tenantSlug: string | null): string {
   return `hindi:cache:catalogue:${tenantSlug ?? "default"}`;
 }

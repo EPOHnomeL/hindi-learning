@@ -648,6 +648,7 @@
   "Offline": {
     "note": "Sin conexión. Mostrando la última lista guardada.",
     "needsConnection": "Las lecciones necesitan conexión. Reconéctate e inténtalo de nuevo.",
-    "nothingSaved": "Sin conexión y aún no hay nada guardado en este dispositivo."
+    "nothingSaved": "Sin conexión y aún no hay nada guardado en este dispositivo.",
+    "retry": "Reintentar"
   }
 }

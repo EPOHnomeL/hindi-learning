@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useConvexConnectionState } from "convex/react";
 import { useTranslations } from "next-intl";
 import { useTenant, useTenantSlug } from "./TenantContext";
-import { catalogueCacheKey, DASHBOARD_CACHE_KEY, readCache } from "./offlineCache";
+import { catalogueCacheKey, DASHBOARD_CACHE_KEY, readCache, TENANT_NAME_CACHE_KEY } from "./offlineCache";
 import { Logo } from "./Logo";
 
 // What the two cache writers store: just enough to render a recognisable list.
@@ -37,14 +37,19 @@ export function useOffline(): boolean {
     update();
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
-    const timer = setTimeout(() => setGraceOver(true), 3000);
+    const timer = setTimeout(() => setGraceOver(true), 8000);
     return () => {
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
       clearTimeout(timer);
     };
   }, []);
-  return !onLine || (graceOver && !connection.isWebSocketConnected);
+  // hasEverConnected keeps this honest on a slow mobile first connect and
+  // between reconnect retries: a phone that reached Convex once this page load
+  // is ONLINE with a blip, never "offline" (a learner online saw the offline
+  // view on 2026-08-24: 3s grace was shorter than their first WS connect). The
+  // grace path exists only for the boot that never connects at all.
+  return !onLine || (graceOver && !connection.isWebSocketConnected && !connection.hasEverConnected);
 }
 
 // The Offline Catalogue (installable-app ticket 05, ADR 0030 §3): the last saved
@@ -67,16 +72,28 @@ export function OfflineHome() {
   // still gets the tenant's catalogue); the sign-out sweep clears both.
   const dash = readCache<CachedCourse[]>(window.localStorage, DASHBOARD_CACHE_KEY);
   const list = dash?.length ? dash : readCache<CachedCourse[]>(window.localStorage, catalogueCacheKey(slug));
+  // The live tenant query is unreachable offline, so the header name comes from
+  // the cache the Dashboard keeps; without it a whitelabel host reads "My Course".
+  const name =
+    tenant?.displayName ?? readCache<string>(window.localStorage, TENANT_NAME_CACHE_KEY) ?? "My Course";
 
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
       <header className="mb-6 flex items-center gap-3">
         <Logo className="h-9 w-9 shrink-0 text-accent" />
-        <h1 className="text-2xl font-semibold tracking-tight text-accent">
-          {tenant?.displayName ?? "My Course"}
-        </h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-accent">{name}</h1>
       </header>
-      <p className="mb-6 text-sm text-soft">{t("note")}</p>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <p className="text-sm text-soft">{t("note")}</p>
+        {/* A reload is the full retry: it re-runs the connection attempt AND
+            re-mints the auth client's tokens from the cookie (see HomePage). */}
+        <button
+          onClick={() => window.location.reload()}
+          className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-sm text-accent"
+        >
+          {t("retry")}
+        </button>
+      </div>
       {tapped && (
         <p aria-live="polite" className="mb-4 rounded-lg border border-line bg-card p-3 text-sm text-ink">
           {t("needsConnection")}

@@ -11,7 +11,7 @@ import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
 import { tenantPill } from "~/design/tenantPill";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
-import { catalogueCacheKey, DASHBOARD_CACHE_KEY, writeCache } from "./offlineCache";
+import { catalogueCacheKey, DASHBOARD_CACHE_KEY, TENANT_NAME_CACHE_KEY, writeCache } from "./offlineCache";
 import { CourseCertMenu } from "./Certificate";
 import { CourseSettingsDialog } from "./CourseSettings";
 import { EditionsDialog } from "./Editions";
@@ -105,6 +105,9 @@ export function Dashboard() {
   // every resolve overwrites the cache, so what OfflineHome renders offline is
   // exactly the last list this browser saw. Trimmed to the rendered fields so
   // the cached shape stays stable as this query grows.
+  useEffect(() => {
+    if (tenant?.displayName) writeCache(window.localStorage, TENANT_NAME_CACHE_KEY, tenant.displayName);
+  }, [tenant?.displayName]);
   useEffect(() => {
     if (courses === undefined) return;
     writeCache(

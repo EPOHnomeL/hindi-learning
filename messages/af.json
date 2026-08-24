@@ -648,6 +648,7 @@
   "Offline": {
     "note": "Jy is vanlyn. Wys die laaste gestoorde lys.",
     "needsConnection": "Lesse benodig 'n verbinding. Koppel weer en probeer weer.",
-    "nothingSaved": "Jy is vanlyn en niks is nog op hierdie toestel gestoor nie."
+    "nothingSaved": "Jy is vanlyn en niks is nog op hierdie toestel gestoor nie.",
+    "retry": "Probeer weer"
   }
 }
