@@ -55,3 +55,47 @@ need this derived path built for the missing-asset case.
 - An unseeded host degrades to the default manifest rather than erroring.
 
 ## Answer
+
+Built 2026-08-24. Three pieces, exactly as specified:
+
+- **`src/lib/pwa.ts`** holds the pure seams, pinned by `src/lib/pwa.test.ts` (8 tests):
+  `buildManifest(tenant)` and `appIconSpec(tenant, {size, maskable})`, both taking the
+  `getTenantView()` shape with `null` as the default site AND the degrade path.
+  `theme_color`/`background_color`/icon background are all the tenant's light **paper**
+  (not accent): the Logo already renders on paper in the app header, so legibility there
+  is a property the brand has proven. Icon source falls back Logo, then Favicon, then
+  `null` meaning the shipped `/icon.svg` mark. Contain box is 80% of the square, 60%
+  maskable.
+- **`src/app/manifest.webmanifest/route.ts`** is the route handler (a dotted route
+  *directory*, not Next's static `app/manifest.ts` convention). Note: the middleware
+  matcher skips dotted paths, so no `x-tenant-slug` header is stamped on this route;
+  it resolves anyway because `getTenantSlug` falls back to parsing `Host` directly.
+- **`src/app/app-icon/route.tsx`** renders the icon by `ImageResponse`, sizes via query
+  string (`?size=192|512|180`, `&maskable=1`) because the manifest needs distinct URLs
+  and four route files would say the same thing. Size clamped 48 to 1024. The root
+  layout exports `generateViewport` (per-tenant `themeColor`) and links the manifest,
+  `apple-touch-icon`, and both `mobile-web-app-capable` metas: Next's `appleWebApp`
+  emits only the modern one, so the apple-prefixed original pre-16.4 iOS needs is added
+  via `other`.
+
+**Evidence, and which kind.** Walked live against a dev server on port 3199 and the dev
+Convex deployment (not just read): `curl -H "Host: ywampotch.localhost"` returned the
+YWAM Potch manifest with its own paper `#fdf8f2` and `Content-Type:
+application/manifest+json`; the apex returned the valid "My Course" default; all four
+icon sizes returned 200 `image/png`, opaque, rendered and looked at; the rendered `/`
+head carries the manifest link, theme-color, viewport, apple-touch-icon and both
+capable metas. The unseeded/degrade path is unit-tested and is also what the apex walk
+exercised.
+
+**The YWAM 7:1 check, honestly.** No dev tenant has a logo/favicon seeded (verified:
+`getTheme` returns `logoUrl: null` for all four), and this session was not permitted to
+copy the prod logo into dev, so the *tenant-data* render used the shipped-mark fallback.
+The 7:1 case itself was still walked mechanically: a generated 700x100 raster banner was
+rendered through `appIconSpec` and the route's exact JSX via the same `ImageResponse`,
+at 512 and 512-maskable, and read as expected: a wide logo contained with padding on an
+opaque paper square, smaller inside the maskable safe zone. What remains unwalked is
+only satori fetching a logo over https from Convex storage; the fallback already
+exercises the same fetch-and-composite path against `/icon.svg` on the live server.
+
+DevTools "installable" is deliberately not claimed: Chrome will not report it until
+ticket 02 lands the service worker, per this ticket's own Done-when.
