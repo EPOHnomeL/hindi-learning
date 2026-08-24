@@ -21,7 +21,9 @@ import { useTheme } from "./ThemeContext";
 //
 // Two languages, kept apart on purpose: the APP language (chrome locale) is an
 // account-level preference and lives here; the READING language (a course's
-// Edition, ?lang=) is per-course and lives on the course card's globe.
+// Edition, ?lang=) is per-course and lives in the reader drawer, at the top of
+// the lesson list (ReadingLanguage.tsx, 2026-08-24), plus the owner's Home card
+// globe.
 export function SettingsPage() {
   const t = useTranslations("Settings");
   const tc = useTranslations("Common");

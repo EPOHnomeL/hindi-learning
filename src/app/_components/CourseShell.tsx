@@ -12,6 +12,8 @@ import { CompletionCelebration } from "./Certificate";
 import { Icon } from "./icons";
 import { NavItem } from "./NavItem";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
+import { dragOffset, shouldDismiss } from "./drawerDrag";
+import { ReadingLanguage } from "./ReadingLanguage";
 import { useEditionLang, withLang } from "./editionUrl";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
@@ -88,6 +90,13 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const purchaseToken = searchParams.get("purchase") === "return" ? searchParams.get("mp") : null;
   const [menuOpen, setMenuOpen] = useState(false);
   const navHidden = useHideOnScroll();
+  // Swipe-to-dismiss on the mobile drawer (drawerDrag.ts): `drag` is how far the
+  // sheet is currently pulled down (null when no finger is on the handle),
+  // `dragFrom` the pointer-down Y it is measured from, and `drawerRef` supplies
+  // the sheet's own height for the release threshold.
+  const [drag, setDrag] = useState<number | null>(null);
+  const dragFrom = useRef<number | null>(null);
+  const drawerRef = useRef<HTMLElement>(null);
 
   const lessons = useQuery(api.content.reader.listLessons, { topicSlug: slug, lang: lang ?? undefined });
   const references = useQuery(api.content.reader.listReferences, { topicSlug: slug, lang: lang ?? undefined });
@@ -239,31 +248,72 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
 
         {menuOpen && <div onClick={() => setMenuOpen(false)} aria-hidden className="fixed inset-0 z-30 bg-black/40 md:hidden" />}
 
+        {/* `pb-[5.75rem]` is the fix for the tail the app tab bar was eating
+            (2026-08-24): the drawer is `fixed bottom-0`, the bar is a fixed
+            4.75rem on top of it, so without that padding the last rows of the
+            list (Resources, and whatever is pinned below it) were unreachable at
+            any scroll position. A phone screenshot of it cut off is what
+            reported this. `max-h-[80vh]` stays: the drawer is a sheet over the
+            lesson, not a full-screen takeover.
+            `style.transform` is the live drag (mobile only, while a finger is
+            down); it beats the translate-y classes for exactly that moment. */}
         <aside
-          className={`fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] transform flex-col overflow-y-auto overscroll-y-none border-t border-line rounded-t-2xl bg-paper p-4 transition-transform duration-300 md:static md:z-auto md:w-64 md:h-auto md:border-r md:border-t-0 md:rounded-t-none md:translate-y-0 md:translate-x-0 md:max-h-none md:transition-none ${
+          ref={drawerRef}
+          style={drag === null ? undefined : { transform: `translateY(${drag}px)`, transition: "none" }}
+          className={`fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] transform flex-col overflow-y-auto overscroll-y-none border-t border-line rounded-t-2xl bg-paper p-4 pb-[5.75rem] transition-transform duration-300 md:static md:z-auto md:w-64 md:h-auto md:border-r md:border-t-0 md:rounded-t-none md:translate-y-0 md:translate-x-0 md:max-h-none md:p-4 md:transition-none ${
             menuOpen ? "translate-y-0" : "translate-y-full"
           }`}
         >
-          {/* Drawer handle for mobile */}
-          <div className="mx-auto mb-3.5 h-1.5 w-12 shrink-0 rounded-full bg-line md:hidden" />
+          {/* Drawer handle for mobile. Draggable as it looks (2026-08-24): the
+              handle used to be decoration, so pulling the sheet down did nothing
+              and the only ways to shut it were the scrim and the hamburger. The
+              pointer handlers live on this generous hit area rather than the
+              whole aside, which is the scroll container for the lesson list. */}
+          <div
+            onPointerDown={(e) => {
+              e.currentTarget.setPointerCapture(e.pointerId);
+              dragFrom.current = e.clientY;
+              setDrag(0);
+            }}
+            onPointerMove={(e) => {
+              if (dragFrom.current === null) return;
+              setDrag(dragOffset(dragFrom.current, e.clientY));
+            }}
+            onPointerUp={(e) => {
+              if (dragFrom.current === null) return;
+              const pulled = dragOffset(dragFrom.current, e.clientY);
+              dragFrom.current = null;
+              setDrag(null);
+              if (shouldDismiss(pulled, drawerRef.current?.offsetHeight ?? 0)) setMenuOpen(false);
+            }}
+            onPointerCancel={() => {
+              dragFrom.current = null;
+              setDrag(null);
+            }}
+            className="-mt-1 mb-2.5 flex shrink-0 cursor-grab touch-none justify-center py-2 active:cursor-grabbing md:hidden"
+          >
+            <span aria-hidden className="h-1.5 w-12 rounded-full bg-line" />
+          </div>
 
           {/* The brand lockup, mirroring PublicReader's sidebar (ywampotch-launch
               01). This was the last chrome surface with no brand mark at all: a
               tenant learner signed in off a branded landing page and read the
               course under an unbranded frame, immediately before being asked to
-              pay. Lives in the sidebar rather than the mobile top bar on purpose —
-              that bar is a fixed h-12 with an already-truncating course title, and
-              a 7:1 banner logo would wreck it. */}
+              pay. Desktop only since 2026-08-24: on a phone the drawer is the
+              lesson list and nothing else, so the course title leads it and the
+              tenant mark stays on the surfaces that have room for it. */}
           <Link
             href="/"
             aria-label={t("backToCoursesLabel")}
             title={t("backToCoursesLabel")}
-            className="mb-3 block shrink-0 hover:opacity-80"
+            className="mb-3 hidden shrink-0 hover:opacity-80 md:block"
           >
             <Brand className="h-8 w-auto max-w-40 object-contain" />
           </Link>
 
-          <div className="mb-2 flex items-center justify-between gap-2">
+          {/* Desktop only, same reasoning: on a phone, Home is a tab and Sign out
+              lives on /settings, one tab away. */}
+          <div className="mb-2 hidden items-center justify-between gap-2 md:flex">
             <Link
               href="/"
               className="hidden md:flex -ml-1 items-center gap-1 rounded-lg px-1.5 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
@@ -287,6 +337,11 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
           <h1 className="mb-4 truncate text-lg font-semibold tracking-tight text-accent">{header?.title ?? "…"}</h1>
 
           <nav className="flex flex-col gap-1">
+            {/* The reading language, first thing in the list (2026-08-24). See
+                ReadingLanguage for why it is here and not on the Home card. */}
+            {header && header.editions.length > 1 && (
+              <ReadingLanguage editions={header.editions} current={header.lang} />
+            )}
             <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wider text-accent2">{t("lessons")}</p>
             {lessons?.length === 0 && (
               <p className="px-2 text-sm text-soft">{canWrite ? t("preparingFirstLesson") : t("noLessonsPublished")}</p>
@@ -319,11 +374,12 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             <ResourcesSection topicSlug={slug} canWrite={canWrite} />
           </nav>
 
-          {/* The drawer is lessons, references and resources, nothing else
-              (mobile bottom nav, 2026-08-23): Course settings and the Edition
-              switcher moved to the course card on Home (the kebab and the globe),
-              where the owner already had a second door to both. */}
-          <div className="mt-auto flex flex-col gap-2 pt-2">
+          {/* On a phone the drawer is the lesson list, the reading language and
+              nothing else. Light/Dark is desktop-only here because on mobile it
+              lives on /settings under Appearance (a tab away), and the Edition
+              switcher that used to sit in this spot moved to the TOP of the nav
+              above, where a thumb can actually reach it (2026-08-24). */}
+          <div className="mt-auto hidden flex-col gap-2 pt-2 md:flex">
             <ThemeToggle />
           </div>
         </aside>

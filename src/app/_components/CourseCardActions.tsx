@@ -73,10 +73,11 @@ export function CourseCardActions({
         {openLabel}
       </Link>
 
-      {/* The reading language of THIS course (its Edition), which came off the
-          lesson drawer. Per-course, so it cannot sit in Settings beside the app
-          language. Only shown once a translation exists: one Edition is not a
-          choice. */}
+      {/* The reading language of THIS course (its Edition). Per-course, so it
+          cannot sit in Settings beside the app language. Only shown once a
+          translation exists: one Edition is not a choice. A second door to the
+          same setting since 2026-08-24, when the reader drawer got its own
+          select back (ReadingLanguage.tsx, mobile-reader-todos/06). */}
       {editions.length > 0 && (
         <Menu triggerIcon="globe" triggerLabel={t("readingLanguageFor", { title })}>
           {(close) => (
