@@ -1,6 +1,6 @@
 import "~/styles/globals.css";
 
-import { type Metadata } from "next";
+import { type Metadata, type Viewport } from "next";
 import { Spectral, Noto_Serif_Devanagari } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
@@ -10,6 +10,7 @@ import { AppTabs } from "./_components/AppTabs";
 import { headers } from "next/headers";
 import { getTenantSlug, getTenantView } from "~/lib/tenant-server";
 import { buildTenantThemeCss } from "~/design/tokens";
+import { pwaThemeColor } from "~/lib/pwa";
 import { isDevanagari } from "../../convex/languages";
 
 // Per-host metadata (issue 11): a tenant serves its own favicon (and browser-tab
@@ -20,6 +21,13 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title: tenant?.displayName ?? "My Course",
     description: "Your courses — lessons grounded in reading.",
+    // The installable-app surface (ticket 01): the per-tenant manifest route and
+    // the derived apple-touch-icon (iOS ignores manifest icons).
+    manifest: "/manifest.webmanifest",
+    appleWebApp: { capable: true, title: tenant?.displayName ?? "My Course" },
+    // Next's appleWebApp emits the modern `mobile-web-app-capable`; pre-16.4 iOS
+    // only reads the apple-prefixed original, so emit that one too.
+    other: { "apple-mobile-web-app-capable": "yes" },
     icons: {
       icon: tenant?.faviconUrl
         ? [{ url: tenant.faviconUrl }]
@@ -27,7 +35,19 @@ export async function generateMetadata(): Promise<Metadata> {
             { url: "/icon.svg", type: "image/svg+xml" },
             { url: "/favicon.ico", sizes: "any" },
           ],
+      apple: [{ url: "/app-icon?size=180", sizes: "180x180", type: "image/png" }],
     },
+  };
+}
+
+// themeColor must be per-tenant like everything else, so it is a generate
+// function, not a static viewport export (installable-app ticket 01).
+export async function generateViewport(): Promise<Viewport> {
+  const tenant = await getTenantView();
+  return {
+    width: "device-width",
+    initialScale: 1,
+    themeColor: pwaThemeColor(tenant),
   };
 }
 
