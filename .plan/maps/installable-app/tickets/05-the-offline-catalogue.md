@@ -55,3 +55,43 @@ within a second of reconnecting.
 - Cached progress being slightly stale is confirmed acceptable in the walkthrough.
 
 ## Answer
+
+Built 2026-08-24. As specified, with one correction the walkthrough forced on the design
+(below). Pieces: `offlineCache.ts` (pure read/write over Storage, corrupt JSON reads as
+null, keys `hindi:cache:dashboard` and `hindi:cache:catalogue:<tenant>`, 4 tests);
+cache writes where the two queries live (Dashboard for `api.content.reader.dashboard`,
+AvailableSection for `api.catalogue.list`, trimmed to slug/title/counts); `OfflineHome`
+renders the cached list with the quiet note, a plain needs-a-connection line when a
+course is tapped, and an honest empty state when nothing is cached. Both keys are
+outside `KEEP`, and the sweep clearing them is pinned by a test beside the existing
+sweep tests. Strings are a `next-intl` `Offline` namespace in all five locales.
+
+**The correction: the ticket's render rule was aimed at the wrong gate.** The
+useQuery-undefined-forever trap is real, but it sits BEHIND the auth gate, and walked in
+a real browser the gate itself does something different offline: Convex Auth's client
+resolves UNAUTHENTICATED (its server-state fetch fails and it drops its localStorage
+tokens), so a signed-in learner relaunching offline got the marketing landing with a
+dead sign-in form, not an eternal spinner. So `/` swaps its whole auth-gated tree for
+OfflineHome whenever `useOffline()` is true: navigator.onLine false, OR the Convex
+WebSocket still unconnected 3s after mount (the dead-router case a bare onLine misses,
+and the ticket's undefined-forever rule expressed at the connection where it is
+actually observable). And because an offline BOOT drops the auth client's tokens while
+the real session survives in the httpOnly cookie, reconnection reloads the document
+once (sessionStorage-stamped against flap loops) so the learner comes back signed in
+instead of stranded on the landing.
+
+**Evidence: walked in a browser** (headless Chromium, production build, a real
+throwaway password account on the dev deployment, real caches written by the live
+queries): signed-in offline relaunch renders the offline note and list, not a spinner;
+cached courses render with their (stale-by-design, confirmed acceptable) progress; a
+tap says plainly it needs a connection; nothing-cached shows the honest empty state;
+reconnecting restored the live signed-in dashboard with no user action; sign-out
+cleared both cache keys. Also walked: the dev deployment was missing yesterday's
+`capture:myLastRead` (frontend committed 2026-08-23, functions never pushed), which
+crashed every signed-in page against a local build; fixed by `npx convex dev --once`.
+
+**Two honest limits.** (1) Signed out, the catalogue cache only fills from the
+signed-in dashboard's Available section, because no signed-out surface queries
+`api.catalogue.list` today; a signed-out first-ever offline visit gets the empty state.
+(2) "Walked" here is DevTools-style offline emulation on desktop Chromium, not
+airplane mode on a device; the device pass rides the ticket 04 release-gate walk.
