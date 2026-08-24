@@ -99,3 +99,12 @@ exercises the same fetch-and-composite path against `/icon.svg` on the live serv
 
 DevTools "installable" is deliberately not claimed: Chrome will not report it until
 ticket 02 lands the service worker, per this ticket's own Done-when.
+
+**Field correction (2026-08-24, commit `b523ac8`).** The unwalked remainder bit exactly
+where flagged: YWAM's prod logo is **webp**, which satori cannot decode and renders as
+NOTHING, silently, so the first real install dialog showed a bare paper square. The
+route now fetches the candidates itself, sniffs magic bytes (`satoriImageType`,
+unit-tested against the real prod files), and uses the first source satori can decode:
+logo, then favicon, then the shipped mark. YWAM's icon is its favicon emblem (jpeg)
+until someone re-uploads the logo as png; `scripts/tenant-branding.ts` now documents
+the caveat.

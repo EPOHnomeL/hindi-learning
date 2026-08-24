@@ -90,6 +90,13 @@ cleared both cache keys. Also walked: the dev deployment was missing yesterday's
 `capture:myLastRead` (frontend committed 2026-08-23, functions never pushed), which
 crashed every signed-in page against a local build; fixed by `npx convex dev --once`.
 
+**Field correction (2026-08-24, commit `46a27ef`).** A learner who was online saw the
+offline view on a real phone: the 3s WebSocket grace was shorter than their first
+connect, and between-retries moments read as offline. The rule is now 8s grace AND the
+socket never having connected this page load (`hasEverConnected`); the offline view
+gained a Retry button (a reload also re-mints the auth tokens from the cookie), and the
+header shows a cached tenant name instead of "My Course" on a whitelabel host.
+
 **Two honest limits.** (1) Signed out, the catalogue cache only fills from the
 signed-in dashboard's Available section, because no signed-out surface queries
 `api.catalogue.list` today; a signed-out first-ever offline visit gets the empty state.
