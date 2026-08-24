@@ -280,3 +280,9 @@ Known costs, accepted knowingly rather than discovered later:
   `?lang=` in the URL still works, and owners switch via the card globe.
   Ticketed as
   [mobile-reader-todos 06](../../mobile-reader-todos/tickets/06-viewer-edition-switcher.md).
+  **Fixed 2026-08-24**, and not the way that ticket proposed: a user in Ivory
+  Coast reported the hole the next morning, so the switcher went back into the
+  reader drawer (at the TOP of the nav, `ReadingLanguage.tsx`) for every reader
+  rather than being copied onto the viewer cards. The card globe stays. This
+  reverses the "the drawer is lessons and nothing else" line of the verdict for
+  one control only; the reasoning is in ticket 06's Answer.

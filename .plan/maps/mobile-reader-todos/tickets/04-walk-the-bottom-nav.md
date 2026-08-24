@@ -44,6 +44,12 @@ rounding it to "fine".
       kinds: owned, shared, purchased (ticket 01's outstanding item).
 - [ ] Nothing sits under the bar: the spacer keeps the last row of every page
       reachable, including the reader's inline Q&A and the site footer.
+- [ ] The reader drawer (added 2026-08-24, ticket 06): the reading-language
+      select is the first thing above *Lessons* on a multi-Edition course and
+      absent on a single-Edition one; picking a language re-renders the list in
+      it; the tail of the list (*Resources*) clears the tab bar; the grab handle
+      drags the sheet down and a short pull snaps it back; no logo, no Sign out,
+      no Light/Dark on the phone drawer.
 
 ## Notes
 
