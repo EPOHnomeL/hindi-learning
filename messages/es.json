@@ -641,7 +641,9 @@
   "Install": {
     "lead": "Añade {name} a tu pantalla de inicio para acceder rápido.",
     "install": "Instalar",
-    "notNow": "Ahora no"
+    "notNow": "Ahora no",
+    "iosStep1": "Toca el botón Compartir",
+    "iosStep2": "Elige \"Añadir a pantalla de inicio\""
   },
   "Offline": {
     "note": "Sin conexión. Mostrando la última lista guardada.",

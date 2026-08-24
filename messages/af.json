@@ -641,7 +641,9 @@
   "Install": {
     "lead": "Voeg {name} by jou tuisskerm vir vinnige toegang.",
     "install": "Installeer",
-    "notNow": "Nie nou nie"
+    "notNow": "Nie nou nie",
+    "iosStep1": "Tik op die Deel-knoppie",
+    "iosStep2": "Kies \"Voeg by tuisskerm\""
   },
   "Offline": {
     "note": "Jy is vanlyn. Wys die laaste gestoorde lys.",

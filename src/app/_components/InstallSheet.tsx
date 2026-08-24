@@ -5,7 +5,8 @@ import { useTranslations } from "next-intl";
 import { Brand } from "./Brand";
 import { useTenant } from "./TenantContext";
 import { INSTALL_DISMISSED_KEY } from "./accountLocalState";
-import { installDismissed } from "./installPromptDerive";
+import { installDismissed, isIosBrowser } from "./installPromptDerive";
+import { Icon } from "./icons";
 
 // Chrome's install event; not in TS's DOM lib because only Chromium ships it.
 type BeforeInstallPromptEvent = Event & { prompt(): Promise<unknown> };
@@ -27,6 +28,11 @@ export function InstallSheet() {
   const t = useTranslations("Install");
   const tenant = useTenant();
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
+  // The iOS half (ticket 04): no beforeinstallprompt exists there and never
+  // will, so an Install button would be a lie; iOS gets Share -> Add to Home
+  // Screen instructions on the same sheet, same trigger, same dismissal key.
+  // Kept deletable without touching the Android path.
+  const [ios, setIos] = useState(false);
   const [pastDelay, setPastDelay] = useState(false);
   const [closed, setClosed] = useState(false);
 
@@ -47,6 +53,7 @@ export function InstallSheet() {
       setPromptEvent(e as BeforeInstallPromptEvent);
     };
     window.addEventListener("beforeinstallprompt", onPrompt);
+    setIos(isIosBrowser(navigator.userAgent, navigator.maxTouchPoints));
     const timer = setTimeout(() => setPastDelay(true), 3000);
     return () => {
       window.removeEventListener("beforeinstallprompt", onPrompt);
@@ -54,11 +61,11 @@ export function InstallSheet() {
     };
   }, []);
 
-  if (!promptEvent || !pastDelay || closed) return null;
+  if ((!promptEvent && !ios) || !pastDelay || closed) return null;
 
   const install = () => {
     setClosed(true);
-    void promptEvent.prompt();
+    void promptEvent?.prompt();
   };
   const dismiss = () => {
     try {
@@ -76,13 +83,32 @@ export function InstallSheet() {
       <div className="mx-auto flex max-w-md flex-col gap-3">
         <Brand />
         <p className="text-sm text-soft">{t("lead", { name: tenant?.displayName ?? "My Course" })}</p>
+        {/* The captured event wins when both could apply: a real one-tap install
+            beats instructions. On iOS it never fires, so iOS always gets the
+            instructions. */}
+        {!promptEvent && ios && (
+          <ol className="flex flex-col gap-1.5 text-sm text-ink">
+            <li className="flex items-center gap-2">
+              <span className="text-soft">1.</span>
+              <Icon name="upload" className="h-4 w-4 text-accent" />
+              {t("iosStep1")}
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="text-soft">2.</span>
+              <Icon name="plus" className="h-4 w-4 text-accent" />
+              {t("iosStep2")}
+            </li>
+          </ol>
+        )}
         <div className="flex gap-2">
-          <button
-            onClick={install}
-            className="flex-1 rounded-lg bg-accent px-4 py-2.5 font-semibold text-paper"
-          >
-            {t("install")}
-          </button>
+          {promptEvent && (
+            <button
+              onClick={install}
+              className="flex-1 rounded-lg bg-accent px-4 py-2.5 font-semibold text-paper"
+            >
+              {t("install")}
+            </button>
+          )}
           <button onClick={dismiss} className="flex-1 rounded-lg border border-line px-4 py-2.5 text-soft">
             {t("notNow")}
           </button>

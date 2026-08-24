@@ -641,7 +641,9 @@
   "Install": {
     "lead": "Ajoutez {name} à votre écran d'accueil pour un accès rapide.",
     "install": "Installer",
-    "notNow": "Pas maintenant"
+    "notNow": "Pas maintenant",
+    "iosStep1": "Touchez le bouton Partager",
+    "iosStep2": "Choisissez \"Sur l'écran d'accueil\""
   },
   "Offline": {
     "note": "Vous êtes hors ligne. Affichage de la dernière liste enregistrée.",

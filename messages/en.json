@@ -641,7 +641,9 @@
   "Install": {
     "lead": "Add {name} to your home screen for quick access.",
     "install": "Install",
-    "notNow": "Not now"
+    "notNow": "Not now",
+    "iosStep1": "Tap the Share button",
+    "iosStep2": "Choose \"Add to Home Screen\""
   },
   "Offline": {
     "note": "You are offline. Showing the last saved list.",
