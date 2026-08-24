@@ -42,6 +42,18 @@ de-emphasising the sign-in most people prefer, to defend against a bug not yet c
 iOS, is the worse trade. If it does break, the fallback is to reorder the sign-in buttons when
 standalone - and `SignIn` already tracks `lastUsed`, so that machinery exists.
 
+**Progress note (2026-08-24, code built, gate NOT walked).** The sheet itself shipped in
+commit `2c3dd01` (its own commit, deletable without touching the Android path, as
+specified): `isIosBrowser(userAgent, maxTouchPoints)` in `installPromptDerive.ts`
+(unit-tested incl. iOS Chrome and iPadOS-as-Mac), and `InstallSheet` shows the Share
+glyph and the two steps when iOS and no `beforeinstallprompt` was captured; same
+trigger, same dismissal key. Walked in emulated-iPhone Chromium: instructions after
+~3s, no Install button, dismissal persists, nothing when `navigator.standalone`,
+nothing on desktop. **This ticket stays open because its release gate needs a real
+iPhone**: install via Share -> Add to Home Screen, then a Google sign-in AND a password
+sign-in completed inside the installed app, outcome written into the Answer either way.
+That walk is a human's.
+
 ## Done when
 
 - On a real iPhone in Safari, the sheet appears on `/` with Share-icon instructions and no Install
