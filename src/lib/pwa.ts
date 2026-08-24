@@ -43,15 +43,31 @@ export function buildManifest(tenant: PwaTenant) {
   };
 }
 
-// What one App Icon render needs: an opaque paper square, the best source image
-// (Logo, else Favicon, else null meaning the shipped /icon.svg mark), and the
-// object-contain box the source is centred in. 80% leaves a 7:1 banner readable
-// padding; maskable drops to 60% so Android's circular crop can't eat it.
+// What one App Icon render needs: an opaque paper square, the source candidates
+// in fallback order (Logo, then Favicon; empty means the shipped /icon.svg
+// mark), and the object-contain box the source is centred in. 80% leaves a 7:1
+// banner readable padding; maskable drops to 60% so Android's circular crop
+// can't eat it. A LIST because being uploaded is not enough: the route must
+// also skip any candidate satori can't decode (see satoriImageType).
 export function appIconSpec(tenant: PwaTenant, { size, maskable }: { size: number; maskable: boolean }) {
   return {
     size,
     background: pwaThemeColor(tenant),
-    src: tenant?.logoUrl ?? tenant?.faviconUrl ?? null,
+    sources: [tenant?.logoUrl, tenant?.faviconUrl].filter((u): u is string => u != null),
     box: Math.round(size * (maskable ? 0.6 : 0.8)),
   };
+}
+
+// Which content type these bytes are, IF satori (next/og) can decode it, else
+// null. Sniffed from magic bytes, never trusted from a header. The one that
+// bites: assertEmblemImage accepts webp uploads and the branding script even
+// recommends them, but satori cannot decode webp and renders the <img> as
+// NOTHING, silently: YWAM's first prod app icon was a bare paper square
+// (2026-08-24). A webp candidate must fall through to the next source.
+export function satoriImageType(bytes: Uint8Array): "image/png" | "image/jpeg" | "image/gif" | null {
+  if (bytes.length < 12) return null;
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return "image/png";
+  if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return "image/gif";
+  return null;
 }

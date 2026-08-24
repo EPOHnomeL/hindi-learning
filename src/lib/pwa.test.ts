@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { appIconSpec, buildManifest, type PwaTenant } from "./pwa";
+import { appIconSpec, buildManifest, satoriImageType, type PwaTenant } from "./pwa";
 
 // A seeded tenant as getTenantView returns it (palette trimmed to the tokens
 // the manifest reads; the real object carries all 14).
@@ -47,12 +47,14 @@ describe("buildManifest", () => {
 });
 
 describe("appIconSpec", () => {
-  it("puts the Logo on an opaque square of the tenant's paper", () => {
+  it("puts the Logo first on an opaque square of the tenant's paper", () => {
     const s = appIconSpec(ywam, { size: 512, maskable: false });
     expect(s).toEqual({
       size: 512,
       background: "#f4f6fb",
-      src: "https://storage.example/logo.png",
+      // Candidates in fallback order; the route uses the first one satori can
+      // actually decode (a webp logo must fall through to the favicon).
+      sources: ["https://storage.example/logo.png", "https://storage.example/favicon.png"],
       // object-contain box: padding keeps a 7:1 banner off the edges.
       box: 410,
     });
@@ -63,19 +65,41 @@ describe("appIconSpec", () => {
     expect(s.box).toBe(307);
   });
 
-  it("falls back Logo -> Favicon -> null (the shipped mark)", () => {
-    expect(appIconSpec({ ...ywam, logoUrl: null }, { size: 192, maskable: false }).src).toBe(
+  it("drops missing sources: Logo -> Favicon -> nothing (the shipped mark)", () => {
+    expect(appIconSpec({ ...ywam, logoUrl: null }, { size: 192, maskable: false }).sources).toEqual([
       "https://storage.example/favicon.png",
-    );
+    ]);
     expect(
-      appIconSpec({ ...ywam, logoUrl: null, faviconUrl: null }, { size: 192, maskable: false }).src,
-    ).toBeNull();
+      appIconSpec({ ...ywam, logoUrl: null, faviconUrl: null }, { size: 192, maskable: false }).sources,
+    ).toEqual([]);
   });
 
   it("degrades an unseeded host to the default square", () => {
     const s = appIconSpec(null, { size: 180, maskable: false });
     expect(s.background).toBe("#fbf7f0");
-    expect(s.src).toBeNull();
+    expect(s.sources).toEqual([]);
     expect(s.size).toBe(180);
+  });
+});
+
+describe("satoriImageType", () => {
+  const bytes = (...b: (number | string)[]) =>
+    Uint8Array.from(
+      b.flatMap((x) => (typeof x === "string" ? [...x].map((c) => c.charCodeAt(0)) : [x])),
+    );
+
+  it("recognises the formats satori can decode", () => {
+    expect(satoriImageType(bytes(0x89, "PNG\r\n", 0x1a, 0x0a, 0, 0, 0, 0))).toBe("image/png");
+    expect(satoriImageType(bytes(0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0))).toBe("image/jpeg");
+    expect(satoriImageType(bytes("GIF89a", 0, 0, 0, 0, 0, 0))).toBe("image/gif");
+  });
+
+  it("rejects webp, which satori renders as nothing (the YWAM blank-icon bug)", () => {
+    expect(satoriImageType(bytes("RIFF", 0x10, 0, 0, 0, "WEBP"))).toBeNull();
+  });
+
+  it("rejects unknown or too-short bytes", () => {
+    expect(satoriImageType(bytes("<svg", 0, 0, 0, 0, 0, 0, 0, 0))).toBeNull();
+    expect(satoriImageType(bytes(1, 2))).toBeNull();
   });
 });

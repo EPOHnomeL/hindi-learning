@@ -15,6 +15,12 @@
 // dependency; note NOT ImageMagick, whose `convert` collides with a Windows disk
 // utility). The output is verified against the same 256 KB raster cap
 // setTenantAsset enforces, so a too-heavy asset fails here, not at upload.
+//
+// Format caveat (2026-08-24): the derived App Icon route (src/app/app-icon)
+// renders via satori, which CANNOT decode webp; a webp logo is skipped there and
+// the icon falls back to the favicon, then the shipped mark. If the tenant's
+// logo should appear on their installed app icon, upload it as .png (the 256 KB
+// cap still fits a 512px logo).
 import { execFileSync } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import { pathToFileURL } from "node:url";

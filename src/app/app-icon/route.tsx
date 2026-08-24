@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import { getTenantView } from "~/lib/tenant-server";
-import { appIconSpec } from "~/lib/pwa";
+import { appIconSpec, satoriImageType } from "~/lib/pwa";
 
 // The derived App Icon (installable-app ticket 01, ADR 0030 §2): the tenant's
 // Logo contained in a padded box, centred on an OPAQUE square of its own paper.
@@ -21,9 +21,29 @@ export async function GET(request: Request) {
 
   const tenant = await getTenantView();
   const spec = appIconSpec(tenant, { size, maskable });
+  // Fetch the candidates ourselves and hand satori a data URI of the first one
+  // it can actually decode. Letting satori fetch the URL was the blank-icon
+  // bug: a webp logo (which uploads allow and the branding script recommends)
+  // renders as NOTHING, silently, so YWAM's icon shipped as a bare paper
+  // square. Sniff magic bytes, skip what satori can't eat, fall through to the
+  // favicon and finally the shipped mark.
+  let src: string | null = null;
+  for (const candidate of spec.sources) {
+    try {
+      const res = await fetch(candidate);
+      if (!res.ok) continue;
+      const bytes = new Uint8Array(await res.arrayBuffer());
+      const type = satoriImageType(bytes);
+      if (!type) continue;
+      src = `data:${type};base64,${Buffer.from(bytes).toString("base64")}`;
+      break;
+    } catch {
+      /* unreachable candidate: try the next one */
+    }
+  }
   // Fallback of last resort: the shipped mark, fetched off this same host
   // because satori wants an absolute URL and fs paths don't survive Vercel.
-  const src = spec.src ?? new URL("/icon.svg", url).toString();
+  src ??= new URL("/icon.svg", url).toString();
 
   return new ImageResponse(
     (
