@@ -290,6 +290,20 @@ which decays every session — re-verify before resuming).
   (<https://claude.ai/code/artifact/af1d82a5-aeb7-4f78-b8e6-110e8007d4c2>) before
   the React wiring. This is the substrate the whitelabel theming tokenises.
 
+- **Samsung Internet cannot install the PWA, and never will from our side**
+  (2026-08-25). Samsung mints its own WebAPK instead of using Chrome's minting
+  service, and that APK targets an old Android SDK, so Play Protect blocks the
+  install: *"Unsafe app blocked. This app was built for an older version of
+  Android and doesn't include the latest privacy protections."* Seen on
+  `ywampotch.my-course.app`; it is not tenant-specific and **not fixable from
+  the manifest** (`buildManifest` in `src/lib/pwa.ts` is already valid and
+  modern; `targetSdk` belongs to whoever mints the APK, not to us). We have no
+  Android project in this repo at all. The fix shipped is the one Progressier
+  took in March 2026: `isSamsungInternet` in
+  `src/app/_components/installPromptDerive.ts` suppresses the Install button on
+  Samsung and `InstallSheet` offers **Open in Chrome** instead, via
+  `chromeIntentUrl`. Do not "fix" this by chasing manifest fields.
+
 ## Repo gotchas
 
 - **`.claude/skills/<skill>` shared entries are directory symlinks into
