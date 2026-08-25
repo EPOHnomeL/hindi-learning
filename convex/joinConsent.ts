@@ -39,6 +39,24 @@ export const CONSENT_VERSIONS: Record<string, readonly string[]> = {
   // "Specific" means naming what is stored and why. "Informed" means saying who
   // can see it and who cannot. Both are POPIA's words, and a pre-ticked box or a
   // line buried in the terms discharges neither.
+  // 2026-08-25. **A deliberate shortening**, and the reason is that the earlier
+  // version failed at the only thing it existed for. Six long sentences on a phone,
+  // in front of somebody who has never seen this site, is a wall people scroll past,
+  // and consent nobody read is not "informed" however carefully it was drafted. Three
+  // short lines keep the three facts POPIA actually needs stated (what is kept, that
+  // the nickname need not be real, that the PIN cannot be recovered) and the full
+  // detail moves to the Terms, which `/join` links from the consent step.
+  //
+  // A NEW KEY, not an edit of the one below, because the 2026-08-23 wording HAS now
+  // been shown to people and agreed to on the dev deployment. Any `seats` row stamped
+  // with it still resolves to exactly what that member saw. That is the whole reason
+  // this module is versioned rather than a constant.
+  "2026-08-25": [
+    "We keep the nickname and the PIN you choose, and which lessons you have finished, so that you can come back on another phone.",
+    "Your nickname does not have to be your real name. We never ask for your email address, your phone number or your name.",
+    "Nobody can recover a forgotten PIN, not even us, so write it down. You can ask us to delete your nickname and PIN at any time.",
+  ],
+
   "2026-08-23": [
     "To take this course we store three things: the nickname you choose, a PIN you choose, and which lessons you have opened and completed.",
     "Your nickname does not have to be your real name, and we would rather it was not. We never ask for your email address, your phone number, or your name.",
@@ -52,4 +70,4 @@ export const CONSENT_VERSIONS: Record<string, readonly string[]> = {
 // The version a join taken today is recorded against. `/join` sends this and the
 // server refuses anything else, so a stale cached page cannot record a member as
 // having agreed to wording it never showed them.
-export const CONSENT_VERSION = "2026-08-23";
+export const CONSENT_VERSION = "2026-08-25";

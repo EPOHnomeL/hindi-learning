@@ -226,27 +226,33 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
             })}
           </p>
         )}
-        {/* **The returning Seat's only door** (ADR 0031). A Seat has no email and no
-            password, so every field on the form above is useless to one, and a member
-            who signs out or whose session finally expires meets a wall with nothing on
-            it for them. `/join` is where they sign back in ("I am coming back"), and
-            until this line existed nothing on the platform said so.
+        {/* **The Organisation Voucher door, and it is a BUTTON.** A Seat has no email
+            and no password, so every field on the form above is useless to one: a
+            member who signs out, or whose session finally expires, met a wall with
+            nothing on it for them. This is the third sign-in method on the platform
+            and it is weighted like one, beside Google and a password, rather than
+            being a sentence somebody has to notice.
 
-            It is a second line rather than folded into the voucher prompt above,
-            because the two rails ask for different things and one sentence covering
-            both would leave a member deciding which of two pages their code belongs
-            to. A voucher is redeemed onto an account; a shared code IS the account.
-            Not shown on `/join` itself. */}
+            Separate from the voucher prompt above on purpose. The two rails ask for
+            different things and one line covering both would leave a member deciding
+            which of two pages their code belongs to: a Bulk Voucher is redeemed ONTO
+            an account, an Organisation Voucher IS the account. Not shown on `/join`
+            itself, where it would point at the page they are standing on. */}
         {!embedded && !path?.startsWith("/join") && (
-          <p className="text-center text-sm text-soft">
-            {t.rich("joinPrompt", {
-              join: (c) => (
-                <Link href="/join" className="text-accent2 underline-offset-2 hover:underline">
-                  {c}
-                </Link>
-              ),
-            })}
-          </p>
+          <div className="flex w-full flex-col gap-2">
+            <div className="flex items-center gap-3 text-xs text-soft">
+              <span className="h-px flex-1 bg-line" />
+              {t("or")}
+              <span className="h-px flex-1 bg-line" />
+            </div>
+            <Link
+              href="/join"
+              className="flex items-center justify-center gap-2 rounded-lg border border-line bg-card px-3 py-2.5 text-center font-medium text-accent hover:border-gold"
+            >
+              {t("joinCta")}
+            </Link>
+            <p className="text-center text-xs leading-relaxed text-soft">{t("joinPrompt")}</p>
+          </div>
         )}
       </div>
     </div>

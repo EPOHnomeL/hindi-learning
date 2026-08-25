@@ -5,7 +5,7 @@ import { Authenticated, AuthLoading, Unauthenticated, useQuery } from "convex/re
 import { ConvexError } from "convex/values";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { normaliseAccessCode } from "../../../convex/accessCodeFormat";
@@ -64,14 +64,14 @@ function JoinFlow() {
   const t = useTranslations("Join");
   const [step, setStep] = useState<Step>("consent");
   const [refused, setRefused] = useState(false);
-  const [code, setCode] = useState("");
-  // Read after mount, not during render: `window` does not exist on the server, so
-  // reading inline would be a hydration mismatch. Same mount-gating RedeemPanel uses.
-  const [seeded, setSeeded] = useState(false);
-  useEffect(() => {
-    setCode(normaliseAccessCode(new URLSearchParams(window.location.search).get("code") ?? ""));
-    setSeeded(true);
-  }, []);
+  // **`useSearchParams`, not `window.location.search`.** The panel renders inside
+  // `<Unauthenticated>`, which mounts only once auth has resolved, and it can be
+  // reached by a client-side navigation as well as a cold load. Reading the framework's
+  // own value covers both, needs no mount effect, and is right on the first paint
+  // rather than one render late.
+  const linkedCode = normaliseAccessCode(useSearchParams().get("code") ?? "");
+  const [typedCode, setTypedCode] = useState("");
+  const code = linkedCode || typedCode;
 
   return (
     <>
@@ -81,16 +81,15 @@ function JoinFlow() {
       {refused ? (
         <Refused onBack={() => setRefused(false)} />
       ) : step === "consent" ? (
-        <Consent onAgree={() => setStep("code")} onRefuse={() => setRefused(true)} />
+        // **A code that arrived on the link skips the code step entirely.** Somebody
+        // who followed `/join?code=...` has already handed the code over by clicking,
+        // so a box asking them to confirm it is a step that exists only because the
+        // page could not tell the two cases apart. `/redeem` learned the same lesson.
+        <Consent onAgree={() => setStep(linkedCode ? "identity" : "code")} onRefuse={() => setRefused(true)} />
       ) : step === "code" ? (
-        // Gated on the mount effect so nothing decides on a half-read URL.
-        seeded ? (
-          <CodeStep code={code} setCode={setCode} onNext={() => setStep("identity")} />
-        ) : (
-          <div className="mt-6 h-32 animate-pulse rounded-2xl border border-line bg-card" />
-        )
+        <CodeStep code={typedCode} setCode={setTypedCode} onNext={() => setStep("identity")} />
       ) : (
-        <Identity code={code} onBack={() => setStep("code")} />
+        <Identity code={code} linked={!!linkedCode} onBack={() => setStep("code")} />
       )}
     </>
   );
@@ -118,6 +117,26 @@ function Consent({ onAgree, onRefuse }: { onAgree: () => void; onRefuse: () => v
           </li>
         ))}
       </ul>
+      {/* The detail lives in the Terms and the Privacy Policy, linked rather than
+          restated. Three short lines are what somebody standing in a room actually
+          reads, and consent nobody read is not "informed" however carefully it was
+          drafted; the link is what keeps it "specific" for anybody who wants the
+          whole undertaking. Opens in a new tab so a member reading it does not lose
+          the code they arrived with. */}
+      <p className="text-[11.5px] leading-relaxed text-soft">
+        {t.rich("consentMore", {
+          terms: (c) => (
+            <Link href="/terms" target="_blank" className="text-accent2 underline-offset-2 hover:underline">
+              {c}
+            </Link>
+          ),
+          privacy: (c) => (
+            <Link href="/privacy" target="_blank" className="text-accent2 underline-offset-2 hover:underline">
+              {c}
+            </Link>
+          ),
+        })}
+      </p>
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -215,7 +234,7 @@ function CodeStep({ code, setCode, onNext }: { code: string; setCode: (c: string
 // server cannot tell "that nickname is taken, pick another" from "you typed your PIN
 // wrong" - and those send the member to two different actions. Asking is what makes
 // both answers possible.
-function Identity({ code, onBack }: { code: string; onBack: () => void }) {
+function Identity({ code, linked, onBack }: { code: string; linked: boolean; onBack: () => void }) {
   const t = useTranslations("Join");
   const { signIn } = useAuthActions();
   const [flow, setFlow] = useState<"join" | "return">("join");
@@ -246,6 +265,14 @@ function Identity({ code, onBack }: { code: string; onBack: () => void }) {
         }
       }}
     >
+      {/* Say which code is being used, on the screen where a member who arrived by
+          link has never seen it echoed back. Without this the page silently uses a
+          code they cannot check, and "we do not recognise that code" arrives with
+          nothing on screen to compare it against. */}
+      <p className="text-[11.5px] leading-relaxed text-soft">
+        {t("usingCode")} <b className="font-mono tracking-widest text-ink">{code}</b>
+      </p>
+
       {/* Which door they are coming through. Two buttons rather than a select: this
           is read on a phone by somebody who has never seen the site. */}
       <div className="flex flex-col gap-1.5">
@@ -319,13 +346,18 @@ function Identity({ code, onBack }: { code: string; onBack: () => void }) {
         >
           {busy ? t("working") : flow === "join" ? t("submitJoin") : t("submitReturn")}
         </button>
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-lg border border-line px-3 py-2 text-xs font-medium text-soft transition-colors hover:border-accent hover:text-accent"
-        >
-          {t("changeCode")}
-        </button>
+        {/* Only when they TYPED it. A linked code lives in the URL, so "change it"
+            would have to fight the query string it came from; a member who followed
+            the wrong link edits the link, not a form. */}
+        {!linked && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="rounded-lg border border-line px-3 py-2 text-xs font-medium text-soft transition-colors hover:border-accent hover:text-accent"
+          >
+            {t("changeCode")}
+          </button>
+        )}
       </div>
       {/* Never an email field, anywhere on this page. The promise is visible in the
           product and not only in the policy. */}
