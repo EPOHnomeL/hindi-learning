@@ -2,6 +2,7 @@ import Google from "@auth/core/providers/google";
 import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
 import type { MutationCtx } from "./_generated/server";
+import { ACCESS_CODE_PROVIDER_ID, AccessCode } from "./accessCodeAuth";
 import { env } from "./env";
 import { claimPendingShares, oauthRedirectUrl } from "./lib";
 
@@ -42,6 +43,13 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     // there is nothing to configure here. Google is an **oidc** provider, not
     // `oauth`; anything branching on the type must accept both.
     Google,
+    // A **Seat** on a shared Access Code: a code, a nickname of the member's own
+    // choosing, and a PIN. No email, ever (ADR 0031). Built on
+    // `ConvexCredentials` rather than `Password` precisely because `Password`
+    // derives its account identity from an email and writes into the `email`
+    // index; see `accessCodeAuth.ts`. It needs the branch at the top of
+    // `createOrUpdateUser` below to be safe at all.
+    AccessCode,
   ],
   callbacks: {
     // Send an OAuth sign-in back to the host it started on. The library's default
@@ -60,8 +68,27 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       // `email` index read below wouldn't typecheck. Narrow once, to the same
       // generated ctx `claimPendingShares` already takes.
       const ctx = genericCtx as MutationCtx;
-      // Already an account row for *this* provider → plain sign-in.
+      // Already an account row for *this* provider -> plain sign-in.
       if (existingUserId !== null) return existingUserId;
+
+      // **A Seat has no email, and this branch must come FIRST** (ADR 0031,
+      // shared-access-codes ticket 03; trap 1 from vouchers ticket 11,
+      // re-verified against `@convex-dev/auth@0.0.80` on 2026-08-23).
+      //
+      // Everything below this point computes `email` from `profile.email` and
+      // then reads the `email` index UNCONDITIONALLY. A provider that supplies no
+      // email therefore inserts a row with `email: ""`, and the *second* member
+      // to join a shared code matches that row on the index and signs in as the
+      // first, inheriting their Entitlement and their progress; the third makes
+      // `.unique()` throw. It fails silently and it looks correct with a single
+      // tester, which is why the test for it drives three joins, not two.
+      //
+      // A fresh row with **no `email` field at all**, not `email: undefined` and
+      // not an empty string: an absent field is absent from the index, so no two
+      // Seats can ever collide there. `claimPendingShares` is skipped because a
+      // Seat has no address for a Share to have been invited to.
+      if (provider.id === ACCESS_CODE_PROVIDER_ID) return await ctx.db.insert("users", {});
+
       const email = String(profile.email ?? "").trim().toLowerCase();
 
       // Convex Auth's own email-linking is unreachable once a custom

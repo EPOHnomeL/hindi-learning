@@ -8,6 +8,9 @@
  * @module
  */
 
+import type * as accessCodeAuth from "../accessCodeAuth.js";
+import type * as accessCodeFormat from "../accessCodeFormat.js";
+import type * as accessCodes from "../accessCodes.js";
 import type * as auth from "../auth.js";
 import type * as authoring from "../authoring.js";
 import type * as backfill from "../backfill.js";
@@ -28,6 +31,7 @@ import type * as geminiClient from "../geminiClient.js";
 import type * as http from "../http.js";
 import type * as interest from "../interest.js";
 import type * as inviteEmail from "../inviteEmail.js";
+import type * as joinConsent from "../joinConsent.js";
 import type * as languages from "../languages.js";
 import type * as ledger from "../ledger.js";
 import type * as lib from "../lib.js";
@@ -63,6 +67,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  accessCodeAuth: typeof accessCodeAuth;
+  accessCodeFormat: typeof accessCodeFormat;
+  accessCodes: typeof accessCodes;
   auth: typeof auth;
   authoring: typeof authoring;
   backfill: typeof backfill;
@@ -83,6 +90,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   interest: typeof interest;
   inviteEmail: typeof inviteEmail;
+  joinConsent: typeof joinConsent;
   languages: typeof languages;
   ledger: typeof ledger;
   lib: typeof lib;

@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { expect, test } from "vitest";
+import { ConvexError } from "convex/values";
+import { beforeAll, expect, test } from "vitest";
+import { generateKeyPairSync } from "node:crypto";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
@@ -18,6 +20,25 @@ import type { Id } from "./_generated/dataModel";
 // exercised.
 
 const modules = import.meta.glob("./**/*.ts");
+
+// Convex Auth signs a session JWT on a successful sign-in, which needs a private
+// key and an issuer in the environment. Minted here exactly as `auth.test.ts` does
+// it, so the accepted join path can actually complete rather than being asserted
+// one mutation short of the thing that matters.
+beforeAll(() => {
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    publicKeyEncoding: { type: "spki", format: "pem" },
+  });
+  process.env.JWT_PRIVATE_KEY = privateKey as string;
+  process.env.CONVEX_SITE_URL = "https://example.convex.site";
+  // `setEnvDefaults` materialises the Google provider off these, and
+  // `getProviderOrThrow` walks the whole providers array. The values are never
+  // used: no HTTP hop runs here.
+  process.env.AUTH_GOOGLE_ID = "test-google-client-id";
+  process.env.AUTH_GOOGLE_SECRET = "test-google-client-secret";
+});
 
 function asUser(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
   return t.withIdentity({ subject: `${userId}|session` });
@@ -207,4 +228,210 @@ test("myAccessCodes lists the caller's own codes with a derived count, and never
   // Signed out sees nothing rather than throwing: the Seller's dialog mounts this
   // query before auth has settled.
   expect(await t.query(api.accessCodes.myAccessCodes, {})).toEqual([]);
+});
+
+// ---- Joining (ticket 03) -------------------------------------------------------
+
+const CONSENT = "2026-08-23";
+
+// Join a code the way `/join` does: through Convex Auth's own `signIn` action and
+// the real credentials provider. Nothing about a Seat is ever hand-inserted, so
+// every row a test reads was written by the code that writes it in production.
+async function join(
+  t: ReturnType<typeof convexTest>,
+  params: { code: string; nickname: string; pin: string; consentVersion?: string },
+) {
+  return await t.action(api.auth.signIn, {
+    provider: "accessCode",
+    params: { flow: "join", consentVersion: CONSENT, ...params },
+  });
+}
+async function comeBack(t: ReturnType<typeof convexTest>, params: { code: string; nickname: string; pin: string }) {
+  return await t.action(api.auth.signIn, { provider: "accessCode", params: { flow: "return", ...params } });
+}
+
+async function entitlementRows(t: ReturnType<typeof convexTest>) {
+  return await t.run((ctx) => ctx.db.query("entitlements").take(200));
+}
+async function tagOf(promise: Promise<unknown>): Promise<string> {
+  try {
+    await promise;
+  } catch (e) {
+    // `data` is what survives a production deployment. A plain `Error` would arrive
+    // at the member as "Server Error", which is the whole reason these are tagged.
+    return e instanceof ConvexError && typeof e.data === "string" ? e.data : `untagged: ${String(e)}`;
+  }
+  return "did not throw";
+}
+
+test("a member joins with a nickname and a PIN and is in the course, with no email anywhere", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+
+  const seats = await seatRows(t);
+  expect(seats).toHaveLength(1);
+  expect(seats[0]).toMatchObject({
+    accessCodeId,
+    // Normalised: trimmed, inner whitespace collapsed, lower-cased. The key has to
+    // be stable across devices, because it is half the account identity.
+    nicknameKey: "thandi",
+    consentVersion: CONSENT,
+    consentedAt: expect.any(Number),
+  });
+  // **No PIN is anywhere in this row.** It is the `secret` Convex Auth hashed into
+  // `authAccounts`, so nothing in `seats` can verify one, by construction.
+  expect(Object.keys(seats[0]!).sort()).toEqual([
+    "_creationTime",
+    "_id",
+    "accessCodeId",
+    "consentVersion",
+    "consentedAt",
+    "nicknameKey",
+    "userId",
+  ]);
+
+  // The member's `users` row carries **no `email` field at all**, not an empty
+  // string and not `undefined`. This is trap 1's fix asserted directly: an absent
+  // field is absent from the `email` index, so no two Seats can collide there.
+  const member = await t.run((ctx) => ctx.db.get(seats[0]!.userId!));
+  expect(member).not.toHaveProperty("email");
+  expect(Object.keys(member!).sort()).toEqual(["_creationTime", "_id"]);
+
+  // The Entitlement, and **its key set is pinned exactly** (ADR 0031, keeping ADR
+  // 0029's decision 3 by half). A Seat's Entitlement is byte-identical to an Admin
+  // comp: no `accessCodeId`, no `pfPaymentId`, no `eftRef`. A refactor that adds
+  // provenance back must fail HERE rather than quietly ending the promise the
+  // organisation's members were given. Do not delete this as redundant.
+  const held = await entitlementRows(t);
+  expect(held).toHaveLength(1);
+  expect(held[0]).toMatchObject({ userId: seats[0]!.userId, topicId, lang: "en" });
+  expect(Object.keys(held[0]!).sort()).toEqual(["_creationTime", "_id", "lang", "topicId", "userId"]);
+});
+
+test("three members joining one code are three accounts with three entitlements (trap 1)", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+
+  // **Three, not two, and the number is the assertion.** Trap 1 (vouchers ticket 11,
+  // re-verified against @convex-dev/auth@0.0.80 on 2026-08-23) is that a provider
+  // supplying no email makes `createOrUpdateUser` insert `email: ""`; the SECOND
+  // member then matches that row on the `email` index and signs in as the first,
+  // inheriting their Entitlement and progress, and the THIRD makes `.unique()`
+  // throw. With one tester it looks perfect.
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Sipho", pin: "5678" });
+  await join(t, { code, nickname: "Naledi", pin: "4321" });
+
+  const seats = await seatRows(t);
+  expect(seats).toHaveLength(3);
+  expect(seats.map((s) => s.nicknameKey).sort()).toEqual(["naledi", "sipho", "thandi"]);
+  // Three DISTINCT users, which is the thing trap 1 destroys.
+  expect(new Set(seats.map((s) => s.userId)).size).toBe(3);
+  const held = await entitlementRows(t);
+  expect(held).toHaveLength(3);
+  expect(new Set(held.map((e) => e.userId)).size).toBe(3);
+});
+
+test("the cap is atomic: two joins at the last seat, exactly one wins", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, { ...MINT, capacity: 2 });
+
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+
+  // Two members arriving on the last seat at once. The cap is read and consumed in
+  // ONE mutation, so the loser is refused rather than both being let in and both
+  // being billed. A cap read in one function and consumed in another sells this
+  // seat twice.
+  const results = await Promise.allSettled([
+    join(t, { code, nickname: "Sipho", pin: "5678" }),
+    join(t, { code, nickname: "Naledi", pin: "4321" }),
+  ]);
+  expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+  expect(await seatRows(t)).toHaveLength(2);
+  expect(await entitlementRows(t)).toHaveLength(2);
+
+  // And the next member is told the seats are gone, distinguishably from a code
+  // that never existed: one is their organisation's problem, the other is a typo.
+  expect(await tagOf(join(t, { code, nickname: "Lerato", pin: "1111" }))).toEqual("access/code-full");
+});
+
+test("every member-facing refusal is a tagged ConvexError, and taken-nickname is not wrong-PIN", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+
+  expect(await tagOf(join(t, { code: "GRP-AAA-AAA-AAA", nickname: "Zola", pin: "1234" }))).toEqual(
+    "access/code-unknown",
+  );
+  // **The distinction the spec insists on.** "Pick another nickname" and "you typed
+  // your PIN wrong" send the member to two different actions, and one blurred
+  // message sends them to neither. The cost is that a nickname's existence leaks to
+  // anybody holding the code, which ADR 0031 records as accepted, not overlooked:
+  // it is inherent to a name being the lookup key, and it is why the nickname is
+  // self-chosen rather than a real name.
+  expect(await tagOf(join(t, { code, nickname: "Thandi", pin: "9999" }))).toEqual("access/nickname-taken");
+  expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "9999" }))).toEqual("access/pin-wrong");
+  // Case and spacing are one nickname: to everybody in the room `Thandi` and
+  // ` thandi ` are the same person, so the second must not silently get a seat.
+  expect(await tagOf(join(t, { code, nickname: "  THANDI ", pin: "0000" }))).toEqual("access/nickname-taken");
+
+  // **Consent is refused server-side**, not merely hidden in the UI. An absent
+  // version and a stale one are both refused: s11(2) puts the burden of proving
+  // consent on us, and a stale cached page must not record a member as agreeing to
+  // wording it never showed them.
+  expect(await tagOf(join(t, { code, nickname: "Zola", pin: "1234", consentVersion: "" }))).toEqual(
+    "access/consent-required",
+  );
+  expect(await tagOf(join(t, { code, nickname: "Zola", pin: "1234", consentVersion: "1999-01-01" }))).toEqual(
+    "access/consent-required",
+  );
+  // Refused means refused: no seat and no entitlement.
+  expect(await seatRows(t)).toHaveLength(1);
+  expect(await entitlementRows(t)).toHaveLength(1);
+});
+
+test("no Seller-facing query can return a nickname or a userId", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Sipho", pin: "5678" });
+
+  // The rows exist on this rail, unlike on the voucher one, so "who took a seat" is
+  // a query that COULD be written. The promise is kept by the returns validator, not
+  // by which fields a page chooses to render, so it is asserted on the shape.
+  const mine = await asUser(t, seller).query(api.accessCodes.myAccessCodes, {});
+  expect(mine).toHaveLength(1);
+  expect(mine[0]).toMatchObject({ taken: 2, runningTotal: 30000 });
+  const serialised = JSON.stringify(mine).toLowerCase();
+  for (const leak of ["thandi", "sipho", "nickname", "userid", "seatid"]) {
+    expect(serialised).not.toContain(leak);
+  }
+});
+
+test("the grant walk is untouched: a Seat reads a priced edition like any entitlement holder", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  const [seat] = await seatRows(t);
+
+  // `lib.ts`'s grant walk was not edited for this rail and does not need to be: a
+  // Seat mints an ordinary Entitlement and the walk already treats its presence as
+  // access. A ticket that finds itself editing the walk has drifted.
+  const mine = await asUser(t, seat!.userId!).query(api.market.myPurchases, {});
+  expect(mine.map((row) => row.slug)).toEqual(["hindi"]);
+  expect(mine[0]!.langs.map((l) => l.lang)).toEqual(["en"]);
 });

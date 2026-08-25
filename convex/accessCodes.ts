@@ -1,9 +1,10 @@
 import { ConvexError, v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mintAccessCodeString } from "./accessCodeFormat";
+import { CONSENT_VERSION } from "./joinConsent";
 import { sellableTopic } from "./vouchers";
 
 // The **shared capped Access Code rail** (ADR 0031, the shared-access-codes map's
@@ -268,3 +269,124 @@ export async function ownCode(ctx: QueryCtx, accessCodeId: Id<"accessCodes">): P
   if (!code || code.sellerId !== userId) throw new Error("that access code isn't yours");
   return code;
 }
+
+// ---- Joining (ticket 03) -------------------------------------------------------
+
+// What the credentials provider needs to know BEFORE it can call
+// `createAccount`: the code's id (half of the account identity), whether this
+// nickname already holds a Seat, and whether a new Seat is possible at all.
+//
+// It is a read, and it is deliberately **not** the cap check that matters. The one
+// that matters is inside `claimSeat`, in the same transaction as the insert. This
+// query exists so that a member who cannot possibly get in is told *why* before an
+// account is created for them, not so that anything is decided here.
+export const forJoin = internalQuery({
+  args: { code: v.string(), nicknameKey: v.string() },
+  returns: v.union(
+    v.object({
+      accessCodeId: v.id("accessCodes"),
+      stopped: v.boolean(),
+      full: v.boolean(),
+      seatExists: v.boolean(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx, { code, nicknameKey }) => {
+    // `.unique()`, not `.first()`: minting retries until a code is unused, so two
+    // rows sharing one code is an invariant violation worth throwing on rather than
+    // silently joining whichever happened to be first.
+    const row = await ctx.db
+      .query("accessCodes")
+      .withIndex("by_code", (q) => q.eq("code", code))
+      .unique();
+    if (!row) return null;
+    const seat = await ctx.db
+      .query("seats")
+      .withIndex("by_code_and_nickname", (q) => q.eq("accessCodeId", row._id).eq("nicknameKey", nicknameKey))
+      .unique();
+    return {
+      accessCodeId: row._id,
+      stopped: row.stoppedAt !== undefined,
+      full: (await seatCount(ctx, row._id)) >= row.capacity,
+      seatExists: seat !== null,
+    };
+  },
+});
+
+// **Consume a seat and grant access, atomically.** The one place a new seam was
+// unavoidable, and the highest point it can sit at: the credentials provider runs
+// inside Convex Auth's `signIn` ACTION and cannot open a transaction itself, so
+// every check that must not race with another member's join lives here, in one
+// mutation, beside the two inserts.
+//
+// **The cap is read and consumed in the same transaction.** A cap read in one
+// function and consumed in another sells the last seat twice, and the two members
+// who both got in are both real and both billed. Re-checking here is not belt and
+// braces over `forJoin`; `forJoin` is the courtesy and this is the rule.
+//
+// **The Entitlement carries no provenance** (ADR 0031, keeping ADR 0029's decision
+// 3 by half): no `accessCodeId`, no `pfPaymentId`, no `eftRef`, so a Seat's
+// Entitlement is byte-identical to an Admin comp. `accessCodes.test.ts` pins its
+// key set positively. Do not delete that assertion as redundant: it is what makes
+// a future "tidy up" that adds the code id back fail a test instead of quietly
+// ending the promise the organisation's members were given.
+export const claimSeat = internalMutation({
+  args: {
+    accessCodeId: v.id("accessCodes"),
+    userId: v.id("users"),
+    nicknameKey: v.string(),
+    consentVersion: v.string(),
+  },
+  returns: v.object({ topicSlug: v.string(), lang: v.string(), courseTitle: v.string() }),
+  handler: async (ctx, { accessCodeId, userId, nicknameKey, consentVersion }) => {
+    const code = await ctx.db.get(accessCodeId);
+    if (!code) throw accessRefusal(ACCESS_ERRORS.codeUnknown);
+    // **Refused here, not merely hidden in the UI.** s11(2) puts the burden of
+    // proving consent on us, so a join that cannot name the wording it agreed to is
+    // a join we cannot defend. An old version is refused too: a stale cached page
+    // must not record a member as having agreed to wording it never showed them.
+    if (consentVersion !== CONSENT_VERSION) throw accessRefusal(ACCESS_ERRORS.consentRequired);
+    // Stopping ends NEW joins only. Existing Seats never come through here.
+    if (code.stoppedAt !== undefined) throw accessRefusal(ACCESS_ERRORS.codeStopped);
+
+    const clash = await ctx.db
+      .query("seats")
+      .withIndex("by_code_and_nickname", (q) => q.eq("accessCodeId", accessCodeId).eq("nicknameKey", nicknameKey))
+      .unique();
+    // Reachable only by two members choosing one nickname at the same moment, since
+    // `forJoin` catches the ordinary case. Kept because that moment is exactly what
+    // this mutation exists to serialise.
+    if (clash) throw accessRefusal(ACCESS_ERRORS.nicknameTaken);
+    if ((await seatCount(ctx, accessCodeId)) >= code.capacity) throw accessRefusal(ACCESS_ERRORS.codeFull);
+
+    const topic = await ctx.db.get(code.topicId);
+    if (!topic) throw accessRefusal(ACCESS_ERRORS.codeUnknown);
+
+    await ctx.db.insert("seats", {
+      accessCodeId,
+      userId,
+      nicknameKey,
+      consentedAt: Date.now(),
+      consentVersion,
+    });
+    await ctx.db.insert("entitlements", { userId, topicId: code.topicId, lang: code.lang });
+    // Where the member has just been let in, so `/join` can send them straight into
+    // the Edition instead of leaving them on a success message with nowhere to go.
+    return { topicSlug: topic.slug, lang: code.lang, courseTitle: topic.title };
+  },
+});
+
+// Where an existing Seat's member should land when they sign back in, and the row
+// that proves the Seat is still theirs. Read by the provider after a successful
+// PIN check on the return path, and by `/join` to navigate.
+export const seatDestination = internalQuery({
+  args: { accessCodeId: v.id("accessCodes"), nicknameKey: v.string() },
+  returns: v.union(v.object({ topicSlug: v.string(), lang: v.string(), courseTitle: v.string() }), v.null()),
+  handler: async (ctx, { accessCodeId, nicknameKey }) => {
+    const code = await ctx.db.get(accessCodeId);
+    if (!code) return null;
+    const topic = await ctx.db.get(code.topicId);
+    if (!topic) return null;
+    return { topicSlug: topic.slug, lang: code.lang, courseTitle: topic.title };
+  },
+});
