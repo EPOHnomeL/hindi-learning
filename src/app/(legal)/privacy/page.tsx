@@ -10,7 +10,7 @@ export default function PrivacyPage() {
   return (
     <>
       <h1>Privacy Policy</h1>
-      <p className="text-soft">Last updated: 16 July 2026</p>
+      <p className="text-soft">Last updated: 23 August 2026</p>
 
       <h2>What we collect</h2>
       <ul>
@@ -34,6 +34,50 @@ export default function PrivacyPage() {
           for making payments.
         </li>
       </ul>
+
+      {/* The Seat, described because POPIA expects what we hold to be disclosed where
+          a data subject looks for it (ADR 0031, shared-access-codes ticket 09). It is
+          its own heading rather than a bullet in the list above, because it is the one
+          account type on the platform with NO email address, and burying that in a
+          list of things we collect would understate the point of it. The claims here
+          have to stay true against `convex/schema.ts`: a nickname, a hashed PIN, and
+          progress. Nothing else. */}
+      <h2>If you joined with a shared code from an organisation</h2>
+      <p>
+        Some organisations buy course places for their people and hand out one shared code. If you joined that way,
+        at <b>/join</b>, what we hold about you is different and deliberately smaller:
+      </p>
+      <ul>
+        <li>
+          <b>A nickname you chose.</b> It does not have to be your real name, and we ask you not to use one. We never
+          ask for your email address, your phone number or your name.
+        </li>
+        <li>
+          <b>A PIN you chose,</b> stored only as a secure hash, so nobody here can read it. It is the only thing that
+          proves a place is yours, which is why <b>nobody can recover it for you if you forget it</b> and there is no
+          reset. You can change it in Settings while you are signed in.
+        </li>
+        <li>
+          <b>Which lessons you have opened and completed,</b> so that you can carry on where you left off when you come
+          back on another device.
+        </li>
+      </ul>
+      <p>
+        <b>Our legal basis is your consent</b> under section 27(1)(a) of POPIA. We ask for it in plain words before you
+        type anything, and we store which wording you agreed to and when, so that we can show what you were told.
+      </p>
+      <p>
+        <b>Who sees what.</b> The organisation that paid for your place, and the course owner, are shown only{" "}
+        <b>how many people joined</b>. No report, page or query we have can tell them, or anybody else, which nickname
+        belongs to which person.
+      </p>
+      <p>
+        <b>Withdrawing.</b> You can delete your nickname and your PIN at any time from Settings, or by emailing{" "}
+        <a href="mailto:support@my-course.app">support@my-course.app</a>. That removes everything linking you to the
+        organisation that paid for your place. Two honest consequences: the count of places used stays as it was,
+        because that is what the organisation was billed for and it says nothing about who you are; and because your
+        nickname and PIN are the only way back in, deleting them means you cannot sign in again on another device.
+      </p>
 
       <h2>What we use it for</h2>
       <p>

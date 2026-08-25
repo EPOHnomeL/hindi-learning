@@ -190,6 +190,58 @@ Gotchas:
     one var you need over dumping the whole env — the PayFast merchant key and
     passphrase live there too.
 
+## Bulk access: there are TWO rails, not one (2026-08-23)
+
+An organisation buying course access for its people can be served two ways, and both
+are built. A new agent that finds only one of them in the notes will reason about the
+wrong deal, so both are here with the rule for which applies.
+
+- **Voucher Batch** ([ADR 0029](../adr/0029-seller-minted-voucher-rail.md),
+  `convex/vouchers.ts`, `/redeem`). The Seller mints **N single-use codes** for one
+  Edition and states the **negotiated total for the whole batch**. The Ledger row is
+  written **at mint**, held `unpaid`, and the codes work immediately, so the seats are
+  live before the money arrives. A redemption records **nothing about who redeemed**.
+  Use it when the organisation knows how many seats it wants and is content to be
+  billed upfront, and when the members already have, or will happily make, accounts
+  with email addresses.
+
+- **Access Code** ([ADR 0031](../adr/0031-shared-capped-access-codes-and-nickname-seats.md),
+  `convex/accessCodes.ts`, `/join`). The Seller mints **one shared, capped code** for
+  one Edition and states a **per-seat price**. A member joins with a self-chosen
+  **nickname and a PIN, never an email**, and each join consumes a **Seat**. The
+  Ledger row is written **when the Seller stops the code**, for the seats actually
+  taken, so the total is unknown until the agreement ends. Use it when the
+  organisation wants one thing to broadcast (a WhatsApp group, a public meeting) and
+  does not know how many of its people will take the course.
+
+Facts about the second rail that are easy to get wrong:
+
+- **A `seats` row links a person to the organisation's cohort**, which ADR 0029
+  refused and ADR 0031 deliberately reverses. It is the whole reason a superseding ADR
+  exists. What makes it defensible is that the handle is **self-chosen** and `/join`
+  says so in those words. **If any UI ever nudges members toward their real name, the
+  POPIA mitigation is gone** (a real name beside a political party's cohort is special
+  personal information under s26 via s1).
+- **The Entitlement a Seat mints carries no provenance**, exactly as a voucher seat's
+  does not. `convex/accessCodes.test.ts` pins its key set, so adding an `accessCodeId`
+  back fails a test rather than quietly ending the promise.
+- **The PIN is unrecoverable, forever, and there is no reset flow.** A reset needs a
+  second channel and the second channel is the email this rail exists to avoid.
+  Nobody has priced the support burden of this at the scale of a party's membership;
+  if it turns out to be constant, the rail needs a redesign rather than a patch.
+- **Both rails settle on the manual EFT path** in the admin portal's Payouts tab, and
+  **the platform generates no invoice document**. The operator raises the invoice
+  elsewhere from the queue line. PayFast has no invoicing product at all (a
+  case-insensitive grep for "invoice" across its whole developer-docs bundle returns
+  zero hits), which is why.
+- **The consent wording is versioned in `convex/joinConsent.ts` and is append only.**
+  Editing an existing version rewrites what an already-joined member is recorded as
+  having agreed to. `seats.consentVersion` resolves against it, and `/join` renders
+  the translated form while the English there stays the record.
+- **`lucia` is a direct dependency for one import**, the scrypt that hashes a PIN.
+  `Password`'s own crypto cannot be borrowed: `ConvexCredentials()` hides its real
+  config under an internal `options` key.
+
 ## Whitelabel LMS (the end goal)
 
 The project is not just the Hindi / "My Course" app — the goal is a **whitelabel

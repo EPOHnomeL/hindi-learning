@@ -228,6 +228,45 @@ _Avoid_: Order, bulk purchase, seat pool, licence pack, organisation or team (th
 organisation entity, deliberately), **[[EFT Intent]]** (an intent grants nothing until confirmed; a
 batch grants everything at creation - the opposite), campaign
 
+**Access Code**:
+ONE shared, multi-use, **capped** code a **[[Seller]]** mints for one **[[Edition]]** of their own
+course, carrying a **per-seat price** and a buying organisation's billing details
+([ADR 0031](docs/adr/0031-shared-capped-access-codes-and-nickname-seats.md)). The organisation
+broadcasts the single code however it likes; each member who joins consumes one **[[Seat]]** until
+the cap is reached, and the Seller may raise the cap on a live code. **Stopping it is the money
+event**: the Seller stops it when the agreement ends, which writes one **[[Ledger]]** row for
+`seats consumed x per-seat price`, held **unpaid** until the operator matches the transfer, exactly
+as a **[[Voucher Batch]]**'s row is. Stopping is **one way**, and it is neither a refund nor a
+revocation: Seats already taken keep working forever, and only new joins end. A code stopped with
+zero Seats writes no Ledger row at all. The buying organisation is still **not an entity** - a name
+and a billing contact on the row, as on a batch.
+_Avoid_: **[[Voucher]]** (single-use, one per member, billed upfront - an Access Code is the
+opposite on all three), enrolment key or PIN in the Moodle/Kahoot sense (those expire or die with a
+session; this grants a lifetime Entitlement), licence, subscription or per-seat plan (there is no
+recurring charge), coupon or discount code (it grants the whole Edition, it does not reduce a price)
+
+**Seat**:
+ONE nickname-and-PIN identity created against an **[[Access Code]]**, and the platform's only
+account that has **no email address at all**
+([ADR 0031](docs/adr/0031-shared-capped-access-codes-and-nickname-seats.md)). Consuming a Seat is
+what decrements the cap; signing back into an existing Seat does **not**, which is what makes the
+bill honest when a member changes phone. The nickname is **self-chosen and need not be a real
+name** - `/join` says so in those words, because under POPIA a real name beside a political party's
+cohort is special personal information (s26 via s1) while a handle is materially weaker on that
+limb; the mitigation is load-bearing, so a UI that nudges members toward their real name destroys
+it. The PIN is stored only as Convex Auth's hash and is **unrecoverable by anybody, forever**: there
+is no reset, because a reset needs a second channel and the second channel is the email this rail
+exists to avoid. The **[[Entitlement]]** a Seat mints carries **no provenance**, so it is
+byte-identical to an Admin comp and the link to the organisation lives in the Seat row and nowhere
+else - which is why a member withdrawing consent has that row stripped of its nickname and user id,
+leaving a count that is not personal information. **The Seat count never moves on a withdrawal**:
+the seats consumed during an agreement are what was billed.
+_Avoid_: Account or User (a Seat IS a `users` row, but one with no address, no display name in use
+and no Certificate), Enrollment (that is the grandfathered free-access primitive), **[[Share]]** (an
+owner grants a Share to a known address; a Seat is claimed by whoever holds the code), licence,
+member or learner record (there is no roster: no Seller-facing query can return a nickname), seat in
+the **[[Voucher Batch]]** sense (a batch's "seats" are a COUNT of codes, not identities)
+
 **Preview**:
 On a paid **Edition**, the free first Lesson *in that Edition's language* — readable without an Entitlement by anyone, including a Guest. The teaser that sits before the paygate; continuing past it requires a buyer account and an Entitlement for that Edition.
 _Avoid_: Free trial, sample, demo, taster
