@@ -232,7 +232,7 @@
     "notSet": "Sin definir",
     "cancel": "Cancelar",
     "seatSection": "Tu plaza en este curso",
-    "seatSignedInAs": "Tu apodo",
+    "seatSignedInAs": "Apodo con el que inicias sesión",
     "seatCourse": "Curso",
     "seatConsent": "Aceptaste",
     "seatConsentValue": "{date} (texto {version})",
@@ -474,9 +474,11 @@
     "accessRaise": "Más plazas",
     "accessRaiseSave": "Guardar",
     "accessRaiseHint": "Se han ocupado {taken} plazas, así que el número no puede bajar de ahí.",
+    "accessRaiseError": "No ha funcionado. Tiene que ser un número entero y no puede bajar de las {taken} plazas ya ocupadas.",
     "accessStop": "Detener este código",
     "accessStopConfirmTitle": "¿Detener este código?",
-    "accessStopConfirmBody": "Se han ocupado {seats} plazas, así que se facturará {total} a {org}. Esto no es un reembolso ni una cancelación: todo el que ya tiene una plaza la conserva para siempre. Solo impide que se unan personas nuevas, y no se puede deshacer."
+    "accessStopConfirmBody": "Se han ocupado {seats} plazas, así que se facturará {total} a {org}. Esto no es un reembolso ni una cancelación: todo el que ya tiene una plaza la conserva para siempre. Solo impide que se unan personas nuevas, y no se puede deshacer.",
+    "accessStopError": "No ha funcionado. Recarga la página y comprueba si el código ya se ha detenido."
   },
   "Certificate": {
     "eyebrow": "Certificado de finalización",
@@ -692,7 +694,7 @@
       "Guardamos esto para que puedas volver al curso en otro teléfono y seguir donde lo dejaste. Es la única razón.",
       "A la organización que pagó tu plaza, y a la persona que escribió el curso, se les muestra cuántas personas se han unido. Nunca se les muestra tu apodo ni nada más sobre ti.",
       "Tu PIN se guarda cifrado, así que nadie aquí puede leerlo. Si lo olvidas, nadie puede recuperarlo para ti, y tu progreso se pierde. Apúntalo.",
-      "Puedes pedirnos que borremos lo que guardamos en cualquier momento, y conservas tu acceso al curso."
+      "Puedes pedirnos que borremos tu apodo y tu PIN en cualquier momento. Ten en cuenta que son la única forma de volver a tu plaza, así que después no podrás iniciar sesión en otro teléfono."
     ],
     "consentAgree": "Acepto, quiero entrar",
     "consentRefuse": "No, gracias",

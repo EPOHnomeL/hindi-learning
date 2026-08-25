@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { ACCESS_CODE_PROVIDER_ID, mintAccessCodeString } from "./accessCodeFormat";
+import { ACCESS_CODE_PROVIDER_ID, mintAccessCodeString, seatAccountId } from "./accessCodeFormat";
 import { CONSENT_VERSION } from "./joinConsent";
 import { platformFeeBps, splitNet } from "./payfast";
 import { sellableTopic } from "./vouchers";
@@ -94,6 +94,15 @@ export function accessRefusal(tag: (typeof ACCESS_ERRORS)[keyof typeof ACCESS_ER
   return new ConvexError(tag);
 }
 
+// The bounds a cap has to satisfy, checked in one place because `mintAccessCode` and
+// `raiseCapacity` both set the same field and a bound enforced in only one of them is
+// a bound a Seller can walk around.
+function assertCapacity(capacity: number): void {
+  if (!Number.isInteger(capacity) || capacity < 1 || capacity > MAX_CAPACITY) {
+    throw new Error(`a seat cap is between 1 and ${MAX_CAPACITY}`);
+  }
+}
+
 // ---- Minting (ticket 02) ------------------------------------------------------
 
 // Mint one Access Code for one Edition: the row, and nothing else.
@@ -123,9 +132,7 @@ export const mintAccessCode = mutation({
     if (!userId) throw new Error("sign in to mint an access code");
     const topic = await sellableTopic(ctx, userId, topicSlug, lang);
 
-    if (!Number.isInteger(capacity) || capacity < 1 || capacity > MAX_CAPACITY) {
-      throw new Error(`a seat cap is between 1 and ${MAX_CAPACITY}`);
-    }
+    assertCapacity(capacity);
     // Zero is refused as well as negative: a free shared code is a published free
     // Edition, which the platform already has, and a zero-priced deal would put a
     // R0.00 line on the operator's settlement queue for them to puzzle over.
@@ -184,7 +191,7 @@ async function freshCode(ctx: MutationCtx): Promise<string> {
 export async function seatCount(ctx: QueryCtx, accessCodeId: Id<"accessCodes">): Promise<number> {
   const seats = await ctx.db
     .query("seats")
-    .withIndex("by_code", (q) => q.eq("accessCodeId", accessCodeId))
+    .withIndex("by_access_code", (q) => q.eq("accessCodeId", accessCodeId))
     .take(MAX_CAPACITY + 1);
   return seats.length;
 }
@@ -304,7 +311,7 @@ export const forJoin = internalQuery({
     if (!row) return null;
     const seat = await ctx.db
       .query("seats")
-      .withIndex("by_code_and_nickname", (q) => q.eq("accessCodeId", row._id).eq("nicknameKey", nicknameKey))
+      .withIndex("by_access_code_and_nickname", (q) => q.eq("accessCodeId", row._id).eq("nicknameKey", nicknameKey))
       .unique();
     return {
       accessCodeId: row._id,
@@ -353,7 +360,7 @@ export const claimSeat = internalMutation({
 
     const clash = await ctx.db
       .query("seats")
-      .withIndex("by_code_and_nickname", (q) => q.eq("accessCodeId", accessCodeId).eq("nicknameKey", nicknameKey))
+      .withIndex("by_access_code_and_nickname", (q) => q.eq("accessCodeId", accessCodeId).eq("nicknameKey", nicknameKey))
       .unique();
     // Reachable only by two members choosing one nickname at the same moment, since
     // `forJoin` catches the ordinary case. Kept because that moment is exactly what
@@ -374,21 +381,6 @@ export const claimSeat = internalMutation({
     await ctx.db.insert("entitlements", { userId, topicId: code.topicId, lang: code.lang });
     // Where the member has just been let in, so `/join` can send them straight into
     // the Edition instead of leaving them on a success message with nowhere to go.
-    return { topicSlug: topic.slug, lang: code.lang, courseTitle: topic.title };
-  },
-});
-
-// Where an existing Seat's member should land when they sign back in, and the row
-// that proves the Seat is still theirs. Read by the provider after a successful
-// PIN check on the return path, and by `/join` to navigate.
-export const seatDestination = internalQuery({
-  args: { accessCodeId: v.id("accessCodes"), nicknameKey: v.string() },
-  returns: v.union(v.object({ topicSlug: v.string(), lang: v.string(), courseTitle: v.string() }), v.null()),
-  handler: async (ctx, { accessCodeId, nicknameKey }) => {
-    const code = await ctx.db.get(accessCodeId);
-    if (!code) return null;
-    const topic = await ctx.db.get(code.topicId);
-    if (!topic) return null;
     return { topicSlug: topic.slug, lang: code.lang, courseTitle: topic.title };
   },
 });
@@ -414,9 +406,7 @@ export const raiseCapacity = mutation({
   handler: async (ctx, { accessCodeId, capacity }) => {
     const code = await ownCode(ctx, accessCodeId);
     if (code.stoppedAt !== undefined) throw new Error("that access code has been stopped");
-    if (!Number.isInteger(capacity) || capacity < 1 || capacity > MAX_CAPACITY) {
-      throw new Error(`a seat cap is between 1 and ${MAX_CAPACITY}`);
-    }
+    assertCapacity(capacity);
     const taken = await seatCount(ctx, accessCodeId);
     if (capacity < taken) throw new Error(`${taken} seats have already been taken, so the cap cannot go below that`);
     await ctx.db.patch(accessCodeId, { capacity });
@@ -737,11 +727,13 @@ export const deleteMySeat = mutation({
     // member can do anything with.
     if (!seat?.nicknameKey) return null;
 
-    const accountId = `${seat.accessCodeId}:${seat.nicknameKey}`;
+    // Through the shared builder, not a template literal spelled out again: this id
+    // has to match byte for byte what `accessCodeAuth.ts` created, or the credential
+    // survives a withdrawal.
     const account = await ctx.db
       .query("authAccounts")
       .withIndex("providerAndAccountId", (q) =>
-        q.eq("provider", ACCESS_CODE_PROVIDER_ID).eq("providerAccountId", accountId),
+        q.eq("provider", ACCESS_CODE_PROVIDER_ID).eq("providerAccountId", seatAccountId(seat.accessCodeId, seat.nicknameKey!)),
       )
       .unique();
     if (account) await ctx.db.delete(account._id);

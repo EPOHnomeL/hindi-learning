@@ -836,9 +836,17 @@ export default defineSchema({
   // itself lives on the Ledger row, not here.
   //
   // **There is no seat counter on this row, and there must never be one.** The
-  // count is derived by reading `seats.by_code`. A stored counter is a second copy
-  // of the truth that drifts away from the seats themselves, which is the choice
-  // this repo already made for the voucher take-up count.
+  // count is derived by reading `seats.by_access_code`. A stored counter is a second
+  // copy of the truth that drifts away from the seats themselves, which is the
+  // choice this repo already made for the voucher take-up count.
+  //
+  // That is a **knowing deviation** from `convex/_generated/ai/guidelines.md`, which
+  // says to maintain a denormalised counter rather than count rows. The trade is
+  // taken with eyes open and it is bounded on both sides: minting caps `capacity` at
+  // 5000 and `myAccessCodes` caps the list at 50, so the read has a ceiling rather
+  // than growing with a Seller history. If a deal ever needs a cap large enough for
+  // that ceiling to bite, the answer is paging plus an aggregate, not a field on
+  // this row that the seats can drift away from.
   accessCodes: defineTable({
     topicId: v.id("topics"),
     lang: v.string(),
@@ -882,7 +890,7 @@ export default defineSchema({
   //
   // `consentedAt` and `consentVersion` are the s27(1)(a) record: POPIA s11(2) puts
   // the burden of proving consent on us, and a timestamp with no wording behind it
-  // proves nothing. `consentVersion` resolves against `src/lib/joinConsent.ts`.
+  // proves nothing. `consentVersion` resolves against `convex/joinConsent.ts`.
   //
   // **`userId` and `nicknameKey` are optional, and that is the deletion design**
   // (ticket 11). A member exercising their s11 withdrawal right has this row
@@ -895,8 +903,11 @@ export default defineSchema({
   // mean keeping the handle, and a kept handle is arguably still a record of the
   // person who asked to be forgotten.
   //
-  // `by_code_and_nickname` is the sign-in lookup and the uniqueness check; `by_code`
-  // is the derived count.
+  // `by_access_code_and_nickname` is the sign-in lookup and the uniqueness check;
+  // `by_access_code` is the derived count. **Not `by_code`**, which spec.md named and
+  // which would have been wrong: `accessCodes.by_code` is an index on the code
+  // STRING, the two tables are read in the same functions, and one name meaning two
+  // different fields is a trap rather than a brevity.
   seats: defineTable({
     accessCodeId: v.id("accessCodes"),
     userId: v.optional(v.id("users")),
@@ -904,8 +915,8 @@ export default defineSchema({
     consentedAt: v.number(),
     consentVersion: v.string(),
   })
-    .index("by_code_and_nickname", ["accessCodeId", "nicknameKey"])
-    .index("by_code", ["accessCodeId"])
+    .index("by_access_code_and_nickname", ["accessCodeId", "nicknameKey"])
+    .index("by_access_code", ["accessCodeId"])
     .index("by_user", ["userId"]),
 
   // A signed-in user's personal preferences (app-language-i18n ticket 03 §1).

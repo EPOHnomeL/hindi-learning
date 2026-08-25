@@ -67,10 +67,17 @@ function credentials(params: Record<string, unknown>) {
   const nicknameKey = normaliseNickname(String(params.nickname ?? ""));
   const pin = String(params.pin ?? "");
   if (!nicknameKey || nicknameKey.length > MAX_NICKNAME_LENGTH) throw new Error("pick a nickname");
+  assertPin(pin);
+  return { code, nicknameKey, pin };
+}
+
+// One place, because a PIN is set at join and reset by `changePin`, and a length rule
+// enforced at only one of them lets a member end up with a credential the other half
+// of the rail will not accept.
+function assertPin(pin: string): void {
   if (pin.length < MIN_PIN_LENGTH || pin.length > MAX_PIN_LENGTH) {
     throw new Error(`a PIN is at least ${MIN_PIN_LENGTH} characters`);
   }
-  return { code, nicknameKey, pin };
 }
 
 // The library's own failures, translated into this rail's tags. `retrieveAccount`
@@ -209,9 +216,7 @@ export const changePin = action({
     // A Guest and an ordinary email-and-password account both land here: neither
     // holds a Seat, so there is no PIN of theirs to change.
     if (!seat) throw new Error("you do not hold a seat on an access code");
-    if (newPin.length < MIN_PIN_LENGTH || newPin.length > MAX_PIN_LENGTH) {
-      throw new Error(`a PIN is at least ${MIN_PIN_LENGTH} characters`);
-    }
+    assertPin(newPin);
     const account = { id: seatAccountId(seat.accessCodeId, seat.nicknameKey) };
     await retrieveAccount(ctx, {
       provider: ACCESS_CODE_PROVIDER_ID,

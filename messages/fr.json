@@ -232,7 +232,7 @@
     "notSet": "Non défini",
     "cancel": "Annuler",
     "seatSection": "Votre place à ce cours",
-    "seatSignedInAs": "Votre pseudo",
+    "seatSignedInAs": "Pseudo avec lequel vous vous connectez",
     "seatCourse": "Cours",
     "seatConsent": "Vous avez accepté",
     "seatConsentValue": "{date} (texte {version})",
@@ -474,9 +474,11 @@
     "accessRaise": "Plus de places",
     "accessRaiseSave": "Enregistrer",
     "accessRaiseHint": "{taken} places ont été prises, le nombre ne peut donc pas descendre en dessous.",
+    "accessRaiseError": "Cela n'a pas marché. Ce doit être un nombre entier et il ne peut pas descendre en dessous des {taken} places déjà prises.",
     "accessStop": "Arrêter ce code",
     "accessStopConfirmTitle": "Arrêter ce code ?",
-    "accessStopConfirmBody": "{seats} places ont été prises, donc {org} sera facturé {total}. Ce n'est ni un remboursement ni une annulation : toute personne qui a déjà une place la garde pour toujours. Cela empêche seulement de nouvelles inscriptions, et c'est irréversible."
+    "accessStopConfirmBody": "{seats} places ont été prises, donc {org} sera facturé {total}. Ce n'est ni un remboursement ni une annulation : toute personne qui a déjà une place la garde pour toujours. Cela empêche seulement de nouvelles inscriptions, et c'est irréversible.",
+    "accessStopError": "Cela n'a pas marché. Rechargez la page et vérifiez si le code a déjà été arrêté."
   },
   "Certificate": {
     "eyebrow": "Certificat de réussite",
@@ -692,7 +694,7 @@
       "Nous conservons cela pour que vous puissiez revenir au cours sur un autre téléphone et reprendre où vous en étiez. C'est la seule raison.",
       "L'organisation qui a payé votre place, et la personne qui a écrit le cours, voient combien de personnes ont rejoint. Elles ne voient jamais votre pseudo ni quoi que ce soit d'autre à votre sujet.",
       "Votre code PIN est conservé chiffré, donc personne ici ne peut le lire. Si vous l'oubliez, personne ne peut le récupérer pour vous, et votre progression est perdue. Notez-le.",
-      "Vous pouvez nous demander de supprimer ce que nous conservons à tout moment, et vous gardez votre accès au cours."
+      "Vous pouvez nous demander de supprimer votre pseudo et votre code PIN à tout moment. Sachez qu'ils sont le seul moyen de retrouver votre place, donc ensuite vous ne pourrez plus vous connecter sur un autre téléphone."
     ],
     "consentAgree": "J'accepte, laissez-moi entrer",
     "consentRefuse": "Non, merci",

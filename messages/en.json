@@ -264,7 +264,7 @@
     "notSet": "Not set",
     "cancel": "Cancel",
     "seatSection": "Your place on this course",
-    "seatSignedInAs": "Your nickname",
+    "seatSignedInAs": "Nickname you sign in with",
     "seatCourse": "Course",
     "seatConsent": "You agreed",
     "seatConsentValue": "{date} (wording {version})",
@@ -474,9 +474,11 @@
     "accessRaise": "More places",
     "accessRaiseSave": "Save",
     "accessRaiseHint": "{taken} places have been taken, so the number cannot go below that.",
+    "accessRaiseError": "That did not work. The number has to be a whole number, and it cannot go below the {taken} places already taken.",
     "accessStop": "Stop this code",
     "accessStopConfirmTitle": "Stop this code?",
-    "accessStopConfirmBody": "{seats} places have been taken, so {org} will be invoiced {total}. This is not a refund and not a cancellation: everybody who already has a place keeps it for good. It only stops new people joining, and it cannot be undone."
+    "accessStopConfirmBody": "{seats} places have been taken, so {org} will be invoiced {total}. This is not a refund and not a cancellation: everybody who already has a place keeps it for good. It only stops new people joining, and it cannot be undone.",
+    "accessStopError": "That did not work. Reload the page and check whether the code has already been stopped."
   },
   "Certificate": {
     "eyebrow": "Certificate of Completion",
@@ -692,7 +694,7 @@
       "We store this so that you can come back to the course on another phone and pick up where you left off. That is the only reason.",
       "The organisation that paid for your place, and the person who wrote the course, are shown how many people joined. They are never shown your nickname or anything else about you.",
       "Your PIN is stored scrambled, so nobody here can read it. If you forget it, nobody can recover it for you, and your progress is gone. Write it down.",
-      "You can ask us to delete what we hold at any time, and you keep your access to the course."
+      "You can ask us to delete your nickname and your PIN at any time. Be aware that they are the only way back into your place, so after that you cannot sign in again on another phone."
     ],
     "consentAgree": "I agree, let me in",
     "consentRefuse": "No, thank you",

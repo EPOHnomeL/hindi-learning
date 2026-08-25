@@ -232,7 +232,7 @@
     "notSet": "Nie gestel nie",
     "cancel": "Kanselleer",
     "seatSection": "Jou plek op hierdie kursus",
-    "seatSignedInAs": "Jou bynaam",
+    "seatSignedInAs": "Bynaam waarmee jy aanteken",
     "seatCourse": "Kursus",
     "seatConsent": "Jy het saamgestem",
     "seatConsentValue": "{date} (woorde {version})",
@@ -474,9 +474,11 @@
     "accessRaise": "Meer plekke",
     "accessRaiseSave": "Stoor",
     "accessRaiseHint": "{taken} plekke is geneem, so die getal kan nie daaronder gaan nie.",
+    "accessRaiseError": "Dit het nie gewerk nie. Die getal moet 'n heelgetal wees en kan nie onder die {taken} plekke wat al geneem is gaan nie.",
     "accessStop": "Stop hierdie kode",
     "accessStopConfirmTitle": "Stop hierdie kode?",
-    "accessStopConfirmBody": "{seats} plekke is geneem, so {org} sal {total} gefaktureer word. Dit is nie 'n terugbetaling en nie 'n kansellasie nie: elkeen wat al 'n plek het, hou dit vir goed. Dit keer net dat nuwe mense aansluit, en dit kan nie ongedaan gemaak word nie."
+    "accessStopConfirmBody": "{seats} plekke is geneem, so {org} sal {total} gefaktureer word. Dit is nie 'n terugbetaling en nie 'n kansellasie nie: elkeen wat al 'n plek het, hou dit vir goed. Dit keer net dat nuwe mense aansluit, en dit kan nie ongedaan gemaak word nie.",
+    "accessStopError": "Dit het nie gewerk nie. Laai die bladsy weer en kyk of die kode al gestop is."
   },
   "Certificate": {
     "eyebrow": "Sertifikaat van Voltooiing",
@@ -692,7 +694,7 @@
       "Ons stoor dit sodat jy op 'n ander foon na die kursus kan terugkom en kan aangaan waar jy opgehou het. Dit is die enigste rede.",
       "Die organisasie wat vir jou plek betaal het, en die persoon wat die kursus geskryf het, sien hoeveel mense aangesluit het. Hulle sien nooit jou bynaam of enigiets anders oor jou nie.",
       "Jou PIN word deurmekaar gestoor, sodat niemand hier dit kan lees nie. As jy dit vergeet, kan niemand dit vir jou terugkry nie, en jou vordering is weg. Skryf dit neer.",
-      "Jy kan ons enige tyd vra om te skrap wat ons hou, en jy hou jou toegang tot die kursus."
+      "Jy kan ons enige tyd vra om jou bynaam en jou PIN te skrap. Weet net: hulle is die enigste pad terug na jou plek, so daarna kan jy nie weer op 'n ander foon aanteken nie."
     ],
     "consentAgree": "Ek stem saam, laat my in",
     "consentRefuse": "Nee, dankie",

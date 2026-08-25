@@ -27,6 +27,15 @@
 export const CONSENT_VERSIONS: Record<string, readonly string[]> = {
   // 2026-08-23, the wording this rail shipped with.
   //
+  // Corrected on 2026-08-25, before the version had ever been issued to anybody, so
+  // no `seats` row records agreement to the earlier draft and the append-only rule is
+  // not being bent. The last line used to say "and you keep your access to the
+  // course", which was false as built: deleting a Seat deletes the `authAccounts` row
+  // too, because the nickname IS the personal link, so a member who withdraws cannot
+  // sign in again anywhere. The privacy policy said so and this record did not, which
+  // is precisely backwards for the artefact s11(2) rests on. Once a version has been
+  // issued, a wording change is a NEW key, never an edit.
+  //
   // "Specific" means naming what is stored and why. "Informed" means saying who
   // can see it and who cannot. Both are POPIA's words, and a pre-ticked box or a
   // line buried in the terms discharges neither.
@@ -36,7 +45,7 @@ export const CONSENT_VERSIONS: Record<string, readonly string[]> = {
     "We store this so that you can come back to the course on another phone and pick up where you left off. That is the only reason.",
     "The organisation that paid for your place, and the person who wrote the course, are shown how many people joined. They are never shown your nickname or anything else about you.",
     "Your PIN is stored scrambled, so nobody here can read it. If you forget it, nobody can recover it for you, and your progress is gone. Write it down.",
-    "You can ask us to delete what we hold at any time, and you keep your access to the course.",
+    "You can ask us to delete your nickname and your PIN at any time. Be aware that they are the only way back into your place, so after that you cannot sign in again on another phone.",
   ],
 } as const;
 

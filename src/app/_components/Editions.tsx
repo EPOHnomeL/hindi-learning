@@ -1377,6 +1377,11 @@ function AccessCodeRow({ code }: { code: FunctionReturnType<typeof api.accessCod
   const [confirming, setConfirming] = useState(false);
   const [raising, setRaising] = useState(false);
   const [newCap, setNewCap] = useState("");
+  // Both writes here have real server-side refusals a Seller can hit by accident:
+  // lowering the cap below the seats already taken, and stopping a code somebody
+  // else stopped a moment ago. Swallowing them left the Seller staring at an
+  // unchanged number with no idea why, and left the rejection unhandled.
+  const [error, setError] = useState<string | null>(null);
   // Read after mount, not during render, because `window` does not exist on the
   // server. It is the CURRENT host on purpose: `/join` is served on every host, so a
   // Seller working on their own whitelabel domain hands their organisation their own
@@ -1478,10 +1483,14 @@ function AccessCodeRow({ code }: { code: FunctionReturnType<typeof api.accessCod
                 const next = Number(newCap);
                 if (!Number.isInteger(next) || next < 1) return;
                 setBusy(true);
-                void raise({ accessCodeId: code.accessCodeId, capacity: next }).finally(() => {
-                  setBusy(false);
-                  setRaising(false);
-                });
+                setError(null);
+                void raise({ accessCodeId: code.accessCodeId, capacity: next })
+                  .then(() => setRaising(false))
+                  // The server's refusals are plain Errors, which a production
+                  // deployment redacts, so this says the thing the Seller can check
+                  // rather than pretending to relay a message that never arrives.
+                  .catch(() => setError(t("accessRaiseError", { taken: code.taken })))
+                  .finally(() => setBusy(false));
               }}
             >
               <input
@@ -1502,6 +1511,8 @@ function AccessCodeRow({ code }: { code: FunctionReturnType<typeof api.accessCod
               <span className="text-[11px] text-soft">{t("accessRaiseHint", { taken: code.taken })}</span>
             </form>
           )}
+
+          {error && <p className="mt-1.5 text-xs text-danger">{error}</p>}
         </>
       )}
 
@@ -1520,10 +1531,13 @@ function AccessCodeRow({ code }: { code: FunctionReturnType<typeof api.accessCod
           confirmDisabled={busy}
           onConfirm={() => {
             setBusy(true);
-            void stop({ accessCodeId: code.accessCodeId }).finally(() => {
-              setBusy(false);
-              setConfirming(false);
-            });
+            setError(null);
+            void stop({ accessCodeId: code.accessCodeId })
+              .catch(() => setError(t("accessStopError")))
+              .finally(() => {
+                setBusy(false);
+                setConfirming(false);
+              });
           }}
           onClose={() => setConfirming(false)}
         />
