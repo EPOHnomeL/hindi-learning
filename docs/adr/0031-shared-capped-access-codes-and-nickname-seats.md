@@ -199,3 +199,51 @@ Each of these is **accepted**, not overlooked:
 - **No certificate on a Seat.** Confirmed out for this buyer: a certificate is something a member
   could lose with a forgotten PIN, and there is no recovery, so shipping both together would sell a
   promise the design cannot keep.
+
+## Addendum, 2026-08-25: two decisions reversed after walking the rail
+
+The rail above was built and walked. Two of its decisions did not survive contact, and both are
+reversed here rather than in the text above, which stands as the record of what was decided on
+2026-08-23.
+
+**1. A Seat may now adopt an email and a password.** The Out of Scope list said "linking a Seat to a
+Google or Password account later"; the operator asked for it after using the rail, because the one
+thing the design cannot otherwise offer is any way back from a lost PIN, and "your progress is gone"
+is a support conversation nobody wants to have at the scale of a party's membership. It is built
+**password only**: Google's callback is an httpAction with no Convex identity, so `getAuthUserId`
+returns null there and the adoption has nothing to adopt onto. That limitation is the research
+finding this ADR already recorded, unchanged.
+
+It is **opt-in, unprompted, and it does not create a PIN reset.** Nothing in the product asks for an
+address, nothing nags, and a member who never touches the control is never worse off. The join page's
+promise stays literally true: a forgotten PIN cannot be recovered. A member who added an email signs
+in the other way and changes the PIN; a member who did not still cannot.
+
+The **cost is real and accepted**: a Seat that adopts an address is an ordinary personal
+identifier sitting beside a political party's cohort, which is what this design was shaped to avoid.
+What limits it is that the member chooses it, one at a time, for a benefit they can name. The
+mitigation the rail rests on is unchanged for everybody who declines.
+
+The adoption branch lives in `convex/auth.ts` and is the narrow version of the remedy vouchers ticket
+11 warned about. Three guards, all load-bearing and all tested: the caller must already be signed in,
+their `users` row must have **no** email (so an ordinary account can never be repointed), and the
+target address must not already exist on a `users` row (so two people can never be merged into one
+account, which is the #111 failure).
+
+**2. The consent wording was shortened, as a new version.** The 2026-08-23 wording was six long
+sentences, which on a phone in front of somebody who has never seen the site is a wall people scroll
+past, and **consent nobody read is not "informed" however carefully it was drafted**. Version
+2026-08-25 is three short lines carrying the three facts POPIA needs stated, and `/join` links the
+Terms and the Privacy Policy for the rest. The Terms gained a full section for it.
+
+The old version is kept in `convex/joinConsent.ts` rather than edited, so a `seats` row stamped
+2026-08-23 still resolves to exactly what that member saw. That is what the versioning was for.
+
+**Not reversed, and worth saying so:** the seat cap, the self-chosen nickname, the derived count, the
+Ledger row written on stop, the provenance-free Entitlement, and the rule that no Seller-facing query
+can return a nickname. All still hold.
+
+**Renamed, 2026-08-25.** In the product this rail is an **Organisation Voucher** and the single-use
+rail is **Bulk Vouchers**. The code identifiers (`accessCodes`, `seats`, `mintAccessCode`) were left
+alone: renaming a Convex table is a data migration and a word is not worth one. The mapping is in
+`docs/agents/project-context.md`. This ADR keeps the old names throughout.

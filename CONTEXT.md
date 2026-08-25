@@ -212,7 +212,7 @@ _Avoid_: Coupon, discount code, promo code (a Voucher does not reduce a price - 
 Edition), gift card (there is no balance), licence key, seat, invite or **[[Share]]** (a Share is
 granted by an owner to a known person; a Voucher is redeemed by whoever holds the code), token
 
-**Voucher Batch**:
+**Bulk Vouchers**:
 N **[[Voucher]]**s a **[[Seller]]** mints for one **[[Edition]]** of their own course, sold to an
 organisation that will not disclose its members' email addresses - the reason the rail exists at
 all ([ADR 0029](docs/adr/0029-seller-minted-voucher-rail.md)). The Seller owns the commercial
@@ -224,11 +224,13 @@ codes work from creation, so an unpaid batch has already granted its seats. Crea
 **unpaid** and excluded from payouts until the reference is logged. The buying organisation exists
 only as a name and a billing contact on the batch: it holds no account, and **[[Voucher]]** counts
 are all it is ever shown.
-_Avoid_: Order, bulk purchase, seat pool, licence pack, organisation or team (there is no
+_Avoid_: "Voucher Batch" (the name it shipped under, and still its `voucherBatches` table and
+`mintBatch` mutation; renamed in the product on 2026-08-25 to pair with **[[Organisation
+Voucher]]**), Order, bulk purchase, seat pool, licence pack, organisation or team (there is no
 organisation entity, deliberately), **[[EFT Intent]]** (an intent grants nothing until confirmed; a
 batch grants everything at creation - the opposite), campaign
 
-**Access Code**:
+**Organisation Voucher**:
 ONE shared, multi-use, **capped** code a **[[Seller]]** mints for one **[[Edition]]** of their own
 course, carrying a **per-seat price** and a buying organisation's billing details
 ([ADR 0031](docs/adr/0031-shared-capped-access-codes-and-nickname-seats.md)). The organisation
@@ -240,13 +242,16 @@ as a **[[Voucher Batch]]**'s row is. Stopping is **one way**, and it is neither 
 revocation: Seats already taken keep working forever, and only new joins end. A code stopped with
 zero Seats writes no Ledger row at all. The buying organisation is still **not an entity** - a name
 and a billing contact on the row, as on a batch.
-_Avoid_: **[[Voucher]]** (single-use, one per member, billed upfront - an Access Code is the
-opposite on all three), enrolment key or PIN in the Moodle/Kahoot sense (those expire or die with a
+_Avoid_: "Access Code" (the name it shipped under on 2026-08-23 and still carries in the code:
+the `accessCodes` table, `convex/accessCodes.ts`, `mintAccessCode`. Renamed in the product on
+2026-08-25 because "code" described the string and not the deal; the identifiers were left alone
+rather than migrating a table for a word), **[[Bulk Vouchers]]** (single-use, one per member,
+billed upfront - an Organisation Voucher is the opposite on all three), enrolment key or PIN in the Moodle/Kahoot sense (those expire or die with a
 session; this grants a lifetime Entitlement), licence, subscription or per-seat plan (there is no
 recurring charge), coupon or discount code (it grants the whole Edition, it does not reduce a price)
 
 **Seat**:
-ONE nickname-and-PIN identity created against an **[[Access Code]]**, and the platform's only
+ONE nickname-and-PIN identity created against an **[[Organisation Voucher]]**, and the platform's only
 account that has **no email address at all**
 ([ADR 0031](docs/adr/0031-shared-capped-access-codes-and-nickname-seats.md)). Consuming a Seat is
 what decrements the cap; signing back into an existing Seat does **not**, which is what makes the

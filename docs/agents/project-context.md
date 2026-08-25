@@ -190,7 +190,21 @@ Gotchas:
     one var you need over dumping the whole env — the PayFast merchant key and
     passphrase live there too.
 
-## Bulk access: there are TWO rails, not one (2026-08-23)
+## Bulk access: there are TWO rails, not one (2026-08-23; renamed 2026-08-25)
+
+**The product names and the code names differ, on purpose.** Renamed on 2026-08-25 after the
+operator walked both rails: "Access Code" described the string rather than the deal. **The
+identifiers were deliberately NOT migrated** - renaming a Convex table is a data migration, and
+buying a word with one is a bad trade. So:
+
+| Product name | Code |
+| --- | --- |
+| **Organisation Voucher** | `accessCodes` table, `seats` table, `convex/accessCodes.ts`, `mintAccessCode`, `/join` |
+| **Bulk Vouchers** | `voucherBatches` table, `vouchers` table, `convex/vouchers.ts`, `mintBatch`, `/redeem` |
+
+ADRs 0029 and 0031 use the old names throughout and **are not edited**: they are the record of what
+was decided when. Read them with this table beside them.
+
 
 An organisation buying course access for its people can be served two ways, and both
 are built. A new agent that finds only one of them in the notes will reason about the
