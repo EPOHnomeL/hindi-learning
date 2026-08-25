@@ -3,6 +3,11 @@
 # code and under test. Only the status line changed - an ADR is never rewritten to
 # correct it; a stale one gets a superseding ADR.
 status: accepted
+# Superseded IN PART by ADR 0031 (2026-08-23): the rejection of "One code with N
+# uses" below, and decision 3's "records nothing about who redeemed", are reversed
+# for a SECOND rail (shared capped Access Codes with nickname Seats). Everything
+# else here, including this whole single-use voucher rail, stands unchanged.
+superseded_in_part_by: 0031
 ---
 
 # Seller-minted voucher batches, and redemptions that record nobody
