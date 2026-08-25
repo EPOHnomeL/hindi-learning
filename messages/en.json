@@ -740,7 +740,9 @@
     "install": "Install",
     "notNow": "Not now",
     "iosStep1": "Tap the Share button",
-    "iosStep2": "Choose \"Add to Home Screen\""
+    "iosStep2": "Choose \"Add to Home Screen\"",
+    "openInChrome": "Open in Chrome",
+    "samsungNote": "Samsung Internet cannot install this app: Android blocks the app it builds. Open this page in Chrome and install from there."
   },
   "Offline": {
     "note": "You are offline. Showing the last saved list.",

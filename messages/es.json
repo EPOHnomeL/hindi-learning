@@ -740,7 +740,9 @@
     "install": "Instalar",
     "notNow": "Ahora no",
     "iosStep1": "Toca el botón Compartir",
-    "iosStep2": "Elige \"Añadir a pantalla de inicio\""
+    "iosStep2": "Elige \"Añadir a pantalla de inicio\"",
+    "openInChrome": "Abrir en Chrome",
+    "samsungNote": "Samsung Internet no puede instalar esta aplicación: Android bloquea la que genera. Abre esta página en Chrome e instala desde ahí."
   },
   "Offline": {
     "note": "Sin conexión. Mostrando la última lista guardada.",

@@ -319,10 +319,13 @@ which decays every session — re-verify before resuming).
   ship a real signed app: a Bubblewrap/PWABuilder **TWA** with a current
   `targetSdk`, on the Play Store, with Digital Asset Links on the tenant domain.
   That is a real project (Play Console account, per-tenant signing or one shell
-  app that takes the tenant host), not a patch. Until then Chrome installs work
-  and Samsung's do not. **A redirect-to-Chrome notice was built and then removed
-  on 2026-08-25** at the user's instruction (commits 8a329fc, 77411b2, reverted):
-  it papered over the block instead of fixing it. Do not rebuild it unasked.
+  app that takes the tenant host), not a patch. **Until then, what ships is the
+  redirect** (`isSamsungInternet` + `chromeIntentUrl` in
+  `src/app/_components/installPromptDerive.ts`): Samsung renders the sheet on
+  user agent alone, since the event never fires there, and gets a notice saying
+  Samsung cannot install the app plus an **Open in Chrome** button on an Android
+  intent URL. It is a workaround and is labelled as one; the block itself stays
+  Samsung's until the TWA exists.
 
 ## Repo gotchas
 

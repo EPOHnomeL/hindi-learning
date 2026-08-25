@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { Brand } from "./Brand";
 import { useTenant } from "./TenantContext";
 import { INSTALL_DISMISSED_KEY } from "./accountLocalState";
-import { installDismissed, isIosBrowser } from "./installPromptDerive";
+import { chromeIntentUrl, installDismissed, isIosBrowser, isSamsungInternet } from "./installPromptDerive";
 import { Icon } from "./icons";
 
 // Chrome's install event; not in TS's DOM lib because only Chromium ships it.
@@ -13,13 +13,15 @@ type BeforeInstallPromptEvent = Event & { prompt(): Promise<unknown> };
 
 // The branded install prompt (installable-app ticket 03, ADR 0030 §1): a
 // dismissible bottom sheet on "/" only, in both auth states, never a blocking
-// interstitial. Android-only in effect: it renders solely after
-// beforeinstallprompt has fired, which is also the browser confirming the app is
-// installable and not already installed, so the Install button replays the kept
-// event and opens the REAL OS install dialog. iOS never fires it and is a
-// separate feature (ticket 04). Samsung Internet 27+ dropped the event too, so
-// the sheet is simply absent there; see project-context.md, there is nothing we
-// can render that would make the Samsung install succeed.
+// interstitial. On Chrome it renders only after beforeinstallprompt has fired,
+// which is also the browser confirming the app is installable and not already
+// installed, so the Install button replays the kept event and opens the REAL OS
+// install dialog. iOS never fires it and is a separate feature (ticket 04), and
+// Samsung Internet 27+ DELIBERATELY stopped firing it (Samsung's position: it is
+// a Chrome-specific non-standard extension), which is why no sheet appeared at
+// all in prod on 2026-08-25. So Samsung, like iOS, renders on user agent alone.
+// That costs nothing there: the Samsung path never touches the event, it just
+// leaves for Chrome.
 //
 // Appears ~3s after mount so first paint is the tenant's landing content, and
 // never when already running standalone. "Not now" writes
@@ -35,6 +37,12 @@ export function InstallSheet() {
   // Screen instructions on the same sheet, same trigger, same dismissal key.
   // Kept deletable without touching the Android path.
   const [ios, setIos] = useState(false);
+  // The Samsung half (2026-08-25): Samsung Internet fires beforeinstallprompt
+  // like any Chromium browser, but the WebAPK it mints is built against an old
+  // targetSdk and Play Protect blocks the install outright. An Install button
+  // there is a button that fails, so Samsung gets an Open in Chrome button
+  // instead. See isSamsungInternet for the whole story.
+  const [samsung, setSamsung] = useState(false);
   const [pastDelay, setPastDelay] = useState(false);
   const [closed, setClosed] = useState(false);
 
@@ -56,6 +64,7 @@ export function InstallSheet() {
     };
     window.addEventListener("beforeinstallprompt", onPrompt);
     setIos(isIosBrowser(navigator.userAgent, navigator.maxTouchPoints));
+    setSamsung(isSamsungInternet(navigator.userAgent));
     const timer = setTimeout(() => setPastDelay(true), 3000);
     return () => {
       window.removeEventListener("beforeinstallprompt", onPrompt);
@@ -63,11 +72,16 @@ export function InstallSheet() {
     };
   }, []);
 
-  if ((!promptEvent && !ios) || !pastDelay || closed) return null;
+  if ((!promptEvent && !ios && !samsung) || !pastDelay || closed) return null;
 
   const install = () => {
     setClosed(true);
     void promptEvent?.prompt();
+  };
+  // Not setClosed: the sheet is about to be replaced by Chrome anyway, and if
+  // the intent does not resolve the user still has their Not now.
+  const openInChrome = () => {
+    window.location.href = chromeIntentUrl(window.location.href);
   };
   const dismiss = () => {
     try {
@@ -88,7 +102,7 @@ export function InstallSheet() {
         {/* The captured event wins when both could apply: a real one-tap install
             beats instructions. On iOS it never fires, so iOS always gets the
             instructions. */}
-        {!promptEvent && ios && (
+        {!promptEvent && ios && !samsung && (
           <ol className="flex flex-col gap-1.5 text-sm text-ink">
             <li className="flex items-center gap-2">
               <span className="text-soft">1.</span>
@@ -102,14 +116,26 @@ export function InstallSheet() {
             </li>
           </ol>
         )}
+        {/* Samsung is told WHY it is being sent elsewhere, so the redirect
+            reads as help rather than as the site dodging the question. */}
+        {samsung && <p className="text-sm text-soft">{t("samsungNote")}</p>}
         <div className="flex gap-2">
-          {promptEvent && (
+          {samsung ? (
             <button
-              onClick={install}
+              onClick={openInChrome}
               className="flex-1 rounded-lg bg-accent px-4 py-2.5 font-semibold text-paper"
             >
-              {t("install")}
+              {t("openInChrome")}
             </button>
+          ) : (
+            promptEvent && (
+              <button
+                onClick={install}
+                className="flex-1 rounded-lg bg-accent px-4 py-2.5 font-semibold text-paper"
+              >
+                {t("install")}
+              </button>
+            )
           )}
           <button onClick={dismiss} className="flex-1 rounded-lg border border-line px-4 py-2.5 text-soft">
             {t("notNow")}
