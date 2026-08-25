@@ -13,11 +13,14 @@ type BeforeInstallPromptEvent = Event & { prompt(): Promise<unknown> };
 
 // The branded install prompt (installable-app ticket 03, ADR 0030 §1): a
 // dismissible bottom sheet on "/" only, in both auth states, never a blocking
-// interstitial. Android-only in effect: it renders solely after
-// beforeinstallprompt has fired, which is also the browser confirming the app is
-// installable and not already installed, so the Install button replays the kept
-// event and opens the REAL OS install dialog. iOS never fires it and is a
-// separate feature (ticket 04).
+// interstitial. On Chrome it renders only after beforeinstallprompt has fired,
+// which is also the browser confirming the app is installable and not already
+// installed, so the Install button replays the kept event and opens the REAL OS
+// install dialog. iOS never fires it and is a separate feature (ticket 04), and
+// neither does Samsung reliably (2026-08-25, reported in prod: no sheet ever
+// appeared) so Samsung, like iOS, renders on user agent alone. That costs
+// nothing there: the Samsung path never touches the event, it just leaves for
+// Chrome.
 //
 // Appears ~3s after mount so first paint is the tenant's landing content, and
 // never when already running standalone. "Not now" writes
@@ -68,7 +71,7 @@ export function InstallSheet() {
     };
   }, []);
 
-  if ((!promptEvent && !ios) || !pastDelay || closed) return null;
+  if ((!promptEvent && !ios && !samsung) || !pastDelay || closed) return null;
 
   const install = () => {
     setClosed(true);
