@@ -502,6 +502,10 @@ test("stopping a code with zero seats writes no ledger row at all", async () => 
   expect(row!.stoppedAt).toEqual(expect.any(Number));
   expect(row).not.toHaveProperty("ledgerId");
   expect(await ledgerRows(t)).toEqual([]);
+  // Nothing to settle and no Ledger row, so a STOPPED zero-seat voucher leaves the
+  // list rather than sitting there as R0.00 for the operator to work out how to clear.
+  // (A LIVE voucher with nobody joined yet is kept: that is a deal in progress, and
+  // "nobody has joined" is the thing to see early.)
   expect(await asUser(t, admin).query(api.accessCodes.pendingAccessCodes, {})).toEqual([]);
 });
 
@@ -592,9 +596,14 @@ test("a stopped code appears on the operator's queue with everything an invoice 
   await join(t, { code, nickname: "Thandi", pin: "1234" });
   await join(t, { code, nickname: "Sipho", pin: "5678" });
 
-  // A LIVE code is not on the queue: there is no bill yet, so it is not work waiting
-  // on the operator.
-  expect(await asUser(t, admin).query(api.accessCodes.pendingAccessCodes, {})).toEqual([]);
+  // **A live voucher IS on the list, marked running.** It began as stopped-only, on
+  // the reasoning that a live voucher owes nothing; that was wrong in practice
+  // (2026-08-25). A Bulk Voucher shows from the moment it is minted, so an operator
+  // who mints an Organisation Voucher and finds no trace of it reasonably concludes it
+  // failed.
+  const live = await asUser(t, admin).query(api.accessCodes.pendingAccessCodes, {});
+  expect(live).toHaveLength(1);
+  expect(live[0]).toMatchObject({ accessCodeId, orgName: "The Party", seats: 2, total: 30000, stoppedAt: null });
   await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
 
   const queue = await asUser(t, admin).query(api.accessCodes.pendingAccessCodes, {});
@@ -610,6 +619,8 @@ test("a stopped code appears on the operator's queue with everything an invoice 
     pricePerSeat: 15000,
     total: 30000,
   });
+  // Stopped now, so there is a reference to log against it.
+  expect(queue[0]!.stoppedAt).toEqual(expect.any(Number));
   // **No code string, no nickname, no userId**, enforced in the returns validator
   // the way `pendingBatches` enforces "no codes". The money role and the selling
   // role are separated by what the query CAN say, so a later UI change cannot undo

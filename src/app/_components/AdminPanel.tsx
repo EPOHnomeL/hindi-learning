@@ -923,10 +923,10 @@ function AccessCodeQueue() {
   return (
     <section className="mt-12">
       <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">Organisation Vouchers awaiting payment</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-accent">Organisation Vouchers</h2>
         <p className="mt-0.5 text-sm text-soft">
-          Raise the invoice from the line, then log the reference when it lands - that makes the seller&apos;s share
-          payable
+          Running deals and the ones ready to invoice. A stopped voucher takes a reference; a running one owes nothing
+          yet
         </p>
       </div>
       {pending === undefined ? (
@@ -966,10 +966,28 @@ function AccessCodeQueueRow({ code }: { code: FunctionReturnType<typeof api.acce
           </span>
           <span className="block text-xs text-soft">{code.orgContact}</span>
         </div>
-        <span className="shrink-0 rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
-          {formatRand(code.total)}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Running vs ready-to-invoice, because the total means different things:
+              on a live voucher it is what the deal has run up SO FAR and will keep
+              moving, on a stopped one it is final and invoiceable. */}
+          {code.stoppedAt === null && (
+            <span className="rounded-full bg-hi px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-soft">
+              Running
+            </span>
+          )}
+          <span className="rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
+            {formatRand(code.total)}
+          </span>
+        </div>
       </div>
+      {/* Nothing to log on a live voucher, so no box to type into. Saying why beats a
+          disabled field the operator has to work out the reason for. */}
+      {code.stoppedAt === null ? (
+        <p className="mt-1.5 text-xs text-soft">
+          Still running, so nothing is due yet. The seller stops it when the agreement ends and it moves up this list
+          ready to invoice.
+        </p>
+      ) : (
       <form
         className="mt-2.5 flex flex-wrap items-center gap-2"
         onSubmit={async (e) => {
@@ -1000,6 +1018,7 @@ function AccessCodeQueueRow({ code }: { code: FunctionReturnType<typeof api.acce
         </button>
         {error && <span className="text-xs text-danger">{error}</span>}
       </form>
+      )}
     </li>
   );
 }

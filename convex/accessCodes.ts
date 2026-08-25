@@ -522,7 +522,19 @@ export const pendingAccessCodes = query({
       seats: v.number(),
       pricePerSeat: v.number(),
       total: v.number(),
-      stoppedAt: v.number(),
+      // **Null while the voucher is still running.** Live vouchers are on this list
+      // too, and that is a correction rather than the original design: it began as
+      // stopped-only, on the reasoning that a live voucher owes nothing so it is not
+      // work waiting on the operator. That was wrong in practice (reported
+      // 2026-08-25). A Bulk Voucher appears here the moment it is minted, because its
+      // Ledger row exists from then, so an operator who mints an Organisation Voucher
+      // and finds no trace of it in the portal reasonably concludes it failed. They
+      // also have a legitimate reason to look: knowing a deal is running, and how
+      // full it is, is how they answer "what is coming".
+      //
+      // The UI shows no reference box on a live one, because there is genuinely
+      // nothing to log yet.
+      stoppedAt: v.union(v.number(), v.null()),
     }),
   ),
   handler: async (ctx) => {
@@ -536,9 +548,8 @@ export const pendingAccessCodes = query({
       .query("accessCodes")
       .withIndex("by_payment_ref", (q) => q.eq("paymentRef", undefined))
       .take(500);
-    const stopped = rows.filter((r) => r.stoppedAt !== undefined);
     const lines = await Promise.all(
-      stopped.map(async (c) => {
+      rows.map(async (c) => {
         const [seller, topic, seats] = await Promise.all([
           ctx.db.get(c.sellerId),
           ctx.db.get(c.topicId),
@@ -554,14 +565,20 @@ export const pendingAccessCodes = query({
           seats,
           pricePerSeat: c.pricePerSeat,
           total: seats * c.pricePerSeat,
-          stoppedAt: c.stoppedAt ?? 0,
+          stoppedAt: c.stoppedAt ?? null,
         };
       }),
     );
-    // A code stopped with zero seats settles to nothing and has no Ledger row, so it
-    // is not paperwork and does not belong on a to-do list. Dropped here rather than
-    // shown as R0.00 for the operator to work out how to clear.
-    return lines.filter((l) => l.seats > 0).sort((a, b) => a.stoppedAt - b.stoppedAt);
+    // A code STOPPED with zero seats settles to nothing and has no Ledger row, so it
+    // is not paperwork and does not belong on a to-do list. Dropped rather than shown
+    // as R0.00 for the operator to work out how to clear. A LIVE one with no places
+    // taken yet is kept: that is a deal in progress, and "nobody has joined yet" is
+    // exactly the thing the operator and the Seller need to see early.
+    return lines
+      .filter((l) => l.stoppedAt === null || l.seats > 0)
+      // Stopped first: those are the ones with something to do. Oldest first within
+      // each group, so the longest-waiting is at the top.
+      .sort((a, b) => Number(a.stoppedAt === null) - Number(b.stoppedAt === null) || (a.stoppedAt ?? 0) - (b.stoppedAt ?? 0));
   },
 });
 
