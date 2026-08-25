@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSrcDoc } from "./lessonSrcDoc";
+import { buildEditDoc, buildSrcDoc } from "./lessonSrcDoc";
 
 // A stored lesson carries the legacy floating theme pill (injected by the old
 // foot.html) baked into its immutable HTML.
@@ -8,6 +8,16 @@ const LESSON = `<!DOCTYPE html><html lang="en"><head></head><body><div class="wr
 var btn=document.createElement('button'); btn.className='theme-toggle';
 document.body.appendChild(btn);})();</script>
 </body></html>`;
+
+// A stored lesson carrying the green "ask your teacher" block (teacher-qa/02) and
+// the <footer> Sources line directly below it. Lessons are immutable (ADR 0003),
+// so hiding the block is a CSS rule injected at render time, and this markup must
+// survive every build byte for byte.
+const ASK_BODY = `<div class="wrap"><p>lesson</p>
+<div class="ask"><b>I'm your teacher for this journey, ask me anything.</b></div>
+<footer>Sources: Watchman Nee, <em>Basic Lesson Series</em>.</footer>
+</div>`;
+const ASK_LESSON = `<!DOCTYPE html><html lang="en"><head></head><body>${ASK_BODY}</body></html>`;
 
 describe("buildSrcDoc", () => {
   it("bakes the selected theme onto the root <html> for a lesson", () => {
@@ -153,5 +163,59 @@ describe("buildSrcDoc", () => {
     expect(out).toContain("#1b1815"); // dark --paper value
     // Palette must land inside <head> so it applies before the body renders.
     expect(out.indexOf(":root[data-theme")).toBeLessThan(out.indexOf("</head>"));
+  });
+
+  it("hides the ask block, into <head>, when Teacher Q&A is off", () => {
+    // The setting is per Topic (teacher-qa/01); off means the green invitation shows
+    // on no lesson, on any reader path.
+    const out = buildSrcDoc(ASK_LESSON, { quiz: true, theme: "light", teacherQa: false });
+    expect(out).toContain(".ask{display:none}");
+    // Before paint, like every other injection on this rail.
+    expect(out.indexOf(".ask{display:none}")).toBeLessThan(out.indexOf("</head>"));
+  });
+
+  it("injects no such rule when Teacher Q&A is on, or when the setting is absent", () => {
+    // Absence means on (teacher-qa/01), so an un-set Topic must build byte for byte
+    // like an explicitly-on one. That equality is what makes the rollout free.
+    const on = buildSrcDoc(ASK_LESSON, { quiz: true, theme: "light", teacherQa: true });
+    const unset = buildSrcDoc(ASK_LESSON, { quiz: true, theme: "light" });
+    expect(on).not.toContain("display:none");
+    expect(on).toBe(unset);
+  });
+
+  it("leaves the stored lesson body untouched when the ask block is hidden", () => {
+    // Lessons are immutable (ADR 0003). Hiding is display only: the block, its
+    // markup and the footer citation below it all still ship in the document.
+    const out = buildSrcDoc(ASK_LESSON, { quiz: true, theme: "light", teacherQa: false });
+    expect(out).toContain(ASK_BODY);
+  });
+
+  it("hides the ask block identically in both themes", () => {
+    // Display, not colour, so dark needs no separate rule and gets one for free.
+    for (const theme of ["light", "dark"] as const) {
+      expect(buildSrcDoc(ASK_LESSON, { quiz: true, theme, teacherQa: false })).toContain(".ask{display:none}");
+    }
+  });
+});
+
+describe("buildEditDoc", () => {
+  it("hides the ask block when Teacher Q&A is off, so the owner edits what a learner sees", () => {
+    const out = buildEditDoc(ASK_LESSON, { theme: "light", teacherQa: false });
+    expect(out).toContain(".ask{display:none}");
+    expect(out.indexOf(".ask{display:none}")).toBeLessThan(out.indexOf("</head>"));
+  });
+
+  it("injects no rule when Teacher Q&A is on, or when the setting is absent", () => {
+    const on = buildEditDoc(ASK_LESSON, { theme: "light", teacherQa: true });
+    expect(on).not.toContain("display:none");
+    expect(on).toBe(buildEditDoc(ASK_LESSON, { theme: "light" }));
+  });
+
+  it("keeps the hide rule out of the body, so the read-back on save cannot store it", () => {
+    // The editor saves `body.innerHTML` back (replaceBodyInner). A rule injected into
+    // the body would be written into the immutable Lesson on the next save.
+    const out = buildEditDoc(ASK_LESSON, { theme: "light", teacherQa: false });
+    expect(out).toContain(ASK_BODY);
+    expect(out.slice(out.indexOf("<body"))).not.toContain("display:none");
   });
 });

@@ -323,6 +323,26 @@ function injectTenantPaletteCss(html: string, palette: TenantTheme): string {
   return i === -1 ? style + html : html.slice(0, i) + style + html.slice(i);
 }
 
+// Hide the green "ask your teacher" block when the Topic has Teacher Q&A off
+// (teacher-qa/02). Published Lessons are immutable (ADR 0003) and the teach Routine
+// keeps authoring the block unconditionally, so this is a render-time display rule
+// rather than a rewrite: it needs no backfill, it reaches lessons authored while
+// the setting was off, and flipping the setting back on restores the block on every
+// lesson at once. Head-only, which is also what keeps the editor's body read-back
+// on save free of it.
+//
+// head.html styles `.ask` at (0,1,0) and sets no `display`, so a bare `.ask` rule
+// injected later in the head is enough; no specificity doubling is needed. The
+// block's "Main source for this week's reading" citation is redundant with the
+// <footer> Sources line directly below it, which carries the fuller attribution, so
+// nothing is lost by hiding the whole block.
+const ASK_HIDDEN_CSS = `<style>.ask{display:none}</style>`;
+
+function injectAskHidden(html: string): string {
+  const i = html.indexOf("</head>");
+  return i === -1 ? ASK_HIDDEN_CSS + html : html.slice(0, i) + ASK_HIDDEN_CSS + html.slice(i);
+}
+
 // Some authored references arrive as a bare fragment (e.g. `<section
 // class="glossary">…</section>`) with all page styling scoped to that element,
 // not a full <html> document. The rest of this pipeline assumes a document:
@@ -397,6 +417,11 @@ export function buildSrcDoc(
     // The resolved tenant's palette (issue 13), from the client tenant context.
     // Absent on the default site → no override, the authored palette stands.
     tenantPalette?: TenantTheme;
+    // The Topic's Teacher Q&A setting (teacher-qa/01), already resolved to a boolean
+    // by the bundle the reader loads (`content.reader.courseHeader`, or
+    // `public.publicCourse` for a Guest). `false` hides the lesson's ask block;
+    // `true` and absence both leave the document exactly as authored.
+    teacherQa?: boolean;
     // References only (reference-cards/02): add the reference bridge + card CSS so a
     // lesson can deep-link to a single glossary card. The parent drives the scroll
     // via a `scrollToCard` postMessage, so the target isn't baked (no reload on a
@@ -421,6 +446,7 @@ export function buildSrcDoc(
     doc = injectLessonOptionInk(doc);
     doc = injectLessonJustify(doc);
   }
+  if (opts.teacherQa === false) doc = injectAskHidden(doc);
   doc = setRootDirLang(doc, opts.dir, opts.lang);
   if (opts.lang && isDevanagari(opts.lang)) doc = injectDevanagariCss(doc);
   if (opts.tenantPalette) doc = injectTenantPaletteCss(doc, opts.tenantPalette);
@@ -450,7 +476,9 @@ export function buildSrcDoc(
 // the <html> tag, so the baked `data-theme` never reaches the saved HTML.
 export function buildEditDoc(
   html: string,
-  opts: { theme?: Theme; themeCss?: boolean; dir?: "ltr" | "rtl"; lang?: string } = {},
+  // `teacherQa` mirrors buildSrcDoc's: the owner edits what a learner sees, so a
+  // course with the setting off shows no ask block in the in-place editor either.
+  opts: { theme?: Theme; themeCss?: boolean; dir?: "ltr" | "rtl"; lang?: string; teacherQa?: boolean } = {},
 ): string {
   let doc = ensureDocument(html);
   if (opts.theme) {
@@ -466,6 +494,7 @@ export function buildEditDoc(
   // the <html> tag + head, so the body read-back is unaffected.
   doc = setRootDirLang(doc, opts.dir, opts.lang);
   if (opts.lang && isDevanagari(opts.lang)) doc = injectDevanagariCss(doc);
+  if (opts.teacherQa === false) doc = injectAskHidden(doc);
   return doc;
 }
 

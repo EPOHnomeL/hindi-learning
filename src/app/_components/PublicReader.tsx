@@ -375,7 +375,15 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
         {/* Quizzes stay interactive (self-check); nothing is recorded for a Guest.
             Resource links open from the in-bundle list (rich-media/11); a paid
             Preview withholds Resources, so those links no-op. */}
-        <Frame html={html} withBridge theme={theme} dir={course.dir} lang={course.lang} resources={course.resources} />
+        <Frame
+          html={html}
+          withBridge
+          theme={theme}
+          dir={course.dir}
+          lang={course.lang}
+          resources={course.resources}
+          teacherQa={course.teacherQa}
+        />
         {/* The end-of-lesson Next card, mirroring the authed reader (they are
             deliberate twins until ui-overhaul 06 rules on collapsing them).
             Advancing ticks the Guest's per-device done set, like the top-bar

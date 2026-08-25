@@ -147,6 +147,7 @@ export function Frame({
   reference,
   cardTarget,
   share,
+  teacherQa,
 }: {
   html: string;
   withBridge: boolean;
@@ -171,6 +172,10 @@ export function Frame({
   // URL. When set, each card gets a share button that copies a branded snippet +
   // opens the native share sheet. Null/absent → no share buttons (private course).
   share?: { courseTitle: string; url: string } | null;
+  // The Topic's Teacher Q&A setting (teacher-qa/01), off the course bundle the
+  // caller already holds. `false` hides the lesson's green ask block; `true` and
+  // absence build the document exactly as authored.
+  teacherQa?: boolean;
 }) {
   const t = useTranslations("Artifact");
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -202,8 +207,9 @@ export function Frame({
   shareRef.current = share;
   const [copied, setCopied] = useState(false);
   const srcDoc = useMemo(
-    () => buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss, dir, lang, tenantPalette, reference, refShare: shareable }),
-    [html, withBridge, themeCss, dir, lang, tenantPalette, reference, shareable],
+    () =>
+      buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss, dir, lang, tenantPalette, reference, refShare: shareable, teacherQa }),
+    [html, withBridge, themeCss, dir, lang, tenantPalette, reference, shareable, teacherQa],
   );
 
   // Deep-link to a glossary card (reference-cards/02). Read the target via a ref so
@@ -546,7 +552,7 @@ function LessonView({
             iframe is a descendant, so hovering the lesson body counts as hovering
             the group and reveals it; focus reveals it for keyboard users. */}
         <div className="group relative flex min-h-0 flex-1 flex-col">
-          <Frame html={html} withBridge theme={theme} dir={dir} lang={contentLang} resources={resources} />
+          <Frame html={html} withBridge theme={theme} dir={dir} lang={contentLang} resources={resources} teacherQa={header?.teacherQa} />
           {canEdit && (
             <button
               type="button"
@@ -568,6 +574,7 @@ function LessonView({
             dir={dir}
             lang={contentLang}
             label="lesson"
+            teacherQa={header?.teacherQa}
             onClose={() => setEditing(false)}
             commit={(storageId) =>
               isSource
@@ -671,6 +678,7 @@ function ContentEditor({
   label,
   onClose,
   commit,
+  teacherQa,
 }: {
   topicSlug: string;
   // The Edition being edited, for the upload-URL guard (owner or THIS Edition's
@@ -689,6 +697,10 @@ function ContentEditor({
   label: string;
   onClose: () => void;
   commit: (storageId: Id<"_storage">) => Promise<unknown>;
+  // Mirrors the reader Frame's, so the owner edits what a learner sees
+  // (teacher-qa/02). Display only: the rule is injected into <head>, and the save
+  // reads back body content, so it can never be stored into the Lesson.
+  teacherQa?: boolean;
 }) {
   const t = useTranslations("Artifact");
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -699,7 +711,10 @@ function ContentEditor({
 
   // Bake theme/dir/lang for display only; the read-back takes body content, not
   // the <html> tag, so none of it reaches the saved HTML.
-  const srcDoc = useMemo(() => buildEditDoc(html, { theme, themeCss, dir, lang }), [html, theme, themeCss, dir, lang]);
+  const srcDoc = useMemo(
+    () => buildEditDoc(html, { theme, themeCss, dir, lang, teacherQa }),
+    [html, theme, themeCss, dir, lang, teacherQa],
+  );
 
   useEffect(() => dialogRef.current?.showModal(), []);
 
