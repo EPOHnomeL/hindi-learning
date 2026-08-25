@@ -51,6 +51,12 @@ states.
   The boolean rides **two** bundles the reader already loads: `content.reader.courseHeader` for
   every authed caller and `public.publicCourse` for a Guest. Tickets 02 and 03 consume those and do
   not re-decide. Built 2026-08-25, `2928d46`, verified by tests and by reading the code, not walked.
+- **The green ask block disappears from the lesson**
+  ([02](tickets/02-the-green-ask-block-disappears.md)): one injected `.ask{display:none}` before
+  `</head>`, in both `lessonSrcDoc` builders (the reader's and the owner's in-place editor's), fed
+  `teacherQa` off the bundles 01 named. On and unset build byte for byte identically; no stored
+  Lesson HTML is touched. Built 2026-08-25, `2e5b977`, verified by tests and by reading the code.
+  The browser walk stays with 04.
 
 ## Not yet specified
 
