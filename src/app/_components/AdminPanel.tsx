@@ -71,9 +71,10 @@ export function AdminPanel() {
 }
 
 // The sys-admin dashboard: a tab switcher between the platform Allowlist and the
-// per-tenant Tenants panel. Allowlist is the default tab (its historical landing).
+// per-tenant Tenants panel. Payouts is the default tab (2026-08-25): it is the one
+// screen with money waiting on an action, so it is what the admin opens for.
 function SysAdminDashboard() {
-  const [tab, setTab] = useState<"allowlist" | "sales" | "payouts" | "tenants" | "generation">("allowlist");
+  const [tab, setTab] = useState<"allowlist" | "sales" | "payouts" | "tenants" | "generation">("payouts");
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
       <header className="mb-8 flex items-center justify-between gap-4">
@@ -2526,8 +2527,9 @@ function AddEmailForm() {
       <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Admit an email</label>
       <p className="text-sm text-soft">They can then create courses with their account.</p>
       <div className="mt-1 flex gap-2">
+        {/* No autoFocus: the Allowlist is a list you come to read, and focusing
+            the field on mount scrolled the roster out of view on a phone. */}
         <input
-          autoFocus
           type="email"
           value={email}
           onChange={(e) => {
