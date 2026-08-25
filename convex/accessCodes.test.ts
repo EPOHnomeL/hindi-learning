@@ -435,3 +435,302 @@ test("the grant walk is untouched: a Seat reads a priced edition like any entitl
   expect(mine.map((row) => row.slug)).toEqual(["hindi"]);
   expect(mine[0]!.langs.map((l) => l.lang)).toEqual(["en"]);
 });
+
+// ---- Raising the cap, and stopping (ticket 06) ----------------------------------
+
+test("stopping writes exactly one unpaid batch ledger row for the seats taken", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Sipho", pin: "5678" });
+
+  await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
+
+  const row = await t.run((ctx) => ctx.db.get(accessCodeId));
+  expect(row!.stoppedAt).toEqual(expect.any(Number));
+
+  // ONE row, for `seats consumed x per-seat price`. Shaped exactly like a batch's:
+  // `fee: 0` because no gateway took a cut, the standard split so payout arithmetic
+  // is identical on every rail, and `buyerEmail` is the ORGANISATION's billing
+  // contact, never a member's.
+  const ledger = await ledgerRows(t);
+  expect(ledger).toHaveLength(1);
+  expect(ledger[0]).toMatchObject({
+    topicId,
+    lang: "en",
+    sellerId: seller,
+    buyerEmail: "billing@party.example.org",
+    gross: 30000,
+    fee: 0,
+    net: 30000,
+    sellerShare: 15000,
+    platformShare: 15000,
+    kind: "batch",
+    status: "unpaid",
+  });
+  expect(ledger[0]).not.toHaveProperty("pfPaymentId");
+  expect(ledger[0]).not.toHaveProperty("eftRef");
+  expect(row!.ledgerId).toEqual(ledger[0]!._id);
+
+  // **Invisible to payouts and to the sales report, with `ledger.ts` and `sales.ts`
+  // unedited.** `owedPayouts` reads `by_status` for "owed" and `salesOnly` is an
+  // allow-list that excludes batch rows, so both exclusions are free. A ticket that
+  // finds itself editing either file has drifted.
+  expect(await asUser(t, admin).query(api.ledger.owedPayouts, {})).toEqual([]);
+  expect(await asUser(t, admin).query(api.sales.report, {})).toEqual([]);
+});
+
+test("stopping a code with zero seats writes no ledger row at all", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { accessCodeId } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+
+  await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
+
+  // A deal that went nowhere settles to nothing and costs no admin. No row, no
+  // `ledgerId`, and nothing on the operator's queue to clear.
+  const row = await t.run((ctx) => ctx.db.get(accessCodeId));
+  expect(row!.stoppedAt).toEqual(expect.any(Number));
+  expect(row).not.toHaveProperty("ledgerId");
+  expect(await ledgerRows(t)).toEqual([]);
+  expect(await asUser(t, admin).query(api.accessCodes.pendingAccessCodes, {})).toEqual([]);
+});
+
+test("stopping twice is refused and writes no second row", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+
+  await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
+  // Refused rather than ignored: a silent second stop looks to the Seller like it
+  // worked, and "already billed" and "just billed" are different conversations with
+  // the organisation. And there is no restart, because a restart would reopen a row
+  // the operator may already have invoiced against.
+  await expect(asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId })).rejects.toThrow();
+  expect(await ledgerRows(t)).toHaveLength(1);
+});
+
+test("a stopped code grants no new seat, and existing seats keep working", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
+
+  // Distinguishable from a full code and from a code that never existed: the reason
+  // is the agreement, not the member's typing, and only one of the three is
+  // something they can do anything about.
+  expect(await tagOf(join(t, { code, nickname: "Sipho", pin: "5678" }))).toEqual("access/code-stopped");
+  expect(await seatRows(t)).toHaveLength(1);
+  expect(await entitlementRows(t)).toHaveLength(1);
+
+  // **Stopping is not a revocation.** The seat already taken still signs in, and the
+  // Entitlement was never touched: it carries no provenance, so nothing on this rail
+  // could find it even if somebody tried.
+  await expect(comeBack(t, { code, nickname: "Thandi", pin: "1234" })).resolves.toBeDefined();
+});
+
+test("only the minting Seller can stop or raise, and lowering below the seats taken is refused", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { seller: other } = await seedSeller(t, admin, "other@example.com", "urdu");
+  const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Sipho", pin: "5678" });
+
+  // Server-side, not by which codes a page lists. A stop is a money event and a cap
+  // raise is a bill increase, so both are things one Seller could do to another's
+  // deal.
+  await expect(asUser(t, other).mutation(api.accessCodes.stopCode, { accessCodeId })).rejects.toThrow();
+  await expect(
+    asUser(t, other).mutation(api.accessCodes.raiseCapacity, { accessCodeId, capacity: 500 }),
+  ).rejects.toThrow();
+  await expect(t.mutation(api.accessCodes.stopCode, { accessCodeId })).rejects.toThrow();
+
+  // Raising works and lets the organisation carry on without a second code and a
+  // split bill.
+  await asUser(t, seller).mutation(api.accessCodes.raiseCapacity, { accessCodeId, capacity: 10 });
+  expect((await t.run((ctx) => ctx.db.get(accessCodeId)))!.capacity).toEqual(10);
+  // Down to the count is allowed - it stops new joins without ending the agreement.
+  await asUser(t, seller).mutation(api.accessCodes.raiseCapacity, { accessCodeId, capacity: 2 });
+  // Below it is not: those two seats exist, their Entitlements are permanent, and
+  // nothing on this rail can find them to un-grant.
+  await expect(
+    asUser(t, seller).mutation(api.accessCodes.raiseCapacity, { accessCodeId, capacity: 1 }),
+  ).rejects.toThrow();
+  await expect(
+    asUser(t, seller).mutation(api.accessCodes.raiseCapacity, { accessCodeId, capacity: 100000 }),
+  ).rejects.toThrow();
+
+  // And a stopped code has no meaningful cap.
+  await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
+  await expect(
+    asUser(t, seller).mutation(api.accessCodes.raiseCapacity, { accessCodeId, capacity: 50 }),
+  ).rejects.toThrow();
+});
+
+// ---- The operator settles (ticket 07) ------------------------------------------
+
+test("a stopped code appears on the operator's queue with everything an invoice needs", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Sipho", pin: "5678" });
+
+  // A LIVE code is not on the queue: there is no bill yet, so it is not work waiting
+  // on the operator.
+  expect(await asUser(t, admin).query(api.accessCodes.pendingAccessCodes, {})).toEqual([]);
+  await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
+
+  const queue = await asUser(t, admin).query(api.accessCodes.pendingAccessCodes, {});
+  expect(queue).toHaveLength(1);
+  expect(queue[0]).toMatchObject({
+    accessCodeId,
+    courseTitle: "hindi",
+    lang: "en",
+    sellerEmail: "author@example.com",
+    orgName: "The Party",
+    orgContact: "billing@party.example.org",
+    seats: 2,
+    pricePerSeat: 15000,
+    total: 30000,
+  });
+  // **No code string, no nickname, no userId**, enforced in the returns validator
+  // the way `pendingBatches` enforces "no codes". The money role and the selling
+  // role are separated by what the query CAN say, so a later UI change cannot undo
+  // it.
+  const serialised = JSON.stringify(queue).toLowerCase();
+  for (const leak of [code.toLowerCase(), "thandi", "sipho", "nickname", "userid"]) {
+    expect(serialised).not.toContain(leak);
+  }
+
+  // Admin-only, server-side.
+  await expect(asUser(t, seller).query(api.accessCodes.pendingAccessCodes, {})).rejects.toThrow();
+  await expect(t.query(api.accessCodes.pendingAccessCodes, {})).rejects.toThrow();
+});
+
+test("logging the reference makes the Seller payable, and logging it twice is harmless", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
+
+  await asUser(t, admin).mutation(api.accessCodes.logAccessCodePayment, { accessCodeId, reference: "FNB-8814" });
+
+  // `unpaid` -> `owed` is the whole of "the Seller's share is payable now", and it
+  // goes through the EXISTING payouts path with no change to it.
+  const owed = await asUser(t, admin).query(api.ledger.owedPayouts, {});
+  expect(owed).toHaveLength(1);
+  expect(owed[0]).toMatchObject({ email: "author@example.com", totalOwed: 7500 });
+  expect(owed[0]!.sales[0]).toMatchObject({ kind: "batch", buyerEmail: "billing@party.example.org" });
+
+  // A second click is a no-op: it must never move a second row or overwrite the
+  // reference that reconciles the statement line.
+  await asUser(t, admin).mutation(api.accessCodes.logAccessCodePayment, { accessCodeId, reference: "TYPO-0000" });
+  expect((await t.run((ctx) => ctx.db.get(accessCodeId)))!.paymentRef).toEqual("FNB-8814");
+  expect(await ledgerRows(t)).toHaveLength(1);
+  // Settled, so it leaves the queue. This is a to-do list, not a log.
+  expect(await asUser(t, admin).query(api.accessCodes.pendingAccessCodes, {})).toEqual([]);
+
+  // Admin-only, and nothing is due on a code that has not stopped.
+  await expect(
+    asUser(t, seller).mutation(api.accessCodes.logAccessCodePayment, { accessCodeId, reference: "X" }),
+  ).rejects.toThrow();
+  const live = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await expect(
+    asUser(t, admin).mutation(api.accessCodes.logAccessCodePayment, {
+      accessCodeId: live.accessCodeId,
+      reference: "TOO-SOON",
+    }),
+  ).rejects.toThrow();
+});
+
+// ---- Returning to a Seat (ticket 04) -------------------------------------------
+
+test("returning lands in the same seat with the same entitlement and progress, and costs no seat", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  const [seat] = await seatRows(t);
+  const member = seat!.userId!;
+  // Progress written the way the reader writes it, so what is being asserted is the
+  // member's real work and not a hand-seeded row.
+  await asUser(t, member).mutation(api.capture.setProgress, {
+    topicSlug: "hindi",
+    lessonKey: "0001",
+    status: "completed",
+  });
+
+  // A different phone: the same three things typed again, nothing else carried over.
+  await comeBack(t, { code, nickname: "  thandi ", pin: "1234" });
+
+  // **The same `users` row**, so the same Entitlement and the same progress. A second
+  // row here is trap 1 wearing a different hat.
+  const seats = await seatRows(t);
+  expect(seats).toHaveLength(1);
+  expect(seats[0]!.userId).toEqual(member);
+  expect(await entitlementRows(t)).toHaveLength(1);
+  const progress = await t.run((ctx) => ctx.db.query("progress").collect());
+  expect(progress).toHaveLength(1);
+  expect(progress[0]).toMatchObject({ userId: member, topicId, lessonKey: "0001", status: "completed" });
+
+  // **Returning consumes no seat**, which is the assertion the whole bill rests on:
+  // a member who switches phones twice must not cost the organisation three seats.
+  const mine = await asUser(t, seller).query(api.accessCodes.myAccessCodes, {});
+  expect(mine[0]).toMatchObject({ taken: 1, runningTotal: 15000 });
+  expect(accessCodeId).toEqual(mine[0]!.accessCodeId);
+});
+
+test("a full code still admits an existing seat", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, { ...MINT, capacity: 1 });
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+
+  // The cap is about NEW seats. A full code is full of seats that all still have to
+  // work, or a member is locked out of a course by the success of the campaign that
+  // gave it to them.
+  expect(await tagOf(join(t, { code, nickname: "Sipho", pin: "5678" }))).toEqual("access/code-full");
+  await expect(comeBack(t, { code, nickname: "Thandi", pin: "1234" })).resolves.toBeDefined();
+});
+
+test("failed PIN attempts are rate limited per seat, and the limit survives signing out", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Sipho", pin: "5678" });
+
+  // **Without this the credential is decorative.** A shared code plus a guessable
+  // handle plus a four-digit PIN is 10,000 guesses, which is an afternoon for
+  // anybody who was ever given the code - and that is everybody.
+  const tags: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    tags.push(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "0000" })));
+  }
+  expect(tags).toContain("access/pin-wrong");
+  expect(tags).toContain("access/too-many-attempts");
+  // The right PIN is refused too while the limit holds: a limit that the real member
+  // can walk past is a limit an attacker can walk past.
+  expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "1234" }))).toEqual("access/too-many-attempts");
+
+  // **Per `(accessCodeId, nicknameKey)`**, so one member being attacked never locks
+  // the rest of the organisation out of their own course.
+  await expect(comeBack(t, { code, nickname: "Sipho", pin: "5678" })).resolves.toBeDefined();
+});

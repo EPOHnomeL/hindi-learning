@@ -5,7 +5,9 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { mintAccessCodeString } from "./accessCodeFormat";
 import { CONSENT_VERSION } from "./joinConsent";
+import { platformFeeBps, splitNet } from "./payfast";
 import { sellableTopic } from "./vouchers";
+import { isCallerAdmin } from "./whitelist";
 
 // The **shared capped Access Code rail** (ADR 0031, the shared-access-codes map's
 // spec.md). The second bulk-access rail: one code a Seller mints for one Edition,
@@ -388,5 +390,224 @@ export const seatDestination = internalQuery({
     const topic = await ctx.db.get(code.topicId);
     if (!topic) return null;
     return { topicSlug: topic.slug, lang: code.lang, courseTitle: topic.title };
+  },
+});
+
+// ---- Raising the cap, and stopping (ticket 06) ----------------------------------
+
+// The organisation filled the code and wants to carry on, so the Seller raises the
+// cap rather than minting a second code and splitting the bill in two.
+//
+// **Lowering below the seats already taken is refused.** Those seats exist, their
+// Entitlements are permanent, and nothing here can find them to un-grant (the
+// Entitlement carries no provenance, by design). A cap under the count would make
+// `taken of capacity` read as a lie and would make the settlement arithmetic
+// disagree with the seats it is meant to describe. Lowering to at or above the
+// count is allowed: it stops new joins, which is a thing a Seller may legitimately
+// want to do mid-agreement without ending it.
+//
+// Refused on a stopped code, because a stopped code grants nothing and a cap on it
+// is a number with no meaning.
+export const raiseCapacity = mutation({
+  args: { accessCodeId: v.id("accessCodes"), capacity: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { accessCodeId, capacity }) => {
+    const code = await ownCode(ctx, accessCodeId);
+    if (code.stoppedAt !== undefined) throw new Error("that access code has been stopped");
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > MAX_CAPACITY) {
+      throw new Error(`a seat cap is between 1 and ${MAX_CAPACITY}`);
+    }
+    const taken = await seatCount(ctx, accessCodeId);
+    if (capacity < taken) throw new Error(`${taken} seats have already been taken, so the cap cannot go below that`);
+    await ctx.db.patch(accessCodeId, { capacity });
+    return null;
+  },
+});
+
+// **The money event.** The agreement is over, so the code stops granting new seats
+// and the organisation is billed for the ones it took.
+//
+// This is the one place this rail differs structurally from the voucher rail rather
+// than cosmetically. `mintBatch` writes its Ledger row at creation because a
+// batch's total is known then. An Access Code's total is unknown until somebody
+// decides the agreement is over, so **stopping is what creates the row**, and it is
+// written in the same mutation that sets `stoppedAt` so a stopped code can never
+// exist without its bill.
+//
+// The Ledger row is shaped exactly like a batch's, deliberately: `kind: "batch"`,
+// `fee: 0` (no gateway took a cut, so net == gross), the standard split through
+// `splitNet` so payout arithmetic is identical on every rail, and `buyerEmail` =
+// the **organisation's** billing contact, never a member's. It carries neither
+// `pfPaymentId` nor `eftRef`: its provenance is the code row that points back at it.
+//
+// `status: "unpaid"` is the whole payout guard, and it needs no new logic anywhere.
+// `ledger.owedPayouts` reads the `by_status` index for `"owed"`, so an unpaid row is
+// invisible to payouts with no filter a later edit could forget to apply, and
+// `sales.ts`'s `salesOnly` is an allow-list that already excludes `"batch"` rows
+// from the per-course report. Neither file was edited for this rail. **A ticket
+// that finds itself editing `ledger.ts` or `sales.ts` has drifted.**
+//
+// **Zero seats writes no row at all.** A deal that went nowhere has nothing to
+// settle and must not put a R0.00 line on the operator's queue for them to work out
+// how to clear.
+//
+// **Stopping is one way.** There is no restart, because a restart would reopen a
+// Ledger row the operator may already have invoiced against, and a second stop
+// would then write a second row for seats that were already billed.
+//
+// **Stopping is neither a refund nor a revocation.** Seats already taken keep
+// working forever: their Entitlements are ordinary and carry no provenance, so
+// nothing here can find them, and that is by design rather than a limitation to
+// engineer around. An agent who sets out to make stopping retroactive will end up
+// adding the provenance back and destroying the feature. The Seller's confirm says
+// this in plain words (ticket 08).
+export const stopCode = mutation({
+  args: { accessCodeId: v.id("accessCodes") },
+  returns: v.null(),
+  handler: async (ctx, { accessCodeId }) => {
+    const code = await ownCode(ctx, accessCodeId);
+    // Refused rather than ignored. A silent second stop would look to the Seller
+    // like it worked, and the difference between "already billed" and "just billed"
+    // is a conversation with the organisation.
+    if (code.stoppedAt !== undefined) throw new Error("that access code has already been stopped");
+
+    const taken = await seatCount(ctx, accessCodeId);
+    if (taken === 0) {
+      await ctx.db.patch(accessCodeId, { stoppedAt: Date.now() });
+      return null;
+    }
+
+    const total = taken * code.pricePerSeat;
+    const { sellerShare, platformShare } = splitNet(total, platformFeeBps());
+    const ledgerId = await ctx.db.insert("ledger", {
+      topicId: code.topicId,
+      lang: code.lang,
+      sellerId: code.sellerId,
+      buyerEmail: code.orgContact,
+      gross: total,
+      fee: 0,
+      net: total,
+      sellerShare,
+      platformShare,
+      kind: "batch",
+      status: "unpaid",
+    });
+    // One patch, one row, one transaction: `stoppedAt` and `ledgerId` land together
+    // or not at all.
+    await ctx.db.patch(accessCodeId, { stoppedAt: Date.now(), ledgerId });
+    return null;
+  },
+});
+
+// ---- The operator's settlement queue (ticket 07) ---------------------------------
+
+// The stopped codes whose transfer has not been logged yet: the operator's queue,
+// shaped after `vouchers.pendingBatches` because to the operator this is the same
+// job they already do, and a queue that looks like a stranger is a queue that gets
+// missed.
+//
+// **Everything needed to raise the invoice is on the line, and nothing else.** The
+// platform generates no invoice document (ADR 0031): SARS wants seven fields plus a
+// serial and a date within 21 days of supply, and a serial series is a thing to own
+// forever and never duplicate. So the line carries the organisation, the billing
+// contact, the seat count, the per-seat price and the total, and the operator raises
+// the invoice in whatever they already use.
+//
+// **It returns no code string, no nickname and no userId, and the returns validator
+// is where that is enforced** - not a page that chooses not to render them. The
+// money role and the selling role are separated by what the query can say, so a
+// later UI change cannot undo it. The code string is withheld for the same reason
+// `pendingBatches` withholds its codes: the operator has no use for it and holding
+// it would let the money role hand out seats.
+export const pendingAccessCodes = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      accessCodeId: v.id("accessCodes"),
+      courseTitle: v.string(),
+      lang: v.string(),
+      sellerEmail: v.string(),
+      orgName: v.string(),
+      orgContact: v.string(),
+      seats: v.number(),
+      pricePerSeat: v.number(),
+      total: v.number(),
+      stoppedAt: v.number(),
+    }),
+  ),
+  handler: async (ctx) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    // An ABSENT `paymentRef` is the queue, indexed rather than filtered, exactly as
+    // on the voucher rail. Then filtered to STOPPED codes in memory: a live code has
+    // no bill yet, so it is not work waiting on the operator. Capped anyway, because
+    // a hand-reconciled queue is small by definition and one that is not is a signal
+    // rather than a page to paginate.
+    const rows = await ctx.db
+      .query("accessCodes")
+      .withIndex("by_payment_ref", (q) => q.eq("paymentRef", undefined))
+      .take(500);
+    const stopped = rows.filter((r) => r.stoppedAt !== undefined);
+    const lines = await Promise.all(
+      stopped.map(async (c) => {
+        const [seller, topic, seats] = await Promise.all([
+          ctx.db.get(c.sellerId),
+          ctx.db.get(c.topicId),
+          seatCount(ctx, c._id),
+        ]);
+        return {
+          accessCodeId: c._id,
+          courseTitle: topic?.title ?? "(deleted course)",
+          lang: c.lang,
+          sellerEmail: seller?.email ?? "(unknown)",
+          orgName: c.orgName,
+          orgContact: c.orgContact,
+          seats,
+          pricePerSeat: c.pricePerSeat,
+          total: seats * c.pricePerSeat,
+          stoppedAt: c.stoppedAt ?? 0,
+        };
+      }),
+    );
+    // A code stopped with zero seats settles to nothing and has no Ledger row, so it
+    // is not paperwork and does not belong on a to-do list. Dropped here rather than
+    // shown as R0.00 for the operator to work out how to clear.
+    return lines.filter((l) => l.seats > 0).sort((a, b) => a.stoppedAt - b.stoppedAt);
+  },
+});
+
+// The organisation's transfer landed: record the reference against the code and flip
+// its Ledger row `unpaid` -> `owed`, which is what makes the Seller's share payable
+// in the ordinary payout run. Sysadmin only.
+//
+// **This is bookkeeping, not a gate**, and rather more so than on the voucher rail:
+// by the time a code is stopped the seats have been granted, used and finished with.
+// Nothing in here reads or invalidates a seat, and the operator never sees the code.
+//
+// Idempotent on the reference already being recorded, like `logBatchPayment` and
+// `confirmEftPayment`: a second click must never move a second Ledger row or
+// overwrite the reference that reconciles the statement line.
+export const logAccessCodePayment = mutation({
+  args: { accessCodeId: v.id("accessCodes"), reference: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { accessCodeId, reference }) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const ref = reference.trim();
+    // The whole point is being able to point at the bank statement line later.
+    if (!ref) throw new Error("the bank reference or transaction id is required");
+    const code = await ctx.db.get(accessCodeId);
+    if (!code) throw new Error("that access code does not exist");
+    if (code.stoppedAt === undefined) throw new Error("that access code has not been stopped, so nothing is due yet");
+    if (code.paymentRef !== undefined) return null;
+
+    await ctx.db.patch(accessCodeId, { paymentRef: ref });
+    // Only an `unpaid` row moves. A row somehow already `owed` or `paid` keeps its
+    // state rather than being re-owed, the same posture `markPaid` takes from the
+    // other end of the lifecycle. A zero-seat code has no row at all, which is why
+    // this is a conditional read rather than an assertion.
+    if (code.ledgerId) {
+      const row = await ctx.db.get(code.ledgerId);
+      if (row?.status === "unpaid") await ctx.db.patch(code.ledgerId, { status: "owed" });
+    }
+    return null;
   },
 });
