@@ -45,7 +45,12 @@ states.
 
 <!-- one line per resolved ticket: gist + link -->
 
-Nothing resolved yet.
+- **The setting exists and the owner can flip it** ([01](tickets/01-the-setting-and-its-toggle.md)):
+  `topics.teacherQa`, an optional boolean read only through `capture.teacherQaOn` (absence means on,
+  in one place); owner-only `capture.setTeacherQa`; a source-tab-only toggle in the Editions dialog.
+  The boolean rides **two** bundles the reader already loads: `content.reader.courseHeader` for
+  every authed caller and `public.publicCourse` for a Guest. Tickets 02 and 03 consume those and do
+  not re-decide. Built 2026-08-25, `2928d46`, verified by tests and by reading the code, not walked.
 
 ## Not yet specified
 

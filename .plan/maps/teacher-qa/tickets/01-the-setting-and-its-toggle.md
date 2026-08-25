@@ -51,3 +51,71 @@ Leave the `qa` tenant feature flag completely alone.
   carries it so tickets 02 and 03 can consume it without re-deciding.
 - No change to `tenants.flags`, to the tenant flag helper, or to the admin portal.
 - `pnpm typecheck` is green and the Convex suite passes.
+
+## Answer
+
+Built and committed on 2026-08-25 as `2928d46` (`feat(teacher-qa): add the per-Topic Teacher Q&A
+setting and its owner toggle`). Verified by reading the code and by the Convex suite; **not walked
+in a browser**, which is ticket 04's job.
+
+**The setting.** `topics.teacherQa: v.optional(v.boolean())` in `convex/schema.ts`, commented with
+the absence-means-on rule and with why it is distinct from the `qa` tenant flag. No migration, no
+backfill, no default written onto any row.
+
+**Absence means on lives in one function.** `teacherQaOn(topic)` in `convex/capture.ts` is the only
+place `teacherQa !== false` is written; every consumer calls it rather than reading the field.
+Tickets 02 and 03 should import it, not re-derive the rule. It is exported from `capture.ts`
+alongside the mutation, following the prior art of `accessCodes.ts` (a module holding both
+registered functions and plain helpers).
+
+**The mutation.** `capture.setTeacherQa({ topicSlug, enabled })`, owner-only through
+`requireOwnedTopic`, the same `getOwnedTopic` path `catalogue.setEditionPublished` uses. It writes
+`true` explicitly rather than clearing the field, so the owner's decision is legible in the row and
+still reads identically to absence.
+
+**Which query carries the boolean, so 02 and 03 need not re-decide.** Two, one per reader path, and
+both are bundles the reader already loads:
+
+- **`content.reader.courseHeader`** for every authed caller (owner, Viewer, entitled, enrolled,
+  preview). This is the one the desktop and mobile Q&A panels, the sidebar dots and the reply
+  indicator should branch on. `CourseShell` already subscribes to it, so the panel gets the boolean
+  with no new query.
+- **`public.publicCourse`** for a Guest on a Public link. It has an explicit output allowlist, so
+  the field had to be listed there deliberately; it now is.
+
+Both return `teacherQa: v.boolean()` (never optional on the wire) resolved through `teacherQaOn`, so
+a consumer never sees `undefined` and can never accidentally reintroduce the absence rule.
+
+**The toggle.** `TeacherQaToggle` in `src/app/_components/Editions.tsx`, rendered as
+`{edition.source && <TeacherQaToggle .../>}` beside `PublishToggle` and `PublicLinkToggle` and
+reusing their row shape, so it appears on the source language tab only. It reads its value from
+`courseHeader` (the same bundle the reader uses, so there is one source of truth) and writes through
+`setTeacherQa`; both are live, so a flip is reactive and a reload re-reads the row. While the header
+is loading it renders **on**, so a course with an open channel never flashes off. Icon is `chat`.
+
+**Copy.** Four keys under `Editions`: `teacherQa`, `teacherQaOn`, `teacherQaOff`, and
+`teacherQaWhole`. The last is a third line rendered in accent under the on/off hint, saying the
+setting applies to the whole course in every language and not just this edition, because a
+Topic-level control inside a per-language panel is otherwise misread. Present in all five
+catalogues. **Provenance note:** a concurrent session's commit `8d38218` swallowed the
+`messages/*.json` half of this work before `2928d46` landed, so the strings are committed there, not
+in the feature commit. They are in the tree and the parity test passes.
+
+**Tests** (`convex/capture.test.ts`, eight new cases): absence means on, asserted as an untouched
+Topic and an explicitly-on Topic reading identically; the owner flipping off and on; per-Topic
+isolation (one course off leaves a sibling on); owner-only refusal; a Viewer reading the setting off
+the same bundle; the Guest bundle carrying it both ways; and stored Questions surviving the flip.
+
+**One correction to this ticket's own Done-when.** It asks for a **Translator** to be refused, but
+there is no Translator role in the tree: `shares.role` is `viewer | editor` only, and CONTEXT.md
+records Translator as decided on 2026-08-11 and NOT built (`translator-status-report`). The test
+covers a Viewer, an Editor, a tenant Admin (an `isAdmin` Allowlist row on the course's own tenant),
+a stranger and a signed-out caller, and notes that a Translator, whenever built, will be a Share
+holder failing on the same owner-only gate.
+
+**Untouched, as required:** `tenants.flags`, `assertTenantFlag`, the admin portal, and
+`askQuestion`'s tenant-flag gate. Nothing hides yet: the read gates are ticket 03 and the injected
+CSS is ticket 02.
+
+`pnpm typecheck` green; full suite 937 tests green (one `courseHeader` `toEqual` fixture in
+`sharing-readonly.test.ts` updated for the new field, which is the cost of that assertion style).
