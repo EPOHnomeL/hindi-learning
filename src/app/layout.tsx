@@ -115,6 +115,18 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               __html: `try{var m=document.cookie.match(/(?:^|; )hindi_mode=(dark|light)/);var t=m?m[1]:localStorage.getItem('hindi:theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);}catch(e){}`,
             }}
           />
+          {/* Open at the top, always. The dashboard's content arrives from Convex
+              *after* first paint, so the browser's own scroll restoration lands on
+              a short skeleton, then the grid grows underneath it and the learner is
+              left staring at the footer. Next's App Router does its own scroll
+              handling for client navigations, so turning the browser's off only
+              affects a cold document load, which is exactly the launch we want at
+              the top. Must run before paint, hence an inline script. */}
+          <script
+            dangerouslySetInnerHTML={{
+              __html: `try{if('scrollRestoration' in history)history.scrollRestoration='manual';}catch(e){}`,
+            }}
+          />
         </head>
         {/* Escape hatch A (ticket 04): a Devanagari chrome locale (Hindi) needs a
             Devanagari-capable face — the Spectral body font has no such glyphs.
