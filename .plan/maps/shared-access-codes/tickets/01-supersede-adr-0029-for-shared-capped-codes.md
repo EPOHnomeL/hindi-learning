@@ -52,3 +52,43 @@ link lives in one `seats` row, so deleting that row deletes the link.
 - A Considered and rejected section covers the three identity shapes that lost: nameless
   device-bound guest (cannot count returning members), personal recovery code (one forward from
   being a shared code), and passkeys (no provider in `@convex-dev/auth@0.0.80`).
+
+## Answer
+
+[ADR 0031](../../../../docs/adr/0031-shared-capped-access-codes-and-nickname-seats.md), accepted,
+dated 2026-08-23. It supersedes ADR 0029 **in part** and names the two parts: the *Considered and
+rejected* entry "One code with N uses", and decision 3's "records nothing about who redeemed".
+Everything else in 0029, including the whole single-use voucher rail, is stated as standing
+unchanged.
+
+ADR 0029 gained a `superseded_in_part_by: 0031` line in its frontmatter with a four-line comment
+naming what was reversed, and **nothing else in that file changed**. It was not rewritten.
+
+The Decision section carries all ten points: the seat cap consumed in the same transaction, the
+self-chosen nickname (with the load-bearing note that a UI nudging toward a real name removes the
+mitigation), the PIN as Convex Auth's `secret` with rate limiting per `(accessCodeId, nickname)`, no
+email ever, the Ledger row written on stop rather than at mint (with the zero-seat case writing
+none, and stopping being one-way), stopping as neither refund nor revocation, the Entitlement
+carrying no provenance and `lib.ts`'s grant walk unchanged, no invoice document, the organisation
+still not an entity, and no Seller-facing query able to return a nickname.
+
+The Consequences section states each cost as accepted: the `seats` row linking a person to a cohort,
+the operator being able to enumerate a cohort's size and handles, a nickname's existence leaking to
+anybody holding the code (because taken-nickname and wrong-PIN must be distinguishable), and a
+forgotten PIN being unrecoverable by anybody forever. It also carries the unpriced support burden of
+that last one as the thing that would reopen the whole design.
+
+The POPIA position is its own section: s27(1)(a) consent as the basis, s26 via s1 as what makes it
+necessary, the self-chosen nickname as the mitigation, and an explicit paragraph saying the statutory
+wording came from Information Regulator guidance plus a third-party reproduction rather than the
+printed Act, because the Act's PDFs would not text-extract and SAFLII returned 403.
+
+Considered and rejected covers the three identity shapes that lost (nameless device-bound guest,
+personal recovery code, passkeys) plus PayFast, Stripe, and a stored seat counter.
+
+**One thing the ADR settles that the spec left implicit**, and every ticket below inherits it: the
+provider takes a **`flow` of `"join"` or `"return"`**, the way `Password` takes `signUp`/`signIn`.
+Without it, `access/nickname-taken` and `access/pin-wrong` cannot be distinguished at all, because
+a code plus an existing nickname plus a wrong PIN is *the same request* whether the member believes
+they are new or returning. The spec requires those two tags be distinguishable, and an intent
+declared by the member is the only thing that separates them.

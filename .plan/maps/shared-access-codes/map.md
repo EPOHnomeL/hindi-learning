@@ -53,6 +53,14 @@ existing manual EFT rail. Built, walked in a browser, and legitimate under a sup
 <!-- the index over resolved tickets: one line each, zoom the link for the detail.
      Open build tickets are never listed here; the frontier is derived, not written. -->
 
+- **[01](tickets/01-supersede-adr-0029-for-shared-capped-codes.md) The rail is legitimate.**
+  [ADR 0031](../../../docs/adr/0031-shared-capped-access-codes-and-nickname-seats.md) supersedes
+  ADR 0029 in part: the rejection of one-code-with-N-uses, and decision 3's "records nothing about
+  who redeemed". Nothing else in 0029 moved, and 0029 was not rewritten. It also settles the one
+  thing the spec left implicit: the credentials provider takes a `flow` of `"join"` or `"return"`,
+  because without a declared intent `access/nickname-taken` and `access/pin-wrong` are the same
+  request.
+
 ## Not yet specified
 
 - **Nobody has priced the support burden of an unrecoverable PIN.** The design promises, in writing
