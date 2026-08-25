@@ -47,14 +47,17 @@ const MAX_SEATS = 1000;
 // and wants paging, which is a different ticket than raising a constant.
 const MAX_BATCHES_LISTED = 50;
 
-// The Topic a batch may be minted against for this Edition, or a thrown
-// explanation. (It returns the TOPIC - the Edition is that topic plus `lang`.) The two Seller
+// The Topic a bulk deal may be minted against for this Edition, or a thrown
+// explanation. **Exported and shared with `accessCodes.ts`** (ADR 0031): the two
+// bulk rails have to answer "may this Seller sell N seats of this Edition?"
+// identically, and two copies of a three-gate authorisation check is two places
+// for one of them to be forgotten. (It returns the TOPIC - the Edition is that topic plus `lang`.) The two Seller
 // gates are the existing ones verbatim - a `sellers` row IS the Admin's can-sell
 // grant, and it must carry saved payout details - because the platform must never
 // issue a seat it cannot pay anybody for. On top of them: the caller owns the
 // Topic, and the Edition is PUBLISHED. It need not be PRICED: the Seller states
 // the total, so a listing price is irrelevant to a batch.
-async function sellableTopic(
+export async function sellableTopic(
   ctx: MutationCtx,
   userId: Id<"users">,
   topicSlug: string,
@@ -62,12 +65,12 @@ async function sellableTopic(
 ): Promise<Doc<"topics">> {
   const status = sellerStatusOf(await getSeller(ctx, userId));
   if (status === "not-granted") throw new Error("you are not set up to sell yet");
-  if (status !== "ready") throw new Error("add your payout bank details before selling a batch");
+  if (status !== "ready") throw new Error("add your payout bank details before selling seats");
   const topic = await topicBySlug(ctx, topicSlug);
   if (!topic) throw new Error("that course does not exist");
   if (topic.ownerId !== userId) throw new Error("you can only sell editions of your own course");
   if (!(await publishedLangs(ctx, topic._id)).has(lang)) {
-    throw new Error("publish this edition before selling a batch of it");
+    throw new Error("publish this edition before selling seats of it");
   }
   return topic;
 }

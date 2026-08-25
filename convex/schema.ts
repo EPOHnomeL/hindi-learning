@@ -807,6 +807,107 @@ export default defineSchema({
     .index("by_code", ["code"])
     .index("by_batch", ["batchId"]),
 
+  // An **Access Code**: ONE shared, capped, priced code for one Edition (ADR 0031,
+  // the shared-access-codes map). The second bulk-access rail, beside
+  // `voucherBatches` and deliberately shaped as its sibling so the two read as two
+  // ways of doing one thing: N single-use codes billed upfront, or one shared code
+  // billed for what it used.
+  //
+  // Three fields carry the whole difference from a batch:
+  //
+  //   - `capacity` is the seat cap the deal was struck on. It is what makes a
+  //     shared code safe to broadcast at all: a forwarded code stops granting at
+  //     the number the organisation already agreed to pay for. The minting Seller
+  //     may RAISE it on a live code and may never lower it below the seats taken.
+  //   - `pricePerSeat` (cents, ZAR) prices a SEAT, where a batch's `total` prices
+  //     the whole deal. Here the count is the thing that varies, so the per-seat
+  //     number is the one that was negotiated.
+  //   - `stoppedAt` is the money event. A batch writes its Ledger row at mint,
+  //     because its total is known then; an Access Code's total is unknown until
+  //     somebody decides the agreement is over, so STOPPING writes the row. That
+  //     is why `ledgerId` is OPTIONAL here and required on a batch, and why it
+  //     stays absent forever on a code stopped with zero seats: nothing to settle.
+  //     Stopping is one way. A restart would reopen a row the operator may already
+  //     have invoiced against.
+  //
+  // `paymentRef` is the bank reference the sysadmin logs once the transfer lands;
+  // its ABSENCE is the unpaid queue, which is what `by_payment_ref` is indexed for
+  // (`q.eq("paymentRef", undefined)`), exactly as on a batch. The payment state
+  // itself lives on the Ledger row, not here.
+  //
+  // **There is no seat counter on this row, and there must never be one.** The
+  // count is derived by reading `seats.by_code`. A stored counter is a second copy
+  // of the truth that drifts away from the seats themselves, which is the choice
+  // this repo already made for the voucher take-up count.
+  accessCodes: defineTable({
+    topicId: v.id("topics"),
+    lang: v.string(),
+    sellerId: v.id("users"),
+    code: v.string(),
+    capacity: v.number(),
+    pricePerSeat: v.number(),
+    orgName: v.string(),
+    orgContact: v.string(),
+    stoppedAt: v.optional(v.number()),
+    ledgerId: v.optional(v.id("ledger")),
+    paymentRef: v.optional(v.string()),
+  })
+    .index("by_code", ["code"])
+    .index("by_seller", ["sellerId"])
+    .index("by_payment_ref", ["paymentRef"]),
+
+  // One **Seat**: a nickname-and-PIN identity on an Access Code (ADR 0031).
+  //
+  // **This table is the part of ADR 0029 that ADR 0031 reverses**, and it is the
+  // whole reason a superseding ADR was required. A Voucher records that it was
+  // spent and nothing about who; a Seat records a link between a person and the
+  // organisation that paid for them. There is no version of a CAPPED SHARED code
+  // that stores nothing, because counting returning members IS the identifier: a
+  // member coming back on a second phone has to be recognised, or the cap is
+  // unusable and the bill is a lie.
+  //
+  // What limits the damage, and none of it is cosmetic:
+  //
+  //   - `nicknameKey` is a handle the member CHOSE, and `/join` says in those words
+  //     that it need not be their real name. Under POPIA a real name beside a
+  //     political party's cohort is special personal information (s26 via s1); a
+  //     self-chosen handle is materially weaker on that limb. If the UI ever nudges
+  //     members toward their real name, the mitigation is gone.
+  //   - The Entitlement a Seat mints carries NO provenance (no `accessCodeId`), so
+  //     it stays byte-identical to an Admin comp. The link lives here and nowhere
+  //     else, which is what makes deleting this one row a real withdrawal.
+  //   - **No PIN is stored here.** The PIN is the `secret` handed to Convex Auth's
+  //     `createAccount`, hashed with the library's own scrypt in `authAccounts`.
+  //     Nothing in this table can verify a PIN, by construction.
+  //
+  // `consentedAt` and `consentVersion` are the s27(1)(a) record: POPIA s11(2) puts
+  // the burden of proving consent on us, and a timestamp with no wording behind it
+  // proves nothing. `consentVersion` resolves against `src/lib/joinConsent.ts`.
+  //
+  // **`userId` and `nicknameKey` are optional, and that is the deletion design**
+  // (ticket 11). A member exercising their s11 withdrawal right has this row
+  // stripped of both rather than deleted: what is left says "one seat was consumed
+  // on this code" and nothing else, which is a COUNT and not personal information.
+  // The count must not move when somebody withdraws, because the bill is for seats
+  // consumed during the agreement and the member did consume one; a decrement would
+  // let a member reduce an invoice the operator may already have raised. A stripped
+  // row also frees the nickname for reuse, which is deliberate: retiring it would
+  // mean keeping the handle, and a kept handle is arguably still a record of the
+  // person who asked to be forgotten.
+  //
+  // `by_code_and_nickname` is the sign-in lookup and the uniqueness check; `by_code`
+  // is the derived count.
+  seats: defineTable({
+    accessCodeId: v.id("accessCodes"),
+    userId: v.optional(v.id("users")),
+    nicknameKey: v.optional(v.string()),
+    consentedAt: v.number(),
+    consentVersion: v.string(),
+  })
+    .index("by_code_and_nickname", ["accessCodeId", "nicknameKey"])
+    .index("by_code", ["accessCodeId"])
+    .index("by_user", ["userId"]),
+
   // A signed-in user's personal preferences (app-language-i18n ticket 03 §1).
   // One row per user, minted on their first app-language pick. `locale` is a
   // free-form BCP-47 chrome-language code (e.g. "es"); absent = never picked.
