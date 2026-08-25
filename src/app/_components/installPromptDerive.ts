@@ -17,31 +17,3 @@ export function installDismissed(raw: string | null, now: number): boolean {
 export function isIosBrowser(userAgent: string, maxTouchPoints: number): boolean {
   return /iPhone|iPad|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && maxTouchPoints > 1);
 }
-
-// Is this Samsung Internet? Samsung mints its OWN WebAPK rather than using
-// Chrome's minting service, and that APK is built against an old targetSdk, so
-// Android 13+ refuses it: "Unsafe app blocked. This app was built for an older
-// version of Android and doesn't include the latest privacy protections."
-// Reported on ywampotch.my-course.app 2026-08-25 and reproducible for every
-// tenant; nothing in our manifest can change it, because targetSdk belongs to
-// whoever mints the APK. So Samsung Internet does NOT get the Install button:
-// it gets sent to Chrome, whose WebAPK Play Protect trusts. Same call
-// Progressier made in March 2026.
-//
-// Deliberately narrow: SamsungBrowser only. Samsung's UA also says Chrome/<v>
-// (it is Chromium), so a bare /Chrome/ test would sweep in the browser that
-// works fine.
-export function isSamsungInternet(userAgent: string): boolean {
-  return /SamsungBrowser\//.test(userAgent);
-}
-
-// The Android intent URL that reopens this page in Chrome. `href` is the full
-// current URL; the scheme is stripped from the intent body and restated in the
-// scheme= field, which is what the intent syntax requires. S.browser_fallback_url
-// sends a phone with no Chrome installed to the plain page instead of a dead tap.
-export function chromeIntentUrl(href: string): string {
-  const url = new URL(href);
-  const scheme = url.protocol.replace(":", "");
-  const body = href.slice(url.protocol.length + 2);
-  return `intent://${body}#Intent;scheme=${scheme};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(href)};end`;
-}

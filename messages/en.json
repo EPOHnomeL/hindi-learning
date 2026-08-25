@@ -740,9 +740,7 @@
     "install": "Install",
     "notNow": "Not now",
     "iosStep1": "Tap the Share button",
-    "iosStep2": "Choose \"Add to Home Screen\"",
-    "openInChrome": "Open in Chrome",
-    "samsungNote": "Samsung Internet's installs get blocked by Android. Open this page in Chrome and install from there."
+    "iosStep2": "Choose \"Add to Home Screen\""
   },
   "Offline": {
     "note": "You are offline. Showing the last saved list.",

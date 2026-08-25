@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chromeIntentUrl, installDismissed, isIosBrowser, isSamsungInternet } from "./installPromptDerive";
+import { installDismissed, isIosBrowser } from "./installPromptDerive";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = 1_756_000_000_000;
@@ -54,38 +54,5 @@ describe("isIosBrowser", () => {
     expect(isIosBrowser(IPADOS_AS_MAC, 0)).toBe(false);
     expect(isIosBrowser(ANDROID, 5)).toBe(false);
     expect(isIosBrowser(WINDOWS, 0)).toBe(false);
-  });
-});
-
-describe("isSamsungInternet", () => {
-  const SAMSUNG =
-    "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0.0.0 Mobile Safari/537.36";
-  const ANDROID_CHROME =
-    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Mobile Safari/537.36";
-  const ANDROID_EDGE =
-    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Mobile Safari/537.36 EdgA/125.0";
-
-  it("recognises Samsung Internet", () => {
-    expect(isSamsungInternet(SAMSUNG)).toBe(true);
-  });
-
-  it("does not sweep in the other Chromium browsers, whose WebAPK is fine", () => {
-    expect(isSamsungInternet(ANDROID_CHROME)).toBe(false);
-    expect(isSamsungInternet(ANDROID_EDGE)).toBe(false);
-  });
-});
-
-describe("chromeIntentUrl", () => {
-  it("reopens the exact page in Chrome", () => {
-    expect(chromeIntentUrl("https://ywampotch.my-course.app/")).toBe(
-      "intent://ywampotch.my-course.app/#Intent;scheme=https;package=com.android.chrome;" +
-        "S.browser_fallback_url=https%3A%2F%2Fywampotch.my-course.app%2F;end",
-    );
-  });
-
-  it("keeps the path and query, so the tenant lands where it left off", () => {
-    expect(chromeIntentUrl("https://ywampotch.my-course.app/course/abc?ref=1")).toContain(
-      "intent://ywampotch.my-course.app/course/abc?ref=1#Intent;",
-    );
   });
 });
