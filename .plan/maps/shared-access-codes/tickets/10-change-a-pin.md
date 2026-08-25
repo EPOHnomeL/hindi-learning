@@ -57,3 +57,15 @@ and the mobile door) and `SettingsDialog` (the desktop gear). It renders **nothi
 `accessCodes.mySeat` returns a Seat, so a Guest and an ordinary account never see it by server answer
 rather than by a page's judgement. There is deliberately **no "forgot it?" link**: there is no reset,
 and offering one would make the join page's promise a lie.
+
+
+### Amended 2026-08-25 after `/code-review`
+
+`accessCodes.mySeat` returns `nicknameKey`, so a member who joined as `Thandi` is shown
+`thandi`. Not fixed, and the reason is worth writing down rather than leaving as a puzzle: the
+normalised key is the **only** form stored (spec.md's schema is explicit, and it is half the
+account identity), so there is nothing else to display. Adding a display field would be a schema
+change for a cosmetic. The row's label was changed instead, to "Nickname you sign in with", which
+is both true and the more useful thing to tell somebody whose next act is typing it on another
+phone. If a Seller or a member ever complains, the fix is a `nicknameDisplay` field, not a
+transformation, because casing cannot be recovered.

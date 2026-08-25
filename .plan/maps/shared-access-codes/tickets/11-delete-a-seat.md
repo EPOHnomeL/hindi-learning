@@ -80,3 +80,25 @@ on their own.
 One shape worth flagging for whoever reads the schema cold: **`seats.userId` and `seats.nicknameKey`
 are optional**, and they look wrong that way until you reach this ticket. The schema comment carries
 the reasoning at the field, so nobody narrows them back.
+
+
+### Amended 2026-08-25 after `/code-review`
+
+Two things in the Answer above were overclaimed, and the review caught both. Corrected here
+rather than quietly:
+
+- **"Losing access is a separate choice, and the flow makes clear which one they are making"
+  is only half met.** The flow narrates the consequence, in the confirm, in the words the Answer
+  quotes. It does **not** offer the second choice: there is one button, and it always keeps the
+  Entitlement. Giving up the course as well would mean deleting the Entitlement, which is a
+  second destructive act with its own confirm and its own irreversibility, and it was not built.
+  **That gap is real and it is deliberate**: nobody has asked for it, a member who wants to stop
+  reading can simply stop, and the thing POPIA actually gives them (removing the personal link)
+  is what shipped. If it is wanted, it is a small follow-up ticket, not a redesign.
+- **The consent record was corrected.** Its last line said "and you keep your access to the
+  course", which was false as built for exactly the reason (3) above gives. It was fixed before
+  the version had ever been issued to anybody, so no `seats` row records agreement to the
+  earlier draft and the append-only rule is not bent. `convex/joinConsent.ts` carries a comment
+  saying so and saying that a change after issue must be a new key. **The privacy page said this
+  honestly and the versioned record did not, which is precisely backwards for the artefact
+  s11(2) rests on**, and it is worth remembering that the page and the record can disagree.

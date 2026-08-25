@@ -116,6 +116,14 @@ existing manual EFT rail. Built, walked in a browser, and legitimate under a sup
 
 ## Not yet specified
 
+- **Giving up the course, as a choice separate from withdrawing.** Deleting a Seat removes the
+  personal link and deliberately leaves the Entitlement, so a member who withdraws keeps the
+  course on the device they are holding and can never sign in elsewhere. Ticket 11 asked for
+  "losing access" to be a *separate choice* and only the narration shipped, not a second button.
+  Nobody has asked for it and stopping reading is free, so it is a small follow-up rather than a
+  gap in the rail. Named here because the ticket's Answer overclaimed it before `/code-review`
+  caught it.
+
 - **Nobody has priced the support burden of an unrecoverable PIN.** The design promises, in writing
   on the join page, that a forgotten PIN cannot be recovered by anybody. That is true and it is the
   cost of having no second channel. What is unknown is how often it happens at the scale of a
