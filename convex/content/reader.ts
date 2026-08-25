@@ -3,6 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, type QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
 import { buildPaywall, getEditableTopic, paywallValidator, heldLangs, lessonsToc, loadEdition, readLesson, readReference, referencesToc, resolveEdition, SOURCE_LANG, topicBySlug } from "../lib";
+import { teacherQaOn } from "../capture";
 import { topicLessonCounts } from "../progressCounts";
 import { langInfo } from "../languages";
 
@@ -169,6 +170,13 @@ export const courseHeader = query({
       // and `tenantSlug` mints the link on the course's canonical host. Mirrors the
       // certificate's `course` field (certificates.ts).
       publicLink: v.union(v.null(), v.object({ shareToken: v.string(), tenantSlug: v.union(v.null(), v.string()) })),
+      // Teacher Q&A (teacher-qa): whether this course offers a question channel.
+      // THIS is the course bundle that carries the setting to the authed reader,
+      // so the Q&A surfaces branch on the boolean and never on an empty question
+      // list (an owner who has simply never asked has an empty list too, and must
+      // still see the ask form). Resolved through `teacherQaOn`, so an unset field
+      // arrives as `true`.
+      teacherQa: v.boolean(),
     }),
   ),
   handler: async (ctx, { topicSlug, lang }) => {
@@ -202,6 +210,7 @@ export const courseHeader = query({
       publicLink: topic.publicToken
         ? { shareToken: topic.publicToken, tenantSlug: topic.tenantSlug ?? null }
         : null,
+      teacherQa: teacherQaOn(topic),
     };
   },
 });

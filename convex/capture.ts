@@ -23,6 +23,38 @@ async function requireOwnedTopic(ctx: MutationCtx, userId: Id<"users">, slug: st
   return topic;
 }
 
+// ---- Teacher Q&A: the per-Topic show/hide -----------------------------------
+
+// Whether a Topic offers a question channel (teacher-qa, CONTEXT.md). The single
+// place the ABSENCE MEANS ON rule is expressed: a Topic that has never had the
+// field written reads exactly as one with it explicitly on, which is why the
+// setting needs no migration and no backfill. Read it, never `topic.teacherQa`.
+//
+// Not to be confused with the `qa` TENANT feature flag (tenantFlags.ts), which is
+// per tenant and refuses only the `askQuestion` mutation. That flag gates the
+// asking; this setting decides the showing. Both exist on purpose.
+export function teacherQaOn(topic: { teacherQa?: boolean }): boolean {
+  return topic.teacherQa !== false;
+}
+
+// Turn the course's question channel on or off. **Owner-only**, resolved through
+// the same owner-only path `catalogue.setEditionPublished` uses: neither an
+// Editor, a Share holder nor a tenant Admin decides how someone's course teaches.
+// Per Topic, so it applies to every Edition; the UI puts it on the source
+// language tab alone.
+export const setTeacherQa = mutation({
+  args: { topicSlug: v.string(), enabled: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, enabled }) => {
+    const userId = await requireUser(ctx);
+    const topic = await requireOwnedTopic(ctx, userId, topicSlug);
+    // Written explicitly either way: `true` is stored rather than cleared, so the
+    // owner's decision is legible in the row and reads the same as absence.
+    await ctx.db.patch(topic._id, { teacherQa: enabled });
+    return null;
+  },
+});
+
 // ---- Reader (learner) ------------------------------------------------------
 
 // First answer wins — a quiz is the learner's initial attempt, recorded once.

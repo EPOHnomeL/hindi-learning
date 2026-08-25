@@ -300,6 +300,10 @@ function EditionPanel({
       <InviteByEmail topicSlug={topicSlug} lang={edition.lang} />
       <PublishToggle topicSlug={topicSlug} lang={edition.lang} published={edition.published} />
       <PublicLinkToggle topicSlug={topicSlug} lang={edition.lang} publicToken={edition.publicToken} />
+      {/* Teacher Q&A (teacher-qa) is per TOPIC, not per Edition, so it renders on
+          the source language tab alone and its copy says that it governs the whole
+          course in every language. Its row shape is the Publish/Public link one. */}
+      {edition.source && <TeacherQaToggle topicSlug={topicSlug} />}
       <SellEdition topicSlug={topicSlug} lang={edition.lang} name={edition.name} completed={completed} />
       {completed && (
         <VoucherBatches topicSlug={topicSlug} lang={edition.lang} name={edition.name} published={edition.published} />
@@ -503,6 +507,62 @@ function PublishToggle({ topicSlug, lang, published }: { topicSlug: string; lang
           onChange={(e) => {
             setBusy(true);
             void setPublished({ topicSlug, lang, published: e.target.checked }).finally(() => setBusy(false));
+          }}
+          className="peer sr-only"
+        />
+        <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 peer-checked:after:translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
+      </label>
+    </div>
+  );
+}
+
+// Teacher Q&A (teacher-qa): whether this COURSE offers a question channel at all,
+// as an on/off toggle. Per Topic, so it sits on the source language tab only and
+// applies to every Edition; the extra line under the hint says so, because a
+// Topic-level control living inside a per-language panel is otherwise misread.
+// Owner-only server-side (capture.setTeacherQa), like every control in this dialog.
+//
+// Reads its current value from the reader's own course bundle
+// (content.reader.courseHeader), which is where an absent field resolves to ON.
+// Distinct from the `qa` TENANT feature flag, which is the admin portal's and is
+// untouched by this control.
+function TeacherQaToggle({ topicSlug }: { topicSlug: string }) {
+  const t = useTranslations("Editions");
+  const header = useQuery(api.content.reader.courseHeader, { topicSlug });
+  const setTeacherQa = useMutation(api.capture.setTeacherQa);
+  const [busy, setBusy] = useState(false);
+  // Absence means ON, and so does a header still loading: the toggle must never
+  // flash "off" on a course whose Q&A is open.
+  const on = header?.teacherQa ?? true;
+
+  return (
+    <div
+      className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
+        on ? "border-accent2/40" : "border-line"
+      } bg-card`}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <span
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] transition-colors ${
+            on ? "bg-accent2/15 text-accent2" : "bg-hi text-soft"
+          }`}
+        >
+          <Icon name="chat" className="h-4.5 w-4.5" />
+        </span>
+        <div className="min-w-0">
+          <b className="block text-[13.5px] font-semibold text-ink">{t("teacherQa")}</b>
+          <span className="block text-[11.5px] text-soft">{on ? t("teacherQaOn") : t("teacherQaOff")}</span>
+          <span className="block text-[11.5px] font-medium text-accent2">{t("teacherQaWhole")}</span>
+        </div>
+      </div>
+      <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+        <input
+          type="checkbox"
+          checked={on}
+          disabled={busy || header === undefined}
+          onChange={(e) => {
+            setBusy(true);
+            void setTeacherQa({ topicSlug, enabled: e.target.checked }).finally(() => setBusy(false));
           }}
           className="peer sr-only"
         />

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { buildPaywall, editionAccessLevel, lessonsToc, paywallValidator, loadEdition, readLesson, readReference, referencesToc, SOURCE_LANG, type EditionAccess } from "./lib";
+import { teacherQaOn } from "./capture";
 import { langInfo } from "./languages";
 
 // The Guest read seam (issue 07 / ADR 0013). Every function here authorizes by
@@ -123,6 +124,11 @@ export const publicCourse = query({
           reply: v.union(v.string(), v.null()),
         }),
       ),
+      // Teacher Q&A (teacher-qa): whether this course offers a question channel.
+      // The Guest's half of the pair with `content.reader.courseHeader`, so the
+      // Guest reader branches on the boolean rather than on `questions` being
+      // empty. Resolved through `teacherQaOn`, so an unset field arrives as `true`.
+      teacherQa: v.boolean(),
       // Present only on a PAID Edition (paid marketplace): the price and which
       // Lesson is the free Preview, so a Guest sees the paygate. On a free
       // Edition it is absent and the Guest reads everything, exactly as today.
@@ -204,6 +210,7 @@ export const publicCourse = query({
       resources: preview ? [] : resources,
       progress: preview ? [] : progress,
       questions: preview ? [] : questions,
+      teacherQa: teacherQaOn(topic),
       paywall,
     };
   },

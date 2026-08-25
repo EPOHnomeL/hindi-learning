@@ -53,7 +53,14 @@ test("courseHeader reports the role: owner, viewer, or null for a stranger", asy
 
   // Editions metadata (course-translation): with no translations, both the owner
   // and a legacy (English) Viewer see just the source English edition.
-  const enEdition = { lang: "en", dir: "ltr" as const, editions: [{ lang: "en", name: "English", native: "English", rtl: false }] };
+  // `teacherQa` is the per-Topic Q&A setting (teacher-qa): unset on this fixture,
+  // and an unset field reads as ON, so both callers see `true`.
+  const enEdition = {
+    lang: "en",
+    dir: "ltr" as const,
+    editions: [{ lang: "en", name: "English", native: "English", rtl: false }],
+    teacherQa: true,
+  };
   expect(await asUser(t, owner).query(api.content.reader.courseHeader, { topicSlug: "hindi" })).toEqual({
     title: "Hindi",
     mission: null,

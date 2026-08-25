@@ -162,6 +162,17 @@ export default defineSchema({
         ownerSet: v.optional(v.boolean()),
       }),
     ),
+    // Teacher Q&A (teacher-qa, CONTEXT.md): whether this course offers a question
+    // channel at all. ABSENCE MEANS ON, which is the whole migration story: an
+    // unset field reads as today's behaviour, so no existing course changes and no
+    // backfill is written. Per Topic on purpose (whether a course invites questions
+    // is a pedagogy choice about the course, not about one language), so it governs
+    // every Edition and is set on the source language tab only. Owner-only to write.
+    // DISTINCT from the `qa` TENANT feature flag (`tenants.flags`), which is per
+    // tenant and only refuses the `askQuestion` mutation while hiding nothing. The
+    // two gates coexist deliberately: the flag refuses the asking, this decides the
+    // showing. Do not unify them.
+    teacherQa: v.optional(v.boolean()),
     // The whitelabel tenant this course belongs to (issue 07 / ADR 0021 §3):
     // absent = default site (shows on my-course.app only). `by_tenant` lists a
     // subdomain's own courses. Legacy rows carry none — a safe no-op backfill.
