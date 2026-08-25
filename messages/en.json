@@ -197,7 +197,8 @@
     "toggleToSignUp": "No account? Sign up",
     "toggleToSignIn": "Already have an account? Sign in",
     "termsAgreement": "By creating an account you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
-    "voucherPrompt": "Got a code from your organisation? <redeem>Redeem your voucher</redeem>."
+    "voucherPrompt": "Got a code from your organisation? <redeem>Redeem your voucher</redeem>.",
+    "joinPrompt": "Joined with a shared code, a nickname and a PIN? <join>Sign in there instead</join>."
   },
   "Checkout": {
     "referenceLockedTitle": "This reference is part of the full course",

@@ -165,7 +165,8 @@
     "toggleToSignUp": "कोई खाता नहीं? साइन अप करें",
     "toggleToSignIn": "पहले से खाता है? साइन इन करें",
     "termsAgreement": "खाता बनाकर आप <terms>नियमों</terms> और <privacy>गोपनीयता नीति</privacy> से सहमत होते हैं।",
-    "voucherPrompt": "अपने संगठन से कोड मिला है? <redeem>अपना वाउचर भुनाएं</redeem>।"
+    "voucherPrompt": "अपने संगठन से कोड मिला है? <redeem>अपना वाउचर भुनाएं</redeem>।",
+    "joinPrompt": "साझा कोड, उपनाम और पिन से शामिल हुए थे? <join>वहीं साइन इन करें</join>।"
   },
   "Checkout": {
     "referenceLockedTitle": "यह संदर्भ पूर्ण कोर्स का हिस्सा है",

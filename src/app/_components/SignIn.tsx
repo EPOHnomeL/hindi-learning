@@ -226,6 +226,28 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
             })}
           </p>
         )}
+        {/* **The returning Seat's only door** (ADR 0031). A Seat has no email and no
+            password, so every field on the form above is useless to one, and a member
+            who signs out or whose session finally expires meets a wall with nothing on
+            it for them. `/join` is where they sign back in ("I am coming back"), and
+            until this line existed nothing on the platform said so.
+
+            It is a second line rather than folded into the voucher prompt above,
+            because the two rails ask for different things and one sentence covering
+            both would leave a member deciding which of two pages their code belongs
+            to. A voucher is redeemed onto an account; a shared code IS the account.
+            Not shown on `/join` itself. */}
+        {!embedded && !path?.startsWith("/join") && (
+          <p className="text-center text-sm text-soft">
+            {t.rich("joinPrompt", {
+              join: (c) => (
+                <Link href="/join" className="text-accent2 underline-offset-2 hover:underline">
+                  {c}
+                </Link>
+              ),
+            })}
+          </p>
+        )}
       </div>
     </div>
   );

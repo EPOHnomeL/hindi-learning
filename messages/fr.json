@@ -165,7 +165,8 @@
     "toggleToSignUp": "Pas de compte ? Inscrivez-vous",
     "toggleToSignIn": "Vous avez déjà un compte ? Connectez-vous",
     "termsAgreement": "En créant un compte, vous acceptez les <terms>Conditions</terms> et la <privacy>Politique de confidentialité</privacy>.",
-    "voucherPrompt": "Vous avez un code de votre organisation ? <redeem>Utilisez votre bon</redeem>."
+    "voucherPrompt": "Vous avez un code de votre organisation ? <redeem>Utilisez votre bon</redeem>.",
+    "joinPrompt": "Vous avez rejoint avec un code partagé, un pseudo et un code PIN ? <join>Connectez-vous là</join>."
   },
   "Checkout": {
     "referenceLockedTitle": "Cette référence fait partie du cours complet",

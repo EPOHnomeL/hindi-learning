@@ -165,7 +165,8 @@
     "toggleToSignUp": "Geen rekening? Registreer",
     "toggleToSignIn": "Het jy reeds ’n rekening? Meld aan",
     "termsAgreement": "Deur ’n rekening te skep, stem jy in tot die <terms>Bepalings</terms> en <privacy>Privaatheidsbeleid</privacy>.",
-    "voucherPrompt": "Het jy 'n kode van jou organisasie? <redeem>Los jou geskenkbewys in</redeem>."
+    "voucherPrompt": "Het jy 'n kode van jou organisasie? <redeem>Los jou geskenkbewys in</redeem>.",
+    "joinPrompt": "Met 'n gedeelde kode, 'n bynaam en 'n PIN aangesluit? <join>Teken eerder daar aan</join>."
   },
   "Checkout": {
     "referenceLockedTitle": "Hierdie verwysing is deel van die volledige kursus",
