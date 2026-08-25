@@ -807,7 +807,7 @@ function BatchQueue() {
   return (
     <section className="mt-12">
       <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">Voucher batches awaiting payment</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-accent">Bulk Vouchers awaiting payment</h2>
         <p className="mt-0.5 text-sm text-soft">
           Check the total against what landed, then log the reference - that makes the seller&apos;s share payable
         </p>
@@ -840,8 +840,13 @@ function BatchQueueRow({ batch }: { batch: FunctionReturnType<typeof api.voucher
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
           <b className="block truncate text-sm font-semibold text-ink">{batch.orgName}</b>
+          {/* Take-up beside the size, because "0 of 200 redeemed" after a month is a
+              distribution problem to raise with the Seller and "195 of 200" is a
+              payment to chase, and the line could not tell them apart before. A
+              NUMBER only: a redemption records nothing about who (ADR 0029). */}
           <span className="text-xs text-soft">
-            {batch.seats} seats · {batch.courseTitle} · {batch.lang} · {batch.sellerEmail}
+            {batch.redeemed} of {batch.seats} seats taken · {batch.courseTitle} · {batch.lang} ·{" "}
+            {batch.sellerEmail}
           </span>
           <span className="block text-xs text-soft">{batch.orgContact}</span>
         </div>
@@ -918,7 +923,7 @@ function AccessCodeQueue() {
   return (
     <section className="mt-12">
       <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">Access codes awaiting payment</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-accent">Organisation Vouchers awaiting payment</h2>
         <p className="mt-0.5 text-sm text-soft">
           Raise the invoice from the line, then log the reference when it lands - that makes the seller&apos;s share
           payable

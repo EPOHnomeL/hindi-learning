@@ -286,6 +286,13 @@ export const pendingBatches = query({
       lang: v.string(),
       sellerEmail: v.string(),
       seats: v.number(),
+      // How many of the batch's codes have been spent. **A number and only a number**
+      // (ADR 0029): a redemption records nothing about who, so this cannot be broken
+      // down by anything and must never be. The sysadmin needs it because a batch
+      // sitting at 0 of 200 after a month is a distribution problem to raise with the
+      // Seller, not a payment to chase, and the queue line was the one place that
+      // difference was invisible.
+      redeemed: v.number(),
       total: v.number(),
       orgName: v.string(),
       orgContact: v.string(),
@@ -310,13 +317,23 @@ export const pendingBatches = query({
       .take(500);
     return await Promise.all(
       rows.map(async (b) => {
-        const [seller, topic] = await Promise.all([ctx.db.get(b.sellerId), ctx.db.get(b.topicId)]);
+        const [seller, topic, codes] = await Promise.all([
+          ctx.db.get(b.sellerId),
+          ctx.db.get(b.topicId),
+          // Derived, like `myBatches` does it, and bounded by the seat ceiling minting
+          // enforces. No counter field anywhere: one truth, and it is the codes.
+          ctx.db
+            .query("vouchers")
+            .withIndex("by_batch", (q) => q.eq("batchId", b._id))
+            .take(MAX_SEATS),
+        ]);
         return {
           batchId: b._id,
           courseTitle: topic?.title ?? "(deleted course)",
           lang: b.lang,
           sellerEmail: seller?.email ?? "(unknown)",
           seats: b.seats,
+          redeemed: codes.filter((c) => c.redeemedAt !== undefined).length,
           total: b.total,
           orgName: b.orgName,
           orgContact: b.orgContact,

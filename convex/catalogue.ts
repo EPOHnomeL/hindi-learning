@@ -1,7 +1,9 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
-import { getOwnedTopic, livePublishedLangs, SOURCE_LANG } from "./lib";
+import type { QueryCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import { SOURCE_LANG, getOwnedTopic, livePublishedLangs } from "./lib";
 import { langInfo } from "./languages";
 
 // Course publishing & the tenant catalogue (.scratch/course-publishing/PRD.md, as
@@ -104,6 +106,20 @@ export const list = query({
       if (topic.ownerId === userId) continue;
       const listed = await livePublishedLangs(ctx, topic._id);
       if (listed.size === 0) continue;
+      // **A course the caller already holds is not a course to discover.** Owning it
+      // was skipped above; this covers the other three ways in, because a card
+      // offering to sell somebody a course already sitting in their own list reads as
+      // "your purchase did not count", the same reason the Dashboard filters out a
+      // course awaiting an EFT.
+      //
+      // **Not `heldLangs`, and that distinction is the whole of this check.** A held
+      // set includes a FREE PUBLISHED Edition, which everybody signed in "holds", so
+      // filtering on it empties the catalogue of exactly the free courses it exists to
+      // show. What has to be filtered is the caller's PERSONAL holdings: an
+      // Entitlement they bought or were granted, a Share somebody sent them, and a
+      // grandfathered Enrollment. Those are the three that survive whatever the owner
+      // does next, which is the same set the voucher rail refuses to redeem on top of.
+      if (await heldPersonally(ctx, topic._id, userId)) continue;
       const prices = await ctx.db
         .query("listings")
         .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
@@ -131,3 +147,30 @@ export const list = query({
     return cards;
   },
 });
+
+// Does this caller already hold this Topic personally, by any route that is not
+// "it happens to be free right now"?
+//
+// Three reads on three `by_topic_user`-shaped indexes rather than one call into the
+// grant walk, because the walk deliberately answers a different question (what may
+// this caller READ) and the answer includes a free published Edition. Language is
+// ignored on purpose: the catalogue card is one course with its Editions as chips, so
+// a caller holding any one of them would otherwise be shown a card whose primary
+// action opens the Edition they already have.
+async function heldPersonally(ctx: QueryCtx, topicId: Id<"topics">, userId: Id<"users">): Promise<boolean> {
+  const entitlement = await ctx.db
+    .query("entitlements")
+    .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
+    .first();
+  if (entitlement) return true;
+  const share = await ctx.db
+    .query("shares")
+    .withIndex("by_topic_viewer", (q) => q.eq("topicId", topicId).eq("viewerId", userId))
+    .first();
+  if (share) return true;
+  const enrollment = await ctx.db
+    .query("enrollments")
+    .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
+    .first();
+  return enrollment !== null;
+}
