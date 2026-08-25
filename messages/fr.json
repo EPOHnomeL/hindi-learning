@@ -737,7 +737,9 @@
     "install": "Installer",
     "notNow": "Pas maintenant",
     "iosStep1": "Touchez le bouton Partager",
-    "iosStep2": "Choisissez \"Sur l'écran d'accueil\""
+    "iosStep2": "Choisissez \"Sur l'écran d'accueil\"",
+    "openInChrome": "Ouvrir dans Chrome",
+    "samsungNote": "Android bloque les installations de Samsung Internet. Ouvrez cette page dans Chrome et installez-la depuis Chrome."
   },
   "Offline": {
     "note": "Vous êtes hors ligne. Affichage de la dernière liste enregistrée.",

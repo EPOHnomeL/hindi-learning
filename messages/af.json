@@ -737,7 +737,9 @@
     "install": "Installeer",
     "notNow": "Nie nou nie",
     "iosStep1": "Tik op die Deel-knoppie",
-    "iosStep2": "Kies \"Voeg by tuisskerm\""
+    "iosStep2": "Kies \"Voeg by tuisskerm\"",
+    "openInChrome": "Maak in Chrome oop",
+    "samsungNote": "Samsung Internet se installasies word deur Android geblokkeer. Maak hierdie bladsy in Chrome oop en installeer daar."
   },
   "Offline": {
     "note": "Jy is vanlyn. Wys die laaste gestoorde lys.",
