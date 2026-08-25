@@ -30,6 +30,21 @@ export const INSTALL_DISMISSED_KEY = "hindi:install-dismissed";
 // progress it names a *method*, not an identity: it reveals nothing about the
 // account that just left, so the shared-browser leak the sweep exists to prevent
 // doesn't apply.
+// A ONE-SHOT flag saying "the next app screen this browser renders should offer the
+// install sheet" (2026-08-25). Written when somebody takes a place with an
+// Organisation Voucher and read-and-cleared by the sheet itself.
+//
+// It exists because that member is the single best install candidate on the platform
+// and the one who could never see the prompt: the sheet lives on "/" and a join sends
+// them straight into the course, so they never pass through it. They arrived from a
+// WhatsApp link on a phone, they have no email and no password, and an icon on their
+// home screen is the only bookmark that survives them clearing a tab.
+//
+// One-shot rather than sticky: it is consumed the first time it is honoured, so a
+// member who ignores the sheet is not followed around the app by it. The 30-day
+// dismissal still applies on top, so "Not now" means not now here too.
+export const INSTALL_ARMED_KEY = "hindi:install-armed";
+
 const KEEP = new Set(["hindi:theme", LAST_AUTH_KEY, INSTALL_DISMISSED_KEY]);
 const PREFIX = "hindi:";
 
@@ -73,5 +88,27 @@ export function clearAccountLocalStateOnSignOut(): void {
     clearAccountLocalState(window.localStorage);
   } catch {
     /* storage unavailable — nothing to clear */
+  }
+}
+
+// Arm the install sheet for the next app screen (see INSTALL_ARMED_KEY). Best
+// effort: storage can be disabled, and the cost of failure is one prompt not shown.
+export function armInstallPrompt(): void {
+  try {
+    window.localStorage.setItem(INSTALL_ARMED_KEY, "1");
+  } catch {
+    /* storage unavailable: no prompt, no harm */
+  }
+}
+
+// Read and clear in one go, so the flag is honoured exactly once however many
+// components happen to mount.
+export function takeInstallPromptArmed(): boolean {
+  try {
+    const armed = window.localStorage.getItem(INSTALL_ARMED_KEY) !== null;
+    if (armed) window.localStorage.removeItem(INSTALL_ARMED_KEY);
+    return armed;
+  } catch {
+    return false;
   }
 }

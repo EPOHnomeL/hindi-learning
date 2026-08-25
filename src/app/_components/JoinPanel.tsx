@@ -5,11 +5,12 @@ import { Authenticated, AuthLoading, Unauthenticated, useQuery } from "convex/re
 import { ConvexError } from "convex/values";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { normaliseAccessCode } from "../../../convex/accessCodeFormat";
 import { CONSENT_VERSION } from "../../../convex/joinConsent";
+import { armInstallPrompt } from "./accountLocalState";
 import { withLang } from "./editionUrl";
 
 // The `/join` journey (ADR 0031, shared-access-codes ticket 05). Where a stranger
@@ -42,14 +43,14 @@ import { withLang } from "./editionUrl";
 // The three steps, in order. Consent first, always.
 type Step = "consent" | "code" | "identity";
 
-export function JoinPanel() {
+export function JoinPanel({ linkedCode }: { linkedCode: string }) {
   return (
     <div className="mx-auto w-full max-w-md px-6 py-10">
       <AuthLoading>
         <div className="mt-6 h-40 animate-pulse rounded-2xl border border-line bg-card" />
       </AuthLoading>
       <Unauthenticated>
-        <JoinFlow />
+        <JoinFlow linkedCode={linkedCode} />
       </Unauthenticated>
       {/* Signed in already: either they have just joined (and go straight into the
           course) or they arrived holding a code on an account that already exists. */}
@@ -60,16 +61,12 @@ export function JoinPanel() {
   );
 }
 
-function JoinFlow() {
+function JoinFlow({ linkedCode }: { linkedCode: string }) {
   const t = useTranslations("Join");
   const [step, setStep] = useState<Step>("consent");
   const [refused, setRefused] = useState(false);
-  // **`useSearchParams`, not `window.location.search`.** The panel renders inside
-  // `<Unauthenticated>`, which mounts only once auth has resolved, and it can be
-  // reached by a client-side navigation as well as a cold load. Reading the framework's
-  // own value covers both, needs no mount effect, and is right on the first paint
-  // rather than one render late.
-  const linkedCode = normaliseAccessCode(useSearchParams().get("code") ?? "");
+  // Already normalised by the server component that read it. Nothing in this
+  // component touches the URL: see `join/page.tsx` for why the read moved there.
   const [typedCode, setTypedCode] = useState("");
   const code = linkedCode || typedCode;
 
@@ -257,6 +254,14 @@ function Identity({ code, linked, onBack }: { code: string; linked: boolean; onB
         setError(null);
         try {
           await signIn("accessCode", { flow, code, nickname, pin, consentVersion: CONSENT_VERSION });
+          // **Arm the install sheet for the course screen they are about to land on.**
+          // This member is the best install candidate on the platform and the one who
+          // could never see the prompt: it lives on "/" and a join goes straight into
+          // the reader. They arrived from a WhatsApp link on a phone and hold no email
+          // and no password, so a home-screen icon is the only bookmark that survives
+          // them closing the tab. Armed rather than shown here, because the sheet waits
+          // 3s by design and this component is about to unmount.
+          armInstallPrompt();
           // No navigation here. `AlreadyIn` takes over the moment the token lands and
           // sends them into the Edition, so success is never a screen with a button.
         } catch (err) {

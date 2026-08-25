@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Brand } from "./Brand";
 import { useTenant } from "./TenantContext";
-import { INSTALL_DISMISSED_KEY } from "./accountLocalState";
+import { INSTALL_DISMISSED_KEY, takeInstallPromptArmed } from "./accountLocalState";
 import { chromeIntentUrl, installDismissed, isIosBrowser, isSamsungInternet } from "./installPromptDerive";
 import { Icon } from "./icons";
 
@@ -28,7 +28,13 @@ type BeforeInstallPromptEvent = Event & { prompt(): Promise<unknown> };
 // hindi:install-dismissed (in the sign-out sweep's KEEP set) and the sheet stays
 // away for 30 days; tenants are separate origins, so dismissing one leaves the
 // others untouched for free.
-export function InstallSheet() {
+// `armed` mounts the sheet somewhere it does not normally live, for one screen only.
+// Today that is the course a member lands on straight after taking a place with an
+// Organisation Voucher: the sheet's home is "/" and that member never passes through
+// it, which made the platform's best install candidate the one person who could not be
+// asked. Everything else about the gate is unchanged, dismissal included, so an armed
+// mount is a permission to ask and not a bypass.
+export function InstallSheet({ armed = false }: { armed?: boolean } = {}) {
   const t = useTranslations("Install");
   const tenant = useTenant();
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
@@ -57,6 +63,9 @@ export function InstallSheet() {
       /* storage unavailable: worst case is one extra ask */
     }
     if (standalone || dismissed) return;
+    // Read and CLEARED here, so the flag is honoured exactly once. A member who
+    // ignores the sheet is not followed around the app by it.
+    if (armed && !takeInstallPromptArmed()) return;
 
     const onPrompt = (e: Event) => {
       e.preventDefault();
@@ -70,6 +79,7 @@ export function InstallSheet() {
       window.removeEventListener("beforeinstallprompt", onPrompt);
       clearTimeout(timer);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if ((!promptEvent && !ios && !samsung) || !pastDelay || closed) return null;
