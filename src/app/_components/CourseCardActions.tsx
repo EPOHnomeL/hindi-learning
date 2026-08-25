@@ -73,27 +73,35 @@ export function CourseCardActions({
         {openLabel}
       </Link>
 
-      {/* The reading language of THIS course (its Edition). Per-course, so it
-          cannot sit in Settings beside the app language. Only shown once a
-          translation exists: one Edition is not a choice. A second door to the
-          same setting since 2026-08-24, when the reader drawer got its own
-          select back (ReadingLanguage.tsx, mobile-reader-todos/06). */}
-      {editions.length > 0 && (
-        <Menu triggerIcon="globe" triggerLabel={t("readingLanguageFor", { title })}>
-          {(close) => (
-            <>
-              <MenuItem icon="book" href={withLang(`/courses/${slug}`, "en")} onClick={close}>
-                English
+      {/* The reading language of THIS course (its Edition). Per course, so it
+          cannot sit in Settings beside the app language. Always shown since
+          2026-08-25: the home screen no longer carries a global language
+          select, so this button beside "Open course" is where a learner
+          changes language. A course with no translation yet still gets the
+          button, with "Editions & sharing" as the way to add one. */}
+      <Menu triggerIcon="globe" triggerLabel={t("readingLanguageFor", { title })}>
+        {(close) => (
+          <>
+            <MenuItem icon="book" href={withLang(`/courses/${slug}`, "en")} onClick={close}>
+              English
+            </MenuItem>
+            {editions.map((e) => (
+              <MenuItem key={e.lang} icon="book" href={withLang(`/courses/${slug}`, e.lang)} onClick={close}>
+                {e.native}
               </MenuItem>
-              {editions.map((e) => (
-                <MenuItem key={e.lang} icon="book" href={withLang(`/courses/${slug}`, e.lang)} onClick={close}>
-                  {e.native}
-                </MenuItem>
-              ))}
-            </>
-          )}
-        </Menu>
-      )}
+            ))}
+            <MenuItem
+              icon="globe"
+              onClick={() => {
+                close();
+                onOpenEditions();
+              }}
+            >
+              {ted("dialogTitle")}
+            </MenuItem>
+          </>
+        )}
+      </Menu>
 
       <Menu triggerLabel={t("moreActionsFor", { title })} dot={dot}>
         {(close) => (

@@ -218,7 +218,9 @@ export function Dashboard() {
         <PurchasedSection />
         <AvailableSection />
       </div>
-      <SiteFooter />
+      {/* No global language select on the home screen (2026-08-25): language is
+          chosen per course, from the card action row beside "Open course". */}
+      <SiteFooter localePicker={false} />
       {prefsOpen && <SettingsDialog onClose={() => setPrefsOpen(false)} />}
     </>
   );

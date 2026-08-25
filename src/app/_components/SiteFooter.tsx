@@ -6,7 +6,11 @@ import { Logo } from "./Logo";
 // The site-wide footer: brand mark, origin note, and the PayFast-compliance legal
 // links (terms, privacy, refunds) that must appear site-wide. Shared by the public
 // Landing and the signed-in Dashboard so the legal links live in exactly one place.
-export function SiteFooter() {
+// `localePicker` is how the signed-in home opts out (2026-08-25): a learner with
+// courses changes reading language per course, from the card's action row beside
+// "Open course", so a second global control on the same screen is noise. Guest
+// surfaces (the Landing, the legal pages) keep it: pre-login there is no course.
+export function SiteFooter({ localePicker = true }: { localePicker?: boolean }) {
   const t = useTranslations("Footer");
   return (
     <footer className="border-t border-line">
@@ -25,9 +29,11 @@ export function SiteFooter() {
         {/* The app-language picker (ticket 03 §4): site-wide chrome, so it's the
             guest-reachable home for the setting — the landing/legal pages all
             render this footer, pre-login. */}
-        <div className="mt-2">
-          <LocalePicker />
-        </div>
+        {localePicker && (
+          <div className="mt-2">
+            <LocalePicker />
+          </div>
+        )}
       </div>
     </footer>
   );
