@@ -35,3 +35,38 @@ readable enough to say out loud at a meeting.
   full sentence rather than a status word.
 - **No nickname, no userId, and no member count broken down by anything** appears anywhere in this
   surface.
+
+
+## Answer
+
+Built: the `AccessCodes` section in `src/app/_components/Editions.tsx`, beside `VoucherBatches` and
+under the price control, behind the same `completed` and `sellerStatus === "ready"` gates.
+
+- Lists the Seller's codes for that Edition with live take-up (`{taken} of {capacity} places taken`),
+  the per-seat price and the running total, all from `myAccessCodes`.
+- **The join URL is built from `window.location.origin`, read after mount**, so a whitelabel Seller
+  hands their organisation their own domain. `/join` is served on every host, which is what makes
+  that correct rather than merely convenient. The code itself is shown in full beside it, because one
+  code means one URL and this is the code somebody reads out at a meeting.
+- Minting is a four-field form (places, price per place, organisation, billing contact) with the
+  Rand-to-cents conversion the price control already uses. Its hint says the thing a Seller must not
+  be surprised by, and it is the **opposite** of a batch's surprise: nothing is billed now, the bill
+  comes when they stop the code.
+- Raising the cap is available on a live code and **absent** on a stopped one, not disabled: there is
+  no restart, and a greyed-out button invites a Seller to hunt for the thing that would re-enable it.
+  The raise form states how many places are taken, so the refusal to go below that is explained
+  before it happens rather than as an error.
+- Stopping is behind `ConfirmDialog` with three plain sentences: it bills `{org}` `{total}` for
+  `{seats}` places, everybody who already has a place keeps it for good, and it cannot be undone. A
+  Seller must never mistake stopping for a refund.
+- A stopped code shows a badge and its settlement state **in a full sentence rather than a status
+  word**, in both directions: awaiting the transfer (with the seats and total that were raised), or
+  settled against a named reference with the share payable in the next payout run. A Seller looking
+  at an unsettled code should understand why their share is not payable yet instead of filing a
+  support question about a missing payout.
+
+**No nickname, no userId, and no breakdown of the count by anything** appears in this surface, and it
+cannot: `myAccessCodes` has no field for any of them. That is the point ticket 02 made in its returns
+validator and this ticket's job was to not route around it. There is no roster, no list and no export.
+The section's header comment says so in those words, because this is the surface where the promise is
+most likely to be broken by somebody being helpful.

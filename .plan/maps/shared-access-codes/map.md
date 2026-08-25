@@ -47,6 +47,14 @@ existing manual EFT rail. Built, walked in a browser, and legitimate under a sup
   drifted.
 - Skills: `/tdd` (every ticket carries its assertions), `/ponytail` (05, 07 and 08 are all smaller
   than they sound).
+- **The rail is built and green (2026-08-25): 26 tests in `convex/accessCodes.test.ts`, the whole
+  suite at 918, `next build` clean, and `/join` a real route. One thing is outstanding and it is a
+  Done-when condition, not a nicety: [05](tickets/05-the-join-page.md) has never been WALKED in a
+  browser.** Nothing was listening on port 3000 in the building session and this repo never starts a
+  dev server, so ticket 05 is deliberately left OPEN with a `## Progress` section instead of an
+  `## Answer`. The map records elsewhere that "test-covered and read correct" is not the same claim
+  as "somebody clicked it", and this rail's first user is a stranger with no account, so that walk
+  is the last gate.
 
 ## Decisions so far
 
@@ -60,6 +68,51 @@ existing manual EFT rail. Built, walked in a browser, and legitimate under a sup
   thing the spec left implicit: the credentials provider takes a `flow` of `"join"` or `"return"`,
   because without a declared intent `access/nickname-taken` and `access/pin-wrong` are the same
   request.
+- **[02](tickets/02-mint-an-access-code.md) A Seller mints one capped, priced code.**
+  `convex/accessCodes.ts` plus `accessCodeFormat.ts`. `GRP-7K4-Q2X-9MB`, a different *shape* from a
+  voucher's `MYC-7K4Q-2XR9` because both rails can be live on one Edition, and 32^9 of entropy
+  because a guessed Access Code grants seats up to the cap. **No Ledger row at mint.**
+  `sellableTopic` is shared with `vouchers.ts` rather than copied.
+- **[03](tickets/03-a-member-joins-and-is-in-the-course.md) A member joins with a nickname and a
+  PIN, and no email exists anywhere.** A `ConvexCredentials` provider on
+  `${accessCodeId}:${nicknameKey}`, an internal `claimSeat` that consumes the cap and mints the Seat
+  and the Entitlement in one transaction, and the `createOrUpdateUser` branch that keeps trap 1
+  shut. Three joins assert three accounts. The Entitlement's key set is pinned. `lucia` became a
+  direct dependency for one scrypt import, and `AccessCode` needs an explicit
+  `ConvexCredentialsConfig` annotation or the whole generated api collapses to `any`.
+- **[04](tickets/04-return-to-a-seat-on-another-device.md) Returning costs no seat, and the PIN
+  actually holds.** The return branch writes nothing, so "no seat consumed" is true by construction.
+  Rate limiting is the library's own, keyed on the `authAccounts` row, which is exactly
+  `(accessCodeId, nicknameKey)`: asserted to refuse the *right* PIN while it holds, and to leave
+  another member on the same code signing in.
+- **[06](tickets/06-stop-a-code-and-bill-what-it-used.md) Stopping is the money event.** One Ledger
+  row of `seats x price` at `unpaid`, `kind: "batch"`, in the same mutation as `stoppedAt`. Zero
+  seats writes none. Stopping twice is refused and there is no restart. `ledger.ts` and `sales.ts`
+  were **not edited**, and the tests assert the exclusions rather than trusting them.
+- **[07](tickets/07-the-operator-settles-a-stopped-code.md) The operator settles it the way they
+  settle everything else.** `pendingAccessCodes` beside the EFT and batch queues in the Payouts tab,
+  returning no code, no nickname and no userId (enforced in the returns validator, asserted by
+  serialising the result). `logAccessCodePayment` is idempotent and flips the row to `owed`. **No
+  invoice document is generated**, deliberately.
+- **[08](tickets/08-the-sellers-access-code-section.md) The Seller's section, with no roster in
+  it.** In the Editions dialog beside the voucher section: take-up, running total, the join URL from
+  the browser's own origin, a cap raise that is absent rather than disabled on a stopped code, and a
+  stop confirm that says in plain words that it bills and does not revoke. No nickname can appear
+  here because no query can return one.
+- **[09](tickets/09-say-what-we-hold-and-in-the-glossary.md) What we hold, said in four places and
+  gated.** Versioned wording in `convex/joinConsent.ts` (append only), rendered translated by
+  `/join`, with `messages/consent.test.ts` pinning the English word for word so the two copies
+  cannot drift. Plus the privacy policy's own heading for the Seat, `CONTEXT.md`'s **Access Code**
+  and **Seat**, and a dated two-rails section in `project-context.md`.
+- **[10](tickets/10-change-a-pin.md) A change, never a reset.** `changePin` demands the old PIN,
+  takes no seat argument (the Seat comes from `ctx.auth`), and goes through `retrieveAccount` so it
+  shares sign-in's rate limit. Asserted by locking it out and then finding sign-in locked too.
+- **[11](tickets/11-delete-a-seat.md) A withdrawal strips the row rather than deleting it.**
+  `userId` and `nicknameKey` go, `consentedAt` and `consentVersion` stay, so what carries the count
+  is not personal information and the bill cannot move under an operator who already raised it. The
+  `authAccounts` row goes too, which kills the credential, and the honest consequence is that the
+  member keeps the course only on the device they are holding. The nickname is freed for reuse,
+  because retirement means keeping the handle.
 
 ## Not yet specified
 

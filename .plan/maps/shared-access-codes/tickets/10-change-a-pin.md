@@ -24,3 +24,36 @@ recovery path on this rail and this ticket must not accidentally create one.
 - The Seat, its Entitlement and its progress are untouched, asserted on the key set.
 - Nothing here lets a caller change a PIN they cannot already authenticate, asserted server-side.
 - A member with no Seat, or with an ordinary account, never sees the control.
+
+
+## Answer
+
+Built as `accessCodeAuth.changePin`, an **action** rather than a mutation, because
+`modifyAccountCredentials` hashes the new secret and no mutation can call it.
+
+Three things hold it shut, and each answers one line of the ticket:
+
+- **It demands the old PIN.** The only thing that proves a caller owns a Seat is the PIN, so a change
+  that skips it is a takeover, and on this rail there is no email to send a warning to afterwards.
+  Asserted: the wrong old PIN gives `access/pin-wrong`.
+- **It takes no seat argument.** The Seat comes from `ctx.auth` through
+  `internal.accessCodes.mySeatAccount`, an internal query with no args, so there is no id a caller
+  could pass to change somebody else's PIN. Asserted server-side against a signed-out caller and
+  against an ordinary email-and-password account, both of which are refused because neither holds a
+  Seat.
+- **It shares sign-in's rate limit rather than routing around it.** The old-PIN check goes through
+  `retrieveAccount`, which is where the library's per-account limiter lives. Asserted twice: twelve
+  wrong old PINs produce `access/too-many-attempts`, and a `/join` sign-in with the *correct* PIN is
+  then refused too, which is what proves it is one counter and not two.
+
+The new PIN works immediately and the old one stops working, asserted in both directions. **The Seat,
+its Entitlement and its progress are untouched**, asserted on the Entitlement's key set and on
+`consentedAt` being byte-identical, not merely on a row count: a PIN change happens in
+`authAccounts`, and anything it moved in `seats` or `entitlements` would be a bug hiding as a
+convenience.
+
+The control is in `src/app/_components/SeatSettings.tsx`, mounted in both `SettingsPage` (the route,
+and the mobile door) and `SettingsDialog` (the desktop gear). It renders **nothing at all** unless
+`accessCodes.mySeat` returns a Seat, so a Guest and an ordinary account never see it by server answer
+rather than by a page's judgement. There is deliberately **no "forgot it?" link**: there is no reset,
+and offering one would make the join page's promise a lie.
