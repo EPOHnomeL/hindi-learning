@@ -5,6 +5,7 @@ import { beforeAll, expect, test } from "vitest";
 import { generateKeyPairSync } from "node:crypto";
 import { api } from "./_generated/api";
 import schema from "./schema";
+import { CONSENT_VERSION } from "./joinConsent";
 import type { Id } from "./_generated/dataModel";
 
 // The shared capped Access Code rail (ADR 0031, the shared-access-codes map).
@@ -232,7 +233,12 @@ test("myAccessCodes lists the caller's own codes with a derived count, and never
 
 // ---- Joining (ticket 03) -------------------------------------------------------
 
-const CONSENT = "2026-08-23";
+// Read from the module rather than pinned to a literal. The wording gets revised and
+// the version with it, and a literal here turns every join test red for a reason that
+// has nothing to do with what they assert (it did exactly that once). What matters is
+// that the CURRENT version is accepted and a stale one is refused, and both of those
+// are asserted below.
+const CONSENT = CONSENT_VERSION;
 
 // Join a code the way `/join` does: through Convex Auth's own `signIn` action and
 // the real credentials provider. Nothing about a Seat is ever hand-inserted, so
@@ -909,4 +915,78 @@ test("a deleted Seat frees its nickname, and reclaiming it consumes a new seat",
   // The newcomer's PIN is theirs, and the departed member's does not reach it.
   await expect(comeBack(t, { code, nickname: "Thandi", pin: "9999" })).resolves.toBeDefined();
   expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "1234" }))).toEqual("access/pin-wrong");
+});
+
+// ---- Adopting an email onto a Seat (2026-08-25) ----------------------------------
+
+test("a Seat can add an email and a password, and keeps its nickname and PIN", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  const [seat] = await seatRows(t);
+  const member = seat!.userId!;
+  expect((await asUser(t, member).query(api.accessCodes.mySeat, {}))!.hasEmail).toBe(false);
+
+  // The ordinary Password sign-UP flow, run while already signed in as the Seat.
+  await asUser(t, member).action(api.auth.signIn, {
+    provider: "password",
+    params: { email: "Thandi@Example.com", password: "correct horse battery", flow: "signUp" },
+  });
+
+  // **Adopted, not duplicated.** The whole risk here is a SECOND `users` row: that is
+  // what strands a member's Entitlement and progress in an account they cannot reach
+  // (#111), and it is the same failure trap 1 causes from the other direction.
+  const users = await t.run((ctx) => ctx.db.query("users").collect());
+  expect(users.filter((u) => u.email === "thandi@example.com")).toHaveLength(1);
+  expect(users.find((u) => u._id === member)!.email).toEqual("thandi@example.com");
+
+  // The Seat is untouched, so BOTH doors work now.
+  const after = await seatRows(t);
+  expect(after).toHaveLength(1);
+  expect(after[0]!.userId).toEqual(member);
+  expect((await asUser(t, member).query(api.accessCodes.mySeat, {}))!.hasEmail).toBe(true);
+  await expect(comeBack(t, { code, nickname: "Thandi", pin: "1234" })).resolves.toBeDefined();
+  await expect(
+    t.action(api.auth.signIn, {
+      provider: "password",
+      params: { email: "thandi@example.com", password: "correct horse battery", flow: "signIn" },
+    }),
+  ).resolves.toBeDefined();
+
+  // And the one place it must NOT reach: the Entitlement is still provenance-free.
+  const held = await entitlementRows(t);
+  expect(Object.keys(held[0]!).sort()).toEqual(["_creationTime", "_id", "lang", "topicId", "userId"]);
+});
+
+test("adoption cannot take an address in use, and cannot repoint an ordinary account", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  const member = (await seatRows(t))[0]!.userId!;
+  const ordinary = await seedUser(t, "taken@example.com");
+
+  // **An address already on a `users` row is refused adoption.** Adopting it would
+  // merge two people into one account, which is exactly the failure #111 was about.
+  // The guard falls through to the ordinary sign-up path, so a SEPARATE account is
+  // created and the Seat keeps its own row: nothing is merged either way.
+  await asUser(t, member).action(api.auth.signIn, {
+    provider: "password",
+    params: { email: "taken@example.com", password: "correct horse battery", flow: "signUp" },
+  });
+  const stillTheirs = await t.run((ctx) => ctx.db.get(member));
+  expect(stillTheirs!.email).toBeUndefined();
+  expect((await t.run((ctx) => ctx.db.get(ordinary)))!.email).toEqual("taken@example.com");
+
+  // **An ordinary account is never repointed.** The signed-in row has an email, so the
+  // guard refuses: a signed-in buyer signing up with a second address gets a second
+  // account, exactly as before this branch existed.
+  await asUser(t, ordinary).action(api.auth.signIn, {
+    provider: "password",
+    params: { email: "second@example.com", password: "correct horse battery", flow: "signUp" },
+  });
+  expect((await t.run((ctx) => ctx.db.get(ordinary)))!.email).toEqual("taken@example.com");
 });

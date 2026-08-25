@@ -624,6 +624,11 @@ export const mySeat = query({
       lang: v.string(),
       consentVersion: v.string(),
       consentedAt: v.number(),
+      // Whether this Seat has ALSO taken an email and a password (2026-08-25). A
+      // boolean and never the address: the Settings row only needs to know whether to
+      // offer the control, and returning the address would put it on a wire that
+      // exists to prove none is held.
+      hasEmail: v.boolean(),
     }),
     v.null(),
   ),
@@ -634,7 +639,7 @@ export const mySeat = query({
     if (!seat) return null;
     const code = await ctx.db.get(seat.accessCodeId);
     if (!code) return null;
-    const topic = await ctx.db.get(code.topicId);
+    const [topic, me] = await Promise.all([ctx.db.get(code.topicId), ctx.db.get(userId)]);
     return {
       accessCodeId: seat.accessCodeId,
       nickname: seat.nicknameKey ?? "",
@@ -647,6 +652,7 @@ export const mySeat = query({
       // cannot see is a worse record.
       consentVersion: seat.consentVersion,
       consentedAt: seat.consentedAt,
+      hasEmail: me?.email !== undefined,
     };
   },
 });

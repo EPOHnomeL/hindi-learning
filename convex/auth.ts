@@ -1,6 +1,6 @@
 import Google from "@auth/core/providers/google";
 import { Password } from "@convex-dev/auth/providers/Password";
-import { convexAuth } from "@convex-dev/auth/server";
+import { convexAuth, getAuthUserId } from "@convex-dev/auth/server";
 import type { MutationCtx } from "./_generated/server";
 import { AccessCode } from "./accessCodeAuth";
 import { ACCESS_CODE_PROVIDER_ID } from "./accessCodeFormat";
@@ -103,6 +103,46 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       // pre-registers a password account on an address they don't own will
       // receive its owner's later Google sign-in.)
       const viaOAuth = provider.type === "oauth" || provider.type === "oidc";
+
+      // **A Seat adopting an email and a password** (the Organisation Voucher rail,
+      // ADR 0031 + its 2026-08-25 addendum). The spec listed this out of scope; the
+      // operator asked for it after walking the rail, and it is built PASSWORD-ONLY
+      // because the Google path genuinely cannot do it: that callback is an
+      // httpAction with no Convex identity, so `getAuthUserId` returns null there
+      // (vouchers ticket 11, trap 2).
+      //
+      // This is the narrow, guarded version of the remedy that ticket warned about,
+      // and every clause of the guard is load-bearing:
+      //
+      //   - `getAuthUserId(ctx)` non-null: only a caller who is ALREADY signed in can
+      //     adopt, so nothing here is reachable from a plain sign-up form.
+      //   - the signed-in row has **no `email`**: only a Seat can be adopted. An
+      //     ordinary account can never be silently repointed at another address.
+      //   - the target address is **not already a `users` row**: adopting a taken
+      //     address would merge two people into one account, which is the exact
+      //     failure #111 was about.
+      //
+      // Fall through when any clause fails, so the ordinary sign-up path below is
+      // untouched. The Seat row survives: the member keeps nickname-and-PIN AND gains
+      // email-and-password, which is the whole point of the ask.
+      if (!viaOAuth && email) {
+        const signedInId = await getAuthUserId(ctx);
+        const signedIn = signedInId === null ? null : await ctx.db.get(signedInId);
+        if (signedIn && signedIn.email === undefined) {
+          const taken = await ctx.db
+            .query("users")
+            .withIndex("email", (q) => q.eq("email", email))
+            .unique();
+          if (taken === null) {
+            await ctx.db.patch(signedIn._id, { email });
+            // Shares invited to this address before it existed on an account are
+            // claimable now, exactly as they are for a fresh sign-up.
+            await claimPendingShares(ctx, signedIn._id, email);
+            return signedIn._id;
+          }
+        }
+      }
+
       const existing = await ctx.db
         .query("users")
         .withIndex("email", (q) => q.eq("email", email))
