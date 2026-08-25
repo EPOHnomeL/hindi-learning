@@ -304,6 +304,10 @@ function EditionPanel({
       {completed && (
         <VoucherBatches topicSlug={topicSlug} lang={edition.lang} name={edition.name} published={edition.published} />
       )}
+      {/* The second bulk rail, beside the first (ADR 0031): N single-use codes billed
+          upfront, or one shared code billed for what it used. Same `completed` gate,
+          because both sell a finished course. */}
+      {completed && <AccessCodes topicSlug={topicSlug} lang={edition.lang} published={edition.published} />}
       <div className="flex flex-col items-start gap-3 border-t border-line pt-4">
         <AccessRoster topicSlug={topicSlug} lang={edition.lang} />
         {/* Destructive actions (regenerate link, re-translate, remove) live behind a
@@ -1186,6 +1190,337 @@ function BatchRow({
           onConfirm={() => {
             setBusy(true);
             void voidBatch({ batchId: batch.batchId }).finally(() => {
+              setBusy(false);
+              setConfirming(false);
+            });
+          }}
+          onClose={() => setConfirming(false)}
+        />
+      )}
+    </li>
+  );
+}
+
+// The Seller's **Access Code** section (ADR 0031, shared-access-codes ticket 08):
+// mint one shared code for THIS Edition, watch it fill, raise its cap, and stop it
+// when the agreement ends.
+//
+// It sits beside `VoucherBatches` above, under the price control, because to the
+// Seller these are two ways of doing one thing and they belong next to each other:
+// a batch sells N seats billed upfront, an Access Code sells one broadcastable code
+// billed for what it used.
+//
+// **The Seller must never see a nickname, and this is the surface where that promise
+// is most likely to be broken by somebody being helpful.** The organisation's members
+// were told nobody can see who they are, and the Seller is the party with the
+// commercial interest in knowing. `myAccessCodes` cannot return a nickname or a user
+// id (its returns validator refuses to), and nothing here may add a route around
+// that: no roster, no list, and no breakdown of the count by anything at all. Take-up
+// is a NUMBER and it stays one.
+function AccessCodes({
+  topicSlug,
+  lang,
+  published,
+}: {
+  topicSlug: string;
+  lang: string;
+  published: boolean;
+}) {
+  const t = useTranslations("Editions");
+  const status = useQuery(api.sellers.sellerStatus);
+  const codes = useQuery(api.accessCodes.myAccessCodes);
+  const [open, setOpen] = useState(false);
+
+  const mine = (codes ?? []).filter((c) => c.topicSlug === topicSlug && c.lang === lang);
+
+  // The same two gates minting itself enforces. SellEdition above already explains
+  // how to clear them, so repeating it here would be a second set-up prompt for one
+  // set-up.
+  if (status !== "ready") return null;
+
+  return (
+    <div className="rounded-xl border border-line bg-card p-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-hi text-soft">
+            <Icon name="users" className="h-4.5 w-4.5" />
+          </span>
+          <div className="min-w-0">
+            <b className="block text-[13.5px] font-semibold text-ink">{t("accessTitle")}</b>
+            <span className="text-[11.5px] text-soft">{t("accessBlurb")}</span>
+          </div>
+        </div>
+        {published && (
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent hover:text-accent"
+          >
+            {open ? t("accessClose") : t("accessNew")}
+          </button>
+        )}
+      </div>
+
+      {/* Minting needs a PUBLISHED Edition (the server refuses otherwise), so say so
+          rather than offering a form that always fails. */}
+      {!published && <p className="mt-2.5 text-[11.5px] text-soft">{t("accessPublishFirst")}</p>}
+
+      {open && <MintAccessCodeForm topicSlug={topicSlug} lang={lang} onMinted={() => setOpen(false)} />}
+
+      {mine.length > 0 && (
+        <ul className="mt-3 flex flex-col gap-2">
+          {mine.map((c) => (
+            <AccessCodeRow key={c.accessCodeId} code={c} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// The mint form. Four fields, because the deal IS four facts: how many seats it is
+// good for, what one seat costs, and who the Seller struck the deal with. There is no
+// discount machinery and no approval step: the Seller states the per-seat price,
+// which is exactly why a bulk price needs neither.
+function MintAccessCodeForm({
+  topicSlug,
+  lang,
+  onMinted,
+}: {
+  topicSlug: string;
+  lang: string;
+  onMinted: () => void;
+}) {
+  const t = useTranslations("Editions");
+  const mint = useMutation(api.accessCodes.mintAccessCode);
+  const [capacity, setCapacity] = useState("");
+  const [price, setPrice] = useState("");
+  const [orgName, setOrgName] = useState("");
+  const [orgContact, setOrgContact] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const field = (label: string, value: string, set: (v: string) => void, placeholder: string, mode?: "numeric") => (
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{label}</span>
+      <input
+        value={value}
+        inputMode={mode}
+        placeholder={placeholder}
+        onChange={(e) => {
+          set(e.target.value);
+          setError(null);
+        }}
+        className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+      />
+    </label>
+  );
+
+  return (
+    <form
+      className="mt-3 flex flex-col gap-2.5 border-t border-line pt-3"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const seats = Number(capacity);
+        // Rand in, cents out - the same major/minor conversion the price control
+        // does, and the server re-checks both bounds.
+        const cents = Math.round(parseFloat(price) * 100);
+        if (!Number.isInteger(seats) || seats < 1 || !Number.isFinite(cents) || cents <= 0) {
+          setError(t("accessError"));
+          return;
+        }
+        setBusy(true);
+        setError(null);
+        try {
+          await mint({ topicSlug, lang, capacity: seats, pricePerSeat: cents, orgName, orgContact });
+          onMinted();
+        } catch {
+          // The server's own refusals are plain Errors, which a production
+          // deployment redacts - so this says what a Seller can actually check
+          // rather than pretending to relay a message that never arrives.
+          setError(t("accessError"));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        {field(t("accessCapacityLabel"), capacity, setCapacity, "500", "numeric")}
+        {field(t("accessPriceLabel"), price, setPrice, "0.00", "numeric")}
+        {field(t("accessOrgLabel"), orgName, setOrgName, t("accessOrgPlaceholder"))}
+        {field(t("accessContactLabel"), orgContact, setOrgContact, t("accessContactPlaceholder"))}
+      </div>
+      {/* The one thing a Seller must not be surprised by, and it is the opposite of a
+          batch's surprise: nothing is billed now. The bill is written when they stop
+          the code, for the seats actually taken. */}
+      <p className="text-[11.5px] leading-relaxed text-soft">{t("accessMintHint")}</p>
+      <button
+        type="submit"
+        disabled={busy}
+        className="self-start rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+      >
+        {busy ? t("accessMinting") : t("accessMint")}
+      </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </form>
+  );
+}
+
+// One Access Code: who it was sold to, how full it is, what it has run up, the URL to
+// hand out, and the two controls that change the deal.
+function AccessCodeRow({ code }: { code: FunctionReturnType<typeof api.accessCodes.myAccessCodes>[number] }) {
+  const t = useTranslations("Editions");
+  const raise = useMutation(api.accessCodes.raiseCapacity);
+  const stop = useMutation(api.accessCodes.stopCode);
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [raising, setRaising] = useState(false);
+  const [newCap, setNewCap] = useState("");
+  // Read after mount, not during render, because `window` does not exist on the
+  // server. It is the CURRENT host on purpose: `/join` is served on every host, so a
+  // Seller working on their own whitelabel domain hands their organisation their own
+  // domain rather than the platform's.
+  const [origin, setOrigin] = useState("");
+  useEffect(() => setOrigin(window.location.origin), []);
+  // One code means one URL, and it has to be readable enough to say out loud at a
+  // meeting - which is also why the code itself is grouped in threes.
+  const joinUrl = origin ? `${origin}/join?code=${code.code}` : "";
+  const stopped = code.stoppedAt !== null;
+
+  return (
+    <li className={`rounded-lg border px-3 py-2.5 ${stopped ? "border-line bg-hi/40" : "border-line bg-hi"}`}>
+      {/* The whole summary is the toggle, not a separate chevron target: a Seller
+          aiming at a 16px glyph on a phone misses. Its accessible name is the
+          organisation, which is what the row is. */}
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full flex-wrap items-center justify-between gap-2 text-left"
+      >
+        <div className="min-w-0">
+          <b className="block truncate text-[13px] font-semibold text-ink">{code.orgName}</b>
+          <span className="text-[11.5px] text-soft">
+            {t("accessTakeUp", { taken: code.taken, capacity: code.capacity })} ·{" "}
+            {formatPrice(code.runningTotal, "ZAR")}
+          </span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {stopped && (
+            <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-danger">
+              {t("accessStoppedBadge")}
+            </span>
+          )}
+          <Icon name="chevron" className={`h-4 w-4 shrink-0 text-soft transition-transform ${open ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+
+      {open && (
+        <>
+          {/* The code and the URL, in full and copyable. The Seller is the only person
+              who can tell the organisation where to type it: the platform has no
+              member addresses and sends nothing to anybody. */}
+          <p className="mt-2 font-mono text-[13px] font-semibold tracking-widest text-ink">{code.code}</p>
+          {joinUrl && <p className="mt-1 break-all text-[11px] leading-relaxed text-soft">{joinUrl}</p>}
+          <p className="mt-1.5 text-[11.5px] leading-relaxed text-soft">
+            {t("accessPerSeat", { price: formatPrice(code.pricePerSeat, "ZAR") })}
+          </p>
+
+          {/* Stated in a full sentence rather than a status word, because a Seller
+              looking at an unsettled code should understand why their share is not
+              payable yet instead of filing a support question about a missing
+              payout. */}
+          <p className="mt-1.5 text-[11.5px] leading-relaxed text-soft">
+            {stopped
+              ? code.paymentRef
+                ? t("accessPaymentLogged", {
+                    reference: code.paymentRef,
+                    seats: code.taken,
+                    total: formatPrice(code.runningTotal, "ZAR"),
+                  })
+                : t("accessAwaitingPayment", { seats: code.taken, total: formatPrice(code.runningTotal, "ZAR") })
+              : t("accessLiveHint")}
+          </p>
+
+          {/* Both controls are absent on a stopped code rather than disabled: there is
+              no restart, and a greyed-out button invites a Seller to look for the
+              thing that would re-enable it. */}
+          {!stopped && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  setRaising((r) => !r);
+                  setNewCap(String(code.capacity));
+                }}
+                className="rounded-lg border border-line px-2.5 py-1 text-[11.5px] font-medium text-ink transition-colors hover:border-accent hover:text-accent disabled:opacity-60"
+              >
+                {t("accessRaise")}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setConfirming(true)}
+                className="rounded-lg border border-line px-2.5 py-1 text-[11.5px] font-medium text-soft transition-colors hover:border-danger hover:text-danger disabled:opacity-60"
+              >
+                {t("accessStop")}
+              </button>
+            </div>
+          )}
+
+          {raising && !stopped && (
+            <form
+              className="mt-2 flex flex-wrap items-center gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const next = Number(newCap);
+                if (!Number.isInteger(next) || next < 1) return;
+                setBusy(true);
+                void raise({ accessCodeId: code.accessCodeId, capacity: next }).finally(() => {
+                  setBusy(false);
+                  setRaising(false);
+                });
+              }}
+            >
+              <input
+                value={newCap}
+                inputMode="numeric"
+                onChange={(e) => setNewCap(e.target.value)}
+                className="w-24 rounded-lg border border-line bg-card px-2.5 py-1.5 text-sm focus:border-gold focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={busy}
+                className="rounded-lg bg-accent px-3 py-1.5 text-[11.5px] font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+              >
+                {t("accessRaiseSave")}
+              </button>
+              {/* Why the number cannot go down past the count: those seats exist and
+                  their access is permanent. */}
+              <span className="text-[11px] text-soft">{t("accessRaiseHint", { taken: code.taken })}</span>
+            </form>
+          )}
+        </>
+      )}
+
+      {confirming && (
+        <ConfirmDialog
+          title={t("accessStopConfirmTitle")}
+          // Three plain sentences, because a Seller must never mistake stopping for a
+          // refund: it BILLS the organisation for the seats taken, the seats already
+          // taken keep working, and it cannot be undone.
+          body={t("accessStopConfirmBody", {
+            seats: code.taken,
+            total: formatPrice(code.runningTotal, "ZAR"),
+            org: code.orgName,
+          })}
+          confirmLabel={t("accessStop")}
+          confirmDisabled={busy}
+          onConfirm={() => {
+            setBusy(true);
+            void stop({ accessCodeId: code.accessCodeId }).finally(() => {
               setBusy(false);
               setConfirming(false);
             });

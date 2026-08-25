@@ -10,6 +10,7 @@ import { api } from "../../../convex/_generated/api";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { Icon } from "./icons";
 import { LocalePicker } from "./LocalePicker";
+import { SeatSettings } from "./SeatSettings";
 import { useTheme } from "./ThemeContext";
 
 // The Settings PAGE (mobile bottom nav, 2026-08-23). A route, not a modal: no
@@ -29,6 +30,9 @@ export function SettingsPage() {
   const tc = useTranslations("Common");
   const tf = useTranslations("Footer");
   const me = useQuery(api.users.me);
+  // `undefined` while it loads, so neither the account section nor the seat section
+  // flashes before the answer arrives.
+  const seat = useQuery(api.accessCodes.mySeat);
   const { theme, toggle } = useTheme();
   const { signOut } = useAuthActions();
   const router = useRouter();
@@ -39,13 +43,22 @@ export function SettingsPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-accent">{t("title")}</h1>
       </header>
       <div>
-        <Section title={t("account")}>
-          <div className="flex items-center justify-between gap-3 px-3 py-3.5 text-sm">
-            <span className="text-ink">{t("signedInAs")}</span>
-            <span className="min-w-0 truncate text-soft">{me?.email ?? ""}</span>
-          </div>
-          <DisplayNameRow />
-        </Section>
+        {/* An ordinary account has an email and a display name. A **Seat** on a
+            shared Access Code has neither, deliberately (ADR 0031), so the two are
+            mutually exclusive rather than stacked: showing "Signed in as" with a
+            blank beside it, and a name field that only prints on certificates a Seat
+            cannot earn, would be the app asking for an email in all but name. The
+            promise has to be visible in the product and not only in the policy. */}
+        {seat === null && (
+          <Section title={t("account")}>
+            <div className="flex items-center justify-between gap-3 px-3 py-3.5 text-sm">
+              <span className="text-ink">{t("signedInAs")}</span>
+              <span className="min-w-0 truncate text-soft">{me?.email ?? ""}</span>
+            </div>
+            <DisplayNameRow />
+          </Section>
+        )}
+        <SeatSettings />
 
         <Section title={t("appearance")}>
           <button

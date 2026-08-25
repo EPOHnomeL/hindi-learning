@@ -8,6 +8,7 @@ import { langInfo } from "../../../convex/languages";
 import { LOCALES } from "~/i18n/config";
 import { useSetLocale } from "~/i18n/locale-client";
 import { Icon } from "./icons";
+import { SeatSettings } from "./SeatSettings";
 import { useTheme } from "./ThemeContext";
 import { Dialog } from "./ui";
 
@@ -49,6 +50,10 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   return (
     <Dialog title={t("title")} onClose={onClose}>
       <div className="flex flex-col gap-6">
+        {/* A Seat on a shared Access Code, if the caller holds one: their nickname,
+            their PIN change and their withdrawal. Renders nothing for everybody else,
+            by server answer rather than by this dialog's judgement. */}
+        <SeatSettings />
         {/* Display name — the account name, which prints on certificates. */}
         <section className="flex flex-col gap-2">
           <label htmlFor="settings-name" className="text-xs font-medium uppercase tracking-wide text-soft">

@@ -693,6 +693,7 @@ function PayoutsManager() {
 
       <EftQueue />
       <BatchQueue />
+      <AccessCodeQueue />
       <OperatorBankForm />
     </div>
   );
@@ -867,6 +868,111 @@ function BatchQueueRow({ batch }: { batch: FunctionReturnType<typeof api.voucher
           setError(null);
           try {
             await log({ batchId: batch.batchId, reference });
+          } catch (err) {
+            setError(mutationError(err, "Failed - retry"));
+            setBusy(false);
+          }
+        }}
+      >
+        <input
+          value={reference}
+          onChange={(e) => setReference(e.target.value)}
+          placeholder="Bank reference / transaction id"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-hi px-2.5 py-1.5 text-sm focus:border-gold focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={busy || !reference.trim()}
+          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+        >
+          {busy ? "Working…" : "Log payment"}
+        </button>
+        {error && <span className="text-xs text-danger">{error}</span>}
+      </form>
+    </li>
+  );
+}
+
+// The stopped Access Codes whose transfer has not been logged yet (ADR 0031,
+// shared-access-codes ticket 07). Beside the EFT queue and the batch queue
+// deliberately: to the operator all three are the same job, money on a bank
+// statement that has to be matched to something in the app, and a queue that looks
+// like a stranger is a queue that gets missed.
+//
+// **The line carries everything needed to raise the invoice, because the platform
+// does not raise it.** SARS wants seven fields plus a serial and a date within 21
+// days of supply, and a serial series is a thing to own forever and never duplicate,
+// so the operator raises the invoice in whatever they already use and this is the
+// line they read it off. Organisation, billing contact, seats, per-seat price, total.
+//
+// Two things this is NOT. It is not an approval: the seats were granted while the
+// code was live and have been used and finished with by the time it stops, so logging
+// the reference changes nothing for the organisation and only makes the Seller's half
+// payable. And it never shows a code or a nickname, because `pendingAccessCodes`
+// cannot return either. The boundary between the money role and the selling role is
+// server-side, not this component's restraint.
+function AccessCodeQueue() {
+  const pending = useQuery(api.accessCodes.pendingAccessCodes);
+  if (pending !== undefined && pending.length === 0) return null;
+  return (
+    <section className="mt-12">
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold tracking-tight text-accent">Access codes awaiting payment</h2>
+        <p className="mt-0.5 text-sm text-soft">
+          Raise the invoice from the line, then log the reference when it lands - that makes the seller&apos;s share
+          payable
+        </p>
+      </div>
+      {pending === undefined ? (
+        <ul className="flex flex-col gap-2" aria-busy>
+          {[0, 1].map((i) => (
+            <li key={i} className="h-16 animate-pulse rounded-xl border border-line bg-card" />
+          ))}
+        </ul>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {pending.map((c) => (
+            <AccessCodeQueueRow key={c.accessCodeId} code={c} />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function AccessCodeQueueRow({ code }: { code: FunctionReturnType<typeof api.accessCodes.pendingAccessCodes>[number] }) {
+  const log = useMutation(api.accessCodes.logAccessCodePayment);
+  const [reference, setReference] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <li className="rounded-xl border border-gold/40 bg-card px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
+          <b className="block truncate text-sm font-semibold text-ink">{code.orgName}</b>
+          {/* The arithmetic spelled out rather than just its answer: the operator is
+              about to put these numbers on an invoice, and "42 x R150.00" is what they
+              have to be able to justify to the organisation. */}
+          <span className="text-xs text-soft">
+            {code.seats} seats x {formatRand(code.pricePerSeat)} · {code.courseTitle} · {code.lang} ·{" "}
+            {code.sellerEmail}
+          </span>
+          <span className="block text-xs text-soft">{code.orgContact}</span>
+        </div>
+        <span className="shrink-0 rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
+          {formatRand(code.total)}
+        </span>
+      </div>
+      <form
+        className="mt-2.5 flex flex-wrap items-center gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!reference.trim()) return;
+          setBusy(true);
+          setError(null);
+          try {
+            await log({ accessCodeId: code.accessCodeId, reference });
           } catch (err) {
             setError(mutationError(err, "Failed - retry"));
             setBusy(false);
