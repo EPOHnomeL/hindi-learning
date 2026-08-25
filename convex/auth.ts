@@ -2,7 +2,8 @@ import Google from "@auth/core/providers/google";
 import { Password } from "@convex-dev/auth/providers/Password";
 import { convexAuth } from "@convex-dev/auth/server";
 import type { MutationCtx } from "./_generated/server";
-import { ACCESS_CODE_PROVIDER_ID, AccessCode } from "./accessCodeAuth";
+import { AccessCode } from "./accessCodeAuth";
+import { ACCESS_CODE_PROVIDER_ID } from "./accessCodeFormat";
 import { env } from "./env";
 import { claimPendingShares, oauthRedirectUrl } from "./lib";
 

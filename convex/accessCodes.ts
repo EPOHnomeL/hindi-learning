@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { mintAccessCodeString } from "./accessCodeFormat";
+import { ACCESS_CODE_PROVIDER_ID, mintAccessCodeString } from "./accessCodeFormat";
 import { CONSENT_VERSION } from "./joinConsent";
 import { platformFeeBps, splitNet } from "./payfast";
 import { sellableTopic } from "./vouchers";
@@ -608,6 +608,147 @@ export const logAccessCodePayment = mutation({
       const row = await ctx.db.get(code.ledgerId);
       if (row?.status === "unpaid") await ctx.db.patch(code.ledgerId, { status: "owed" });
     }
+    return null;
+  },
+});
+
+// ---- The member's own Seat (tickets 10 and 11) -----------------------------------
+
+// The caller's Seat, or null. **The one query that returns a nickname**, and it
+// returns it only to the person who chose it: this is what `/join` and the settings
+// panel read to know a Seat exists at all, and it is scoped to `getAuthUserId` so
+// there is no argument by which one member could ask about another.
+//
+// Null for a Guest and null for an ordinary email-and-password account, which is
+// how the PIN-change and delete-my-seat controls stay invisible to everybody who has
+// no Seat rather than being hidden by a page's own judgement.
+export const mySeat = query({
+  args: {},
+  returns: v.union(
+    v.object({
+      accessCodeId: v.id("accessCodes"),
+      nickname: v.string(),
+      orgName: v.string(),
+      topicSlug: v.string(),
+      courseTitle: v.string(),
+      lang: v.string(),
+      consentVersion: v.string(),
+      consentedAt: v.number(),
+    }),
+    v.null(),
+  ),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const seat = await ownSeat(ctx, userId);
+    if (!seat) return null;
+    const code = await ctx.db.get(seat.accessCodeId);
+    if (!code) return null;
+    const topic = await ctx.db.get(code.topicId);
+    return {
+      accessCodeId: seat.accessCodeId,
+      nickname: seat.nicknameKey ?? "",
+      orgName: code.orgName,
+      topicSlug: topic?.slug ?? "",
+      courseTitle: topic?.title ?? "(deleted course)",
+      lang: code.lang,
+      // Which wording they agreed to and when, shown back to them. The record exists
+      // to discharge s11(2)'s burden of proof, and a record the person it is about
+      // cannot see is a worse record.
+      consentVersion: seat.consentVersion,
+      consentedAt: seat.consentedAt,
+    };
+  },
+});
+
+// The caller's own live Seat row. A member holds at most one in practice (a join
+// creates a fresh account, so one account is one Seat), and `by_user` finding more
+// than one would mean an account was linked to two Seats, which nothing can do.
+// A STRIPPED row (ticket 11) is not a Seat any more and is excluded here by its
+// absent `nicknameKey`.
+async function ownSeat(ctx: QueryCtx, userId: Id<"users">): Promise<Doc<"seats"> | null> {
+  const seat = await ctx.db
+    .query("seats")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .first();
+  return seat && seat.nicknameKey !== undefined ? seat : null;
+}
+
+// The Seat's account identity, for the PIN change (ticket 10). Internal, and it
+// takes no arguments on purpose: the caller is `ctx.auth`, so there is no id a
+// caller could pass to change somebody else's PIN.
+export const mySeatAccount = internalQuery({
+  args: {},
+  returns: v.union(v.object({ accessCodeId: v.id("accessCodes"), nicknameKey: v.string() }), v.null()),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const seat = await ownSeat(ctx, userId);
+    if (!seat?.nicknameKey) return null;
+    return { accessCodeId: seat.accessCodeId, nicknameKey: seat.nicknameKey };
+  },
+});
+
+// ---- Deleting a Seat (ticket 11) --------------------------------------------------
+
+// POPIA s11 gives a member the right to withdraw consent, and s27(1)(a) consent is
+// the entire legal basis for this rail, so a withdrawal that cannot be exercised is
+// not a right. The `seats` row is the one place the link between a person and the
+// organisation's cohort exists, so removing it is the meaningful act.
+//
+// **Three things happen, and the third is the one nobody expects.**
+//
+//   1. The row is STRIPPED, not deleted: `userId` and `nicknameKey` go, and
+//      `consentedAt` / `consentVersion` stay. What is left says "one seat was
+//      consumed on this code" and nothing about who consumed it. The seat COUNT must
+//      not move, because the bill is for seats consumed during the agreement and
+//      this member did consume one. A decrement would let a member reduce an invoice
+//      the organisation already agreed to, and worse, change a number under an
+//      operator who had already raised it. The cap ledger and the personal link are
+//      two different facts, and only one of them is being deleted.
+//   2. The `authAccounts` row goes, which is what makes the credential stop working
+//      immediately. It has to go: `providerAccountId` is
+//      `${accessCodeId}:${nicknameKey}`, so leaving it would leave the nickname and
+//      the link to the organisation in plain text, which is exactly what was asked
+//      to be forgotten.
+//   3. **The Entitlement is left alone, and the honest consequence of (2) is that it
+//      becomes unreachable.** The member stays signed in on the device they are
+//      holding, for as long as their session lasts, and the course keeps working
+//      there. But there is no longer a nickname and PIN that reaches this account, so
+//      they cannot sign in again on another phone. That is not a bug to engineer
+//      around: the credential IS the personal link, so keeping one means keeping the
+//      other. `/join`'s confirm says this in those words, because a member who was
+//      not told will reasonably believe they can come back.
+//
+// **The nickname is freed for reuse**, and that is the choice rather than an
+// oversight. Retiring it permanently would mean keeping the handle in a tombstone,
+// and a kept handle is arguably still a record of the person who asked to be
+// forgotten, which defeats the whole act. The cost is that a stranger can later
+// claim a departed member's handle on the same code. That cost is affordable
+// precisely because the handle was never a real name.
+export const deleteMySeat = mutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("sign in to delete your seat");
+    const seat = await ownSeat(ctx, userId);
+    // Idempotent: a second click on a Seat that is already gone is not an error the
+    // member can do anything with.
+    if (!seat?.nicknameKey) return null;
+
+    const accountId = `${seat.accessCodeId}:${seat.nicknameKey}`;
+    const account = await ctx.db
+      .query("authAccounts")
+      .withIndex("providerAndAccountId", (q) =>
+        q.eq("provider", ACCESS_CODE_PROVIDER_ID).eq("providerAccountId", accountId),
+      )
+      .unique();
+    if (account) await ctx.db.delete(account._id);
+
+    // The strip. `undefined` on an optional field removes it, so the row genuinely
+    // carries no nickname and no user id afterwards rather than carrying blanks.
+    await ctx.db.patch(seat._id, { userId: undefined, nicknameKey: undefined });
     return null;
   },
 });

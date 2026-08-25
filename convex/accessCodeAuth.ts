@@ -2,9 +2,11 @@ import { ConvexCredentials } from "@convex-dev/auth/providers/ConvexCredentials"
 import { createAccount, modifyAccountCredentials, retrieveAccount } from "@convex-dev/auth/server";
 import type { ConvexCredentialsConfig } from "@convex-dev/auth/server";
 import { Scrypt } from "lucia";
+import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { action } from "./_generated/server";
 import type { DataModel, Id } from "./_generated/dataModel";
-import { normaliseAccessCode, normaliseNickname } from "./accessCodeFormat";
+import { ACCESS_CODE_PROVIDER_ID, normaliseAccessCode, normaliseNickname, seatAccountId } from "./accessCodeFormat";
 import { ACCESS_ERRORS, accessRefusal } from "./accessCodes";
 
 // The **Access Code credentials provider** (ADR 0031, shared-access-codes tickets
@@ -41,8 +43,6 @@ import { ACCESS_ERRORS, accessRefusal } from "./accessCodes";
 // the old PIN, because the only thing that proves a caller owns a Seat is the PIN,
 // and a change that does not require it is a takeover.
 
-export const ACCESS_CODE_PROVIDER_ID = "accessCode";
-
 // Four digits minimum, and the join page says so. Not a password: it is typed on a
 // phone in a room full of people, so length is traded for a member who can actually
 // use it, and the trade is paid for by the rate limit the library applies per
@@ -53,14 +53,6 @@ const MAX_PIN_LENGTH = 64;
 // Long enough for a handle somebody wants, short enough that the account id stays
 // an index key rather than an essay.
 const MAX_NICKNAME_LENGTH = 40;
-
-// The account identity: the code's id joined to the normalised nickname. The CODE
-// ID rather than the code string, so that a Seat's credential survives anything
-// that might ever be done to the string, and so that one nickname can be held on
-// two different organisations' codes by two different people.
-function accountIdFor(accessCodeId: Id<"accessCodes">, nicknameKey: string): string {
-  return `${accessCodeId}:${nicknameKey}`;
-}
 
 // What the member typed, folded into what is stored and looked up.
 //
@@ -118,7 +110,7 @@ export const AccessCode: ConvexCredentialsConfig = ConvexCredentials<DataModel>(
     // needs to try again, and a member holding a dud needs to go back to whoever
     // gave it to them. One message for both is the one that helps neither.
     if (!found) throw accessRefusal(ACCESS_ERRORS.codeUnknown);
-    const account = { id: accountIdFor(found.accessCodeId, nicknameKey), secret: pin };
+    const account = { id: seatAccountId(found.accessCodeId, nicknameKey), secret: pin };
 
     if (flow === "return") {
       // **A stopped or full code still admits an existing Seat**, and neither is
@@ -187,30 +179,50 @@ export const AccessCode: ConvexCredentialsConfig = ConvexCredentials<DataModel>(
   },
 });
 
-// Change the PIN on a Seat (ticket 10). A **change**, never a reset: it demands
-// the old PIN, and it goes through `retrieveAccount`, which means it shares
-// sign-in's rate-limit counter rather than offering a way around it.
+// Change the PIN on the caller's own Seat (ticket 10).
 //
-// It lives here rather than in `accessCodes.ts` because `modifyAccountCredentials`
-// is an action-only helper: the hash is the library's to compute, and no mutation
-// can call it.
-export async function changeSeatPin(
-  ctx: Parameters<typeof retrieveAccount>[0],
-  args: { accessCodeId: Id<"accessCodes">; nicknameKey: string; oldPin: string; newPin: string },
-): Promise<void> {
-  const { accessCodeId, nicknameKey, oldPin, newPin } = args;
-  if (newPin.length < MIN_PIN_LENGTH || newPin.length > MAX_PIN_LENGTH) {
-    throw new Error(`a PIN is at least ${MIN_PIN_LENGTH} characters`);
-  }
-  const account = { id: accountIdFor(accessCodeId, nicknameKey) };
-  // Proving the caller owns the Seat and nothing else. A change that skips this is
-  // a takeover, and on this rail there is no email to send a warning to.
-  await retrieveAccount(ctx, {
-    provider: ACCESS_CODE_PROVIDER_ID,
-    account: { ...account, secret: oldPin },
-  }).catch(signInFailure);
-  await modifyAccountCredentials(ctx, {
-    provider: ACCESS_CODE_PROVIDER_ID,
-    account: { ...account, secret: newPin },
-  });
-}
+// A member types four digits on a phone, in a room full of people, at a party
+// meeting. Being unable to change it afterwards makes the credential worse than it
+// looks, so this exists. What it is **not** is a reset: there is no recovery path on
+// this rail and this must never accidentally create one.
+//
+// Three things hold it shut:
+//
+//   - **It demands the old PIN.** The only thing that proves a caller owns a Seat is
+//     the PIN, so a change that skips it is a takeover, and on this rail there is no
+//     email to send a warning to afterwards.
+//   - **It takes no seat argument.** The Seat comes from `ctx.auth` through
+//     `internal.accessCodes.mySeatAccount`, so there is no id a caller could pass to
+//     change somebody else's PIN.
+//   - **It shares sign-in's rate limit.** The old-PIN check goes through
+//     `retrieveAccount`, which is where the library's per-account limiter lives, so
+//     this is not a way around ticket 04's limit. Guessing a PIN here costs exactly
+//     what guessing it at the sign-in box costs.
+//
+// An **action**, not a mutation, because `modifyAccountCredentials` hashes the new
+// secret and no mutation can call it.
+export const changePin = action({
+  args: { oldPin: v.string(), newPin: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { oldPin, newPin }) => {
+    const seat = await ctx.runQuery(internal.accessCodes.mySeatAccount, {});
+    // A Guest and an ordinary email-and-password account both land here: neither
+    // holds a Seat, so there is no PIN of theirs to change.
+    if (!seat) throw new Error("you do not hold a seat on an access code");
+    if (newPin.length < MIN_PIN_LENGTH || newPin.length > MAX_PIN_LENGTH) {
+      throw new Error(`a PIN is at least ${MIN_PIN_LENGTH} characters`);
+    }
+    const account = { id: seatAccountId(seat.accessCodeId, seat.nicknameKey) };
+    await retrieveAccount(ctx, {
+      provider: ACCESS_CODE_PROVIDER_ID,
+      account: { ...account, secret: oldPin },
+    }).catch(signInFailure);
+    // The library rehashes. Nothing in `seats` changes, so the Seat, its consent
+    // record, its Entitlement and its progress are all untouched by construction.
+    await modifyAccountCredentials(ctx, {
+      provider: ACCESS_CODE_PROVIDER_ID,
+      account: { ...account, secret: newPin },
+    });
+    return null;
+  },
+});

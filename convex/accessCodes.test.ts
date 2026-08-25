@@ -734,3 +734,179 @@ test("failed PIN attempts are rate limited per seat, and the limit survives sign
   // the rest of the organisation out of their own course.
   await expect(comeBack(t, { code, nickname: "Sipho", pin: "5678" })).resolves.toBeDefined();
 });
+
+// ---- Changing a PIN (ticket 10) --------------------------------------------------
+
+test("a Seat can change its PIN with the old one, and the old one stops working", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  const [seat] = await seatRows(t);
+  const member = seat!.userId!;
+  await asUser(t, member).mutation(api.capture.setProgress, {
+    topicSlug: "hindi",
+    lessonKey: "0001",
+    status: "completed",
+  });
+
+  // The wrong old PIN is refused: the only thing that proves a caller owns a Seat is
+  // the PIN, so a change that skips it is a takeover, and on this rail there is no
+  // email to send a warning to afterwards.
+  expect(
+    await tagOf(asUser(t, member).action(api.accessCodeAuth.changePin, { oldPin: "0000", newPin: "5678" })),
+  ).toEqual("access/pin-wrong");
+
+  await asUser(t, member).action(api.accessCodeAuth.changePin, { oldPin: "1234", newPin: "998877" });
+
+  // Immediately: the new PIN works and the old one does not.
+  expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "1234" }))).toEqual("access/pin-wrong");
+  await expect(comeBack(t, { code, nickname: "Thandi", pin: "998877" })).resolves.toBeDefined();
+
+  // **The Seat, its Entitlement and its progress are untouched**, asserted on the
+  // key sets rather than on a count: a PIN change happens in `authAccounts`, and
+  // anything it moved in `seats` or `entitlements` would be a bug hiding as a
+  // convenience.
+  const after = await seatRows(t);
+  expect(after).toHaveLength(1);
+  expect(after[0]).toMatchObject({ userId: member, nicknameKey: "thandi", consentVersion: CONSENT });
+  expect(after[0]!.consentedAt).toEqual(seat!.consentedAt);
+  const held = await entitlementRows(t);
+  expect(held).toHaveLength(1);
+  expect(Object.keys(held[0]!).sort()).toEqual(["_creationTime", "_id", "lang", "topicId", "userId"]);
+  const progress = await t.run((ctx) => ctx.db.query("progress").collect());
+  expect(progress[0]).toMatchObject({ userId: member, topicId, status: "completed" });
+});
+
+test("nobody without a Seat can change a PIN, and the change shares sign-in's rate limit", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  const [seat] = await seatRows(t);
+  const ordinary = await seedUser(t, "ordinary@example.com");
+
+  // Asserted server-side, not by which control a page renders: a Guest and an
+  // ordinary email-and-password account both hold no Seat, so there is no PIN of
+  // theirs to change and no argument by which they could name somebody else's.
+  await expect(t.action(api.accessCodeAuth.changePin, { oldPin: "1234", newPin: "5678" })).rejects.toThrow();
+  await expect(
+    asUser(t, ordinary).action(api.accessCodeAuth.changePin, { oldPin: "1234", newPin: "5678" }),
+  ).rejects.toThrow();
+  expect(await asUser(t, ordinary).query(api.accessCodes.mySeat, {})).toBeNull();
+  expect(await t.query(api.accessCodes.mySeat, {})).toBeNull();
+
+  // **Not a way around ticket 04's limit.** The old-PIN check goes through
+  // `retrieveAccount`, where the library's per-account limiter lives, so guessing
+  // here costs what guessing at the sign-in box costs.
+  const tags: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    tags.push(
+      await tagOf(asUser(t, seat!.userId!).action(api.accessCodeAuth.changePin, { oldPin: "0000", newPin: "5678" })),
+    );
+  }
+  expect(tags).toContain("access/too-many-attempts");
+  // And the limit is shared with sign-in rather than being a second counter beside it.
+  expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "1234" }))).toEqual("access/too-many-attempts");
+
+  // A short PIN is refused rather than accepted and then unusable.
+  await expect(
+    asUser(t, seat!.userId!).action(api.accessCodeAuth.changePin, { oldPin: "1234", newPin: "12" }),
+  ).rejects.toThrow();
+});
+
+// ---- Deleting a Seat (ticket 11) --------------------------------------------------
+
+test("a member deletes their Seat: the link goes, the count stays, the credential dies", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Sipho", pin: "5678" });
+  const before = await asUser(t, seller).query(api.accessCodes.myAccessCodes, {});
+  expect(before[0]).toMatchObject({ taken: 2, runningTotal: 30000 });
+
+  const seat = (await seatRows(t)).find((s) => s.nicknameKey === "thandi");
+  const member = seat!.userId!;
+  expect(await asUser(t, member).query(api.accessCodes.mySeat, {})).toMatchObject({
+    accessCodeId,
+    nickname: "thandi",
+    orgName: "The Party",
+    courseTitle: "hindi",
+    consentVersion: CONSENT,
+  });
+
+  await asUser(t, member).mutation(api.accessCodes.deleteMySeat, {});
+
+  // **The link is gone**: no nickname, no user id, nothing tying a person to the
+  // organisation's cohort. That row is the only place the link ever existed.
+  const rows = await seatRows(t);
+  expect(rows).toHaveLength(2);
+  const stripped = rows.find((r) => r.nicknameKey === undefined);
+  expect(stripped).toBeDefined();
+  expect(stripped).not.toHaveProperty("userId");
+  expect(stripped).not.toHaveProperty("nicknameKey");
+  expect(Object.keys(stripped!).sort()).toEqual([
+    "_creationTime",
+    "_id",
+    "accessCodeId",
+    "consentVersion",
+    "consentedAt",
+  ]);
+
+  // **The seat count does NOT move**, which is the real design question in this
+  // ticket. The bill is for seats consumed during the agreement and this member did
+  // consume one; a decrement would let a member reduce an invoice the organisation
+  // already agreed to, and change a number under an operator who may have raised it.
+  const after = await asUser(t, seller).query(api.accessCodes.myAccessCodes, {});
+  expect(after[0]).toMatchObject({ taken: 2, runningTotal: 30000 });
+  await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
+  expect((await ledgerRows(t))[0]).toMatchObject({ gross: 30000, status: "unpaid" });
+
+  // **The credential stops working immediately.** The `authAccounts` row had to go:
+  // its `providerAccountId` is `${accessCodeId}:${nicknameKey}`, so leaving it would
+  // leave the nickname and the link in plain text.
+  expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "1234" }))).toEqual("access/pin-wrong");
+  expect(await asUser(t, member).query(api.accessCodes.mySeat, {})).toBeNull();
+
+  // **The Entitlement is left alone.** The honest consequence, stated in the
+  // confirm copy: the member keeps the course on the device they are holding for as
+  // long as their session lasts, and cannot sign in again anywhere else, because the
+  // credential IS the personal link.
+  const held = await entitlementRows(t);
+  expect(held).toHaveLength(2);
+  expect(held.some((e) => e.userId === member)).toBe(true);
+
+  // A second click is harmless.
+  await asUser(t, member).mutation(api.accessCodes.deleteMySeat, {});
+  expect(await seatRows(t)).toHaveLength(2);
+});
+
+test("a deleted Seat frees its nickname, and reclaiming it consumes a new seat", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  const seat = (await seatRows(t))[0]!;
+  await asUser(t, seat.userId!).mutation(api.accessCodes.deleteMySeat, {});
+
+  // **Reuse, not retirement**, and the reasoning is the whole choice: retiring the
+  // nickname permanently means keeping the handle in a tombstone, and a kept handle
+  // is arguably still a record of the person who asked to be forgotten. The cost is
+  // that a stranger can claim a departed member's handle, which is affordable
+  // precisely because the handle was never a real name.
+  await join(t, { code, nickname: "Thandi", pin: "9999" });
+
+  // And it costs a NEW seat. That is correct rather than harsh: this is a different
+  // person taking a place, and the departed member's place was consumed during the
+  // agreement.
+  const mine = await asUser(t, seller).query(api.accessCodes.myAccessCodes, {});
+  expect(mine[0]).toMatchObject({ taken: 2, runningTotal: 30000 });
+  // The newcomer's PIN is theirs, and the departed member's does not reach it.
+  await expect(comeBack(t, { code, nickname: "Thandi", pin: "9999" })).resolves.toBeDefined();
+  expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "1234" }))).toEqual("access/pin-wrong");
+});

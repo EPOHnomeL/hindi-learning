@@ -77,3 +77,20 @@ export function normaliseAccessCode(raw: string): string {
 export function normaliseNickname(raw: string): string {
   return raw.trim().replace(/\s+/g, " ").toLowerCase();
 }
+
+// The Convex Auth provider id a Seat's credential is filed under, and the account
+// identity it is keyed by.
+//
+// Both live in this leaf module rather than beside the provider itself so that
+// `accessCodes.ts` (which has to find and delete an `authAccounts` row when a member
+// withdraws) and `accessCodeAuth.ts` (which creates it) can agree on the shape
+// without importing each other. A cycle between those two is a real one: the
+// provider needs the rail's error tags and the rail needs the provider's id.
+export const ACCESS_CODE_PROVIDER_ID = "accessCode";
+
+// The code's **id**, not its string, joined to the normalised nickname. The id so
+// that a Seat's credential survives anything ever done to the string, and so that
+// one nickname can be held by two different people on two organisations' codes.
+export function seatAccountId(accessCodeId: string, nicknameKey: string): string {
+  return `${accessCodeId}:${nicknameKey}`;
+}
