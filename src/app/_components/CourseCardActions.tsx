@@ -6,8 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { CertificateControl } from "./Certificate";
-import { withLang } from "./editionUrl";
-import { Menu, MenuItem } from "./ui";
+import { IconButton, Menu, MenuItem } from "./ui";
 
 // The owned-course card's single action row (mobile bottom nav, 2026-08-23):
 //
@@ -16,8 +15,11 @@ import { Menu, MenuItem } from "./ui";
 // The card had grown up to five tap targets in one row on a phone, including
 // TWO visually identical kebabs side by side (the certificate menu and the
 // admin menu), which is unreadable. This collapses to three: the primary
-// action, the reading language, and one overflow holding everything else, with
-// a dot when something inside wants attention.
+// action, Editions & sharing, and one overflow holding everything else, with a
+// dot when something inside wants attention. The globe opened a reading-language
+// menu until 2026-08-25; it now opens the Editions & sharing dialog directly,
+// which is where a learner picks a language now that the home screen has no
+// global language select.
 //
 // `CertificateControl` is reused rather than reimplemented: it already handles
 // both states (view an earned certificate, claim an eligible one) and
@@ -31,7 +33,6 @@ export function CourseCardActions({
   title,
   openHref,
   openLabel,
-  editions,
   courseCompleted,
   onOpenSettings,
   onOpenEditions,
@@ -40,7 +41,6 @@ export function CourseCardActions({
   title: string;
   openHref: string;
   openLabel: string;
-  editions: { lang: string; native: string; rtl: boolean }[];
   // True once the course is `completed` (ADR 0015): authoring has stopped, so
   // the kebab never offers the admin's "Finish generating course" there.
   courseCompleted: boolean;
@@ -73,35 +73,17 @@ export function CourseCardActions({
         {openLabel}
       </Link>
 
-      {/* The reading language of THIS course (its Edition). Per course, so it
-          cannot sit in Settings beside the app language. Always shown since
-          2026-08-25: the home screen no longer carries a global language
-          select, so this button beside "Open course" is where a learner
-          changes language. A course with no translation yet still gets the
-          button, with "Editions & sharing" as the way to add one. */}
-      <Menu triggerIcon="globe" triggerLabel={t("readingLanguageFor", { title })}>
-        {(close) => (
-          <>
-            <MenuItem icon="book" href={withLang(`/courses/${slug}`, "en")} onClick={close}>
-              English
-            </MenuItem>
-            {editions.map((e) => (
-              <MenuItem key={e.lang} icon="book" href={withLang(`/courses/${slug}`, e.lang)} onClick={close}>
-                {e.native}
-              </MenuItem>
-            ))}
-            <MenuItem
-              icon="globe"
-              onClick={() => {
-                close();
-                onOpenEditions();
-              }}
-            >
-              {ted("dialogTitle")}
-            </MenuItem>
-          </>
-        )}
-      </Menu>
+      {/* One tap beside "Open course" opens Editions & sharing, the dialog that
+          owns this course's languages and who they are shared with (2026-08-25).
+          It used to drop a menu listing the Editions, but the home screen no
+          longer carries a global language select, so the dialog itself is the
+          destination rather than a second stop on the way. */}
+      <IconButton
+        icon="globe"
+        label={ted("dialogTitle")}
+        ariaHasPopup="dialog"
+        onClick={onOpenEditions}
+      />
 
       <Menu triggerLabel={t("moreActionsFor", { title })} dot={dot}>
         {(close) => (
@@ -115,15 +97,6 @@ export function CourseCardActions({
               }}
             >
               {tcs("title")}
-            </MenuItem>
-            <MenuItem
-              icon="globe"
-              onClick={() => {
-                close();
-                onOpenEditions();
-              }}
-            >
-              {ted("dialogTitle")}
             </MenuItem>
             {/* Admin "fire and pray": generate the remaining curriculum in one
                 go. Self-gated; lives in this one kebab rather than beside it. */}

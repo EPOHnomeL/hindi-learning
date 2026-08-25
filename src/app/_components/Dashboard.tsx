@@ -445,7 +445,6 @@ function CourseCard({ course }: { course: Course }) {
             title={course.title}
             openHref={`/courses/${course.slug}`}
             openLabel={t("openCourse")}
-            editions={editions}
             courseCompleted={complete}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenEditions={() => setEditionsOpen(true)}
