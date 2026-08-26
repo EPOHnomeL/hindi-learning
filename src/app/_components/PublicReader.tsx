@@ -352,6 +352,11 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
     );
   }
   const preview = !!course.paywall;
+  // Teacher Q&A (teacher-qa): the Guest's half of the same branch the authed
+  // reader makes, off the boolean on this bundle rather than off `questions`
+  // being empty. The server has already withheld the thread when it is off
+  // (public.publicCourse), so this only stops the empty panel being drawn.
+  const teacherQa = course.teacherQa;
 
   return (
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
@@ -393,13 +398,13 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
           <GuestLessonFoot course={course} lessonKey={lessonKey} completed={completed} markComplete={markComplete} token={token} />
         )}
         {/* Q&A sits past the paygate — withheld from a paid-Edition Guest. */}
-        {!preview && (
+        {!preview && teacherQa && (
           <div className="p-3 md:hidden">
             <GuestQuestions qa={qa} />
           </div>
         )}
       </div>
-      {!preview && (
+      {!preview && teacherQa && (
         <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
           <GuestQuestions qa={qa} />
         </aside>

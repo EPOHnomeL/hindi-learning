@@ -204,3 +204,36 @@ test("publicCourse serves the Edition's translated mission, falling back to Engl
     "Read Premchand in the original.",
   );
 });
+
+// Teacher Q&A (teacher-qa ticket 03): with the setting off the owner's Q&A is
+// absent from the GUEST PAYLOAD, not merely hidden in the DOM. This is the second
+// read path (the first is capture.myQuestions) and the reason the gate is server
+// side at all: a client side hide would leave the owner's thread readable in
+// devtools on a public, anonymous page.
+test("publicCourse: Teacher Q&A off withholds the owner's questions from the payload", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi");
+  await t.run(async (ctx) => {
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" });
+    await ctx.db.insert("questions", { userId: owner, topicId, lessonKey: "0001-a", text: "why?", status: "answered", reply: "because" });
+  });
+  const token = await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true });
+
+  // On (unset) the Guest sees the thread, as today.
+  expect(await t.query(api.public.publicCourse, { token: token! })).toMatchObject({
+    teacherQa: true,
+    questions: [{ text: "why?", reply: "because" }],
+  });
+
+  await asUser(t, owner).mutation(api.capture.setTeacherQa, { topicSlug: "hindi", enabled: false });
+  const off = await t.query(api.public.publicCourse, { token: token! });
+  expect(off).toMatchObject({ teacherQa: false, questions: [] });
+  // The lessons TOC and everything else the Guest reads is untouched.
+  expect(off?.lessons).toMatchObject([{ key: "0001-a", seq: 1 }]);
+
+  // Hidden, never destroyed: the rows are still there and come back on.
+  expect(await t.run((ctx) => ctx.db.query("questions").collect())).toMatchObject([{ text: "why?" }]);
+  await asUser(t, owner).mutation(api.capture.setTeacherQa, { topicSlug: "hindi", enabled: true });
+  expect((await t.query(api.public.publicCourse, { token: token! }))?.questions).toMatchObject([{ text: "why?", reply: "because" }]);
+});

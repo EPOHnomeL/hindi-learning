@@ -179,7 +179,15 @@ export const publicCourse = query({
             .collect()
         ).map((p) => ({ lessonKey: p.lessonKey, status: p.status }))
       : [];
-    const questions = ownerId
+    // Teacher Q&A off (teacher-qa, CONTEXT.md): the owner's thread is withheld
+    // from the PAYLOAD, not hidden in the DOM. This is the reason the setting
+    // gates the read path at all, against `assertTenantFlag`'s rule that a flag
+    // never does: this bundle is anonymous and public, so a client-side hide
+    // would leave the thread readable in devtools. Twin gate in
+    // capture.myQuestions; please do not "fix" either back. Rows are never
+    // deleted, so switching the setting on restores the thread.
+    const qaOn = teacherQaOn(topic);
+    const questions = ownerId && qaOn
       ? (
           await ctx.db
             .query("questions")
@@ -210,7 +218,7 @@ export const publicCourse = query({
       resources: preview ? [] : resources,
       progress: preview ? [] : progress,
       questions: preview ? [] : questions,
-      teacherQa: teacherQaOn(topic),
+      teacherQa: qaOn,
       paywall,
     };
   },

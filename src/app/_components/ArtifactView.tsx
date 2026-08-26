@@ -431,6 +431,13 @@ function LessonView({
   // Progress — so the open/complete writes below are gated off for them.
   const header = useQuery(api.content.reader.courseHeader, { topicSlug, lang: lang ?? undefined });
   const preview = header?.role === "preview";
+  // Teacher Q&A (teacher-qa): whether this course offers a question channel at
+  // all. Read off the same bundle the injected `.ask` rule below uses, and note
+  // it is the BOOLEAN, never `myQuestions` being empty: an owner who has simply
+  // never asked anything has an empty list and must keep their ask form. A
+  // loading header reads as ON, like the toggle and the `.ask` rule, so a course
+  // with an open channel never flashes shut.
+  const teacherQa = header?.teacherQa !== false;
   const html = useContentHtml(lesson);
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
@@ -605,14 +612,16 @@ function LessonView({
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
             scrolling, no slide-up trigger. Desktop uses the side column instead.
             Hidden for a `preview` caller: Q&A is past the paygate. */}
-        {!preview && (
+        {!preview && teacherQa && (
           <div className="p-3 md:hidden">
             <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} variant="inline" readOnly={readOnly} />
           </div>
         )}
       </div>
       {/* Desktop: persistent ask column on the right (past the paygate for preview). */}
-      {!preview && (
+      {/* Teacher Q&A off takes the whole column away, so the lesson reads at the
+          full width rather than beside an empty panel. */}
+      {!preview && teacherQa && (
         <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
           <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} readOnly={readOnly} />
         </aside>

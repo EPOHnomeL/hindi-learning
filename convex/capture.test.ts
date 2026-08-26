@@ -265,8 +265,76 @@ test("teacherQa: turning it off destroys nothing, so stored Questions survive", 
   await as.mutation(api.capture.askQuestion, { topicSlug: "hindi", lessonKey: "0001", text: "why ne?" });
 
   await as.mutation(api.capture.setTeacherQa, { topicSlug: "hindi", enabled: false });
-  // Ticket 01 lays the rail only: nothing is hidden yet (that is tickets 02 and
-  // 03), and the Question rows are never destroyed.
+  // The setting hides, it never destroys: the read gate (ticket 03) empties the
+  // query while the Question rows stay exactly where they were.
   const rows = await t.run((ctx) => ctx.db.query("questions").collect());
   expect(rows).toMatchObject([{ lessonKey: "0001", text: "why ne?" }]);
+});
+
+// ---- Teacher Q&A: the read gate (teacher-qa ticket 03) ---------------------
+// With the setting off nobody sees the question channel, and the withholding
+// happens on the SERVER: `myQuestions` returns an empty list, so the desktop
+// panel, the mobile block and the (currently unwired) sidebar reply dot all go
+// quiet off one query. The reader still branches on the `teacherQa` boolean from
+// the course bundle, never on the list being empty: an owner who has simply
+// never asked anything has an empty list too and must keep their ask form.
+
+test("teacherQa off: the owner's own questions query goes empty, and comes back when it is on", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  const as = asUser(t, alice);
+  await as.mutation(api.capture.askQuestion, { topicSlug: "hindi", lessonKey: "0001", text: "why ne?" });
+
+  expect(await as.query(api.capture.myQuestions, { topicSlug: "hindi" })).toMatchObject([{ text: "why ne?" }]);
+
+  await as.mutation(api.capture.setTeacherQa, { topicSlug: "hindi", enabled: false });
+  expect(await as.query(api.capture.myQuestions, { topicSlug: "hindi" })).toEqual([]);
+
+  // Hidden, never destroyed: flipping back on restores the conversation intact.
+  await as.mutation(api.capture.setTeacherQa, { topicSlug: "hindi", enabled: true });
+  expect(await as.query(api.capture.myQuestions, { topicSlug: "hindi" })).toMatchObject([
+    { lessonKey: "0001", text: "why ne?", status: "open" },
+  ]);
+});
+
+test("teacherQa off: a Viewer of a shared Edition reads no Q&A either", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const viewer = await seedUser(t, "viewer@example.com");
+  const topicId = await seedTopic(t, alice, "hindi");
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: viewer, lang: "en" }));
+  const as = asUser(t, alice);
+  await as.mutation(api.capture.askQuestion, { topicSlug: "hindi", lessonKey: "0001", text: "why ne?" });
+
+  expect(await asUser(t, viewer).query(api.capture.myQuestions, { topicSlug: "hindi" })).toMatchObject([{ text: "why ne?" }]);
+
+  await as.mutation(api.capture.setTeacherQa, { topicSlug: "hindi", enabled: false });
+  expect(await asUser(t, viewer).query(api.capture.myQuestions, { topicSlug: "hindi" })).toEqual([]);
+});
+
+test("teacherQa on with nothing asked: an empty list, but the bundle still says ON so the ask form stays", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  const as = asUser(t, alice);
+
+  // The pair that proves the reader must branch on the boolean and not on
+  // emptiness: this owner and an owner with the setting off both see [].
+  expect(await as.query(api.capture.myQuestions, { topicSlug: "hindi" })).toEqual([]);
+  expect((await as.query(api.content.reader.courseHeader, { topicSlug: "hindi" }))?.teacherQa).toBe(true);
+});
+
+test("teacherQa off: the gate is per Topic, so the owner's other course keeps its Q&A", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  await seedTopic(t, alice, "hindi");
+  await seedTopic(t, alice, "spanish");
+  const as = asUser(t, alice);
+  await as.mutation(api.capture.askQuestion, { topicSlug: "hindi", lessonKey: "0001", text: "why ne?" });
+  await as.mutation(api.capture.askQuestion, { topicSlug: "spanish", lessonKey: "0001", text: "por que?" });
+
+  await as.mutation(api.capture.setTeacherQa, { topicSlug: "hindi", enabled: false });
+  expect(await as.query(api.capture.myQuestions, { topicSlug: "hindi" })).toEqual([]);
+  expect(await as.query(api.capture.myQuestions, { topicSlug: "spanish" })).toMatchObject([{ text: "por que?" }]);
 });

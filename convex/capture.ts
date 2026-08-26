@@ -170,6 +170,17 @@ export const myQuestions = query({
     if (!userId) return [];
     const topic = await getViewableTopic(ctx, userId, topicSlug);
     if (!topic?.ownerId) return [];
+    // Teacher Q&A off (teacher-qa, CONTEXT.md): the question channel is withheld
+    // HERE, on the read path, and not merely undrawn by the client. That is a
+    // deliberate departure from `assertTenantFlag`'s rule that a flag never gates
+    // reads, because a Guest's course bundle ships the owner's Q&A over the wire
+    // (see the twin gate in public.publicCourse), so a client-side hide would
+    // leave it readable in devtools. Please do not "fix" this back.
+    //
+    // One query, three silences: the desktop panel, the mobile block and the
+    // sidebar reply dot all read this list. Nothing is deleted, so flipping the
+    // setting back on restores the conversation exactly as it was.
+    if (!teacherQaOn(topic)) return [];
     const ownerId = topic.ownerId;
     const effLang = await readableLang(ctx, topic, userId, lang ?? null);
     if (!effLang) return [];
