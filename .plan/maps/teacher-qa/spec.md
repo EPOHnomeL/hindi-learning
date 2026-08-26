@@ -139,6 +139,16 @@ code comment at both sites.
 the *same* query, `capture.myQuestions`. Emptying it removes the panel's content, the dots and the
 "New reply from your teacher" indicator together, with no separate suppression logic.
 
+<!-- Correction, 2026-08-25 (while building ticket 03): only ONE of those three surfaces is
+     actually live. The sidebar unread reply dot and the "New reply from your teacher"
+     indicator have been UNWIRED since 2026-07-09 (`1d05eb7`, "remove unused unseenAnswers
+     logic from CourseShell"): `NavItem` still accepts a `notify` prop and `readerDerive`
+     still exports `unseenReplyKeys`, but CourseShell passes neither, so no dot renders on
+     any course in any state. The claim above is right about the mechanism and wrong about
+     the count: emptying `capture.myQuestions` silences the panel, and would silence the dot
+     the day anyone rewires it. Nothing was wired up for this effort, since a dot that
+     appears only when Teacher Q&A is off is not a feature anyone asked for. -->
+
 **The reader still needs the flag itself, not just an empty list.** An empty `myQuestions` is
 ambiguous: an owner who has simply never asked anything also gets an empty list, and that owner must
 still see the ask form. The boolean therefore has to reach the reader on the course bundle the

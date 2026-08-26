@@ -57,6 +57,13 @@ states.
   `teacherQa` off the bundles 01 named. On and unset build byte for byte identically; no stored
   Lesson HTML is touched. Built 2026-08-25, `2e5b977`, verified by tests and by reading the code.
   The browser walk stays with 04.
+- **The Q&A panel, the dots and the guest payload go quiet**
+  ([03](tickets/03-the-question-panel-goes-quiet.md)): two server gates on `teacherQaOn`
+  (`capture.myQuestions` returns `[]`, `public.publicCourse` omits the owner's thread from the
+  payload), and four client branches on the boolean rather than on emptiness, so an owner with it on
+  and nothing asked keeps their ask form. The sidebar reply dot turned out to have been unwired since
+  2026-07-09, so it needed no code. Built 2026-08-25, `78963a7`, verified by tests and by reading
+  the code. The browser walk stays with 04.
 
 ## Not yet specified
 
