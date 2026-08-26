@@ -64,6 +64,10 @@ states.
   and nothing asked keeps their ask form. The sidebar reply dot turned out to have been unwired since
   2026-07-09, so it needed no code. Built 2026-08-25, `78963a7`, verified by tests and by reading
   the code. The browser walk stays with 04.
+- **The prophetic school walked in a browser** ([04](tickets/04-walk-the-prophetic-school.md)): the
+  owner walked the real course on 2026-08-26 with the setting off and on, at both widths, in both
+  themes, on a non source Edition and as a Guest on the public link. It behaves as specified and no
+  defects were found, so the whole effort is now seen and not merely read. Map complete.
 
 ## Not yet specified
 

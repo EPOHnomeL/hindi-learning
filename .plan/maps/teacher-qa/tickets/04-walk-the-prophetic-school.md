@@ -40,3 +40,21 @@ never kill whatever is on port 3000.
   says which.
 - The resolution states plainly that this was walked in a browser, and names what was actually
   looked at.
+
+## Answer
+
+**Walked in a browser by the repo owner on 2026-08-26**, on `prophetic-school` on the YWAM
+Potchefstroom tenant, and it behaves as specified. This is the browser claim tickets 01, 02 and 03
+each deferred to here, and it is the owner's own report rather than an agent reading code: no agent
+saw these pixels.
+
+Covered, per the owner: the course with Teacher Q&A **off** and again with it **on**, at a desktop
+width and a mobile width, in light and dark, on a non source language Edition (confirming the per
+Topic setting reaches an Edition whose own tab carries no toggle), and as a Guest through the public
+link. No defects were found, so nothing was fixed here and no follow up ticket was filed.
+
+One note for whoever reads this later: the "no sidebar reply dots" line in the Done-when could not
+fail, because the dot has been unwired since 2026-07-09 (`1d05eb7`) and renders on no course in any
+state. Ticket 03's Answer and a dated correction in [spec.md](../spec.md) carry the detail.
+
+That closes the map: the destination named at the top of [map.md](../map.md) is reached.
