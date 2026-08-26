@@ -248,6 +248,12 @@ Facts about the second rail that are easy to get wrong:
   elsewhere from the queue line. PayFast has no invoicing product at all (a
   case-insensitive grep for "invoice" across its whole developer-docs bundle returns
   zero hits), which is why.
+- **A Seat earns no Certificate, and this is ENFORCED** (`isEligible` in
+  `convex/certificates.ts`), not merely documented. It was documented-only until
+  2026-08-26 and therefore did not work. Two reasons: a Certificate is losable with a
+  forgotten PIN and there is no recovery, and more sharply, a Certificate prints and
+  stores a name the learner types, which is the real name beside a cohort that the whole
+  nickname mitigation exists to prevent. A Seat that adopted an email is still refused.
 - **The consent wording is versioned in `convex/joinConsent.ts` and is append only.**
   Editing an existing version rewrites what an already-joined member is recorded as
   having agreed to. `seats.consentVersion` resolves against it, and `/join` renders

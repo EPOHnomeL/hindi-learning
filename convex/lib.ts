@@ -306,6 +306,23 @@ export async function freePublishedLangs(ctx: QueryCtx, topicId: Id<"topics">): 
 // Edition); a non-owner holds the languages their Shares grant PLUS the languages
 // they have an Entitlement for (an entitled buyer reads their Edition exactly like
 // a Viewer, ADR 0016); anyone else nothing.
+// Does this account hold a **Seat** on an Organisation Voucher? (ADR 0031.)
+//
+// The `seats` table belongs to `convex/accessCodes.ts`; this predicate lives here
+// because it is a cross-cutting question that modules with no other business in that
+// rail have to ask, and a one-line read is a smaller thing to share than a new import
+// edge into a module full of mutations.
+//
+// A row stripped of its `userId` by a withdrawal cannot match, which is correct: that
+// member no longer holds a Seat.
+export async function holdsSeat(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
+  const seat = await ctx.db
+    .query("seats")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .first();
+  return seat !== null;
+}
+
 export async function heldLangs(
   ctx: QueryCtx,
   topic: Doc<"topics">,

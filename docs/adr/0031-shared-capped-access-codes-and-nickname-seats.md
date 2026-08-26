@@ -247,3 +247,36 @@ can return a nickname. All still hold.
 rail is **Bulk Vouchers**. The code identifiers (`accessCodes`, `seats`, `mintAccessCode`) were left
 alone: renaming a Convex table is a data migration and a word is not worth one. The mapping is in
 `docs/agents/project-context.md`. This ADR keeps the old names throughout.
+
+### Addendum, 2026-08-26: the no-Certificate consequence was not enforced
+
+"No certificate on a Seat" is listed above under Consequences as accepted, and it was
+never implemented. A Seat mints an **ordinary Entitlement**, which is exactly the point
+of the design, and `claimCertificate` gates on `getViewableTopic` plus completion. So a
+Seat that finished a course could claim one. Found by asking on 2026-08-26; guard added
+the same day, in `isEligible` so that all four claim surfaces stop offering it, plus the
+server-side refusal in `claimCertificate`.
+
+**The reason this mattered more than the stated one.** The Consequences section gives
+the forgotten-PIN argument: a Certificate is a thing a member could lose, and there is
+no recovery, so issuing one sells a promise the design cannot keep. True, and the
+smaller half. The sharper problem is that **a Certificate prints a name the learner
+types and stores it on the row**. A real name beside a political party's cohort is
+precisely the special personal information (s26 via s1) that the self-chosen nickname
+exists to keep out of the database, so this rail's one mitigation could have been undone
+by a member being helpfully honest in a name box. That argument was not in the original
+text and belongs here.
+
+A Seat that adopts an email and a password is **still** refused: it still holds a Seat,
+so the name argument still applies. The day that changes should change deliberately,
+with the name question answered, rather than falling out of an unrelated feature.
+
+Certificates **already earned** are left resolvable rather than revoked, which is this
+codebase's posture throughout (`claimCertificate` returns an existing row before every
+gate). If any Seat certificate exists on a real deployment it holds a typed name; that is
+a data question to look at rather than a code one, and nothing here deletes it.
+
+**The general lesson, worth more than the fix:** an Out of Scope line is not a control.
+Three of this rail's guarantees are enforced by tests that fail loudly (the pinned
+Entitlement key set, the atomic cap, no nickname in a Seller-facing validator) and this
+one was enforced by a sentence in a document. It is the only one that was wrong.

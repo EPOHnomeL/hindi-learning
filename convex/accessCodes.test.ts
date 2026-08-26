@@ -1001,3 +1001,83 @@ test("adoption cannot take an address in use, and cannot repoint an ordinary acc
   });
   expect((await t.run((ctx) => ctx.db.get(ordinary)))!.email).toEqual("taken@example.com");
 });
+
+// ---- No Certificate on a Seat (ADR 0031; guard landed 2026-08-26) ----------------
+
+test("a Seat earns no certificate, however finished the course is", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  const member = (await seatRows(t))[0]!.userId!;
+
+  // Finish the whole course, so the ONLY thing standing between this member and a
+  // certificate is the Seat itself.
+  await asUser(t, member).mutation(api.capture.setProgress, {
+    topicSlug: "hindi",
+    lessonKey: "0001",
+    status: "completed",
+  });
+
+  // Not offered: `eligible` is what all four claim surfaces read, so gating it here is
+  // what stops a member being shown a button that refuses.
+  expect(await asUser(t, member).query(api.certificates.myCertificate, { topicSlug: "hindi" })).toMatchObject({
+    certificate: null,
+    eligible: false,
+  });
+
+  // And refused SERVER-side, which is the gate that actually holds. Two reasons, and
+  // the second is the sharper one: a certificate is a thing a member could lose with a
+  // forgotten PIN and there is no recovery, and a certificate PRINTS AND STORES a name
+  // the learner types, which is exactly the real name beside a political party's cohort
+  // that the self-chosen nickname exists to keep out of the database.
+  await expect(
+    asUser(t, member).mutation(api.certificates.claimCertificate, { topicSlug: "hindi", name: "Thandi Real Surname" }),
+  ).rejects.toThrow();
+  expect(await t.run((ctx) => ctx.db.query("certificates").collect())).toEqual([]);
+
+  // **An ordinary buyer on the same finished Edition still earns one**, so what was
+  // added is a Seat guard and not a certificates regression.
+  const buyer = await seedUser(t, "buyer@example.com");
+  await t.run((ctx) => ctx.db.insert("entitlements", { userId: buyer, topicId, lang: "en" }));
+  await asUser(t, buyer).mutation(api.capture.setProgress, {
+    topicSlug: "hindi",
+    lessonKey: "0001",
+    status: "completed",
+  });
+  expect(await asUser(t, buyer).query(api.certificates.myCertificate, { topicSlug: "hindi" })).toMatchObject({
+    eligible: true,
+  });
+  await asUser(t, buyer).mutation(api.certificates.claimCertificate, { topicSlug: "hindi", name: "A. Buyer" });
+  expect(await t.run((ctx) => ctx.db.query("certificates").collect())).toHaveLength(1);
+});
+
+test("adopting an email does not buy a Seat a certificate", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedSysAdmin(t, "admin@example.com");
+  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
+  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
+  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  const member = (await seatRows(t))[0]!.userId!;
+  await asUser(t, member).mutation(api.capture.setProgress, {
+    topicSlug: "hindi",
+    lessonKey: "0001",
+    status: "completed",
+  });
+  await asUser(t, member).action(api.auth.signIn, {
+    provider: "password",
+    params: { email: "thandi@example.com", password: "correct horse battery", flow: "signUp" },
+  });
+
+  // Still refused. The account gained a second door, not a different kind of account:
+  // it still holds a Seat, so the name reason still applies. The day that changes it
+  // should change deliberately, with the name question answered, rather than falling
+  // out of an unrelated feature.
+  expect(await asUser(t, member).query(api.certificates.myCertificate, { topicSlug: "hindi" })).toMatchObject({
+    eligible: false,
+  });
+  await expect(
+    asUser(t, member).mutation(api.certificates.claimCertificate, { topicSlug: "hindi", name: "Thandi" }),
+  ).rejects.toThrow();
+});

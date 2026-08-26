@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getViewableTopic, loadEdition, mintToken, readableLang, SOURCE_LANG } from "./lib";
+import { getViewableTopic, holdsSeat, loadEdition, mintToken, readableLang, SOURCE_LANG } from "./lib";
 import { assertTenantFlag } from "./tenantFlags";
 import { topicLessonCounts } from "./progressCounts";
 import { langInfo } from "./languages";
@@ -69,6 +69,26 @@ async function certificatePayload(ctx: QueryCtx, row: Doc<"certificates">) {
 // nothing.
 async function isEligible(ctx: QueryCtx, topic: Doc<"topics">, userId: Id<"users">): Promise<boolean> {
   if (topic.status !== "completed") return false;
+  // **A Seat on an Organisation Voucher earns no Certificate** (ADR 0031, which put
+  // this out of scope; the guard itself landed 2026-08-26 when the omission was
+  // spotted). Gating eligibility rather than only the claim is what hides the offer on
+  // all four surfaces that read this flag, so nobody is shown a button that refuses.
+  //
+  // TWO reasons, and the second is the sharper one.
+  //
+  //   1. A Certificate is a thing a member could lose with a forgotten PIN, and there
+  //      is no recovery on that rail, so issuing one sells a promise the design cannot
+  //      keep.
+  //   2. **A Certificate prints a name the learner types**, and it is stored on the
+  //      row. A real name beside a political party's cohort is exactly the special
+  //      personal information (POPIA s26 via s1) that the self-chosen nickname exists
+  //      to keep out of the database. Left open, this rail's one mitigation could be
+  //      undone by a member being helpfully honest in a name box.
+  //
+  // A Seat that ADOPTS an email and a password is still refused. It still holds a Seat,
+  // so reason 2 still applies, and the day that changes it should change deliberately
+  // with the name question answered rather than as a side effect.
+  if (await holdsSeat(ctx, userId)) return false;
   const { lessonCount, completedCount } = await topicLessonCounts(ctx, topic._id, userId);
   return lessonCount > 0 && completedCount === lessonCount;
 }
@@ -136,9 +156,12 @@ export const claimCertificate = mutation({
 
     // Re-check eligibility and snapshot the lesson count from one read (the same
     // counts the dashboard shows). lessonCount is frozen onto the Certificate.
-    if (topic.status !== "completed") throw new Error("not eligible");
-    const { lessonCount, completedCount } = await topicLessonCounts(ctx, topic._id, userId);
-    if (lessonCount === 0 || completedCount !== lessonCount) throw new Error("not eligible");
+    // Server-side, not merely hidden: `isEligible` carries the reasoning, and this is
+    // the gate that actually holds. It sits AFTER the existing-certificate return
+    // above, deliberately, so a Certificate already earned stays resolvable rather than
+    // being revoked - frozen, not revoked, is this file's posture throughout.
+    if (!(await isEligible(ctx, topic, userId))) throw new Error("not eligible");
+    const { lessonCount } = await topicLessonCounts(ctx, topic._id, userId);
 
     const user = await ctx.db.get(userId);
     const fallback = (user?.email ?? "Learner").split("@")[0]!;
