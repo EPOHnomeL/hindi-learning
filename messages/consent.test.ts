@@ -26,8 +26,15 @@ const lines = CONSENT_VERSIONS[CONSENT_VERSION];
 // directory, and a warning nobody can act on is a warning everybody learns to skip.
 const files = import.meta.glob("./*.json", { eager: true }) as Record<
   string,
-  { default: { Join: { consentLines: string[] } } }
+  { default: { Join: { agree: string } } }
 >;
+
+// The page's copy carries `<terms>`/`<privacy>` markup around the two link labels, and
+// the canonical record is plain prose. Strip the tags, keep the labels: what is being
+// compared is the UNDERTAKING, and a tag is presentation.
+function plain(rich: string): string {
+  return rich.replace(/<\/?(terms|privacy)>/g, "");
+}
 
 describe("the join consent wording", () => {
   it("has a canonical record for the version the app is issuing", () => {
@@ -36,18 +43,23 @@ describe("the join consent wording", () => {
   });
 
   it("English on the page is the canonical record, word for word", () => {
-    expect(en.Join.consentLines).toEqual([...lines!]);
+    expect(plain(en.Join.agree)).toEqual(lines!.join(" "));
   });
 
   for (const code of LOCALES) {
     if (code === "en") continue;
-    it(`${code} states the same number of things`, () => {
+    it(`${code} carries the agreement and both links`, () => {
       // Not a translation check, which no test can do. It catches the failure that
-      // actually happens: a locale that quietly drops the sentence about the PIN
-      // being unrecoverable, or the one about the nickname not needing to be a real
-      // name. Both are compliance controls, and a member who never read them did not
-      // give informed consent.
-      expect(files[`./${code}.json`]!.default.Join.consentLines).toHaveLength(lines!.length);
+      // actually happens: a locale that quietly drops half the sentence, or loses the
+      // Terms link so the full undertaking is unreachable in that language. Both are
+      // compliance controls, and a member who could not read them did not give
+      // informed consent.
+      const rich = files[`./${code}.json`]!.default.Join.agree;
+      expect(rich).toContain("<terms>");
+      expect(rich).toContain("<privacy>");
+      // Within a third of English, which catches a truncation without pretending to
+      // know how long the same meaning takes in Hindi.
+      expect(plain(rich).length).toBeGreaterThan(plain(en.Join.agree).length * 0.66);
     });
   }
 });

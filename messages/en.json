@@ -198,8 +198,7 @@
     "toggleToSignIn": "Already have an account? Sign in",
     "termsAgreement": "By creating an account you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
     "voucherPrompt": "Got a code from your organisation? <redeem>Redeem your voucher</redeem>.",
-    "joinPrompt": "No email or password needed. You sign in with a nickname and a PIN.",
-    "joinCta": "Continue with a code from your organisation"
+    "joinPrompt": "No account? For guest or organisational sign in, <join>click here</join>."
   },
   "Checkout": {
     "referenceLockedTitle": "This reference is part of the full course",
@@ -701,27 +700,15 @@
   "Join": {
     "title": "Join with your Organisation Voucher",
     "blurb": "Your organisation gave you a code. Type it in, pick a nickname and a PIN, and you are in. We never ask for your email address.",
-    "consentTitle": "Before you start, here is what we keep",
-    "consentLines": [
-      "We keep the nickname and the PIN you choose, and which lessons you have finished, so that you can come back on another phone.",
-      "Your nickname does not have to be your real name. We never ask for your email address, your phone number or your name.",
-      "Nobody can recover a forgotten PIN, not even us, so write it down. You can ask us to delete your nickname and PIN at any time."
-    ],
-    "consentMore": "Full details are in our <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
-    "consentAgree": "I agree, let me in",
-    "consentRefuse": "No, thank you",
-    "refusedTitle": "That is a real choice, and nothing was stored",
-    "refusedBody": "We cannot give you a place on the course without keeping a nickname and a PIN, because that is how we know it is you when you come back. Nothing has been stored, and you can change your mind. If you would rather not, ask whoever gave you the code what else they can offer, or see what else is on the site.",
-    "refusedBrowse": "See what else is here",
-    "refusedBack": "Go back",
+    "agree": "By joining you agree to the <terms>Terms</terms> and the <privacy>Privacy Policy</privacy>. We do not track you: no email address, no phone number, no name, and no advertising. We keep the nickname and PIN you choose and the lessons you finish, so you can come back on another phone. Nobody can recover a forgotten PIN, so write it down.",
     "codeLabel": "Your code",
     "codePlaceholder": "GRP-XXX-XXX-XXX",
     "continue": "Continue",
     "changeCode": "Change the code",
     "usingCode": "Using code",
     "whichLabel": "Is this your first time?",
-    "iAmNew": "I am new here",
-    "iAmReturning": "I am coming back",
+    "iAmNew": "Register",
+    "iAmReturning": "Sign back in",
     "nicknameLabel": "Pick a nickname",
     "nicknamePlaceholder": "Anything you like",
     "nicknameHint": "This does not have to be your real name, and we would rather it was not. Pick anything you will remember.",

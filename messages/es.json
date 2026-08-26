@@ -166,8 +166,7 @@
     "toggleToSignIn": "¿Ya tienes una cuenta? Inicia sesión",
     "termsAgreement": "Al crear una cuenta aceptas los <terms>Términos</terms> y la <privacy>Política de privacidad</privacy>.",
     "voucherPrompt": "¿Tienes un código de tu organización? <redeem>Canjea tu vale</redeem>.",
-    "joinPrompt": "No necesitas correo ni contraseña. Inicias sesión con un apodo y un PIN.",
-    "joinCta": "Continuar con un código de tu organización"
+    "joinPrompt": "¿No tienes cuenta? Para acceder como invitado o con tu organización, <join>haz clic aquí</join>."
   },
   "Checkout": {
     "referenceLockedTitle": "Esta referencia forma parte del curso completo",
@@ -701,27 +700,15 @@
   "Join": {
     "title": "Únete con tu Vale de organización",
     "blurb": "Tu organización te dio un código. Escríbelo, elige un apodo y un PIN, y ya estás dentro. Nunca te pedimos tu correo electrónico.",
-    "consentTitle": "Antes de empezar, esto es lo que guardamos",
-    "consentLines": [
-      "Guardamos el apodo y el PIN que elijas, y qué lecciones has terminado, para que puedas volver en otro teléfono.",
-      "Tu apodo no tiene que ser tu nombre real. Nunca te pedimos tu correo electrónico, tu teléfono ni tu nombre.",
-      "Nadie puede recuperar un PIN olvidado, ni nosotros, así que apúntalo. Puedes pedirnos que borremos tu apodo y tu PIN en cualquier momento."
-    ],
-    "consentMore": "Los detalles completos están en nuestros <terms>Términos</terms> y nuestra <privacy>Política de Privacidad</privacy>.",
-    "consentAgree": "Acepto, quiero entrar",
-    "consentRefuse": "No, gracias",
-    "refusedTitle": "Es una decisión real, y no se ha guardado nada",
-    "refusedBody": "No podemos darte una plaza en el curso sin guardar un apodo y un PIN, porque así sabemos que eres tú cuando vuelves. No se ha guardado nada y puedes cambiar de opinión. Si prefieres no hacerlo, pregunta a quien te dio el código qué más puede ofrecerte, o mira qué más hay en el sitio.",
-    "refusedBrowse": "Ver qué más hay aquí",
-    "refusedBack": "Volver",
+    "agree": "Al unirte aceptas los <terms>Términos</terms> y la <privacy>Política de Privacidad</privacy>. No te rastreamos: sin correo electrónico, sin teléfono, sin nombre y sin publicidad. Guardamos el apodo y el PIN que elijas y las lecciones que termines, para que puedas volver en otro teléfono. Nadie puede recuperar un PIN olvidado, así que apúntalo.",
     "codeLabel": "Tu código",
     "codePlaceholder": "GRP-XXX-XXX-XXX",
     "continue": "Continuar",
     "changeCode": "Cambiar el código",
     "usingCode": "Usando el código",
     "whichLabel": "¿Es tu primera vez?",
-    "iAmNew": "Soy nuevo aquí",
-    "iAmReturning": "Estoy volviendo",
+    "iAmNew": "Registrarme",
+    "iAmReturning": "Volver a entrar",
     "nicknameLabel": "Elige un apodo",
     "nicknamePlaceholder": "Lo que quieras",
     "nicknameHint": "No tiene que ser tu nombre real, y preferimos que no lo sea. Elige cualquier cosa que vayas a recordar.",

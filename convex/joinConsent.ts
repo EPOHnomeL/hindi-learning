@@ -39,6 +39,28 @@ export const CONSENT_VERSIONS: Record<string, readonly string[]> = {
   // "Specific" means naming what is stored and why. "Informed" means saying who
   // can see it and who cannot. Both are POPIA's words, and a pre-ticked box or a
   // line buried in the terms discharges neither.
+  // 2026-08-26. **The consent step is gone; consent is now the act of joining**, with
+  // this sentence stated directly above the button that does it (asked for
+  // 2026-08-26, after the shortened step was still judged too heavy).
+  //
+  // Say plainly what changed, because it is the third revision of this wording and the
+  // direction has been one way: an explicit agree/refuse step became three short
+  // lines, and three short lines became one sentence over a button. **What POPIA
+  // needs is a "voluntary, specific and informed expression of will" and s11(2) puts
+  // the burden of proving it on us.** A sentence over the button somebody presses is a
+  // clear affirmative action, which is defensible; it is materially weaker than a
+  // separate step, and it is a step closer to the "buried in the terms" pattern that
+  // discharges nothing. What holds the line: the sentence sits AT the button rather
+  // than in a footer, it names the three facts rather than gesturing at a policy, the
+  // Terms carry the full undertaking one tap away, and the timestamp and version are
+  // still stored per Seat and still refused server-side.
+  //
+  // If a legal opinion is ever taken on this rail (the map has a fog patch for it),
+  // this is the decision to put in front of it first.
+  "2026-08-26": [
+    "By joining you agree to the Terms and the Privacy Policy. We do not track you: no email address, no phone number, no name, and no advertising. We keep the nickname and PIN you choose and the lessons you finish, so you can come back on another phone. Nobody can recover a forgotten PIN, so write it down.",
+  ],
+
   // 2026-08-25. **A deliberate shortening**, and the reason is that the earlier
   // version failed at the only thing it existed for. Six long sentences on a phone,
   // in front of somebody who has never seen this site, is a wall people scroll past,
@@ -70,4 +92,4 @@ export const CONSENT_VERSIONS: Record<string, readonly string[]> = {
 // The version a join taken today is recorded against. `/join` sends this and the
 // server refuses anything else, so a stale cached page cannot record a member as
 // having agreed to wording it never showed them.
-export const CONSENT_VERSION = "2026-08-25";
+export const CONSENT_VERSION = "2026-08-26";

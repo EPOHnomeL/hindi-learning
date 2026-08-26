@@ -37,11 +37,27 @@ import { withLang } from "./editionUrl";
 //     there is no reset flow and there must never be one, and a member who was not
 //     told will reasonably believe support can help.
 //
-// **Consent comes before the nickname box**, because consent obtained after the fact
-// is not consent, and because s11(2) puts the burden of proving it on us.
+// **Consent is the act of joining** (2026-08-26): one sentence stated directly above
+// the button that does it, the way the sign-in page states its terms agreement. It was
+// a separate agree/refuse step until the wording had been shortened twice and the step
+// itself was still judged too heavy for somebody standing in a room with a phone.
+//
+// That is materially weaker than a separate step and it is worth knowing why it is
+// still defensible: POPIA wants a "voluntary, specific and informed expression of
+// will", pressing a button under a sentence that names what is kept IS a clear
+// affirmative action, the Terms carry the full undertaking one tap away, and the
+// version and timestamp are still stored per Seat and still refused server-side. See
+// `convex/joinConsent.ts` for the full reasoning and for the one thing to put in front
+// of a legal opinion first.
 
-// The three steps, in order. Consent first, always.
-type Step = "consent" | "code" | "identity";
+// Two steps now, and a code that arrived on a link skips the first.
+//
+// **There used to be a third, a consent step in front of both** (an agree/refuse
+// screen, then three short lines). It went on 2026-08-26: consent is now the act of
+// joining, stated in one sentence directly above the button that does it, the way the
+// sign-in page states its terms agreement. See `convex/joinConsent.ts` for what that
+// costs and what holds the line.
+type Step = "code" | "identity";
 
 export function JoinPanel({ linkedCode }: { linkedCode: string }) {
   return (
@@ -63,8 +79,11 @@ export function JoinPanel({ linkedCode }: { linkedCode: string }) {
 
 function JoinFlow({ linkedCode }: { linkedCode: string }) {
   const t = useTranslations("Join");
-  const [step, setStep] = useState<Step>("consent");
-  const [refused, setRefused] = useState(false);
+  // **A code that arrived on the link skips the code step entirely.** Somebody who
+  // followed `/join?code=...` has already handed the code over by clicking, so a box
+  // asking them to confirm it is a step that exists only because the page could not
+  // tell the two cases apart. `/redeem` learned the same lesson.
+  const [step, setStep] = useState<Step>(linkedCode ? "identity" : "code");
   // Already normalised by the server component that read it. Nothing in this
   // component touches the URL: see `join/page.tsx` for why the read moved there.
   const [typedCode, setTypedCode] = useState("");
@@ -75,15 +94,7 @@ function JoinFlow({ linkedCode }: { linkedCode: string }) {
       <h1 className="text-2xl font-semibold tracking-tight text-accent">{t("title")}</h1>
       <p className="mt-1.5 text-sm leading-relaxed text-soft">{t("blurb")}</p>
 
-      {refused ? (
-        <Refused onBack={() => setRefused(false)} />
-      ) : step === "consent" ? (
-        // **A code that arrived on the link skips the code step entirely.** Somebody
-        // who followed `/join?code=...` has already handed the code over by clicking,
-        // so a box asking them to confirm it is a step that exists only because the
-        // page could not tell the two cases apart. `/redeem` learned the same lesson.
-        <Consent onAgree={() => setStep(linkedCode ? "identity" : "code")} onRefuse={() => setRefused(true)} />
-      ) : step === "code" ? (
+      {step === "code" ? (
         <CodeStep code={typedCode} setCode={setTypedCode} onNext={() => setStep("identity")} />
       ) : (
         <Identity code={code} linked={!!linkedCode} onBack={() => setStep("code")} />
@@ -92,98 +103,7 @@ function JoinFlow({ linkedCode }: { linkedCode: string }) {
   );
 }
 
-// Step 1. The wording lives in `convex/joinConsent.ts` (versioned, append only) and
-// is TRANSLATED here, because consent has to be *informed* and a member reading
-// Afrikaans cannot be informed by English. The version travels with the join and is
-// stored on the Seat, so what a particular member agreed to is answerable a year
-// later.
-//
-// **The buttons are not pre-ticked and there is no default.** POPIA defines consent
-// as "any voluntary, specific and informed expression of will", and a box that is
-// already ticked expresses nothing.
-function Consent({ onAgree, onRefuse }: { onAgree: () => void; onRefuse: () => void }) {
-  const t = useTranslations("Join");
-  const lines = t.raw("consentLines") as string[];
-  return (
-    <section className="mt-6 flex flex-col gap-4 rounded-2xl border border-line bg-card p-5 shadow-sm">
-      <h2 className="text-base font-semibold text-ink">{t("consentTitle")}</h2>
-      <ul className="flex flex-col gap-2.5">
-        {lines.map((line, i) => (
-          <li key={i} className="text-sm leading-relaxed text-soft">
-            {line}
-          </li>
-        ))}
-      </ul>
-      {/* The detail lives in the Terms and the Privacy Policy, linked rather than
-          restated. Three short lines are what somebody standing in a room actually
-          reads, and consent nobody read is not "informed" however carefully it was
-          drafted; the link is what keeps it "specific" for anybody who wants the
-          whole undertaking. Opens in a new tab so a member reading it does not lose
-          the code they arrived with. */}
-      <p className="text-[11.5px] leading-relaxed text-soft">
-        {t.rich("consentMore", {
-          terms: (c) => (
-            <Link href="/terms" target="_blank" className="text-accent2 underline-offset-2 hover:underline">
-              {c}
-            </Link>
-          ),
-          privacy: (c) => (
-            <Link href="/privacy" target="_blank" className="text-accent2 underline-offset-2 hover:underline">
-              {c}
-            </Link>
-          ),
-        })}
-      </p>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={onAgree}
-          className="rounded-lg bg-accent px-3.5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent/90"
-        >
-          {t("consentAgree")}
-        </button>
-        {/* Refusing is a real choice with a real destination, not a dead end that
-            leaves them looking at the same screen. */}
-        <button
-          type="button"
-          onClick={onRefuse}
-          className="rounded-lg border border-line px-3.5 py-2.5 text-sm font-medium text-soft transition-colors hover:border-danger hover:text-danger"
-        >
-          {t("consentRefuse")}
-        </button>
-      </div>
-    </section>
-  );
-}
-
-// What a member who refuses can do instead. Refusing has to be a real choice, and a
-// choice with nothing on the other side of it is a wall.
-function Refused({ onBack }: { onBack: () => void }) {
-  const t = useTranslations("Join");
-  return (
-    <section className="mt-6 flex flex-col items-start gap-3 rounded-2xl border border-line bg-card p-5">
-      <h2 className="text-base font-semibold text-ink">{t("refusedTitle")}</h2>
-      <p className="text-sm leading-relaxed text-soft">{t("refusedBody")}</p>
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href="/"
-          className="rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90"
-        >
-          {t("refusedBrowse")}
-        </Link>
-        <button
-          type="button"
-          onClick={onBack}
-          className="rounded-lg border border-line px-3.5 py-2 text-sm font-medium text-soft transition-colors hover:border-accent hover:text-accent"
-        >
-          {t("refusedBack")}
-        </button>
-      </div>
-    </section>
-  );
-}
-
-// Step 2. Normalised as they type, so the thing on screen is the thing being looked
+// Step 1. Normalised as they type, so the thing on screen is the thing being looked
 // up. It matters more here than on `/redeem`: this code was read out in a room or
 // forwarded through three people, and a code that "does not exist" because of a
 // stray space is indistinguishable to a stranger from a dud one.
@@ -224,7 +144,7 @@ function CodeStep({ code, setCode, onNext }: { code: string; setCode: (c: string
   );
 }
 
-// Step 3. Nickname, PIN, and **which of the two things they are doing**.
+// Step 2. Nickname, PIN, and **which of the two things they are doing**.
 //
 // The new/returning choice is not a convenience. A code plus an existing nickname
 // plus a wrong PIN is the same request either way, so without a declared intent the
@@ -342,6 +262,32 @@ function Identity({ code, linked, onBack }: { code: string; linked: boolean; onB
           {flow === "join" ? t("pinHintNew") : t("pinHintReturn")}
         </span>
       </label>
+
+      {/* **The consent record, at the button that gives it.** This replaced a separate
+          consent step (2026-08-26). It names the three facts rather than gesturing at a
+          policy, and the Terms carry the full undertaking one tap away; the version and
+          timestamp are still stored on the Seat and still refused server-side, so the
+          proof does not depend on this paragraph being read. Its wording is pinned to
+          `convex/joinConsent.ts` by `messages/consent.test.ts`: editing it here without
+          minting a new version there fails a test, deliberately, because it would
+          rewrite what already-joined members are recorded as having agreed to.
+
+          Links open in a new tab so a member reading them does not lose the code they
+          arrived with. */}
+      <p className="text-[11.5px] leading-relaxed text-soft">
+        {t.rich("agree", {
+          terms: (c) => (
+            <Link href="/terms" target="_blank" className="text-accent2 underline-offset-2 hover:underline">
+              {c}
+            </Link>
+          ),
+          privacy: (c) => (
+            <Link href="/privacy" target="_blank" className="text-accent2 underline-offset-2 hover:underline">
+              {c}
+            </Link>
+          ),
+        })}
+      </p>
 
       <div className="flex flex-wrap items-center gap-2">
         <button

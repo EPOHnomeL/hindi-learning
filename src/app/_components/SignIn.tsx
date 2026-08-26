@@ -119,6 +119,29 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
             <CheckoutSteps current={1} />
           </div>
         )}
+        {/* **The Organisation Voucher door**, above the form rather than below it and a
+            line rather than a button (2026-08-25). A Seat has no email and no password,
+            so every field below is useless to one: a member who signs out, or whose
+            session finally expires, would otherwise meet a wall with nothing on it for
+            them. Above, because it has to be read BEFORE somebody starts typing into
+            fields that cannot work for them.
+
+            Not shown on `/join` itself, where it would point at the page they are
+            standing on. Kept separate from the voucher prompt below: a Bulk Voucher is
+            redeemed ONTO an account, an Organisation Voucher IS the account, and one
+            line covering both would leave a member guessing which page their code
+            belongs to. */}
+        {!embedded && !path?.startsWith("/join") && (
+          <p className="w-full text-center text-sm text-soft">
+            {t.rich("joinPrompt", {
+              join: (c) => (
+                <Link href="/join" className="text-accent2 underline-offset-2 hover:underline">
+                  {c}
+                </Link>
+              ),
+            })}
+          </p>
+        )}
         <form
           className="flex w-full flex-col gap-3 rounded-2xl border border-line bg-card p-5 shadow-sm sm:p-6"
           onSubmit={async (e) => {
@@ -225,34 +248,6 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
               ),
             })}
           </p>
-        )}
-        {/* **The Organisation Voucher door, and it is a BUTTON.** A Seat has no email
-            and no password, so every field on the form above is useless to one: a
-            member who signs out, or whose session finally expires, met a wall with
-            nothing on it for them. This is the third sign-in method on the platform
-            and it is weighted like one, beside Google and a password, rather than
-            being a sentence somebody has to notice.
-
-            Separate from the voucher prompt above on purpose. The two rails ask for
-            different things and one line covering both would leave a member deciding
-            which of two pages their code belongs to: a Bulk Voucher is redeemed ONTO
-            an account, an Organisation Voucher IS the account. Not shown on `/join`
-            itself, where it would point at the page they are standing on. */}
-        {!embedded && !path?.startsWith("/join") && (
-          <div className="flex w-full flex-col gap-2">
-            <div className="flex items-center gap-3 text-xs text-soft">
-              <span className="h-px flex-1 bg-line" />
-              {t("or")}
-              <span className="h-px flex-1 bg-line" />
-            </div>
-            <Link
-              href="/join"
-              className="flex items-center justify-center gap-2 rounded-lg border border-line bg-card px-3 py-2.5 text-center font-medium text-accent hover:border-gold"
-            >
-              {t("joinCta")}
-            </Link>
-            <p className="text-center text-xs leading-relaxed text-soft">{t("joinPrompt")}</p>
-          </div>
         )}
       </div>
     </div>

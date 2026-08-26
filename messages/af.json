@@ -166,8 +166,7 @@
     "toggleToSignIn": "Het jy reeds ’n rekening? Meld aan",
     "termsAgreement": "Deur ’n rekening te skep, stem jy in tot die <terms>Bepalings</terms> en <privacy>Privaatheidsbeleid</privacy>.",
     "voucherPrompt": "Het jy 'n kode van jou organisasie? <redeem>Los jou geskenkbewys in</redeem>.",
-    "joinPrompt": "Geen e-pos of wagwoord nodig nie. Jy teken aan met 'n bynaam en 'n PIN.",
-    "joinCta": "Gaan voort met 'n kode van jou organisasie"
+    "joinPrompt": "Geen rekening nie? Vir gaste- of organisasie-aanteken, <join>klik hier</join>."
   },
   "Checkout": {
     "referenceLockedTitle": "Hierdie verwysing is deel van die volledige kursus",
@@ -701,27 +700,15 @@
   "Join": {
     "title": "Sluit aan met jou Organisasie-koepon",
     "blurb": "Jou organisasie het jou 'n kode gegee. Tik dit in, kies 'n bynaam en 'n PIN, en jy is binne. Ons vra nooit jou e-posadres nie.",
-    "consentTitle": "Voor jy begin, dit is wat ons hou",
-    "consentLines": [
-      "Ons hou die bynaam en die PIN wat jy kies, en watter lesse jy klaargemaak het, sodat jy op 'n ander foon kan terugkom.",
-      "Jou bynaam hoef nie jou regte naam te wees nie. Ons vra nooit jou e-posadres, jou foonnommer of jou naam nie.",
-      "Niemand kan 'n vergete PIN terugkry nie, ook nie ons nie, so skryf dit neer. Jy kan ons enige tyd vra om jou bynaam en PIN te skrap."
-    ],
-    "consentMore": "Volledige besonderhede is in ons <terms>Bepalings</terms> en <privacy>Privaatheidsbeleid</privacy>.",
-    "consentAgree": "Ek stem saam, laat my in",
-    "consentRefuse": "Nee, dankie",
-    "refusedTitle": "Dit is 'n regte keuse, en niks is gestoor nie",
-    "refusedBody": "Ons kan jou nie 'n plek op die kursus gee sonder om 'n bynaam en 'n PIN te hou nie, want dit is hoe ons weet dit is jy wanneer jy terugkom. Niks is gestoor nie, en jy kan van plan verander. As jy verkies om nie, vra die persoon wat jou die kode gegee het wat hulle anders kan aanbied, of kyk wat anders op die werf is.",
-    "refusedBrowse": "Kyk wat anders hier is",
-    "refusedBack": "Gaan terug",
+    "agree": "Deur aan te sluit stem jy in tot die <terms>Bepalings</terms> en die <privacy>Privaatheidsbeleid</privacy>. Ons spoor jou nie na nie: geen e-posadres, geen foonnommer, geen naam en geen advertensies. Ons hou die bynaam en PIN wat jy kies en die lesse wat jy klaarmaak, sodat jy op 'n ander foon kan terugkom. Niemand kan 'n vergete PIN terugkry nie, so skryf dit neer.",
     "codeLabel": "Jou kode",
     "codePlaceholder": "GRP-XXX-XXX-XXX",
     "continue": "Gaan voort",
     "changeCode": "Verander die kode",
     "usingCode": "Gebruik kode",
     "whichLabel": "Is dit jou eerste keer?",
-    "iAmNew": "Ek is nuut hier",
-    "iAmReturning": "Ek kom terug",
+    "iAmNew": "Registreer",
+    "iAmReturning": "Teken weer aan",
     "nicknameLabel": "Kies 'n bynaam",
     "nicknamePlaceholder": "Enigiets wat jy wil",
     "nicknameHint": "Dit hoef nie jou regte naam te wees nie, en ons verkies dat dit nie is nie. Kies enigiets wat jy sal onthou.",
