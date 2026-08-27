@@ -33,16 +33,21 @@ export const isAdmitted = internalQuery({
 });
 
 // Admit a (normalised) email, idempotently. Inserts the row if absent; if it
-// already exists it's a no-op, except that `isAdmin: true` is applied so the
-// migration/seed can promote an already-admitted email to Admin. `tenantSlug`
+// already exists it's a no-op, except that `isAdmin: true` / `unlimited: true` are
+// applied so the migration/seed can promote an already-admitted email. `tenantSlug`
 // scopes a new row (issue 08 / ADR 0022); on an existing row it's left alone
 // (re-scoping an account's tenant is not an idempotent-admit concern). Shared by
 // `seedEmail`, `addEmail`, and the migration so they normalise identically.
+//
+// Both flags only ever go from absent to true here: an admit is not a revoke, and
+// a bare `addEmail` on an existing Admin must not quietly demote them. Removing
+// either is `removeEmail` + re-admit, or a direct operator run.
 async function admitEmail(
   ctx: MutationCtx,
   email: string,
   isAdmin?: boolean,
   tenantSlug?: string,
+  unlimited?: boolean,
 ): Promise<void> {
   const normalised = normaliseEmail(email);
   const existing = await ctx.db
@@ -50,13 +55,18 @@ async function admitEmail(
     .withIndex("by_email", (q) => q.eq("email", normalised))
     .unique();
   if (existing) {
-    if (isAdmin && !existing.isAdmin) await ctx.db.patch(existing._id, { isAdmin: true });
+    const patch = {
+      ...(isAdmin && !existing.isAdmin ? { isAdmin: true } : {}),
+      ...(unlimited && !existing.unlimited ? { unlimited: true } : {}),
+    };
+    if (Object.keys(patch).length > 0) await ctx.db.patch(existing._id, patch);
     return;
   }
   await ctx.db.insert("whitelist", {
     email: normalised,
     ...(isAdmin ? { isAdmin: true } : {}),
     ...(tenantSlug ? { tenantSlug } : {}),
+    ...(unlimited ? { unlimited: true } : {}),
   });
 }
 
@@ -95,6 +105,31 @@ export async function isCallerAdmin(
   if (!row.tenantSlug) return true;
   // Tenant admin: only their own tenant, and never an unscoped (sys-level) check.
   return tenantSlug !== undefined && row.tenantSlug === tenantSlug;
+}
+
+// May the caller seed courses and fire lessons without the per-user daily caps
+// (ADR 0032)? True for an Admin of either tier, who drives the app and was always
+// exempt, and for a plain member whose Allowlist row carries `unlimited`.
+//
+// This exists because the two cap sites (`content.seedTopic`'s one-course-per-day
+// and `routine.tryAcquireGeneration`'s one-manual-fire-per-day) both asked
+// `isCallerAdmin`, which fused "trust them with volume" to "give them the Admin
+// panel". A heavy author needs the first and must not get the second, so the
+// question the caps ask is now this one. The caps' *purpose* is unchanged: they
+// bound runaway Claude spend by an unknown account, and an `unlimited` row is an
+// explicit operator statement that this account isn't one.
+//
+// Identity is derived server-side (never a client arg), same as `isCallerAdmin`.
+export async function isCallerUncapped(ctx: MutationCtx | QueryCtx): Promise<boolean> {
+  const userId = await getAuthUserId(ctx);
+  if (!userId) return false;
+  const user = await ctx.db.get(userId);
+  if (!user?.email) return false;
+  const row = await ctx.db
+    .query("whitelist")
+    .withIndex("by_email", (q) => q.eq("email", normaliseEmail(user.email!)))
+    .unique();
+  return !!row && (!!row.isAdmin || !!row.unlimited);
 }
 
 // The Admin authorization boundary: every Admin-only function calls this first.
@@ -222,11 +257,22 @@ export const removeEmail = mutation({
 // is therefore closed. Idempotent. `tenantSlug` scopes the row (issue 08 / ADR
 // 0022): omit for a sys admin / default-site member, pass a slug to bootstrap a
 // tenant admin or tenant member.
+//
+// `unlimited` (ADR 0032) is how an uncapped author is granted, and this CLI is
+// deliberately the only way in: there is no Admin-panel toggle, because lifting a
+// cost cap on someone else's account is an operator decision and the panel has no
+// way to record who asked for it. Run:
+//   npx convex run whitelist:seedEmail '{"email":"a@b.com","unlimited":true}'
 export const seedEmail = internalMutation({
-  args: { email: v.string(), isAdmin: v.optional(v.boolean()), tenantSlug: v.optional(v.string()) },
+  args: {
+    email: v.string(),
+    isAdmin: v.optional(v.boolean()),
+    tenantSlug: v.optional(v.string()),
+    unlimited: v.optional(v.boolean()),
+  },
   returns: v.null(),
-  handler: async (ctx, { email, isAdmin, tenantSlug }) => {
-    await admitEmail(ctx, email, isAdmin, tenantSlug);
+  handler: async (ctx, { email, isAdmin, tenantSlug, unlimited }) => {
+    await admitEmail(ctx, email, isAdmin, tenantSlug, unlimited);
     return null;
   },
 });

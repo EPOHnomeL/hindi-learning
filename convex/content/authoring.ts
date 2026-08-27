@@ -6,7 +6,7 @@ import type { Id } from "../_generated/dataModel";
 import { getEditableTopic, getOwnedTopic, SOURCE_LANG, topicBySlug } from "../lib";
 import { assertTenantFlag } from "../tenantFlags";
 import { itemHash, quizStructureMatches } from "../translate";
-import { isCallerAdmin, isEmailAdmitted } from "../whitelist";
+import { isCallerUncapped, isEmailAdmitted } from "../whitelist";
 
 // A learner may seed at most one new course per this window — an anti-abuse / cost
 // cap that mirrors the routine's per-user on-demand cap. Rolling 24h window.
@@ -38,11 +38,13 @@ export const seedTopic = mutation({
     // tenant `seeding` flag (there's no Topic yet at creation, so the tenant comes
     // from the user, not a Topic). No-op for a default-site user (issue 17).
     await assertTenantFlag(ctx, user.tenantSlug, "seeding");
-    // One new course per user per day (issue 08 — bounds Claude usage). The Admin
-    // is exempt (they drive the app and aren't the runaway-usage risk this guards
-    // against, mirroring the routine's on-demand bypass). Checked against the
-    // user's most recent Topic, so their first course is never blocked.
-    if (!(await isCallerAdmin(ctx))) {
+    // One new course per user per day (issue 08, bounds Claude usage). Exempt: an
+    // Admin (they drive the app and aren't the runaway-usage risk this guards
+    // against, mirroring the routine's on-demand bypass) and any member whose
+    // Allowlist row carries `unlimited` (ADR 0032), which grants the volume without
+    // granting the Admin panel. Checked against the user's most recent Topic, so
+    // their first course is never blocked.
+    if (!(await isCallerUncapped(ctx))) {
       const newest = await ctx.db
         .query("topics")
         .withIndex("by_owner", (q) => q.eq("ownerId", userId))

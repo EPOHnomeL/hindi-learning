@@ -14,7 +14,7 @@ import {
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { assertAdmin, getOwnedTopic, topicBySlug } from "./lib";
-import { isCallerAdmin } from "./whitelist";
+import { isCallerAdmin, isCallerUncapped } from "./whitelist";
 
 // The next-lesson Routine (ADR 0008). One cloud Claude Code routine, fired two
 // ways through one gate: a daily Convex cron (`dailyFire`) and the reader button
@@ -362,15 +362,19 @@ export const tryAcquireGeneration = internalMutation({
       }
     }
     // The on-demand button is capped to one manual fire per user per day, across
-    // ALL their Topics — so a learner with several courses can't advance every one
+    // ALL their Topics, so a learner with several courses can't advance every one
     // at once and spike Claude usage (issue 08). The cron (manual=false) is the
-    // primary authoring path and isn't capped. The Admin bypasses the cap: they
-    // drive authoring and aren't the runaway-usage risk it guards against; admin-
-    // ness is derived server-side from the forwarded identity, never a client arg.
-    // Runs whether or not THIS Topic has a lock row yet (the user may have fired a
-    // different Topic), so it sits outside the per-Topic branch above. Checked last
-    // so the per-user scan only runs for an otherwise-acceptable manual fire.
-    if (manual && !(await isCallerAdmin(ctx))) {
+    // primary authoring path and isn't capped. Bypassed by an Admin (they drive
+    // authoring and aren't the runaway-usage risk it guards against) and by an
+    // `unlimited` member (ADR 0032) for the same reason: it rides the same
+    // `isCallerUncapped` question as seedTopic's per-day cap, so an author granted
+    // the volume to seed many courses can also advance them, which is what made
+    // that grant mean anything. Derived server-side from the forwarded identity,
+    // never a client arg. Runs whether or not THIS Topic has a lock row yet (the
+    // user may have fired a different Topic), so it sits outside the per-Topic
+    // branch above. Checked last so the per-user scan only runs for an
+    // otherwise-acceptable manual fire.
+    if (manual && !(await isCallerUncapped(ctx))) {
       const userId = await getAuthUserId(ctx);
       if (userId && (await userFiredManuallyWithinDay(ctx, userId, now))) {
         return { acquired: false, reason: "rate-limited" };

@@ -128,6 +128,27 @@ test("seedTopic caps a non-Admin to one new course per day; the Admin is exempt"
   expect(adminTopics.map((x) => x.slug).sort()).toEqual(["one", "two"]);
 });
 
+test("an `unlimited` Allowlist row lifts the per-day cap without granting Admin", async () => {
+  const t = convexTest(schema, modules);
+  // The grant this exists for: a heavy author who needs to seed many courses in a
+  // sitting, but must NOT get the Admin panel with it (ADR 0032). Two separate
+  // columns on the same row, so neither implies the other.
+  const email = "author@example.com";
+  const author = await seedUser(t, email);
+  await t.mutation(internal.whitelist.seedEmail, { email, unlimited: true });
+  const as = asUser(t, author);
+
+  await as.mutation(api.content.authoring.seedTopic, { title: "One", why: "a" });
+  await as.mutation(api.content.authoring.seedTopic, { title: "Two", why: "b" });
+  await as.mutation(api.content.authoring.seedTopic, { title: "Three", why: "c" });
+  expect((await as.query(api.content.reader.listTopics, {})).map((x) => x.slug).sort()).toEqual(["one", "three", "two"]);
+
+  // Uncapped, but not an Admin: the panel's own gate still says no.
+  expect(await as.query(api.whitelist.amIAdmin, {})).toBe(false);
+  expect(await as.query(api.whitelist.myAdminScope, {})).toEqual({ role: "none", tenantSlug: null });
+  await expect(as.query(api.whitelist.list, {})).rejects.toThrow(/forbidden/);
+});
+
 // editMission (authoring) is exercised alongside publishMission (publish) — this
 // test genuinely crosses both audiences (it's checking that the learner's own
 // edit and the Routine's write-back don't stomp on each other), so it couldn't

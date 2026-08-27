@@ -397,6 +397,30 @@ test("the Admin bypasses the on-demand cooldown", async () => {
   expect(await asUser(t, admin).mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: true });
 });
 
+test("an `unlimited` member bypasses the on-demand cooldown too, without being an Admin", async () => {
+  const t = convexTest(schema, modules);
+  const email = "author@example.com";
+  const author = await seedUser(t, email);
+  await t.mutation(internal.whitelist.seedEmail, { email, unlimited: true });
+  const topicId = await seedTopic(t, author, "hindi");
+  await t.run(async (ctx) => {
+    await ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1" });
+    await ctx.db.insert("progress", { userId: author, topicId, lessonKey: "0001", status: "completed" });
+  });
+  const as = asUser(t, author);
+
+  expect(await as.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: true });
+  await t.run(async (ctx) => {
+    const gen = await ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique();
+    await ctx.db.patch(gen!._id, { status: "idle", startedAt: undefined, claimedAt: undefined, runId: undefined });
+  });
+  // Uncapped (ADR 0032), so the second fire inside the cooldown acquires, exactly
+  // as the Admin's does above. The Admin-only rails stay shut: this is the volume
+  // grant, not a role.
+  expect(await as.mutation(internal.routine.tryAcquireGeneration, { topicSlug: "hindi", manual: true })).toMatchObject({ acquired: true });
+  expect(await as.query(api.whitelist.amIAdmin, {})).toBe(false);
+});
+
 // ---- Generation Run log (generation-observability, issue 01) ----------------
 
 // The durable history the single-flight lock can't give: one immutable

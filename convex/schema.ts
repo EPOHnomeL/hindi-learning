@@ -108,6 +108,11 @@ export default defineSchema({
     email: v.string(),
     isAdmin: v.optional(v.boolean()),
     tenantSlug: v.optional(v.string()),
+    // Lifts the per-user daily caps (one new course / one manual lesson fire) for
+    // a trusted heavy author, WITHOUT making them an Admin (ADR 0032). Admin-ness
+    // used to be the only way to be uncapped, which meant "let them seed freely"
+    // and "give them the Admin panel" were one decision; they are now two columns.
+    unlimited: v.optional(v.boolean()),
   })
     .index("by_email", ["email"])
     // Whitelabel issue 22: the tenant Members section reads a tenant's own rows
