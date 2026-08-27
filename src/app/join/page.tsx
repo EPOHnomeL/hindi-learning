@@ -26,9 +26,17 @@ import { normaliseAccessCode } from "../../../convex/accessCodeFormat";
 // this takes Next's own `searchParams`: there is no hydration timing, no Suspense
 // boundary subtlety, and no dependency on when `<Unauthenticated>` decides to mount
 // its children. If the code is in the URL the server has it, full stop.
-export default async function JoinPage({ searchParams }: { searchParams: Promise<{ code?: string | string[] }> }) {
-  const raw = (await searchParams).code;
-  // A repeated `?code=a&code=b` arrives as an array. Take the first rather than
+//
+// **The param is `voucher`, and it can NEVER be `code`** (2026-08-27, and why the two
+// client-side reads above "did not arrive"): `convexAuthNextjsMiddleware` claims a
+// `?code=` query param on any HTML GET as an OAuth/magic-link code exchange
+// (@convex-dev/auth `handleAuthenticationInRequest`), tries to redeem it, fails, and
+// 307s to the same URL with `code` stripped. The page never sees the param on any
+// name-collision fix short of dropping the middleware, so the link uses a different
+// name. `Editions.tsx` mints the matching `/join?voucher=` URL.
+export default async function JoinPage({ searchParams }: { searchParams: Promise<{ voucher?: string | string[] }> }) {
+  const raw = (await searchParams).voucher;
+  // A repeated `?voucher=a&voucher=b` arrives as an array. Take the first rather than
   // rendering "a,b" into the box, which would look to a member like their code was
   // mangled by us.
   const code = normaliseAccessCode(Array.isArray(raw) ? (raw[0] ?? "") : (raw ?? ""));

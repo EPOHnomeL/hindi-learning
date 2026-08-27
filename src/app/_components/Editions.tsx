@@ -1449,9 +1449,25 @@ function AccessCodeRow({ code }: { code: FunctionReturnType<typeof api.accessCod
   const [origin, setOrigin] = useState("");
   useEffect(() => setOrigin(window.location.origin), []);
   // One code means one URL, and it has to be readable enough to say out loud at a
-  // meeting - which is also why the code itself is grouped in threes.
-  const joinUrl = origin ? `${origin}/join?code=${code.code}` : "";
+  // meeting - which is also why the code itself is grouped in threes. The param is
+  // `voucher`, never `code`: Convex Auth's middleware claims any `?code=` on an HTML
+  // GET as an OAuth code exchange and strips it in a redirect (see join/page.tsx).
+  const joinUrl = origin ? `${origin}/join?voucher=${code.code}` : "";
   const stopped = code.stoppedAt !== null;
+  // Which of the two things was last copied, so each button can say "Copied" on its
+  // own without a second state.
+  const [copied, setCopied] = useState<"code" | "url" | null>(null);
+  const copy = (what: "code" | "url", text: string) => {
+    navigator.clipboard?.writeText(text).then(
+      () => {
+        setCopied(what);
+        setTimeout(() => setCopied(null), 1500);
+      },
+      () => {
+        /* clipboard blocked; the text is on screen to copy by hand */
+      },
+    );
+  };
 
   return (
     <li className={`rounded-lg border px-3 py-2.5 ${stopped ? "border-line bg-hi/40" : "border-line bg-hi"}`}>
@@ -1486,8 +1502,28 @@ function AccessCodeRow({ code }: { code: FunctionReturnType<typeof api.accessCod
           {/* The code and the URL, in full and copyable. The Seller is the only person
               who can tell the organisation where to type it: the platform has no
               member addresses and sends nothing to anybody. */}
-          <p className="mt-2 font-mono text-[13px] font-semibold tracking-widest text-ink">{code.code}</p>
-          {joinUrl && <p className="mt-1 break-all text-[11px] leading-relaxed text-soft">{joinUrl}</p>}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <p className="font-mono text-[13px] font-semibold tracking-widest text-ink">{code.code}</p>
+            <button
+              type="button"
+              onClick={() => copy("code", code.code)}
+              className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[10.5px] font-medium text-soft transition-colors hover:border-accent hover:text-accent"
+            >
+              {copied === "code" ? t("copied") : t("copy")}
+            </button>
+          </div>
+          {joinUrl && (
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <p className="min-w-0 break-all text-[11px] leading-relaxed text-soft">{joinUrl}</p>
+              <button
+                type="button"
+                onClick={() => copy("url", joinUrl)}
+                className="inline-flex items-center gap-1 rounded-lg border border-line px-2 py-1 text-[10.5px] font-medium text-soft transition-colors hover:border-accent hover:text-accent"
+              >
+                <Icon name="link" className="h-3 w-3" /> {copied === "url" ? t("copied") : t("copy")}
+              </button>
+            </div>
+          )}
           <p className="mt-1.5 text-[11.5px] leading-relaxed text-soft">
             {t("accessPerSeat", { price: formatPrice(code.pricePerSeat, "ZAR") })}
           </p>
