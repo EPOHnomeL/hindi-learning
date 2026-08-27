@@ -122,6 +122,118 @@ body {
   }
 }
 
+/* Course setup pane (CoursePanes.CourseSetupPane). The owner waits around ten
+   minutes here for Lesson 1, so this is the one place in the app where motion is
+   load-bearing rather than decorative: a static pane over that long reads as a
+   hung page. Everything below is therefore SLOW and repeating, never attention
+   grabbing, and every animation is suppressed under prefers-reduced-motion (the
+   pane's elapsed counter and stage list still convey progress with no motion at
+   all, so nothing is lost). */
+
+/* The card's own entrance, matching pop-in's vocabulary at a calmer pace. */
+@keyframes setup-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.setup-card {
+  animation: setup-card-in 0.35s ease-out;
+}
+
+/* Two haloes breathing out of phase behind the quill: a wide, slow swell rather
+   than Tailwind's animate-ping, which pulses far too briskly to sit next to for
+   ten minutes. The second copy sets a negative delay to offset it. */
+@keyframes setup-halo {
+  0%,
+  100% {
+    transform: scale(0.9);
+    opacity: 0.55;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.15;
+  }
+}
+.setup-halo {
+  animation: setup-halo 2.4s ease-in-out infinite;
+}
+
+/* The quill bobs and tips as if it were writing. Tiny amplitude on purpose. */
+@keyframes setup-quill {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(3deg);
+  }
+}
+.setup-quill {
+  animation: setup-quill 3.2s ease-in-out infinite;
+}
+
+/* A sheen travelling along the filled part of the progress bar, so the bar reads
+   as working even between the once-a-second width changes. The gradient is laid
+   over the fill's own colour via a pseudo-element, leaving the width transition
+   (which React drives inline) untouched. */
+@keyframes setup-sheen {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+.setup-bar {
+  position: relative;
+  overflow: hidden;
+}
+.setup-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+  animation: setup-sheen 1.8s ease-in-out infinite;
+}
+html[data-theme="dark"] .setup-bar::after {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.22), transparent);
+}
+
+/* The live stage's number badge, pulsing gently so the eye can find "where we
+   are" in the list without reading it. */
+@keyframes setup-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+.setup-dot {
+  animation: setup-dot 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .setup-card,
+  .setup-halo,
+  .setup-quill,
+  .setup-dot,
+  .setup-bar::after {
+    animation: none;
+  }
+  /* Without its travel the sheen would sit as a permanent bright band across the
+     fill, so remove it outright rather than freezing it. */
+  .setup-bar::after {
+    display: none;
+  }
+}
+
 /* Completion celebration reveal (ADR 0015): the certificate card scales+fades in
    once when a learner becomes eligible. `prefers-reduced-motion` skips it (the
    confetti is likewise suppressed in JS), so motion-sensitive users get the card
