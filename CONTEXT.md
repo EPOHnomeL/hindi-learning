@@ -226,7 +226,9 @@ only as a name and a billing contact on the batch: it holds no account, and **[[
 are all it is ever shown.
 _Avoid_: "Voucher Batch" (the name it shipped under, and still its `voucherBatches` table and
 `mintBatch` mutation; renamed in the product on 2026-08-25 to pair with **[[Organisation
-Voucher]]**), Order, bulk purchase, seat pool, licence pack, organisation or team (there is no
+Voucher]]**), "one code each" (the sharing surface's mode label for this rail since 2026-08-27,
+ui-overhaul 15/19; it names the distribution choice on the merged voucher card, not the rail),
+Order, bulk purchase, seat pool, licence pack, organisation or team (there is no
 organisation entity, deliberately), **[[EFT Intent]]** (an intent grants nothing until confirmed; a
 batch grants everything at creation - the opposite), campaign
 
@@ -245,7 +247,9 @@ and a billing contact on the row, as on a batch.
 _Avoid_: "Access Code" (the name it shipped under on 2026-08-23 and still carries in the code:
 the `accessCodes` table, `convex/accessCodes.ts`, `mintAccessCode`. Renamed in the product on
 2026-08-25 because "code" described the string and not the deal; the identifiers were left alone
-rather than migrating a table for a word), **[[Bulk Vouchers]]** (single-use, one per member,
+rather than migrating a table for a word), "one shared code" (the sharing surface's mode label for
+this rail since 2026-08-27, ui-overhaul 15/19; it names the distribution choice on the merged
+voucher card, not the rail), **[[Bulk Vouchers]]** (single-use, one per member,
 billed upfront - an Organisation Voucher is the opposite on all three), enrolment key or PIN in the Moodle/Kahoot sense (those expire or die with a
 session; this grants a lifetime Entitlement), licence, subscription or per-seat plan (there is no
 recurring charge), coupon or discount code (it grants the whole Edition, it does not reduce a price)
