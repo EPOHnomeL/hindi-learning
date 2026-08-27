@@ -6,7 +6,7 @@ A spec (`spec.md` here) for an agent-driven UI/UX overhaul of both learner-facin
 authoring surfaces: visual polish, flow fixes, and mobile experience, grounded in
 Mobbin MCP references, foundation first. Done when every decision needed to open a
 sibling `ui-overhaul-impl` map is resolved, and when the course-management strand
-(tickets 14 to 20) has shipped its two rebuilt surfaces. This effort runs **before**
+(tickets 14 to 22) has shipped its three rebuilt surfaces. This effort runs **before**
 the [reader-experience](../reader-experience/map.md) effort resumes.
 
 ## Notes
@@ -43,9 +43,16 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
   default.** Two stated exceptions, both split from the decisions they carry out so a
   resolved decision never reads as shipped: tickets **07, 08, 10 and 11** provision and
   wire PostHog, because ticket 13 cannot be decided without real usage data and the data
-  does not exist until instrumentation ships; tickets **19 and 20** build the two
+  does not exist until instrumentation ships; tickets **19, 20 and 22** build the three
   course-management surfaces. Same shape as ticket 01 buying Mobbin. Nothing else here
   builds.
+- **Input for ticket 16, which was claimed when ticket 17 resolved.** 17 sent the access
+  roster to a course-scoped Users surface and Teacher Q&A to Course settings, so the
+  container 16 chooses must hold at least three peers at two scopes: sharing is per
+  Edition, Users and Course settings are course-wide. The 20-Edition picker therefore
+  governs one peer rather than the shell. 17 declined to add a blocking edge and left the
+  shape, and the picker's placement, entirely to 16. This note exists rather than a line
+  in 16's body because `sonnet5-ui-overhaul-16` held the claim.
 - **Task tickets carry a `## Todo` checklist**, the shape
   [mobile-reader-todos](../mobile-reader-todos/map.md) uses. Tick items as they land,
   but the `## Answer` is still what resolves the ticket. Decision tickets carry a
@@ -60,6 +67,17 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
 
 <!-- one line per resolved ticket -->
 
+- [Which controls belong to sharing, which to course settings, which to the account](tickets/17-control-boundary.md):
+  **three controls move, not four, and nothing goes to `/settings`.** Teacher Q&A goes to
+  Course settings, losing the `source`-tab guard and the two-line disclaimer that only
+  existed to apologise for its placement. The access roster leaves the per-Edition panel
+  for a **course-scoped Users surface**, language as a row attribute, Editor assignable
+  only to someone already shared with. The seller grant and payout form **stay** inside
+  the collapsed price row: ticket 15 wins over this ticket's own prior. Lesson deletion
+  and the lifecycle stay in Course settings with their arrangement deferred to 18. The
+  fourth finding was that an Editor sees **nothing** today, not "Details only":
+  `e228ba5` (2026-08-23) removed the reader's door and the `owner={false}` branch has been
+  dead code since, so the door returns in the reader.
 - [Which of the six share and sell rails survive, and what does the owner call them](tickets/15-which-rails-survive.md):
   **nothing is retired.** Three groups, each a question: Who can find it (Publish alone,
   because publishing is orthogonal to price), Who you hand it to (Public link, Invite,
