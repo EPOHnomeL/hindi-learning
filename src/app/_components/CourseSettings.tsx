@@ -13,10 +13,21 @@ import { ConfirmDialog, Dialog, IconButton } from "./ui";
 // Edition (`lang`): on a translated Edition it edits that Edition's title &
 // mission (replacing the old title pencil); on the English source it edits the
 // source. The dialog self-resolves the served Edition from `lang` via
-// `courseHeader`, so both entry points just pass a language: the reader passes
-// the Edition being read; the dashboard passes the UI-locale Edition when the
-// course has it (else English). An Edition's Editor may open the dialog too but
-// sees only Details — everything else stays owner-only (`owner`).
+// `courseHeader`, so a caller just passes a language.
+//
+// CORRECTED 2026-08-27 (ui-overhaul 17). This comment used to claim two entry
+// points, the reader and the dashboard, and an Editor who "sees only Details".
+// There is ONE caller: Dashboard.tsx, the owner's course-card kebab, and it never
+// passes `owner`. So the `owner={false}` branch below, the Editor's Details-only
+// view, is currently DEAD CODE: nothing renders it. Commit e228ba5 (2026-08-23)
+// removed the reader's door when it trimmed the reader drawer to lessons,
+// references and resources, and that commit message records the cost in its own
+// words, "a translated Edition Editor loses the Details door".
+//
+// The branch is kept rather than deleted because ui-overhaul 17 decided the door
+// returns in the reader, Details only, gated on the per-Edition `canEdit` that
+// `courseHeader` already computes server side (ADR 0020). Ticket 20 revives it.
+// Everything outside Details stays owner-only.
 export function CourseSettingsDialog({
   topicSlug,
   status,
