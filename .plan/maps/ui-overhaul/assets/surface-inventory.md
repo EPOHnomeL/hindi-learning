@@ -127,6 +127,11 @@ Two facts that frame everything below:
 - **Mobile:** **Effectively broken on touch** — the affordance is hover-only on desktop (`md:`), forced always-visible on mobile, but `designMode` editing on a phone has no toolbar and no keyboard affordances.
 
 ### 19. Editions / translations / publishing / selling dialog
+> **Corrected 2026-08-27:** this file is now **2023 lines**, not 1274. Teacher Q&A,
+> bulk vouchers and the shared organisation code all shipped into it after the survey,
+> which is what triggered the course-management strand (tickets 14 to 20). The counts
+> below are the 2026-08-02 snapshot and are left as written.
+
 - **Files:** `src/app/_components/Editions.tsx` (1274 lines) — `EditionsDialog`, `EditionPicker`, `EditionPanel`, `InviteByEmail`, `AccessRoster`, `AccessRow`, `PublishToggle`, `PublicLinkToggle`, `PayoutDetailsForm`, `SellEdition`, `RetryTranslation`, `RemoveEdition`, `EngineToggle`, `EditionDangerMenu`, `RegenerateLinkConfirm`, `RemoveEditionConfirm`, `RetranslateConfirm`, `AddLanguagePanel`, `EmptyPanel`.
 - **What:** The whole studio in one modal: add language editions, choose translation engine, publish, mint/regenerate public links, invite viewers/editors by email, manage the access roster, set a price and payout bank details, sell, retranslate, delete.
 - **UI state:** **1274 lines and 21 components in a single file, all inside one `Dialog`.** Four separate hand-built confirm dialogs (`RegenerateLinkConfirm`, `RemoveEditionConfirm`, `RetranslateConfirm`, plus `EditionDangerMenu`) despite `ConfirmDialog` existing in `ui.tsx`. Its own listbox/combobox (`EditionPicker`) with filtering, its own badge system (`EditionBadges`), its own skeleton (`EditionsDialogSkeleton`), its own empty state (`EmptyPanel`), its own segmented control (`EngineToggle`). Pricing, payout bank details, and access control — three genuinely different mental models — share one modal body.

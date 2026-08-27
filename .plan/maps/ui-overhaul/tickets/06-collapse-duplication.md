@@ -20,7 +20,7 @@ Once the foundation (ticket 03) names the component set, decide what collapses:
 - **Four near-identical course cards** in `Dashboard.tsx` — one card with variants?
 - **`YwamPotch.tsx`**, a hardcoded-English fork of `Landing.tsx` — do tenant landings
   become data-driven before a second fork exists?
-- The god files — `AdminPanel.tsx` (2255 lines), `Editions.tsx` (1274), `Dashboard.tsx`
+- The god files — `AdminPanel.tsx` (2255 lines), `Editions.tsx` (2023 as of 2026-08-27, 1274 when surveyed), `Dashboard.tsx`
   (959) — does the overhaul split them, and along what seams?
 
 ## Done when
