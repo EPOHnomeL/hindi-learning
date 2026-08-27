@@ -67,6 +67,15 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
 
 <!-- one line per resolved ticket -->
 
+- [Modal, sheet or route, and the phone-first Editions layout inside it](tickets/16-management-shell-prototype.md):
+  **a route at `/courses/[slug]/manage`, one shell at both widths.** Two-row header,
+  back plus an edition button that opens a sheet, over one underlined tab row of four
+  iconed peers: Sharing (per edition), Users, Course settings, and a read-only
+  Dashboard stats tab the operator added from prototype D3's rail. Desktop is the same
+  header over one centered column, no grid, no sidebar. The operator walked the
+  interactive artifact through seven rounds; record and prototype in
+  `assets/manage-shell.md`. The Answer names the `Editions.tsx` seams ticket 19 was
+  waiting on; tickets 23 (Dashboard tab) and 24 (dashboard card) came out of it.
 - [Which controls belong to sharing, which to course settings, which to the account](tickets/17-control-boundary.md):
   **three controls move, not four, and nothing goes to `/settings`.** Teacher Q&A goes to
   Course settings, losing the `source`-tab guard and the two-line disclaimer that only
@@ -118,10 +127,6 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
   [assets/mobile-bottom-nav.md](assets/mobile-bottom-nav.md), including the open
   question of what the in-course lesson list becomes underneath it, which belongs to
   this patch. clears-with: 03
-- **What stays on the dashboard course card.** If ticket 16 turns sharing into a route at
-  `/courses/[slug]/manage`, the per-course action set on the dashboard has somewhere
-  else to be, and `Dashboard.tsx` is 959 lines with four duplicated cards.
-  clears-with: 16
 - **Spec assembly**, folding the resolved decisions into `spec.md` and charting
   `ui-overhaul-impl`. The last patch to clear.
 

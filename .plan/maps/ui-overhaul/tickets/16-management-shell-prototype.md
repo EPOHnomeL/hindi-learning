@@ -65,3 +65,58 @@ the edition picker governing only the Sharing peer.
 Next attempt: show the operator something real (an Artifact, or a prototype they can
 open themselves) **before** writing any of it into the repo, and only write to `assets/`
 once they have actually looked at it and picked.
+
+## Answer
+
+**A route at `/courses/[slug]/manage`, laid out as R1 phone plus D1 desktop, with a
+fourth Dashboard tab.** Decided 2026-08-27 by the operator walking an interactive
+Artifact through seven rounds of reaction; the full round history, every rejected
+alternative and the walkable prototype live in
+[assets/manage-shell.md](../assets/manage-shell.md) and
+[assets/manage-shell-prototype.html](../assets/manage-shell-prototype.html).
+
+The shell, at both widths:
+
+- Header of two rows. Title row: back, "Manage course", and an edition button naming
+  the current edition, which opens a sheet (phone) or centered dialog (desktop)
+  listing every edition with ticks. Under it one underlined tab row. No chips in the
+  header; a one-edition course shows no edition button at all. This is what killed
+  the accepted-but-clunky chip row: two horizontal control rows stacked in one header.
+- Four peer tabs, each with an icon: Sharing (globe), Users (users), Course settings
+  (book), Dashboard (needs a new icon in `icons.tsx`; SVG, never emoji). Sharing is
+  per edition and is the only tab the edition button shows on. The other three are
+  course-wide.
+- Dashboard is read-only course stats (published state, people, editors, editions,
+  price), just that for now. The operator added it after seeing prototype D3's pinned
+  summary rail and choosing the stats over the rail. It is the one piece decided
+  without being prototyped as a tab; ticket 23 builds it and can adjust its interior.
+- Sharing tab: ticket 15's groups in order as plain scrolling sections with small-caps
+  labels. A non-seller sees one "Selling is off" row whose Turn on runs a two-step
+  sheet, payout details then price. The voucher card carries the mode picker with both
+  consequence lines and mints a copyable code.
+- Desktop is the phone given room: same header stretched, one centered column of about
+  600px, sheets become dialogs. The operator rejected a three-column grid, a sidebar,
+  and the rail.
+- Flows are part of the decision: toasts confirm publish and link toggles, invites
+  land as revocable awaiting rows visible in Sharing and Users both.
+
+**The seams `Editions.tsx` (2023 lines, 21 components) splits along**, for ticket 19,
+which is also the Editions half of ticket 06:
+
+1. **The shell**: a new route page owning the header, the edition sheet and the tab
+   row. `EditionsDialog` dissolves into it; `EditionPicker` becomes the edition sheet.
+2. **The Sharing tab**: `PublishToggle` (group one); `PublicLinkToggle` and
+   `InviteByEmail` (group two); `SellEdition` and `PayoutDetailsForm` plus one merged
+   voucher card replacing the six voucher components (`VoucherBatches`,
+   `MintBatchForm`, `BatchRow`, `AccessCodes`, `MintAccessCodeForm`,
+   `AccessCodeRow`) per ticket 15.
+3. **The Users tab**: `AccessRoster` and `AccessRow` leave for the course-scoped
+   surface, ticket 22's build.
+4. **The Course settings tab**: `TeacherQaToggle`, `AddLanguagePanel`,
+   `EditionDangerMenu` with its three confirms, `RetryTranslation`, `RemoveEdition`,
+   `EngineToggle`. Its interior is ticket 18's design and ticket 20's build.
+5. **The Dashboard tab**: new code, ticket 23.
+
+**Evidence: walked in the published Artifact**, interactive at 360px and desktop
+width, seller and 20-edition stress cases toggled. Not walked in the app; no app code
+for this shell exists yet.

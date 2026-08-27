@@ -1,0 +1,1332 @@
+<title>Manage Route, Three Ways</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Spectral+SC:wght@600&display=swap">
+
+<style>
+  /* ---- Lab chrome: cool slate, deliberately NOT the product palette, so the
+         warm paper screens read as the product and this reads as the bench. ---- */
+  :root {
+    --lab-bg: #e6e9ee;
+    --lab-panel: #f7f8fa;
+    --lab-ink: #1b1f26;
+    --lab-soft: #5c6470;
+    --lab-line: #d1d7e0;
+    --lab-accent: #2f5fa8;
+    --lab-on-accent: #ffffff;
+    --lab-yes: #2f7d54;
+    --lab-no: #a34a34;
+    --lab-shadow: 0 1px 2px rgba(20,28,40,.08), 0 12px 32px rgba(20,28,40,.10);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --lab-bg: #0f1216;
+      --lab-panel: #171b21;
+      --lab-ink: #e3e7ec;
+      --lab-soft: #949ca8;
+      --lab-line: #272d36;
+      --lab-accent: #86b0ec;
+      --lab-on-accent: #101720;
+      --lab-yes: #79c295;
+      --lab-no: #e08d72;
+      --lab-shadow: 0 1px 2px rgba(0,0,0,.5), 0 14px 34px rgba(0,0,0,.45);
+    }
+  }
+  :root[data-theme="dark"] {
+    --lab-bg: #0f1216;
+    --lab-panel: #171b21;
+    --lab-ink: #e3e7ec;
+    --lab-soft: #949ca8;
+    --lab-line: #272d36;
+    --lab-accent: #86b0ec;
+    --lab-on-accent: #101720;
+    --lab-yes: #79c295;
+    --lab-no: #e08d72;
+    --lab-shadow: 0 1px 2px rgba(0,0,0,.5), 0 14px 34px rgba(0,0,0,.45);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--lab-bg);
+    color: var(--lab-ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+  h1, h2, h3, p, ul, ol { margin: 0; }
+  :focus-visible { outline: 2px solid var(--lab-accent); outline-offset: 2px; }
+
+  .page { max-width: 1300px; margin: 0 auto; padding: 32px 20px 72px; }
+
+  .masthead { display: flex; flex-direction: column; gap: 10px; max-width: 66ch; }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--lab-soft);
+  }
+  .masthead h1 { font-size: 30px; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  .masthead p { color: var(--lab-soft); font-size: 15.5px; }
+  .masthead p b { color: var(--lab-ink); font-weight: 600; }
+
+  .trylist {
+    margin-top: 4px; display: flex; flex-wrap: wrap; gap: 8px;
+  }
+  .trylist span {
+    font-size: 13px; color: var(--lab-soft);
+    border: 1px solid var(--lab-line); border-radius: 999px;
+    padding: 4px 11px; background: var(--lab-panel);
+  }
+
+  /* ---- controls ---- */
+  .controls {
+    position: sticky; top: 0; z-index: 20;
+    margin: 26px 0 8px;
+    display: flex; flex-wrap: wrap; gap: 14px 26px; align-items: center;
+    padding: 12px 16px;
+    background: color-mix(in oklab, var(--lab-panel) 90%, transparent);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--lab-line); border-radius: 12px;
+    box-shadow: var(--lab-shadow);
+  }
+  .ctl { display: flex; align-items: center; gap: 8px; }
+  .ctl > span {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--lab-soft);
+  }
+  .seg { display: flex; border: 1px solid var(--lab-line); border-radius: 8px; overflow: hidden; }
+  .seg button {
+    font: inherit; font-size: 13.5px;
+    min-height: 38px; padding: 0 13px;
+    background: transparent; color: var(--lab-soft);
+    border: 0; border-left: 1px solid var(--lab-line);
+    cursor: pointer;
+  }
+  .seg button:first-child { border-left: 0; }
+  .seg button[aria-pressed="true"] {
+    background: var(--lab-accent); color: var(--lab-on-accent); font-weight: 500;
+  }
+
+  /* ---- the three columns ---- */
+  .deck {
+    display: grid; grid-template-columns: repeat(3, 392px);
+    gap: 24px; margin-top: 26px;
+    overflow-x: auto; padding-bottom: 10px;
+  }
+  @media (max-width: 820px) { .deck { grid-template-columns: 1fr; overflow-x: visible; } }
+
+  .col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .brief { display: flex; flex-direction: column; gap: 8px; }
+  .brief h2 { font-size: 18px; font-weight: 600; display: flex; align-items: baseline; gap: 9px; }
+  .brief h2 b {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px; font-weight: 500; letter-spacing: .1em;
+    color: var(--lab-accent);
+  }
+  .picktag {
+    align-self: flex-start;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--lab-yes); border: 1px solid var(--lab-yes);
+    border-radius: 999px; padding: 2px 8px;
+  }
+  .thesis { font-size: 14.5px; color: var(--lab-soft); }
+  .brief dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: 13px; }
+  .brief dt {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--lab-soft); padding-top: 3px;
+  }
+  .brief dd { margin: 0; }
+
+  /* ---- phone ---- */
+  .phone {
+    width: 360px; max-width: 100%;
+    border: 1px solid var(--lab-line); border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--lab-shadow);
+    display: flex; flex-direction: column;
+    position: relative;
+  }
+  .urlbar {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 12px;
+    background: color-mix(in oklab, var(--lab-panel) 70%, var(--lab-bg));
+    border-bottom: 1px solid var(--lab-line);
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11px; color: var(--lab-soft);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .urlbar em { font-style: normal; color: var(--lab-ink); }
+  .screen {
+    /* The app's real 14-token contract, verbatim from src/styles/globals.css.
+       No raw hex below this line: tenant theming has to stay expressible. */
+    --color-paper: #fbf7f0; --color-card: #fffdf9; --color-ink: #2b2622;
+    --color-soft: #6b6258; --color-line: #e7ddd4; --color-accent: #9c5b34;
+    --color-accent2: #3f6f5e; --color-gold: #b88a2e; --color-hi: #fbeecb;
+    --color-danger: #b4442f;
+    height: 640px; overflow-y: auto; overscroll-behavior: contain;
+    position: relative;
+    background: var(--color-paper); color: var(--color-ink);
+    font-family: "Spectral", Georgia, "Times New Roman", serif;
+    font-size: 16px; line-height: 1.5;
+  }
+  .screen[data-app="dark"], .overlay[data-app="dark"] {
+    --color-paper: #1b1815; --color-card: #241f1a; --color-ink: #e9e1d4;
+    --color-soft: #a99d8a; --color-line: #3a322a; --color-accent: #dd9863;
+    --color-accent2: #79b39b; --color-gold: #d8ab57; --color-hi: #4a3c1f;
+    --color-danger: #e0785f;
+  }
+
+  /* overlay lives beside the screen so sheets and toasts do not scroll away */
+  .overlay {
+    --color-paper: #fbf7f0; --color-card: #fffdf9; --color-ink: #2b2622;
+    --color-soft: #6b6258; --color-line: #e7ddd4; --color-accent: #9c5b34;
+    --color-accent2: #3f6f5e; --color-gold: #b88a2e; --color-hi: #fbeecb;
+    --color-danger: #b4442f;
+    position: absolute; left: 0; right: 0; bottom: 0; top: 34px;
+    pointer-events: none; z-index: 8;
+    font-family: "Spectral", Georgia, serif; color: var(--color-ink);
+    display: flex; flex-direction: column; justify-content: flex-end;
+    overflow: hidden;
+  }
+  .overlay .scrim {
+    position: absolute; inset: 0;
+    background: rgba(30, 24, 18, .38);
+    opacity: 0; transition: opacity .18s ease; pointer-events: none;
+  }
+  .overlay.open { pointer-events: auto; }
+  .overlay.open .scrim { opacity: 1; pointer-events: auto; }
+  .sheet {
+    position: relative;
+    background: var(--color-card);
+    border-top: 1px solid var(--color-line);
+    border-radius: 16px 16px 0 0;
+    padding: 10px 16px 20px;
+    transform: translateY(103%);
+    transition: transform .22s ease;
+    max-height: 86%;
+    display: flex; flex-direction: column; gap: 12px;
+    overflow-y: auto;
+  }
+  .overlay.open .sheet { transform: translateY(0); }
+  @media (prefers-reduced-motion: reduce) {
+    .overlay .scrim, .sheet { transition: none; }
+  }
+  .grab {
+    width: 36px; height: 4px; border-radius: 999px;
+    background: var(--color-line); margin: 0 auto 2px;
+  }
+  .sheet h4 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
+  .sheet .s-sub { margin-top: -6px; }
+
+  .toast {
+    position: absolute; left: 16px; right: 16px; bottom: 14px;
+    display: flex; align-items: center; gap: 8px; justify-content: center;
+    background: var(--color-ink); color: var(--color-paper);
+    border-radius: 10px; padding: 11px 14px;
+    font-family: "IBM Plex Sans", sans-serif; font-size: 13.5px;
+    opacity: 0; transform: translateY(8px);
+    transition: opacity .18s ease, transform .18s ease;
+    pointer-events: none; z-index: 9;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast svg { color: var(--color-accent2); flex: 0 0 auto; }
+  .screen[data-app="dark"] + .overlay .toast,
+  .overlay[data-app="dark"] .toast { background: var(--color-hi); color: var(--color-ink); }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+
+  /* ---- shared screen primitives (product side) ---- */
+  .screen button, .screen input, .overlay button, .overlay input { font: inherit; color: inherit; }
+
+  .glabel {
+    font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+    color: var(--color-soft); font-family: "IBM Plex Sans", sans-serif; font-weight: 500;
+  }
+  .sc-label {
+    font-family: "Spectral SC", "Spectral", serif;
+    font-size: 11.5px; font-weight: 600; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--color-soft);
+  }
+  .gsection { display: flex; flex-direction: column; gap: 10px; }
+
+  .card {
+    background: var(--color-card); border: 1px solid var(--color-line);
+    border-radius: 10px; padding: 10px 14px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .row { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+  .row .grow { flex: 1; min-width: 0; }
+  .rlabel { font-size: 16px; }
+  .rval { font-size: 13px; color: var(--color-soft); }
+  .rval.on { color: var(--color-accent2); }
+  .rval.wait { color: var(--color-gold); }
+
+  .sw {
+    flex: 0 0 auto; width: 46px; height: 28px; border-radius: 999px;
+    border: 1px solid var(--color-line); background: var(--color-paper);
+    position: relative; cursor: pointer; padding: 0;
+  }
+  .sw::after {
+    content: ""; position: absolute; top: 2px; left: 2px;
+    width: 22px; height: 22px; border-radius: 999px;
+    background: var(--color-soft); transition: transform .18s ease, background .18s ease;
+  }
+  .sw[aria-checked="true"] {
+    background: color-mix(in oklab, var(--color-accent2) 20%, var(--color-card));
+    border-color: var(--color-accent2);
+  }
+  .sw[aria-checked="true"]::after { transform: translateX(18px); background: var(--color-accent2); }
+  @media (prefers-reduced-motion: reduce) { .sw::after { transition: none; } }
+
+  .btn {
+    min-height: 44px; padding: 0 14px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--color-line); background: var(--color-card);
+    font-size: 15px;
+  }
+  .btn.primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-card); }
+  .btn.quiet { background: none; border: 0; color: var(--color-accent); padding: 0 4px; min-height: 44px; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 13px; color: var(--color-soft); font-family: "IBM Plex Sans", sans-serif; }
+  .field input {
+    min-height: 44px; border: 1px solid var(--color-line); border-radius: 8px;
+    padding: 0 12px; background: var(--color-paper); width: 100%;
+  }
+  .field input:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+
+  .steps {
+    display: flex; gap: 6px; align-items: center;
+    font-family: "IBM Plex Sans", sans-serif; font-size: 12px; color: var(--color-soft);
+  }
+  .steps i {
+    font-style: normal; width: 22px; height: 22px; border-radius: 999px;
+    display: inline-grid; place-items: center;
+    border: 1px solid var(--color-line); background: var(--color-paper);
+  }
+  .steps i.on { border-color: var(--color-accent); background: var(--color-accent); color: var(--color-card); }
+  .steps i.done { border-color: var(--color-accent2); color: var(--color-accent2); }
+
+  .link-copy {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid var(--color-line); border-radius: 8px;
+    padding: 0 4px 0 10px; min-height: 44px;
+    background: var(--color-paper);
+    font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px;
+    color: var(--color-soft);
+  }
+  .link-copy span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .codecard {
+    display: flex; align-items: center; gap: 10px;
+    border: 1px dashed var(--color-gold); border-radius: 8px;
+    padding: 8px 6px 8px 12px; background: color-mix(in oklab, var(--color-gold) 7%, var(--color-card));
+  }
+  .codecard b {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 15px; letter-spacing: .06em; font-weight: 500; flex: 1;
+  }
+
+  .note { font-size: 13px; color: var(--color-soft); }
+  .pill {
+    display: inline-flex; align-items: center; gap: 5px; align-self: flex-start;
+    font-size: 12px; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--color-accent2); color: var(--color-accent2);
+    font-family: "IBM Plex Sans", sans-serif;
+  }
+  .pill.off { border-color: var(--color-line); color: var(--color-soft); }
+
+  .vmode { display: flex; flex-direction: column; border: 1px solid var(--color-line); border-radius: 8px; overflow: hidden; }
+  .vmode button {
+    display: flex; gap: 10px; text-align: left; align-items: flex-start;
+    padding: 11px 12px; background: var(--color-paper); border: 0;
+    border-top: 1px solid var(--color-line); cursor: pointer;
+  }
+  .vmode button:first-child { border-top: 0; }
+  .vmode button[aria-pressed="true"] { background: color-mix(in oklab, var(--color-accent) 8%, var(--color-card)); }
+  .vmode .dot {
+    flex: 0 0 auto; width: 16px; height: 16px; margin-top: 5px; border-radius: 999px;
+    border: 1px solid var(--color-soft); background: var(--color-card);
+  }
+  .vmode button[aria-pressed="true"] .dot {
+    border-color: var(--color-accent); background: var(--color-accent);
+    box-shadow: inset 0 0 0 3px var(--color-card);
+  }
+  .vmode .mt { font-size: 15px; }
+  .vmode .mc { font-size: 12.5px; color: var(--color-soft); }
+
+  .roster { display: flex; flex-direction: column; }
+  .roster .r {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0; min-height: 48px;
+    border-top: 1px solid var(--color-line);
+  }
+  .roster .r:first-child { border-top: 0; }
+  .av {
+    flex: 0 0 auto; width: 32px; height: 32px; border-radius: 999px;
+    background: var(--color-hi); color: var(--color-accent);
+    display: grid; place-items: center; font-size: 13px; font-weight: 600;
+  }
+
+  /* ---- the chosen shell: header, tabs, picker ---- */
+  .b-head {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--color-paper); padding: 14px 16px 0;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .b-titlerow { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .b-back {
+    flex: none; width: 34px; height: 34px; border-radius: 999px; border: 0;
+    background: var(--color-hi); color: var(--color-accent);
+    display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .b-titlerow h3 { font-size: 16px; font-weight: 600; flex: 1; min-width: 0; }
+  .b-tabs { display: flex; gap: 21px; }
+  .b-tab {
+    appearance: none; background: none; border: 0; font-family: inherit;
+    font-size: 13.5px; font-weight: 600; color: var(--color-soft);
+    padding: 0 1px 10px; cursor: pointer; position: relative; min-height: 44px;
+  }
+  .b-tab[aria-selected="true"] { color: var(--color-accent); }
+  .b-tab[aria-selected="true"]::after {
+    content: ""; position: absolute; left: 0; right: 0; bottom: -1px;
+    height: 2px; border-radius: 2px 2px 0 0; background: var(--color-accent);
+  }
+  .b-body { padding: 18px 16px 28px; display: flex; flex-direction: column; gap: 24px; }
+
+  /* edition disclosure button, shared by R1's title row and R3's condensed state */
+  .edbtn {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid var(--color-line); border-radius: 999px;
+    background: var(--color-card); color: var(--color-accent);
+    font-size: 13px; font-weight: 600; font-family: inherit;
+    min-height: 34px; padding: 0 8px 0 12px; cursor: pointer;
+    white-space: nowrap; flex: none;
+  }
+  .edbtn svg { color: var(--color-soft); }
+
+  /* R2: edition chips inside the summary card */
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .langpill {
+    flex: none; border: 1px solid var(--color-line); border-radius: 9px;
+    padding: 0 11px; min-height: 36px; font-size: 12.5px; font-weight: 600;
+    color: var(--color-soft); background: var(--color-card); cursor: pointer;
+    font-family: inherit; white-space: nowrap;
+  }
+  .langpill[aria-pressed="true"] {
+    border-color: var(--color-accent); color: var(--color-accent);
+    background: color-mix(in oklab, var(--color-accent) 12%, transparent);
+  }
+
+  .summary {
+    background: var(--color-card); border: 1px solid var(--color-line);
+    border-radius: 12px; padding: 14px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .summary p { font-size: 17px; line-height: 1.45; }
+  .summary p b { font-weight: 600; color: var(--color-accent); }
+
+  /* R3: picker collapses into the title row once you scroll */
+  .r3head .b-picker { overflow: hidden; max-height: 60px; opacity: 1; transition: max-height .2s ease, opacity .15s ease; }
+  .r3head.cond .b-picker { max-height: 0; opacity: 0; pointer-events: none; }
+  .r3head .edbtn { display: none; }
+  .r3head.cond .edbtn { display: inline-flex; }
+  @media (prefers-reduced-motion: reduce) { .r3head .b-picker { transition: none; } }
+  .b-picker { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 12px; scrollbar-width: none; }
+  .b-picker::-webkit-scrollbar { display: none; }
+  .b-picker { margin-top: 12px; }
+  .b-head .b-picker { margin-top: 0; padding-top: 12px; }
+
+  /* edition sheet rows */
+  .edlist { display: flex; flex-direction: column; max-height: 380px; overflow-y: auto; }
+  .edlist button {
+    display: flex; align-items: center; gap: 10px;
+    min-height: 48px; padding: 4px 2px; background: none; border: 0;
+    border-top: 1px solid var(--color-line); text-align: left; cursor: pointer;
+    font-size: 16px;
+  }
+  .edlist button:first-child { border-top: 0; }
+  .edlist .tick { margin-left: auto; color: var(--color-accent); opacity: 0; }
+  .edlist button[aria-pressed="true"] .tick { opacity: 1; }
+
+  /* ---- R1 on the desktop, three takes ---- */
+  .deskwrap { margin-top: 48px; display: flex; flex-direction: column; gap: 26px; }
+  .deskwrap .brief { max-width: 70ch; }
+  .deskitem { display: flex; flex-direction: column; gap: 12px; }
+  .deskframe {
+    border: 1px solid var(--lab-line); border-radius: 16px;
+    overflow: hidden; box-shadow: var(--lab-shadow);
+    position: relative;
+  }
+  .screen.desk { height: 600px; }
+
+  /* D1 + D3: the phone header, stretched */
+  .d-head {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--color-paper);
+    border-bottom: 1px solid var(--color-line);
+    padding: 16px 40px 0;
+  }
+  .d-col { max-width: 600px; margin: 0 auto; padding: 26px 40px 44px; display: flex; flex-direction: column; gap: 24px; }
+
+  /* D2: sidebar */
+  .d2 { display: flex; min-height: 100%; align-items: stretch; }
+  .d2-rail {
+    flex: 0 0 218px; position: sticky; top: 0; align-self: flex-start;
+    padding: 18px 14px; display: flex; flex-direction: column; gap: 4px;
+    border-right: 1px solid var(--color-line); min-height: 600px;
+  }
+  .d2-rail .b-back { margin: 0 0 14px 4px; }
+  .d2-item {
+    display: flex; align-items: center; gap: 10px;
+    min-height: 44px; padding: 0 12px; border-radius: 8px;
+    background: none; border: 0; cursor: pointer; text-align: left;
+    font-size: 15px; color: var(--color-soft); width: 100%;
+  }
+  .d2-item svg { flex: 0 0 auto; }
+  .d2-item[aria-selected="true"] {
+    background: var(--color-hi); color: var(--color-accent); font-weight: 600;
+  }
+  .d2-main { flex: 1; min-width: 0; }
+  .d2-mainhead {
+    position: sticky; top: 0; z-index: 5;
+    display: flex; align-items: center; gap: 12px;
+    background: var(--color-paper); border-bottom: 1px solid var(--color-line);
+    padding: 16px 36px;
+  }
+  .d2-mainhead h3 { font-size: 17px; font-weight: 600; flex: 1; }
+  .d2-body { max-width: 640px; padding: 26px 36px 44px; display: flex; flex-direction: column; gap: 24px; }
+
+  /* D3: working column + pinned summary rail */
+  .d3-body {
+    display: grid; grid-template-columns: minmax(0, 600px) 280px;
+    gap: 36px; justify-content: center;
+    padding: 26px 40px 44px;
+  }
+  .d3-main { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+  .d3-rail { position: sticky; top: 118px; align-self: flex-start; display: flex; flex-direction: column; gap: 12px; }
+  .d3-rail .facts { display: flex; flex-direction: column; }
+  .d3-rail .facts div {
+    display: flex; justify-content: space-between; gap: 12px;
+    padding: 8px 0; border-top: 1px solid var(--color-line);
+    font-size: 13.5px;
+  }
+  .d3-rail .facts div:first-child { border-top: 0; }
+  .d3-rail .facts span { color: var(--color-soft); }
+  .d3-rail .facts b { font-weight: 600; }
+
+  /* sheets become centered dialogs on the desktop frame */
+  .overlay.deskov { justify-content: center; align-items: center; }
+  .overlay.deskov .sheet {
+    border: 1px solid var(--color-line); border-radius: 14px;
+    width: 440px; max-width: calc(100% - 80px); max-height: 78%;
+    transform: none; opacity: 0; transition: opacity .16s ease;
+    padding-top: 16px;
+  }
+  .overlay.deskov.open .sheet { opacity: 1; }
+  .overlay.deskov .grab { display: none; }
+  .overlay.deskov .toast { left: 50%; right: auto; transform: translateX(-50%) translateY(8px); min-width: 260px; }
+  .overlay.deskov .toast.show { transform: translateX(-50%) translateY(0); }
+  @media (prefers-reduced-motion: reduce) { .overlay.deskov .sheet { transition: none; } }
+
+  /* ---- comparison ---- */
+  .compare { margin-top: 48px; }
+  .compare h2 { font-size: 21px; font-weight: 600; margin-bottom: 4px; }
+  .compare > p { color: var(--lab-soft); font-size: 14.5px; max-width: 66ch; }
+  .tw { overflow-x: auto; margin-top: 16px; border: 1px solid var(--lab-line); border-radius: 12px; background: var(--lab-panel); }
+  table { border-collapse: collapse; width: 100%; min-width: 680px; font-size: 14px; }
+  th, td { text-align: left; padding: 11px 14px; border-top: 1px solid var(--lab-line); vertical-align: top; }
+  thead th { border-top: 0; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--lab-soft); font-weight: 500; font-family: "IBM Plex Mono", monospace; }
+  tbody th { font-weight: 500; color: var(--lab-soft); width: 210px; }
+  .yes { color: var(--lab-yes); } .no { color: var(--lab-no); }
+  .foot { margin-top: 36px; font-size: 13.5px; color: var(--lab-soft); max-width: 72ch; display: flex; flex-direction: column; gap: 10px; }
+  code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .92em; }
+</style>
+
+<div class="page">
+  <header class="masthead">
+    <div class="eyebrow">ui-overhaul &middot; ticket 16 &middot; prototype, round three</div>
+    <h1>The tab row won. Now make it feel good on a phone.</h1>
+    <p>
+      Same bones you approved: one route, one underlined tab row for Sharing / Users / Settings, the
+      three groups as plain scrolling sections. Each column below fixes the phone problems a
+      different way, and this round the <b>flows are real</b>: everything below is a working walk-through,
+      not a still. <b>R1 is your pick</b>; three desktop takes of it are below the phones.
+    </p>
+    <div class="trylist" aria-label="Flows to try in every phone">
+      <span>Flip Publish</span>
+      <span>Copy the link</span>
+      <span>Invite someone</span>
+      <span>Turn on selling (two steps)</span>
+      <span>Make a voucher code</span>
+      <span>Switch edition</span>
+    </div>
+  </header>
+
+  <div class="controls" role="group" aria-label="Prototype conditions">
+    <div class="ctl">
+      <span id="lbl-seller">Seller</span>
+      <div class="seg" role="group" aria-labelledby="lbl-seller">
+        <button type="button" data-set="seller" data-val="0">Not a seller</button>
+        <button type="button" data-set="seller" data-val="1">Ready seller</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <span id="lbl-ed">Editions</span>
+      <div class="seg" role="group" aria-labelledby="lbl-ed">
+        <button type="button" data-set="editions" data-val="2">2</button>
+        <button type="button" data-set="editions" data-val="20">20</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <span id="lbl-th">App theme</span>
+      <div class="seg" role="group" aria-labelledby="lbl-th">
+        <button type="button" data-set="app" data-val="light">Paper</button>
+        <button type="button" data-set="app" data-val="dark">Dark</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="deck" id="deck"></div>
+
+  <section class="deskwrap" id="desk" aria-label="R1 on the desktop, three takes">
+    <div class="brief">
+      <h2>R1 on the desktop, three takes</h2>
+      <p class="thesis">
+        Same R1 shell, three different desktop structures. The first spreads nothing out. The second
+        turns the tabs into a sidebar. The third keeps one working column and adds a summary rail.
+        Each frame has its own state, and every flow works in all of them.
+      </p>
+    </div>
+
+    <div class="deskitem">
+      <div class="brief">
+        <h2><b>D1</b>One calm column</h2>
+        <p class="thesis">
+          The phone layout, given room and nothing else: the same two-row header stretched across
+          the top, the content in one centered column. Managing a course is a settings page, not a
+          dashboard, so width buys margins, not more columns.
+        </p>
+      </div>
+      <div class="deskframe">
+        <div class="urlbar" data-url="D1"></div>
+        <div class="screen desk" data-screen="D1" tabindex="0" role="group"
+          aria-label="Desktop take D1, one calm column"></div>
+        <div class="overlay deskov" data-ov="D1"><div class="sheetmount"></div>
+        <div class="toast" data-toast="D1" role="status"></div></div>
+      </div>
+    </div>
+
+    <div class="deskitem">
+      <div class="brief">
+        <h2><b>D2</b>Sidebar peers</h2>
+        <p class="thesis">
+          The tab row becomes a left rail: Sharing, Users, Settings as icon rows, always visible.
+          The content keeps one column, headed by the course name and the edition button. The
+          classic desktop management pattern, and the biggest departure from the phone.
+        </p>
+      </div>
+      <div class="deskframe">
+        <div class="urlbar" data-url="D2"></div>
+        <div class="screen desk" data-screen="D2" tabindex="0" role="group"
+          aria-label="Desktop take D2, sidebar peers"></div>
+        <div class="overlay deskov" data-ov="D2"><div class="sheetmount"></div>
+        <div class="toast" data-toast="D2" role="status"></div></div>
+      </div>
+    </div>
+
+    <div class="deskitem">
+      <div class="brief">
+        <h2><b>D3</b>Column plus summary rail</h2>
+        <p class="thesis">
+          The phone header and one working column, plus what the desktop uniquely has room for: a
+          quiet right rail stating what is true right now, pinned while you scroll. The controls
+          stay in one predictable line; the rail is read, never operated.
+        </p>
+      </div>
+      <div class="deskframe">
+        <div class="urlbar" data-url="D3"></div>
+        <div class="screen desk" data-screen="D3" tabindex="0" role="group"
+          aria-label="Desktop take D3, column plus summary rail"></div>
+        <div class="overlay deskov" data-ov="D3"><div class="sheetmount"></div>
+        <div class="toast" data-toast="D3" role="status"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="compare">
+    <h2>What each refinement trades</h2>
+    <p>
+      All three keep the approved tab row. The differences are where the edition picker lives and
+      what the owner sees first, judged at 360px with the seller and 20-edition stress cases on.
+    </p>
+    <div class="tw">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">R1 &middot; Edition in the title</th>
+            <th scope="col">R2 &middot; Summary first</th>
+            <th scope="col">R3 &middot; Condense on scroll</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Header rows at rest</th>
+            <td class="yes">Two, title and tabs, never more</td>
+            <td class="yes">Two, title and tabs, never more</td>
+            <td class="no">Three until you scroll, then two</td>
+          </tr>
+          <tr>
+            <th scope="row">Where the edition picker went</th>
+            <td>A named button in the title, opening a bottom sheet</td>
+            <td>Chips inside the summary card, part of the content</td>
+            <td>Stays where you approved it, folds into the title on scroll</td>
+          </tr>
+          <tr>
+            <th scope="row">Switching among 20 editions</th>
+            <td class="yes">One tap, a full-height list with ticks</td>
+            <td class="no">Sideways chip scroll inside a card</td>
+            <td>Chips at rest, sheet once condensed</td>
+          </tr>
+          <tr>
+            <th scope="row">Answers "what is true right now"</th>
+            <td class="no">Not without reading the groups</td>
+            <td class="yes">One sentence before any control</td>
+            <td class="no">Not without reading the groups</td>
+          </tr>
+          <tr>
+            <th scope="row">For the one-language owner</th>
+            <td>Shows a picker button they never need</td>
+            <td class="yes">Chips hide below two editions, zero picker chrome</td>
+            <td>Shows the chip row they never need</td>
+          </tr>
+          <tr>
+            <th scope="row">Change from what you approved</th>
+            <td>Moderate, the picker moved and changed form</td>
+            <td class="no">Largest, a new summary block leads the tab</td>
+            <td class="yes">Smallest, rest state is pixel-for-pixel the redo</td>
+          </tr>
+          <tr>
+            <th scope="row">Biggest risk</th>
+            <td>The edition name in the title can read as the course name</td>
+            <td>The summary pushes Publish below the first fold on small phones</td>
+            <td>Scroll-linked header motion needs care next to iOS toolbar collapse</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="foot">
+    <p>
+      <b>Shared by all three, so not up for grabs here:</b> the flows. Publish confirms with a toast.
+      Invites go through a sheet and land as awaiting rows. Turning on selling is a two-step sheet,
+      payout details then price, and only then does the cost group unfold. Vouchers pick a mode,
+      then mint a code you can copy. If a flow feels wrong, that is a finding about every variant.
+    </p>
+    <p>
+      Palette and type are the app's own: the 14-token contract from <code>src/styles/globals.css</code>
+      in both light and dark, Spectral for the product, icon paths lifted from
+      <code>src/app/_components/icons.tsx</code>. The slate chrome around the phones is the lab, not
+      the product. Nothing on this page is in the repo yet.
+    </p>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- icons: the real paths from icons.tsx ---------- */
+  var ICON = {
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>',
+    users: '<path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-6A3.5 3.5 0 0 0 4 18.5V20"/><circle cx="10.5" cy="8" r="3.5"/><path d="M20 20v-1.5a3.5 3.5 0 0 0-2.6-3.4"/><path d="M15.5 4.6a3.5 3.5 0 0 1 0 6.8"/>',
+    book: '<path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H20"/>',
+    tag: '<path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.8 8.8a2 2 0 0 0 2.8 0l6.4-6.4a2 2 0 0 0 0-2.8z"/><circle cx="7.5" cy="7.5" r="1.1"/>',
+    chevron: '<path d="M6 9l6 6 6-6"/>',
+    link: '<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1.5-1.5"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    x: '<path d="M18 6 6 18M6 6l12 12"/>'
+  };
+  function svg(name, size, cls) {
+    return '<svg class="' + (cls || '') + '" width="' + (size || 20) + '" height="' + (size || 20) +
+      '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[name] + '</svg>';
+  }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+  /* ---------- conditions + per-variant state ---------- */
+  var cond = { seller: 0, editions: 2, app: 'light' };
+
+  var EDITIONS = ['Hindi', 'English', 'Zulu', 'Afrikaans', 'Sotho', 'Xhosa', 'Tswana', 'Venda',
+    'Tsonga', 'Swati', 'Ndebele', 'Portuguese', 'French', 'Swahili', 'Shona', 'Chichewa',
+    'Arabic', 'Urdu', 'Tamil', 'Spanish'];
+
+  var ROSTER = [
+    { n: 'Thandi Mokoena', e: 'thandi@ymail.com', r: 'Editor', ed: 'Hindi' },
+    { n: 'Sipho Dlamini', e: 'sipho.d@gmail.com', r: 'Editor', ed: 'English' },
+    { n: 'Grace Naidoo', e: 'grace.n@outlook.com', r: 'Learner', ed: 'Hindi' },
+    { n: 'Pieter van Wyk', e: 'pieter@vwyk.co.za', r: 'Learner', ed: 'Hindi' },
+    { n: 'Amina Patel', e: 'amina.p@gmail.com', r: 'Learner', ed: 'English' },
+    { n: 'Lerato Sithole', e: 'lerato@webmail.co.za', r: 'Learner', ed: 'Hindi' }
+  ];
+
+  function blankState() {
+    return {
+      tab: 'sharing', ed: 0, publish: true, pub: true,
+      voucher: 'shared', code: null,
+      sellerOn: false, onboardStep: 1,
+      invites: [], sheet: null
+    };
+  }
+  var V = {
+    R1: blankState(), R2: blankState(), R3: blankState(),
+    D1: blankState(), D2: blankState(), D3: blankState()
+  };
+
+  function eds() { return EDITIONS.slice(0, cond.editions); }
+  function money() { return 'R450'; }
+  function isSeller(v) { return cond.seller === 1 || V[v].sellerOn; }
+
+  /* ---------- toast ---------- */
+  var toastTimers = {};
+  function toast(v, msg) {
+    var el = document.querySelector('.toast[data-toast="' + v + '"]');
+    if (!el) { return; }
+    el.innerHTML = svg('check', 16) + esc(msg);
+    el.classList.add('show');
+    clearTimeout(toastTimers[v]);
+    toastTimers[v] = setTimeout(function () { el.classList.remove('show'); }, 2200);
+  }
+
+  /* ---------- shared product fragments ---------- */
+  function publishRow(v) {
+    var s = V[v];
+    return '<div class="card"><div class="row">' +
+      '<div class="grow"><div class="rlabel">Publish this edition</div>' +
+      '<div class="rval' + (s.publish ? ' on' : '') + '">' +
+      (s.publish ? 'Live since 12 Aug' : 'Nobody can reach it') + '</div></div>' +
+      '<button type="button" class="sw" role="switch" aria-checked="' + s.publish +
+      '" aria-label="Publish this edition" data-v="' + v + '" data-act="publish"></button>' +
+      '</div></div>';
+  }
+
+  function handCard(v) {
+    var s = V[v];
+    var out = '<div class="card">';
+    out += '<div class="row"><div class="grow"><div class="rlabel">Public link</div>' +
+      '<div class="rval' + (s.pub ? ' on' : '') + '">' +
+      (s.pub ? 'Anyone with the link can join' : 'Off') + '</div></div>' +
+      '<button type="button" class="sw" role="switch" aria-checked="' + s.pub +
+      '" aria-label="Public link" data-v="' + v + '" data-act="pub"></button></div>';
+    if (s.pub) {
+      out += '<div class="link-copy"><span>my-course.app/j/7Kq2xV</span>' +
+        '<button type="button" class="btn quiet" data-v="' + v + '" data-act="copylink">Copy</button></div>';
+    }
+    out += '</div>';
+
+    out += '<div class="card">';
+    out += '<div class="row"><div class="grow">' +
+      '<div class="rlabel">Invite by email</div>' +
+      '<div class="rval">Goes straight to this edition</div></div>' +
+      '<button type="button" class="btn" aria-label="Invite someone" data-v="' + v +
+      '" data-act="sheet" data-i="invite">' + svg('plus', 18) + '</button></div>';
+    s.invites.forEach(function (em) {
+      out += '<div class="row" style="border-top:1px solid var(--color-line);min-height:40px">' +
+        '<div class="grow"><div class="rval" style="font-size:14px;color:var(--color-ink)">' + esc(em) + '</div>' +
+        '<div class="rval wait">Invited, awaiting reply</div></div>' +
+        '<button type="button" class="btn quiet" data-v="' + v + '" data-act="uninvite" data-i="' + esc(em) + '">Revoke</button></div>';
+    });
+    out += '</div>';
+    return out;
+  }
+
+  function costCard(v) {
+    var s = V[v];
+    if (!isSeller(v)) {
+      return '<div class="card">' +
+        '<div class="row"><div class="grow"><div class="rlabel">Selling is off</div>' +
+        '<div class="rval">This edition is free to anyone you hand it to</div></div>' +
+        '<button type="button" class="btn" data-v="' + v + '" data-act="sheet" data-i="onboard">Turn on</button></div>' +
+        '<div class="note">Turning it on asks for your payout details once, then a price and ' +
+        'vouchers appear here. Payouts run every second Tuesday.</div>' +
+        '</div>';
+    }
+    var out = '<div class="card"><div class="row">' +
+      '<span style="color:var(--color-gold)">' + svg('tag', 20) + '</span>' +
+      '<div class="grow"><div class="rlabel">Price</div>' +
+      '<div class="rval on">' + money() + ' once off</div></div>' +
+      '<button type="button" class="btn quiet">Change</button></div></div>';
+
+    out += '<div class="card">' +
+      '<div class="row"><div class="grow"><div class="rlabel">Voucher</div>' +
+      '<div class="rval">Lets someone in without paying</div></div></div>' +
+      voucherModes(v) +
+      (s.code
+        ? '<div class="codecard"><b>' + esc(s.code) + '</b>' +
+          '<button type="button" class="btn quiet" data-v="' + v + '" data-act="copycode">Copy</button></div>'
+        : '') +
+      '<button type="button" class="btn" data-v="' + v + '" data-act="sheet" data-i="voucher">Make a ' +
+      (s.voucher === 'shared' ? 'shared code' : 'batch of codes') + '</button>' +
+      '</div>';
+    return out;
+  }
+
+  function voucherModes(v) {
+    var s = V[v];
+    return '<div class="vmode" role="group" aria-label="Voucher kind">' +
+      '<button type="button" aria-pressed="' + (s.voucher === 'shared') + '" data-v="' + v +
+      '" data-act="voucher" data-i="shared"><span class="dot"></span><span>' +
+      '<span class="mt">One shared code</span><br>' +
+      '<span class="mc">You pay ' + money() + ' per seat it opens. Everyone arrives as themselves, ' +
+      'so you cannot tell who used it.</span></span></button>' +
+      '<button type="button" aria-pressed="' + (s.voucher === 'each') + '" data-v="' + v +
+      '" data-act="voucher" data-i="each"><span class="dot"></span><span>' +
+      '<span class="mt">One code each</span><br>' +
+      '<span class="mc">You pay for the codes you generate, used or not. Each code is tied to one ' +
+      'person, so the roster names them.</span></span></button>' +
+      '</div>';
+  }
+
+  function rosterBody(v) {
+    var s = V[v];
+    var out = '<div class="card"><div class="roster">';
+    ROSTER.forEach(function (p) {
+      var ini = p.n.split(' ').map(function (w) { return w[0]; }).join('').slice(0, 2);
+      out += '<div class="r"><div class="av">' + esc(ini) + '</div>' +
+        '<div class="grow"><div class="rlabel" style="font-size:15px">' + esc(p.n) + '</div>' +
+        '<div class="rval">' + esc(p.r) + ' &middot; ' + esc(p.ed) + '</div></div>' +
+        '<button type="button" class="btn quiet">Edit</button></div>';
+    });
+    s.invites.forEach(function (em) {
+      out += '<div class="r"><div class="av">?</div>' +
+        '<div class="grow"><div class="rlabel" style="font-size:15px">' + esc(em) + '</div>' +
+        '<div class="rval wait">Invited, awaiting reply</div></div></div>';
+    });
+    out += '</div></div>';
+    out += '<button type="button" class="btn" data-v="' + v + '" data-act="sheet" data-i="invite">Invite someone</button>';
+    out += '<div class="note">Editor can only be given to someone already shared with. ' +
+      'Language is a property of the person, not a separate list.</div>';
+    return out;
+  }
+
+  function settingsBody() {
+    var rows = [
+      ['Course name', 'Prophetic School'],
+      ['Editions', eds().length + ' (' + eds().slice(0, 2).join(', ') +
+        (eds().length > 2 ? ' and ' + (eds().length - 2) + ' more' : '') + ')'],
+      ['Teacher Q&A', 'On, questions come to your inbox'],
+      ['Lessons', '14 published, 2 drafts']
+    ];
+    var out = '<div class="card">';
+    rows.forEach(function (r, i) {
+      out += '<div class="row"' + (i ? ' style="border-top:1px solid var(--color-line)"' : '') + '>' +
+        '<div class="grow"><div class="rlabel">' + esc(r[0]) + '</div>' +
+        '<div class="rval">' + esc(r[1]) + '</div></div>' +
+        svg('chevron', 18) + '</div>';
+    });
+    out += '</div>';
+    out += '<div class="note">Ticket 18 designs the inside of this one. Here it is a stand-in, ' +
+      'present only so the shell holds three real peers.</div>';
+    return out;
+  }
+
+  function scGroup(label, inner) {
+    return '<div class="gsection"><div class="sc-label">' + label + '</div>' + inner + '</div>';
+  }
+
+  function sharingGroups(v) {
+    return scGroup('Who can find it', publishRow(v)) +
+      scGroup('Who you hand it to', handCard(v)) +
+      scGroup('What it costs', costCard(v));
+  }
+
+  /* ---------- shell pieces ---------- */
+  var PEERS = [['sharing', 'Sharing'], ['users', 'Users'], ['settings', 'Settings']];
+
+  function tabRow(v) {
+    var s = V[v];
+    var out = '<div class="b-tabs" role="tablist">';
+    PEERS.forEach(function (p) {
+      out += '<button type="button" class="b-tab" role="tab" aria-selected="' +
+        (s.tab === p[0]) + '" data-v="' + v + '" data-act="tab" data-i="' + p[0] + '">' +
+        p[1] + '</button>';
+    });
+    return out + '</div>';
+  }
+
+  function backBtn() {
+    return '<button type="button" class="b-back" aria-label="Back">' +
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M15 18l-6-6 6-6"/></svg></button>';
+  }
+
+  function edBtn(v) {
+    return '<button type="button" class="edbtn" data-v="' + v + '" data-act="sheet" data-i="editions" ' +
+      'aria-label="Edition, currently ' + esc(eds()[V[v].ed]) + '">' +
+      esc(eds()[V[v].ed]) + svg('chevron', 15) + '</button>';
+  }
+
+  function pickerChips(v) {
+    var s = V[v];
+    var out = '<div class="b-picker" role="group" aria-label="Edition">';
+    eds().forEach(function (name, i) {
+      out += '<button type="button" class="langpill" aria-pressed="' + (s.ed === i) +
+        '" data-v="' + v + '" data-act="ed" data-i="' + i + '">' + esc(name) + '</button>';
+    });
+    return out + '</div>';
+  }
+
+  function bodyFor(v, sharingHtml) {
+    var s = V[v];
+    if (s.tab === 'sharing') { return sharingHtml; }
+    if (s.tab === 'users') { return rosterBody(v); }
+    return settingsBody();
+  }
+
+  /* ---------- R1: edition named in the title, sheet to switch ---------- */
+  function renderR1() {
+    var s = V.R1;
+    var head = '<div class="b-head"><div class="b-titlerow">' + backBtn() +
+      '<h3>Manage course</h3>' +
+      (s.tab === 'sharing' && eds().length > 1 ? edBtn('R1') : '') +
+      '</div>' + tabRow('R1') + '</div>';
+    return head + '<div class="b-body">' + bodyFor('R1', sharingGroups('R1')) + '</div>';
+  }
+
+  /* ---------- R2: summary sentence first, chips inside it ---------- */
+  function renderR2() {
+    var s = V.R2;
+    var head = '<div class="b-head"><div class="b-titlerow">' + backBtn() +
+      '<h3>Manage course</h3></div>' + tabRow('R2') + '</div>';
+
+    var sentence = s.publish
+      ? (s.pub
+          ? 'Anyone with the link can join <b>' + esc(eds()[s.ed]) + '</b>' +
+            (isSeller('R2') ? ' for <b>' + money() + '</b>.' : ', free.')
+          : 'Only people you invite can join <b>' + esc(eds()[s.ed]) + '</b>' +
+            (isSeller('R2') ? ' for <b>' + money() + '</b>.' : ', free.'))
+      : '<b>' + esc(eds()[s.ed]) + '</b> is not published, so nobody can reach it yet.';
+
+    var summary = '<div class="summary">' +
+      '<span class="pill' + (s.publish ? '' : ' off') + '">' +
+      (s.publish ? svg('check', 14) + 'Published' : 'Draft') + '</span>' +
+      '<p>' + sentence + '</p>' +
+      (eds().length > 1
+        ? '<div class="chips" role="group" aria-label="Edition">' +
+          eds().map(function (name, i) {
+            return '<button type="button" class="langpill" aria-pressed="' + (s.ed === i) +
+              '" data-v="R2" data-act="ed" data-i="' + i + '">' + esc(name) + '</button>';
+          }).join('') + '</div>'
+        : '') +
+      '</div>';
+
+    return head + '<div class="b-body">' +
+      (V.R2.tab === 'sharing' ? summary + sharingGroups('R2') : bodyFor('R2', '')) +
+      '</div>';
+  }
+
+  /* ---------- R3: the approved layout, header condenses on scroll ---------- */
+  function renderR3() {
+    var s = V.R3;
+    var head = '<div class="b-head r3head"><div class="b-titlerow">' + backBtn() +
+      '<h3>Manage course</h3>' +
+      (s.tab === 'sharing' && eds().length > 1 ? edBtn('R3') : '') +
+      '</div>' + tabRow('R3') +
+      (s.tab === 'sharing' && eds().length > 1 ? pickerChips('R3') : '') +
+      '</div>';
+    return head + '<div class="b-body">' + bodyFor('R3', sharingGroups('R3')) + '</div>';
+  }
+
+  /* ---------- R1 on the desktop, three takes ---------- */
+  function stackedBody(v) {
+    var s = V[v];
+    if (s.tab === 'sharing') { return sharingGroups(v); }
+    if (s.tab === 'users') { return rosterBody(v); }
+    return settingsBody();
+  }
+
+  /* D1: the phone header stretched, one centered column */
+  function renderD1() {
+    var s = V.D1;
+    var head = '<div class="d-head"><div class="b-titlerow">' + backBtn() +
+      '<h3>Manage course</h3>' +
+      (s.tab === 'sharing' && eds().length > 1 ? edBtn('D1') : '') +
+      '</div>' + tabRow('D1') + '</div>';
+    return head + '<div class="d-col">' + stackedBody('D1') + '</div>';
+  }
+
+  /* D2: peers as a left rail, content in one column */
+  function renderD2() {
+    var s = V.D2;
+    var RAIL = [['sharing', 'Sharing', 'globe'], ['users', 'Users', 'users'], ['settings', 'Course settings', 'book']];
+    var rail = '<nav class="d2-rail" aria-label="Manage">' + backBtn();
+    RAIL.forEach(function (p) {
+      rail += '<button type="button" class="d2-item" aria-selected="' + (s.tab === p[0]) +
+        '" data-v="D2" data-act="tab" data-i="' + p[0] + '">' + svg(p[2], 19) + p[1] + '</button>';
+    });
+    rail += '</nav>';
+    var head = '<div class="d2-mainhead"><h3>Prophetic School</h3>' +
+      (s.tab === 'sharing' && eds().length > 1 ? edBtn('D2') : '') + '</div>';
+    return '<div class="d2">' + rail +
+      '<div class="d2-main">' + head +
+      '<div class="d2-body">' + stackedBody('D2') + '</div></div></div>';
+  }
+
+  /* D3: the phone header, one working column, pinned summary rail */
+  function renderD3() {
+    var s = V.D3;
+    var head = '<div class="d-head"><div class="b-titlerow">' + backBtn() +
+      '<h3>Manage course</h3>' +
+      (s.tab === 'sharing' && eds().length > 1 ? edBtn('D3') : '') +
+      '</div>' + tabRow('D3') + '</div>';
+
+    var sentence = s.publish
+      ? (s.pub
+          ? 'Anyone with the link can join <b>' + esc(eds()[s.ed]) + '</b>' +
+            (isSeller('D3') ? ' for <b>' + money() + '</b>.' : ', free.')
+          : 'Only people you invite can join <b>' + esc(eds()[s.ed]) + '</b>' +
+            (isSeller('D3') ? ' for <b>' + money() + '</b>.' : ', free.'))
+      : '<b>' + esc(eds()[s.ed]) + '</b> is not published, so nobody can reach it yet.';
+
+    var rail = '<aside class="d3-rail" aria-label="Right now">' +
+      '<div class="summary">' +
+      '<span class="pill' + (s.publish ? '' : ' off') + '">' +
+      (s.publish ? svg('check', 14) + 'Published' : 'Draft') + '</span>' +
+      '<p style="font-size:15.5px">' + sentence + '</p></div>' +
+      '<div class="card facts">' +
+      '<div><span>People</span><b>' + (ROSTER.length + s.invites.length) + '</b></div>' +
+      '<div><span>Editors</span><b>2</b></div>' +
+      '<div><span>Editions</span><b>' + eds().length + '</b></div>' +
+      '<div><span>Price</span><b>' + (isSeller('D3') ? money() : 'Free') + '</b></div>' +
+      '</div></aside>';
+
+    return head + '<div class="d3-body">' +
+      '<div class="d3-main">' + stackedBody('D3') + '</div>' + rail + '</div>';
+  }
+
+  /* ---------- sheets ---------- */
+  function sheetHtml(v) {
+    var s = V[v];
+    if (!s.sheet) { return ''; }
+
+    if (s.sheet === 'editions') {
+      var list = '<div class="edlist">';
+      eds().forEach(function (name, i) {
+        list += '<button type="button" aria-pressed="' + (s.ed === i) +
+          '" data-v="' + v + '" data-act="edsheet" data-i="' + i + '">' + esc(name) +
+          '<span class="tick">' + svg('check', 18) + '</span></button>';
+      });
+      list += '</div>';
+      return sheetWrap(v, 'Edition',
+        '<div class="s-sub note">Sharing is set per edition. Users and settings are the whole course.</div>' + list);
+    }
+
+    if (s.sheet === 'invite') {
+      return sheetWrap(v, 'Invite to ' + esc(eds()[s.ed]),
+        '<div class="field"><label for="' + v + '-em">Email</label>' +
+        '<input id="' + v + '-em" type="email" inputmode="email" autocomplete="email" ' +
+        'placeholder="name@example.com" data-inv="' + v + '"></div>' +
+        '<div class="note">They get a link that signs them straight into this edition.</div>' +
+        '<button type="button" class="btn primary" data-v="' + v + '" data-act="sendinvite">Send invite</button>');
+    }
+
+    if (s.sheet === 'voucher') {
+      return sheetWrap(v, s.voucher === 'shared' ? 'One shared code' : 'One code each',
+        (s.voucher === 'shared'
+          ? '<div class="note">One code, any number of uses. You are billed ' + money() +
+            ' for every seat it opens, and the roster cannot tell you who used it.</div>'
+          : '<div class="note">A batch of single-use codes. You pay for each code you generate, ' +
+            'used or not, and the roster names whoever redeems one.</div>') +
+        '<button type="button" class="btn primary" data-v="' + v + '" data-act="mint">Create ' +
+        (s.voucher === 'shared' ? 'the code' : '5 codes') + '</button>');
+    }
+
+    if (s.sheet === 'onboard') {
+      var steps = '<div class="steps">' +
+        '<i class="' + (s.onboardStep === 1 ? 'on' : 'done') + '">' + (s.onboardStep === 1 ? '1' : '') +
+        (s.onboardStep === 2 ? svg('check', 12) : '') + '</i> Payout details ' +
+        '<i class="' + (s.onboardStep === 2 ? 'on' : '') + '">2</i> Price' +
+        '</div>';
+      if (s.onboardStep === 1) {
+        return sheetWrap(v, 'Turn on selling', steps +
+          '<div class="field"><label for="' + v + '-bank">Bank</label>' +
+          '<input id="' + v + '-bank" value="Capitec"></div>' +
+          '<div class="field"><label for="' + v + '-acc">Account number</label>' +
+          '<input id="' + v + '-acc" inputmode="numeric" value="1402 887 331"></div>' +
+          '<div class="note">Asked once, for the whole account. Payouts run every second Tuesday.</div>' +
+          '<button type="button" class="btn primary" data-v="' + v + '" data-act="onboard2">Save details</button>');
+      }
+      return sheetWrap(v, 'Set a price', steps +
+        '<div class="field"><label for="' + v + '-pr">Price for ' + esc(eds()[s.ed]) + '</label>' +
+        '<input id="' + v + '-pr" inputmode="decimal" value="R450"></div>' +
+        '<div class="note">Once off, per learner. You can change it any time.</div>' +
+        '<button type="button" class="btn primary" data-v="' + v + '" data-act="onboarddone">Start selling</button>');
+    }
+    return '';
+  }
+
+  function sheetWrap(v, title, inner) {
+    return '<div class="sheet" role="dialog" aria-label="' + esc(title) + '">' +
+      '<div class="grab"></div>' +
+      '<div class="row" style="min-height:auto"><h4 class="grow">' + esc(title) + '</h4>' +
+      '<button type="button" class="btn quiet" aria-label="Close" data-v="' + v + '" data-act="closesheet">' +
+      svg('x', 18) + '</button></div>' + inner + '</div>';
+  }
+
+  /* ---------- deck ---------- */
+  var VARIANTS = [
+    { k: 'R1', name: 'Edition in the title', render: renderR1,
+      thesis: 'The picker leaves the header. The current edition is named in the title row as a ' +
+        'small labelled button, and tapping it opens a bottom sheet, which is also the only place ' +
+        'twenty editions ever exist.',
+      how: 'Title + tabs, edition sheet on demand',
+      url: function () { return '/courses/prophetic-school/manage?tab=' + V.R1.tab; },
+      wins: 'Two header rows, always. Twenty editions cost the layout nothing.' },
+    { k: 'R2', name: 'Summary first', render: renderR2,
+      thesis: 'The Sharing tab opens with one sentence saying what is true right now, and the ' +
+        'edition chips live inside that summary card, because the edition is part of what the ' +
+        'sentence describes, not navigation.',
+      how: 'Title + tabs, state sentence leads the tab',
+      url: function () { return '/courses/prophetic-school/manage?tab=' + V.R2.tab; },
+      wins: 'A one-language owner sees zero picker chrome and reads their status in a glance.' },
+    { k: 'R3', name: 'Condense on scroll', render: renderR3,
+      thesis: 'Exactly the layout you approved at rest. Scroll, and the chip row folds into a ' +
+        'small edition button beside the title, so the header pays for itself once you are ' +
+        'working. Tap the button to get the sheet.',
+      how: 'The approved header, collapsing to two rows on scroll',
+      url: function () { return '/courses/prophetic-school/manage?tab=' + V.R3.tab; },
+      wins: 'Nothing you approved moves until the moment it would be in the way.' }
+  ];
+
+  var deck = document.getElementById('deck');
+
+  function paintOne(k, renderFn, urlText) {
+    var url = document.querySelector('[data-url="' + k + '"]');
+    var sc = document.querySelector('[data-screen="' + k + '"]');
+    var ov = document.querySelector('[data-ov="' + k + '"]');
+    url.innerHTML = svg('link', 12) + '<em>' + esc(urlText) + '</em>';
+    var top = sc.scrollTop;
+    sc.setAttribute('data-app', cond.app);
+    ov.setAttribute('data-app', cond.app);
+    sc.innerHTML = renderFn();
+    sc.scrollTop = top;
+    if (k === 'R3') { condenseR3(sc); }
+    var mount = ov.querySelector('.sheetmount');
+    mount.innerHTML = '<div class="scrim" data-v="' + k + '" data-act="closesheet"></div>' + sheetHtml(k);
+    ov.classList.toggle('open', !!V[k].sheet);
+    if (V[k].sheet) {
+      /* let the phone sheet transition in from its translated position */
+      var sheet = mount.querySelector('.sheet');
+      if (sheet && !ov.dataset.wasopen && !ov.classList.contains('deskov')) {
+        sheet.style.transform = 'translateY(103%)';
+        requestAnimationFrame(function () { sheet.style.transform = ''; });
+      }
+      ov.dataset.wasopen = '1';
+    } else {
+      delete ov.dataset.wasopen;
+    }
+  }
+
+  var DESKS = [['D1', renderD1], ['D2', renderD2], ['D3', renderD3]];
+
+  function paint() {
+    VARIANTS.forEach(function (v) { paintOne(v.k, v.render, v.url()); });
+    DESKS.forEach(function (d) {
+      paintOne(d[0], d[1], '/courses/prophetic-school/manage?tab=' + V[d[0]].tab + '  (>= 1024px)');
+    });
+    document.querySelectorAll('[data-set]').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(cond[b.dataset.set]) === b.dataset.val);
+    });
+  }
+
+  function build() {
+    deck.innerHTML = VARIANTS.map(function (v) {
+      return '<div class="col">' +
+        '<div class="brief"><h2><b>' + v.k + '</b>' + v.name + '</h2>' +
+        (v.k === 'R1' ? '<span class="picktag">Your pick</span>' : '') +
+        '<p class="thesis">' + v.thesis + '</p>' +
+        '<dl><dt>Shape</dt><dd>' + v.how + '</dd>' +
+        '<dt>Wins</dt><dd>' + v.wins + '</dd></dl></div>' +
+        '<div class="phone"><div class="urlbar" data-url="' + v.k + '"></div>' +
+        '<div class="screen" data-screen="' + v.k + '" tabindex="0" role="group" ' +
+        'aria-label="Variant ' + v.k + ', ' + v.name + ', at 360 pixels"></div>' +
+        '<div class="overlay" data-ov="' + v.k + '"><div class="sheetmount"></div>' +
+        '<div class="toast" data-toast="' + v.k + '" role="status"></div></div>' +
+        '</div></div>';
+    }).join('');
+    paint();
+  }
+
+  function condenseR3(sc) {
+    var head = sc.querySelector('.r3head');
+    if (head) { head.classList.toggle('cond', sc.scrollTop > 56); }
+  }
+
+  document.addEventListener('scroll', function (e) {
+    var sc = e.target;
+    if (sc && sc.dataset && sc.dataset.screen === 'R3') { condenseR3(sc); }
+  }, true);
+
+  document.addEventListener('click', function (e) {
+    var set = e.target.closest('[data-set]');
+    if (set) {
+      var val = set.dataset.val;
+      cond[set.dataset.set] = (set.dataset.set === 'app') ? val : Number(val);
+      Object.keys(V).forEach(function (k) {
+        if (cond.editions <= V[k].ed) { V[k].ed = 0; }
+      });
+      paint();
+      return;
+    }
+    var a = e.target.closest('[data-act]');
+    if (!a) { return; }
+    var v = a.dataset.v, s = V[v], act = a.dataset.act;
+
+    if (act === 'tab') { s.tab = a.dataset.i; }
+    else if (act === 'ed') { s.ed = Number(a.dataset.i); s.code = null; }
+    else if (act === 'edsheet') { s.ed = Number(a.dataset.i); s.code = null; s.sheet = null; }
+    else if (act === 'publish') {
+      s.publish = !s.publish;
+      toast(v, s.publish ? eds()[s.ed] + ' is live' : eds()[s.ed] + ' unpublished');
+    }
+    else if (act === 'uninvite') {
+      s.invites = s.invites.filter(function (em) { return em !== a.dataset.i; });
+      toast(v, 'Invite revoked');
+    }
+    else if (act === 'pub') {
+      s.pub = !s.pub;
+      toast(v, s.pub ? 'Public link is on' : 'Public link is off');
+    }
+    else if (act === 'copylink') { toast(v, 'Link copied'); return; }
+    else if (act === 'copycode') { toast(v, 'Code copied'); return; }
+    else if (act === 'voucher') { s.voucher = a.dataset.i; s.code = null; }
+    else if (act === 'sheet') { s.sheet = a.dataset.i; if (a.dataset.i === 'onboard') { s.onboardStep = 1; } }
+    else if (act === 'closesheet') { s.sheet = null; }
+    else if (act === 'sendinvite') {
+      var inp = document.querySelector('input[data-inv="' + v + '"]');
+      var em = (inp && inp.value.trim()) || 'naledi@gmail.com';
+      s.invites.push(em);
+      s.sheet = null;
+      toast(v, 'Invite sent to ' + em);
+    }
+    else if (act === 'mint') {
+      s.code = s.voucher === 'shared' ? 'PROPH-7KQ2' : 'PROPH-7KQ2 +4 more';
+      s.sheet = null;
+      toast(v, s.voucher === 'shared' ? 'Shared code created' : '5 codes created');
+    }
+    else if (act === 'onboard2') { s.onboardStep = 2; }
+    else if (act === 'onboarddone') {
+      s.sellerOn = true; s.sheet = null;
+      toast(v, 'Selling is on for ' + eds()[s.ed]);
+    }
+    else { return; }
+    paint();
+  });
+
+  build();
+})();
+</script>
