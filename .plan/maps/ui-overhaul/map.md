@@ -6,7 +6,7 @@ A spec (`spec.md` here) for an agent-driven UI/UX overhaul of both learner-facin
 authoring surfaces: visual polish, flow fixes, and mobile experience, grounded in
 Mobbin MCP references, foundation first. Done when every decision needed to open a
 sibling `ui-overhaul-impl` map is resolved, and when the course-management strand
-(tickets 14 to 23) has shipped its three rebuilt surfaces. This effort runs **before**
+(tickets 14 to 22) has shipped its three rebuilt surfaces. This effort runs **before**
 the [reader-experience](../reader-experience/map.md) effort resumes.
 
 ## Notes
@@ -46,13 +46,13 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
   does not exist until instrumentation ships; tickets **19, 20 and 22** build the three
   course-management surfaces. Same shape as ticket 01 buying Mobbin. Nothing else here
   builds.
-- **Ticket 17 resolved while ticket 16 was claimed, 2026-08-27.** 17 sent the access
+- **Input for ticket 16, which was claimed when ticket 17 resolved.** 17 sent the access
   roster to a course-scoped Users surface and Teacher Q&A to Course settings, so the
-  container 16 chose had to hold at least three peers at two scopes: sharing per Edition,
-  Users and Course settings course-wide, the edition picker governing one peer rather
-  than the shell. Routed here rather than into 16's body because `sonnet5-ui-overhaul-16`
-  held the live claim; 16's answer folded this in before resolving, so this note is now
-  history rather than open input.
+  container 16 chooses must hold at least three peers at two scopes: sharing is per
+  Edition, Users and Course settings are course-wide. The 20-Edition picker therefore
+  governs one peer rather than the shell. 17 declined to add a blocking edge and left the
+  shape, and the picker's placement, entirely to 16. This note exists rather than a line
+  in 16's body because `sonnet5-ui-overhaul-16` held the claim.
 - **Task tickets carry a `## Todo` checklist**, the shape
   [mobile-reader-todos](../mobile-reader-todos/map.md) uses. Tick items as they land,
   but the `## Answer` is still what resolves the ticket. Decision tickets carry a
@@ -67,15 +67,6 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
 
 <!-- one line per resolved ticket -->
 
-- [Modal, sheet or route, and the phone-first Editions layout inside it](tickets/16-management-shell-prototype.md):
-  **a route**, `/courses/[slug]/manage`, wins over the dialog-stays and bottom-sheet
-  candidates: no dialog stacking, deep linkable like Settings, and a sticky sub-nav that
-  survives scroll where the dialog's accordion loses it. Reworked mid-session once ticket
-  17 resolved concurrently to a top-level Sharing / Users / Settings peer nav, the edition
-  picker scoped to Sharing alone. Prototype at
-  `src/app/_components/EditionsManagementPrototype.tsx` (`?variant=A|B|C`), write-up at
-  `assets/management-shell-prototype.md`. Names the seams `Editions.tsx` splits along for
-  ticket 06.
 - [Which controls belong to sharing, which to course settings, which to the account](tickets/17-control-boundary.md):
   **three controls move, not four, and nothing goes to `/settings`.** Teacher Q&A goes to
   Course settings, losing the `source`-tab guard and the two-line disclaimer that only
@@ -127,6 +118,10 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
   [assets/mobile-bottom-nav.md](assets/mobile-bottom-nav.md), including the open
   question of what the in-course lesson list becomes underneath it, which belongs to
   this patch. clears-with: 03
+- **What stays on the dashboard course card.** If ticket 16 turns sharing into a route at
+  `/courses/[slug]/manage`, the per-course action set on the dashboard has somewhere
+  else to be, and `Dashboard.tsx` is 959 lines with four duplicated cards.
+  clears-with: 16
 - **Spec assembly**, folding the resolved decisions into `spec.md` and charting
   `ui-overhaul-impl`. The last patch to clear.
 
