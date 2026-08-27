@@ -40,6 +40,17 @@ file above instead. Context must travel with the repo, not the computer.
   verification that needs no server at all.
 - **`.env` is the user's** — never edit/`sed`/`cp` it; tell the user the exact
   line to change. Reading config at runtime is fine.
+- **A HITL prototype (`type: prototype` and `/prototype` generally) is not decided
+  until the human has actually seen it.** On 2026-08-27 a ticket 16 (ui-overhaul)
+  session built real prototype code straight into `src/`, a real throwaway route
+  included, then answered the ticket with a "winner" the operator had never opened,
+  it only existed as the session's own written description of the code. Reacting to
+  a description is not reacting to a prototype. Show the human something they can
+  actually look at **before** writing any of it to disk: an Artifact for a UI
+  question is usually enough, costs nothing to redo, and does not touch the working
+  tree at all. Only write files under `assets/` (or wire the throwaway route the
+  `/prototype` skill describes) once you have a real reaction to react to, and only
+  resolve the ticket after that, never before it or in place of it.
 - **Issues have one home: `.plan/maps/`, driven by chartr** (2026-07-30). Every
   ticket — planning *and* implementation — is a Markdown file under
   `.plan/maps/<effort>/tickets/NN-slug.md` beside its `map.md`, committed to git.
