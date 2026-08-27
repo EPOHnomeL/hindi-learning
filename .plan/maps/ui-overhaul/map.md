@@ -67,6 +67,12 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
 
 <!-- one line per resolved ticket -->
 
+- [Build the reorganised sharing surface](tickets/19-build-editions-sharing.md):
+  **shipped.** `/courses/[slug]/manage` is live with the four-tab shell, ticket 15's
+  three groups, the merged voucher card and ticket 17's moves; `EditionsDialog` and
+  `Editions.tsx` are deleted, every query and mutation untouched. Walked headless at
+  360px on a dev course through the full seller loop (turn-on, price, mint, stop);
+  screenshots in `assets/manage-walk/`. Unblocks tickets 20, 22 and 23.
 - [Modal, sheet or route, and the phone-first Editions layout inside it](tickets/16-management-shell-prototype.md):
   **a route at `/courses/[slug]/manage`, one shell at both widths.** Two-row header,
   back plus an edition button that opens a sheet, over one underlined tab row of four
