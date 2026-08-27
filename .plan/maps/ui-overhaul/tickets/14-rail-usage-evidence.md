@@ -80,10 +80,17 @@ ever earned money. Strip it out and five of the six rails have no real usage at 
 - **Sales are one course, one price.** 17 paid Entitlements, 14 PayFast and 3 manual
   EFT, all `prophetic-school`, plus 3 Admin or legacy grants and 1 on `test-course`.
   The EFT rail (ADR 0026) is genuinely load-bearing at roughly one sale in six.
-- **The legacy public-link rail is the widely-used one.** 19 Topics carry a
-  `topics.publicToken`; only 3 have a `publicLinks` row. Whatever ticket 15 decides,
-  the rail with real breadth is the older storage shape, not the newer one, so
-  "retire the legacy field" is a data-migration question and not a UI cleanup.
+- **The public-link rail is the broadest thing on the panel.** 19 Topics carry a
+  `topics.publicToken`; 3 have a `publicLinks` row.
+
+  **Corrected 2026-08-27 while resolving ticket 15.** The paragraph here originally
+  read the two tables as legacy storage against new, and called retiring the legacy
+  field a data-migration question. That was wrong. `shares.setEditionPublic` branches
+  on `lang === SOURCE_LANG`: English writes `topics.publicToken`, every translation
+  writes a `publicLinks` row. Both shapes are current, one control writes both, and
+  neither is legacy. The 19-to-3 gap says 19 owners shared English and 3 shared a
+  translation. There is no migration hiding here. `setTopicPublic` still exists but
+  only tests call it.
 - **31 invites were sent to addresses that never signed up**, 29 of them for one
   course, against 68 Shares that did land. Nearly a third of all invites are sitting
   unclaimed. That is a funnel problem in the invite rail rather than an argument about
