@@ -243,17 +243,19 @@ const CONSENT = CONSENT_VERSION;
 // Join a code the way `/join` does: through Convex Auth's own `signIn` action and
 // the real credentials provider. Nothing about a Seat is ever hand-inserted, so
 // every row a test reads was written by the code that writes it in production.
-async function join(
-  t: ReturnType<typeof convexTest>,
-  params: { code: string; nickname: string; pin: string; consentVersion?: string },
-) {
+//
+// Since 2026-08-27 there is no PIN and no join/return flow declaration: the name is
+// the whole request, and the server decides which of the two things it is. The two
+// helpers are the SAME call; `comeBack` deliberately sends no consentVersion, which
+// is itself an assertion that signing back in never re-runs the consent gate.
+async function join(t: ReturnType<typeof convexTest>, params: { code: string; nickname: string; consentVersion?: string }) {
   return await t.action(api.auth.signIn, {
     provider: "accessCode",
-    params: { flow: "join", consentVersion: CONSENT, ...params },
+    params: { consentVersion: CONSENT, ...params },
   });
 }
-async function comeBack(t: ReturnType<typeof convexTest>, params: { code: string; nickname: string; pin: string }) {
-  return await t.action(api.auth.signIn, { provider: "accessCode", params: { flow: "return", ...params } });
+async function comeBack(t: ReturnType<typeof convexTest>, params: { code: string; nickname: string }) {
+  return await t.action(api.auth.signIn, { provider: "accessCode", params });
 }
 
 async function entitlementRows(t: ReturnType<typeof convexTest>) {
@@ -270,13 +272,13 @@ async function tagOf(promise: Promise<unknown>): Promise<string> {
   return "did not throw";
 }
 
-test("a member joins with a nickname and a PIN and is in the course, with no email anywhere", async () => {
+test("a member joins with just a name and is in the course, with no email anywhere", async () => {
   const t = convexTest(schema, modules);
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
 
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
 
   const seats = await seatRows(t);
   expect(seats).toHaveLength(1);
@@ -288,8 +290,8 @@ test("a member joins with a nickname and a PIN and is in the course, with no ema
     consentVersion: CONSENT,
     consentedAt: expect.any(Number),
   });
-  // **No PIN is anywhere in this row.** It is the `secret` Convex Auth hashed into
-  // `authAccounts`, so nothing in `seats` can verify one, by construction.
+  // **Nothing in this row is a credential beyond the name key itself.** Since
+  // 2026-08-27 there is no PIN anywhere on the rail, so there is nothing to store.
   expect(Object.keys(seats[0]!).sort()).toEqual([
     "_creationTime",
     "_id",
@@ -330,9 +332,9 @@ test("three members joining one code are three accounts with three entitlements 
   // member then matches that row on the `email` index and signs in as the first,
   // inheriting their Entitlement and progress, and the THIRD makes `.unique()`
   // throw. With one tester it looks perfect.
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
-  await join(t, { code, nickname: "Sipho", pin: "5678" });
-  await join(t, { code, nickname: "Naledi", pin: "4321" });
+  await join(t, { code, nickname: "Thandi" });
+  await join(t, { code, nickname: "Sipho" });
+  await join(t, { code, nickname: "Naledi" });
 
   const seats = await seatRows(t);
   expect(seats).toHaveLength(3);
@@ -350,15 +352,15 @@ test("the cap is atomic: two joins at the last seat, exactly one wins", async ()
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, { ...MINT, capacity: 2 });
 
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
 
   // Two members arriving on the last seat at once. The cap is read and consumed in
   // ONE mutation, so the loser is refused rather than both being let in and both
   // being billed. A cap read in one function and consumed in another sells this
   // seat twice.
   const results = await Promise.allSettled([
-    join(t, { code, nickname: "Sipho", pin: "5678" }),
-    join(t, { code, nickname: "Naledi", pin: "4321" }),
+    join(t, { code, nickname: "Sipho" }),
+    join(t, { code, nickname: "Naledi" }),
   ]);
   expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
   expect(await seatRows(t)).toHaveLength(2);
@@ -366,39 +368,36 @@ test("the cap is atomic: two joins at the last seat, exactly one wins", async ()
 
   // And the next member is told the seats are gone, distinguishably from a code
   // that never existed: one is their organisation's problem, the other is a typo.
-  expect(await tagOf(join(t, { code, nickname: "Lerato", pin: "1111" }))).toEqual("access/code-full");
+  expect(await tagOf(join(t, { code, nickname: "Lerato" }))).toEqual("access/code-full");
 });
 
-test("every member-facing refusal is a tagged ConvexError, and taken-nickname is not wrong-PIN", async () => {
+test("every member-facing refusal is a tagged ConvexError, and an existing name signs back in", async () => {
   const t = convexTest(schema, modules);
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
 
-  expect(await tagOf(join(t, { code: "GRP-AAA-AAA-AAA", nickname: "Zola", pin: "1234" }))).toEqual(
+  expect(await tagOf(join(t, { code: "GRP-AAA-AAA-AAA", nickname: "Zola" }))).toEqual(
     "access/code-unknown",
   );
-  // **The distinction the spec insists on.** "Pick another nickname" and "you typed
-  // your PIN wrong" send the member to two different actions, and one blurred
-  // message sends them to neither. The cost is that a nickname's existence leaks to
-  // anybody holding the code, which ADR 0031 records as accepted, not overlooked:
-  // it is inherent to a name being the lookup key, and it is why the nickname is
-  // self-chosen rather than a real name.
-  expect(await tagOf(join(t, { code, nickname: "Thandi", pin: "9999" }))).toEqual("access/nickname-taken");
-  expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "9999" }))).toEqual("access/pin-wrong");
-  // Case and spacing are one nickname: to everybody in the room `Thandi` and
-  // ` thandi ` are the same person, so the second must not silently get a seat.
-  expect(await tagOf(join(t, { code, nickname: "  THANDI ", pin: "0000" }))).toEqual("access/nickname-taken");
+  // **An existing name is not a refusal any more (2026-08-27): it IS the sign-in.**
+  // Case and spacing fold to one name, so to everybody in the room `Thandi` and
+  // ` THANDI ` are the same person and land in the same seat, consuming nothing.
+  // The stated cost of this design: anybody holding the code who types an existing
+  // member's name is in that member's seat. The owner accepted that trade.
+  await join(t, { code, nickname: "  THANDI " });
+  expect(await seatRows(t)).toHaveLength(1);
+  expect(await entitlementRows(t)).toHaveLength(1);
 
-  // **Consent is refused server-side**, not merely hidden in the UI. An absent
-  // version and a stale one are both refused: s11(2) puts the burden of proving
-  // consent on us, and a stale cached page must not record a member as agreeing to
-  // wording it never showed them.
-  expect(await tagOf(join(t, { code, nickname: "Zola", pin: "1234", consentVersion: "" }))).toEqual(
+  // **Consent is refused server-side**, not merely hidden in the UI, and only a NEW
+  // name reaches the gate. An absent version and a stale one are both refused:
+  // s11(2) puts the burden of proving consent on us, and a stale cached page must
+  // not record a member as agreeing to wording it never showed them.
+  expect(await tagOf(join(t, { code, nickname: "Zola", consentVersion: "" }))).toEqual(
     "access/consent-required",
   );
-  expect(await tagOf(join(t, { code, nickname: "Zola", pin: "1234", consentVersion: "1999-01-01" }))).toEqual(
+  expect(await tagOf(join(t, { code, nickname: "Zola", consentVersion: "1999-01-01" }))).toEqual(
     "access/consent-required",
   );
   // Refused means refused: no seat and no entitlement.
@@ -411,8 +410,8 @@ test("no Seller-facing query can return a nickname or a userId", async () => {
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
-  await join(t, { code, nickname: "Sipho", pin: "5678" });
+  await join(t, { code, nickname: "Thandi" });
+  await join(t, { code, nickname: "Sipho" });
 
   // The rows exist on this rail, unlike on the voucher one, so "who took a seat" is
   // a query that COULD be written. The promise is kept by the returns validator, not
@@ -431,7 +430,7 @@ test("the grant walk is untouched: a Seat reads a priced edition like any entitl
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
   const [seat] = await seatRows(t);
 
   // `lib.ts`'s grant walk was not edited for this rail and does not need to be: a
@@ -449,8 +448,8 @@ test("stopping writes exactly one unpaid batch ledger row for the seats taken", 
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
-  await join(t, { code, nickname: "Sipho", pin: "5678" });
+  await join(t, { code, nickname: "Thandi" });
+  await join(t, { code, nickname: "Sipho" });
 
   await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
 
@@ -514,7 +513,7 @@ test("stopping twice is refused and writes no second row", async () => {
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
 
   await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
   // Refused rather than ignored: a silent second stop looks to the Seller like it
@@ -530,20 +529,20 @@ test("a stopped code grants no new seat, and existing seats keep working", async
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
   await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
 
   // Distinguishable from a full code and from a code that never existed: the reason
   // is the agreement, not the member's typing, and only one of the three is
   // something they can do anything about.
-  expect(await tagOf(join(t, { code, nickname: "Sipho", pin: "5678" }))).toEqual("access/code-stopped");
+  expect(await tagOf(join(t, { code, nickname: "Sipho" }))).toEqual("access/code-stopped");
   expect(await seatRows(t)).toHaveLength(1);
   expect(await entitlementRows(t)).toHaveLength(1);
 
   // **Stopping is not a revocation.** The seat already taken still signs in, and the
   // Entitlement was never touched: it carries no provenance, so nothing on this rail
   // could find it even if somebody tried.
-  await expect(comeBack(t, { code, nickname: "Thandi", pin: "1234" })).resolves.toBeDefined();
+  await expect(comeBack(t, { code, nickname: "Thandi" })).resolves.toBeDefined();
 });
 
 test("only the minting Seller can stop or raise, and lowering below the seats taken is refused", async () => {
@@ -552,8 +551,8 @@ test("only the minting Seller can stop or raise, and lowering below the seats ta
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { seller: other } = await seedSeller(t, admin, "other@example.com", "urdu");
   const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
-  await join(t, { code, nickname: "Sipho", pin: "5678" });
+  await join(t, { code, nickname: "Thandi" });
+  await join(t, { code, nickname: "Sipho" });
 
   // Server-side, not by which codes a page lists. A stop is a money event and a cap
   // raise is a bill increase, so both are things one Seller could do to another's
@@ -593,8 +592,8 @@ test("a stopped code appears on the operator's queue with everything an invoice 
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
-  await join(t, { code, nickname: "Sipho", pin: "5678" });
+  await join(t, { code, nickname: "Thandi" });
+  await join(t, { code, nickname: "Sipho" });
 
   // **A live voucher IS on the list, marked running.** It began as stopped-only, on
   // the reasoning that a live voucher owes nothing; that was wrong in practice
@@ -640,7 +639,7 @@ test("logging the reference makes the Seller payable, and logging it twice is ha
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
   await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
 
   await asUser(t, admin).mutation(api.accessCodes.logAccessCodePayment, { accessCodeId, reference: "FNB-8814" });
@@ -681,7 +680,7 @@ test("returning lands in the same seat with the same entitlement and progress, a
   const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
 
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
   const [seat] = await seatRows(t);
   const member = seat!.userId!;
   // Progress written the way the reader writes it, so what is being asserted is the
@@ -692,8 +691,8 @@ test("returning lands in the same seat with the same entitlement and progress, a
     status: "completed",
   });
 
-  // A different phone: the same three things typed again, nothing else carried over.
-  await comeBack(t, { code, nickname: "  thandi ", pin: "1234" });
+  // A different phone: the same two things typed again, nothing else carried over.
+  await comeBack(t, { code, nickname: "  thandi " });
 
   // **The same `users` row**, so the same Entitlement and the same progress. A second
   // row here is trap 1 wearing a different hat.
@@ -717,121 +716,13 @@ test("a full code still admits an existing seat", async () => {
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, { ...MINT, capacity: 1 });
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
 
   // The cap is about NEW seats. A full code is full of seats that all still have to
   // work, or a member is locked out of a course by the success of the campaign that
   // gave it to them.
-  expect(await tagOf(join(t, { code, nickname: "Sipho", pin: "5678" }))).toEqual("access/code-full");
-  await expect(comeBack(t, { code, nickname: "Thandi", pin: "1234" })).resolves.toBeDefined();
-});
-
-test("failed PIN attempts are rate limited per seat, and the limit survives signing out", async () => {
-  const t = convexTest(schema, modules);
-  const admin = await seedSysAdmin(t, "admin@example.com");
-  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
-  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
-  await join(t, { code, nickname: "Sipho", pin: "5678" });
-
-  // **Without this the credential is decorative.** A shared code plus a guessable
-  // handle plus a four-digit PIN is 10,000 guesses, which is an afternoon for
-  // anybody who was ever given the code - and that is everybody.
-  const tags: string[] = [];
-  for (let i = 0; i < 12; i++) {
-    tags.push(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "0000" })));
-  }
-  expect(tags).toContain("access/pin-wrong");
-  expect(tags).toContain("access/too-many-attempts");
-  // The right PIN is refused too while the limit holds: a limit that the real member
-  // can walk past is a limit an attacker can walk past.
-  expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "1234" }))).toEqual("access/too-many-attempts");
-
-  // **Per `(accessCodeId, nicknameKey)`**, so one member being attacked never locks
-  // the rest of the organisation out of their own course.
-  await expect(comeBack(t, { code, nickname: "Sipho", pin: "5678" })).resolves.toBeDefined();
-});
-
-// ---- Changing a PIN (ticket 10) --------------------------------------------------
-
-test("a Seat can change its PIN with the old one, and the old one stops working", async () => {
-  const t = convexTest(schema, modules);
-  const admin = await seedSysAdmin(t, "admin@example.com");
-  const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
-  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
-  const [seat] = await seatRows(t);
-  const member = seat!.userId!;
-  await asUser(t, member).mutation(api.capture.setProgress, {
-    topicSlug: "hindi",
-    lessonKey: "0001",
-    status: "completed",
-  });
-
-  // The wrong old PIN is refused: the only thing that proves a caller owns a Seat is
-  // the PIN, so a change that skips it is a takeover, and on this rail there is no
-  // email to send a warning to afterwards.
-  expect(
-    await tagOf(asUser(t, member).action(api.accessCodeAuth.changePin, { oldPin: "0000", newPin: "5678" })),
-  ).toEqual("access/pin-wrong");
-
-  await asUser(t, member).action(api.accessCodeAuth.changePin, { oldPin: "1234", newPin: "998877" });
-
-  // Immediately: the new PIN works and the old one does not.
-  expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "1234" }))).toEqual("access/pin-wrong");
-  await expect(comeBack(t, { code, nickname: "Thandi", pin: "998877" })).resolves.toBeDefined();
-
-  // **The Seat, its Entitlement and its progress are untouched**, asserted on the
-  // key sets rather than on a count: a PIN change happens in `authAccounts`, and
-  // anything it moved in `seats` or `entitlements` would be a bug hiding as a
-  // convenience.
-  const after = await seatRows(t);
-  expect(after).toHaveLength(1);
-  expect(after[0]).toMatchObject({ userId: member, nicknameKey: "thandi", consentVersion: CONSENT });
-  expect(after[0]!.consentedAt).toEqual(seat!.consentedAt);
-  const held = await entitlementRows(t);
-  expect(held).toHaveLength(1);
-  expect(Object.keys(held[0]!).sort()).toEqual(["_creationTime", "_id", "lang", "topicId", "userId"]);
-  const progress = await t.run((ctx) => ctx.db.query("progress").collect());
-  expect(progress[0]).toMatchObject({ userId: member, topicId, status: "completed" });
-});
-
-test("nobody without a Seat can change a PIN, and the change shares sign-in's rate limit", async () => {
-  const t = convexTest(schema, modules);
-  const admin = await seedSysAdmin(t, "admin@example.com");
-  const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
-  const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
-  const [seat] = await seatRows(t);
-  const ordinary = await seedUser(t, "ordinary@example.com");
-
-  // Asserted server-side, not by which control a page renders: a Guest and an
-  // ordinary email-and-password account both hold no Seat, so there is no PIN of
-  // theirs to change and no argument by which they could name somebody else's.
-  await expect(t.action(api.accessCodeAuth.changePin, { oldPin: "1234", newPin: "5678" })).rejects.toThrow();
-  await expect(
-    asUser(t, ordinary).action(api.accessCodeAuth.changePin, { oldPin: "1234", newPin: "5678" }),
-  ).rejects.toThrow();
-  expect(await asUser(t, ordinary).query(api.accessCodes.mySeat, {})).toBeNull();
-  expect(await t.query(api.accessCodes.mySeat, {})).toBeNull();
-
-  // **Not a way around ticket 04's limit.** The old-PIN check goes through
-  // `retrieveAccount`, where the library's per-account limiter lives, so guessing
-  // here costs what guessing at the sign-in box costs.
-  const tags: string[] = [];
-  for (let i = 0; i < 12; i++) {
-    tags.push(
-      await tagOf(asUser(t, seat!.userId!).action(api.accessCodeAuth.changePin, { oldPin: "0000", newPin: "5678" })),
-    );
-  }
-  expect(tags).toContain("access/too-many-attempts");
-  // And the limit is shared with sign-in rather than being a second counter beside it.
-  expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "1234" }))).toEqual("access/too-many-attempts");
-
-  // A short PIN is refused rather than accepted and then unusable.
-  await expect(
-    asUser(t, seat!.userId!).action(api.accessCodeAuth.changePin, { oldPin: "1234", newPin: "12" }),
-  ).rejects.toThrow();
+  expect(await tagOf(join(t, { code, nickname: "Sipho" }))).toEqual("access/code-full");
+  await expect(comeBack(t, { code, nickname: "Thandi" })).resolves.toBeDefined();
 });
 
 // ---- Deleting a Seat (ticket 11) --------------------------------------------------
@@ -841,8 +732,8 @@ test("a member deletes their Seat: the link goes, the count stays, the credentia
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { accessCodeId, code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
-  await join(t, { code, nickname: "Sipho", pin: "5678" });
+  await join(t, { code, nickname: "Thandi" });
+  await join(t, { code, nickname: "Sipho" });
   const before = await asUser(t, seller).query(api.accessCodes.myAccessCodes, {});
   expect(before[0]).toMatchObject({ taken: 2, runningTotal: 30000 });
 
@@ -883,10 +774,12 @@ test("a member deletes their Seat: the link goes, the count stays, the credentia
   await asUser(t, seller).mutation(api.accessCodes.stopCode, { accessCodeId });
   expect((await ledgerRows(t))[0]).toMatchObject({ gross: 30000, status: "unpaid" });
 
-  // **The credential stops working immediately.** The `authAccounts` row had to go:
-  // its `providerAccountId` is `${accessCodeId}:${nicknameKey}`, so leaving it would
-  // leave the nickname and the link in plain text.
-  expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "1234" }))).toEqual("access/pin-wrong");
+  // **The old sign-in is gone.** The `authAccounts` row had to go: its
+  // `providerAccountId` is `${accessCodeId}:${nicknameKey}`, so leaving it would
+  // leave the name and the link in plain text. Typing the freed name now starts a
+  // FRESH join, not a way back into the old seat: this code was stopped above, so
+  // the freed name is refused the way any newcomer is on a stopped code.
+  expect(await tagOf(comeBack(t, { code, nickname: "Thandi" }))).toEqual("access/code-stopped");
   expect(await asUser(t, member).query(api.accessCodes.mySeat, {})).toBeNull();
 
   // **The Entitlement is left alone.** The honest consequence, stated in the
@@ -907,7 +800,7 @@ test("a deleted Seat frees its nickname, and reclaiming it consumes a new seat",
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
   const seat = (await seatRows(t))[0]!;
   await asUser(t, seat.userId!).mutation(api.accessCodes.deleteMySeat, {});
 
@@ -916,26 +809,28 @@ test("a deleted Seat frees its nickname, and reclaiming it consumes a new seat",
   // is arguably still a record of the person who asked to be forgotten. The cost is
   // that a stranger can claim a departed member's handle, which is affordable
   // precisely because the handle was never a real name.
-  await join(t, { code, nickname: "Thandi", pin: "9999" });
+  await join(t, { code, nickname: "Thandi" });
 
   // And it costs a NEW seat. That is correct rather than harsh: this is a different
   // person taking a place, and the departed member's place was consumed during the
   // agreement.
   const mine = await asUser(t, seller).query(api.accessCodes.myAccessCodes, {});
   expect(mine[0]).toMatchObject({ taken: 2, runningTotal: 30000 });
-  // The newcomer's PIN is theirs, and the departed member's does not reach it.
-  await expect(comeBack(t, { code, nickname: "Thandi", pin: "9999" })).resolves.toBeDefined();
-  expect(await tagOf(comeBack(t, { code, nickname: "Thandi", pin: "1234" }))).toEqual("access/pin-wrong");
+  // The name now signs into the NEWCOMER's seat, not the departed member's.
+  await expect(comeBack(t, { code, nickname: "Thandi" })).resolves.toBeDefined();
+  const seatsNow = await seatRows(t);
+  expect(seatsNow.filter((s) => s.nicknameKey === "thandi")).toHaveLength(1);
+  expect(seatsNow.find((s) => s.nicknameKey === "thandi")!.userId).not.toEqual(seat.userId);
 });
 
 // ---- Adopting an email onto a Seat (2026-08-25) ----------------------------------
 
-test("a Seat can add an email and a password, and keeps its nickname and PIN", async () => {
+test("a Seat can add an email and a password, and keeps its name sign-in", async () => {
   const t = convexTest(schema, modules);
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
   const [seat] = await seatRows(t);
   const member = seat!.userId!;
   expect((await asUser(t, member).query(api.accessCodes.mySeat, {}))!.hasEmail).toBe(false);
@@ -958,7 +853,7 @@ test("a Seat can add an email and a password, and keeps its nickname and PIN", a
   expect(after).toHaveLength(1);
   expect(after[0]!.userId).toEqual(member);
   expect((await asUser(t, member).query(api.accessCodes.mySeat, {}))!.hasEmail).toBe(true);
-  await expect(comeBack(t, { code, nickname: "Thandi", pin: "1234" })).resolves.toBeDefined();
+  await expect(comeBack(t, { code, nickname: "Thandi" })).resolves.toBeDefined();
   await expect(
     t.action(api.auth.signIn, {
       provider: "password",
@@ -976,7 +871,7 @@ test("adoption cannot take an address in use, and cannot repoint an ordinary acc
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
   const member = (await seatRows(t))[0]!.userId!;
   const ordinary = await seedUser(t, "taken@example.com");
 
@@ -1009,7 +904,7 @@ test("a Seat earns no certificate, however finished the course is", async () => 
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller, topicId } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
   const member = (await seatRows(t))[0]!.userId!;
 
   // Finish the whole course, so the ONLY thing standing between this member and a
@@ -1058,7 +953,7 @@ test("adopting an email does not buy a Seat a certificate", async () => {
   const admin = await seedSysAdmin(t, "admin@example.com");
   const { seller } = await seedSeller(t, admin, "author@example.com", "hindi");
   const { code } = await asUser(t, seller).mutation(api.accessCodes.mintAccessCode, MINT);
-  await join(t, { code, nickname: "Thandi", pin: "1234" });
+  await join(t, { code, nickname: "Thandi" });
   const member = (await seatRows(t))[0]!.userId!;
   await asUser(t, member).mutation(api.capture.setProgress, {
     topicSlug: "hindi",

@@ -33,7 +33,7 @@ import { normaliseAccessCode } from "../../../convex/accessCodeFormat";
 // (@convex-dev/auth `handleAuthenticationInRequest`), tries to redeem it, fails, and
 // 307s to the same URL with `code` stripped. The page never sees the param on any
 // name-collision fix short of dropping the middleware, so the link uses a different
-// name. `Editions.tsx` mints the matching `/join?voucher=` URL.
+// name. `manage/VoucherCard.tsx` mints the matching `/join?voucher=` URL.
 export default async function JoinPage({ searchParams }: { searchParams: Promise<{ voucher?: string | string[] }> }) {
   const raw = (await searchParams).voucher;
   // A repeated `?voucher=a&voucher=b` arrives as an array. Take the first rather than

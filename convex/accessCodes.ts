@@ -61,33 +61,32 @@ const MAX_CODES_LISTED = 50;
 // translated sentence, because the member may not be reading in English.
 //
 // Each tag sends the member somewhere different, and that is the point of having
-// six of them rather than one:
+// several of them rather than one:
 //
 //   - `code-unknown`     -> check your typing, or ask who gave it to you
 //   - `code-stopped`     -> the agreement ended; ask your organisation
 //   - `code-full`        -> the seats are gone; ask your organisation
-//   - `nickname-taken`   -> pick another, or say you are coming back
-//   - `pin-wrong`        -> what you typed does not match a seat on this code
+//   - `nickname-taken`   -> two members hit one name in the same instant (see below)
 //   - `consent-required` -> nothing was stored, and here is what else you can do
-//   - `too-many-attempts`-> wait; the credential is being protected
 //
-// **`nickname-taken` and `pin-wrong` must stay distinguishable.** A member cannot
-// tell "pick another nickname" from "you typed your PIN wrong" out of one message.
-// This leaks the existence of a nickname to anybody holding the code, which is an
-// accepted consequence recorded in ADR 0031, not an oversight: it is inherent to a
-// name being the lookup key, and it is a second reason the nickname is self-chosen.
+// **The PIN and its two tags (`pin-wrong`, `too-many-attempts`) went on 2026-08-27,
+// by the owner's explicit call**: a voucher member types ONE thing, their name, and
+// that either takes a new seat or signs them back into the one that name already
+// holds. `nickname-taken` is no longer a member-facing branch (an existing name now
+// signs in instead of being refused); it survives only as `claimSeat`'s answer to
+// two members claiming one name in the same transaction-race instant, where the
+// loser just tries again and lands in the sign-back-in path.
 //
-// `too-many-attempts` is the one tag the spec did not list. It is here because
-// ticket 04's rate limit is real and a locked-out member told "your PIN is wrong"
-// would keep typing the right PIN and conclude the seat is gone.
+// The cost is stated rather than hidden: **the name is the whole credential.**
+// Anybody holding the code who types an existing member's name is signed into that
+// member's seat. The owner accepted that for this audience (a code handed around a
+// known group), the way a shared classroom device is accepted.
 export const ACCESS_ERRORS = {
   codeUnknown: "access/code-unknown",
   codeStopped: "access/code-stopped",
   codeFull: "access/code-full",
   nicknameTaken: "access/nickname-taken",
-  pinWrong: "access/pin-wrong",
   consentRequired: "access/consent-required",
-  tooManyAttempts: "access/too-many-attempts",
 } as const;
 
 export function accessRefusal(tag: (typeof ACCESS_ERRORS)[keyof typeof ACCESS_ERRORS]): ConvexError<string> {
@@ -282,8 +281,9 @@ export async function ownCode(ctx: QueryCtx, accessCodeId: Id<"accessCodes">): P
 // ---- Joining (ticket 03) -------------------------------------------------------
 
 // What the credentials provider needs to know BEFORE it can call
-// `createAccount`: the code's id (half of the account identity), whether this
-// nickname already holds a Seat, and whether a new Seat is possible at all.
+// `createAccount`: the code's id (half of the account identity), who already holds
+// a Seat under this name (so typing it signs them back in, 2026-08-27), and whether
+// a new Seat is possible at all.
 //
 // It is a read, and it is deliberately **not** the cap check that matters. The one
 // that matters is inside `claimSeat`, in the same transaction as the insert. This
@@ -296,7 +296,10 @@ export const forJoin = internalQuery({
       accessCodeId: v.id("accessCodes"),
       stopped: v.boolean(),
       full: v.boolean(),
-      seatExists: v.boolean(),
+      // The account this name already signs into, or null if the name is free. A
+      // STRIPPED seat (withdrawal, ticket 11) has no `nicknameKey`, so the index
+      // cannot find it and its freed name correctly reads as null here.
+      seatUserId: v.union(v.id("users"), v.null()),
     }),
     v.null(),
   ),
@@ -317,7 +320,7 @@ export const forJoin = internalQuery({
       accessCodeId: row._id,
       stopped: row.stoppedAt !== undefined,
       full: (await seatCount(ctx, row._id)) >= row.capacity,
-      seatExists: seat !== null,
+      seatUserId: seat?.userId ?? null,
     };
   },
 });
@@ -627,8 +630,8 @@ export const logAccessCodePayment = mutation({
 // there is no argument by which one member could ask about another.
 //
 // Null for a Guest and null for an ordinary email-and-password account, which is
-// how the PIN-change and delete-my-seat controls stay invisible to everybody who has
-// no Seat rather than being hidden by a page's own judgement.
+// how the delete-my-seat control stays invisible to everybody who has no Seat
+// rather than being hidden by a page's own judgement.
 export const mySeat = query({
   args: {},
   returns: v.union(
@@ -686,21 +689,6 @@ async function ownSeat(ctx: QueryCtx, userId: Id<"users">): Promise<Doc<"seats">
     .first();
   return seat && seat.nicknameKey !== undefined ? seat : null;
 }
-
-// The Seat's account identity, for the PIN change (ticket 10). Internal, and it
-// takes no arguments on purpose: the caller is `ctx.auth`, so there is no id a
-// caller could pass to change somebody else's PIN.
-export const mySeatAccount = internalQuery({
-  args: {},
-  returns: v.union(v.object({ accessCodeId: v.id("accessCodes"), nicknameKey: v.string() }), v.null()),
-  handler: async (ctx) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-    const seat = await ownSeat(ctx, userId);
-    if (!seat?.nicknameKey) return null;
-    return { accessCodeId: seat.accessCodeId, nicknameKey: seat.nicknameKey };
-  },
-});
 
 // ---- Deleting a Seat (ticket 11) --------------------------------------------------
 

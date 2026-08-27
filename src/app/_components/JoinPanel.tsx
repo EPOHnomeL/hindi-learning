@@ -26,15 +26,17 @@ import { withLang } from "./editionUrl";
 // the sign-up, so there is no round trip, no localStorage stash and no OAuth hop to
 // survive. That absence is the feature.
 //
-// **Stripped to the bone on 2026-08-27, by the owner's explicit call**: the blurb, the
-// nickname hint ("does not have to be your real name"), both PIN hints, and the "we do
-// not track you" half of the consent sentence are gone, and the nickname label is
-// plain "Name". Those hints were treated as POPIA compliance controls when they
-// shipped (the real-name mitigation and the no-PIN-reset warning); the owner judged
-// the wall of text was losing the audience it existed to protect and chose the simple
-// form. The no-reset fact still lives in the Terms and the Privacy Policy, and the
-// consent record was re-versioned (see `convex/joinConsent.ts`, "2026-08-27") rather
-// than silently rewritten.
+// **Stripped to the bone on 2026-08-27, by the owner's explicit call, in two
+// passes**: first the blurb, the field hints and the "we do not track you" half of
+// the consent sentence went; then the PIN itself and the new/returning toggle. What
+// is left is one box, the member's name and surname, and one button: the server
+// signs a known name back into its seat and takes a new seat for an unknown one
+// (`convex/accessCodeAuth.ts`). The hints this page used to carry were treated as
+// POPIA compliance controls when they shipped (the real-name mitigation and the
+// no-PIN-reset warning); the owner judged the ceremony was losing the audience it
+// existed to protect and chose the simple form, real names included. The consent
+// record was re-versioned (see `convex/joinConsent.ts`, "2026-08-27") rather than
+// silently rewritten.
 //
 // **Consent is the act of joining** (2026-08-26): one sentence stated directly above
 // the button that does it, the way the sign-in page states its terms agreement. It was
@@ -142,25 +144,18 @@ function CodeStep({ code, setCode, onNext }: { code: string; setCode: (c: string
   );
 }
 
-// Step 2. Nickname, PIN, and **which of the two things they are doing**.
-//
-// The new/returning choice is not a convenience. A code plus an existing nickname
-// plus a wrong PIN is the same request either way, so without a declared intent the
-// server cannot tell "that nickname is taken, pick another" from "you typed your PIN
-// wrong" - and those send the member to two different actions. Asking is what makes
-// both answers possible.
+// Step 2. One box: the member's name (2026-08-27, the owner's call). The server
+// signs the name into the seat it already holds on this code, or takes a new seat
+// for it, so there is no new/returning choice and no PIN. The trade that buys this
+// (the name is the whole credential) is recorded at `accessCodes.ts` ACCESS_ERRORS.
 function Identity({ code }: { code: string }) {
   const t = useTranslations("Join");
   const { signIn } = useAuthActions();
-  const [flow, setFlow] = useState<"join" | "return">("join");
   const [nickname, setNickname] = useState("");
-  const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Four characters, matching the server, and stated rather than enforced silently:
-  // a disabled button with no explanation is a dead end on a phone.
-  const ready = nickname.trim().length > 0 && pin.length >= 4;
+  const ready = nickname.trim().length > 0;
 
   return (
     <form
@@ -171,7 +166,7 @@ function Identity({ code }: { code: string }) {
         setBusy(true);
         setError(null);
         try {
-          await signIn("accessCode", { flow, code, nickname, pin, consentVersion: CONSENT_VERSION });
+          await signIn("accessCode", { code, nickname, consentVersion: CONSENT_VERSION });
           // **Arm the install sheet for the course screen they are about to land on.**
           // This member is the best install candidate on the platform and the one who
           // could never see the prompt: it lives on "/" and a join goes straight into
@@ -196,36 +191,14 @@ function Identity({ code }: { code: string }) {
         {t("usingCode")} <b className="font-mono tracking-widest text-ink">{code}</b>
       </p>
 
-      {/* Which door they are coming through. Two buttons rather than a select: this
-          is read on a phone by somebody who has never seen the site. */}
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{t("whichLabel")}</span>
-        <div className="flex gap-2">
-          {(["join", "return"] as const).map((f) => (
-            <button
-              key={f}
-              type="button"
-              aria-pressed={flow === f}
-              onClick={() => {
-                setFlow(f);
-                setError(null);
-              }}
-              className={`flex-1 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
-                flow === f ? "border-accent bg-accent/10 text-accent" : "border-line text-soft hover:border-accent"
-              }`}
-            >
-              {f === "join" ? t("iAmNew") : t("iAmReturning")}
-            </button>
-          ))}
-        </div>
-      </div>
-
+      {/* The one thing asked for. `autoComplete="name"` so the phone offers the fill:
+          the same name typed the same way is the way back into the same seat. */}
       <label className="flex flex-col gap-1.5">
         <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{t("nicknameLabel")}</span>
         <input
           value={nickname}
           autoFocus
-          autoComplete="off"
+          autoComplete="name"
           spellCheck={false}
           placeholder={t("nicknamePlaceholder")}
           onChange={(e) => {
@@ -233,22 +206,6 @@ function Identity({ code }: { code: string }) {
             setError(null);
           }}
           className="w-full rounded-lg border border-line bg-hi px-3 py-2.5 text-base text-ink focus:border-gold focus:outline-none"
-        />
-      </label>
-
-      <label className="flex flex-col gap-1.5">
-        <span className="text-[10.5px] font-bold uppercase tracking-wide text-accent2">{t("pinLabel")}</span>
-        <input
-          value={pin}
-          type="password"
-          inputMode="numeric"
-          autoComplete={flow === "join" ? "new-password" : "current-password"}
-          placeholder={t("pinPlaceholder")}
-          onChange={(e) => {
-            setPin(e.target.value);
-            setError(null);
-          }}
-          className="w-full rounded-lg border border-line bg-hi px-3 py-2.5 font-mono text-base tracking-widest text-ink focus:border-gold focus:outline-none"
         />
       </label>
 
@@ -283,7 +240,7 @@ function Identity({ code }: { code: string }) {
         disabled={busy || !ready}
         className="rounded-lg bg-accent px-3.5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
       >
-        {busy ? t("working") : flow === "join" ? t("submitJoin") : t("submitReturn")}
+        {busy ? t("working") : t("submitJoin")}
       </button>
       {/* Never an email field, anywhere on this page. The promise is visible in the
           product and not only in the policy. */}
@@ -347,9 +304,10 @@ function AlreadyIn() {
 
 // The refusal tags the credentials provider throws, turned into something a stranger
 // can act on. Each one sends them somewhere different, which is the whole reason the
-// server distinguishes them: a typo is theirs to fix, a taken nickname means picking
-// another, a stopped or full code means asking their organisation, and a wrong PIN
-// means checking what they typed.
+// server distinguishes them: a typo is theirs to fix, a stopped or full code means
+// asking their organisation. (The PIN tags went with the PIN on 2026-08-27, and
+// `nickname-taken` is now only a same-instant race whose loser's retry signs in, so
+// both fall through to the generic line.)
 //
 // **Never a raw tag and never "Server Error".** Only a `ConvexError`'s `data`
 // survives a production deployment, which is why the server throws tags rather than
@@ -363,14 +321,8 @@ function messageFor(e: unknown, t: (key: string) => string): string {
       return t("errStopped");
     case "access/code-full":
       return t("errFull");
-    case "access/nickname-taken":
-      return t("errNicknameTaken");
-    case "access/pin-wrong":
-      return t("errPinWrong");
     case "access/consent-required":
       return t("errConsent");
-    case "access/too-many-attempts":
-      return t("errTooMany");
     default:
       return t("errGeneric");
   }
