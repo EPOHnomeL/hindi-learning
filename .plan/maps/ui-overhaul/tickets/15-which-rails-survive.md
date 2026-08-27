@@ -2,13 +2,13 @@
 type: grilling
 blocked_by: [14]
 ---
-# Which of the seven share and sell rails survive, and what does the owner call them
+# Which of the six share and sell rails survive, and what does the owner call them
 
 > `/wayfinder .plan/maps/ui-overhaul/tickets/15-which-rails-survive.md`
 
 ## Question
 
-`Editions.tsx` presents seven rails as seven sibling cards of equal weight, which is
+`Editions.tsx` presents six rails as six sibling cards of equal weight, which is
 why the panel reads as noise. Two of them are voucher rails that a reader cannot tell
 apart without opening ADR 0029 and ADR 0031. Decide, with ticket 14's usage counts in
 hand:
@@ -23,6 +23,12 @@ hand:
   otherwise.
 - The words. Publish, public link, invite, sell, voucher, batch and access code are
   seven nouns for one act, and the glossary in CONTEXT.md is the tiebreak.
+
+Two facts from ticket 14 bear on the verdicts and are easy to misread. The voucher
+rail has never been used outside `test-course`, so it is a candidate for retirement on
+usage grounds alone. Free self-enroll has granted nobody anything, but ticket 21 is
+open on whether that path is broken rather than unwanted, so do not read its zero as
+demand until 21 lands.
 
 Read ADR 0029 and ADR 0031 before proposing any merge. Both encode choices that look
 like bugs to a fresh reader, and a redemption deliberately records nothing about who

@@ -61,6 +61,12 @@ sibling `ui-overhaul-impl` map is resolved, and when the course-management stran
 
 <!-- one line per resolved ticket -->
 
+- [Which share and sell rails has anyone actually used](tickets/14-rail-usage-evidence.md):
+  the dialog has **six** rails, not seven; one course (`prophetic-school`) carries every
+  one of them and is the only Topic that ever earned money (17 paid seats, 14 PayFast
+  and 3 EFT). Vouchers have never been used outside `test-course` and `enrollments` is
+  empty, while the widely-used public-link rail is the **legacy** `topics.publicToken`
+  (19 Topics) rather than `publicLinks` (3).
 - [Surface inventory and priority order](tickets/04-surface-inventory.md) — 21 surfaces
   ranked worst-first; no design system exists (6 theme toggles, 7 confirm dialogs,
   `PublicReader` is a fork of `CourseShell`), the lesson quiz lives outside React in an
