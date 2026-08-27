@@ -26,16 +26,15 @@ import { withLang } from "./editionUrl";
 // the sign-up, so there is no round trip, no localStorage stash and no OAuth hop to
 // survive. That absence is the feature.
 //
-// **Two sentences on this page are compliance controls, not copy**, and an editor
-// tidying them is editing a control:
-//
-//   - The nickname hint says the nickname need not be a real name. Under POPIA a real
-//     name beside a political party's cohort is special personal information (s26 via
-//     s1); a self-chosen handle is materially weaker on that limb. A UI that nudges
-//     members toward their real name removes the mitigation the whole design rests on.
-//   - The PIN hint says a forgotten PIN cannot be recovered by anybody. That is true,
-//     there is no reset flow and there must never be one, and a member who was not
-//     told will reasonably believe support can help.
+// **Stripped to the bone on 2026-08-27, by the owner's explicit call**: the blurb, the
+// nickname hint ("does not have to be your real name"), both PIN hints, and the "we do
+// not track you" half of the consent sentence are gone, and the nickname label is
+// plain "Name". Those hints were treated as POPIA compliance controls when they
+// shipped (the real-name mitigation and the no-PIN-reset warning); the owner judged
+// the wall of text was losing the audience it existed to protect and chose the simple
+// form. The no-reset fact still lives in the Terms and the Privacy Policy, and the
+// consent record was re-versioned (see `convex/joinConsent.ts`, "2026-08-27") rather
+// than silently rewritten.
 //
 // **Consent is the act of joining** (2026-08-26): one sentence stated directly above
 // the button that does it, the way the sign-in page states its terms agreement. It was
@@ -80,7 +79,7 @@ export function JoinPanel({ linkedCode }: { linkedCode: string }) {
 function JoinFlow({ linkedCode }: { linkedCode: string }) {
   const t = useTranslations("Join");
   // **A code that arrived on the link skips the code step entirely.** Somebody who
-  // followed `/join?code=...` has already handed the code over by clicking, so a box
+  // followed `/join?voucher=...` has already handed the code over by clicking, so a box
   // asking them to confirm it is a step that exists only because the page could not
   // tell the two cases apart. `/redeem` learned the same lesson.
   const [step, setStep] = useState<Step>(linkedCode ? "identity" : "code");
@@ -92,12 +91,11 @@ function JoinFlow({ linkedCode }: { linkedCode: string }) {
   return (
     <>
       <h1 className="text-2xl font-semibold tracking-tight text-accent">{t("title")}</h1>
-      <p className="mt-1.5 text-sm leading-relaxed text-soft">{t("blurb")}</p>
 
       {step === "code" ? (
         <CodeStep code={typedCode} setCode={setTypedCode} onNext={() => setStep("identity")} />
       ) : (
-        <Identity code={code} linked={!!linkedCode} onBack={() => setStep("code")} />
+        <Identity code={code} />
       )}
     </>
   );
@@ -151,7 +149,7 @@ function CodeStep({ code, setCode, onNext }: { code: string; setCode: (c: string
 // server cannot tell "that nickname is taken, pick another" from "you typed your PIN
 // wrong" - and those send the member to two different actions. Asking is what makes
 // both answers possible.
-function Identity({ code, linked, onBack }: { code: string; linked: boolean; onBack: () => void }) {
+function Identity({ code }: { code: string }) {
   const t = useTranslations("Join");
   const { signIn } = useAuthActions();
   const [flow, setFlow] = useState<"join" | "return">("join");
@@ -236,9 +234,6 @@ function Identity({ code, linked, onBack }: { code: string; linked: boolean; onB
           }}
           className="w-full rounded-lg border border-line bg-hi px-3 py-2.5 text-base text-ink focus:border-gold focus:outline-none"
         />
-        {/* COMPLIANCE CONTROL. See the header comment. Do not soften this into
-            "your name" and do not add a real-name placeholder. */}
-        <span className="text-[11.5px] leading-relaxed text-soft">{t("nicknameHint")}</span>
       </label>
 
       <label className="flex flex-col gap-1.5">
@@ -255,22 +250,16 @@ function Identity({ code, linked, onBack }: { code: string; linked: boolean; onB
           }}
           className="w-full rounded-lg border border-line bg-hi px-3 py-2.5 font-mono text-base tracking-widest text-ink focus:border-gold focus:outline-none"
         />
-        {/* COMPLIANCE CONTROL, and the true statement the whole rail depends on:
-            there is no reset flow, because a reset needs a second channel and the
-            second channel is the email this design exists to avoid. */}
-        <span className="text-[11.5px] leading-relaxed text-soft">
-          {flow === "join" ? t("pinHintNew") : t("pinHintReturn")}
-        </span>
       </label>
 
-      {/* **The consent record, at the button that gives it.** This replaced a separate
-          consent step (2026-08-26). It names the three facts rather than gesturing at a
-          policy, and the Terms carry the full undertaking one tap away; the version and
-          timestamp are still stored on the Seat and still refused server-side, so the
-          proof does not depend on this paragraph being read. Its wording is pinned to
-          `convex/joinConsent.ts` by `messages/consent.test.ts`: editing it here without
-          minting a new version there fails a test, deliberately, because it would
-          rewrite what already-joined members are recorded as having agreed to.
+      {/* **The consent record, at the button that gives it.** One sentence since
+          2026-08-27 (the owner cut the "we do not track you" detail as reading like a
+          scam disclaimer); the Terms and Privacy Policy carry the full undertaking one
+          tap away, and the version and timestamp are still stored on the Seat and still
+          refused server-side. Its wording is pinned to `convex/joinConsent.ts` by
+          `messages/consent.test.ts`: editing it here without minting a new version
+          there fails a test, deliberately, because it would rewrite what already-joined
+          members are recorded as having agreed to.
 
           Links open in a new tab so a member reading them does not lose the code they
           arrived with. */}
@@ -289,27 +278,13 @@ function Identity({ code, linked, onBack }: { code: string; linked: boolean; onB
         })}
       </p>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="submit"
-          disabled={busy || !ready}
-          className="rounded-lg bg-accent px-3.5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-        >
-          {busy ? t("working") : flow === "join" ? t("submitJoin") : t("submitReturn")}
-        </button>
-        {/* Only when they TYPED it. A linked code lives in the URL, so "change it"
-            would have to fight the query string it came from; a member who followed
-            the wrong link edits the link, not a form. */}
-        {!linked && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="rounded-lg border border-line px-3 py-2 text-xs font-medium text-soft transition-colors hover:border-accent hover:text-accent"
-          >
-            {t("changeCode")}
-          </button>
-        )}
-      </div>
+      <button
+        type="submit"
+        disabled={busy || !ready}
+        className="rounded-lg bg-accent px-3.5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+      >
+        {busy ? t("working") : flow === "join" ? t("submitJoin") : t("submitReturn")}
+      </button>
       {/* Never an email field, anywhere on this page. The promise is visible in the
           product and not only in the policy. */}
       {error && <p className="text-sm leading-relaxed text-danger">{error}</p>}

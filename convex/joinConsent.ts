@@ -25,6 +25,16 @@
 // one thing this module exists to prevent.
 
 export const CONSENT_VERSIONS: Record<string, readonly string[]> = {
+  // 2026-08-27. **The fourth shortening, asked for by the owner**: the "we do not
+  // track you" enumeration read to them like a scam disclaimer on the page ("that
+  // sounds sus"), so the sentence is now only the agreement itself, with the what-we-
+  // keep and no-PIN-recovery facts living in the linked Terms and Privacy Policy
+  // rather than at the button. Continuing the one-way direction the 2026-08-26 note
+  // records, and a step further from "specific and informed" at the point of action:
+  // if a legal opinion is ever taken on this rail, put this version in front of it
+  // alongside the 2026-08-26 decision. A NEW key because 2026-08-26 has been issued.
+  "2026-08-27": ["By joining you agree to the Terms and the Privacy Policy."],
+
   // 2026-08-23, the wording this rail shipped with.
   //
   // Corrected on 2026-08-25, before the version had ever been issued to anybody, so
@@ -92,4 +102,4 @@ export const CONSENT_VERSIONS: Record<string, readonly string[]> = {
 // The version a join taken today is recorded against. `/join` sends this and the
 // server refuses anything else, so a stale cached page cannot record a member as
 // having agreed to wording it never showed them.
-export const CONSENT_VERSION = "2026-08-26";
+export const CONSENT_VERSION = "2026-08-27";
