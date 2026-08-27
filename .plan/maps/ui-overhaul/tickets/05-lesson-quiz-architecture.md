@@ -2,35 +2,32 @@
 type: grilling
 blocked_by: [04]
 ---
-# Does the lesson body — and the quiz — come out of the iframe?
+# Does the lesson body, and the quiz, come out of the iframe
 
 > `/wayfinder .plan/maps/ui-overhaul/tickets/05-lesson-quiz-architecture.md`
 
 ## Question
 
-The inventory (ticket 04) found that the highest-traffic surface in the product is
-not React: lesson HTML is LLM-authored and injected into a sandboxed iframe `srcDoc`,
-with four hand-written `<script>` string bridges over `postMessage`, and **the quiz
-has no React surface at all** — it is `.quiz[data-correct]` markup styled by CSS
-strings in `lessonSrcDoc.ts`, wired up by `querySelectorAll`.
+Ticket 04 found the highest-traffic surface in the product is not React. Lesson HTML
+is LLM-authored into a sandboxed iframe `srcDoc` behind four hand-written script
+bridges, and the quiz has no React surface at all: it is `.quiz[data-correct]` markup
+wired up by `querySelectorAll`, with correctness normalisation duplicated in two
+places a comment admits must stay in sync.
 
-No design system reaches inside that iframe, so this decides how far the overhaul can
-actually go on the surface that matters most. Decide:
+No design system reaches inside that iframe, so this bounds how far the overhaul can
+go on the surface that matters most. Three questions, in order:
 
-- Does the **quiz** become a React component fed by structured data the authoring
-  step emits, leaving only prose in the iframe? Or does it stay as authored markup?
-- If quizzes come out, what happens to the ~1400 existing authored lessons — does the
-  bridge stay as a compatibility path, or is there a migration?
-- Does the **prose** stay in an iframe at all, or get sanitised and rendered inline?
-- The breakpoint conflict (iframe `641px` vs Tailwind `md` 768px) — one number, wherever
-  the boundary lands.
+1. **Does the quiz become React**, fed by structured data the authoring step emits?
+   If yes, what happens to the ~1400 existing authored lessons: bridge kept as a
+   compatibility path, or a migration?
+2. **Does the prose stay in an iframe at all**, or get sanitised and rendered inline?
+3. **One breakpoint number**, wherever the boundary lands. The iframe CSS says 641px
+   and Tailwind `md` says 768px, so today they disagree between the two.
 
-This is deliberately **not** blocked on the design foundation (ticket 03): it is an
-architecture question, and its answer constrains what the foundation must cover.
+Deliberately not blocked on ticket 03: this is architecture, and its answer
+constrains what the foundation must cover.
 
 ## Done when
 
-The answer states whether quiz and prose leave the iframe, what happens to existing
-authored content either way, and what the lesson surface's component boundary is —
-precisely enough that ticket 03 knows whether the component set must include quiz
-primitives.
+The Answer settles all three, precisely enough that ticket 03 knows whether the
+component set must include quiz primitives.

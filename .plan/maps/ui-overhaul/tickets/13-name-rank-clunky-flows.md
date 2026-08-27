@@ -1,6 +1,6 @@
 ---
 type: grilling
-blocked_by: [08, 12]
+blocked_by: [08, 10]
 ---
 # Name and rank the clunky flows from the evidence
 
@@ -8,38 +8,35 @@ blocked_by: [08, 12]
 
 ## Question
 
-The ticket the whole PostHog strand exists to serve, and the reason this map's
-**Flow fixes** fog was blocked. The map's problem statement names three ills —
-"looks amateur", clunky flows, weak mobile — and this one settles the second:
-**which journeys are actually clunky, ranked, on evidence rather than suspicion.**
+The map names three ills, "looks amateur", clunky flows, weak mobile. This settles the
+second: **which journeys are actually clunky, ranked, on evidence rather than
+suspicion.** It is the ticket the whole PostHog strand exists to serve, and the reason
+the Flow fixes fog was blocked.
 
-Ticket 04's surface inventory already nominates suspects, and they are the first
-places to look, not the answer:
+Ticket 04 nominates three suspects. They are the first places to look, not the answer:
+the authoring composer stuffed into a dashboard grid cell, pricing and payouts and
+access control sharing one modal, and `/admin` role-branching on a single route.
 
-- the authoring composer stuffed into a dashboard grid cell,
-- pricing, payouts and access control sharing one modal,
-- `/admin` role-branching on a single route.
+How to work it:
 
-Work it against the bar ticket 12 set:
+- **Watch every replay.** Rage clicks, dead clicks, back-navigation, long hesitations,
+  mis-taps on mobile especially.
+- **Funnels find sessions, they do not compute rates.** Ten sales cannot support a
+  percentage; one confused visitor swings a "30% drop-off".
+- **Rank what you find**, with a stated reason for the order. A flat list of gripes
+  does not feed per-surface work.
+- **Label every finding observed or inferred.** A self-walkthrough on a real phone is
+  admitted evidence, but an untagged guess recorded as an observation is how a
+  redesign gets aimed at the wrong surface.
 
-- Watch the replays. At this volume every session can be watched individually — look
-  for rage clicks, dead clicks, back-navigation, long hesitations, and mis-taps on
-  mobile especially, since a weak phone experience is one of the map's three stated
-  ills.
-- Use funnels to *find* the interesting sessions, not to compute rates. Ten sales
-  cannot support a percentage.
-- Rank what you find. The output feeds per-surface work, so a flat list of gripes is
-  not enough — it needs an order, and the order needs a stated reason.
-- Say which findings are **observed** and which are **inferred**. Ticket 12 may have
-  admitted a self-walkthrough alongside real sessions; if so, keep the two labelled.
-  A guess recorded as an observation is how a redesign gets aimed at the wrong
-  surface.
-
-With ticket 08 done this is largely **AFK**: an agent can query the events and
-recordings through the PostHog MCP directly and bring findings back for judgement.
+With ticket 08 done this is largely AFK: an agent queries events and recordings
+through the PostHog MCP and brings findings back for judgement.
 
 ## Done when
 
-The clunky flows are named and ranked with the evidence for each, precisely enough
-that this map's **Flow fixes** fog can graduate into per-flow tickets — and each
-finding is marked observed or inferred.
+Every session recorded in the **two weeks after ticket 10 goes live** has been watched,
+and the flows are named and ranked with the evidence for each, each marked observed or
+inferred, precisely enough that the map's Flow fixes fog graduates into per-flow
+tickets. Proceed on whatever evidence exists at the end of that window; a thin trickle
+of traffic does not stall the map. (This bar came from ticket 12, which was ruled out
+as ceremony on 2026-08-27.)

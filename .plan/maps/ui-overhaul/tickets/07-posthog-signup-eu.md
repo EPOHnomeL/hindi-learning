@@ -7,31 +7,25 @@ type: task
 
 ## Question
 
-Manual (HITL) provisioning that every PostHog ticket on this map waits on. The
-decisions are already made (grilling, 2026-08-02) and are **not** reopened here:
+HITL provisioning that the rest of the PostHog strand waits on. Nothing to decide.
+Two settled facts, from grilling 2026-08-02, that this ticket must not get wrong:
+**EU region** (fixed at signup, unmigratable, and the easier POPIA s72 story for a
+South African user base) and **one project for all tenants** (tenancy is a property
+and a group, per ticket 09).
 
-- **PostHog Cloud, EU region.** Not US, not self-hosted. The region is fixed at
-  signup and cannot be changed later without losing history, so this is a one-way
-  door — pick EU deliberately. EU is the easier POPIA §72 cross-border story for a
-  South African user base than the US, and the shorter hop from SA.
-- **One project for all tenants** (`upf`, `ywampotch`, `almighty-warriors`, `yknot`
-  and the default site). Tenancy is a property and a group, never a separate
-  project — see ticket 09.
+## Todo
 
-Checklist for the human:
-
-1. Sign up at <https://eu.posthog.com> — confirm the URL is the **eu.** host before
-   creating the account. A US-region account cannot be migrated.
-2. Create **one** project for the whole app (not one per tenant).
-3. Grab the **project API key** (`phc_…`) and the **API host** (`https://eu.i.posthog.com`).
-4. Create a **personal API key** as well — ticket 08's MCP authorization needs it.
-5. Note the plan and any free-tier limits on event and recording volume, so ticket
-   09 can size the taxonomy against them rather than guessing.
-6. Do **not** wire anything into the app yet — that is ticket 10, and it is gated on
-   the masking policy (09) and the privacy-policy disclosure (11).
+- [ ] Sign up at <https://eu.posthog.com>. Confirm the **eu.** host before creating
+      the account.
+- [ ] Create **one** project for the whole app, not one per tenant.
+- [ ] Record the project API key (`phc_...`) location and the API host
+      (`https://eu.i.posthog.com`).
+- [ ] Create a **personal** API key as well; ticket 08 needs it.
+- [ ] Record the plan's event and session-recording limits, so ticket 09 sizes the
+      taxonomy against a real number.
+- [ ] Wire nothing into the app. That is ticket 10, gated on 09 and 11.
 
 ## Done when
 
-A PostHog Cloud **EU** project exists, and the Answer records: the project API key
-location, the API host, that a personal API key exists for 08, and the plan's event
-and session-recording limits.
+The EU project exists and the Answer carries the key locations, the API host, and the
+plan limits.

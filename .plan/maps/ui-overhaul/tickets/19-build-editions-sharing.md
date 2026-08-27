@@ -8,29 +8,36 @@ blocked_by: [16, 17]
 
 ## Question
 
-Ship what tickets 15, 16 and 17 decided. Those three Answers are the contract, and
-there is no separate spec.
+Ship what tickets 15, 16 and 17 decided. Those three Answers are the contract; there
+is no separate spec. This is presentation plus the moves 17 assigned. Every query and
+mutation stays as it is, and a rail retired from the UI keeps its backend.
 
-`Editions.tsx` is 2023 lines and 21 components in one file. It splits along the seams
-ticket 16 named, which is also the Editions half of ticket 06. Every query and
-mutation it calls stays as it is: this is a presentation change, plus the moves ticket
-17 assigned and the rails ticket 15 retired from view. A rail retired from the UI keeps
-its backend.
+Use `/tdd` and `/ponytail`.
 
-Constraints that are not up for renegotiation here:
+## Todo
 
-- Owner-only checks stay server-side. Run `convex:convex-authz` over anything that
-  moved.
-- All copy goes through the existing `Editions` and `CourseSettings` message
-  namespaces. No hardcoded English, since the app ships more than one app language.
-- Tenant theming stays expressible. The app is whitelabeled per ADR 0022.
-- Four bespoke confirm dialogs live in this file while `ConfirmDialog` exists in
-  `ui.tsx`. They collapse onto it.
-
-Use `/tdd` and `/ponytail`. Walk it in a browser on a real course before resolving.
+- [ ] Split `Editions.tsx` (2023 lines, 21 components) along the seams ticket 16
+      named. This is also the Editions half of ticket 06.
+- [ ] Render ticket 15's three groups: Who can find it, Who you hand it to, What it
+      costs.
+- [ ] Build the merged voucher card with the distribution mode picker, each mode
+      stating its billing and its identity consequence in a line.
+- [ ] Collapse the four bespoke confirm dialogs in this file onto `ConfirmDialog` in
+      `ui.tsx`.
+- [ ] Move the controls ticket 17 reassigned, and make anything sent to `/settings`
+      reachable there.
+- [ ] Run `convex:convex-authz` over everything that moved. Owner checks stay
+      server-side; a move must not widen who can call it.
+- [ ] All copy through the existing `Editions` and `CourseSettings` message
+      namespaces. No hardcoded English.
+- [ ] Keep tenant theming expressible (ADR 0022).
+- [ ] Add the CONTEXT.md edit ticket 15 assigned: "one code each" and "one shared
+      code" onto the Avoid lists of the Bulk Vouchers and Organisation Voucher
+      entries.
+- [ ] `pnpm typecheck` green, tests covering the moved controls' authorisation.
+- [ ] Walk it in a browser on a real course at phone width.
 
 ## Done when
 
-The surface is built, `pnpm typecheck` is green, tests cover the moved controls'
-authorisation, and the Answer records that it was walked in a browser at phone width
-rather than only read. Any control ticket 17 sent to `/settings` is reachable there.
+Every box above is ticked and the Answer records that it was walked in a browser at
+phone width rather than only read.

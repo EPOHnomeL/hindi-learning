@@ -8,19 +8,24 @@ blocked_by: [18, 19]
 
 ## Question
 
-Ship the layout ticket 18 settled, holding the controls ticket 17 assigned. It follows
-ticket 19 rather than running beside it, because both surfaces read from
-`content.reader.courseHeader` and share the confirm and dialog primitives that 19
-collapses.
-
-Same constraints as 19. Server-side owner checks, existing message namespaces, tenant
-theming, and `ConfirmDialog` instead of another bespoke one. The three entry points,
-reader, dashboard and Editor, all keep working.
+Ship ticket 18's layout holding ticket 17's control set. It follows 19 rather than
+running beside it, because both surfaces read `content.reader.courseHeader` and share
+the primitives 19 collapses.
 
 Use `/tdd` and `/ponytail`.
 
+## Todo
+
+- [ ] Build the layout, with the mission field and save affordance as 18 settled them.
+- [ ] Keep all three entry points working: reader, dashboard, and the Editor's
+      Details-only view.
+- [ ] `ConfirmDialog` from `ui.tsx`, not another bespoke one.
+- [ ] Owner checks stay server-side; existing message namespaces; tenant theming
+      intact.
+- [ ] `pnpm typecheck` green, and a test covering the Editor's Details-only view.
+- [ ] Walk it at phone width from both the reader and the dashboard.
+
 ## Done when
 
-Built, `pnpm typecheck` green, the Editor's Details-only view covered by a test, and
-the Answer records a browser walk at phone width from both the reader and the
-dashboard entry points.
+Every box above is ticked and the Answer records the browser walk from both entry
+points.

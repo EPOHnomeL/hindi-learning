@@ -8,23 +8,20 @@ blocked_by: [03]
 
 ## Question
 
-The inventory found the overhaul would otherwise land twice on several surfaces.
-Once the foundation (ticket 03) names the component set, decide what collapses:
+Ticket 04 found the overhaul would otherwise land twice on several surfaces. Once
+ticket 03 names the component set, give each of these a destination:
 
-- **`PublicReader.tsx` (474 lines) vs `CourseShell.tsx` (591 lines)** — a near
-  line-for-line fork, identical drawer, identical inline SVGs. One shell with a guest
-  mode, or two that stay separate on purpose?
-- **Six theme-toggle implementations** and **seven confirm-dialog implementations**
-  (including a `window.confirm` in `AdminPanel`) — one each, presumably; confirm and
-  say where they live.
-- **Four near-identical course cards** in `Dashboard.tsx` — one card with variants?
-- **`YwamPotch.tsx`**, a hardcoded-English fork of `Landing.tsx` — do tenant landings
+- **`PublicReader.tsx` (474) vs `CourseShell.tsx` (591)**, a near line-for-line fork.
+  One shell with a guest mode, or two kept apart on purpose?
+- **Six theme toggles** and **seven confirm dialogs** (one is a `window.confirm`).
+  Presumably one each. Say where each lives.
+- **Four near-identical course cards** in `Dashboard.tsx`. One card with variants?
+- **`YwamPotch.tsx`**, a hardcoded-English fork of `Landing.tsx`. Do tenant landings
   become data-driven before a second fork exists?
-- The god files — `AdminPanel.tsx` (2255 lines), `Editions.tsx` (2023 as of 2026-08-27, 1274 when surveyed), `Dashboard.tsx`
-  (959) — does the overhaul split them, and along what seams?
+- **The god files**: `AdminPanel.tsx` (2255), `Editions.tsx` (2023), `Dashboard.tsx`
+  (959). Split, and along what seams? Ticket 16 answers the Editions half first.
 
 ## Done when
 
-Each duplicate above has a named destination (collapse into X / stay separate because
-Y), so per-surface redesign tickets can be cut without two of them touching the same
-markup.
+Each item above has a named destination, collapse into X or stay separate because Y,
+so per-surface tickets can be cut without two of them touching the same markup.
