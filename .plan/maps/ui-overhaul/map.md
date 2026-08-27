@@ -109,6 +109,10 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
 
 ## Out of scope
 
+- [Set the evidence bar](tickets/12-set-evidence-bar.md): ruled out 2026-08-27 as
+  ceremony. At around ten lifetime sales there is exactly one defensible bar, and it
+  needs no separate ticket to reach: watch every session. Its bar and stop rule moved
+  into ticket 13's Done-when.
 - PWA and offline itself: the [reader-experience](../reader-experience/map.md) map; this
   effort only precedes it. Ticket 04 found its "groundwork already closed" premise is
   false; correcting that belongs to that map.
