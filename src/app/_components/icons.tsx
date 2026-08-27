@@ -30,7 +30,8 @@ export type IconName =
   | "chevron"
   | "tag"
   | "users"
-  | "chat";
+  | "chat"
+  | "chart";
 
 const PATHS: Record<IconName, ReactNode> = {
   edit: (
@@ -123,6 +124,13 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M12.6 2.6A2 2 0 0 0 11.2 2H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.8 8.8a2 2 0 0 0 2.8 0l6.4-6.4a2 2 0 0 0 0-2.8z" />
       <circle cx="7.5" cy="7.5" r="1.1" />
+    </>
+  ),
+  // A bar chart (the manage route's Dashboard tab, ui-overhaul 16).
+  chart: (
+    <>
+      <path d="M3 3v18h18" />
+      <path d="M8 17v-6M13 17V7M18 17v-9" />
     </>
   ),
   users: (

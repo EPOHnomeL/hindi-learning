@@ -14,7 +14,6 @@ import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { catalogueCacheKey, DASHBOARD_CACHE_KEY, TENANT_NAME_CACHE_KEY, writeCache } from "./offlineCache";
 import { CourseCertMenu } from "./Certificate";
 import { CourseSettingsDialog } from "./CourseSettings";
-import { EditionsDialog } from "./Editions";
 import { checkoutLink, withLang } from "./editionUrl";
 import { Icon } from "./icons";
 import { formatPrice } from "./Paygate";
@@ -323,7 +322,6 @@ function CourseCard({ course }: { course: Course }) {
   const t = useTranslations("Dashboard");
   const [showMission, setShowMission] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [editionsOpen, setEditionsOpen] = useState(false);
   // Course settings follows the UI language: when the course has an Edition in
   // the active locale, Details edits that translated Edition (else the English
   // source). Mirrors the reader, which follows the Edition being read.
@@ -447,7 +445,6 @@ function CourseCard({ course }: { course: Course }) {
             openLabel={t("openCourse")}
             courseCompleted={complete}
             onOpenSettings={() => setSettingsOpen(true)}
-            onOpenEditions={() => setEditionsOpen(true)}
           />
         )}
       </div>
@@ -457,9 +454,6 @@ function CourseCard({ course }: { course: Course }) {
       )}
       {settingsOpen && (
         <CourseSettingsDialog topicSlug={course.slug} status={course.status} lang={settingsLang} onClose={() => setSettingsOpen(false)} />
-      )}
-      {editionsOpen && (
-        <EditionsDialog topicSlug={course.slug} title={course.title} onClose={() => setEditionsOpen(false)} />
       )}
     </article>
   );

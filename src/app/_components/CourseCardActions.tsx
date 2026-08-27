@@ -35,7 +35,6 @@ export function CourseCardActions({
   openLabel,
   courseCompleted,
   onOpenSettings,
-  onOpenEditions,
 }: {
   slug: string;
   title: string;
@@ -45,7 +44,6 @@ export function CourseCardActions({
   // the kebab never offers the admin's "Finish generating course" there.
   courseCompleted: boolean;
   onOpenSettings: () => void;
-  onOpenEditions: () => void;
 }) {
   const t = useTranslations("Dashboard");
   const tcs = useTranslations("CourseSettings");
@@ -73,17 +71,10 @@ export function CourseCardActions({
         {openLabel}
       </Link>
 
-      {/* One tap beside "Open course" opens Editions & sharing, the dialog that
-          owns this course's languages and who they are shared with (2026-08-25).
-          It used to drop a menu listing the Editions, but the home screen no
-          longer carries a global language select, so the dialog itself is the
-          destination rather than a second stop on the way. */}
-      <IconButton
-        icon="globe"
-        label={ted("dialogTitle")}
-        ariaHasPopup="dialog"
-        onClick={onOpenEditions}
-      />
+      {/* One tap beside "Open course" goes to the manage route (ui-overhaul 16),
+          which replaced the Editions & sharing dialog on 2026-08-27. Ticket 24
+          redesigns this card. */}
+      <IconButton icon="globe" label={ted("manageCourse")} href={`/courses/${slug}/manage`} />
 
       <Menu triggerLabel={t("moreActionsFor", { title })} dot={dot}>
         {(close) => (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
+import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Icon, type IconName } from "./icons";
 
@@ -25,6 +26,7 @@ export function IconButton({
   title,
   ariaHasPopup,
   ariaExpanded,
+  href,
 }: {
   icon: IconName;
   label: string;
@@ -36,7 +38,26 @@ export function IconButton({
   title?: string;
   ariaHasPopup?: "menu" | "dialog" | true;
   ariaExpanded?: boolean;
+  // Renders a Link instead of a button (e.g. the manage route's back arrow, or
+  // the course card's door to /manage). Same chip, real navigation.
+  href?: string;
 }) {
+  const cls = `relative inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] border text-soft transition-colors after:absolute after:-inset-[3px] after:content-[''] hover:border-transparent hover:bg-hi hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-soft ${
+    variant === "ghost" ? "border-transparent" : "border-line"
+  } ${className ?? ""}`;
+  const body = (
+    <>
+      <Icon name={icon} />
+      {dot && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-gold ring-2 ring-card" aria-hidden />}
+    </>
+  );
+  if (href) {
+    return (
+      <Link href={href} aria-label={label} title={title ?? label} className={cls}>
+        {body}
+      </Link>
+    );
+  }
   return (
     <button
       type="button"
@@ -46,12 +67,9 @@ export function IconButton({
       title={title ?? label}
       aria-haspopup={ariaHasPopup}
       aria-expanded={ariaExpanded}
-      className={`relative inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] border text-soft transition-colors after:absolute after:-inset-[3px] after:content-[''] hover:border-transparent hover:bg-hi hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-soft ${
-        variant === "ghost" ? "border-transparent" : "border-line"
-      } ${className ?? ""}`}
+      className={cls}
     >
-      <Icon name={icon} />
-      {dot && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-gold ring-2 ring-card" aria-hidden />}
+      {body}
     </button>
   );
 }

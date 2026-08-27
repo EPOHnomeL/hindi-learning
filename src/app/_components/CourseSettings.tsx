@@ -42,6 +42,27 @@ export function CourseSettingsDialog({
   lang?: string | null;
 }) {
   const t = useTranslations("CourseSettings");
+  return (
+    <Dialog title={t("title")} onClose={onClose}>
+      <CourseSettingsBody topicSlug={topicSlug} status={status} owner={owner} lang={lang} />
+    </Dialog>
+  );
+}
+
+// The dialog's interior, shared with the manage route's Course settings tab
+// (ui-overhaul 19); ticket 20 redesigns it.
+export function CourseSettingsBody({
+  topicSlug,
+  status,
+  owner = true,
+  lang = null,
+}: {
+  topicSlug: string;
+  status: "seeded" | "active" | "completed";
+  owner?: boolean;
+  lang?: string | null;
+}) {
+  const t = useTranslations("CourseSettings");
   const translated = lang != null && lang !== "en";
   // Self-resolve the served Edition (owner-deduped: the reader already holds this
   // exact query). Skipped entirely on the English source.
@@ -57,34 +78,85 @@ export function CourseSettingsDialog({
       : null;
 
   return (
-    <Dialog title={t("title")} onClose={onClose}>
-      <div className="flex flex-col">
-        <div className={owner ? "pb-5" : ""}>
-          {translated ? (
-            edition ? (
-              <EditionDetailsSection topicSlug={topicSlug} edition={edition} />
-            ) : (
-              <p className="text-[12.5px] text-soft">{t("loading")}</p>
-            )
+    <div className="flex flex-col">
+      <div className={owner ? "pb-5" : ""}>
+        {translated ? (
+          edition ? (
+            <EditionDetailsSection topicSlug={topicSlug} edition={edition} />
           ) : (
-            <DetailsSection topicSlug={topicSlug} />
-          )}
-        </div>
-        {owner && (
-          <>
-            <div className="border-t border-line py-5">
-              <LessonsSection topicSlug={topicSlug} />
-            </div>
-            <div className="border-t border-line py-5">
-              <EmblemSection topicSlug={topicSlug} />
-            </div>
-            <div className="border-t border-line pt-5">
-              <CompletionSection topicSlug={topicSlug} status={status} />
-            </div>
-          </>
+            <p className="text-[12.5px] text-soft">{t("loading")}</p>
+          )
+        ) : (
+          <DetailsSection topicSlug={topicSlug} />
         )}
       </div>
-    </Dialog>
+      {owner && (
+        <>
+          <div className="border-t border-line py-5">
+            <TeacherQaSection topicSlug={topicSlug} />
+          </div>
+          <div className="border-t border-line py-5">
+            <LessonsSection topicSlug={topicSlug} />
+          </div>
+          <div className="border-t border-line py-5">
+            <EmblemSection topicSlug={topicSlug} />
+          </div>
+          <div className="border-t border-line pt-5">
+            <CompletionSection topicSlug={topicSlug} status={status} />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Teacher Q&A (teacher-qa): whether this COURSE offers a question channel at
+// all, as an on/off toggle. Per Topic and pedagogical, which is why ui-overhaul
+// 17 moved it here from the per-Edition sharing panel: in a course-scoped
+// surface it needs no guard and no "applies to the whole course" disclaimer.
+// Owner-only server-side (capture.setTeacherQa).
+//
+// Reads its current value from the reader's own course bundle
+// (content.reader.courseHeader), where an absent field resolves to ON. Distinct
+// from the `qa` TENANT feature flag, which is the admin portal's.
+function TeacherQaSection({ topicSlug }: { topicSlug: string }) {
+  const t = useTranslations("CourseSettings");
+  const header = useQuery(api.content.reader.courseHeader, { topicSlug });
+  const setTeacherQa = useMutation(api.capture.setTeacherQa);
+  const [busy, setBusy] = useState(false);
+  // Absence means ON, and so does a header still loading: the toggle must never
+  // flash "off" on a course whose Q&A is open.
+  const on = header?.teacherQa ?? true;
+
+  return (
+    <div>
+      <h4 className="text-[13px] font-bold text-ink">{t("teacherQa")}</h4>
+      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-3 py-2.5">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] transition-colors ${
+              on ? "bg-accent2/15 text-accent2" : "bg-hi text-soft"
+            }`}
+          >
+            <Icon name="chat" className="h-4.5 w-4.5" />
+          </span>
+          <span className="text-[11.5px] text-soft">{on ? t("teacherQaOn") : t("teacherQaOff")}</span>
+        </div>
+        <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+          <input
+            type="checkbox"
+            checked={on}
+            disabled={busy || header === undefined}
+            onChange={(e) => {
+              setBusy(true);
+              void setTeacherQa({ topicSlug, enabled: e.target.checked }).finally(() => setBusy(false));
+            }}
+            className="peer sr-only"
+          />
+          <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 peer-checked:after:translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
+        </label>
+      </div>
+    </div>
   );
 }
 
