@@ -61,6 +61,15 @@ sibling `ui-overhaul-impl` map is resolved, and when the course-management stran
 
 <!-- one line per resolved ticket -->
 
+- [Which of the six share and sell rails survive, and what does the owner call them](tickets/15-which-rails-survive.md):
+  **nothing is retired.** Three groups, each a question: Who can find it (Publish alone,
+  because publishing is orthogonal to price), Who you hand it to (Public link, Invite,
+  roster), What it costs (Price plus one voucher control, collapsed to one row for
+  anyone who is not a ready Seller, with the seller grant and payout details moved
+  inside it). The two voucher rails merge into **one** card whose mode picks
+  distribution, one shared code against one code each, with billing and the identity
+  difference stated per mode. Four owner-facing words survive: Publish, Public link,
+  Invite, Voucher. Batch and access code go.
 - [Which share and sell rails has anyone actually used](tickets/14-rail-usage-evidence.md):
   the dialog has **six** rails, not seven; one course (`prophetic-school`) carries every
   one of them and is the only Topic that ever earned money (17 paid seats, 14 PayFast
@@ -112,9 +121,10 @@ sibling `ui-overhaul-impl` map is resolved, and when the course-management stran
   [app-language-i18n](../app-language-i18n/map.md).
 - Whitelabel leaks surfaced by the inventory (legal pages hardcode "My Course" and
   `support@my-course.app`) — [whitelabel](../whitelabel/map.md).
-- Tearing down the backend of any rail ticket 15 retires from the UI. Hiding a control
-  is this strand's; deleting a Convex table or mutation, and superseding ADR 0029 or
-  ADR 0031, is a separate effort charted if and when that verdict lands.
+- Tearing down the backend of any rail ticket 15 retires from the UI. **That verdict
+  never landed** (2026-08-27): ticket 15 retired no rail, so nothing is owed a teardown
+  effort and neither ADR 0029 nor ADR 0031 needs superseding. The line stays because
+  the boundary still holds for whatever the strand argues later.
 - What the access roster should grow into, plus the share-management edge cases and the
   learner insights view. Ticket 17 decides only where the roster lives. The depth is
   [topic-sharing](../topic-sharing/map.md) tickets 06, 08 and 09.

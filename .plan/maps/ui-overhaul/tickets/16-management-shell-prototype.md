@@ -28,6 +28,21 @@ link, maybe sets a price. Vouchers, seller setup and payout details are the rare
 and may cost a tap. The 20-edition picker still has to work, but it stops being the
 thing the layout is built around.
 
+What ticket 15 handed down, on 2026-08-27, and what it did not. The layout holds
+three groups, in this order: **Who can find it** (Publish alone), **Who you hand it to**
+(Public link, Invite, the access roster), **What it costs** (Price, plus one voucher
+control). Group three is one collapsed row saying selling is off unless the owner is a
+ready Seller, and the seller grant and payout details live inside that row rather than
+inside the price card. What 15 left to this ticket is everything about how a group is
+drawn: heading or accordion, one open at a time or all open, and where the group
+boundary is visible at 360px.
+
+One new form arrives with it. The two voucher rails are now one card with a mode
+picker on distribution, "one shared code" against "one code each", and each mode has
+to state its billing and its identity consequence in a line. That is the densest thing
+on the surface and it is on the rare path, so it is the prototype's stress case for
+whatever disclosure the container uses.
+
 Use the `/prototype` skill and throwaway code. Reuse the real queries where it is
 cheap, fake them where it is not. Mobbin references via the MCP if tickets 01 and 02
 have landed by then, otherwise proceed without them and say so.
