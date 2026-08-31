@@ -236,7 +236,16 @@ Bible, never a back-translation).
 `translate.readEditionBodies` (topic+lang scoped; returns inline `html` or a signed
 `url` per item — a CLI fetches the URLs byte-perfect).
 
-**Write** in place — stage **only** the corrected lessons at
+> **For a handful of items, edit in the app instead (2026-08-31).** The owner,
+> or an Editor of that Edition (ADR 0020), can correct a translated Lesson **or
+> Reference** straight from the reader: open the item, press Edit, fix the prose
+> (and the title, in the same field), save. It writes that Edition's own
+> `translations` row through `editTranslatedLesson` / `editTranslatedReference`,
+> stamps the same `sourceHash` this CLI route does, and needs no checkout, no
+> `OWNER_EMAIL`, and no secret. The route below is for a **bulk** pass, where
+> dozens of items are being swept at once.
+
+**Write** in place, stage **only** the corrected lessons at
 `topics/<slug>/translations/<lang>/lessons/<key>.html`, then:
 
 ```bash
