@@ -40,9 +40,15 @@ asked has actually used them.
   now names as its one remaining box.
 - **Unit 1 shipped 2026-08-31 too**, asked for directly once the rename was in:
   the Edit button no longer hides itself behind a desktop hover. That was the
-  original driver's actual blockage, so what is left of the Destination is unit 2
-  (accent styling for a button that already has its pencil and label) and unit 3
-  (Resources open by default).
+  original driver's actual blockage.
+- **Units 2 and 3 shipped 2026-08-31 as well**, so the whole spec is built: the
+  button is accent-styled with a real pencil icon, and Resources are open by
+  default in both readers. **The Destination is not met yet**, and cannot be met
+  by a session: its second half is that the course author who asked has actually
+  used these, and nobody has walked any of it in a browser (no dev server was
+  listening on the day). That, plus
+  [mobile-reader-todos ticket 03](../mobile-reader-todos/tickets/03-rename-a-lesson.md)'s
+  last open box, is all that stands between this map and done.
 
 ## Decisions so far
 
@@ -53,9 +59,9 @@ are not yet cut._
 
 ## Not yet specified
 
-- Tickets for **units 2 and 3**, all that is left unbuilt. The spec is complete
-  and their decisions are made (2026-08-27), so this is a cutting job, not a
-  deciding one; units 1 and 4 plus D9 shipped without tickets on 2026-08-31.
+- Nothing. All four units and D9 shipped on 2026-08-31 without tickets ever
+  being cut, so no planning work is left here. What remains is not
+  specification: a human has to look at it.
 
 ## Out of scope
 

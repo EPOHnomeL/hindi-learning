@@ -140,12 +140,27 @@ spec had ruled out (D8) and one unit whose shape it had settled differently (D5)
   only to drive it. `hover:bg-hi` stays, as an ordinary button hover state rather
   than the way the button is found. Visible at every breakpoint wherever
   `canEdit` holds, on Lessons and References alike.
-- **Units 2 and 3: NOT shipped.** The button is still the ghost card
-  (`border-line`, `bg-card/90`, `text-accent`) rather than unit 2's accent
-  styling, though note it already carries the pencil glyph and the localised
-  label, since `t("edit")` is "✎ Edit" in every catalogue; unit 2 is now only the
-  styling half of what it describes. The sidebar Resources still default
-  collapsed (unit 3).
+- **Unit 2 (make the button unmissable): shipped**, same day. Accent styling
+  (`bg-accent`, white label, `hover:bg-accent/90`) in place of the ghost card,
+  and a real pencil from the icon set (`<Icon name="edit" />`, which existed and
+  was used nowhere) in place of the "✎ " that had been living inside the
+  translated string. The glyph came OUT of all five catalogues in the same
+  change, so the button shows one pencil rather than two and each catalogue's
+  `edit` is now just the word. **Correction to this file's own note from earlier
+  the same day**, which said the pencil was already there and unit 2 was reduced
+  to a restyle: true of what a reader saw, misleading about where the glyph
+  lived, and acting on it as written would have shipped two pencils.
+- **Unit 3 (Resources shown by default): shipped**, same day. Both `<details>`
+  render `open`: the signed-in sidebar (`CourseShell`) and the Guest reader
+  (`PublicReader`), the latter now for every caller rather than only a paid
+  preview. Still collapsible per page load, still persisted nowhere.
+- **Judgement call, recorded rather than asked:** `CourseShell`'s section
+  renders even on a course with no Resources (it holds the "none yet" line and
+  the owner's add controls), so on such a course it is now open and empty. Taken
+  as this spec's literal intent rather than gated behind a non-empty list, since
+  the add controls are exactly the sort of thing this effort exists to stop
+  hiding. `PublicReader`'s section already sits inside a `resources.length > 0`
+  guard, so a Guest never sees an empty one.
 
 ## Ripple checks for the build session
 
