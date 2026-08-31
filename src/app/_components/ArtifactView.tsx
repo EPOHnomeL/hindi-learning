@@ -558,10 +558,14 @@ function LessonView({
             )}
           </div>
         </div>
-        {/* The pencil rides over the lesson on hover (owner + source edition). The
-            iframe is a descendant, so hovering the lesson body counts as hovering
-            the group and reveals it; focus reveals it for keyboard users. */}
-        <div className="group relative flex min-h-0 flex-1 flex-col">
+        {/* The Edit button rides over the lesson, always visible wherever
+            `canEdit` holds (editing-obviousness unit 1, 2026-08-31). It used to be
+            revealed by hovering the body on desktop, which is how the course
+            author who asked for editing never found it: it was invisible until
+            the mouse was already inside the lesson, and invisible on the
+            keyboard until focus landed. No hover state gates it now, at any
+            breakpoint. */}
+        <div className="relative flex min-h-0 flex-1 flex-col">
           <Frame html={html} withBridge theme={theme} dir={dir} lang={contentLang} resources={resources} teacherQa={header?.teacherQa} />
           {canEdit && (
             <button
@@ -569,7 +573,7 @@ function LessonView({
               onClick={() => setEditing(true)}
               aria-label={t("editLesson")}
               title={t("editLesson")}
-              className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent opacity-100 shadow-sm backdrop-blur transition-opacity hover:bg-hi focus:opacity-100 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+              className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent shadow-sm backdrop-blur transition-colors hover:bg-hi"
             >
               {t("edit")}
             </button>
@@ -992,9 +996,9 @@ function ReferenceView({
       </h2>
       {/* References carry no dark CSS of their own, so themeCss injects the dark
           palette (ADR 0011) — the theme then flips them with the rest of the app.
-          The pencil rides over the body on hover for whoever may edit the Edition
-          being read, source or translated. */}
-      <div className="group relative flex min-h-0 flex-1 flex-col">
+          The Edit button rides over the body, always visible for whoever may edit
+          the Edition being read, source or translated (unit 1, as on Lessons). */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} resources={resources} reference cardTarget={cardTarget} share={share} />
         {canEdit && (
           <button
@@ -1002,7 +1006,7 @@ function ReferenceView({
             onClick={() => setEditing(true)}
             aria-label={t("editReference")}
             title={t("editReference")}
-            className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent opacity-100 shadow-sm backdrop-blur transition-opacity hover:bg-hi focus:opacity-100 focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100"
+            className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent shadow-sm backdrop-blur transition-colors hover:bg-hi"
           >
             {t("edit")}
           </button>
