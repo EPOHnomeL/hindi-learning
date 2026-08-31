@@ -159,9 +159,9 @@ export const lessonEditTarget = internalQuery({
 // caller, but the guard doesn't depend on it. The quiz-structure check has
 // already run in the action (it needs the blob bytes); this just applies the swap.
 export const applyLessonEdit = internalMutation({
-  args: { topicSlug: v.string(), key: v.string(), storageId: v.id("_storage") },
+  args: { topicSlug: v.string(), key: v.string(), storageId: v.id("_storage"), title: v.optional(v.string()) },
   returns: v.null(),
-  handler: async (ctx, { topicSlug, key, storageId }) => {
+  handler: async (ctx, { topicSlug, key, storageId, title }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
     // Owner OR an Editor of the English (source) edition (ADR 0020).
@@ -173,7 +173,7 @@ export const applyLessonEdit = internalMutation({
       .unique();
     if (!lesson || lesson.supersededBy) throw new Error("lesson not found");
     const old = lesson.htmlStorageId;
-    await ctx.db.patch(lesson._id, { htmlStorageId: storageId });
+    await ctx.db.patch(lesson._id, { htmlStorageId: storageId, ...titlePatch(title) });
     if (old && old !== storageId) await ctx.storage.delete(old);
     return null;
   },
@@ -206,6 +206,17 @@ const REFUSAL = {
   unreadableReference: "The edited reference couldn't be read back. Please try saving again.",
 } as const;
 
+// The display title from an edit save (editing-obviousness unit 4). The editor
+// splices the same string into the stored document's head `<title>`
+// (`replaceTitleDisplay`) and sends it here for the row's `title` column, which
+// is what the reader renders; the column is therefore the authority, and the tag
+// is what keeps a document read on its own self-describing. Absent or blank means
+// "leave the current title alone", so a body-only save can never clear a name.
+function titlePatch(title: string | undefined): { title: string } | undefined {
+  const trimmed = title?.trim();
+  return trimmed ? { title: trimmed } : undefined;
+}
+
 // Owner corrects a source Lesson's body in place (amends ADR 0003): the client
 // uploads the edited HTML (generateEditUploadUrl) and passes its storageId here.
 // A Lesson stays structurally immutable — a save that changes the quiz's marker
@@ -216,9 +227,9 @@ const REFUSAL = {
 // who isn't the Topic owner before any blob is touched. A refused edit's uploaded
 // blob is deleted so a rejected save leaves no orphan.
 export const editLesson = action({
-  args: { topicSlug: v.string(), key: v.string(), storageId: v.id("_storage") },
+  args: { topicSlug: v.string(), key: v.string(), storageId: v.id("_storage"), title: v.optional(v.string()) },
   returns: v.null(),
-  handler: async (ctx, { topicSlug, key, storageId }): Promise<null> => {
+  handler: async (ctx, { topicSlug, key, storageId, title }): Promise<null> => {
     const target = await ctx.runQuery(internal.content.authoring.lessonEditTarget, { topicSlug, key });
     // Read the edited body up front. The swap must NEVER proceed on an unreadable
     // upload (a bogus/consumed storageId): that would patch the lesson to a dead
@@ -239,7 +250,7 @@ export const editLesson = action({
     // Guard passed. If the swap itself fails (e.g. the lesson was superseded in the
     // window since lessonEditTarget resolved), delete the upload so it doesn't orphan.
     try {
-      await ctx.runMutation(internal.content.authoring.applyLessonEdit, { topicSlug, key, storageId });
+      await ctx.runMutation(internal.content.authoring.applyLessonEdit, { topicSlug, key, storageId, title });
     } catch (e) {
       await ctx.storage.delete(storageId);
       throw e;
@@ -330,13 +341,15 @@ export const deleteLesson = mutation({
 // first (a mutation can't read bytes, but `db.system.get` confirms the blob is
 // real) so a bogus/consumed upload can't swap in a dead id and destroy the body.
 export const editReference = mutation({
-  args: { topicSlug: v.string(), key: v.string(), storageId: v.id("_storage") },
+  args: { topicSlug: v.string(), key: v.string(), storageId: v.id("_storage"), title: v.optional(v.string()) },
   returns: v.null(),
-  handler: async (ctx, { topicSlug, key, storageId }) => {
+  handler: async (ctx, { topicSlug, key, storageId, title }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
-    // Owner OR an Editor of the English (source) edition — References are
-    // English-source-only, so a translated-edition Editor never reaches here.
+    // Owner OR an Editor of the English (source) edition. Since 2026-08-31 a
+    // translated Edition's Reference has its own write path
+    // (`editTranslatedReference`), so a caller reaching HERE is editing the
+    // source, and an Editor of some other Edition is refused by the resolver.
     const topic = await getEditableTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
     const ref = await ctx.db
@@ -346,7 +359,7 @@ export const editReference = mutation({
     if (!ref) throw new Error("reference not found");
     if (!(await ctx.db.system.get(storageId))) throw new ConvexError(REFUSAL.unreadableReference);
     const old = ref.htmlStorageId;
-    await ctx.db.patch(ref._id, { htmlStorageId: storageId });
+    await ctx.db.patch(ref._id, { htmlStorageId: storageId, ...titlePatch(title) });
     if (old && old !== storageId) await ctx.storage.delete(old);
     return null;
   },
@@ -384,9 +397,9 @@ export const translatedLessonEditTarget = internalQuery({
 // later re-translate of an unchanged source skips this item and keeps the manual
 // edit. When no row exists yet, insert one (correcting an untranslated term).
 export const applyTranslatedLessonEdit = internalMutation({
-  args: { topicSlug: v.string(), key: v.string(), lang: v.string(), storageId: v.id("_storage") },
+  args: { topicSlug: v.string(), key: v.string(), lang: v.string(), storageId: v.id("_storage"), title: v.optional(v.string()) },
   returns: v.null(),
-  handler: async (ctx, { topicSlug, key, lang, storageId }) => {
+  handler: async (ctx, { topicSlug, key, lang, storageId, title }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
     if (lang === SOURCE_LANG) throw new Error("not a translated edition");
@@ -407,12 +420,13 @@ export const applyTranslatedLessonEdit = internalMutation({
       const old = row.htmlStorageId;
       // Clear any inline `html` (older translations stored the body inline) so the
       // row is blob-only going forward.
-      await ctx.db.patch(row._id, { htmlStorageId: storageId, html: undefined, sourceHash });
+      await ctx.db.patch(row._id, { htmlStorageId: storageId, html: undefined, sourceHash, ...titlePatch(title) });
       if (old && old !== storageId) await ctx.storage.delete(old);
     } else {
       // First edit of this item in this Edition (it was showing the English
-      // fallback). No translated title — the reader falls back to the source title.
-      await ctx.db.insert("translations", { topicId: topic._id, lang, kind: "lesson", key, htmlStorageId: storageId, sourceHash });
+      // fallback). With no title of its own the reader falls back to the source
+      // title, so the column is set only when the rename field carried one.
+      await ctx.db.insert("translations", { topicId: topic._id, lang, kind: "lesson", key, htmlStorageId: storageId, sourceHash, ...titlePatch(title) });
     }
     return null;
   },
@@ -426,9 +440,9 @@ export const applyTranslatedLessonEdit = internalMutation({
 // source untouched, live on the next tick. A rejected/failed save's upload is
 // deleted so it can't orphan.
 export const editTranslatedLesson = action({
-  args: { topicSlug: v.string(), key: v.string(), lang: v.string(), storageId: v.id("_storage") },
+  args: { topicSlug: v.string(), key: v.string(), lang: v.string(), storageId: v.id("_storage"), title: v.optional(v.string()) },
   returns: v.null(),
-  handler: async (ctx, { topicSlug, key, lang, storageId }): Promise<null> => {
+  handler: async (ctx, { topicSlug, key, lang, storageId, title }): Promise<null> => {
     const target = await ctx.runQuery(internal.content.authoring.translatedLessonEditTarget, { topicSlug, key, lang });
     const newHtml = await blobText(ctx, storageId);
     if (newHtml === null) throw new ConvexError(REFUSAL.unreadableUpload);
@@ -440,10 +454,68 @@ export const editTranslatedLesson = action({
       }
     }
     try {
-      await ctx.runMutation(internal.content.authoring.applyTranslatedLessonEdit, { topicSlug, key, lang, storageId });
+      await ctx.runMutation(internal.content.authoring.applyTranslatedLessonEdit, { topicSlug, key, lang, storageId, title });
     } catch (e) {
       await ctx.storage.delete(storageId);
       throw e;
+    }
+    return null;
+  },
+});
+
+// Correct a translated Edition's Reference in place: the grammar sheet, the
+// glossary, whatever the course carries. The twin of `editTranslatedLesson` for
+// References, and of `editReference` for a non-source Edition.
+//
+// Reference editing was source-only until 2026-08-31 (the map's own out-of-scope
+// line, editing-obviousness D8), which left a translator holding an Editor share
+// on their own Edition able to fix every Lesson and neither the grammar sheet nor
+// the glossary. Nothing about References made that necessary: the reader has
+// always served a translated Reference (`loadEdition(...).reference` in
+// convex/lib.ts) and `publishTranslation` has always written the rows. Only the
+// in-app write path was missing.
+//
+// A plain mutation, not an action: References carry no quiz, so there is no
+// structure to guard and no reason to read either body's bytes (the same reason
+// `editReference` is a mutation). `db.system.get` still confirms the upload is a
+// real blob, so a bogus or consumed id can't swap in a dead body. The source
+// Reference and every other Edition are untouched, and `sourceHash` is stamped
+// from the current source so a later re-translate of an unchanged source skips
+// this item and keeps the correction.
+export const editTranslatedReference = mutation({
+  args: { topicSlug: v.string(), key: v.string(), lang: v.string(), storageId: v.id("_storage"), title: v.optional(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, key, lang, storageId, title }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    // The source Edition keeps its own write path: it patches the `references`
+    // row, not a `translations` row (which never carries lang "en").
+    if (lang === SOURCE_LANG) throw new Error("not a translated edition");
+    // Owner OR an Editor of THIS Edition (ADR 0020): an editor-Share for lang X
+    // never authorises an edit to lang Y.
+    const topic = await getEditableTopic(ctx, userId, topicSlug, lang);
+    if (!topic) throw new Error("topic not found");
+    const ref = await ctx.db
+      .query("references")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+      .unique();
+    if (!ref) throw new Error("reference not found");
+    if (!(await ctx.db.system.get(storageId))) throw new ConvexError(REFUSAL.unreadableReference);
+    const sourceHash = itemHash("reference", ref);
+    const row = await ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topic._id).eq("lang", lang).eq("kind", "reference").eq("key", key))
+      .unique();
+    if (row) {
+      const old = row.htmlStorageId;
+      // Clear any inline `html` (older translations stored the body inline) so the
+      // row is blob-only going forward, exactly as the Lesson path does.
+      await ctx.db.patch(row._id, { htmlStorageId: storageId, html: undefined, sourceHash, ...titlePatch(title) });
+      if (old && old !== storageId) await ctx.storage.delete(old);
+    } else {
+      // First edit of this Reference in this Edition: it was showing the English
+      // fallback, and now this Edition owns it.
+      await ctx.db.insert("translations", { topicId: topic._id, lang, kind: "reference", key, htmlStorageId: storageId, sourceHash, ...titlePatch(title) });
     }
     return null;
   },

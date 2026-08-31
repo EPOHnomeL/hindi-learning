@@ -10,11 +10,11 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { LockedPane, Paygate } from "./Paygate";
 import { checkoutLink, publicCourseUrl, useEditionLang, withLang } from "./editionUrl";
-import { buildEditDoc, buildSrcDoc, replaceBodyInner, scrollToCardMessage, themeMessage, type Theme } from "./lessonSrcDoc";
+import { buildEditDoc, buildSrcDoc, replaceBodyInner, replaceTitleDisplay, scrollToCardMessage, themeMessage, type Theme } from "./lessonSrcDoc";
 import { LessonFootCard } from "./LessonFoot";
 import { Markdown } from "./MarkdownView";
 import { MarkdownResourceDialog } from "./ResourceItem";
-import { cardIdFromHash, composeCardShare, resolveArtifactClick, resourceTarget } from "./readerDerive";
+import { cardIdFromHash, composeCardShare, editionToEdit, resolveArtifactClick, resourceTarget } from "./readerDerive";
 import { ReaderSkeleton } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useTenant } from "./TenantContext";
@@ -457,7 +457,10 @@ function LessonView({
   // leaving the source untouched. Both guard the quiz structure server-side — the
   // real control; `canEdit` (server, per-Edition) only hides the affordance from
   // those who can't edit this Edition (Viewers, Guests, an Editor of another lang).
-  const isSource = lang == null || lang === "en";
+  // The Edition being edited is the SERVED one, not the URL's (editionToEdit):
+  // a caller who holds only a translated Edition arrives with no `?lang` at all.
+  const editLang = editionToEdit(header?.lang, lang);
+  const isSource = editLang === "en";
 
   useEffect(() => {
     // Owner or Viewer: opening a lesson marks it opened in the caller's own
@@ -575,7 +578,7 @@ function LessonView({
         {canEdit && editing && (
           <ContentEditor
             topicSlug={topicSlug}
-            editionLang={lang ?? undefined}
+            editionLang={editLang}
             html={html}
             theme={theme}
             dir={dir}
@@ -583,10 +586,11 @@ function LessonView({
             label="lesson"
             teacherQa={header?.teacherQa}
             onClose={() => setEditing(false)}
-            commit={(storageId) =>
+            title={lesson.title}
+            commit={(storageId, title) =>
               isSource
-                ? editLesson({ topicSlug, key: lessonKey, storageId })
-                : editTranslatedLesson({ topicSlug, key: lessonKey, lang: lang!, storageId })
+                ? editLesson({ topicSlug, key: lessonKey, storageId, title })
+                : editTranslatedLesson({ topicSlug, key: lessonKey, lang: editLang, storageId, title })
             }
           />
         )}
@@ -685,6 +689,7 @@ function ContentEditor({
   dir,
   lang,
   label,
+  title,
   onClose,
   commit,
   teacherQa,
@@ -704,8 +709,14 @@ function ContentEditor({
   dir?: "ltr" | "rtl";
   lang?: string;
   label: string;
+  // The item's current display title. Present turns on the rename field
+  // (editing-obviousness unit 4), which is where a title is edited: one save
+  // writes the body and the name together, through one already-guarded write
+  // path, so there is one affordance to find rather than two. Absent hides it.
+  title?: string;
   onClose: () => void;
-  commit: (storageId: Id<"_storage">) => Promise<unknown>;
+  // `title` is the (trimmed) rename field's value, blank when it was left alone.
+  commit: (storageId: Id<"_storage">, title: string) => Promise<unknown>;
   // Mirrors the reader Frame's, so the owner edits what a learner sees
   // (teacher-qa/02). Display only: the rule is injected into <head>, and the save
   // reads back body content, so it can never be stored into the Lesson.
@@ -717,6 +728,7 @@ function ContentEditor({
   const generateUploadUrl = useMutation(api.content.authoring.generateEditUploadUrl);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [titleDraft, setTitleDraft] = useState(title ?? "");
 
   // Bake theme/dir/lang for display only; the read-back takes body content, not
   // the <html> tag, so none of it reaches the saved HTML.
@@ -733,13 +745,19 @@ function ContentEditor({
     setSaving(true);
     setError(null);
     try {
-      const edited = replaceBodyInner(html, doc.body.innerHTML);
+      // The name goes into the uploaded document's head as well as the row, so a
+      // renamed item's stored HTML still describes itself (replaceTitleDisplay).
+      // A blank field means "keep the current name": splice nothing, send nothing,
+      // and the write path leaves the column as it is.
+      const nextTitle = titleDraft.trim();
+      const withBody = replaceBodyInner(html, doc.body.innerHTML);
+      const edited = nextTitle ? replaceTitleDisplay(withBody, nextTitle) : withBody;
       const url = await generateUploadUrl({ topicSlug, lang: editionLang });
       const res = await fetch(url, { method: "POST", headers: { "Content-Type": "text/html" }, body: edited });
       if (!res.ok) throw new Error(t("uploadFailed"));
       const { storageId } = (await res.json()) as { storageId: string };
-      // The write path may reject (e.g. a Lesson's quiz-structure guard) — show it.
-      await commit(storageId as Id<"_storage">);
+      // The write path may reject (e.g. a Lesson's quiz-structure guard), show it.
+      await commit(storageId as Id<"_storage">, nextTitle);
       onClose(); // live for every reader on the next reactive tick — no publish step.
     } catch (e) {
       setError(saveError(e, t("saveFailed")));
@@ -773,6 +791,27 @@ function ContentEditor({
           </button>
         </div>
       </div>
+      {/* The rename field. Sits above the body editor rather than on the title in
+          the reader, so renaming and rewriting are one save and one guarded write.
+          dir/lang are the served Edition's, so a translated title types in its own
+          script and direction (an RTL Urdu name in an RTL field). */}
+      {title !== undefined && (
+        <div className="flex items-center gap-3 border-b border-line px-5 py-2.5">
+          <label htmlFor="edit-title" className="shrink-0 text-sm text-soft">
+            {t("titleLabel")}
+          </label>
+          <input
+            id="edit-title"
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            disabled={saving}
+            dir={dir}
+            lang={lang}
+            placeholder={title}
+            className="min-w-0 flex-1 rounded-lg border border-line bg-paper px-3 py-1.5 text-sm text-ink placeholder:text-soft focus:border-accent focus:outline-none disabled:opacity-60"
+          />
+        </div>
+      )}
       {/* allow-same-origin (no allow-scripts): editable via designMode, lesson
           scripts inert, contentDocument readable back by the same-origin parent. */}
       <iframe
@@ -901,6 +940,7 @@ function ReferenceView({
   // Resource links work inside a Reference body too (rich-media/11).
   const resources = useQuery(api.resources.listResources, { topicSlug });
   const editReference = useMutation(api.content.authoring.editReference);
+  const editTranslatedReference = useMutation(api.content.authoring.editTranslatedReference);
   const [editing, setEditing] = useState(false);
   const cardTarget = useCardTarget(refKey);
   // Per-card share (reference-cards/03), only when the course has a public link. The
@@ -908,11 +948,20 @@ function ReferenceView({
   const publicLink = header?.publicLink ?? null;
   const shareUrl = publicLink ? publicCourseUrl(publicLink.shareToken, publicLink.tenantSlug) : null;
   const share = publicLink && shareUrl && header ? { courseTitle: header.title, url: shareUrl } : null;
-  // Editable by the owner or an English-edition Editor (server `canEdit`), and
-  // only on the source (English) edition — `editReference` patches the source
-  // Reference (translated-Reference editing is out of scope). References are
-  // mutable (ADR 0003), so the save takes the write path with no quiz guard.
-  const canEditRef = canEdit && (lang == null || lang === "en");
+  // Editable by the owner or by an Editor of the Edition being read: the
+  // server's per-Edition `canEdit` is the whole gate, so an Editor of the Dutch
+  // Edition may fix the Dutch glossary and no other Edition's.
+  //
+  // Until 2026-08-31 this also required the source Edition, which left a
+  // translator able to correct every Lesson in their Edition but neither the
+  // grammar sheet nor the glossary (editing-obviousness). The source patches the
+  // `references` row (`editReference`); a translated Edition patches its own
+  // `translations` row (`editTranslatedReference`), leaving the source alone,
+  // exactly as the Lesson pair does. References are mutable (ADR 0003) and carry
+  // no quiz, so neither save has a structure guard.
+  // As in LessonView: the served Edition, not the URL's (editionToEdit).
+  const editLang = editionToEdit(header?.lang, lang);
+  const isSourceRef = editLang === "en";
   if (ref === undefined || html === undefined) return <ReaderSkeleton aside={false} />;
   if (ref === null) return <p className="text-soft">{t("referenceNotFound")}</p>;
   if (html === null) return <p className="text-soft">{t("referenceLoadError")}</p>;
@@ -943,10 +992,11 @@ function ReferenceView({
       </h2>
       {/* References carry no dark CSS of their own, so themeCss injects the dark
           palette (ADR 0011) — the theme then flips them with the rest of the app.
-          The pencil rides over the body on hover for the owner (source edition). */}
+          The pencil rides over the body on hover for whoever may edit the Edition
+          being read, source or translated. */}
       <div className="group relative flex min-h-0 flex-1 flex-col">
         <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} resources={resources} reference cardTarget={cardTarget} share={share} />
-        {canEditRef && (
+        {canEdit && (
           <button
             type="button"
             onClick={() => setEditing(true)}
@@ -958,15 +1008,23 @@ function ReferenceView({
           </button>
         )}
       </div>
-      {canEditRef && editing && (
+      {canEdit && editing && (
         <ContentEditor
           topicSlug={topicSlug}
+          editionLang={editLang}
           html={html}
           theme={theme}
           themeCss
+          dir={dir}
+          lang={contentLang}
           label="reference"
           onClose={() => setEditing(false)}
-          commit={(storageId) => editReference({ topicSlug, key: refKey, storageId })}
+          title={ref.title}
+          commit={(storageId, title) =>
+            isSourceRef
+              ? editReference({ topicSlug, key: refKey, storageId, title })
+              : editTranslatedReference({ topicSlug, key: refKey, lang: editLang, storageId, title })
+          }
         />
       )}
     </div>

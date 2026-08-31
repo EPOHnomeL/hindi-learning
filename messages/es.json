@@ -311,6 +311,7 @@
     "referenceNotFound": "Referencia no encontrada.",
     "referenceLoadError": "No se pudo cargar esta referencia. Prueba a actualizar.",
     "editHeading": "Editar {label}",
+    "titleLabel": "Título",
     "lesson": "lección",
     "reference": "referencia",
     "cancel": "Cancelar",

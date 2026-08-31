@@ -311,6 +311,7 @@
     "referenceNotFound": "संदर्भ नहीं मिला।",
     "referenceLoadError": "यह संदर्भ लोड नहीं हो सका। रीफ़्रेश करके देखें।",
     "editHeading": "{label} संपादित करें",
+    "titleLabel": "शीर्षक",
     "lesson": "पाठ",
     "reference": "संदर्भ",
     "cancel": "रद्द करें",

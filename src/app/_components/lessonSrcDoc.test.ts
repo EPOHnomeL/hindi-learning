@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEditDoc, buildSrcDoc } from "./lessonSrcDoc";
+import { buildEditDoc, buildSrcDoc, replaceTitleDisplay } from "./lessonSrcDoc";
 
 // A stored lesson carries the legacy floating theme pill (injected by the old
 // foot.html) baked into its immutable HTML.
@@ -217,5 +217,45 @@ describe("buildEditDoc", () => {
     const out = buildEditDoc(ASK_LESSON, { theme: "light", teacherQa: false });
     expect(out).toContain(ASK_BODY);
     expect(out.slice(out.indexOf("<body"))).not.toContain("display:none");
+  });
+});
+
+describe("replaceTitleDisplay", () => {
+  // The in-editor rename (editing-obviousness unit 4) splices the new display
+  // title into the stored document's head so the row and the document agree.
+  it("replaces the display half and keeps the 'Lesson N · ' prefix", () => {
+    const out = replaceTitleDisplay("<html><head><title>Lesson 3 · Old name</title></head><body><p>x</p></body></html>", "New name");
+    expect(out).toContain("<title>Lesson 3 · New name</title>");
+  });
+
+  it("keeps the 'Reference · ' prefix", () => {
+    const out = replaceTitleDisplay("<html><head><title>Reference · Glossary</title></head><body></body></html>", "Woordenlijst");
+    expect(out).toContain("<title>Reference · Woordenlijst</title>");
+  });
+
+  it("replaces the whole title when there is no prefix to preserve", () => {
+    expect(replaceTitleDisplay("<title>Bare</title>", "Named")).toBe("<title>Named</title>");
+  });
+
+  it("keeps a display title that itself contains the separator on the display side", () => {
+    // `titleFrom` joins everything after the FIRST " · " back together, so a
+    // subtitle carrying its own separator round-trips.
+    const out = replaceTitleDisplay("<title>Lesson 3 · A · B</title>", "C · D");
+    expect(out).toBe("<title>Lesson 3 · C · D</title>");
+  });
+
+  it("escapes markup so a typed title cannot inject into the document head", () => {
+    const out = replaceTitleDisplay("<title>Lesson 1 · x</title>", '</title><script>bad()</script> & <b>');
+    expect(out).toBe("<title>Lesson 1 · &lt;/title&gt;&lt;script&gt;bad()&lt;/script&gt; &amp; &lt;b&gt;</title>");
+  });
+
+  it("leaves a document with no <title> untouched", () => {
+    const html = "<html><head></head><body><p>x</p></body></html>";
+    expect(replaceTitleDisplay(html, "Name")).toBe(html);
+  });
+
+  it("touches only the head, so the body read-back is unaffected", () => {
+    const html = "<html><head><title>Lesson 1 · A</title></head><body><p>the &amp; body</p></body></html>";
+    expect(replaceTitleDisplay(html, "B")).toContain("<body><p>the &amp; body</p></body>");
   });
 });

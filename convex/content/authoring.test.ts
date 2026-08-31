@@ -682,3 +682,193 @@ test("editor enforcement: the quiz-structure guard still rejects a structural ch
     contentUrl: expect.stringContaining(`/content?id=${oldSid}`),
   });
 });
+
+// ---- editTranslatedReference + the in-editor rename (editing-obviousness) ----
+//
+// Reference editing was source-only until 2026-08-31, so a translator holding an
+// Editor share on their own Edition could fix every Lesson but neither the
+// grammar sheet nor the glossary. Titles were editable nowhere at all.
+
+// Mark `lang` a ready Edition so the owner (and its Editor) holds it, with an
+// optional translated Reference row already in place.
+async function seedTranslatedReference(
+  t: ReturnType<typeof convexTest>,
+  topicId: Id<"topics">,
+  lang: string,
+  key: string,
+  storageId: Id<"_storage"> | null,
+  title?: string,
+) {
+  await t.run(async (ctx) => {
+    await ctx.db.insert("translationJobs", { topicId, lang, status: "ready", total: 1, done: 1, failed: 0 });
+    if (storageId) {
+      await ctx.db.insert("translations", { topicId, lang, kind: "reference", key, htmlStorageId: storageId, sourceHash: "seed", ...(title ? { title } : {}) });
+    }
+  });
+}
+
+test("editTranslatedReference: an Editor of that Edition fixes the glossary; the English source is untouched", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const editor = await seedUser(t, "editor@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, "<p>English glossary</p>");
+  await seedReference(t, topicId, "glossary", srcSid);
+  const oldSid = await storeHtml(t, "<p>Nederlandse woordenlijst</p>");
+  await seedTranslatedReference(t, topicId, "nl", "glossary", oldSid);
+  await seedEditorShare(t, topicId, editor, "nl");
+
+  const newSid = await storeHtml(t, "<p>Nederlandse woordenlijst, gecorrigeerd</p>");
+  await asUser(t, editor).mutation(api.content.authoring.editTranslatedReference, { topicSlug: "hindi", key: "glossary", lang: "nl", storageId: newSid });
+
+  expect(await asUser(t, editor).query(api.content.reader.getReference, { topicSlug: "hindi", key: "glossary", lang: "nl" })).toMatchObject({
+    contentUrl: expect.stringContaining(`/content?id=${newSid}`),
+  });
+  // The source Edition still serves English, and its blob is untouched.
+  expect(await asUser(t, owner).query(api.content.reader.getReference, { topicSlug: "hindi", key: "glossary" })).toMatchObject({
+    contentUrl: expect.stringContaining(`/content?id=${srcSid}`),
+  });
+  expect(await t.run((ctx) => ctx.db.system.get(srcSid))).not.toBeNull();
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).toBeNull(); // old translated blob cleaned up
+});
+
+test("editTranslatedReference: creates a row when the Edition had none, so an English-fallback reference becomes translated", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, "<p>English glossary</p>");
+  await seedReference(t, topicId, "glossary", srcSid);
+  await seedTranslatedReference(t, topicId, "nl", "glossary", null); // ready Edition, no row
+
+  const newSid = await storeHtml(t, "<p>Woordenlijst</p>");
+  await asUser(t, owner).mutation(api.content.authoring.editTranslatedReference, { topicSlug: "hindi", key: "glossary", lang: "nl", storageId: newSid });
+
+  expect(await asUser(t, owner).query(api.content.reader.getReference, { topicSlug: "hindi", key: "glossary", lang: "nl" })).toMatchObject({
+    contentUrl: expect.stringContaining(`/content?id=${newSid}`),
+  });
+  // Stamped with the CURRENT source hash, so a later re-translate of an unchanged
+  // source skips this item and keeps the manual fix (mirrors the Lesson path).
+  const row = await t.run((ctx) =>
+    ctx.db.query("translations").withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "nl").eq("kind", "reference").eq("key", "glossary")).unique(),
+  );
+  expect(row?.sourceHash).not.toBe("seed");
+  expect(row?.sourceHash).toBeTruthy();
+});
+
+test("editTranslatedReference: refuses the source language, another Edition's Editor, a Viewer, and an anonymous caller", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const frEditor = await seedUser(t, "fr@example.com");
+  const viewer = await seedUser(t, "viewer@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, "<p>English glossary</p>");
+  await seedReference(t, topicId, "glossary", srcSid);
+  const oldSid = await storeHtml(t, "<p>Woordenlijst</p>");
+  await seedTranslatedReference(t, topicId, "nl", "glossary", oldSid);
+  await seedEditorShare(t, topicId, frEditor, "fr");
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: viewer, lang: "nl" }));
+
+  const sid = await storeHtml(t, "<p>hijacked</p>");
+  const call = (as: Id<"users"> | null, lang: string) =>
+    (as ? asUser(t, as) : t).mutation(api.content.authoring.editTranslatedReference, { topicSlug: "hindi", key: "glossary", lang, storageId: sid });
+  // The source Edition has no translations row: editReference is its write path.
+  await expect(call(owner, "en")).rejects.toThrow();
+  await expect(call(frEditor, "nl")).rejects.toThrow(); // Editor of fr, not nl
+  await expect(call(viewer, "nl")).rejects.toThrow(); // read-only Share
+  await expect(call(null, "nl")).rejects.toThrow();
+
+  const row = await t.run((ctx) =>
+    ctx.db.query("translations").withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "nl").eq("kind", "reference").eq("key", "glossary")).unique(),
+  );
+  expect(row?.htmlStorageId).toBe(oldSid);
+});
+
+test("editTranslatedReference: refuses an unreadable upload and preserves the current body", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, "<p>English glossary</p>");
+  await seedReference(t, topicId, "glossary", srcSid);
+  const oldSid = await storeHtml(t, "<p>Woordenlijst</p>");
+  await seedTranslatedReference(t, topicId, "nl", "glossary", oldSid);
+
+  const deadSid = await t.run(async (ctx) => {
+    const id = await ctx.storage.store(new Blob(["tmp"], { type: "text/html" }));
+    await ctx.storage.delete(id);
+    return id;
+  });
+  await expect(
+    asUser(t, owner).mutation(api.content.authoring.editTranslatedReference, { topicSlug: "hindi", key: "glossary", lang: "nl", storageId: deadSid }),
+  ).rejects.toThrow();
+
+  expect(await asUser(t, owner).query(api.content.reader.getReference, { topicSlug: "hindi", key: "glossary", lang: "nl" })).toMatchObject({
+    contentUrl: expect.stringContaining(`/content?id=${oldSid}`),
+  });
+  expect(await t.run((ctx) => ctx.db.system.get(oldSid))).not.toBeNull();
+});
+
+test("rename: a title arg on a source save renames the Lesson and the Reference", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const editor = await seedUser(t, "editor@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  const lessonSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", lessonSid); // title "A"
+  const refSid = await storeHtml(t, "<p>ref</p>");
+  await seedReference(t, topicId, "grammar", refSid); // title "Grammar"
+  await seedEditorShare(t, topicId, editor, "en");
+
+  // Whoever may rewrite the body may rename it (spec D2), Editor included.
+  await asUser(t, editor).action(api.content.authoring.editLesson, {
+    topicSlug: "hindi", key: "0001", storageId: await storeHtml(t, QUIZ_BODY), title: "  The aorist  ",
+  });
+  await asUser(t, editor).mutation(api.content.authoring.editReference, {
+    topicSlug: "hindi", key: "grammar", storageId: await storeHtml(t, "<p>ref2</p>"), title: "Grammar sheet",
+  });
+
+  expect(await asUser(t, owner).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001" })).toMatchObject({ title: "The aorist" });
+  expect(await asUser(t, owner).query(api.content.reader.getReference, { topicSlug: "hindi", key: "grammar" })).toMatchObject({ title: "Grammar sheet" });
+});
+
+test("rename: a title arg on a translated save renames only that Edition; the source titles stand", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const editor = await seedUser(t, "editor@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  const srcSid = await storeHtml(t, QUIZ_BODY);
+  await seedLesson(t, topicId, "0001", srcSid); // title "A"
+  const refSid = await storeHtml(t, "<p>ref</p>");
+  await seedReference(t, topicId, "glossary", refSid); // title "Grammar"
+  await seedTranslatedReference(t, topicId, "nl", "glossary", null); // ready nl Edition
+  await seedEditorShare(t, topicId, editor, "nl");
+
+  await asUser(t, editor).action(api.content.authoring.editTranslatedLesson, {
+    topicSlug: "hindi", key: "0001", lang: "nl", storageId: await storeHtml(t, QUIZ_BODY), title: "De aoristus",
+  });
+  await asUser(t, editor).mutation(api.content.authoring.editTranslatedReference, {
+    topicSlug: "hindi", key: "glossary", lang: "nl", storageId: await storeHtml(t, "<p>x</p>"), title: "Woordenlijst",
+  });
+
+  expect(await asUser(t, editor).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001", lang: "nl" })).toMatchObject({ title: "De aoristus" });
+  expect(await asUser(t, editor).query(api.content.reader.getReference, { topicSlug: "hindi", key: "glossary", lang: "nl" })).toMatchObject({ title: "Woordenlijst" });
+  // A source rename leaves translated Editions alone and vice versa (spec D3).
+  expect(await asUser(t, owner).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001" })).toMatchObject({ title: "A" });
+  expect(await asUser(t, owner).query(api.content.reader.getReference, { topicSlug: "hindi", key: "glossary" })).toMatchObject({ title: "Grammar" });
+});
+
+test("rename: an absent or blank title leaves the current one alone, so a body-only save never clears it", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi", 1);
+  await seedLesson(t, topicId, "0001", await storeHtml(t, QUIZ_BODY)); // title "A"
+  await seedReference(t, topicId, "grammar", await storeHtml(t, "<p>ref</p>")); // title "Grammar"
+  await seedTranslatedReference(t, topicId, "nl", "grammar", await storeHtml(t, "<p>nl</p>"), "Grammatica");
+
+  await asUser(t, owner).action(api.content.authoring.editLesson, { topicSlug: "hindi", key: "0001", storageId: await storeHtml(t, QUIZ_BODY) });
+  await asUser(t, owner).mutation(api.content.authoring.editReference, { topicSlug: "hindi", key: "grammar", storageId: await storeHtml(t, "<p>r</p>"), title: "   " });
+  await asUser(t, owner).mutation(api.content.authoring.editTranslatedReference, { topicSlug: "hindi", key: "grammar", lang: "nl", storageId: await storeHtml(t, "<p>n</p>"), title: "" });
+
+  expect(await asUser(t, owner).query(api.content.reader.getLesson, { topicSlug: "hindi", key: "0001" })).toMatchObject({ title: "A" });
+  expect(await asUser(t, owner).query(api.content.reader.getReference, { topicSlug: "hindi", key: "grammar" })).toMatchObject({ title: "Grammar" });
+  expect(await asUser(t, owner).query(api.content.reader.getReference, { topicSlug: "hindi", key: "grammar", lang: "nl" })).toMatchObject({ title: "Grammatica" });
+});

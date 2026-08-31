@@ -4,6 +4,7 @@ import {
   composeCardShare,
   completedKeys,
   courseIndexRedirect,
+  editionToEdit,
   firstLessonKey,
   frontierKey,
   internalNavTarget,
@@ -389,5 +390,27 @@ describe("seenAfterOpening", () => {
     expect(seenAfterOpening(questions, "0002-beta", new Set(["q3"]))).not.toBe(seen);
     // a lesson with no replies at all leaves seen untouched
     expect(seenAfterOpening(questions, "no-such-lesson", seen)).toBe(seen);
+  });
+});
+
+describe("editionToEdit", () => {
+  // The reason this is not `urlLang ?? "en"`: a Dutch Editor's first visit has no
+  // `?lang` (nl is not an app locale, and nothing is stored yet), and the server
+  // serves + authorises the nl Edition regardless.
+  it("takes the served Edition when the URL carries no lang", () => {
+    expect(editionToEdit("nl", null)).toBe("nl");
+  });
+
+  it("still takes the served Edition when the URL disagrees", () => {
+    // The server honours ?lang only if the caller holds it, so the header wins.
+    expect(editionToEdit("en", "nl")).toBe("en");
+  });
+
+  it("falls back to the URL while the header query is in flight", () => {
+    expect(editionToEdit(undefined, "nl")).toBe("nl");
+  });
+
+  it("falls back to English when neither is known", () => {
+    expect(editionToEdit(undefined, null)).toBe("en");
   });
 });

@@ -311,6 +311,7 @@
     "referenceNotFound": "Référence introuvable.",
     "referenceLoadError": "Impossible de charger cette référence. Essayez d’actualiser.",
     "editHeading": "Modifier {label}",
+    "titleLabel": "Titre",
     "lesson": "leçon",
     "reference": "référence",
     "cancel": "Annuler",

@@ -512,3 +512,25 @@ export function replaceBodyInner(html: string, inner: string): string {
   const openEnd = open.index + open[0].length;
   return doc.slice(0, openEnd) + inner + doc.slice(close);
 }
+
+// Splice a new display title into the stored document's head `<title>`,
+// preserving the `Lesson N · ` / `Reference · ` prefix that the publish path
+// parses back out (`titleFrom`, convex/authoring.ts). The in-editor rename
+// (editing-obviousness unit 4) writes the name to two places in one save: the
+// row's `title` column, which is what the reader renders, and this tag, which
+// keeps the stored document self-describing when it is read on its own. A string
+// splice for the same reason replaceBodyInner is one (the rest of the document
+// round-trips byte-for-byte), and head-only, so it composes with the body splice
+// without touching what the editor read back. A document with no <title> is
+// returned unchanged: the column is the authority, so a missing tag is cosmetic.
+export function replaceTitleDisplay(html: string, display: string): string {
+  const escaped = display.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  // A callback replacement, so a `$&` inside a typed title is inert.
+  return html.replace(/<title>([\s\S]*?)<\/title>/i, (_m, raw: string) => {
+    // Only the FIRST " · " is a prefix boundary: `titleFrom` joins everything
+    // after it back together, so a subtitle may carry its own separator.
+    const sep = raw.indexOf(" · ");
+    const prefix = sep === -1 ? "" : raw.slice(0, sep + 3);
+    return `<title>${prefix}${escaped}</title>`;
+  });
+}

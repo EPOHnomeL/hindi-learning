@@ -311,6 +311,7 @@
     "referenceNotFound": "Reference not found.",
     "referenceLoadError": "Couldn’t load this reference. Try refreshing.",
     "editHeading": "Edit {label}",
+    "titleLabel": "Title",
     "lesson": "lesson",
     "reference": "reference",
     "cancel": "Cancel",

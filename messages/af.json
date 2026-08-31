@@ -311,6 +311,7 @@
     "referenceNotFound": "Verwysing nie gevind nie.",
     "referenceLoadError": "Kon nie hierdie verwysing laai nie. Probeer verfris.",
     "editHeading": "Redigeer {label}",
+    "titleLabel": "Titel",
     "lesson": "les",
     "reference": "verwysing",
     "cancel": "Kanselleer",

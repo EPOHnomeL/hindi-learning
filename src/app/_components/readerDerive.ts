@@ -180,3 +180,24 @@ export function seenAfterOpening(
   for (const id of ids) next.add(id);
   return next;
 }
+
+// The Edition an in-place edit must be aimed at: the one the server actually
+// SERVED (`courseHeader.lang`), never the URL's `?lang`.
+//
+// They differ whenever the served Edition came from the resolver's fallback
+// rather than the URL, and that is the normal first visit for exactly the person
+// per-Edition editing exists for. A Dutch Editor holds only `nl`: `nl` is not an
+// app locale, so the course-index redirect cannot pre-fill `?lang=nl` from the
+// UI language, and on a first visit nothing is in localStorage either. So she
+// lands on a lang-less URL, the resolver serves her the one Edition she holds,
+// and the server sets `canEdit` true against `nl`. A client keying off the URL
+// would read that as the English source, aim `editReference` / `editLesson` at
+// it, and get a bare save failure from the upload guard (she holds no `en`
+// share). Keying off the header makes the client agree with the server by
+// construction, since `canEdit` is computed against this very language.
+//
+// `headerLang` is undefined only while that query is in flight; the URL is the
+// stopgap for that beat, and English the last resort.
+export function editionToEdit(headerLang: string | undefined, urlLang: string | null): string {
+  return headerLang ?? urlLang ?? "en";
+}
