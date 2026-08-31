@@ -65,9 +65,79 @@ chapter titles". The facts behind the blockage, verified in the tree that day:
   `<title>`; it cannot reach the body, so `quizStructureMatches` is not
   involved. The blob-swap safety rules from `editLesson` still apply: never
   swap onto an unreadable upload, delete the new blob if the apply fails.
-- **D8: References rename source-only.** Matches their body edit
+- **D8: References rename source-only.** **Superseded 2026-08-31 by D9.**
+  Matches their body edit
   (`editReference`), which is explicitly source-only today. Translated
   Reference editing as a whole stays out of scope.
+
+## Decisions added 2026-08-31 (the operator asked for the rest of it)
+
+The operator asked for "glossary and reference editing for other languages and
+also lesson titles editing in the editor view preferably". That is one unit this
+spec had ruled out (D8) and one unit whose shape it had settled differently (D5).
+
+- **D9: a translated Edition's References are editable, by that Edition's
+  Editor.** New `editTranslatedReference` mutation, the twin of
+  `editTranslatedLesson` for References and of `editReference` for a non-source
+  Edition: it upserts that Edition's `translations` row (kind `reference`),
+  stamps `sourceHash` from the current source so a later re-translate keeps the
+  correction, and leaves the source Reference and every other Edition untouched.
+  A plain mutation, not an action, for the same reason `editReference` is one:
+  References carry no quiz, so there is no structure to guard and no need to read
+  either body's bytes. **Supersedes D8** and the map's out-of-scope line.
+  Nothing about References had made this hard: the reader has always served a
+  translated Reference (`loadEdition(...).reference`) and `publishTranslation`
+  has always written the rows. Only the in-app write path was missing, and its
+  absence is what left a translator able to fix every Lesson in their Edition but
+  neither the grammar sheet nor the glossary.
+- **D10: the rename affordance is a field in the editor view, not a title-side
+  pencil. Supersedes D5.** The `ContentEditor` modal gains a Title field above
+  the body editor, present wherever the editor itself is. Chosen on the
+  operator's explicit preference, and it is also the lazier shape: one save
+  writes body and name together through one already-guarded write path, there is
+  one affordance to discover rather than two, and no new mutation, resolver or
+  reader chrome is involved. The cost is that a rename now requires opening the
+  editor, which is a fair trade while unit 1 (always-visible Edit) is still
+  unbuilt and is the thing that makes the editor findable at all.
+- **D11: the client writes the name to both places in one save.** It splices the
+  display half of the document's `<title>` (`replaceTitleDisplay`, preserving the
+  `Lesson N · ` / `Reference · ` prefix) and sends the same string as a `title`
+  arg on the same call. The row's column is the authority (it is what the reader
+  renders; nothing reads the blob's `<title>` at runtime), and the tag is what
+  keeps a document self-describing when read on its own. Preferred over parsing
+  the title back out server-side because two of the four write paths are plain
+  mutations that never read the blob's bytes, and one contract across all four
+  beats an asymmetry. D1's outcome (row and document never disagree) is
+  preserved; only the computation moved to the client.
+
+- **D12: the client aims an edit at the SERVED Edition, not the URL's
+  `?lang`.** Found while building D9, and it is a bug the pre-existing Lesson
+  path had too. `ArtifactView` keyed the write path off `useEditionLang()` (the
+  URL), while the server computes `canEdit` against the Edition its resolver
+  actually served (`courseHeader.lang`). Those diverge on the normal first visit
+  of the very person per-Edition editing exists for: a Dutch Editor holds only
+  `nl`, `nl` is not an app locale so the course-index redirect cannot pre-fill
+  `?lang=nl` from the UI language, and nothing is in localStorage yet. She would
+  land on a lang-less URL, be served and authorised on `nl`, and have the client
+  send her save to the English source, where the upload guard refuses it and the
+  editor shows a bare save failure. Fixed by deriving the target with
+  `editionToEdit(header?.lang, urlLang)`, a pure function in `readerDerive.ts`
+  (the house pattern for testable client logic, since there is no component-test
+  rig), so client and server agree by construction.
+
+## Shipped so far (2026-08-31)
+
+- **Unit 4 (rename Lessons and References in place): shipped**, in D10's shape.
+- **D9's translated-Reference editing: shipped** (not one of the original four
+  units; it is what the operator's request added).
+- **D12's edit-target fix: shipped**, and it repaired the existing Lesson path as
+  well as the new Reference one.
+- **Units 1, 2 and 3: NOT shipped.** The Edit button is still hover-revealed on
+  desktop (`md:opacity-0 md:group-hover:opacity-100`), still a ghost card rather
+  than a labelled accent pencil, and the sidebar Resources still default
+  collapsed. These were left alone deliberately to keep the 2026-08-31 change to
+  what was asked for; they remain the discoverability half of this effort, and
+  unit 1 is a two-token CSS deletion.
 
 ## Ripple checks for the build session
 

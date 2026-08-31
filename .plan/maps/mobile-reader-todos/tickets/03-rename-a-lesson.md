@@ -52,14 +52,14 @@ the translated Editions.
       [editing-obviousness spec D1](../../editing-obviousness/spec.md)): the
       column already existed; a rename patches it AND splices the blob's
       `<title>` display part so document and row never disagree.
-- [ ] Write the mutation. **Gate corrected 2026-08-27**: not owner-only like
+- [x] Write the mutation. **Gate corrected 2026-08-27**: not owner-only like
       `renameTopic` but the body-edit `canEdit` gate (owner or that Edition's
       Editor), spec D2 and D4.
-- [ ] Decide and implement what a source rename does to ready translated Editions
+- [x] Decide and implement what a source rename does to ready translated Editions
       (carry over, leave alone, or flag as stale). **Decided 2026-08-27**
       (spec D3): leave alone, matching the `editLesson` body precedent. The
       implement half is what keeps this box unticked.
-- [ ] Build the rename UI. **The "settled UI" this item used to describe (a
+- [x] Build the rename UI. **The "settled UI" this item used to describe (a
       Rename button in the lesson bar's freed certificate slot) was superseded
       2026-08-27** by [editing-obviousness spec D5](../../editing-obviousness/spec.md):
       a title-side pencil turning the title into an inline field, both
@@ -68,9 +68,17 @@ the translated Editions.
       `.plan/maps/ui-overhaul/assets/mobile-bottom-nav.md` (the prototype file
       itself, `AppTabsPrototype.tsx`, was deleted 2026-08-23 when variant D
       shipped without the rename button).
-- [ ] Check the name is not cached anywhere that will now go stale (sidebar list,
+- [x] Check the name is not cached anywhere that will now go stale (sidebar list,
       drawer, the Continue card on Home, certificate rendering).
+      **Checked 2026-08-31 by reading the code:** all three read titles through
+      reactive `listLessons` / `listReferences` queries, so a rename propagates
+      with no extra work, and `convex/certificates.ts` snapshots the COURSE title
+      plus lesson count, never lesson titles.
 - [ ] Test: rename, reload, and confirm the sidebar and drawer agree.
+      **Still open 2026-08-31:** covered by automated tests
+      (`convex/content/authoring.test.ts`), NOT by a browser walk. No dev server
+      was listening in the building session, so nobody has yet watched a rename
+      land in the sidebar.
 
 ## Notes
 
@@ -84,3 +92,38 @@ the translated Editions.
   screen, rather than pretending. See `MobileNavPrototype.NOTES.md`.
 - Related but separate: ticket 01 takes the certificate control off this same bar,
   which is what freed the space the Rename button now uses.
+## Answer
+
+**Built and shipped 2026-08-31** under the
+[editing-obviousness](../../editing-obviousness/map.md) effort, in a different UI
+shape than D5 had settled.
+
+- **The name is edited in the in-place editor, not from a title-side pencil.** The
+  operator asked for title editing "in the editor view" on 2026-08-31, so the
+  `ContentEditor` modal gained a Title field above the body editor
+  (`src/app/_components/ArtifactView.tsx`): one save writes the body and the name
+  together, through one already-guarded write path, and there is one affordance to
+  find instead of two. This **supersedes spec D5** (a pencil on the title in the
+  reader). No rename control was added to the reader chrome at all, so the mobile
+  lesson bar stays exactly as variant D shipped it.
+- **What a save writes (D1 holds).** The client splices the new display string into
+  the uploaded document's head `<title>`, preserving the `Lesson N · ` /
+  `Reference · ` prefix that `titleFrom` parses (`replaceTitleDisplay`,
+  `lessonSrcDoc.ts`), and sends the same string as a `title` arg. The write path
+  patches the row's `title` column, which is what the reader renders, so document
+  and row agree and the column is the authority.
+- **Gate = the body-edit gate (D2 holds).** No new mutation and no new resolver for
+  the rename: the four write paths (`editLesson`, `editReference`,
+  `editTranslatedLesson`, and the new `editTranslatedReference`) each took an
+  optional `title` arg, so `getEditableTopic` already decides who may rename what.
+  An Editor renames what they may rewrite.
+- **Translated Editions (D3 and D4 hold).** A source rename leaves ready Editions
+  alone; a translated save patches that Edition's own `translations.title`. Both
+  directions are covered by test.
+- **Blank means keep.** An absent or whitespace-only `title` leaves the column
+  alone (`titlePatch`), so a body-only save can never clear a name.
+
+Evidence: `pnpm typecheck` clean, `pnpm test` green (978 tests), including new
+cases for a source rename, a translated-Edition rename, and the blank-title case.
+The read-side staleness check was done by reading the code, not by walking a
+browser. See the last Todo box for what a human still has to look at.
