@@ -14,10 +14,10 @@
 const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
 // Model slugs are env-overridable with the spike's defaults. GLM 4.2 (the PRD's
-// name) has no OpenRouter slug — the z-ai line runs 4.5 → 4.6 → 4.7 — so the
-// authoring default is the current GLM flagship `z-ai/glm-4.7`. Translation
-// defaults to `google/gemini-3.5-flash`. Both confirmed on OpenRouter (issue 02).
-export const authorModel = (): string => process.env.OPENROUTER_AUTHOR_MODEL ?? "z-ai/glm-4.7";
+// name) has no OpenRouter slug — the z-ai line runs 4.5 → 4.6 → 4.7 → 5.3 —
+// so the authoring default is the current GLM flagship `z-ai/glm-5.3-flash`.
+// Translation defaults to `google/gemini-3.5-flash`. Both confirmed on OpenRouter (issue 02).
+export const authorModel = (): string => process.env.OPENROUTER_AUTHOR_MODEL ?? "z-ai/glm-5.3-flash";
 export const translateModel = (): string => process.env.OPENROUTER_TRANSLATE_MODEL ?? "google/gemini-3.5-flash";
 
 export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };

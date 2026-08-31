@@ -89,7 +89,7 @@ test("chatComplete throws on a non-OK response and when the key is missing", asy
 });
 
 test("model slugs come from env with GLM/Gemini defaults", () => {
-  expect(authorModel()).toBe("z-ai/glm-4.7");
+  expect(authorModel()).toBe("z-ai/glm-5.3-flash");
   expect(translateModel()).toBe("google/gemini-3.5-flash");
   process.env.OPENROUTER_AUTHOR_MODEL = "custom/author";
   process.env.OPENROUTER_TRANSLATE_MODEL = "custom/translate";

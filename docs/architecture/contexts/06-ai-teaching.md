@@ -131,7 +131,7 @@ The provider-agnostic line ([ADR 0014](/docs/adr/0014-provider-agnostic-teaching
 runs the whole thing inside a Convex `internalAction` with no filesystem. Three modules matter:
 
 - **[`convex/openrouterClient.ts`](/convex/openrouterClient.ts#L20-L21)** — the OpenRouter model client
-  (authoring, and the translation *rollback* path). Defaults (env-overridable): author `z-ai/glm-4.7`,
+  (authoring, and the translation *rollback* path). Defaults (env-overridable): author `z-ai/glm-5.3-flash`,
   translate `google/gemini-3.5-flash`. Notable params: `webSearch` toggles OpenRouter's `web` plugin for
   grounded generation; `reasoning: "none"` *asks* to disable billed thinking. It retries once without
   `reasoning` if an endpoint mandates it — a resilience guardrail, but for Gemini that retry silently
