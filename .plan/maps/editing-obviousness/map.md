@@ -33,10 +33,16 @@ asked has actually used them.
   against the spec instead of ticketing it. Landed: **unit 4** (rename, in the
   editor view rather than D5's title-side pencil, see spec D10) and
   **translated-Edition Reference editing** (spec D9, which supersedes D8 and the
-  out-of-scope line this map used to carry). Still open: **units 1, 2 and 3**,
-  the whole discoverability half of the Destination, plus the browser walk that
+  out-of-scope line this map used to carry). Still open after it: **units 2 and
+  3** (unit 1 followed later the same day, see the next bullet), plus the browser
+  walk that
   [mobile-reader-todos ticket 03](../mobile-reader-todos/tickets/03-rename-a-lesson.md)
   now names as its one remaining box.
+- **Unit 1 shipped 2026-08-31 too**, asked for directly once the rename was in:
+  the Edit button no longer hides itself behind a desktop hover. That was the
+  original driver's actual blockage, so what is left of the Destination is unit 2
+  (accent styling for a button that already has its pencil and label) and unit 3
+  (Resources open by default).
 
 ## Decisions so far
 
@@ -47,9 +53,9 @@ are not yet cut._
 
 ## Not yet specified
 
-- Tickets for **units 1, 2 and 3**, the unbuilt discoverability half. The spec
-  is complete and their decisions are made (2026-08-27), so this is a cutting
-  job, not a deciding one; unit 4 and D9 shipped without tickets on 2026-08-31.
+- Tickets for **units 2 and 3**, all that is left unbuilt. The spec is complete
+  and their decisions are made (2026-08-27), so this is a cutting job, not a
+  deciding one; units 1 and 4 plus D9 shipped without tickets on 2026-08-31.
 
 ## Out of scope
 

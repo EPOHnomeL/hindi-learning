@@ -132,12 +132,20 @@ spec had ruled out (D8) and one unit whose shape it had settled differently (D5)
   units; it is what the operator's request added).
 - **D12's edit-target fix: shipped**, and it repaired the existing Lesson path as
   well as the new Reference one.
-- **Units 1, 2 and 3: NOT shipped.** The Edit button is still hover-revealed on
-  desktop (`md:opacity-0 md:group-hover:opacity-100`), still a ghost card rather
-  than a labelled accent pencil, and the sidebar Resources still default
-  collapsed. These were left alone deliberately to keep the 2026-08-31 change to
-  what was asked for; they remain the discoverability half of this effort, and
-  unit 1 is a two-token CSS deletion.
+- **Unit 1 (always-visible Edit buttons): shipped**, later the same day, when
+  the operator asked for it in as many words. Both buttons lost
+  `md:opacity-0 md:group-hover:opacity-100` plus the opacity plumbing that only
+  existed to fight it (the base `opacity-100`, the two focus overrides,
+  `transition-opacity`), and both wrappers lost the `group` class that existed
+  only to drive it. `hover:bg-hi` stays, as an ordinary button hover state rather
+  than the way the button is found. Visible at every breakpoint wherever
+  `canEdit` holds, on Lessons and References alike.
+- **Units 2 and 3: NOT shipped.** The button is still the ghost card
+  (`border-line`, `bg-card/90`, `text-accent`) rather than unit 2's accent
+  styling, though note it already carries the pencil glyph and the localised
+  label, since `t("edit")` is "✎ Edit" in every catalogue; unit 2 is now only the
+  styling half of what it describes. The sidebar Resources still default
+  collapsed (unit 3).
 
 ## Ripple checks for the build session
 
