@@ -238,8 +238,10 @@ export function PublicCourseShell({ token, children }: { token: string; children
               </NavItem>
             ))}
 
+            {/* Open by default for EVERY caller (editing-obviousness unit 3),
+                not just a paid preview as it was until 2026-08-31. */}
             {course.resources.length > 0 && (
-              <details className="group mt-1" open={preview}>
+              <details className="group mt-1" open>
                 <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 pt-4 pb-2 text-xs font-semibold uppercase tracking-wider text-accent2 hover:text-accent [&::-webkit-details-marker]:hidden">
                   {t("resources")}
                   <svg

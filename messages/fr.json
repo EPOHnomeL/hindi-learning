@@ -307,7 +307,7 @@
     "nextLesson": "Leçon suivante →",
     "editLesson": "Modifier cette leçon",
     "editReference": "Modifier cette référence",
-    "edit": "✎ Modifier",
+    "edit": "Modifier",
     "referenceNotFound": "Référence introuvable.",
     "referenceLoadError": "Impossible de charger cette référence. Essayez d’actualiser.",
     "editHeading": "Modifier {label}",

@@ -11,6 +11,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { LockedPane, Paygate } from "./Paygate";
 import { checkoutLink, publicCourseUrl, useEditionLang, withLang } from "./editionUrl";
 import { buildEditDoc, buildSrcDoc, replaceBodyInner, replaceTitleDisplay, scrollToCardMessage, themeMessage, type Theme } from "./lessonSrcDoc";
+import { Icon } from "./icons";
 import { LessonFootCard } from "./LessonFoot";
 import { Markdown } from "./MarkdownView";
 import { MarkdownResourceDialog } from "./ResourceItem";
@@ -573,9 +574,9 @@ function LessonView({
               onClick={() => setEditing(true)}
               aria-label={t("editLesson")}
               title={t("editLesson")}
-              className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent shadow-sm backdrop-blur transition-colors hover:bg-hi"
+              className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent/90"
             >
-              {t("edit")}
+              <Icon name="edit" className="h-4 w-4" /> {t("edit")}
             </button>
           )}
         </div>
@@ -1006,9 +1007,9 @@ function ReferenceView({
             onClick={() => setEditing(true)}
             aria-label={t("editReference")}
             title={t("editReference")}
-            className="absolute right-3 top-3 z-10 rounded-lg border border-line bg-card/90 px-2.5 py-1.5 text-sm text-accent shadow-sm backdrop-blur transition-colors hover:bg-hi"
+            className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent/90"
           >
-            {t("edit")}
+            <Icon name="edit" className="h-4 w-4" /> {t("edit")}
           </button>
         )}
       </div>

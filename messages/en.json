@@ -307,7 +307,7 @@
     "nextLesson": "Next lesson →",
     "editLesson": "Edit this lesson",
     "editReference": "Edit this reference",
-    "edit": "✎ Edit",
+    "edit": "Edit",
     "referenceNotFound": "Reference not found.",
     "referenceLoadError": "Couldn’t load this reference. Try refreshing.",
     "editHeading": "Edit {label}",

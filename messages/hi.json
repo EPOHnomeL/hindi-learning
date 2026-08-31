@@ -307,7 +307,7 @@
     "nextLesson": "अगला पाठ →",
     "editLesson": "इस पाठ को संपादित करें",
     "editReference": "इस संदर्भ को संपादित करें",
-    "edit": "✎ संपादित करें",
+    "edit": "संपादित करें",
     "referenceNotFound": "संदर्भ नहीं मिला।",
     "referenceLoadError": "यह संदर्भ लोड नहीं हो सका। रीफ़्रेश करके देखें।",
     "editHeading": "{label} संपादित करें",

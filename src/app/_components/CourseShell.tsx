@@ -456,8 +456,11 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
     }
   }
 
+  // Open by default (editing-obviousness unit 3): the Resources a course carries
+  // were invisible behind a collapsed summary nobody opened. Still collapsible,
+  // and deliberately NOT persisted anywhere.
   return (
-    <details className="group mt-1">
+    <details className="group mt-1" open>
       <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-2 pt-4 pb-2 text-xs font-semibold uppercase tracking-wider text-accent2 hover:text-accent [&::-webkit-details-marker]:hidden">
         {t("resources")}
         <svg
