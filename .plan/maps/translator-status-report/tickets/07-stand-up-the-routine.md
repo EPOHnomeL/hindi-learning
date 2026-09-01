@@ -52,9 +52,5 @@ the mechanics.
 A live tab has no cadence, so there is no Sunday 07:00 GMT+2 run, no third sibling of
 `teacher-next-lesson` and `translate`, no Instructions field, and no runbook.
 
-**One live loose end, for the operator, not for an agent:** the Routine
-**"Ywam Potch Translator Status"** already exists on claude.ai, wired to
-`EPOHnomeL/hindi-learning` and `hindi-learning-prod` with `PUBLISH_SECRET` and
-`CONVEX_PROD_URL` on it. It was never given instructions, so it is inert rather than
-wrong, but it should be deleted so a later session does not find it and assume this
-map is live. Nothing in this repo can delete it.
+The claude.ai Routine the Question above describes as already created **no longer
+exists**; the operator deleted it on 2026-09-01. Nothing is left standing.
