@@ -515,8 +515,37 @@
     "modeEachTitle": "Een kode elk",
     "modeEachBilling": "Eenmalige kodes, een per lid. Vooraf gefaktureer vir die hele groep.",
     "modeEachIdentity": "’n Inlossing teken net aan dat dit gebeur het: geen name, geen lys nie.",
-    "usersIntro": "Almal met wie hierdie kursus gedeel is, en wat hulle kan doen. Vir eers per taal gegroepeer.",
-    "dashboardSoon": "Lees-alleen kursusstatistieke kom hier."
+    "usersIntro": "Almal met wie hierdie kursus gedeel is, en wat hulle kan doen. Vir eers per taal gegroepeer."
+  },
+  "ManageDashboard": {
+    "loadError": "Hierdie kursus kon nie gelaai word nie.",
+    "intro": "Hoe dit met jou kursus gaan. Alles op hierdie oortjie is net leesbaar.",
+    "statPublished": "Gepubliseer",
+    "publishedOf": "{published} van {total}",
+    "statPeople": "Mense",
+    "statEditors": "Redigeerders",
+    "statLanguages": "Tale",
+    "statPrice": "Prys",
+    "priceFree": "Gratis",
+    "priceRange": "{min} tot {max}",
+    "goToSharing": "Maak die Deel-oortjie oop",
+    "goToUsers": "Maak die Mense-oortjie oop",
+    "reachTitle": "Mense per taal",
+    "reachHint": "Almal met toegang tot elke taal, hangende uitnodigings ingesluit.",
+    "noPeopleYet": "Niemand het nog toegang tot hierdie kursus nie.",
+    "progressTitle": "Vordering",
+    "progressHint": "{learners, plural, one {# leerder} other {# leerders}} oor {lessons, plural, one {# les} other {# lesse}}.",
+    "progressTooLarge": "Hierdie kursus het te veel lesers om hier op te som.",
+    "noLearnersYet": "Nog geen leerders om te wys nie.",
+    "buckets": {
+      "0": "Nie begin nie",
+      "100": "Klaar",
+      "1-20": "Tot 20%",
+      "20-40": "20 tot 40%",
+      "40-60": "40 tot 60%",
+      "60-80": "60 tot 80%",
+      "80-99": "80 tot 99%"
+    }
   },
   "Certificate": {
     "eyebrow": "Sertifikaat van Voltooiing",

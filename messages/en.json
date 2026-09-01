@@ -515,8 +515,37 @@
     "modeEachTitle": "One code each",
     "modeEachBilling": "Single-use codes, one per member. Billed upfront for the whole batch.",
     "modeEachIdentity": "A redemption records only that it happened: no names, no roster.",
-    "usersIntro": "Everyone this course has been shared with, and what they can do. Grouped by language for now.",
-    "dashboardSoon": "Read-only course stats will live here."
+    "usersIntro": "Everyone this course has been shared with, and what they can do. Grouped by language for now."
+  },
+  "ManageDashboard": {
+    "loadError": "This course could not be loaded.",
+    "intro": "How your course is doing. Everything on this tab is read only.",
+    "statPublished": "Published",
+    "publishedOf": "{published} of {total}",
+    "statPeople": "People",
+    "statEditors": "Editors",
+    "statLanguages": "Languages",
+    "statPrice": "Price",
+    "priceFree": "Free",
+    "priceRange": "{min} to {max}",
+    "goToSharing": "Open the Sharing tab",
+    "goToUsers": "Open the Users tab",
+    "reachTitle": "People per language",
+    "reachHint": "Everyone with access to each language, pending invites included.",
+    "noPeopleYet": "Nobody has access to this course yet.",
+    "progressTitle": "Progress",
+    "progressHint": "{learners, plural, one {# learner} other {# learners}} across {lessons, plural, one {# lesson} other {# lessons}}.",
+    "progressTooLarge": "This course has too many readers to summarise here.",
+    "noLearnersYet": "No learners to chart yet.",
+    "buckets": {
+      "0": "Not started",
+      "100": "Finished",
+      "1-20": "Up to 20%",
+      "20-40": "20 to 40%",
+      "40-60": "40 to 60%",
+      "60-80": "60 to 80%",
+      "80-99": "80 to 99%"
+    }
   },
   "Certificate": {
     "eyebrow": "Certificate of Completion",

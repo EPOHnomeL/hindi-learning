@@ -515,8 +515,37 @@
     "modeEachTitle": "Un code par personne",
     "modeEachBilling": "Des codes à usage unique, un par membre. Facturé d’avance pour tout le lot.",
     "modeEachIdentity": "Un échange n’enregistre que le fait qu’il a eu lieu : ni nom, ni liste.",
-    "usersIntro": "Toutes les personnes avec qui ce cours est partagé, et ce qu’elles peuvent faire. Groupé par langue pour l’instant.",
-    "dashboardSoon": "Les statistiques du cours, en lecture seule, vivront ici."
+    "usersIntro": "Toutes les personnes avec qui ce cours est partagé, et ce qu’elles peuvent faire. Groupé par langue pour l’instant."
+  },
+  "ManageDashboard": {
+    "loadError": "Ce cours n'a pas pu être chargé.",
+    "intro": "Où en est votre cours. Tout dans cet onglet est en lecture seule.",
+    "statPublished": "Publié",
+    "publishedOf": "{published} sur {total}",
+    "statPeople": "Personnes",
+    "statEditors": "Éditeurs",
+    "statLanguages": "Langues",
+    "statPrice": "Prix",
+    "priceFree": "Gratuit",
+    "priceRange": "{min} à {max}",
+    "goToSharing": "Ouvrir l'onglet Partage",
+    "goToUsers": "Ouvrir l'onglet Personnes",
+    "reachTitle": "Personnes par langue",
+    "reachHint": "Toutes les personnes ayant accès à chaque langue, invitations en attente comprises.",
+    "noPeopleYet": "Personne n'a encore accès à ce cours.",
+    "progressTitle": "Progression",
+    "progressHint": "{learners, plural, one {# apprenant} other {# apprenants}} sur {lessons, plural, one {# leçon} other {# leçons}}.",
+    "progressTooLarge": "Ce cours a trop de lecteurs pour être résumé ici.",
+    "noLearnersYet": "Aucun apprenant à afficher pour l'instant.",
+    "buckets": {
+      "0": "Pas commencé",
+      "100": "Terminé",
+      "1-20": "Jusqu'à 20 %",
+      "20-40": "20 à 40 %",
+      "40-60": "40 à 60 %",
+      "60-80": "60 à 80 %",
+      "80-99": "80 à 99 %"
+    }
   },
   "Certificate": {
     "eyebrow": "Certificat de réussite",

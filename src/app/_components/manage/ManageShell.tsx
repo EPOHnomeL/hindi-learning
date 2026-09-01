@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { CourseSettingsBody } from "../CourseSettings";
+import { DashboardTab } from "./DashboardTab";
 import { Icon, type IconName } from "../icons";
 import { IconButton } from "../ui";
 import { EditionBadges, EmptyPanel, Sheet, type Edition } from "./shared";
@@ -133,8 +134,7 @@ export function ManageShell({ slug }: { slug: string }) {
         ) : tab === "settings" ? (
           <SettingsTab topicSlug={slug} />
         ) : (
-          /* Read-only course stats; ticket 23 builds the interior. */
-          <EmptyPanel icon="chart" tone="soft" message={t("dashboardSoon")} />
+          <DashboardTab topicSlug={slug} editions={editions} onGoTo={setTab} />
         )}
       </main>
 
