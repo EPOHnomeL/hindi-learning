@@ -93,3 +93,38 @@ This walk stops at **Awaiting payment** — the buyer's half. The operator's hal
 (confirm the intent, the email, the Entitlement, the Sales row and the Payouts
 `owed`) is [19](./19-real-eft-sale-end-to-end-on-prod.md), which is the map's
 Done-when claim in full.
+
+## Answer
+
+**Walked on prod on a real phone, and the operator is happy: nothing to change,
+no follow-up tickets.** Recorded 2026-09-01 from the operator's own report of the
+walk. This is the taste judgement the ticket asked for, not a code reading, and
+the ticket's bar was explicitly "the operator has said what to change, or that
+they're happy". They're happy.
+
+All nine steps were covered, including the two the ticket flagged as awkward:
+
+- **Steps 1 to 8**: both entry paths, the four-step rail, the EFT dead end and the
+  Awaiting-payment section, the card return's Payment-complete panel, the PayFast
+  cancel landing on the course page, a non-YWAM tenant, the smallest phone on the
+  two screens ticket 14 changed, and ticket 01's owed brand check across sign-in,
+  dashboard, course reader and public reader. Nothing was named.
+- **Step 9, the regional-pricing look**: done, and **it read right**. The $10.00
+  view with **charged as R184.00 (ZAR)** beneath and the EFT option withheld was
+  seen on a deployed URL through a VPN, which is what ticket 21 needed and could
+  not get on localhost. Per this map's Rules the Rand figure was the thing to
+  judge, and the operator judged it acceptable.
+
+**What this closes.** Tickets **13, 14, 16 and 17** lose their "operator's walk
+pending" note; this walk was their walk, all four at once, which is why 18
+existed. **Ticket 21** loses its walk-pending note too, on the strength of step 9.
+**Ticket 01's brand check stops being owed**: ticket 07 had cleared the whitelabel
+list but left this one item undone, and it now has an observation behind it.
+
+The 320px measurement is worth calling out as the one thing that changed status
+rather than merely being confirmed. Ticket 14's fix was arithmetic that had never
+been measured on a device. It has now been, and it holds.
+
+This walk stopped at Awaiting payment by design. The operator's half went on to
+resolve as [19](./19-real-eft-sale-end-to-end-on-prod.md), which carries the map's
+Done-when.

@@ -50,15 +50,15 @@ history on a repo that now handles real money.
 | 10 | Research — non-ZAR charging + buyer geo | [10](tickets/10-research-non-zar-charging-and-geo.md) | answered |
 | 11 | Regional pricing mechanism ($10/€10/R100) | [11](tickets/11-regional-pricing-mechanism.md) | answered — decided, **not built** |
 | 12 | Checkout as a page — route + step model | [12](tickets/12-checkout-page-route-and-step-model.md) | answered |
-| 13 | Move the purchase out of `BuyDialog` onto the page | [13](tickets/13-move-purchase-out-of-buydialog.md) | built `f971945` — **operator's walk pending** |
-| 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | built — **operator's walk pending** |
+| 13 | Move the purchase out of `BuyDialog` onto the page | [13](tickets/13-move-purchase-out-of-buydialog.md) | built `f971945`, walked on prod (18) |
+| 14 | Phone-first pass — locked card and `SignIn` | [14](tickets/14-phone-first-pass-locked-card-and-signin.md) | built, walked on prod (18) |
 | 15 | Launch risk — rollback + prod walk-through | [15](tickets/15-checkout-page-launch-risk-and-prod-walk.md) | answered — no rollback armed; walk split to 18 |
-| 16 | The EFT dead end — a way out, and somewhere to wait | [16](tickets/16-eft-dead-end-and-awaiting-payment.md) | built `14b3888` — **operator's walk pending** |
-| 17 | The card buyer's payment-complete moment | [17](tickets/17-payment-complete-moment-on-card-return.md) | built `f8b55c3` — **operator's walk pending** |
-| 18 | The operator's prod walk — both paths, both rails | [18](tickets/18-operators-prod-walk.md) | open — collects the four pending walks |
-| 19 | One real EFT sale, end to end, on prod | [19](tickets/19-real-eft-sale-end-to-end-on-prod.md) | open — blocked by 18; the map's Done-when |
+| 16 | The EFT dead end — a way out, and somewhere to wait | [16](tickets/16-eft-dead-end-and-awaiting-payment.md) | built `14b3888`, walked on prod (18) |
+| 17 | The card buyer's payment-complete moment | [17](tickets/17-payment-complete-moment-on-card-return.md) | built `f8b55c3`, walked on prod (18) |
+| 18 | The operator's prod walk — both paths, both rails | [18](tickets/18-operators-prod-walk.md) | answered: operator happy, nothing to change |
+| 19 | One real EFT sale, end to end, on prod | [19](tickets/19-real-eft-sale-end-to-end-on-prod.md) | answered: real EFT sale on prod 2026-09-01 |
 | 20 | Build regional pricing — backend + geo | [20](tickets/20-regional-pricing-backend.md) | built `35eb877` |
-| 21 | Build regional pricing — seller + buyer surfaces | [21](tickets/21-regional-pricing-surfaces.md) | built `dc9db73` — **unpushed; operator's walk pending** |
+| 21 | Build regional pricing — seller + buyer surfaces | [21](tickets/21-regional-pricing-surfaces.md) | built `dc9db73`, pushed; walked on prod (18, step 9) |
 
 The strict sequencing above applied to units 01–06, which shared files and are
 done. The 2026-08-01 additions are a second strand: 09 stood alone (a
@@ -75,7 +75,7 @@ the container was the complaint. 12 is the decision the other three hang off;
 **11 and 13 land in the same surface** — whichever ships second inherits the
 merge.
 
-**18 and 19 are what is left** (21's build landed 2026-08-06 and left only its
+**18 and 19 were the last two, and both resolved 2026-09-01** (21's build landed 2026-08-06 and left only its
 walk, which 18 now names as a fifth), and they are the same person's afternoon
 in two sittings: 18 is the buyer's half (taste, on a phone, stopping at Awaiting
 payment), 19 is the operator's half and the map's Done-when (a real transfer,
@@ -191,8 +191,7 @@ It also needs an acceptance criterion that post-dates the issue — see
   — so `checkoutStep` grew a **fourth step** that wins over both payment states,
   and the page shows "This course is yours" instead of a chooser whose buttons
   would throw. That is the EFT rail's step 4, the counterpart of PayFast's
-  `return_url`. **No purchase was completed and nothing was seen in a browser** —
-  the operator's walk in dev is the bar, and it is still owed.
+  `return_url`. **No purchase was completed and nothing was seen in a browser** at the time. Cleared by 18: walked on prod 2026-09-01, operator happy.
 
 - [The EFT dead end — a way out, and somewhere to wait](./tickets/16-eft-dead-end-and-awaiting-payment.md) —
   found by the operator's dev walk of 13. The instructions panel had no exit, and
@@ -228,8 +227,7 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   the ticket didn't name: dismissal is per-tab-session and buying happens inside
   one session, so a pre-purchase dismissal would have silenced the receipt.
   `ConfirmingBanner` and its two `Reader` strings deleted, four `Welcome` keys
-  added across all five locales. `convex/` untouched. **The operator's walk is
-  still owed**, same bar as 13 and 16.
+  added across all five locales. `convex/` untouched. **The operator’s walk was owed**, same bar as 13 and 16. Cleared by 18: walked on prod 2026-09-01, operator happy.
 
 - [Phone-first pass — locked card and `SignIn`](./tickets/14-phone-first-pass-locked-card-and-signin.md) —
   a presentation-only pass, and it found **one real bug behind the ugliness**: the
@@ -248,8 +246,7 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   `_landing/YwamPotch.tsx` — and none wraps or overrides `SignIn`'s classes, so the
   leak the ticket warned about lands identically and benignly on every tenant. No
   tokens, no scale, no breakpoint system. `convex/` untouched; 758/758 tests green.
-  **The operator's walk is owed** — nothing was seen in a browser, and the 320px
-  arithmetic is computed, not measured.
+  **The 320px arithmetic was computed, not measured**, and nothing had been seen in a browser. Cleared by 18: walked on prod 2026-09-01, operator happy. The smallest phone to hand was used on both screens this ticket changed, so the arithmetic is now a measurement.
 
 - [Prod-verify the security fixes](./tickets/07-prod-verify-security-fixes.md) —
   **both checks passed on prod, no failures, no follow-up tickets.** The
@@ -361,9 +358,7 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   locales. **Two facts that decide whether this is visible at all:** nothing
   changes until a seller types the prices (no existing Edition has them), and the
   header is absent on localhost and reads `ZA` in Potchefstroom — so the $10 view
-  needs a deployed URL *and* a VPN. **Unpushed, and the operator's walk is owed**
-  — the same bar as 13, 14, 16 and 17, and 18 does not cover it while it is off
-  prod.
+  needs a deployed URL *and* a VPN. **Both facts have since resolved.** `dc9db73` is an ancestor of `origin/main`, and the owed walk became step 9 of ticket 18: seen on a deployed URL through a VPN on 2026-09-01, reading $10.00 with charged as R184.00 (ZAR) beneath and the EFT option withheld. The operator judged the Rand figure right.
 
 - [Fix the four known stale facts](./tickets/08-fix-known-stale-docs-and-tracker.md) —
   **four of the five were already fixed, and the ticket had itself gone stale.** The
@@ -383,6 +378,31 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   `.scratch/docs-reconciliation/HANDOFF.md` is **not git-tracked**, so the systematic
   sweep it defers to is invisible to a fresh clone.
 
+- [The operator’s prod walk: both entry paths, both rails, on a phone](./tickets/18-operators-prod-walk.md):
+  **walked on prod on a real phone 2026-09-01, and the operator is happy: nothing
+  named, no follow-up tickets.** All nine steps, including the two the ticket
+  flagged as awkward: the 320px pass on the smallest phone to hand (ticket 14’s
+  fix was arithmetic and is now a measurement), and step 9’s regional-pricing
+  look through a VPN on a deployed URL, which read $10.00 with **charged as
+  R184.00 (ZAR)** beneath and the EFT option withheld. This was the walk owed by
+  **13, 14, 16, 17 and 21** all at once, which is why 18 existed, and it also
+  discharged **ticket 01’s brand check**, left undone by 07 with nowhere else to
+  live. Judged by the operator’s eye, as the ticket specified; there was no rubric.
+
+- [Close the loop: one real EFT sale, end to end, on prod](./tickets/19-real-eft-sale-end-to-end-on-prod.md):
+  **done with a real transfer 2026-09-01. All six steps held, no faults.** The
+  operator’s half of the funnel ran for the first time outside `convex-test`:
+  the pending-EFT row carried the right reference, buyer email, course, Edition
+  and amount; confirming it sent the email, whose link opened the course **on the
+  tenant host** (ADR 0025) and cleared **Awaiting payment** into Purchased; the
+  sale is in **Sales** and `owed` in **Payouts** with `fee: 0` and `net == gross`,
+  the **ADR 0026 provenance rule seen against real money** rather than a fixture.
+  A second Confirm press minted **no** second Entitlement, Ledger row or email,
+  retiring the map’s last test-only claim. Tickets 02 to 05 built this whole side
+  under `convex-test` and none of it had ever met a real payment, so it was the
+  map’s largest untested surface and it came back clean. The reference is held by
+  the operator and deliberately **not committed** to the repo.
+
 ## Not yet specified
 
 <!-- Empty, and correctly so. The one patch this map carried — Regional pricing
@@ -391,8 +411,8 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
      left here first; chartr flagged it, because a graduated patch has no
      identity left to render and the strike hid its lead title. Deleted rather
      than restyled: the graduation is recorded in Decisions so far, which is
-     where it belongs. Nothing else about this map is foggy — what remains is
-     the operator's two walks (18, 19) and the regional-pricing surfaces (21). -->
+     where it belongs. Nothing else about this map is foggy, and as of 2026-09-01 nothing else is
+     open either: 18 and 19 both resolved, which was everything that remained. -->
 
 
 ## Out of scope
@@ -443,6 +463,12 @@ and the operator has chosen its shape (a purchase variant of the Welcome panel).
   rollback target and re-check it survived the build.
 
 ## Done when
+
+**VERIFIED ON PROD 2026-09-01** by ticket [19](./tickets/19-real-eft-sale-end-to-end-on-prod.md), on the buyer walk
+ticket [18](./tickets/18-operators-prod-walk.md) ran the same day. A real buyer paid by
+EFT, the operator confirmed, the email arrived and opened the course on the tenant
+host, and the sale is in Sales and `owed` in Payouts. The reference is held by the
+operator rather than committed here.
 
 One end-to-end claim, verified **on prod against the real tenant host** — not in
 tests, not on localhost:
