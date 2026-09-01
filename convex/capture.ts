@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, getViewableTopic, loadEdition, readableLang } from "./lib";
+import { assertAdmin, getOwnedTopic, getViewableTopic, loadEdition, readableLang, topicBySlug } from "./lib";
 import { assertTenantFlag } from "./tenantFlags";
 
 // The conversation loop (PRD §4–§5). Reader writes responses/progress/questions
@@ -98,6 +98,101 @@ export const setProgress = mutation({
       return;
     }
     await ctx.db.insert("progress", { userId, topicId: topic._id, lessonKey, status, lastReadAt: Date.now() });
+  },
+});
+
+// Admin: read someone else's Progress on one Topic, so an operator can look before
+// writing with `setProgressFor` below and check the result afterwards. Read-only and
+// secret-guarded. `null` when no such registered user or no such Topic, which is
+// itself the answer to "does this person even have an account".
+export const readProgressFor = query({
+  args: { secret: v.string(), email: v.string(), topicSlug: v.string() },
+  returns: v.union(
+    v.null(),
+    v.array(v.object({ lessonKey: v.string(), status: v.string(), lastReadAt: v.union(v.number(), v.null()) })),
+  ),
+  handler: async (ctx, { secret, email, topicSlug }) => {
+    assertAdmin(secret);
+    const user = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", email))
+      .unique();
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!user || !topic) return null;
+    const rows = await ctx.db
+      .query("progress")
+      .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id).eq("userId", user._id))
+      .collect();
+    return rows
+      .map((r) => ({ lessonKey: r.lessonKey, status: r.status, lastReadAt: r.lastReadAt ?? null }))
+      .sort((a, b) => a.lessonKey.localeCompare(b.lessonKey));
+  },
+});
+
+// Admin: set SOMEONE ELSE'S Progress, named by email. `setProgress` above is
+// deliberately self-only (a reader marks their own, keyed by their own userId),
+// which leaves no way to do the one thing an operator legitimately needs: place a
+// reader at a lesson they reached outside the reader. That happens with a
+// translator or reviewer who worked through a course in a spreadsheet rather than
+// by clicking Next, and would otherwise have to re-open twenty-odd lessons by hand
+// to stop the course telling them they are on lesson 1.
+//
+// Two rules are inherited from `setProgress` on purpose:
+//
+//   * completed is never downgraded to opened. An operator backfill must not be
+//     able to erase a reader's own record of having finished something.
+//   * every entry stamps `lastReadAt`, because that is what the resume point reads
+//     (`myLastRead`). They are stamped in ARGUMENT ORDER, one millisecond apart, so
+//     the caller's last entry is the newest and therefore the lesson the reader
+//     lands on. Stamping them all with one `Date.now()` would leave the resume
+//     point to sort order rather than intent.
+export const setProgressFor = mutation({
+  args: {
+    secret: v.string(),
+    email: v.string(),
+    topicSlug: v.string(),
+    entries: v.array(
+      v.object({ lessonKey: v.string(), status: v.union(v.literal("opened"), v.literal("completed")) }),
+    ),
+  },
+  returns: v.object({ inserted: v.number(), updated: v.number(), kept: v.number() }),
+  handler: async (ctx, { secret, email, topicSlug, entries }) => {
+    assertAdmin(secret);
+    const user = await ctx.db
+      .query("users")
+      .withIndex("email", (q) => q.eq("email", email))
+      .unique();
+    if (!user) throw new Error(`no registered user with email ${email}`);
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) throw new Error(`no topic ${topicSlug}`);
+
+    const base = Date.now() - entries.length;
+    let inserted = 0;
+    let updated = 0;
+    let kept = 0;
+    for (const [i, { lessonKey, status }] of entries.entries()) {
+      const lastReadAt = base + i;
+      const existing = await ctx.db
+        .query("progress")
+        .withIndex("by_topic_user_lesson", (q) =>
+          q.eq("topicId", topic._id).eq("userId", user._id).eq("lessonKey", lessonKey),
+        )
+        .unique();
+      if (!existing) {
+        await ctx.db.insert("progress", { userId: user._id, topicId: topic._id, lessonKey, status, lastReadAt });
+        inserted++;
+      } else if (existing.status === "completed" && status === "opened") {
+        await ctx.db.patch(existing._id, { lastReadAt });
+        kept++;
+      } else if (existing.status === status) {
+        await ctx.db.patch(existing._id, { lastReadAt });
+        kept++;
+      } else {
+        await ctx.db.patch(existing._id, { status, lastReadAt });
+        updated++;
+      }
+    }
+    return { inserted, updated, kept };
   },
 });
 

@@ -4,7 +4,7 @@ import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { getOwnedTopic, loadEdition, mintToken, normaliseEmail, shareLang, shareRole, SOURCE_LANG } from "./lib";
+import { assertAdmin, getOwnedTopic, loadEdition, mintToken, normaliseEmail, shareLang, shareRole, SOURCE_LANG, topicBySlug } from "./lib";
 import { assertTenantFlag } from "./tenantFlags";
 import { topicLessonCounts } from "./progressCounts";
 import { langInfo } from "./languages";
@@ -205,6 +205,51 @@ export const setEditionPublic = mutation({
 // first owner-facing "who has access" surface. Owner-only via getOwnedTopic, so
 // a non-owner is rejected before any row is read. Lang is matched in-memory over
 // `by_topic` (legacy rows carry no `lang`), matching shareTopic.
+// Admin: everyone granted access to this Topic, across every Edition, with the
+// account email each grant resolves to. `listEditionAccess` below answers the same
+// question for the owner in the UI, but it is auth'd as the owner, so a script
+// cannot call it. Operator jobs keep starting from "a person emailed me, which
+// account is that?" and the email on the message is often not the account email.
+// Read-only, secret-guarded, and scoped to one Topic: it discloses only the people
+// the owner can already see in the sharing panel.
+export const listAccessAdmin = query({
+  args: { secret: v.string(), topicSlug: v.string() },
+  returns: v.union(
+    v.null(),
+    v.array(
+      v.object({
+        email: v.union(v.string(), v.null()),
+        name: v.union(v.string(), v.null()),
+        lang: v.string(),
+        role: v.string(),
+        status: v.union(v.literal("accepted"), v.literal("pending")),
+      }),
+    ),
+  ),
+  handler: async (ctx, { secret, topicSlug }) => {
+    assertAdmin(secret);
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return null;
+    const out = [];
+    for (const s of await ctx.db.query("shares").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()) {
+      const u = await ctx.db.get(s.viewerId);
+      out.push({
+        email: u?.email ?? null,
+        name: u?.name ?? null,
+        lang: shareLang(s),
+        role: shareRole(s),
+        status: "accepted" as const,
+      });
+    }
+    for (const p of await ctx.db.query("pendingShares").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect()) {
+      // Not shareLang/shareRole: those are typed for a `shares` row. A pending
+      // invite carries the same two optional fields with the same defaults.
+      out.push({ email: p.email, name: null, lang: p.lang ?? SOURCE_LANG, role: p.role ?? "viewer", status: "pending" as const });
+    }
+    return out;
+  },
+});
+
 export const listEditionAccess = query({
   args: { topicSlug: v.string(), lang: v.string() },
   returns: v.array(
