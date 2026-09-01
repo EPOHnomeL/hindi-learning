@@ -136,7 +136,16 @@ export function planPush(manifest: Manifest, read: (path: string) => string | nu
       fail("quiz-drift", `working/${item.file} changed the quiz markers (data-correct / data-answer / data-k). The server would skip it and the reader would fall back to English`);
       continue;
     }
-    const title = titleFrom(working) || item.title;
+    // The stored row title (what lesson lists and cards render) and the document's
+    // own <title> can legitimately disagree: an Edition translated in more than one
+    // pass has rows whose stored title came from an older, rougher pass than the
+    // body did. Deriving the title from the document on EVERY push would silently
+    // rewrite every one of those the first time any unrelated row was sent, which on
+    // prophetic-school/es would have been 40 titles nobody asked to change. So the
+    // document only wins when the operator actually edited it. Otherwise the stored
+    // title round-trips untouched, and push changes exactly what you changed.
+    const workingTitle = titleFrom(working);
+    const title = workingTitle !== titleFrom(pristine) ? workingTitle : (item.title ?? workingTitle);
     if (!title) {
       // publishTranslation is a db.replace: a title left out is DROPPED, not kept.
       fail("no-title", `working/${item.file} has no <title> and the row carried none. Publishing would clear the stored title`);

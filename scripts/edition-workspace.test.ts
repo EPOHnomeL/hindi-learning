@@ -80,6 +80,36 @@ test("an edited lesson is sent, with its title re-derived from the edited docume
   expect("html" in body && body.title).toBe("Ho Ithuta ho Mamela");
 });
 
+test("an unedited <title> keeps the stored row title, even when the two disagree", () => {
+  // prophetic-school/es has ~40 rows whose stored title came from an older, rougher
+  // translation pass than the body. Re-deriving from the document on every push
+  // would have rewritten all of them the first time any unrelated row was sent.
+  const it = item({ kind: "lesson", key: "0010", title: "Se apoya en la cruz", blobBacked: true });
+  const plan = planPush(
+    manifestOf([it]),
+    reader({
+      "pristine/lessons/0010.html": lesson("Reposa en la cruz"),
+      "working/lessons/0010.html": lesson("Reposa en la cruz"),
+    }),
+  );
+  expect(plan.send).toHaveLength(1);
+  const body = plan.send[0]!.body;
+  expect("html" in body && body.title).toBe("Se apoya en la cruz");
+});
+
+test("an edited <title> is what replaces the stored row title", () => {
+  const it = item({ kind: "lesson", key: "0010", title: "Se apoya en la cruz" });
+  const plan = planPush(
+    manifestOf([it]),
+    reader({
+      "pristine/lessons/0010.html": lesson("Reposa en la cruz"),
+      "working/lessons/0010.html": lesson("Todo descansa en la Cruz"),
+    }),
+  );
+  const body = plan.send[0]!.body;
+  expect("html" in body && body.title).toBe("Todo descansa en la Cruz");
+});
+
 test("a blob-backed row is sent even when nothing changed", () => {
   // It may still be sharing its _storage object with the Edition it was cloned from,
   // so republishing (which writes inline and clears htmlStorageId) is what makes the

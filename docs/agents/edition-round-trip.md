@@ -64,6 +64,29 @@ different courses and nothing on disk records where the seam is.
 | `no-title` | `publishTranslation` is a `db.replace`, so a title left out is dropped, not kept. |
 | `missing` | A deleted working file does not delete a row. Restore it or re-pull. |
 
+## Two titles per Lesson, and they drift
+
+A Lesson has a **stored row title** (`translations.title`, what lesson lists and cards
+render) and the **document's own `<title>`** (the browser tab). They are set together on
+publish and can then drift, because an Edition translated in more than one pass ends up
+with rows whose stored title came from an older, rougher pass than the body did.
+
+Measured on `prophetic-school`/`es` on 2026-09-01: **40 of 56 lessons** disagreed, with
+the stored titles in mixed register (`Lleve`, `Practique`, `Adorad y sed llenos`) against
+`tú` in the documents. One row, lesson 3, had **no stored title at all** and an entirely
+English `<title>`, which is what a reviewer saw leaking into the Spanish lesson list.
+
+So push derives the title from the document **only when the document's `<title>` was
+actually edited**; otherwise the stored title round-trips untouched. Without that rule the
+first push of any single unrelated row would have rewritten all 40. To change a stored
+title, edit that document's `<title>` (keeping the `Lección N · ` prefix, which
+`titleFrom` strips).
+
+Use `--only <key>[,<key>]` to scope a push to named rows; a lesson-number prefix
+(`--only 0003,0021`) is enough, and `title`/`mission` are named by kind. Worth reaching
+for when applying a reviewer's list against a live Edition, so the blast radius is
+exactly the rows on the list.
+
 ## Things that cost someone a round-trip already
 
 - **Only what changed is sent**, plus every **blob-backed** row. A row whose body still

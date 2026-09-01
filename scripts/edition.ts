@@ -202,7 +202,28 @@ const read = (path: string): string | null => {
   const full = `${ROOT}/${path}`;
   return existsSync(full) ? readFileSync(full, "utf8") : null;
 };
-const plan = planPush(manifest, read, { all: ALL });
+
+// Applying a reviewer's list of corrections touches a handful of named rows, and on
+// a live Edition the blast radius is worth being able to state exactly. `--only`
+// scopes the run to those rows; a `title`/`mission` row is named by its kind, since
+// its key is empty.
+const only = flag("--only");
+const wanted = only ? only.split(",").map((s) => s.trim()).filter(Boolean) : null;
+// A reviewer refers to "lesson 12", not to "0012-catching-what-the-tongue-carries",
+// so the leading number is enough. The "-" boundary keeps 0001 from matching 00010.
+const names = (i: Item, k: string) => i.key === k || i.kind === k || i.key.startsWith(`${k}-`);
+const scoped: Manifest = wanted
+  ? { ...manifest, items: manifest.items.filter((i) => wanted.some((k) => names(i, k))) }
+  : manifest;
+if (wanted) {
+  const missing = wanted.filter((k) => !manifest.items.some((i) => names(i, k)));
+  if (missing.length) {
+    console.error(`--only named ${missing.length} row(s) this Edition does not have: ${missing.join(", ")}`);
+    process.exit(1);
+  }
+  console.log(`--only: ${scoped.items.length} of ${manifest.items.length} rows in scope`);
+}
+const plan = planPush(scoped, read, { all: ALL });
 
 console.log(`${manifest.topicSlug} / ${manifest.lang} on ${manifest.deployment.toUpperCase()} as ${owner}`);
 for (const { item, body, reason } of plan.send) {
