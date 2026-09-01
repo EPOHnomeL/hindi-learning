@@ -363,6 +363,20 @@ disk as history only). The follow-on effort that grows the flag set is
   intent URL. It is a workaround and is labelled as one; the block itself stays
   Samsung's until the TWA exists.
 
+## Editing a shipped Edition
+
+Changing the content of an Edition that is already in the Hub goes through the
+**local round-trip**: `pnpm edition:pull:prod` to disk, edit `working/`, `pnpm
+edition:push:prod` back (dry run unless `--go`). It sends only what changed plus
+every blob-backed row, and refuses the whole run on a quiz-marker drift, a
+surviving static-block placeholder, or a blanked text row. Added 2026-09-01,
+generalising the two one-off scripts that came before it. Full contract, and the
+traps each of those two hit, in
+[docs/agents/edition-round-trip.md](edition-round-trip.md).
+
+English is the **source** Edition and is not editable this way: use
+`scripts/publish.ts`.
+
 ## Repo gotchas
 
 - **`.claude/skills/<skill>` shared entries are directory symlinks into
