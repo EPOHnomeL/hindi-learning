@@ -14,6 +14,20 @@ that already ship.
 
 ## Notes
 
+- **Moved out 2026-09-01** in the `.plan` consolidation, which took 33 map directories
+  down to 7 active maps. The four open tickets left, all to the new
+  [distribution map](../distribution/map.md), which groups how a course reaches a learner and
+  how money comes back: 01 (authoring-cost and model-provider strategy) is now **01** there,
+  02 (marketplace and discover component) is **02**, 04 (feature the paygate on the landing
+  page) is **03**, and 06 (recurring monthly giving) is **04**. Tickets 05, 09 and 12 had
+  already gone to `technical-foundation` (13, 14 and 04 there) earlier the same day. What is
+  left here is the **finished donation rail** (03, 07, 08, 10, 11), so this map is
+  closed.
+
+  Renumbering was forced: `blocked_by` is map-local and the numbers collided across the
+  donor maps. **Do not reuse the old numbers here**, they remain those tickets' identity in
+  this map's history, and do not mint a replacement for a moved ticket.
+
 - **The paygate spine is decided and shipping**: Edition-grain sale, free first-Lesson
   Preview, lifetime Entitlement, **no refunds**. Nothing on this map re-opens that — every
   ticket here consumes it.

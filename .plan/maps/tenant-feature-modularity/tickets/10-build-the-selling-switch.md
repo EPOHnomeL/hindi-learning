@@ -21,8 +21,11 @@ The gate composes with two existing ones rather than replacing either: the deplo
 three read together, and the Answer should state the composed truth table plainly, because three
 independent gates on a money path is exactly the kind of thing the next session gets wrong.
 
-Once course-publishing ticket 11 is built here, go and say so on that map: its ticket needs an
-Answer pointing at this one, or the two maps disagree about whether the flag exists.
+**Done 2026-09-01: `course-publishing/11` now carries an Answer pointing here**, written
+during the `.plan` consolidation, so the two maps no longer disagree about who owns the flag.
+That Answer is explicit that it records a *transfer* and not a build. Read that ticket's
+Question for the fully-scoped migration; it is the version this ticket inherits, and nothing
+in it has shipped.
 
 ## Done when
 

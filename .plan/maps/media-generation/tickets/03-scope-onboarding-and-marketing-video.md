@@ -106,7 +106,7 @@ The audience/moment, one-artifact-or-two, which-flow, interactive-page-vs-video,
 - Deliberately distinct from three neighbours:
   [Scope the course trailer](01-scope-course-trailer.md) (per-course, generated from course
   data), [Scope course audio](02-scope-course-audio.md) (learner-facing), and
-  [Improve onboarding flow](../../onboarding/tickets/01-improve-onboarding-flow.md)
+  [Improve onboarding flow](../../learning-experience/tickets/05-improve-onboarding-flow.md)
   (in-product first run). A shared rendering approach may still fall out of the trailer work.
 - Skills: `html-demo-wizard`, `/grilling`, `/prototype`.
 - **Out of scope:** paid-ads or distribution tooling; **actually building it** — the
@@ -167,7 +167,7 @@ not to this map): `emptyLibrary` at `src/app/_components/Dashboard.tsx:106-115` 
 the catalogue, so a new tenant learner sees "No courses yet — a marketplace is coming
 soon" rendered directly above a live "Available courses" section containing a buyable
 R100 course. **Filed 2026-08-07** as
-[Dashboard empty state contradicts the catalogue below it](../../onboarding/tickets/03-dashboard-empty-state-ignores-catalogue.md);
+[Dashboard empty state contradicts the catalogue below it](../../learning-experience/tickets/06-dashboard-empty-state-ignores-catalogue.md);
 re-verified live in that session, and the onboarding map's "already shipped, different
 audience" out-of-scope line corrected in the same edit.
 
@@ -181,7 +181,7 @@ owed elsewhere.
 - **One artifact, not two.** The learner-path walkthrough is the whole deliverable. No
   owner-path demo and no signed-in first-run demo. Signed-in first-run is not a video
   problem and stays with
-  [Improve onboarding flow](../../onboarding/tickets/01-improve-onboarding-flow.md): a user
+  [Improve onboarding flow](../../learning-experience/tickets/05-improve-onboarding-flow.md): a user
   who already has an account should be touching the real UI, not watching a cartoon of it.
 - **Audience and moment: the pre-signup stranger** on the YWAM Potch landing page. This is
   marketing, aimed at the comprehension half of the funnel leak that
@@ -228,7 +228,7 @@ fixing it first.
 
 Chosen here deliberately and at full reach, not just for this clip: **all product video,
 including learner-facing course video, goes to Mux.** This settles the hosting half of
-[Video & audio integration](../../rich-media/tickets/01-video-and-audio-integration.md),
+[Video & audio integration](../../authoring/tickets/06-video-and-audio-integration.md),
 whose deliverable was exactly that comparison (Convex storage vs unlisted YouTube vs
 Cloudflare Stream vs Mux vs R2+CDN); that ticket has been narrowed accordingly. The reach
 was flagged during grilling and taken knowingly.

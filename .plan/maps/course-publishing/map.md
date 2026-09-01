@@ -25,6 +25,15 @@ not the feature.
 
 ## Notes
 
+- **Moved out 2026-09-01** in the `.plan` consolidation, which took 33 map directories
+  down to 7 active maps. Nothing moved, but the last open ticket closed:
+  **11 (per-tenant `selling` flag) now carries an Answer recording a scope transfer** to
+  [tenant-feature-modularity/10](../tenant-feature-modularity/tickets/10-build-the-selling-switch.md),
+  which says in its own body that it absorbs it. Decided, **NOT built**: the flag still does
+  not exist. That closes this map. The reason 11 was left behind at the `technical-foundation`
+  charter earlier the same day (an edge from ticket 14) was wrong on inspection: 14 is
+  resolved and shipped, so its `blocked_by` gates nothing.
+
 - **Tracker:** local markdown (this directory). Blocking via `**Depends on:**` lines listing the
   ticket numbers that must close first; a ticket is **claimed** by adding `**Claimed:** <who/session>`
   under its Status before working it. Refer to tickets by **name**, not bare number.

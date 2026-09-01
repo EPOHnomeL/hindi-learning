@@ -12,6 +12,18 @@ files are hosted, and how a Lesson cites the course's own Resources.
 
 ## Notes
 
+- **Moved out 2026-09-01** in the `.plan` consolidation, which took 33 map directories
+  down to 7 active maps. Ticket 01 (video and audio integration) is now
+  [authoring/06](../authoring/tickets/06-video-and-audio-integration.md); ticket 12 (book
+  screenshots and direct references) left as **fog, not a ticket**, a `## Not yet specified`
+  patch on the [authoring map](../authoring/map.md) with its body at
+  `authoring/assets/deferred/book-screenshots.md`. Only resolved ticket 11 is left here, so
+  this map is closed.
+
+  Renumbering was forced: `blocked_by` is map-local and the numbers collided across the
+  donor maps. **Do not reuse the old numbers here**, they remain those tickets' identity in
+  this map's history, and do not mint a replacement for a moved ticket.
+
 - **Ticket 01 is a merged umbrella.** Nine separately-scoped tickets (image/poster Resources,
   media embedded in Lessons, YouTube embed, transcript ingestion, transcription fallback,
   uploaded-video hosting, video-anchored teach mode, provider-path ingestion, Editions ×
@@ -26,7 +38,7 @@ files are hosted, and how a Lesson cites the course's own Resources.
 - **The provider split is the recurring constraint:** Convex actions cannot run ffmpeg. TTS
   and transcript fetches are plain HTTP and fine; transcoding and video rendering are not.
   Every hosting or ingestion answer has to respect it — the same wall
-  [Scope the course trailer](../media-generation/tickets/01-scope-course-trailer.md) hits.
+  [Scope the course trailer](../authoring/assets/deferred/course-trailer.md) hits.
 - **Video hosting is decided: Mux, product-wide** (2026-08-07), settled from outside this map
   in [media-generation/03](../media-generation/tickets/03-scope-onboarding-and-marketing-video.md)
   and owed an ADR in
@@ -62,9 +74,9 @@ files are hosted, and how a Lesson cites the course's own Resources.
 ## Not yet specified
 
 - **Remediation policy** when a learner fails a video-anchored comprehension gate. The same
-  seam surfaces in [pedagogy](../pedagogy/map.md) — one owner, not two.
+  seam surfaces in [pedagogy](../learning-experience/map.md) — one owner, not two.
 - **Cost of media at Edition scale.** Media multiplied by languages is a real bill; depends on
-  [Authoring-cost funding & model-provider strategy](../marketplace/tickets/01-authoring-cost-and-model-provider-strategy.md).
+  [Authoring-cost funding & model-provider strategy](../distribution/tickets/01-authoring-cost-and-model-provider-strategy.md).
 
 ## Out of scope
 

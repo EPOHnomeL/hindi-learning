@@ -9,6 +9,18 @@ and nothing here is waiting on a decision from the
 
 ## Notes
 
+- **Moved out 2026-09-01** in the `.plan` consolidation, which took 33 map directories
+  down to 7 active maps. Ticket 04 (walk the mobile bottom nav) is now
+  [learning-experience/07](../learning-experience/tickets/07-walk-the-bottom-nav.md) and
+  ticket 05 (the Editor's Details door on a translated Edition) is now
+  [authoring/08](../authoring/tickets/08-editor-details-door.md), split by subject rather
+  than by device: one is a learner surface and one is an authoring affordance. The four
+  resolved tickets stay, so this map is closed.
+
+  Renumbering was forced: `blocked_by` is map-local and the numbers collided across the
+  donor maps. **Do not reuse the old numbers here**, they remain those tickets' identity in
+  this map's history, and do not mint a replacement for a moved ticket.
+
 - **This map carries build tickets, deliberately.** wayfinder plans by default and
   permits the override only here: everything on this map is a `task` that *does*
   rather than decides. That is the entire point of it. Small chores surfaced while

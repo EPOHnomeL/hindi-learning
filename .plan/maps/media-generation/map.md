@@ -13,6 +13,15 @@ marketing demo** — each ending in an approach, lifecycle and format spec, not 
 
 ## Notes
 
+- **Moved out 2026-09-01** in the `.plan` consolidation, which took 33 map directories
+  down to 7 active maps. This map's two open scope tickets left as **fog, not tickets**:
+  01 (course trailer) and 02 (course audio) are now `## Not yet specified` patches on the
+  [authoring map](../authoring/map.md), with their full bodies kept verbatim at
+  `authoring/assets/deferred/`. Ticket 04 had already gone to
+  [technical-foundation/15](../technical-foundation/tickets/15-adr-mux-as-the-video-rail.md)
+  earlier the same day. Only resolved ticket 03 (the onboarding and marketing video) is left
+  here, so this map is closed.
+
 - **What unifies these three is the constraint, not the audience:** Convex actions cannot run
   ffmpeg. TTS and transcript fetches are plain HTTP and fine; transcoding and video rendering
   are not.
@@ -51,7 +60,7 @@ marketing demo** — each ending in an approach, lifecycle and format spec, not 
 - **Video hosting is Mux, product-wide** (decided 2026-08-07 in
   [the demo ticket](tickets/03-scope-onboarding-and-marketing-video.md), at full reach). That
   binds anything on this map that ends in a video file, and it closes the hosting half of
-  [rich-media/01](../rich-media/tickets/01-video-and-audio-integration.md). It is **not yet
+  [rich-media/01](../authoring/tickets/06-video-and-audio-integration.md). It is **not yet
   provisioned** and it is owed an ADR —
   [ticket 04](../technical-foundation/tickets/15-adr-mux-as-the-video-rail.md).
 - **Staleness on 03 was priced and accepted** (2026-08-07). The guided-tour-over-the-real-app
@@ -90,7 +99,7 @@ marketing demo** — each ending in an approach, lifecycle and format spec, not 
 
 - **Whether audio multiplies per Edition.** Named in ticket 02; the real answer depends on the
   funding decision in
-  [Authoring-cost funding & model-provider strategy](../marketplace/tickets/01-authoring-cost-and-model-provider-strategy.md).
+  [Authoring-cost funding & model-provider strategy](../distribution/tickets/01-authoring-cost-and-model-provider-strategy.md).
 
 ## Out of scope
 

@@ -13,6 +13,17 @@ Built and reachable, with the money recorded and the Seller payable only once th
 
 ## Notes
 
+- **Moved out 2026-09-01** in the `.plan` consolidation, which took 33 map directories
+  down to 7 active maps. Ticket 11 (guest redemption, and saving it to an account) is
+  now [distribution/05](../distribution/tickets/05-guest-redemption-and-saving-it-to-an-account.md).
+  Its `blocked_by: [06]` was dropped rather than lost: ticket 06 here is resolved and stayed,
+  so the edge could not be expressed map-locally and no longer gates anything. The ten
+  resolved tickets stay, so this map is closed.
+
+  Renumbering was forced: `blocked_by` is map-local and the numbers collided across the
+  donor maps. **Do not reuse the old numbers here**, they remain those tickets' identity in
+  this map's history, and do not mint a replacement for a moved ticket.
+
 - **This map carries only implementation tickets, deliberately.** wayfinder's default is
   plan-don't-do; the override applies here because the planning is already finished elsewhere -
   every decision lives in [ADR 0029](../../../docs/adr/0029-seller-minted-voucher-rail.md) and

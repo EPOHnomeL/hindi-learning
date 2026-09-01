@@ -49,7 +49,7 @@ the translated Editions.
 - [x] Decide: rewrite the document `<title>`, or add a title column to the lesson
       row. Record the reasoning, it is the load-bearing call here.
       **Decided 2026-08-27** (grilled, recorded in
-      [editing-obviousness spec D1](../../editing-obviousness/spec.md)): the
+      [editing-obviousness spec D1](../../authoring/assets/editing-obviousness-spec.md)): the
       column already existed; a rename patches it AND splices the blob's
       `<title>` display part so document and row never disagree.
 - [x] Write the mutation. **Gate corrected 2026-08-27**: not owner-only like
@@ -61,7 +61,7 @@ the translated Editions.
       implement half is what keeps this box unticked.
 - [x] Build the rename UI. **The "settled UI" this item used to describe (a
       Rename button in the lesson bar's freed certificate slot) was superseded
-      2026-08-27** by [editing-obviousness spec D5](../../editing-obviousness/spec.md):
+      2026-08-27** by [editing-obviousness spec D5](../../authoring/assets/editing-obviousness-spec.md):
       a title-side pencil turning the title into an inline field, both
       breakpoints, shared with References; the lesson-bar button is not coming
       back. The old prototype's record stays in
@@ -83,7 +83,7 @@ the translated Editions.
 ## Notes
 
 - **2026-08-27:** every open decision in this ticket was resolved in the
-  [editing-obviousness spec](../../editing-obviousness/spec.md) (grilled with
+  [editing-obviousness spec](../../authoring/assets/editing-obviousness-spec.md) (grilled with
   the operator; the course author, an Editor, asked for "editing the chapter
   titles"). The build lands under that effort and the building session writes
   this ticket's `## Answer` too. Until then this ticket stays open: decided,
@@ -95,7 +95,7 @@ the translated Editions.
 ## Answer
 
 **Built and shipped 2026-08-31** under the
-[editing-obviousness](../../editing-obviousness/map.md) effort, in a different UI
+[editing-obviousness](../../authoring/assets/editing-obviousness-map.md) effort, in a different UI
 shape than D5 had settled.
 
 - **The name is edited in the in-place editor, not from a title-side pencil.** The

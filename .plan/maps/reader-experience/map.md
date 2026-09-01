@@ -13,6 +13,18 @@ either backfilled or knowingly left alone.
 
 ## Notes
 
+- **Moved out 2026-09-01** in the `.plan` consolidation, which took 33 map directories
+  down to 7 active maps. Ticket 01 (progress feature) is now
+  [learning-experience/03](../learning-experience/tickets/03-progress-feature.md) and ticket
+  03 (not-found and deep-link edge cases) is now
+  [learning-experience/04](../learning-experience/tickets/04-not-found-edge-cases.md).
+  Tickets 04 and 05 had already gone to `technical-foundation` (06 and 05 there) earlier the
+  same day. Only resolved ticket 02 is left here, so this map is closed.
+
+  Renumbering was forced: `blocked_by` is map-local and the numbers collided across the
+  donor maps. **Do not reuse the old numbers here**, they remain those tickets' identity in
+  this map's history, and do not mint a replacement for a moved ticket.
+
 - **Domain:** Progress, Completion, Response, Lesson, Reference, Edition (CONTEXT.md).
 - **These four are follow-ups on shipped work, not new ground** — which is exactly why none of
   them deserved a map of its own. The spine each one hangs off has already landed: the reader,
@@ -53,7 +65,7 @@ either backfilled or knowingly left alone.
   can't see it" must be *identical* responses, so the routing layer never leaks what the data
   layer protects. No silent fallbacks. Watch the `useQuery`-is-`undefined`-while-loading trap.
 - **02 bundles a session complaint that belongs elsewhere** — "not having to log in all the
-  time" is [auth-sessions](../auth-sessions/map.md), and the grilling must split it out first.
+  time" is [auth-sessions](../technical-foundation/map.md), and the grilling must split it out first.
 - Skills: `/ponytail` (three of the four may shrink to nothing), `/tdd`,
   `convex:convex-expert`, `convex:convex-migration-helper` (04, only if a migration is
   warranted), `vercel:nextjs` (App Router `not-found` conventions).
@@ -90,5 +102,5 @@ either backfilled or knowingly left alone.
 - Certificates and Completion — already shipped.
 - The routing spine and URL scheme — shipped under ADR 0012.
 - The anchor contract, reference deep-links and share icons — all shipped.
-- Session lifetime — [auth-sessions](../auth-sessions/map.md).
+- Session lifetime — [auth-sessions](../technical-foundation/map.md).
 - First-run orientation in the reader — [onboarding](../onboarding/map.md).

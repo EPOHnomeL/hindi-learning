@@ -34,7 +34,7 @@ The live session lifetime is measured against the auth-cookie persistence that a
   decision (closed on GitHub as tenant-session-isolation/01, superseding part of ADR 0022) —
   so "sign in again on another tenant" may be *intended*, and this ticket must not undo it by
   accident.
-- **Related but distinct:** [Forgot-password flow](../../auth-sessions/tickets/01-forgot-password-flow.md) is being able
+- **Related but distinct:** [Forgot-password flow](../../technical-foundation/tickets/21-forgot-password-flow.md) is being able
   to sign in at all;
   [Download course for offline](../../reader-experience/tickets/02-download-course-for-offline.md)
   bundles the same complaint into its download ask.

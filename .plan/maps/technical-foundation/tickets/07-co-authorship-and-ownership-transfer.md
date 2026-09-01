@@ -8,7 +8,7 @@ blocked_by: []
 ## Question
 
 Deferred feature idea, not yet grilled or PRD'd. No local `.scratch` file yet — first
-capture is this issue. Surfaced while scoping [Self-serve course building](../../course-authoring/tickets/03-self-serve-course-building.md)/#105 (self-serve building + course
+capture is this issue. Surfaced while scoping [Self-serve course building](../../authoring/assets/deferred/self-serve-course-building.md)/#105 (self-serve building + course
 organization) — this is the data-model gap underneath both.
 
 ## The gap
@@ -65,9 +65,9 @@ The transfer-vs-co-ownership fork is closed, with the whitelabel interaction, th
 - **The fork is the whole question.** Transfer is one mutation. Co-ownership touches *every*
   ownership check in the codebase (`getOwnedTopic` and siblings). Decide before building.
 - This is the primitive underneath
-  [Self-serve course building](../../course-authoring/tickets/03-self-serve-course-building.md)
+  [Self-serve course building](../../authoring/assets/deferred/self-serve-course-building.md)
   ("hand over building capabilities") and part of
-  [Folders and collections](../../course-management/tickets/02-folders-and-collections.md) ("this course really belongs to
+  [Folders and collections](../../authoring/assets/deferred/folders-and-collections.md) ("this course really belongs to
   so-and-so now").
 - Whitelabel's two-tier admin model (ADR 0022) already gives tenant-admins scoped rights —
   so transferring *within* a tenant may differ from transferring *across* tenants.

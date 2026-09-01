@@ -173,4 +173,4 @@ mistaken for having been forgotten, and neither belongs to this map:
   spec's only reader was a build session that the in-session publish made unnecessary. Not a
   decision, so it stays out of Decisions-so-far; it blocked nothing, being the leaf.
 - **The English→X pipeline defect** that put the English there in the first place — handed to
-  [english-source-untranslated-chrome](../english-source-untranslated-chrome/map.md) on 2026-08-04.
+  [english-source-untranslated-chrome](../translation-and-locales/map.md) on 2026-08-04.

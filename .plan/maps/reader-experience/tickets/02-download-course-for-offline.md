@@ -58,7 +58,7 @@ implementation tickets exist.
 - **Fog:** offline Progress and quiz answers. If a learner works offline, their Responses have
   to queue and reconcile. Real, and unspecifiable until the offline-content decision lands.
 - **Out of scope:** session lifetime itself —
-  [auth-sessions](../../auth-sessions/map.md).
+  [auth-sessions](../../technical-foundation/map.md).
 
 ---
 

@@ -89,7 +89,7 @@ works). Write each ticket's `## Answer` as you finish it, since that is what res
 
 **This work is not done until a Google sign-in has been completed inside the installed app on a
 real iPhone**, and the outcome written into
-[ticket 04's `## Answer`](../maps/installable-app/tickets/04-the-ios-instruction-sheet.md) either
+[ticket 04's `## Answer`](../maps/learning-experience/tickets/08-the-ios-instruction-sheet.md) either
 way.
 
 An installed iOS app has its own cookie jar, separate from Safari, so a learner signs in once

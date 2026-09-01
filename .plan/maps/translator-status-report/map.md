@@ -22,6 +22,19 @@ a breakdown of the tenant's income.
 
 ## Notes
 
+- **Moved out 2026-09-01** in the `.plan` consolidation, which took 33 map directories
+  down to 7 active maps. The seven open tickets left, all to the new
+  [translation-and-locales map](../translation-and-locales/map.md), which groups Editions,
+  translators and the app's own chrome: 01 stays **01** there, 02 stays **02**, 03 stays
+  **03**, 08 becomes **04**, 09 becomes **05**, 10 becomes **06**, and 11 becomes **07**.
+  What is left here is the four tickets closed out of scope, so this map is closed. The
+  weekly report itself is **not** part of the new map's Destination; only the roster, the
+  third Share role, the revenue split and the "does Finished lie" question moved.
+
+  Renumbering was forced: `blocked_by` is map-local and the numbers collided across the
+  donor maps. **Do not reuse the old numbers here**, they remain those tickets' identity in
+  this map's history, and do not mint a replacement for a moved ticket.
+
 ### The report became a tab (2026-09-01)
 
 The operator decided that everything this map was going to publish weekly, the owner

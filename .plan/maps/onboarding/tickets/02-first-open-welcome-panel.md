@@ -72,7 +72,7 @@ course is, how big it is, and the next lesson to click.
   (`convex/email.ts`, `convex/inviteEmail.ts`) stays untouched.
 - A dashboard-wide welcome or product tour — [Improve onboarding flow](01-improve-onboarding-flow.md) owns the broader onboarding flow.
 - Real per-lesson progress semantics beyond the existing `opened`/`completed`
-  rows — [Progress feature](../../reader-experience/tickets/01-progress-feature.md) owns the Progress feature. This issue consumes what exists and must
+  rows — [Progress feature](../../learning-experience/tickets/03-progress-feature.md) owns the Progress feature. This issue consumes what exists and must
   not fork a second progress model.
 - Paid/preview upsell copy — the Paygate ([Paygate.tsx](../../../../src/app/_components/Paygate.tsx))
   already handles locked Editions; the welcome panel must not duplicate it.

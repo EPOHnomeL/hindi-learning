@@ -104,4 +104,4 @@ be fixed, and they were:
   ([ticket](tickets/09-unescaped-quote-breaks-quiz-feedback-markup.md)).
 - App-wide chrome localisation ([app-language-i18n](../app-language-i18n/map.md)).
 - Who pays for translated Editions —
-  [Authoring-cost funding & model-provider strategy](../marketplace/tickets/01-authoring-cost-and-model-provider-strategy.md).
+  [Authoring-cost funding & model-provider strategy](../distribution/tickets/01-authoring-cost-and-model-provider-strategy.md).

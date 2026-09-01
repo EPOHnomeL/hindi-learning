@@ -31,7 +31,7 @@ A course-wide list needs a query that does not exist: `listEditionAccess` is
 lang-filtered and takes a `lang` argument. Either add a course-scoped sibling or widen
 it, and keep the `getOwnedTopic` owner gate exactly as it is either way.
 
-Out of scope, with [topic-sharing](../../topic-sharing/map.md) 06, 08 and 09: the edge
+Out of scope, with [topic-sharing](../../distribution/map.md) 06, 08 and 09: the edge
 cases, the learner insights view, and what the roster grows into beyond the four things
 above. Also out of scope here: paying buyers and public-link readers, who are not shares
 and never were on this list.

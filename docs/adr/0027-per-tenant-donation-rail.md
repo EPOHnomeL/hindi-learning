@@ -83,7 +83,7 @@ transaction, which is worse than either alone.
 The rate is a committed constant changed by deploy, consistent with the surface it
 serves (a landing page is hand-authored, "no DB, nothing runtime-editable"). The
 accepted cost is staleness; the follow-up is
-[Live USD→ZAR rate](../../.plan/maps/marketplace/tickets/05-live-usd-zar-rate.md).
+[Live USD→ZAR rate](../../.plan/maps/technical-foundation/tickets/13-live-usd-zar-rate.md).
 A minimum donation exists because PayFast's per-transaction fee makes a $1
 donation mostly fee — the floor protects the payee's 90%.
 

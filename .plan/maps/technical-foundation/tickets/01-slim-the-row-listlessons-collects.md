@@ -65,6 +65,6 @@ Open sub-questions the resolving session must actually answer, not assume:
 
 <!-- Filed 2026-08-11, from the audit that produced 784eb70. Numbers throughout are
      from invoice RJDCQK-00001 and the dashboard's by-function Database I/O view;
-     the full baseline table lives in ../../convex-cost/map.md so it is not duplicated here. -->
+     the full baseline table lives in ../assets/convex-cost-baseline.md so it is not duplicated here. -->
 
 <!-- Moved 2026-09-01 from `convex-cost/01` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 01 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->

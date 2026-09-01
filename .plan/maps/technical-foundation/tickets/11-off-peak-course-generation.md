@@ -93,7 +93,7 @@ schedules the finisher. Ruling the scheduled half out of scope is a legitimate o
 - **Pairs with**
   [Cost instrumentation](12-cost-instrumentation.md):
   running unattended overnight is precisely when you want per-run token numbers, and
-  [Streamline the Routine's effort](../../course-authoring/tickets/04-streamline-routine-effort.md) makes each run cheaper
+  [Streamline the Routine's effort](../../authoring/tickets/02-streamline-routine-effort.md) makes each run cheaper
   before you multiply it by a whole curriculum. Consider doing both first.
 - Skills: `/grilling`, `convex:convex-crons`, `convex:convex-expert`.
 - **Fog:** what happens when an overnight run fails halfway. Unattended work needs a failure

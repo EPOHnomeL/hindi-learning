@@ -171,7 +171,7 @@ the *second* such user signs in as the first. The branch inserts a fresh `users`
 `email` field at all, and skips `claimPendingShares`, since a Seat has no email and so has nothing
 pending to claim.
 
-This is trap 1 from [vouchers ticket 11](../vouchers/tickets/11-guest-redemption-and-saving-it-to-an-account.md),
+This is trap 1 from [vouchers ticket 11](../distribution/tickets/05-guest-redemption-and-saving-it-to-an-account.md),
 which the research confirmed still holds verbatim against `@convex-dev/auth@0.0.80`. **Trap 2 does
 not apply to this spec**, because a Seat never links to a Google or Password account. If linking is
 ever wanted, note that the ticket's proposed `getAuthUserId` remedy works on the Password path but

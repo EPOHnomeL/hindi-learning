@@ -74,7 +74,7 @@ where this ticket said it would be.
   `mission` on the `publicCourse` allowlist), including its two deliberate
   deviations from spec and its later purchase variant.
 - **#46 — same story: migrated, deleted, still a stub.** Now
-  [Improve Onboarding Flow](../../onboarding/tickets/01-improve-onboarding-flow.md).
+  [Improve Onboarding Flow](../../learning-experience/tickets/05-improve-onboarding-flow.md).
   **Scoped, not closed** — its map's Destination hangs off it. The one sentence
   ("This should be as smooth as possible") became a concrete walk: cold sign-up on
   prod, on a tenant subdomain, on a phone; what to record per stall; what to read

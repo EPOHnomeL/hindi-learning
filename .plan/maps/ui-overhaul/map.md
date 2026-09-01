@@ -173,5 +173,5 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
   for whatever the strand argues later.
 - What the access roster should grow into, plus the share-management edge cases and the
   learner insights view. Ticket 17 decides only where the roster lives; the depth is
-  [topic-sharing](../topic-sharing/map.md) tickets 06, 08 and 09.
-- Session lifetime: [auth-sessions](../auth-sessions/map.md).
+  [topic-sharing](../distribution/map.md) tickets 06, 08 and 09.
+- Session lifetime: [auth-sessions](../technical-foundation/map.md).

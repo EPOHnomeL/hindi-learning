@@ -12,6 +12,19 @@ vague aspiration.
 
 ## Notes
 
+- **Moved out 2026-09-01** in the `.plan` consolidation, which took 33 map directories
+  down to 7 active maps. Ticket 01 (improve the onboarding flow, which is a walk) is
+  now [learning-experience/05](../learning-experience/tickets/05-improve-onboarding-flow.md)
+  and ticket 03 (the dashboard empty state contradicting the catalogue) is now
+  [learning-experience/06](../learning-experience/tickets/06-dashboard-empty-state-ignores-catalogue.md).
+  Only resolved ticket 02 (the first-open welcome panel) is left here, so this map is
+  closed. **This map's Destination is not met**, it moved: it now hangs off
+  learning-experience/05.
+
+  Renumbering was forced: `blocked_by` is map-local and the numbers collided across the
+  donor maps. **Do not reuse the old numbers here**, they remain those tickets' identity in
+  this map's history, and do not mint a replacement for a moved ticket.
+
 <!-- Ticket 02 arrived 2026-08-01 from the retired single-ticket `welcome` map; it carries
      that map's context folded in under a "Context folded from" heading. -->
 

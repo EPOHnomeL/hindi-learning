@@ -1,6 +1,6 @@
 ---
 type: task
-blocked_by: [01, 02, 08]
+blocked_by: []
 ---
 # The reportData query and its script
 
@@ -72,3 +72,10 @@ What survives, and where it went:
 
 Only the delivery mechanism is dead: the `PUBLISH_SECRET` guard, the `pnpm` script,
 and the JSON contract with an agent.
+
+<!-- blocked_by emptied 2026-09-01 in the .plan consolidation. It named 01, 02 and 08, all
+     three of which moved to the translation-and-locales map (01, 02 and 04 there), leaving
+     this closed ticket pointing at numbers that no longer exist on this map, which the
+     tracker flags as a malformation. Nothing is lost: this ticket is out of scope, so its
+     ordering constraint was never going to be walked. The blockers it named were the
+     translators roster, the third Share role, and the "does Finished lie" question. -->

@@ -136,7 +136,7 @@ specified, checked step.
 
 ### Handed upstream
 
-**Filed as a separate effort:** [The English the English→X path never translates](../../english-source-untranslated-chrome/map.md).
+**Filed as a separate effort:** [The English the English→X path never translates](../../translation-and-locales/map.md).
 These strings are English in all nine Editions, so the defect is in the English→X pipeline, not in
 this conversion; repairing only here would remove the evidence that motivates fixing it there. This
 effort still repairs its own Edition — it does not wait on that one.

@@ -95,7 +95,7 @@ Editor assignable **only** to someone already shared with. That last constraint 
 makes it a destination rather than a list, and it is what lets the surface later carry
 who translates which language and who was invited to which, which is the shape the
 owner asked for. The depth beyond that, the edge cases and the learner insights view,
-stays out of scope with [topic-sharing](../../topic-sharing/map.md) 06, 08 and 09.
+stays out of scope with [topic-sharing](../../distribution/map.md) 06, 08 and 09.
 
 **The Editor's Details door returns in the reader.** The ticket asked what an Editor
 sees "after the move" on the premise that they see Details today. They see nothing.

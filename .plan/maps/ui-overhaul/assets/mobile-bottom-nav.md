@@ -275,7 +275,7 @@ Known costs, accepted knowingly rather than discovered later:
 - An **Editor of a translated Edition** lost the reader-drawer door to Course
   settings (Details, edition-title-edit 02). They own no Home card, so their
   only remaining edit surface is the in-place content editor. Ticketed as
-  [mobile-reader-todos 05](../../mobile-reader-todos/tickets/05-editor-details-door.md).
+  [mobile-reader-todos 05](../../authoring/tickets/08-editor-details-door.md).
 - A **Viewer holding several Editions** has no in-reader switcher any more;
   `?lang=` in the URL still works, and owners switch via the card globe.
   Ticketed as

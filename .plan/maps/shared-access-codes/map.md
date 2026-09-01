@@ -13,6 +13,19 @@ existing manual EFT rail. Built, walked in a browser, and legitimate under a sup
 
 ## Notes
 
+- **Moved out 2026-09-01** in the `.plan` consolidation, which took 33 map directories
+  down to 7 active maps. Ticket 05 (the `/join` page) is now
+  [distribution/07](../distribution/tickets/07-the-join-page.md). It is **code-built and
+  holds open for a browser walk**, which is what its own `## Progress` section says, and two
+  lines of its `## Done when` are superseded rather than unbuilt (the separate consent step
+  went on 2026-08-26; a linked code skips the code step). Its `blocked_by: [04]` was dropped
+  rather than lost: ticket 04 here is resolved and stayed. The ten resolved tickets stay, so
+  this map is closed.
+
+  Renumbering was forced: `blocked_by` is map-local and the numbers collided across the
+  donor maps. **Do not reuse the old numbers here**, they remain those tickets' identity in
+  this map's history, and do not mint a replacement for a moved ticket.
+
 - **This map carries implementation tickets, deliberately.** wayfinder's default is plan-don't-do;
   the override applies because the planning finished in the grilling and research that produced
   [spec.md](spec.md). Ticket 01 is the one exception: it is a decision artifact, and it gates
@@ -34,7 +47,7 @@ existing manual EFT rail. Built, walked in a browser, and legitimate under a sup
   the manual EFT rail.
 - **The nickname is never a real name, in the copy as well as the code.** Any ticket touching
   `/join` copy is touching a compliance control.
-- **Trap 1 from [vouchers ticket 11](../vouchers/tickets/11-guest-redemption-and-saving-it-to-an-account.md)
+- **Trap 1 from [vouchers ticket 11](../distribution/tickets/05-guest-redemption-and-saving-it-to-an-account.md)
   is live and was re-verified against `@convex-dev/auth@0.0.80` on 2026-08-23.** A provider that
   supplies no email makes `createOrUpdateUser` insert `email: ""`, and the second such member signs
   in as the first. It fails silently and looks correct with one tester. Trap 2 does not apply to
