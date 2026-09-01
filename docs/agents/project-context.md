@@ -268,15 +268,31 @@ The project is not just the Hindi / "My Course" app — the goal is a **whitelab
 course-generator LMS platform**: one codebase, multiple branded tenant sites.
 Initial tenants: **upf, ywampotch, almighty-warriors, yknot**, each on its own
 subdomain, each with its own styling and features toggled on/off. Scoping lives
-under `.scratch/whitelabel/` (source of truth: `issues/00-whitelabel-map.md`,
-which decays every session — re-verify before resuming).
+in [`.plan/maps/whitelabel/`](../../.plan/maps/whitelabel/map.md) (corrected
+2026-09-01: the old pointer here was `.scratch/whitelabel/`, retired on
+2026-07-30 when maps became the one home for tickets; those files still exist on
+disk as history only). The follow-on effort that grows the flag set is
+[`.plan/maps/tenant-feature-modularity/`](../../.plan/maps/tenant-feature-modularity/map.md).
 
-- **Feature flags:** five flat required booleans on `tenants.flags`
-  (`certificates`, `translations`, `publicLinks`, `qa`, `seeding`), all `true` at
-  the v1 migration. Enforced by an `assertTenantFlag(ctx, tenantSlug, flag)`
-  helper called explicitly from each gated mutation; `getOwnedTopic`/
+- **Feature flags: SIX, not five** (corrected 2026-09-01). Five flat **required**
+  booleans on `tenants.flags` (`certificates`, `translations`, `publicLinks`,
+  `qa`, `seeding`), all `true` at the v1 migration, plus `donations`, which is
+  **optional** and defaults off (ADR 0027, added 2026-08). Enforced by an
+  `assertTenantFlag(ctx, tenantSlug, flag)` helper in `convex/tenantFlags.ts`,
+  called explicitly from each gated mutation; `getOwnedTopic`/
   `getViewableTopic` stay flag-agnostic. Flag-off is frozen-not-revoked (blocks
   new grants only); a flag added later defaults `false`.
+  - **A flag gates the server, not the UI.** Only `donations` hides its own
+    affordance (`src/app/donate/page.tsx`, `DonateSection.tsx`). For the other
+    five the button is still rendered and the click throws *"This feature isn't
+    available on this site."* Verified 2026-09-01. Closing that gap is the
+    tenant-feature-modularity map's job; until it lands, do not assume a flag
+    makes anything disappear.
+  - **`selling` does not exist yet.** Selling is gated per-seller
+    (`isReadySeller`) and deployment-wide (`PAYFAST_MODE`), with no tenant grain.
+    The flag is fully scoped and unbuilt at
+    [course-publishing ticket 11](../../.plan/maps/course-publishing/tickets/11-per-tenant-selling-flag.md).
+    Both voucher rails and the manual EFT rail are likewise ungated per tenant.
 - Treat single-site assumptions (site-wide Allowlist, one Resend domain, one
   payments merchant) as **tenancy debt** when you touch them. (The one-Admin
   assumption is retired — see the two-tier admin model below.)
