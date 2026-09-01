@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: [19]
+claimed_by: dashboard-tab-build-2026-09-01
+claimed_at: 2026-09-01T11:08:02+02:00
 ---
 # Build the Dashboard tab on the manage route
 
