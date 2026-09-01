@@ -2,7 +2,7 @@
 type: task
 blocked_by: [23]
 claimed_by: editor-progress-table-2026-09-01
-claimed_at: 2026-09-01T11:41:00+02:00
+claimed_at: 2026-09-01T15:52:55+02:00
 ---
 # The editor progress table on the course Dashboard
 
