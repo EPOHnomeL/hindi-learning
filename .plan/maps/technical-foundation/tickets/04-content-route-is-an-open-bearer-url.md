@@ -58,5 +58,3 @@ implementation tickets exist - including what it costs in caching and what the r
 change.
 
 <!-- Moved 2026-09-01 from `marketplace/12` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 04 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->
-
-## Answer

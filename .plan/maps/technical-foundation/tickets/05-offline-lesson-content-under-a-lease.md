@@ -52,5 +52,3 @@ Progress queue's reconciliation rule, and its dependency on marketplace/12 settl
 implementation tickets exist or the ticket is ruled out with the reason recorded.
 
 <!-- Moved 2026-09-01 from `reader-experience/05` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 05 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->
-
-## Answer

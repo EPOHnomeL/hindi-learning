@@ -65,5 +65,3 @@ That walk is a human's.
   outcome written into this ticket's Answer either way. If it fails, a follow-up ticket exists for
   the standalone sign-in reordering - do not leave it as a note.
 - Password sign-in inside the installed app also confirmed working.
-
-## Answer
