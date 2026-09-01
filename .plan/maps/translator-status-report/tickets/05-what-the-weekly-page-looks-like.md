@@ -1,6 +1,6 @@
 ---
 type: prototype
-blocked_by: none
+blocked_by: []
 ---
 # What the weekly page actually looks like
 

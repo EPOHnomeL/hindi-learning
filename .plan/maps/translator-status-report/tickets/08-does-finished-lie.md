@@ -1,6 +1,6 @@
 ---
 type: grilling
-blocked_by: none
+blocked_by: []
 ---
 # Does "Finished" lie about the five machine Editions?
 

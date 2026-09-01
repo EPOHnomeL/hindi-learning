@@ -1,6 +1,6 @@
 ---
 type: task
-blocked_by: none
+blocked_by: []
 ---
 # Create the translators roster and import the fourteen rows
 

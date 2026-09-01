@@ -1,6 +1,6 @@
 ---
 type: grilling
-blocked_by: none
+blocked_by: []
 ---
 # The translator revenue share: a third split, and who may set it
 

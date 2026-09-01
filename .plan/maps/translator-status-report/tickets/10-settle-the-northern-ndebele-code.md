@@ -1,6 +1,6 @@
 ---
 type: task
-blocked_by: none
+blocked_by: []
 ---
 # Settle what language Bishop Ndumisa actually translates
 

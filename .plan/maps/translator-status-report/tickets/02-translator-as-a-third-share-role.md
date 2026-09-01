@@ -1,6 +1,6 @@
 ---
 type: task
-blocked_by: none
+blocked_by: []
 ---
 # Add translator as a third Share role
 
