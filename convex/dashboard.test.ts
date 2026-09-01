@@ -224,3 +224,50 @@ test("a superseded Lesson leaves both the denominator and the completed count", 
   expect(stats!.lessonCount).toBe(9);
   expect(bucket(stats!, "100")).toBe(1);
 });
+
+// ---- The editor progress rows (ui-overhaul 26) -----------------------------
+
+test("one row per editor per language, carrying that person's own completion marks", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedCourse(t, owner, 10);
+  const two = await seedUser(t, "two@example.com");
+  const named = await seedUser(t, "named@example.com");
+  const plain = await seedUser(t, "plain@example.com");
+
+  await t.run(async (ctx) => {
+    await ctx.db.patch(named, { name: "Named Person" });
+    // One editor on two Editions.
+    await ctx.db.insert("shares", { topicId, viewerId: two, lang: "es", role: "editor" });
+    await ctx.db.insert("shares", { topicId, viewerId: two, lang: "fr", role: "editor" });
+    await ctx.db.insert("shares", { topicId, viewerId: named, lang: "es", role: "editor" });
+    // A Viewer is not an editor and must not appear.
+    await ctx.db.insert("shares", { topicId, viewerId: plain, lang: "es", role: "viewer" });
+    // An invited editor with no account yet.
+    await ctx.db.insert("pendingShares", { topicId, email: "invited@example.com", lang: "fr", role: "editor" });
+  });
+  await complete(t, topicId, two, 6);
+  await complete(t, topicId, named, 10);
+
+  const stats = await asUser(t, owner).query(api.dashboard.courseStats, { topicSlug: "hindi" });
+  expect(stats!.editorRows).toEqual([
+    // A person's completion is course-wide, so `two` carries 6 on both rows.
+    { lang: "es", person: "Named Person", pending: false, completed: 10 },
+    { lang: "es", person: "two@example.com", pending: false, completed: 6 },
+    { lang: "fr", person: "invited@example.com", pending: true, completed: 0 },
+    { lang: "fr", person: "two@example.com", pending: false, completed: 6 },
+  ]);
+});
+
+test("editorRows is owner-only, like the rest of the query", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const editor = await seedUser(t, "editor@example.com");
+  const topicId = await seedCourse(t, owner, 10);
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: editor, lang: "es", role: "editor" }));
+
+  // An Editor is not the owner, so the roster (and its email addresses) is
+  // refused even though they hold a role on the course.
+  expect(await asUser(t, editor).query(api.dashboard.courseStats, { topicSlug: "hindi" })).toBeNull();
+  expect(await t.query(api.dashboard.courseStats, { topicSlug: "hindi" })).toBeNull();
+});

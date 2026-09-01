@@ -6,7 +6,7 @@ import { type ReactNode } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { Icon, type IconName } from "../icons";
 import { formatPrice } from "../Paygate";
-import { barPercent, priceSummary } from "./dashboardDerive";
+import { barPercent, priceSummary, reviewByEdition, type EditionReview, type EditorRow } from "./dashboardDerive";
 import { EmptyPanel, type Edition } from "./shared";
 
 // The Dashboard peer of the manage route (ui-overhaul 23): the owner's read-only
@@ -124,8 +124,115 @@ export function DashboardTab({
         )}
       </Panel>
 
-      {/* ticket 26's editor-by-language table lands here. */}
+      <Panel title={t("editorsTitle")} hint={t("editorsHint")}>
+        <EditorTable
+          reviews={reviewByEdition(editions, stats.editorRows, stats.prices.map((p) => p.lang))}
+          name={name}
+          lessonCount={stats.lessonCount}
+          counted={!stats.truncated}
+        />
+      </Panel>
     </div>
+  );
+}
+
+// The foot of the tab (ui-overhaul 26): where every editor has got to, grouped
+// under the Edition they hold.
+//
+// It is grouped rather than a four-column grid, which is how the ticket's stated
+// layout problem (a four-column table at 360px) goes away: the language becomes
+// the group heading instead of a column, leaving each row at name, meter, count.
+//
+// EVERY Edition appears, including the ones with nobody appointed, because that
+// empty row is the most useful cell on the whole table.
+function EditorTable({
+  reviews,
+  name,
+  lessonCount,
+  counted,
+}: {
+  reviews: EditionReview[];
+  name: (lang: string) => string;
+  lessonCount: number;
+  counted: boolean;
+}) {
+  const t = useTranslations("ManageDashboard");
+  return (
+    <div className="flex flex-col gap-4">
+      {reviews.map((review) => (
+        <section key={review.lang} className="flex flex-col gap-1.5">
+          <h4 className="flex items-center gap-2 text-[12.5px] font-semibold text-ink">
+            <span className="min-w-0 truncate">{name(review.lang)}</span>
+            {review.unreviewed && (
+              <span
+                title={t("unreviewedWhy")}
+                className="shrink-0 rounded-full bg-hi px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-gold"
+              >
+                {t("unreviewed")}
+              </span>
+            )}
+          </h4>
+          {review.editors.length === 0 ? (
+            <p className="text-xs text-soft">{t("noEditor")}</p>
+          ) : (
+            <ul className="flex flex-col gap-1.5">
+              {review.editors.map((editor) => (
+                <EditorLine
+                  key={`${editor.pending ? "p" : "a"}:${editor.person}`}
+                  editor={editor}
+                  lessonCount={lessonCount}
+                  counted={counted}
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+// One editor: who they are, then how far through the course their own
+// completion marks have got them. A pending invite has no account, so it has no
+// marks to show and says why instead of showing a zero that reads as idleness.
+function EditorLine({
+  editor,
+  lessonCount,
+  counted,
+}: {
+  editor: EditorRow;
+  lessonCount: number;
+  counted: boolean;
+}) {
+  const t = useTranslations("ManageDashboard");
+  const measurable = !editor.pending && counted && lessonCount > 0;
+  return (
+    <li className="flex items-center gap-2.5 rounded-lg border border-line px-3 py-2">
+      <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink" title={editor.person}>
+        {editor.person}
+      </span>
+      {editor.pending ? (
+        <span className="shrink-0 text-[11px] text-soft">{t("editorInvited")}</span>
+      ) : measurable ? (
+        <>
+          <span
+            className="h-2 w-[28%] shrink-0 rounded-[4px]"
+            style={{ background: "color-mix(in srgb, var(--color-accent) 14%, transparent)" }}
+            aria-hidden
+          >
+            <span
+              className="block h-full rounded-r-[4px] bg-accent"
+              style={{ width: `${barPercent(editor.completed, lessonCount)}%` }}
+            />
+          </span>
+          <span className="shrink-0 text-[11.5px] font-semibold tabular-nums text-ink">
+            {t("editorProgress", { completed: editor.completed, total: lessonCount })}
+          </span>
+        </>
+      ) : (
+        <span className="shrink-0 text-[11px] text-soft">{t("editorProgressUnavailable")}</span>
+      )}
+    </li>
   );
 }
 

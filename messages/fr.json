@@ -545,7 +545,15 @@
       "40-60": "40 à 60 %",
       "60-80": "60 à 80 %",
       "80-99": "80 à 99 %"
-    }
+    },
+    "editorsTitle": "Progression des éditeurs",
+    "editorsHint": "Où en est chaque éditeur. Compté à partir de ses propres leçons terminées sur l'ensemble du cours, et non par langue.",
+    "noEditor": "Aucun éditeur désigné.",
+    "editorInvited": "Invité",
+    "editorProgress": "{completed} sur {total}",
+    "editorProgressUnavailable": "Non compté",
+    "unreviewed": "Non relu",
+    "unreviewedWhy": "En ligne, mais aucun éditeur ne l'a encore relu."
   },
   "Certificate": {
     "eyebrow": "Certificat de réussite",

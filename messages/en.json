@@ -545,7 +545,15 @@
       "40-60": "40 to 60%",
       "60-80": "60 to 80%",
       "80-99": "80 to 99%"
-    }
+    },
+    "editorsTitle": "Editor progress",
+    "editorsHint": "How far each editor has got. Counted from their own completed lessons across the whole course, not per language.",
+    "noEditor": "No editor appointed.",
+    "editorInvited": "Invited",
+    "editorProgress": "{completed} of {total}",
+    "editorProgressUnavailable": "Not counted",
+    "unreviewed": "Unreviewed",
+    "unreviewedWhy": "Live, but no editor has worked through it yet."
   },
   "Certificate": {
     "eyebrow": "Certificate of Completion",

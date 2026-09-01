@@ -545,7 +545,15 @@
       "40-60": "40 tot 60%",
       "60-80": "60 tot 80%",
       "80-99": "80 tot 99%"
-    }
+    },
+    "editorsTitle": "Redigeerdervordering",
+    "editorsHint": "Hoe ver elke redigeerder gevorder het. Getel uit hul eie voltooide lesse oor die hele kursus, nie per taal nie.",
+    "noEditor": "Geen redigeerder aangestel nie.",
+    "editorInvited": "Genooi",
+    "editorProgress": "{completed} van {total}",
+    "editorProgressUnavailable": "Nie getel nie",
+    "unreviewed": "Nie nagegaan nie",
+    "unreviewedWhy": "Lewendig, maar geen redigeerder het dit nog deurgewerk nie."
   },
   "Certificate": {
     "eyebrow": "Sertifikaat van Voltooiing",

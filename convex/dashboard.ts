@@ -78,6 +78,19 @@ export const courseStats = query({
       learners: v.number(),
       buckets: v.array(v.object({ key: v.string(), count: v.number() })),
       truncated: v.boolean(),
+      // One row per (editor, Edition) for the foot of the tab (ui-overhaul 26).
+      // `completed` is that PERSON's own completion marks over the whole course
+      // and is repeated on each of their rows, because a mark carries no
+      // language (see the note above `editorRows` below). Owner-gated PII: this
+      // is the only part of the query that carries an email.
+      editorRows: v.array(
+        v.object({
+          lang: v.string(),
+          person: v.string(),
+          pending: v.boolean(),
+          completed: v.number(),
+        }),
+      ),
     }),
   ),
   handler: async (ctx, { topicSlug }) => {
@@ -112,6 +125,9 @@ export const courseStats = query({
     const everyone = new Set<string>();
     const editors = new Set<string>();
     const accounts = new Set<Id<"users">>();
+    // The (editor, Edition) pairs, kept in grant order and resolved to people
+    // after the walk so the name lookup happens once per editor account.
+    const editorGrants: { lang: string; userId: Id<"users"> | null; email: string | null }[] = [];
     const grant = (lang: string, key: string) => {
       const set = byLang.get(lang) ?? new Set<string>();
       set.add(key);
@@ -123,12 +139,18 @@ export const courseStats = query({
       if (s.viewerId === ownerId) continue;
       grant(shareLang(s), s.viewerId);
       accounts.add(s.viewerId);
-      if (shareRole(s) === "editor") editors.add(s.viewerId);
+      if (shareRole(s) === "editor") {
+        editors.add(s.viewerId);
+        editorGrants.push({ lang: shareLang(s), userId: s.viewerId, email: null });
+      }
     }
     for (const p of pending) {
       const key = `email:${normaliseEmail(p.email)}`;
       grant(p.lang ?? SOURCE_LANG, key);
-      if (shareRole(p) === "editor") editors.add(key);
+      if (shareRole(p) === "editor") {
+        editors.add(key);
+        editorGrants.push({ lang: p.lang ?? SOURCE_LANG, userId: null, email: normaliseEmail(p.email) });
+      }
     }
     // The paid and self-serve twins of a Share: access, never an editing right,
     // so neither can put anyone in `editors`.
@@ -176,6 +198,14 @@ export const courseStats = query({
       }
     }
 
+    // One name lookup per distinct editor account, not per grant, so a person
+    // editing six Editions is still read once.
+    const person = new Map<Id<"users">, string>();
+    for (const id of new Set(editorGrants.map((g) => g.userId).filter((x): x is Id<"users"> => x !== null))) {
+      const user = await ctx.db.get(id);
+      person.set(id, user?.name?.trim() || user?.email || "");
+    }
+
     return {
       people: everyone.size,
       editors: editors.size,
@@ -189,6 +219,19 @@ export const courseStats = query({
       learners: truncated ? 0 : accounts.size,
       buckets: PROGRESS_BUCKETS.map((key) => ({ key, count: counts.get(key) ?? 0 })),
       truncated,
+      editorRows: editorGrants
+        .map((g) => ({
+          lang: g.lang,
+          person: g.userId ? (person.get(g.userId) ?? "") : (g.email ?? ""),
+          pending: g.userId === null,
+          // An editor's progress is the SAME completion mark a learner leaves
+          // (`progress.status === "completed"`), which is what the operator
+          // ruled on 2026-09-01. A mark carries no language, so this figure is
+          // the person's across the whole course and repeats on each of their
+          // rows; the tab says so rather than letting it read as per Edition.
+          completed: g.userId ? (done.get(g.userId) ?? 0) : 0,
+        }))
+        .sort((a, b) => a.lang.localeCompare(b.lang) || a.person.localeCompare(b.person)),
     };
   },
 });
