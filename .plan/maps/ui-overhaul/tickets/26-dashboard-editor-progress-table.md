@@ -54,16 +54,66 @@ Use `/tdd` and `/ponytail`; read `dataviz` before drawing any progress meter.
 
 ## Todo
 
-- [ ] Settle the four decisions above and record each in the Answer.
-- [ ] One owner-gated query returning one row per (editor, language), tested with
+- [x] Settle the four decisions above and record each in the Answer.
+- [x] One owner-gated query returning one row per (editor, language), tested with
       `vitest` including the non-owner case.
-- [ ] Render as a real table in 23's Dashboard body, read-only, legible at 360px.
+- [x] Render as a real table in 23's Dashboard body, read-only, legible at 360px.
       A four-column table at phone width is the layout problem here.
-- [ ] Show languages with no editor, per decision 3.
-- [ ] Copy through the message namespaces, no hardcoded English.
-- [ ] No real name, email or roster row committed to the tree, fixtures included.
-- [ ] `pnpm typecheck` green.
+- [x] Show languages with no editor, per decision 3.
+- [x] Copy through the message namespaces, no hardcoded English.
+- [x] No real name, email or roster row committed to the tree, fixtures included.
+- [x] `pnpm typecheck` green.
 - [ ] Walk it in a browser at phone width.
+
+### Where it stands (2026-09-01)
+
+Built and committed as `c748d08`. `pnpm typecheck` clean, 1001 tests pass.
+**The browser walk has NOT happened**, same reason as ticket 23: nothing was
+listening on port 3000 and the manage route needs a signed-in owner. No Answer
+until it is walked, so this ticket stays claimed.
+
+Worked out of frontier order at the operator's direction, while 23 still has no
+Answer. 23's code was already built and committed, so nothing technical was
+being waited on.
+
+**The four decisions, as ruled by the operator on 2026-09-01.**
+
+1. **What progress means.** The editor's OWN completion marks, the same
+   `progress` rows (`status: "completed"`) the learner histogram counts. Not the
+   derived ladder, not a count of translated units, and no new edit stamp. What
+   it CANNOT see: who edited what. No write path records an editor, so an editor
+   who reworks every lesson without marking any complete reads as zero. The
+   measurement is "how far they have read through it", offered as the proxy for
+   how far they have worked through it.
+2. **Whether the derived ladder survives.** It does not, and it is gone. There is
+   no Rostered/Invited/Busy/Finished rung on this surface at all; there are
+   counts, plus one qualifier. See the ticket 08 note below.
+3. **Languages with no editor.** They get a row, with "No editor appointed". The
+   empty cell was the point.
+4. **Names and the public repo.** The table reads `users.name` (falling back to
+   `users.email`) from Convex at runtime. Nothing real is committed: the tests
+   use `@example.com` and `@test.invalid` addresses only.
+
+**Two departures from this ticket's Todo, both deliberate.**
+
+- **No separate query.** The rows ride on 23's existing `courseStats`. The
+  `progress` scan is the dashboard's dominant read and was already in hand, so a
+  second owner-gated query would have doubled it for rows derived from the very
+  same documents. Still one owner-gated query, tested with the non-owner case;
+  it is just 23's.
+- **Not a four-column table.** Grouped under language headings instead, which is
+  how the ticket's own stated layout problem (four columns at 360px) goes away:
+  the language becomes the heading rather than a column.
+
+**A correction to this ticket's premise.** It says there is "no edit log and no
+edit stamp anywhere". Half true as of 2026-09-01: `applyTranslatedLessonEdit`
+(`convex/content/authoring.ts:399`) writes `htmlStorageId` and clears the inline
+`html`, while machine translations are stored inline, so a human edit to an
+Edition IS distinguishable from machine output. What genuinely does not exist is
+attribution: no write path records WHO edited. That is why option 1 above is a
+reading proxy rather than a measurement, and it is what a future
+`editedBy`/`editedAt` ticket would fix.
+
 
 ## Done when
 

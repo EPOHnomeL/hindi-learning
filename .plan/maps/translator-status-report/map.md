@@ -98,6 +98,16 @@ ticket that needs to contradict it should say so loudly in its Answer.
   row, so they have an account) → **Finished** (`publishedEditions.published`, or a
   `listings` row exists). Staleness comes free from `_creationTime`; there is no edit
   stamp and no edit log, by decision.
+  - **Finished is QUALIFIED, ruled 2026-09-01**
+    ([translation-and-locales 04](../translation-and-locales/tickets/04-does-finished-lie.md),
+    this map's ticket 08 before the consolidation): published-or-priced are both
+    owner acts, so a live Edition on which no editor holds a completion mark renders
+    **Unreviewed** rather than finished. Shipped in `c748d08`.
+  - **The ladder itself did not survive its first consumer.** That surface
+    ([ui-overhaul 26](../ui-overhaul/tickets/26-dashboard-editor-progress-table.md),
+    2026-09-01) shows completion COUNTS per editor plus the Unreviewed qualifier, and
+    no rung at all. The ladder above remains the settled model for anything that still
+    wants one; nothing built uses it today.
 - **The roster's five chasing columns are dropped** (`Status`, `Progress %`,
   `Date Sent`, `Date Returned`, `Last Contact`). Four are derived better; `Notes`
   survives, because off-system chasing has nowhere else to live.

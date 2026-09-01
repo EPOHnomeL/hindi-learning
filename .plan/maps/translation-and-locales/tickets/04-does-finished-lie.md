@@ -42,6 +42,33 @@ Then the decision. Options worth putting to the user:
   reached Busy. Cleanest semantics, but it renders the currently-live Editions as
   unfinished, which is arguably also true.
 
+## The ruling, made 2026-09-01 (this ticket stays OPEN)
+
+The operator ruled **Qualify it**, in
+[ui-overhaul 26](../../ui-overhaul/tickets/26-dashboard-editor-progress-table.md),
+which that ticket was licensed to do ("resolve 08 first or decide here" — it was
+ticket 08 of `translator-status-report` before the 2026-09-01 consolidation
+renumbered it here). Built and shipped the same day in `c748d08`.
+
+What shipped: a live Edition (published OR priced) on which **no editor holds a
+single completion mark** renders **Unreviewed** beside its name on the course
+Dashboard. It is still live; it is simply not claimed as finished. That makes the
+five machine Editions a visible backlog rather than a false finish line, which is
+exactly what this ticket feared. The predicate is `reviewByEdition` in
+`src/app/_components/manage/dashboardDerive.ts`.
+
+Note the qualifier is keyed on **completion marks**, not on the Busy rung this
+ticket imagined: ui-overhaul 26 dropped the derived ladder entirely in favour of
+counts, so there is no Rostered/Invited/Busy/Finished anywhere on that surface.
+
+**Why this ticket is still open.** Its Done-when asks for the PROD FACTS first,
+as a dated table: which languages have an Edition and what each
+`translationJobs.status` is, which have a `publishedEditions` row, which have a
+`listings` row. Nobody has read prod for this; `.mcp.json` is still empty and the
+prod-PII grant is still removed, so the build session could not. The ruling no
+longer depends on those facts, but the table was wanted as the record of what the
+five machine Editions were actually doing on the day, and it is still unwritten.
+
 ## Done when
 
 - The prod facts above are written into the Answer as a table, with the date read, and
