@@ -45,3 +45,16 @@ the mechanics.
   Answer says what it changed.
 - One real run has fired end to end and produced an artifact, with its URL in the
   Answer. A document that has never been run is not done.
+
+## Ruled out
+
+**Superseded on 2026-09-01 by the course Dashboard tab.** The report is not a Routine.
+A live tab has no cadence, so there is no Sunday 07:00 GMT+2 run, no third sibling of
+`teacher-next-lesson` and `translate`, no Instructions field, and no runbook.
+
+**One live loose end, for the operator, not for an agent:** the Routine
+**"Ywam Potch Translator Status"** already exists on claude.ai, wired to
+`EPOHnomeL/hindi-learning` and `hindi-learning-prod` with `PUBLISH_SECRET` and
+`CONVEX_PROD_URL` on it. It was never given instructions, so it is inert rather than
+wrong, but it should be deleted so a later session does not find it and assume this
+map is live. Nothing in this repo can delete it.

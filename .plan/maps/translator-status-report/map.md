@@ -7,14 +7,56 @@
 
 ## Destination
 
-A Sunday-morning claude.ai Routine that publishes a Claude Artifact showing, for YWAM
-Potch's **Growing in the Holy Spirit** (`prophetic-school`), who the translator is per
-language and which rung of a **derived** status ladder they are on, alongside a
-breakdown of the tenant's income. Plus the data model that makes any of that
-derivable: a `translators` roster, `translator` as a third Share role, and a
-tenant-configurable translator revenue share.
+**Redirected 2026-09-01, see "The report became a tab" in Notes.** The destination is
+now the **data model**, surfaced live in the app: a `translators` roster, `translator`
+as a third Share role, a tenant-configurable translator revenue share, and the
+**derived status ladder** that says who the translator is per language and which rung
+they are on. The reader is the course owner, on the Dashboard peer of
+`/courses/[slug]/manage`, and the tickets that build that surface live on the
+`ui-overhaul` map, not this one.
+
+The original destination, kept because four ruled-out tickets still argue against it:
+a Sunday-morning claude.ai Routine publishing a Claude Artifact for YWAM Potch's
+**Growing in the Holy Spirit** (`prophetic-school`), showing the same ladder alongside
+a breakdown of the tenant's income.
 
 ## Notes
+
+### The report became a tab (2026-09-01)
+
+The operator decided that everything this map was going to publish weekly, the owner
+reads live in the app instead, calling the in-app version "much more elegant". That
+retires the delivery half of this map and keeps the model half.
+
+**Ruled out, the delivery mechanism:** [04](tickets/04-report-data-query-and-script.md)
+(the `PUBLISH_SECRET` query and its script), [05](tickets/05-what-the-weekly-page-looks-like.md)
+(the weekly page design), [06](tickets/06-render-and-publish-the-artifact.md) (render
+and publish), [07](tickets/07-stand-up-the-routine.md) (stand up the Routine).
+
+**Kept, the model, and the reason each survives:**
+
+- [01](tickets/01-translators-table-and-roster-import.md) roster and
+  [02](tickets/02-translator-as-a-third-share-role.md) the third Share role: the tab
+  needs to name humans who have no account yet, which `shares` alone cannot do.
+  Verified 2026-09-01: `shares.role` is still `viewer | editor` (`convex/schema.ts:359`).
+- [03](tickets/03-editions-panel-translator-selector.md) the selector: still the only
+  way anyone gets appointed. Its surface moved though, see the fog below.
+- [08](tickets/08-does-finished-lie.md) does "Finished" lie: **promoted in
+  importance.** A wrong rung in a Sunday report is embarrassing; a wrong rung on a
+  live tab the owner acts on is worse, and the tab is now its first real consumer.
+- [09](tickets/09-the-translator-revenue-share.md) and
+  [11](tickets/11-build-the-translator-revenue-share.md) the revenue share: a money
+  model, not a surface. Nothing about where it is displayed touches whether a
+  translator earns a percentage.
+- [10](tickets/10-settle-the-northern-ndebele-code.md) the Ndebele code: a
+  data-correctness question about a real human, independent of any surface.
+
+**Where the surface went:** [`ui-overhaul/23`](../ui-overhaul/tickets/23-manage-dashboard-tab.md)
+(the tab, plus users per language and progress buckets),
+[`ui-overhaul/25`](../ui-overhaul/tickets/25-dashboard-payout-panel.md) (payout), and
+[`ui-overhaul/26`](../ui-overhaul/tickets/26-dashboard-editor-progress-table.md) (the
+editor-by-language table, which is what 05 was designing). Those three cite this map's
+settled model rather than re-deciding it.
 
 **This map carries build tickets, deliberately.** wayfinder's default is
 plan-don't-do; the charting grill of 2026-08-11 already settled twenty-one decisions
@@ -119,6 +161,11 @@ into the tree, and the generated artifact is not committed either.
   languages, their rung, and once the share exists, their projected earnings. Adjacent
   to the revenue share but a different audience and a different access question.
   clears-with: 09
+- **Which surface the translator selector lives on.** Ticket 03 was written against
+  `Editions.tsx`, which `ui-overhaul/19` deleted; 03 now points at the Sharing tab, but
+  `ui-overhaul/17` also moved the access roster onto a course-scoped Users tab. Whether
+  appointing a translator is a Sharing-tab act on a language row or a Users-tab act
+  with language as an attribute is a real fork nobody has walked. clears-with: 03
 - **Whether `notes` survives contact with real chasing.** The three date columns were
   dropped on the argument that `_creationTime` derives staleness. If the answer to
   "why has Elias not signed up" turns out to need a phone log, the dates come back in
@@ -130,6 +177,13 @@ into the tree, and the generated artifact is not committed either.
 
 ## Out of scope
 
+- **The whole weekly delivery route** (2026-09-01): the Claude Artifact, the Sunday
+  07:00 GMT+2 claude.ai Routine, the `PUBLISH_SECRET`-guarded query, the `pnpm` script
+  and the JSON contract with an agent. Tickets 04 to 07, each ruled out in its own
+  file. The owner reads this in the app instead, on the Dashboard peer of
+  `/courses/[slug]/manage`. Note this **subsumes** the two entries below about the PDF
+  and the delivery machinery, and moots the one about a deterministic cron: there is
+  no run of any kind to schedule now.
 - **A literal PDF.** Replaced by a print-friendly Claude Artifact; anyone needing a PDF
   prints the page. Python and PyMuPDF are on the cloud image if this ever reverses.
 - **Delivery machinery**: Convex file storage for the artifact, a `reports` row, Resend

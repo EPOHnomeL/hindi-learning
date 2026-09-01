@@ -39,3 +39,13 @@ test data uses invented names.
 - If the renderer is a script, it has tests over at least the empty-data case, a
   single-language case, and the full fourteen.
 - No real name, email or figure has entered a committed file.
+
+## Ruled out
+
+**Superseded on 2026-09-01 by the course Dashboard tab.** No artifact is rendered and
+none is published, so there is nothing to render 04's JSON into and nothing for 05 to
+have designed. React components in the app read an owner-gated query directly.
+
+The division of labour this ticket was built to protect ("the numbers come from the
+query, the words from the agent, and the agent never computes a figure") is satisfied
+trivially once the agent is gone: there are no words and no agent, only the query.

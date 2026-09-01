@@ -49,3 +49,26 @@ call-site change rather than a rewrite.
 - Verified against prod once, and the Answer records the real numbers seen, so a later
   session can tell a rendering bug from a data change.
 - `pnpm typecheck` and `pnpm test` green.
+
+## Ruled out
+
+**Superseded on 2026-09-01 by the course Dashboard tab.** The operator decided the
+owner reads all of this in the app, on the Dashboard peer of
+`/courses/[slug]/manage`, rather than in a Sunday artifact. A live owner-gated Convex
+query read by a React tab replaces a `PUBLISH_SECRET`-guarded query read by an agent,
+so the boundary this ticket existed to draw ("an agent must not derive income
+figures, only arrange them") is moot: no agent is in the loop.
+
+What survives, and where it went:
+
+- The **owed/paid `sellerShare` shape** is reused verbatim by
+  [`ui-overhaul/25`](../../ui-overhaul/tickets/25-dashboard-payout-panel.md), which
+  cites this map's settled vocabulary as its default.
+- The **per-rung, per-language row shape** is reused by
+  [`ui-overhaul/26`](../../ui-overhaul/tickets/26-dashboard-editor-progress-table.md).
+- The **test list above** (each rung, roster row with no Edition, Edition with no
+  roster row, language with income but no translator, the donation row, the owed/paid
+  split) is a good list and both tickets should steal it.
+
+Only the delivery mechanism is dead: the `PUBLISH_SECRET` guard, the `pnpm` script,
+and the JSON contract with an agent.

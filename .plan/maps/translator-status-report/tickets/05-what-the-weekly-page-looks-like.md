@@ -45,3 +45,15 @@ React component does not.
 - The user has reacted to it and the layout is agreed, including the empty-chart case.
 - The Answer records what was chosen **and what was rejected**, so 06 does not
   re-open it.
+
+## Ruled out
+
+**Superseded on 2026-09-01 by the course Dashboard tab.** There is no weekly page to
+design: the operator decided the numbers live in the app, on the Dashboard peer of
+`/courses/[slug]/manage`. The design question moves with them, and it changes shape
+completely. This ticket asked what a print-friendly A4 artifact looks like on a Sunday
+morning; the live question is what a table of editors by language looks like at 360px,
+which is [`ui-overhaul/26`](../../ui-overhaul/tickets/26-dashboard-editor-progress-table.md).
+
+The prototype discipline still applies over there, and so does the constraint that
+made this ticket's fixtures invented rather than real: this repo is public.
