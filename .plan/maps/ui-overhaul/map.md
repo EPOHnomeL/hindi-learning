@@ -115,6 +115,16 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
 
 ## Not yet specified
 
+- **What the Dashboard tab becomes once the owner actually reads it.** The operator
+  widened it on 2026-09-01 from the 2026-08-27 five stats to a real course dashboard:
+  payout, users per language, a progress-percentage histogram over all readers, and a
+  separate editor-by-language table. Tickets 23 (the tab, users per language, buckets),
+  25 (payout) and 26 (the editor table) carry it, and the
+  [translator-status-report](../translator-status-report/map.md) map was redirected the
+  same day, four of its tickets ruled out, because that report is now this tab. What is
+  not specified is what a **fifth** thing on this tab would be, and at what point four
+  panels in one 640px column stops being a glance and starts needing its own layout
+  decision. clears-with: 23
 - **Per-surface redesign directions**, one direction ticket per surface, in the
   inventory's priority order, cut once the foundation and the collapse plan exist.
   Two surfaces left this patch on 2026-08-27 and became tickets 14 to 20, the Editions
