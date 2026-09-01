@@ -117,8 +117,8 @@ browser" are different claims, and for this gate only the second one counts.
 ## Out of scope, with homes
 
 - Offline Lesson content, the lease, and the offline Response/Progress queue:
-  [reader-experience/05](../maps/reader-experience/tickets/05-offline-lesson-content-under-a-lease.md).
+  [reader-experience/05](../maps/../maps/technical-foundation/tickets/05-offline-lesson-content-under-a-lease.md).
 - The `/content` open-bearer-URL exposure this grilling uncovered:
-  [marketplace/12](../maps/marketplace/tickets/12-content-route-is-an-open-bearer-url.md). Worth
+  [marketplace/12](../maps/../maps/technical-foundation/tickets/04-content-route-is-an-open-bearer-url.md). Worth
   reading even though it is not yours, because it is why offline content was deferred rather than
   encrypted.

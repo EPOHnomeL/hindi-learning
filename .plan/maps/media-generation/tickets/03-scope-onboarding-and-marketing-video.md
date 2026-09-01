@@ -234,6 +234,6 @@ Cloudflare Stream vs Mux vs R2+CDN); that ticket has been narrowed accordingly. 
 was flagged during grilling and taken knowingly.
 
 Because it reaches past this map, it is owed an ADR, which is
-[Record the ADR: Mux is the product-wide video rail](04-adr-mux-as-the-video-rail.md). Mux
+[Record the ADR: Mux is the product-wide video rail](../../technical-foundation/tickets/15-adr-mux-as-the-video-rail.md). Mux
 is **not yet provisioned** — no account, no keys, no `mux` reference anywhere in
 `package.json` or the env as of 2026-08-07.

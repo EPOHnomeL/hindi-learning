@@ -9,7 +9,7 @@ blocked_by: []
 
 The catalogue half, independent of RTL — a message file is just data, and it can land and be
 parity-green before the layout flips (it simply reads wrongly-aligned until
-[03](03-rtl-app-shell.md)).
+[03](../../technical-foundation/tickets/10-rtl-app-shell.md)).
 
 - Add `messages/ur.json` with **exactly** `en.json`'s leaf keys — `messages/parity.test.ts`
   fails on any missing or extra key, which is the whole point of it. Preserve ICU plural syntax

@@ -46,7 +46,7 @@ URLs minted per request (loses the year-long cache, and the reader would need to
 authenticated content route (a session check per Lesson fetch, and a CORS decision); or scoping
 the capability by wrapping the id in a token that carries an expiry.
 
-Note the dependency: **[reader-experience/05](../../reader-experience/tickets/05-offline-lesson-content-under-a-lease.md)
+Note the dependency: **[reader-experience/05](05-offline-lesson-content-under-a-lease.md)
 may be blocked on this.** A time-boxed lease on offline content is theatre if the underlying
 content route hands out permanent access anyway - so decide this first, or decide deliberately that
 the lease is worth having regardless.
@@ -56,5 +56,7 @@ the lease is worth having regardless.
 The exposure is either accepted with the reasoning and date recorded, or a fix is chosen and its
 implementation tickets exist - including what it costs in caching and what the reader client has to
 change.
+
+<!-- Moved 2026-09-01 from `marketplace/12` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 04 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->
 
 ## Answer

@@ -9,7 +9,7 @@ blocked_by: []
 
 **Where it stands:** open — no token/usage recording or per-Topic aggregate
 
-Vocabulary: [`CONTEXT.md`](../../../../CONTEXT.md) (Routine, Topic, Generation). Spec: `../PRD.md`. Respects [ADR 0008](../../../../docs/adr/0008-next-lesson-routine-gate-in-convex.md) / [ADR 0009](../../../../docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md) (the gate + report path).
+Vocabulary: [`CONTEXT.md`](../../../../CONTEXT.md) (Routine, Topic, Generation). Spec: `../../internal-course-studio/PRD.md`. Respects [ADR 0008](../../../../docs/adr/0008-next-lesson-routine-gate-in-convex.md) / [ADR 0009](../../../../docs/adr/0009-content-source-of-truth-in-convex-routine-pulls-context.md) (the gate + report path).
 
 ## What to build
 
@@ -46,3 +46,5 @@ Per-run token usage is persisted against the Topic and a per-Topic aggregate is 
 <!-- Some links in this ticket were de-linked in the 2026-07-30 migration: their targets
      (.scratch PRDs, already-resolved sibling tickets, the retired product-direction
      roadmap) do not exist in the repo. The names are kept as prose for provenance. -->
+
+<!-- Moved 2026-09-01 from `internal-course-studio/03` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 12 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->

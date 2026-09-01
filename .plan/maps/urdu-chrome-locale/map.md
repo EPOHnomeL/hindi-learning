@@ -15,7 +15,7 @@ layout coming apart. The RTL question is the whole difficulty; the catalogue is 
 ## Notes
 
 - **This map carries build tickets, not just decisions** (wayfinder's plan-don't-do default is
-  overridden here, per the tracker contract). Only [01](tickets/01-chrome-rtl-strategy.md) is a
+  overridden here, per the tracker contract). Only [01](../technical-foundation/tickets/09-chrome-rtl-strategy.md) is a
   decision ticket; 02 and 03 are execution.
 - **Urdu already exists as a *content* language and is already RTL-aware there.**
   `convex/languages.ts:41` carries `{ code: "ur", name: "Urdu", native: "اردو", rtl: true }`,
@@ -43,6 +43,14 @@ layout coming apart. The RTL question is the whole difficulty; the catalogue is 
 - Sibling map: [app-language-i18n](../app-language-i18n/map.md) owns the i18n architecture
   (next-intl without routing, cookie-resolved locale, repo `messages/*.json`, key-parity test).
   This map **consumes** those decisions and does not revisit them.
+
+- **Moved out 2026-09-01 to the [technical-foundation map](../technical-foundation/map.md)**, which now groups this repo’s scalability, refactoring and code-architecture work:
+  - `urdu-chrome-locale/01` [Decide the chrome RTL strategy](../technical-foundation/tickets/09-chrome-rtl-strategy.md), now **09** there.
+  - `urdu-chrome-locale/03` [Build: flip the app shell to RTL for an RTL locale](../technical-foundation/tickets/10-rtl-app-shell.md), now **10** there.
+  
+    **This map kept only its message catalogue.** RTL is a codebase-wide question (every physical `ml-`/`pl-`/`left-` in the learner surfaces, plus the pre-paint style, the dark-mode script and the lesson iframe), not an Urdu question, so the pair moved together and kept its edge: the strategy still blocks the sweep. This map’s destination is now reached partly through the technical map.
+  
+    Renumbering was forced: `blocked_by` is map-local, and the numbers collided across the twelve donor maps. **Do not reuse the old numbers here**, they remain those tickets’ identity in this map’s history.
 
 ## Decisions so far
 

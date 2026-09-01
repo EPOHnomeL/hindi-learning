@@ -38,7 +38,7 @@ fixed:**
 
 **Out of scope** — owned elsewhere, do not absorb:
 [the pre-signup pitch video](../../media-generation/tickets/03-scope-onboarding-and-marketing-video.md),
-[repeat sign-in friction](../../auth-sessions/tickets/02-review-session-management.md),
+[repeat sign-in friction](../../technical-foundation/tickets/08-review-session-management.md),
 and checkout mechanics (ywampotch-launch and [marketplace](../../marketplace/map.md)).
 
 ## Done when

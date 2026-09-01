@@ -25,11 +25,11 @@ that already ship.
   sole merchant of record** ([ADR 0026](../../../docs/adr/0026-manual-eft-payment-rail.md)),
   and a **50%** platform cut (`PLATFORM_FEE_BPS=5000`, split on the *net*). This matters most
   to the donation tickets, which touch the same rails and must not inherit a seller-as-merchant
-  assumption. [Ticket 09](tickets/09-adr-superseding-0016-payfast-merchant-model.md) closes the
+  assumption. [Ticket 09](../technical-foundation/tickets/14-adr-superseding-0016-payfast-merchant-model.md) closes the
   record itself.
 - **Ticket 01 is the blocked one and it blocks the least.** Authoring-cost funding needs real
   per-run token numbers first
-  ([Cost instrumentation](../internal-course-studio/tickets/03-cost-instrumentation.md)), and
+  ([Cost instrumentation](../technical-foundation/tickets/12-cost-instrumentation.md)), and
   it affects economics, not access mechanics — so 02, 03 and 04 do not wait on it.
 - **02 and 04 are the same page from two angles** and should be reconciled, not built twice:
   04 markets the paygate as a *proposition*, 02 lists the actual *courses*. Both may be
@@ -62,6 +62,15 @@ that already ship.
   is worth keeping: an OPEN ticket is named from Notes, never from Decisions-so-far, which
   indexes only the route already walked — naming an open ticket there is a malformation
   chartr catches (and did, twice).
+
+- **Moved out 2026-09-01 to the [technical-foundation map](../technical-foundation/map.md)**, which now groups this repo’s scalability, refactoring and code-architecture work:
+  - `marketplace/05` [Replace the committed USD to ZAR rate with a live one](../technical-foundation/tickets/13-live-usd-zar-rate.md), now **13** there.
+  - `marketplace/09` [Supersede ADR 0016, the money model that actually shipped](../technical-foundation/tickets/14-adr-superseding-0016-payfast-merchant-model.md), now **14** there.
+  - `marketplace/12` [The `/content` route is an open bearer URL](../technical-foundation/tickets/04-content-route-is-an-open-bearer-url.md), now **04** there.
+  
+    The `/content` ticket gained an outgoing edge in the move: it now blocks the offline-under-a-lease ticket, because a lease buys revocation and that route currently gives it away. Ticket 14 also had four ADR links broken at three directory levels instead of four; fixed while moving.
+  
+    Renumbering was forced: `blocked_by` is map-local, and the numbers collided across the twelve donor maps. **Do not reuse the old numbers here**, they remain those tickets’ identity in this map’s history.
 
 ## Decisions so far
 

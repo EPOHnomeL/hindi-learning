@@ -111,7 +111,7 @@ A user who forgets their password can get back in end-to-end via an emailed OTP,
   needs no new infrastructure — a Convex Auth `ResendOTPPasswordReset`-style provider.
 - Prod-only reality: real accounts exist only on prod, so any live verification is a prod
   operation with the operator CLIs (`docs/agents/project-context.md`).
-- **Related but distinct:** [Review session management](02-review-session-management.md) is
+- **Related but distinct:** [Review session management](../../technical-foundation/tickets/08-review-session-management.md) is
   about not having to sign in so often; this is about being able to at all.
 - Skills: `convex:convex-setup-auth`, `convex:convex-expert`, `/tdd`.
 - **Fog:** a change-password UI for a signed-in user. Missing too, and adjacent enough that it

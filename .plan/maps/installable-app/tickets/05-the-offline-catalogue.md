@@ -35,7 +35,7 @@ never resolve, which is what today's behaviour would be.
 
 **Lesson bodies are not cached** ([ADR 0030](../../../../docs/adr/0030-installable-per-tenant-app.md)
 §3). That is
-[reader-experience/05](../../reader-experience/tickets/05-offline-lesson-content-under-a-lease.md),
+[reader-experience/05](../../technical-foundation/tickets/05-offline-lesson-content-under-a-lease.md),
 and its real cost is the offline Response/Progress queue, not the caching.
 
 Note the asymmetry worth remembering: `dashboard` is per-user and its cache is a *stale* view, so

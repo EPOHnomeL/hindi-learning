@@ -117,7 +117,7 @@ Grilled rather than invented, per this ticket's instruction:
 the donor) and **`MIN_DONATION_USD_CENTS = 500`** ($5 — low enough not to deter
 a casual donor, high enough that PayFast's fixed fee isn't most of the gift).
 Both are committed constants changed by deploy, per 03 §6.
-[Live USD→ZAR rate](05-live-usd-zar-rate.md) replaces the first later.
+[Live USD→ZAR rate](../../technical-foundation/tickets/13-live-usd-zar-rate.md) replaces the first later.
 
 ### Decided here, since 03 didn't
 

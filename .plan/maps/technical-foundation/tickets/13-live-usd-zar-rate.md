@@ -1,6 +1,6 @@
 ---
 type: grilling
-blocked_by: [03]
+blocked_by: []
 ---
 
 > `/wayfinder .plan/maps/marketplace/tickets/05-live-usd-zar-rate.md`
@@ -9,7 +9,7 @@ blocked_by: [03]
 
 ## Question
 
-[Donation functionality](03-donation-link-and-prompt.md) put the USD→ZAR rate in a
+[Donation functionality](../../marketplace/tickets/03-donation-link-and-prompt.md) put the USD→ZAR rate in a
 **committed constant**, changed by deploy — consistent with the landing page it
 serves, and accepting one named cost: **it goes stale if nobody watches it.** A
 stale rate is not cosmetic here. The donor types dollars and is charged Rand, so a
@@ -48,3 +48,5 @@ The Answer records: the chosen rate source (or a decision to keep the constant);
 where the fetch runs and how the checkout path stays synchronous; the staleness
 bound; the behaviour when the feed is unavailable; and the rounding rule — plus the
 implementation ticket(s) that follow, or an out-of-scope ruling.
+
+<!-- Moved 2026-09-01 from `marketplace/05` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 13 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->

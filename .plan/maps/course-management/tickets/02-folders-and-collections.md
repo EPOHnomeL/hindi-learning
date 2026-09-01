@@ -72,7 +72,7 @@ The folders-vs-tags decision, whether the tenant model already gives this for fr
 - Two of the three already have owners:
   [Delete button for courses](01-delete-button-for-courses.md) (pruning) and
   [Self-serve course building](../../course-authoring/tickets/03-self-serve-course-building.md)
-  plus [Co-authorship / ownership transfer](03-co-authorship-and-ownership-transfer.md)
+  plus [Co-authorship / ownership transfer](../../technical-foundation/tickets/07-co-authorship-and-ownership-transfer.md)
   (delegation). This ticket owns **only the grouping**.
 - **Check before inventing:** whitelabel's tenant model may already give a coarse grouping
   for free. A new folder concept that duplicates tenant scoping is the failure mode here.

@@ -34,7 +34,7 @@ vague aspiration.
 - **Two adjacent maps own pieces of this; do not absorb them:**
   [Scope the onboarding & marketing video](../media-generation/tickets/03-scope-onboarding-and-marketing-video.md)
   (the pre-signup pitch) and
-  [Review session management](../auth-sessions/tickets/02-review-session-management.md)
+  [Review session management](../technical-foundation/tickets/08-review-session-management.md)
   (having to sign in repeatedly, which is onboarding friction every single visit).
 - **This map carries one fix ticket, deliberately** (wayfinder's default is plan-don't-do):
   [Dashboard empty state contradicts the catalogue below it](tickets/03-dashboard-empty-state-ignores-catalogue.md)

@@ -227,7 +227,7 @@ Read this honestly before building on it: **the paid-marketplace economics this 
 for were never costed.** The decision was made on the strength of one ~50s marketing clip and
 an intent to do video properly, not on egress pricing at hours-of-course-video scale. The ADR
 that records it —
-[media-generation/04](../../media-generation/tickets/04-adr-mux-as-the-video-rail.md) — is
+[media-generation/04](../../technical-foundation/tickets/15-adr-mux-as-the-video-rail.md) — is
 required to say so, and to state the number that would make it the wrong call. Mux is **not
 yet provisioned** (no account, no keys, no `mux` in `package.json` or the env as of
 2026-08-07).
@@ -247,7 +247,7 @@ choice — picking Mux says where bytes live, not whether uploads are worth buil
 comparison table, and the unlock criterion for revisiting.~~
 
 **Narrowed 2026-08-07.** The rail half is decided (Mux, see above) and its ADR is owed by
-[media-generation/04](../../media-generation/tickets/04-adr-mux-as-the-video-rail.md), not by
+[media-generation/04](../../technical-foundation/tickets/15-adr-mux-as-the-video-rail.md), not by
 this ticket. What this ticket still owes: **links-first vs. uploads** — whether "upload to
 YouTube unlisted and paste the link" stays the documented workflow, and what demand signal
 unlocks building an upload path onto the chosen rail. The Convex-storage numbers no longer

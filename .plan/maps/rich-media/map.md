@@ -30,7 +30,7 @@ files are hosted, and how a Lesson cites the course's own Resources.
 - **Video hosting is decided: Mux, product-wide** (2026-08-07), settled from outside this map
   in [media-generation/03](../media-generation/tickets/03-scope-onboarding-and-marketing-video.md)
   and owed an ADR in
-  [media-generation/04](../media-generation/tickets/04-adr-mux-as-the-video-rail.md). Convex
+  [media-generation/04](../technical-foundation/tickets/15-adr-mux-as-the-video-rail.md). Convex
   storage, unlisted YouTube, Cloudflare Stream and R2+CDN are no longer candidates for the
   rail, and [ticket 01](tickets/01-video-and-audio-integration.md) is narrowed accordingly.
   Read the caveat in that ticket before leaning on it: the marketplace economics this map

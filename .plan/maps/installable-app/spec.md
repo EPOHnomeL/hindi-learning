@@ -96,9 +96,9 @@ Three parts:
 **Out:**
 
 - **Offline Lesson bodies.** Needs a lease and an offline Response/Progress queue -
-  [reader-experience/05](../reader-experience/tickets/05-offline-lesson-content-under-a-lease.md).
+  [reader-experience/05](../technical-foundation/tickets/05-offline-lesson-content-under-a-lease.md).
 - **The `/content` bearer-URL exposure** -
-  [marketplace/12](../marketplace/tickets/12-content-route-is-an-open-bearer-url.md).
+  [marketplace/12](../technical-foundation/tickets/04-content-route-is-an-open-bearer-url.md).
 - **Any uploaded `appIcon` brand asset.** Derived is the decision; an upload is a later additive
   change if a tenant asks.
 - **Push notifications, background sync, share targets, app shortcuts.** None asked for.

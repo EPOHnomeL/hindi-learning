@@ -21,10 +21,10 @@ gate none of them have today, and the economics of the Routine run underneath al
   subject — the authoring pipeline — and one recurring dependency, per-run cost numbers.
 - **[Streamline the Routine's effort](tickets/04-streamline-routine-effort.md) is the
   high-priority one.** Every Routine run pays that tax and it compounds as Topics grow; it
-  directly bounds Claude spend. **[Off-peak generation](tickets/05-off-peak-course-generation.md)
+  directly bounds Claude spend. **[Off-peak generation](../technical-foundation/tickets/11-off-peak-course-generation.md)
   multiplies each run by a whole curriculum, so 04 should land first**, and both want the
   numbers from
-  [Cost instrumentation](../internal-course-studio/tickets/03-cost-instrumentation.md).
+  [Cost instrumentation](../technical-foundation/tickets/12-cost-instrumentation.md).
 - **05 asks to remove a safety mechanism**, not to add a feature: the buffer-of-one gate is a
   deliberate cost throttle. That is why it is Admin-only (ADR 0011) and why a per-run Lesson
   cap is not optional.
@@ -52,6 +52,13 @@ gate none of them have today, and the economics of the Routine run underneath al
   a self-serve generate button is a metered LLM cost per click.
 - Skills: `/grilling` + `/domain-modeling`, `convex:convex-expert`, `/ponytail`.
 
+- **Moved out 2026-09-01 to the [technical-foundation map](../technical-foundation/map.md)**, which now groups this repo’s scalability, refactoring and code-architecture work:
+  - `course-authoring/05` [Off-peak scheduling for course generation](../technical-foundation/tickets/11-off-peak-course-generation.md), now **11** there.
+  
+    It gained a blocker in the move: cost instrumentation. The buffer-of-one gate is a deliberate cost throttle, and removing it for overnight generation cannot be priced without per-run token numbers.
+  
+    Renumbering was forced: `blocked_by` is map-local, and the numbers collided across the twelve donor maps. **Do not reuse the old numbers here**, they remain those tickets’ identity in this map’s history.
+
 ## Decisions so far
 
 <!-- one line per resolved ticket -->
@@ -60,7 +67,7 @@ gate none of them have today, and the economics of the Routine run underneath al
 
 - **Who owns a course once building is delegated.** Ticket 03's access question needs the
   primitive from
-  [Co-authorship / ownership transfer](../course-management/tickets/03-co-authorship-and-ownership-transfer.md);
+  [Co-authorship / ownership transfer](../technical-foundation/tickets/07-co-authorship-and-ownership-transfer.md);
   the two will need reconciling and one of them may absorb the other.
 - **Version bumps visible to a learner mid-course.** Ticket 01 names the requirement (never
   silently change content someone has completed) but not the mechanism.

@@ -11,7 +11,7 @@ blocked_by: []
 
 **The repo's decision record for how money works says the opposite of what runs.**
 
-[ADR 0016](../../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md)
+[ADR 0016](../../../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md)
 is titled *"Sellers sell, platform facilitates via **Stripe Connect** (**not** merchant
 of record)"* and is still `status: proposed`. The shipped reality is the exact inverse
 on both counts:
@@ -25,9 +25,9 @@ on both counts:
 The pivot (2026-07-08/07-10, Stripe ripped out rather than run alongside) has **no
 decision record at all** — its only written trace is `.scratch/payfast-payments/PRD.md`,
 a scratch file. So 0016 stands as the current record by default, and later ADRs now
-build on it: [0026](../../../docs/adr/0026-manual-eft-payment-rail.md) says it "**adds
+build on it: [0026](../../../../docs/adr/0026-manual-eft-payment-rail.md) says it "**adds
 to** ADR 0016… supersedes nothing", and
-[0027](../../../docs/adr/0027-per-tenant-donation-rail.md) cites it too. Both are
+[0027](../../../../docs/adr/0027-per-tenant-donation-rail.md) cites it too. Both are
 extending a record whose spine is wrong.
 
 This is not academic. The rail is **live and holding real money**, the donation tickets
@@ -36,7 +36,7 @@ model as fact until 2026-08-01.
 
 **Write a new ADR superseding 0016** — do not rewrite it. That is the repo's rule
 (`CLAUDE.md`, "Verify the claim before you reason from it") and its established practice:
-[0025](../../../docs/adr/0025-per-tenant-session-isolation.md) supersedes 0022 §4a rather
+[0025](../../../../docs/adr/0025-per-tenant-session-isolation.md) supersedes 0022 §4a rather
 than editing it, so the original stands as the record of what was decided and when.
 
 What the new ADR has to settle, and why it is a grilling and not a transcription:
@@ -71,3 +71,5 @@ map's Notes agree with it.
      docs-reconciliation sweep (.scratch/docs-reconciliation/FINDINGS.md §4), which reported
      it and correctly declined to act; it then sat unticketed because that sweep's output
      was a scratch report rather than a map. -->
+
+<!-- Moved 2026-09-01 from `marketplace/09` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 14 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->

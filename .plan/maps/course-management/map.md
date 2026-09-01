@@ -20,7 +20,7 @@ and keep colliding when they are decided apart.
   became a one-ticket map. They are not independent: pruning needs the cascade story
   ([01](tickets/01-delete-button-for-courses.md)), grouping must not duplicate tenant scoping
   ([02](tickets/02-folders-and-collections.md)), delegation needs a second owner to exist
-  ([03](tickets/03-co-authorship-and-ownership-transfer.md)), and grouping *within* a course
+  ([03](../technical-foundation/tickets/07-co-authorship-and-ownership-transfer.md)), and grouping *within* a course
   is the same shape one grain down ([04](tickets/04-modules-and-per-module-unlocking.md)).
 - **Grill 01 and 02 together** — same root motivation, and separating pruning from structure
   is the first thing the grilling has to do.
@@ -35,6 +35,13 @@ and keep colliding when they are decided apart.
   grouping *and* scoped admin rights — both 02 and 03 can be smaller than they look.
 - Skills: `/grilling` + `/domain-modeling`, `convex:convex-expert`, `convex:convex-authz`
   (03 is an authorization change), `/ponytail`.
+
+- **Moved out 2026-09-01 to the [technical-foundation map](../technical-foundation/map.md)**, which now groups this repo’s scalability, refactoring and code-architecture work:
+  - `course-management/03` [Course co-authorship / ownership transfer](../technical-foundation/tickets/07-co-authorship-and-ownership-transfer.md), now **07** there.
+  
+    It is the data-model gap (`topics.ownerId` is single-owner) underneath both this map’s folders ticket and `course-authoring/03`, so it is a schema decision rather than a course-management feature.
+  
+    Renumbering was forced: `blocked_by` is map-local, and the numbers collided across the twelve donor maps. **Do not reuse the old numbers here**, they remain those tickets’ identity in this map’s history.
 
 ## Decisions so far
 

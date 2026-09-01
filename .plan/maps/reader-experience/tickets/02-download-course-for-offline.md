@@ -35,7 +35,7 @@ implementation tickets exist.
   1. *"not need to log in with creds all the time"* — a **session lifetime** problem, already
      partly addressed by the auth-cookie persistence that shipped with Google sign-in, and
      tracked as
-     [Review session management](../../auth-sessions/tickets/02-review-session-management.md).
+     [Review session management](../../technical-foundation/tickets/08-review-session-management.md).
      It has nothing to do with downloading.
   2. *"later introduce downloading the course locally to finish offline"* — the real offline
      want, explicitly framed as later.
@@ -111,9 +111,9 @@ home.
 
 **Two tickets carry the remainder:**
 
-- [reader-experience/05](05-offline-lesson-content-under-a-lease.md) - offline Lesson content, the
+- [reader-experience/05](../../technical-foundation/tickets/05-offline-lesson-content-under-a-lease.md) - offline Lesson content, the
   lease, and the Response/Progress queue.
-- [marketplace/12](../../marketplace/tickets/12-content-route-is-an-open-bearer-url.md) - the
+- [marketplace/12](../../technical-foundation/tickets/04-content-route-is-an-open-bearer-url.md) - the
   `/content` bearer-URL exposure, which may block 05.
 
 **The ui-overhaul sequencing was deliberately jumped.** This ticket said it was sequenced behind

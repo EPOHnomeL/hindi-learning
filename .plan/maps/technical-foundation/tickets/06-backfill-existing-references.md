@@ -7,7 +7,7 @@ blocked_by: []
 
 ## Question
 
-**Depends on:** 01 — card anchor contract
+**Depends on:** the card anchor contract, which shipped. **Corrected 2026-09-01:** this line read "01, card anchor contract", a GitHub issue number the 2026-07-30 migration carried in without repointing. It was never `reader-experience/01` (that is the Progress feature), and `blocked_by` was correctly empty throughout. Nothing blocks this ticket.
 **Domain:** [[Reference]] (CONTEXT.md)
 
 ## Why deferred
@@ -62,3 +62,5 @@ A decision on whether the backfill is worth doing at all, measured against how m
 - Skills: `/ponytail` (the laziest correct answer may be to do nothing),
   `convex:convex-migration-helper` if a migration does turn out to be warranted.
 - **Out of scope:** the anchor contract, deep-links, and share icons themselves — all shipped.
+
+<!-- Moved 2026-09-01 from `reader-experience/04` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 06 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->

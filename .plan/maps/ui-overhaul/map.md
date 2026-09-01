@@ -63,6 +63,13 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
   its stop rule moved into ticket 13's Done-when, which is now `blocked_by: [08, 10]`.
 - Skills: `/grilling`, `/prototype`, `/ponytail`.
 
+- **Moved out 2026-09-01 to the [technical-foundation map](../technical-foundation/map.md)**, which now groups this repo’s scalability, refactoring and code-architecture work:
+  - `ui-overhaul/05` [Does the lesson body, and the quiz, come out of the iframe](../technical-foundation/tickets/02-lesson-quiz-architecture.md), now **02** there.
+  
+    It was architecture, not UX evidence, and it was deliberately unblocked from [03](tickets/03-design-foundation.md) so it could run first. **It still constrains 03**: whether the quiz becomes React decides whether the component set needs quiz primitives. Note also that the technical map’s 03 (a shadcn foundation, moved out of `internal-course-studio`) overlaps this map’s 03 heavily. Whichever runs second inherits the reconciliation.
+  
+    Renumbering was forced: `blocked_by` is map-local, and the numbers collided across the twelve donor maps. **Do not reuse the old numbers here**, they remain those tickets’ identity in this map’s history.
+
 ## Decisions so far
 
 <!-- one line per resolved ticket -->

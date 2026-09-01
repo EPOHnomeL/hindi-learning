@@ -1,6 +1,6 @@
 ---
 type: task
-blocked_by: [03]
+blocked_by: []
 ---
 
 > `/wayfinder .plan/maps/media-generation/tickets/04-adr-mux-as-the-video-rail.md`
@@ -9,7 +9,7 @@ blocked_by: [03]
 
 ## Question
 
-[Scope the product onboarding + marketing video](03-scope-onboarding-and-marketing-video.md)
+[Scope the product onboarding + marketing video](../../media-generation/tickets/03-scope-onboarding-and-marketing-video.md)
 chose **Mux** on 2026-08-07, and chose it at full reach: all product video, including
 learner-facing course video, not just the one marketing clip. That reach settles the hosting
 half of [Video & audio integration](../../rich-media/tickets/01-video-and-audio-integration.md),
@@ -39,3 +39,5 @@ An ADR exists under `docs/adr/`, numbered per the directory's convention, that r
 - **Consequences**: Mux needs provisioning (no account, no keys, no `mux` in `package.json`
   or the env as of 2026-08-07); a second rail for the same media type is now a regression,
   not an option.
+
+<!-- Moved 2026-09-01 from `media-generation/04` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 15 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->

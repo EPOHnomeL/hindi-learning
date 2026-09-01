@@ -67,7 +67,7 @@ The transfer-vs-co-ownership fork is closed, with the whitelabel interaction, th
 - This is the primitive underneath
   [Self-serve course building](../../course-authoring/tickets/03-self-serve-course-building.md)
   ("hand over building capabilities") and part of
-  [Folders and collections](02-folders-and-collections.md) ("this course really belongs to
+  [Folders and collections](../../course-management/tickets/02-folders-and-collections.md) ("this course really belongs to
   so-and-so now").
 - Whitelabel's two-tier admin model (ADR 0022) already gives tenant-admins scoped rights —
   so transferring *within* a tenant may differ from transferring *across* tenants.
@@ -77,3 +77,5 @@ The transfer-vs-co-ownership fork is closed, with the whitelabel interaction, th
   delete courses, "who did what" becomes a real question — raised here without deciding
   whether it belongs to this effort.
 - **Out of scope:** learner-side access grants (Share, Entitlement) — a different relation.
+
+<!-- Moved 2026-09-01 from `course-management/03` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 07 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->

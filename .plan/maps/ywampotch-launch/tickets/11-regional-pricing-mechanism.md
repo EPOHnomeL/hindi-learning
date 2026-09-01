@@ -153,7 +153,7 @@ legally DCC (ticket 10), but it is the honest and dispute-cheap pattern.
   ages, defeating the round number.
 - **The rate constant is shared with marketplace/03.** 03 committed a USD→ZAR
   constant for donations, changed by deploy, with
-  [Live USD→ZAR rate](../../marketplace/tickets/05-live-usd-zar-rate.md) as its
+  [Live USD→ZAR rate](../../technical-foundation/tickets/13-live-usd-zar-rate.md) as its
   follow-up. **This ticket reuses that same constant and adds EUR→ZAR beside it**
   — one rate per currency for the whole repo. Whichever build lands first owns
   the module; the second imports it. **This is the reconciliation this ticket's

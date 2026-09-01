@@ -47,4 +47,6 @@ The strategy is written here as an `## Answer`: where `dir` is set and from what
 inventory of physical-property and positioning offenders on the in-scope learner surfaces with
 the fix pattern for each class; the icon-mirroring rule; the chosen Urdu face plus its
 line-height consequence; and the acceptance path. Explicitly **decided, NOT built** — the build
-is [03](03-rtl-app-shell.md).
+is [03](10-rtl-app-shell.md).
+
+<!-- Moved 2026-09-01 from `urdu-chrome-locale/01` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 09 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->

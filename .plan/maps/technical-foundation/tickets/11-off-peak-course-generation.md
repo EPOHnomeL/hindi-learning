@@ -1,6 +1,6 @@
 ---
 type: grilling
-blocked_by: []
+blocked_by: [12]
 ---
 
 # Off-peak scheduling for course generation (on-demand admin finisher shipped)
@@ -34,7 +34,7 @@ The Routine authors a **buffer of one**: both the daily `dailyFire` cron (04:23 
 
 - The Routine gate/lock ([ADR 0008](../../../../docs/adr/0008-next-lesson-routine-gate-in-convex.md)).
 - The **Admin** capability ([ADR 0011](../../../../docs/adr/0011-allowlist-in-convex-admin-portal.md)).
-- Cost controls (roadmap Costing; multi-topic issue 08).
+- Cost controls (roadmap Costing; a deleted GitHub issue 08, see the migration note below). **Now a real edge:** [12, cost instrumentation](12-cost-instrumentation.md) blocks this ticket, because the buffer-of-one gate exists as a cost throttle and removing it cannot be priced without per-run token numbers.
 
 ## Notes
 
@@ -91,11 +91,13 @@ schedules the finisher. Ruling the scheduled half out of scope is a legitimate o
 - Relates to ADR 0001 (async hub-mediated loop), ADR 0008 (the next-lesson gate),
   `convex/crons.ts`.
 - **Pairs with**
-  [Cost instrumentation](../../internal-course-studio/tickets/03-cost-instrumentation.md):
+  [Cost instrumentation](12-cost-instrumentation.md):
   running unattended overnight is precisely when you want per-run token numbers, and
-  [Streamline the Routine's effort](04-streamline-routine-effort.md) makes each run cheaper
+  [Streamline the Routine's effort](../../course-authoring/tickets/04-streamline-routine-effort.md) makes each run cheaper
   before you multiply it by a whole curriculum. Consider doing both first.
 - Skills: `/grilling`, `convex:convex-crons`, `convex:convex-expert`.
 - **Fog:** what happens when an overnight run fails halfway. Unattended work needs a failure
   story a human reads in the morning; not yet sharp enough to ticket.
 - **Out of scope:** opening this to ordinary owners — the whole point is that it is admin-gated.
+
+<!-- Moved 2026-09-01 from `course-authoring/05` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 11 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->

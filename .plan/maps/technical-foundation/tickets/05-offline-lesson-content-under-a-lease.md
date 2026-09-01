@@ -1,6 +1,6 @@
 ---
 type: grilling
-blocked_by: []
+blocked_by: [04]
 ---
 # Offline Lesson content, under a lease
 
@@ -9,7 +9,7 @@ blocked_by: []
 Should a learner be able to read Lessons with no connection - and if so, what makes a revoked
 Entitlement stop working on a device that is never online?
 
-Split out of [02](02-download-course-for-offline.md) on 2026-08-23, when the installable-app
+Split out of [02](../../reader-experience/tickets/02-download-course-for-offline.md) on 2026-08-23, when the installable-app
 grilling scoped offline down to lists only
 ([ADR 0030](../../../../docs/adr/0030-installable-per-tenant-app.md) §3). Lists were
 decided there and are not built yet either; content was not decided at all. This ticket is the
@@ -21,7 +21,7 @@ was that it puts *"a copy of paid content on a device an Entitlement revocation 
 authentication**, `Access-Control-Allow-Origin: *` and `max-age=31536000, immutable`. Every learner
 who has opened a Lesson already holds a permanent, revocation-proof, world-readable URL to it. So
 caching does not *introduce* the exposure - it makes it convenient. The exposure itself is
-[marketplace/12](../../marketplace/tickets/12-content-route-is-an-open-bearer-url.md).
+[marketplace/12](04-content-route-is-an-open-bearer-url.md).
 
 **2. Encryption is not the answer, and this was tested properly.** WebCrypto makes AES-GCM trivial,
 so the crypto is the easy part - and it buys nothing. The key must reach the device, the plaintext
@@ -50,5 +50,7 @@ around ten.
 The offline-content want is grilled into a decision - lease period and renewal, the Response and
 Progress queue's reconciliation rule, and its dependency on marketplace/12 settled - and either
 implementation tickets exist or the ticket is ruled out with the reason recorded.
+
+<!-- Moved 2026-09-01 from `reader-experience/05` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 05 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->
 
 ## Answer

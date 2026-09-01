@@ -122,6 +122,13 @@ optimisation, because there is no free tier to fall back into. See the new fog p
 `convex:convex-performance-audit`, `convex:convex-migration-helper`,
 `convex:convex-expert`, `/tdd`, `/ponytail`.
 
+- **Moved out 2026-09-01 to the [technical-foundation map](../technical-foundation/map.md)**, which now groups this repo’s scalability, refactoring and code-architecture work:
+  - `convex-cost/01` [Slim the translation row `listLessons` collects](../technical-foundation/tickets/01-slim-the-row-listlessons-collects.md), now **01** there.
+  
+    That was this map’s **only** ticket, so nothing is left here to work. The effort is not abandoned: its subject is now the read-amplification thread on the technical map, and the billing baseline table in this map’s Notes above is still the reference the moved ticket points back to. Do not mint a new 01 here.
+  
+    Renumbering was forced: `blocked_by` is map-local, and the numbers collided across the twelve donor maps. **Do not reuse the old numbers here**, they remain those tickets’ identity in this map’s history.
+
 ## Decisions so far
 
 <!-- the index of resolved tickets — empty until 01 lands an ## Answer. The pre-map

@@ -24,7 +24,7 @@ marketing demo** — each ending in an approach, lifecycle and format spec, not 
   rendered locally at build time; a prototype walked on 2026-08-06 renders HTML → mp4 with
   Playwright + ffmpeg on a developer machine, never in a Convex action. The map still holds,
   but on the shared *audience/format* question, not on a constraint two of the three share.
-- **Ticket 03's Mux choice is owed an ADR, and that is [ticket 04](tickets/04-adr-mux-as-the-video-rail.md)**
+- **Ticket 03's Mux choice is owed an ADR, and that is [ticket 04](../technical-foundation/tickets/15-adr-mux-as-the-video-rail.md)**
   — open as of 2026-08-18, and no Mux code exists on `main` yet (nothing under `src/` or
   `convex/` references it). The pointer lives here rather than in Decisions-so-far, which may
   only index resolved tickets.
@@ -53,7 +53,7 @@ marketing demo** — each ending in an approach, lifecycle and format spec, not 
   binds anything on this map that ends in a video file, and it closes the hosting half of
   [rich-media/01](../rich-media/tickets/01-video-and-audio-integration.md). It is **not yet
   provisioned** and it is owed an ADR —
-  [ticket 04](tickets/04-adr-mux-as-the-video-rail.md).
+  [ticket 04](../technical-foundation/tickets/15-adr-mux-as-the-video-rail.md).
 - **Staleness on 03 was priced and accepted** (2026-08-07). The guided-tour-over-the-real-app
   alternative lost on a hard blocker, not on cost alone: two of the demo's nine beats are
   third-party redirects (Google OAuth, PayFast) that cannot be driven unattended, so a "real"
@@ -64,6 +64,13 @@ marketing demo** — each ending in an approach, lifecycle and format spec, not 
   Same provider split, opposite direction — keep the seam.
 - Skills: `/grilling`, `/prototype` (a template-render spike is cheap and decisive),
   `html-demo-wizard`.
+
+- **Moved out 2026-09-01 to the [technical-foundation map](../technical-foundation/map.md)**, which now groups this repo’s scalability, refactoring and code-architecture work:
+  - `media-generation/04` [Record the ADR: Mux is the product-wide video rail](../technical-foundation/tickets/15-adr-mux-as-the-video-rail.md), now **15** there.
+  
+    Writing the ADR is decision-record work, and the decision it records reaches past this map (it also settles the hosting half of `rich-media/01`).
+  
+    Renumbering was forced: `blocked_by` is map-local, and the numbers collided across the twelve donor maps. **Do not reuse the old numbers here**, they remain those tickets’ identity in this map’s history.
 
 ## Decisions so far
 

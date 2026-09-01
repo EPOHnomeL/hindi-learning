@@ -32,6 +32,14 @@ foundation the rest of the studio can be built on.
   authoritative. ADR 0011's app→iframe theme bridge must not regress.
 - Skills: `/tdd`, `convex:convex-expert`, `vercel:shadcn` (ticket 04).
 
+- **Moved out 2026-09-01 to the [technical-foundation map](../technical-foundation/map.md)**, which now groups this repo’s scalability, refactoring and code-architecture work:
+  - `internal-course-studio/03` [Cost instrumentation (tokens per Routine run)](../technical-foundation/tickets/12-cost-instrumentation.md), now **12** there.
+  - `internal-course-studio/04` [Shadcn/ui foundation](../technical-foundation/tickets/03-shadcn-foundation.md), now **03** there.
+  
+    Both were infrastructure rather than studio product. The shadcn ticket picked up a real blocker in the move (the iframe/quiz question), and the cost-instrumentation ticket picked up a real dependent (off-peak generation cannot be priced without it). Neither edge was visible while they lived here.
+  
+    Renumbering was forced: `blocked_by` is map-local, and the numbers collided across the twelve donor maps. **Do not reuse the old numbers here**, they remain those tickets’ identity in this map’s history.
+
 ## Decisions so far
 
 <!-- one line per resolved ticket -->

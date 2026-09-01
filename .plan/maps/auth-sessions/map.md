@@ -14,7 +14,7 @@ recovers by themselves, and a signed-in learner stops being asked to sign in aga
 
 - **Two halves of one complaint, deliberately kept as separate tickets.**
   [Forgot-password flow](tickets/01-forgot-password-flow.md) is being able to sign in *at
-  all*; [Review session management](tickets/02-review-session-management.md) is not having to
+  all*; [Review session management](../technical-foundation/tickets/08-review-session-management.md) is not having to
   do it *so often*. They share the auth surface and nothing else — do not merge them.
 - **01 is a live, confirmed lockout, not a hypothetical.** A real user hit it on 2026-07-15;
   `convex/auth.ts` configures `Password()` with **no `reset` provider**, and the operator
@@ -33,6 +33,13 @@ recovers by themselves, and a signed-in learner stops being asked to sign in aga
   new infrastructure.
 - Skills: `convex:convex-setup-auth`, `convex:convex-expert`, `/tdd` (01),
   `/diagnose` (02 is reproduce-first, not a design ticket).
+
+- **Moved out 2026-09-01 to the [technical-foundation map](../technical-foundation/map.md)**, which now groups this repo’s scalability, refactoring and code-architecture work:
+  - `auth-sessions/02` [Review session management](../technical-foundation/tickets/08-review-session-management.md), now **08** there.
+  
+    The complaint that opened it is a user-facing one, but everything it has to decide is session architecture. [01](tickets/01-forgot-password-flow.md) stays here and is unaffected.
+  
+    Renumbering was forced: `blocked_by` is map-local, and the numbers collided across the twelve donor maps. **Do not reuse the old numbers here**, they remain those tickets’ identity in this map’s history.
 
 ## Decisions so far
 

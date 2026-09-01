@@ -98,7 +98,7 @@ nominated payee user.
    "hand-authored as a React component and registered here… no DB, nothing
    runtime-editable". A rate constant obeys the same rule. Accepted cost: it goes
    stale if nobody watches it — hence the follow-up ticket
-   [Live USD→ZAR rate](05-live-usd-zar-rate.md).
+   [Live USD→ZAR rate](../../technical-foundation/tickets/13-live-usd-zar-rate.md).
 
 ### The donor is a Guest
 

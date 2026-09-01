@@ -81,7 +81,7 @@ The who-funds-authoring fork is closed and the model-provider strategy is settle
 
 - **Deliberately deferred, not stalled.** The owner is monitoring real authoring cost before
   committing. The blocking data is per-run token instrumentation —
-  [Cost instrumentation](../../internal-course-studio/tickets/03-cost-instrumentation.md).
+  [Cost instrumentation](../../technical-foundation/tickets/12-cost-instrumentation.md).
   Take that first; this cannot honestly resolve without it.
 - **The cost is spent up front on a course that may never sell:** ADR 0016 requires a paid
   course to be fully authored *before* it is listed.

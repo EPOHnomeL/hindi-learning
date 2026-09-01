@@ -19,7 +19,7 @@ either backfilled or knowingly left alone.
   the PWA groundwork, the routing scheme (ADR 0012), and the reference-card anchor contract.
 - **Measure before building — this applies to three of the four.**
   [Progress](tickets/01-progress-feature.md) is most likely half-built already;
-  [Backfill existing References](tickets/04-backfill-existing-references.md) may correctly
+  [Backfill existing References](../technical-foundation/tickets/06-backfill-existing-references.md) may correctly
   resolve as *don't* (References are mutable and may self-heal by being re-authored); and
   [Download for offline](tickets/02-download-course-for-offline.md) has to start by
   re-establishing its own premise — see the next note.
@@ -45,9 +45,9 @@ either backfilled or knowingly left alone.
   serves Lesson bodies with **no authentication**, `Access-Control-Allow-Origin: *` and
   `max-age=31536000, immutable`, so that copy is reachable today by anyone holding the URL.
   Caching would only make it convenient. The exposure is now
-  [marketplace/12](../marketplace/tickets/12-content-route-is-an-open-bearer-url.md); the thing
+  [marketplace/12](../technical-foundation/tickets/04-content-route-is-an-open-bearer-url.md); the thing
   that would actually make offline content revocable is a **time-boxed lease**, in
-  [ticket 05](tickets/05-offline-lesson-content-under-a-lease.md). Immutable Lessons (ADR 0003)
+  [ticket 05](../technical-foundation/tickets/05-offline-lesson-content-under-a-lease.md). Immutable Lessons (ADR 0003)
   still mean cached content cannot go stale underneath a learner.
 - **The routing ticket's interesting half is security, not the 404:** "doesn't exist" and "you
   can't see it" must be *identical* responses, so the routing layer never leaks what the data
@@ -57,6 +57,14 @@ either backfilled or knowingly left alone.
 - Skills: `/ponytail` (three of the four may shrink to nothing), `/tdd`,
   `convex:convex-expert`, `convex:convex-migration-helper` (04, only if a migration is
   warranted), `vercel:nextjs` (App Router `not-found` conventions).
+
+- **Moved out 2026-09-01 to the [technical-foundation map](../technical-foundation/map.md)**, which now groups this repo’s scalability, refactoring and code-architecture work:
+  - `reader-experience/04` [Backfill anchor ids into existing References](../technical-foundation/tickets/06-backfill-existing-references.md), now **06** there.
+  - `reader-experience/05` [Offline Lesson content, under a lease](../technical-foundation/tickets/05-offline-lesson-content-under-a-lease.md), now **05** there.
+  
+    Ticket 06 also had a stale dependency line corrected in the move: it claimed to depend on "01, card anchor contract", which was a GitHub issue number the 2026-07-30 migration carried in. It was never this map’s 01 (the Progress feature), and its `blocked_by` was correctly empty all along.
+  
+    Renumbering was forced: `blocked_by` is map-local, and the numbers collided across the twelve donor maps. **Do not reuse the old numbers here**, they remain those tickets’ identity in this map’s history.
 
 ## Decisions so far
 

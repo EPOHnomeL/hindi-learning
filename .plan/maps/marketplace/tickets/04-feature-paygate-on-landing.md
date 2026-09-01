@@ -61,7 +61,7 @@ The 2026-07-10 and 2026-07-12 comments below are both superseded. Re-verified on
 - **It is PayFast, not Stripe Connect, and the platform is the merchant** — not the Seller as
   merchant of record. There is no `convex/stripe.ts`. ADR 0016's rail is not what shipped, which
   is exactly why
-  [Supersede ADR 0016 — the money model that actually shipped](09-adr-superseding-0016-payfast-merchant-model.md)
+  [Supersede ADR 0016 — the money model that actually shipped](../../technical-foundation/tickets/14-adr-superseding-0016-payfast-merchant-model.md)
   exists and is still open.
 - **A second rail exists that this ticket never knew about:** manual EFT bank transfer
   (ADR 0026), with `fee: 0` and `net == gross`. Any pricing section that names one payment

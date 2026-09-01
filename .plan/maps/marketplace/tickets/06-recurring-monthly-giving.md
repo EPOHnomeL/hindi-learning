@@ -40,7 +40,7 @@ What needs deciding:
   exceptional. Retry, notify, silently lapse? This is the case that generates real
   support mail.
 - **The USD-typed amount over time.** The pledge is $25/month but the charge is Rand
-  from a constant that will move ([Live USD→ZAR rate](05-live-usd-zar-rate.md)). Is
+  from a constant that will move ([Live USD→ZAR rate](../../technical-foundation/tickets/13-live-usd-zar-rate.md)). Is
   the Rand figure frozen at pledge time forever, or re-derived each month — so the
   donor's statement changes without them doing anything? Neither is obviously right,
   and the donor must be told which.

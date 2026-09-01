@@ -174,9 +174,9 @@ The remaining items — lean materialiseTopic digest, source-cache reuse, curric
   teaches worse is a regression, not a win.
 - Relates to ADR 0009 (Convex is source of truth) and ADR 0010 (swappable compute).
 - Measurement overlaps
-  [Cost instrumentation](../../internal-course-studio/tickets/03-cost-instrumentation.md) —
+  [Cost instrumentation](../../technical-foundation/tickets/12-cost-instrumentation.md) —
   that ticket builds the per-run token recording this one wants to measure against. Do it
   first if the numbers aren't available.
 - Skills: `/ponytail` (the point is *less* work per run), `convex:convex-expert`.
 - **Out of scope:** changing the teaching loop's shape (ADR 0001) or the buffer-of-one gate —
-  that's [Off-peak course generation](05-off-peak-course-generation.md).
+  that's [Off-peak course generation](../../technical-foundation/tickets/11-off-peak-course-generation.md).
