@@ -57,22 +57,47 @@ its comment is explicit that "an owner sees their own progress; a Viewer sees th
 
 ## Todo
 
-- [ ] Add the Dashboard tab to the shell ticket 19 ships, with its icon: none of the
+- [x] Add the Dashboard tab to the shell ticket 19 ships, with its icon: none of the
       existing `icons.tsx` paths fits, so add one (SVG, never emoji), same stroke
       style as the rest.
-- [ ] Render the five original stats from queries that already exist where possible;
+- [x] Render the five original stats from queries that already exist where possible;
       a new query needs the owner check server-side.
-- [ ] Users per language: one count per Edition, from one course-wide query rather
+- [x] Users per language: one count per Edition, from one course-wide query rather
       than one query per Edition.
-- [ ] Progress buckets across all Editions' readers, with the bucket edges chosen
+- [x] Progress buckets across all Editions' readers, with the bucket edges chosen
       here and the choice recorded in the Answer.
-- [ ] Leave room in the layout for 25's payout panel and 26's editor table; do not
+- [x] Leave room in the layout for 25's payout panel and 26's editor table; do not
       build either here.
-- [ ] Read-only. No control lives here; each stat may link to the tab that owns it.
-- [ ] Copy through the message namespaces, no hardcoded English.
-- [ ] Read the `dataviz` skill before writing any chart or bucket meter.
-- [ ] `pnpm typecheck` green.
+- [x] Read-only. No control lives here; each stat may link to the tab that owns it.
+- [x] Copy through the message namespaces, no hardcoded English.
+- [x] Read the `dataviz` skill before writing any chart or bucket meter.
+- [x] `pnpm typecheck` green.
 - [ ] Walk it in a browser at phone width.
+
+### Where it stands (2026-09-01)
+
+Built and committed: `19c05b3` (the query and its tests), `0500c03` (the tab).
+The first box was already satisfied when this session opened, and its claim is
+stale: ticket 19 wired the Dashboard peer into the `tabs` array and added the
+`chart` icon (`src/app/_components/icons.tsx:129`) on 2026-08-27, so there was no
+icon to add. Only the placeholder in the `main` block was left to replace.
+`pnpm typecheck` clean, 995 tests pass. **The browser walk has NOT happened**,
+which is why this ticket is still claimed and has no Answer: nothing was
+listening on port 3000 in the build session, and the manage route needs a
+signed-in owner, so no walk was reachable. Reading the code is not the claim
+this ticket's Done-when asks for.
+
+To finish it: `pnpm dev`, open `/courses/<slug>/manage` at 360px, press the
+Dashboard tab, and react to the bucket edges (below). Then the Answer lands.
+
+**The bucket edges chosen, which are the thing to react to.** Seven buckets, not
+the ten-of-10% the Question sketched: `0` exact, `1-20`, `20-40`, `40-60`,
+`60-80`, `80-99`, `100` exact. 0% and 100% are the two rungs an owner acts on,
+so neither is diluted by a neighbour merely near it, and seven rows read at
+360px where twelve do not. 100% compares lesson COUNTS, never a rounded
+percentage, so 99.6% cannot present as finished in the bucket Certificates are
+minted from. They live in `PROGRESS_BUCKETS` in `convex/dashboard.ts`.
+
 
 ## Done when
 
