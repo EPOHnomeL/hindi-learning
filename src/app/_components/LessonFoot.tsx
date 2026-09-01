@@ -3,7 +3,9 @@
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 
-// The end-of-lesson Next card, mobile only (mobile bottom nav, 2026-08-23).
+// The end-of-lesson Next card, at every breakpoint. It was mobile only from the
+// mobile bottom nav of 2026-08-23 until 2026-09-01, when the separate desktop
+// "Mark complete" button was retired and advancing became the one way forward.
 // Rendered at the foot of the lesson body, which is where a reader who just
 // finished actually is, and shared by the authed reader (ArtifactView) and the
 // Guest reader (PublicReader). Before it existed the only next-lesson link was
@@ -30,7 +32,7 @@ export function LessonFootCard({
 
   if (!next) {
     return (
-      <div className="px-3 pb-1 pt-4 md:hidden">
+      <div className="px-3 pb-1 pt-4">
         <div className="rounded-2xl border border-dashed border-line px-4 py-5 text-center">
           <p className="text-sm font-semibold text-accent">{t("lastLessonTitle")}</p>
           <p className="mt-1 text-xs text-soft">{t("lastLessonBody")}</p>
@@ -40,13 +42,13 @@ export function LessonFootCard({
   }
 
   return (
-    <div className="px-3 pb-1 pt-4 md:hidden">
+    <div className="px-3 pb-1 pt-4">
       <Link
         href={next.href}
         onClick={() => {
           if (!completed) onAdvance();
         }}
-        className="flex items-center gap-3 rounded-2xl border border-accent bg-hi/40 px-4 py-4 active:bg-hi"
+        className="flex items-center gap-3 rounded-2xl border border-accent bg-hi/40 px-4 py-4 transition-colors hover:bg-hi active:bg-hi"
       >
         <span className="min-w-0 flex-1">
           <span className="block text-[10px] font-bold uppercase tracking-widest text-accent2">

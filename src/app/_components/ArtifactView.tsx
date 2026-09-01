@@ -525,33 +525,20 @@ function LessonView({
             {/* No certificate pill here: Home carries the certificate on every
                 card kind (mobile-reader-todos 01), and on a phone this bar has
                 no room for anything beside the title. */}
-            {/* Mark complete writes the caller's own Progress — owner or Viewer.
-                A `preview` caller holds no Progress, so it's hidden for them. On
-                the last lesson of a COMPLETED course the click is what makes the
-                certificate claimable, so the label says "Finish course"; on an
-                active course's Frontier it stays "Mark complete", since another
-                lesson may be drafted tomorrow (mobile-reader-todos 02). */}
-            {!preview && (
-              <button
-                onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
-                disabled={completed}
-                className={`hidden md:inline-flex rounded-lg border px-3 py-1.5 text-sm transition-colors ${
-                  completed
-                    ? "cursor-default border-accent2 bg-accent2 text-white"
-                    : "border-accent text-accent hover:bg-hi"
-                }`}
-              >
-                {completed
-                  ? t("completed")
-                  : courseCompleted && !nextLessonKey
-                    ? t("finishCourse")
-                    : t("markComplete")}
-              </button>
-            )}
-            {/* A Viewer also gets plain navigation to the next lesson. */}
+            {/* No standing "Mark complete" button at any breakpoint (2026-09-01).
+                Advancing IS completing: the end-of-lesson card below now renders
+                on desktop too and ticks the lesson it leaves, so a second control
+                that only ticked was a duplicate of half of it. Completion on the
+                last lesson, where there is nothing to advance to, is the FAB at
+                the foot of this component. */}
+            {/* A Viewer also gets plain navigation to the next lesson, which
+                ticks this one like every other way forward does. */}
             {readOnly && nextLessonKey && (
               <Link
                 href={withLang(`/courses/${topicSlug}/lessons/${nextLessonKey}`, lang)}
+                onClick={() => {
+                  if (!preview && !completed) void setProgress({ topicSlug, lessonKey, status: "completed" });
+                }}
                 className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90"
               >
                 {t("nextLesson")}
@@ -635,16 +622,21 @@ function LessonView({
           <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} readOnly={readOnly} />
         </aside>
       )}
-      {/* Mobile "Mark complete" FAB. Retired wherever the end-of-lesson card can
-          do its job (any lesson with a next lesson); it survives only on the
-          last lesson and the Frontier, lifted clear of the app tab bar. On the
-          last lesson of a COMPLETED course it reads "Finish course": that tap
-          is what makes the certificate claimable (mobile-reader-todos 02). */}
+      {/* The "Mark complete" FAB, now at every breakpoint (2026-09-01, when the
+          top-bar button went). Retired wherever the end-of-lesson card can do
+          its job (any lesson with a next lesson); it survives only on the last
+          lesson and the Frontier, lifted clear of the app tab bar. That is the
+          one place advancing cannot tick the lesson, because there is nothing to
+          advance to. On the last lesson of a COMPLETED course it reads "Finish
+          course": that tap is what makes the certificate claimable
+          (mobile-reader-todos 02). */}
       {!preview && !completed && !nextLessonKey && (
         <button
           onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
-          className={`fixed bottom-[6.25rem] right-6 z-30 md:hidden flex items-center gap-1.5 rounded-full shadow-lg bg-good-b hover:bg-good-b/90 text-white px-4 py-3 text-sm font-semibold transition-all duration-300 transform ${
-            navHidden ? "translate-y-24 opacity-0 pointer-events-none" : "translate-y-0 opacity-100"
+          className={`fixed bottom-[6.25rem] right-6 z-30 flex items-center gap-1.5 rounded-full shadow-lg bg-good-b hover:bg-good-b/90 text-white px-4 py-3 text-sm font-semibold transition-all duration-300 transform md:bottom-8 ${
+            navHidden
+              ? "translate-y-24 opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto"
+              : "translate-y-0 opacity-100"
           }`}
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
