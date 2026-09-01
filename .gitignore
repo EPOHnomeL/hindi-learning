@@ -67,3 +67,8 @@ HANDOFF*.md
 # regenerable from the HTML page in one command, so the page is the source of
 # record, not the .mp4.
 /.tmp/
+
+# Edition working copies (scripts/edition.ts pull). A local checkout of what the
+# Hub already holds, one pull away from being regenerated, and often a whole
+# course of HTML. The Hub is the source of truth (ADR 0009), not this directory.
+/editions/

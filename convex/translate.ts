@@ -1171,6 +1171,28 @@ export const editions = query({
 // carries no tokens/PII. Returns inline `html` directly and a signed `url` for a
 // blob-backed body, so the correction CLI can pull an Edition to disk, fix the
 // text, and republish through `publishTranslation`. Null if the Topic is missing.
+// The registered email of a Topic's owner, for the admin scripts that must pass
+// `ownerEmail` into `publishTranslation`. That argument is easy to get wrong and
+// expensive when you do: it is the email of whoever OWNS the Topic, not of whoever
+// runs the script and not necessarily `OWNER_EMAIL` from .env.local (which belongs
+// to whichever Topic the Routine last claimed). `publishTranslation` resolves by
+// (owner, slug) and throws "topic not found" on a mismatch, and Convex REDACTS
+// thrown messages in production, so a wrong guess surfaces only as an opaque
+// "Server Error". Two such guesses cost a round-trip each during the Devanagari
+// conversion on 2026-08-04; `scripts/edition.ts` resolves it here once, at pull
+// time, and records it in the workspace manifest instead.
+export const topicOwnerEmail = query({
+  args: { secret: v.string(), topicSlug: v.string() },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, { secret, topicSlug }) => {
+    assertAdmin(secret);
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic?.ownerId) return null;
+    const owner = await ctx.db.get(topic.ownerId);
+    return owner?.email ?? null;
+  },
+});
+
 export const readEditionBodies = query({
   args: { secret: v.string(), topicSlug: v.string(), lang: v.string() },
   returns: v.union(
