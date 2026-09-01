@@ -16,27 +16,43 @@ import Link from "next/link";
 // ("Complete and continue") rather than doing it silently: Progress gates
 // certificate eligibility and feeds the authoring Routine, so lessons ticked by
 // a reader who only tapped past would read as a bug. One tap, two effects,
-// both named. `next` null means the last published lesson: a dashed
-// nothing-further card, deliberately neutral wording because on an active
-// course this is the Frontier, not the end.
+// both named.
+//
+// `next` null means the last published lesson. It used to render a dashed
+// "That's the last lesson" card and the completion control floated above it as a
+// FAB; both went on 2026-09-01. The card said nothing a reader who had just run
+// out of lessons didn't already know, and the FAB ate a corner of every screen of
+// the last lesson to say it. What is left is `finish`: the completion action
+// itself, inline, found by scrolling to the foot of the page like every other
+// way forward in this reader. No `finish` (already complete, or a Guest) → the
+// end of the lesson is simply the end of the page.
 export function LessonFootCard({
   next,
   completed,
   onAdvance,
+  finish,
 }: {
   next: { href: string; seq: number; title: string } | null;
   completed: boolean;
   onAdvance: () => void;
+  finish?: { label: string; onClick: () => void } | null;
 }) {
   const t = useTranslations("Artifact");
 
   if (!next) {
+    if (!finish) return null;
     return (
       <div className="px-3 pb-1 pt-4">
-        <div className="rounded-2xl border border-dashed border-line px-4 py-5 text-center">
-          <p className="text-sm font-semibold text-accent">{t("lastLessonTitle")}</p>
-          <p className="mt-1 text-xs text-soft">{t("lastLessonBody")}</p>
-        </div>
+        <button
+          type="button"
+          onClick={finish.onClick}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-good-b px-4 py-4 text-sm font-semibold text-white transition-colors hover:bg-good-b/90"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span>{finish.label}</span>
+        </button>
       </div>
     );
   }

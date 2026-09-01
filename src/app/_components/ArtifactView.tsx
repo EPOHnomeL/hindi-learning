@@ -529,8 +529,8 @@ function LessonView({
                 Advancing IS completing: the end-of-lesson card below now renders
                 on desktop too and ticks the lesson it leaves, so a second control
                 that only ticked was a duplicate of half of it. Completion on the
-                last lesson, where there is nothing to advance to, is the FAB at
-                the foot of this component. */}
+                last lesson, where there is nothing to advance to, is that same
+                end-of-lesson card's `finish` button. */}
             {/* A Viewer also gets plain navigation to the next lesson, which
                 ticks this one like every other way forward does. */}
             {readOnly && nextLessonKey && (
@@ -586,10 +586,17 @@ function LessonView({
             }
           />
         )}
-        {/* The end-of-lesson Next card (mobile): the reader's forward
-            navigation, which also marks this lesson complete on advance. Waits
-            for the lessons list so a loading beat never renders as a false
-            "last lesson" card. */}
+        {/* The end-of-lesson card: the reader's forward navigation, which also
+            marks this lesson complete on advance. Waits for the lessons list so a
+            loading beat never renders the last-lesson branch by mistake.
+
+            On the last lesson there is nothing to advance to, so the card
+            carries the completion action itself (`finish`), inline, at the foot
+            of the page. It used to be a floating FAB over a dashed "last lesson"
+            card; both went on 2026-09-01 for eating screen on every last lesson
+            to say what running out of lessons already says. On a COMPLETED
+            course it reads "Finish course": that tap is what makes the
+            certificate claimable (mobile-reader-todos 02). */}
         {!preview && lessons && (
           <LessonFootCard
             next={
@@ -603,6 +610,14 @@ function LessonView({
             }
             completed={completed}
             onAdvance={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
+            finish={
+              completed
+                ? null
+                : {
+                    label: courseCompleted ? t("finishCourse") : t("markComplete"),
+                    onClick: () => void setProgress({ topicSlug, lessonKey, status: "completed" }),
+                  }
+            }
           />
         )}
         {/* Mobile: ask + answers inline right under the lesson — reliably reached by
@@ -621,29 +636,6 @@ function LessonView({
         <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
           <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} readOnly={readOnly} />
         </aside>
-      )}
-      {/* The "Mark complete" FAB, now at every breakpoint (2026-09-01, when the
-          top-bar button went). Retired wherever the end-of-lesson card can do
-          its job (any lesson with a next lesson); it survives only on the last
-          lesson and the Frontier, lifted clear of the app tab bar. That is the
-          one place advancing cannot tick the lesson, because there is nothing to
-          advance to. On the last lesson of a COMPLETED course it reads "Finish
-          course": that tap is what makes the certificate claimable
-          (mobile-reader-todos 02). */}
-      {!preview && !completed && !nextLessonKey && (
-        <button
-          onClick={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
-          className={`fixed bottom-[6.25rem] right-6 z-30 flex items-center gap-1.5 rounded-full shadow-lg bg-good-b hover:bg-good-b/90 text-white px-4 py-3 text-sm font-semibold transition-all duration-300 transform md:bottom-8 ${
-            navHidden
-              ? "translate-y-24 opacity-0 pointer-events-none md:translate-y-0 md:opacity-100 md:pointer-events-auto"
-              : "translate-y-0 opacity-100"
-          }`}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          <span>{courseCompleted ? t("finishCourse") : t("markComplete")}</span>
-        </button>
       )}
     </div>
   );
