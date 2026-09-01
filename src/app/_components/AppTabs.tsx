@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
 import { Icon } from "./icons";
+import { useHideOnScroll } from "./useHideOnScroll";
 
 // The app-level bottom tab bar, mobile only: Home, Course (the resume point),
 // Settings, plus Admin for an admin. Mounted in the root layout so it is present
@@ -29,6 +30,7 @@ const TITLE_SEP = String.fromCharCode(8212);
 function Tabs() {
   const t = useTranslations("Tabs");
   const pathname = usePathname() ?? "/";
+  const navHidden = useHideOnScroll();
 
   const scope = useQuery(api.whitelist.myAdminScope);
   const isAdmin = !!scope && scope.role !== "none";
@@ -42,6 +44,12 @@ function Tabs() {
   const lessons = useQuery(api.content.reader.listLessons, last ? { topicSlug: last.topicSlug } : "skip");
   const lesson = last ? lessons?.find((l) => l.key === last.lessonKey) : undefined;
 
+  // `onCourse` also gates the auto-hide below: scrolling down inside a course
+  // tucks this bar away with the reader's own top bar (useHideOnScroll), and
+  // scrolling up brings both back. On a phone the bar is a fixed 4.75rem, a tenth
+  // of the screen spent on navigation while somebody is reading a lesson they
+  // scrolled to on purpose. Only in the reader. Everywhere else (Home, Settings,
+  // admin) the bar is the way around the app and stays put.
   const onCourse = pathname.startsWith("/courses/");
   const onAdmin = pathname.startsWith("/admin");
   const onSettings = pathname.startsWith("/settings");
@@ -79,9 +87,9 @@ function Tabs() {
       )}
 
       <nav
-        className={`fixed inset-x-0 bottom-0 z-50 grid h-[4.75rem] border-t border-line bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden ${
+        className={`fixed inset-x-0 bottom-0 z-50 grid h-[4.75rem] border-t border-line bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur transition-transform duration-300 md:hidden ${
           isAdmin ? "grid-cols-4" : "grid-cols-3"
-        }`}
+        } ${navHidden && onCourse ? "translate-y-full" : "translate-y-0"}`}
       >
         <Tab href="/" active={onHome} label={t("home")} icon={<HomeIcon />} />
         {/* "Course", not "Continue": the other tabs are places, so a verb here
