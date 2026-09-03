@@ -79,3 +79,5 @@ HANDOFF*.md
 /.posthog-wizard-cache/
 /.claude/skills/integration-nextjs-app-router/
 /posthog-self-driving-report.md
+
+resources/
