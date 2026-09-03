@@ -10,9 +10,18 @@ import { offeredLocale, type Locale } from "./config";
 // paints Hindi chrome, and the middleware persists it as the device's app-language
 // exactly as a sniff or a pick would.
 //
-// Deliberately first-touch only (see the middleware): this widens what a *first*
-// visit resolves to and never overrides a locale the visitor or their browser has
-// already established.
+// Scope, widened 2026-09-03 (it was first-touch only until then, which meant any
+// device that had ever resolved a locale opened a Hindi link in English chrome,
+// including every owner testing their own links): the Edition language now wins on
+// EVERY request under `/share/<token>`, stored cookie or not. It is applied by
+// stamping the forwarded `Cookie` header for that request only, and persisted to
+// the device (`Set-Cookie`) just on a first touch as before, so reading one Hindi
+// link never rewrites the app-language the visitor chose for the rest of the site.
+//
+// The Guest reader carries no app-language picker, so there is no pick under these
+// paths for the override to fight; if one is ever added there, it needs the
+// provenance this deliberately does without (the cookie records a value, not who
+// wrote it).
 
 // The Public-link token in a request path, or null when this isn't a Guest reader
 // URL. The Guest reader is `src/app/share/[token]` — `/share/<token>` plus
@@ -40,4 +49,26 @@ export async function shareEditionLocale(token: string): Promise<Locale | null> 
   } catch {
     return null;
   }
+}
+
+// The per-device memo of the last token to locale lookup. Without it the override
+// above would re-run `publicEditionLang` in the middleware on every page a Guest
+// turns, serially ahead of the response. The old first-touch policy paid for one
+// lookup because the locale cookie it wrote ended the question. Keyed by token, so
+// a regenerated link re-reads; a browser-session cookie (no max-age), so nothing
+// about a stale Edition language can outlive the visit.
+export const SHARE_LOCALE_COOKIE = "hindi_share_lang";
+
+export function shareLocaleMemo(token: string, locale: Locale): string {
+  return `${encodeURIComponent(token)}:${locale}`;
+}
+
+// The memoed locale for `token`, or null when the memo is absent, malformed, for a
+// different token, or for a code we no longer ship chrome for.
+export function readShareLocaleMemo(value: string | undefined | null, token: string): Locale | null {
+  if (!value) return null;
+  const cut = value.lastIndexOf(":");
+  if (cut < 0) return null;
+  if (value.slice(0, cut) !== encodeURIComponent(token)) return null;
+  return offeredLocale(value.slice(cut + 1));
 }

@@ -50,3 +50,19 @@ export function resolveLocale(value: string | undefined | null): Locale {
 export function offeredLocale(value: string | undefined | null): Locale | null {
   return value && (LOCALES as readonly string[]).includes(value) ? (value as Locale) : null;
 }
+
+// Rewrite a forwarded `Cookie` header so `getRequestConfig` sees `locale` for THIS
+// request. Cookie-writer #3 (the middleware) stamps the header as well as setting
+// the cookie, so a derived language paints on the first response with no flash.
+//
+// Any existing pair for the locale cookie is dropped rather than appended after:
+// a header carrying the name twice is ambiguous, and `cookies()` reads the FIRST
+// occurrence, so appending would be silently ignored whenever the stamp is an
+// override of a stored value (which a Public link now is, 2026-09-03).
+export function withLocaleCookie(header: string | null | undefined, locale: Locale): string {
+  const kept = (header ?? "")
+    .split(";")
+    .map((pair) => pair.trim())
+    .filter((pair) => pair !== "" && pair.split("=")[0]?.trim() !== LOCALE_COOKIE);
+  return [...kept, `${LOCALE_COOKIE}=${locale}`].join("; ");
+}

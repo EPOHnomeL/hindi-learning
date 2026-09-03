@@ -6,7 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const fetchQuery = vi.hoisted(() => vi.fn());
 vi.mock("convex/nextjs", () => ({ fetchQuery }));
 
-const { shareEditionLocale, shareTokenFromPath } = await import("./shareLocale");
+const { readShareLocaleMemo, shareEditionLocale, shareLocaleMemo, shareTokenFromPath } =
+  await import("./shareLocale");
 
 describe("shareTokenFromPath", () => {
   it("reads the token off the Guest reader's URLs", () => {
@@ -63,5 +64,36 @@ describe("shareEditionLocale", () => {
       throw new Error("convex down");
     });
     await expect(shareEditionLocale("tok")).resolves.toBeNull();
+  });
+});
+
+// The memo is what keeps the 2026-09-03 per-request override from re-reading
+// `publicEditionLang` on every page a Guest turns. It is a cache, so every doubt
+// about it (wrong token, junk value, a code we dropped chrome for) has to read as
+// a miss and send the caller back to Convex.
+describe("share locale memo", () => {
+  it("round-trips a token and its locale", () => {
+    expect(readShareLocaleMemo(shareLocaleMemo("tok123", "hi"), "tok123")).toBe("hi");
+  });
+
+  it("misses for a different token, so a regenerated link is re-read", () => {
+    expect(readShareLocaleMemo(shareLocaleMemo("tok123", "hi"), "tok999")).toBeNull();
+  });
+
+  it("misses on an absent or malformed memo", () => {
+    expect(readShareLocaleMemo(undefined, "tok")).toBeNull();
+    expect(readShareLocaleMemo("", "tok")).toBeNull();
+    expect(readShareLocaleMemo("tok", "tok")).toBeNull();
+  });
+
+  it("misses when the memoed code is not an offered chrome locale", () => {
+    // A device that memoised Telugu before the offer-set changed under it.
+    expect(readShareLocaleMemo("tok:te", "tok")).toBeNull();
+  });
+
+  it("survives a token with cookie-hostile characters", () => {
+    const memo = shareLocaleMemo("a/b:c", "fr");
+    expect(memo).not.toContain("/");
+    expect(readShareLocaleMemo(memo, "a/b:c")).toBe("fr");
   });
 });
