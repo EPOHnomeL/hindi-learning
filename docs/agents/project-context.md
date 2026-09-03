@@ -124,6 +124,60 @@ Gotchas:
   Convex deploy (tests run in edge-runtime). Pinned `@t3-oss/env@0.11.1` +
   `zod@3.25` for compat.
 
+## Analytics: PostHog (wired 2026-09-03)
+
+**ADR 0030 line 132 says "PostHog is not wired". That was true when written and
+is stale from 2026-09-03.** The ADR stands as the record of what was decided;
+this section is the current state.
+
+- **EU Cloud, project `264778`.** Ingestion host is `https://eu.i.posthog.com`
+  (the `i.` host is ingestion, `eu.posthog.com` is the UI). The project token and
+  the host are a **matched pair per region**: a EU token against the US host is
+  rejected, not rerouted.
+- **Browser only.** `posthog-js` in `package.json`; there is no server SDK and no
+  server-side capture. The singleton is initialised by `initializePostHog()` in
+  `src/app/PostHogClient.tsx`, mounted from `src/app/layout.tsx`.
+- **Two client env vars**, both `.optional()` in `env.js`:
+  `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` and `NEXT_PUBLIC_POSTHOG_HOST`.
+  - **A missing value is a silent no-op in production.** Optional in the schema
+    means the build stays green, and `PostHogClient.tsx` only throws when
+    `NODE_ENV === "development"`; in production it just returns `false`. So a
+    misconfigured deploy captures nothing and reports nothing. There is no alarm
+    to wait for, check the PostHog inbox.
+  - **`NEXT_PUBLIC_*` is inlined at build time, not read at runtime.** Both must
+    exist in Vercel *before* the build, on Production and Preview, and an env-var
+    change only takes effect on a **fresh deploy**: the old bundle keeps the old
+    baked-in value.
+- **Identity is the Convex user document ID** (immutable), read via `users.me` in
+  `convex/users.ts` and passed to `posthog.identify` in
+  `src/app/ConvexClientProvider.tsx`. Email and name are person properties only,
+  never event properties. **`posthog.reset()` runs before Convex sign-out** at all
+  three sign-out sites: `Dashboard.tsx`, `CourseShell.tsx`, `SettingsPage.tsx`.
+  Keep that ordering if you add a fourth, or the next visitor inherits the
+  previous person.
+- **Eight events**, all non-PII properties: `auth_password_submitted`,
+  `auth_google_started` (`SignIn.tsx`), `access_code_join_submitted`
+  (`JoinPanel.tsx`), `voucher_redeemed` (`RedeemPanel.tsx`),
+  `checkout_card_started`, `checkout_eft_started` (`CheckoutPage.tsx`),
+  `quiz_answered`, `lesson_completed` (`ArtifactView.tsx`). The two auth events
+  and the join event are deliberately **personless**: identity doesn't exist yet
+  at those boundaries.
+- **Error tracking:** `capture_exceptions: true` on init, plus the App Router
+  boundary `src/app/global-error.tsx` calling `captureException`.
+- **Session Replay is on and recording** (enabled PostHog-side, not in code).
+  Learner sessions are being recorded; if `/privacy` doesn't say so, it should.
+- **Self-driving was switched on 2026-09-03**: four scouts, error/health/support
+  signal sources, inbox at
+  <https://eu.posthog.com/project/264778/inbox>. It can open PRs at $15 flat each,
+  capped by a monthly limit in the PostHog sidebar. **PostHog's UI is the source of
+  truth for all of that**, not this file, so don't transcribe the scout roster here,
+  it drifts.
+- **The wizard (`npx @posthog/wizard`) leaves scratch behind.** `.posthog-wizard-cache/`,
+  `.claude/skills/integration-nextjs-app-router/` and
+  `posthog-self-driving-report.md` are all gitignored; commit `9f482c9` committed
+  the 69-file cache by accident and `d822c24` removed it. Rerunning the wizard
+  regenerates any of them.
+
 ## Payments — PayFast rail
 
 - **Gateway is PayFast (South Africa)**, a full replacement of the earlier Stripe
