@@ -825,8 +825,13 @@ html[data-theme="dark"] .cert-card--showcase {
 
 /* The installed app's own launch screen (PwaSplash). Absent from a browser tab
    entirely: the display-mode query is what gates it, so no JS runs to decide
-   and no frame of it ever shows on the web. Inside an installed app it paints
-   with the document and is removed by the inline script a beat after load. */
+   and no frame of it ever shows on the web.
+
+   The dismissal is an animation, not a script. Nothing may detach or mutate
+   this node: it belongs to React (root layout), and removing it broke client
+   navigation outright on 2026-09-03. `forwards` parks it invisible and
+   untappable, still in the DOM, and it only ever runs once because a soft
+   navigation never remounts the element. */
 #pwa-splash {
   display: none;
 }
@@ -842,11 +847,7 @@ html[data-theme="dark"] .cert-card--showcase {
     justify-content: center;
     gap: 1rem;
     background: var(--color-paper);
-    transition: opacity 400ms ease-out;
-  }
-  #pwa-splash.is-gone {
-    opacity: 0;
-    pointer-events: none;
+    animation: pwa-splash-out 400ms ease-out 1400ms forwards;
   }
   /* The mark sits slightly above centre, the way an OS splash does, so the
      attribution at the foot doesn't read as crowding it. */
@@ -861,7 +862,7 @@ html[data-theme="dark"] .cert-card--showcase {
     letter-spacing: -0.01em;
     color: var(--color-accent);
   }
-  /* Same slot rule as <Brand>: tenant logos run from ~1:1 stacked to ~7:1
+  /* Same slot rule as <Brand>: tenant marks run from ~1:1 stacked to ~7:1
      banner, so cap both axes and contain rather than fixing a height. */
   #pwa-splash-mark img {
     max-height: 6rem;
@@ -874,11 +875,26 @@ html[data-theme="dark"] .cert-card--showcase {
     font-size: 0.8125rem;
     letter-spacing: 0.02em;
     color: var(--color-soft);
+    text-decoration: none;
+  }
+  #pwa-splash-by b {
+    font-weight: 600;
+    color: var(--color-accent);
   }
 }
 
+@keyframes pwa-splash-out {
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* Reduced motion still needs the splash to GO, so this shortens the hold and
+   drops the fade rather than removing the animation, which would park it
+   opaque over the app forever. */
 @media (display-mode: standalone) and (prefers-reduced-motion: reduce) {
   #pwa-splash {
-    transition: none;
+    animation: pwa-splash-out 1ms linear 900ms forwards;
   }
 }
