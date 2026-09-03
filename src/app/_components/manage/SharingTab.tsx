@@ -190,9 +190,31 @@ function PublicLinkToggle({
   const setPublic = useMutation(api.shares.setEditionPublic);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [qrBusy, setQrBusy] = useState(false);
   const on = publicToken != null;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const url = publicToken ? `${origin}/share/${publicToken}` : null;
+
+  // ponytail: the QR code is a PNG data URL and the download is an anchor click,
+  // same shape as the voucher CSV. `qrcode` is imported on the click so the
+  // encoder never rides in the manage-page bundle for the owners who never
+  // press it. 512px with a wide-ish margin is what a printed flyer needs.
+  const downloadQr = async () => {
+    if (!url) return;
+    setQrBusy(true);
+    try {
+      const QRCode = (await import("qrcode")).default;
+      const png = await QRCode.toDataURL(url, { width: 512, margin: 2 });
+      const a = document.createElement("a");
+      a.href = png;
+      a.download = `${topicSlug}-${lang}-qr.png`;
+      a.click();
+    } catch {
+      notify(t("qrError"));
+    } finally {
+      setQrBusy(false);
+    }
+  };
 
   const run = (isPublic: boolean) => {
     setBusy(true);
@@ -257,6 +279,17 @@ function PublicLinkToggle({
           }`}
         >
           <Icon name="link" className="h-3.5 w-3.5" /> {copied ? t("copied") : t("copy")}
+        </button>
+        <button
+          type="button"
+          disabled={!on || busy || qrBusy}
+          onClick={() => void downloadQr()}
+          title={t("qrDownload")}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+            on ? "border-line bg-hi text-ink hover:bg-line/40" : "cursor-not-allowed border-line/60 bg-soft/10 text-soft/50"
+          }`}
+        >
+          <Icon name="qr" className="h-3.5 w-3.5" /> {t("qrCode")}
         </button>
       </div>
     </div>

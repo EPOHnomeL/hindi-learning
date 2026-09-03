@@ -31,7 +31,8 @@ export type IconName =
   | "tag"
   | "users"
   | "chat"
-  | "chart";
+  | "chart"
+  | "qr";
 
 const PATHS: Record<IconName, ReactNode> = {
   edit: (
@@ -131,6 +132,15 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <path d="M3 3v18h18" />
       <path d="M8 17v-6M13 17V7M18 17v-9" />
+    </>
+  ),
+  qr: (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <path d="M14 14h3v3h-3z" />
+      <path d="M20 14v3M14 20h7" />
     </>
   ),
   users: (
