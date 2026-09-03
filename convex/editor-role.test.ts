@@ -3,7 +3,8 @@ import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
 import schema from "./schema";
 import type { Id } from "./_generated/dataModel";
-import { claimPendingShares, getEditableTopic, shareRole } from "./lib";
+import { getEditableTopic } from "./lib";
+import { claimPendingShares, shareRole } from "./shareGrants";
 
 // Editor role, model layer (edition-editor-rights issue 01): the write-side
 // resolver `getEditableTopic` and role-preserving claim, exercised directly

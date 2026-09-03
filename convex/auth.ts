@@ -5,7 +5,8 @@ import type { MutationCtx } from "./_generated/server";
 import { AccessCode } from "./accessCodeAuth";
 import { ACCESS_CODE_PROVIDER_ID } from "./accessCodeFormat";
 import { env } from "./env";
-import { claimPendingShares, oauthRedirectUrl } from "./lib";
+import { oauthRedirectUrl } from "./lib";
+import { claimPendingShares } from "./shareGrants";
 import { ResendOTPPasswordReset } from "./passwordReset";
 
 // Convex Auth (PRD §6 — auth must "just work"). Email + password, plus Google.

@@ -3,16 +3,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import {
-  editionPrice,
-  getOwnedTopic,
-  hasEntitlement,
-  heldLangs,
-  mintToken,
-  normaliseEmail,
-  topicBySlug,
-  translatedTitle,
-} from "./lib";
+import { editionPrice, getOwnedTopic, hasEntitlement, heldLangs, mintToken, topicBySlug, translatedTitle } from "./lib";
+import { normaliseEmail } from "./shareGrants";
 import { SOURCE_LANG } from "./sourceLang";
 import { isReadySeller } from "./sellerStatus";
 import { topicLessonCounts } from "./progressCounts";

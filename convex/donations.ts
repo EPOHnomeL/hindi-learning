@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { internalMutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { normaliseEmail } from "./lib";
+import { normaliseEmail } from "./shareGrants";
 import { isReadySeller } from "./sellerStatus";
 import { appUrl, buildCheckoutFields, processUrl, randFromCents, sellingEnabled, splitNet } from "./payfast";
 import { USD_ZAR_RATE, zarCentsFromUsdCents } from "./rates";

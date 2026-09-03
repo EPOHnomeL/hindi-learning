@@ -3,15 +3,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
 import { action, internalAction, internalMutation, internalQuery, mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import {
-  assertAdmin,
-  getEditableTopic,
-  getOwnedTopic,
-  hashString,
-  publishedLangs,
-  shareLang,
-  topicBySlug,
-} from "./lib";
+import { assertAdmin, getEditableTopic, getOwnedTopic, hashString, publishedLangs, topicBySlug } from "./lib";
+import { shareLang } from "./shareGrants";
 import { SOURCE_LANG } from "./sourceLang";
 import { assertTenantFlag } from "./tenantFlags";
 import { isKnownLang, langInfo } from "./languages";

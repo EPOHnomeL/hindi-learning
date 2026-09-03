@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { normaliseEmail } from "./lib";
+import { normaliseEmail } from "./shareGrants";
 import { isCallerAdmin } from "./whitelist";
 
 // The **interest list** (ADR 0028) — the landing pages' second conversion, for a
