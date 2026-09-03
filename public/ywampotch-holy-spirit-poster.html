@@ -48,15 +48,15 @@
           proportions enlarged.
 
        3. **The correct-answer colours.** head.html does
-          `.opt.correct{background:var(--good); border-color:var(--good-b)}`, and
-          the app's own defaults (globals.css:23-24) are `--good:#e7f3ec` (a
-          light fill) and `--good-b:#3f8f63` (the strong border/text green). This
-          poster uses that semantic. NOTE: the seeded ywampotch palette
-          (scripts/seed-tenants.ts:49) has the two INVERTED, `good:#3f7d54` and
-          `good-b:#cfe6d6`, which renders a correct option as dark green text on
-          a dark green fill and the `.fb.ok` feedback as pale green on cream.
-          That reads as a real bug in that tenant's palette rather than an
-          intention, so it is flagged to the operator, not copied here.
+          `.opt.correct{background:var(--good); border-color:var(--good-b)}` and
+          `.fb.ok{color:var(--good-b)}`, so `good` must be the pale surface and
+          `good-b` the saturated border. Building this poster turned up that ALL
+          FOUR seeded tenants had that pair inverted (and `bad`/`bad-b` with it),
+          copied from the worked example in docs/agents/tenant-branding.md, which
+          contradicted its own token table. A correct quiz answer was rendering
+          at 1.85:1 and the feedback line at 1.30:1 in the live reader. Fixed
+          2026-09-03 in the doc, the seed and `validateTheme` (which now rejects
+          the swap), so this poster shows the tenant's real greens at 6.9:1.
 
        == The claims are verified, and three of v3's were wrong ==
        v3 said "At your own pace", "Ask mid-lesson" and "Open to anyone". The
@@ -84,9 +84,14 @@
   :root {
     --paper:#f9f4ea; --card:#fffdf8; --ink:#1e2740; --soft:#6a7290; --line:#ece3d2;
     --accent:#1b2a80; --accent2:#3a52a8; --gold:#d8a93f; --hi:#e7ebf7;
-    /* The app's DEFAULT semantic: `good` is the light fill, `good-b` the strong
-       green. See the note above on the tenant seed having these inverted. */
-    --good:#e7f3ec; --good-b:#3f8f63; --good-ink:#235138;
+    /* The tenant's OWN state pair, now that it is the right way round: `good` is
+       the pale surface, `good-b` the saturated border, per
+       docs/agents/tenant-branding.md. Was inverted in the seed until 2026-09-03,
+       which is why this poster briefly used the app defaults instead; with the
+       seed corrected the poster can show the real ywampotch greens, which is
+       what a learner on that tenant actually sees. `--good-ink` is head.html's
+       literal `.opt.correct{color:#235138}`, 6.9:1 on this fill. */
+    --good:#cfe6d6; --good-b:#3f7d54; --good-ink:#235138;
 
     /* The sheet. 1080 x 1350 is 4:5; set --h to 1080px for a true square. */
     --w: 1080px; --h: 1350px;
