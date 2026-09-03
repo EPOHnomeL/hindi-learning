@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, type MutationCtx, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getOwnedTopic } from "./lib";
+import { getOwnedTopic } from "./topicAccess";
 
 // The Emblem (ADR 0017): a Topic's representative mark, snapshotted onto each
 // Certificate at claim and shown on the card. This module holds the shared Emblem

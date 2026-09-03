@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { getOwnedTopic } from "./lib";
+import { getOwnedTopic } from "./topicAccess";
 import { normaliseEmail, shareLang, shareRole } from "./shareGrants";
 import { SOURCE_LANG } from "./sourceLang";
 

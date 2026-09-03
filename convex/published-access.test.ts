@@ -3,7 +3,8 @@ import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
-import { editionAccessLevel, getViewableTopic, heldLangs } from "./lib";
+import { editionAccessLevel, heldLangs } from "./lib";
+import { getViewableTopic } from "./topicAccess";
 import type { Id } from "./_generated/dataModel";
 
 // A FREE **published** Edition reads ≡ a Viewer for any signed-in caller

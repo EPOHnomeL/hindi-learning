@@ -13,7 +13,7 @@ import {
   type ActionCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { getOwnedTopic, topicBySlug } from "./lib";
+import { getOwnedTopic, topicBySlug } from "./topicAccess";
 import { assertAdmin } from "./adminSecret";
 import { isCallerAdmin, isCallerUncapped } from "./whitelist";
 

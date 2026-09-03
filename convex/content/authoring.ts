@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { action, internalMutation, internalQuery, mutation, type ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
-import { getEditableTopic, getOwnedTopic, topicBySlug } from "../lib";
+import { getEditableTopic, getOwnedTopic, topicBySlug } from "../topicAccess";
 import { SOURCE_LANG } from "../sourceLang";
 import { assertTenantFlag } from "../tenantFlags";
 import { itemHash, quizStructureMatches } from "../translate";

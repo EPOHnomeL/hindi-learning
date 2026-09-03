@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { getOwnedTopic, getViewableTopic } from "./lib";
+import { getOwnedTopic, getViewableTopic } from "./topicAccess";
 import { assertAdmin } from "./adminSecret";
 
 // Learner-uploaded Resources (PRD §Resources). Standard Convex 3-step upload:

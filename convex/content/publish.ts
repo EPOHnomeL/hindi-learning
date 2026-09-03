@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
-import { getOwnedTopic, topicBySlug } from "../lib";
+import { getOwnedTopic, topicBySlug } from "../topicAccess";
 import { assertAdmin } from "../adminSecret";
 import { assertEmblemImage, normaliseGlyph } from "../emblem";
 
