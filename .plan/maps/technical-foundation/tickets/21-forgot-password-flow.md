@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: []
+claimed_by: forgot-password-otp-2026-09-03
+claimed_at: 2026-09-03T15:00:46+02:00
 ---
 
 # Forgot-password flow (email OTP reset)
