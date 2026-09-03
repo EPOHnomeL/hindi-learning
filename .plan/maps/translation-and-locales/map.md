@@ -35,6 +35,19 @@ catalogues and untranslated-English defects all pass.
   `translators` table** in `convex/schema.ts` (01 is real) and **no `messages/ur.json`**
   (`messages/` holds `af`, `en`, `es`, `fr`, `hi`), so 08 is real. Re-check before
   acting.
+- **Whether Urdu chrome actually ships is open as of 2026-09-03, and it is not the same
+  question as whether it was built.** [08](tickets/08-urdu-message-catalogue.md) is
+  resolved: the catalogue exists, parity is green, `ur` is in `LOCALES`, and the shell
+  flips. What the operator was still checking when the session ended is whether the UI
+  reorder is wanted at all, and behind that sits this map's question rather than
+  technical-foundation's: **709 strings drafted by an LLM with nobody in the operator set
+  who reads Urdu.** That is the same posture `af`/`es`/`fr`/`hi` have carried since
+  `b2a4887` (2026-07-20), so Urdu is not worse than its siblings, but it is the first
+  catalogue where the drafting has never been checked by *anyone* who reads the language,
+  and it is the first where getting it wrong also flips the layout. If the answer is
+  "hold", the lever is one line and it is documented on the
+  [technical-foundation map](../technical-foundation/map.md) Notes, together with the
+  Tailwind `ltr:` landmine that makes the obvious rollback the wrong one.
 - **The RTL spine is not here, on purpose.** Urdu is the first RTL app language, but
   deciding the chrome RTL strategy and flipping the app shell are
   [technical-foundation/09](../technical-foundation/tickets/09-chrome-rtl-strategy.md)

@@ -28,6 +28,40 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
   and is written with that date. Re-measure before acting: `lib.ts` grew from ~25 import
   sites to 32 while sitting un-ticketed.
 - **`pnpm typecheck` is the cheap check** and needs no server. Never stop the dev server.
+- **The RTL flip has a one-line hold, and one landmine if you remove it wrongly**
+  (2026-09-03, while the operator checks whether the reorder is wanted at all).
+  [09](tickets/09-chrome-rtl-strategy.md) and [10](tickets/10-rtl-app-shell.md) are built
+  and answered, but shipping them is a separate question from having built them, and this
+  is what a session needs before touching either:
+  - **The two halves are separate commits.** `c9e90a3` is the Urdu catalogue and the
+    offer-set; `7b3205b` is the flip (`dir`, the Naskh font, the utility sweep). Neither
+    was pushed on the day. They can be reverted independently.
+  - **The sweep is inert under LTR.** `text-start`, `ms-`/`me-`, `ps-`/`pe-`, `start-`/
+    `end-` render identically to the physical utilities they replaced when direction is
+    left-to-right. Verified by computed style on the legal prose (`padding-left: 24px`
+    under `en`, `padding-right: 24px` under `ur`) and by the full suite staying green.
+    So the reorder costs existing users nothing unless `dir="rtl"` is actually set.
+  - **The cheap hold is one line, not a revert.** Dropping `"ur"` from `LOCALES` in
+    `src/i18n/config.ts` makes Urdu chrome unselectable, so `dir` is `ltr` everywhere and
+    the flip goes dormant with all the work still in the tree. Reversible in both
+    directions with one word. `src/i18n/config.test.ts` pins the exact offer-set, so it
+    changes in the same commit or the suite goes red.
+  - **The landmine: do NOT just delete the `dir` attribute** while keeping the sweep.
+    Tailwind's `ltr:` variant compiles to an explicit `[dir="ltr"]` match, and the toggle
+    knobs now carry `ltr:peer-checked:after:translate-x-4.5`. With no `dir` on `<html>` at
+    all, neither the `ltr:` nor the `rtl:` rule matches and **every toggle knob silently
+    stops moving** while still reporting the right checked state. Browsers defaulting to
+    LTR does not save you: the attribute has to be present. Either keep
+    `dir={langDir(locale)}` (it returns `"ltr"` for every non-RTL locale, so it is inert)
+    or revert `7b3205b` whole.
+  - **Two questions, separable, with different answers.** (a) Should Urdu chrome ship at
+    all yet, given 709 LLM-drafted strings and no Urdu reviewer? That is a
+    translation-quality call and it lives on the
+    [translation-and-locales map](../translation-and-locales/map.md). (b) If it ships,
+    should it be RTL? The operator answered **yes, full flip** on 2026-09-03, and the flip
+    proved much cheaper than the pre-work estimate: no drawer slide to mirror (the mobile
+    sidebar is a bottom sheet on `translate-y`) and no directional icons (the only chevron
+    points down).
 - **The measured Convex billing baseline lives here now**, at
   [assets/convex-cost-baseline.md](assets/convex-cost-baseline.md). It was
   `.plan/maps/technical-foundation/assets/convex-cost-baseline.md` until the 2026-09-01 consolidation folded that
