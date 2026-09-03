@@ -55,7 +55,7 @@ condition: the first code that inserts a Topic with a caller-supplied slug witho
 `collectTopicContext` pulls a Topic's whole authoring context in one round trip. ceiling: the
 comment says it returns all Lesson HTML in one query. upgrade: paginate if a Topic grows huge.
 
-**NEEDS A TICKET**: correct the marker, which is factually stale, and then judge the real
+**NEEDS A TICKET**, filed 2026-09-03 as [technical-foundation 22](../.plan/maps/technical-foundation/tickets/22-materialise-read-amplification.md): correct the marker, which is factually stale, and then judge the real
 amplification. The comment predates the content-blob migration. Lesson rows carry **no HTML**
 today (`schema.ts:195`, `htmlStorageId` only, the inline `html` was dropped at the narrow step),
 and the function hands back a signed `htmlUrl` per lesson rather than a body. So this is **not**
@@ -146,7 +146,7 @@ fields it declares. upgrade: grow it as typed fields, like `userPrefs`.
 cannot import from `src/`. ceiling: the two lists must be kept in sync by hand. upgrade: keep them
 in sync, or have issue 09 re-export a Convex-side copy, when issue 09 lands.
 
-**NEEDS A TICKET**: add a test that asserts the two token lists are identical, because the
+**NEEDS A TICKET**, filed 2026-09-03 as [technical-foundation 23](../.plan/maps/technical-foundation/tickets/23-tenant-token-mirror-has-no-test.md): add a test that asserts the two token lists are identical, because the
 marker's own trigger has already fired and nothing caught it. Verified 2026-09-03: issue 09 has
 landed, `src/design/tokens.ts` exists and declares itself the ONE canonical list, and the Convex
 copy is still a hand-written mirror. The two agree today (both are the same 14 names), but nothing
