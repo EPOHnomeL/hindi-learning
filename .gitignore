@@ -72,3 +72,9 @@ HANDOFF*.md
 # Hub already holds, one pull away from being regenerated, and often a whole
 # course of HTML. The Hub is the source of truth (ADR 0009), not this directory.
 /editions/
+
+# PostHog wizard scratch (npx @posthog/wizard). Its cache and the integration
+# skill it drops are regenerable by rerunning the wizard; 9f482c9 committed the
+# 69-file cache by accident and this removes it (2026-09-03).
+/.posthog-wizard-cache/
+/.claude/skills/integration-nextjs-app-router/
