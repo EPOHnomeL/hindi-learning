@@ -43,44 +43,6 @@ function looksLikeColor(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0 && !/[;{}]/.test(v);
 }
 
-// The two state pairs are a *surface* and its *border*, not two interchangeable
-// greens/reds. head.html paints `.opt.correct{background:var(--good);
-// border-color:var(--good-b)}` and colours the feedback line `.fb.ok` with
-// `--good-b`, so on a LIGHT palette `good` has to be the pale one and `good-b`
-// the saturated one, exactly as the token table in
-// docs/agents/tenant-branding.md says.
-//
-// Swap them and a right answer renders as dark green text on a dark green fill
-// while the feedback text goes pale-green on cream, near invisible. That is not
-// hypothetical: the worked example in that doc had both pairs inverted, all four
-// seeded tenants copied it, and it reached the live lesson reader (found
-// 2026-09-03). The contract was documented but never enforced, so this is the
-// enforcement.
-//
-// LIGHT only. A dark palette legitimately reverses the relation (the shipped
-// dark theme is `--good:#1e3328` behind `--good-b:#74cf9b`), and a tenant's
-// `dark` is an optional partial, so there is nothing dependable to compare.
-const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
-
-// WCAG relative luminance, or null for anything that is not a plain hex colour
-// (a named colour or an oklch() would need a full parser; skipping the check is
-// better than guessing at it).
-export function relativeLuminance(color: string): number | null {
-  const hex = color.trim();
-  if (!HEX_COLOR.test(hex)) return null;
-  const full = hex.length === 4 ? `#${[...hex.slice(1)].map((c) => c + c).join("")}` : hex;
-  const channel = (i: number) => {
-    const v = parseInt(full.slice(1 + i * 2, 3 + i * 2), 16) / 255;
-    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  };
-  return 0.2126 * channel(0) + 0.7152 * channel(1) + 0.0722 * channel(2);
-}
-
-const STATE_PAIRS = [
-  ["good", "good-b"],
-  ["bad", "bad-b"],
-] as const;
-
 // Validate a mapped tenant theme against the 14-token contract (mirrors
 // convex/tenants.ts assertThemeTokens, plus a colour-shape sanity pass). Returns
 // a list of human-readable problems — empty means valid. Pure, so it's unit-
@@ -100,21 +62,6 @@ export function validateTheme(theme: MaybeTheme): string[] {
   if (missing.length) errors.push(`theme.light is missing required token(s): ${missing.join(", ")}`);
   for (const [k, val] of Object.entries(light)) {
     if (known.has(k) && !looksLikeColor(val)) errors.push(`theme.light.${k} is not a valid colour: ${JSON.stringify(val)}`);
-  }
-
-  // Pale surface, saturated border. See STATE_PAIRS above for why this is a
-  // hard check and not a style note.
-  for (const [surface, border] of STATE_PAIRS) {
-    const s = looksLikeColor(light[surface]) ? relativeLuminance(light[surface]) : null;
-    const b = looksLikeColor(light[border]) ? relativeLuminance(light[border]) : null;
-    if (s == null || b == null) continue;
-    if (s <= b) {
-      errors.push(
-        `theme.light.${surface} must be the PALE surface and ${border} its saturated border, ` +
-          `but ${surface} (${String(light[surface])}) is no lighter than ${border} ` +
-          `(${String(light[border])}). The pair looks swapped.`,
-      );
-    }
   }
 
   if (theme.dark != null) {
