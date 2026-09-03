@@ -40,11 +40,19 @@ beyond a one-off.
   [`convex/inviteEmail.ts`](../../../../convex/inviteEmail.ts) as a pure function
   so it's testable.
 - **Wire it** — `Password({ profile, reset: ResendOTPPasswordReset })` in
-  [`convex/auth.ts`](../../../../convex/auth.ts). Honour the NOTE at
-  [`convex/auth.ts:30`](../../../../convex/auth.ts#L30): the reset flow never
-  routes through `createOrUpdateUser`, and it only works for **existing**
-  accounts, so the Allowlist sign-up gate is untouched — state that in a
-  comment where `reset` is added.
+  [`convex/auth.ts`](../../../../convex/auth.ts). Honour the constraint recorded in
+  the `createOrUpdateUser` callback of
+  [`convex/auth.ts`](../../../../convex/auth.ts): the reset flow never routes
+  through `createOrUpdateUser`, and it only works for **existing** accounts, so the
+  Allowlist sign-up gate is untouched. State that in a comment where `reset` is
+  added.
+
+  <!-- Corrected 2026-09-03: this named "the NOTE at convex/auth.ts:30". Verified in
+       the tree, there is no NOTE at line 30 and the string "NOTE" does not appear
+       anywhere in the file; line 30 is a closing brace of the session config. The
+       guidance meant is the block comment inside `createOrUpdateUser`, which the
+       file has grown well past line 30. Named by function now, which cannot drift
+       with the line count. -->
 - **UI** — in [`SignIn.tsx`](../../../../src/app/_components/SignIn.tsx), a
   "Forgot password?" link on the sign-in flow, adding two states to the
   existing `flow` union:
@@ -62,8 +70,8 @@ beyond a one-off.
 
 - Change-password-while-signed-in (separate issue if wanted; reset covers the
   lockout case).
-- Email verification at sign-up (`verify` provider) — different feature, same
-  NOTE applies when it comes.
+- Email verification at sign-up (`verify` provider) — different feature, the
+  same `createOrUpdateUser` constraint applies when it comes.
 - Swapping the raw Resend fetch for `@convex-dev/resend` (tracked as the
   upgrade path in `convex/email.ts`).
 - Rate-limiting reset requests beyond what Convex Auth does itself.
