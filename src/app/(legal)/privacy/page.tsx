@@ -6,11 +6,15 @@ export const metadata: Metadata = { title: "Privacy Policy — My Course" };
 // stores and the categories of processors that touch it — keep it truthful as
 // the product moves. We describe processors by function rather than naming each
 // vendor (POPIA s18 permits categories of recipients); keep it that way.
+// The analytics claims have to stay true against `PostHogClient.tsx` and
+// `ConvexClientProvider.tsx`, which identifies a person by the Convex user
+// document ID and sends NO person properties: no email, no name. The bullet
+// below promises exactly that, so the two files move together or not at all.
 export default function PrivacyPage() {
   return (
     <>
       <h1>Privacy Policy</h1>
-      <p className="text-soft">Last updated: 23 August 2026</p>
+      <p className="text-soft">Last updated: 3 September 2026</p>
 
       <h2>What we collect</h2>
       <ul>
@@ -21,6 +25,16 @@ export default function PrivacyPage() {
         <li>
           <b>Learning activity:</b> which lessons you open and complete, your quiz answers, and questions you ask
           inside a course. We use this to deliver and personalise the learning experience.
+        </li>
+        <li>
+          <b>How you use the site:</b> which pages you open, what you click, and the ordinary things your browser
+          sends with every visit, like the kind of device and browser you are on and a rough idea of which country
+          you are in. This is how we tell which parts of a course people actually use.
+        </li>
+        <li>
+          <b>When something breaks:</b> a record of what the page was doing at the time, so that we can see the
+          problem ourselves instead of guessing from a description of it. Anything you typed is hidden before it
+          leaves your device, your password and your PIN included, and your name and email are never attached.
         </li>
         <li>
           <b>Course content:</b> the titles, goals, and resources a course owner provides to have a course generated.
@@ -72,6 +86,11 @@ export default function PrivacyPage() {
         belongs to which person.
       </p>
       <p>
+        <b>What this means for a shared-code place.</b> Exactly what it means for everybody else. We send an
+        account number and nothing that names you. Your nickname never goes anywhere, and a shared-code account has
+        no email address and no name for us to send even if we wanted to.
+      </p>
+      <p>
         <b>Withdrawing.</b> You can delete your nickname and your PIN at any time from Settings, or by emailing{" "}
         <a href="mailto:support@my-course.app">support@my-course.app</a>. That removes everything linking you to the
         organisation that paid for your place. Two honest consequences: the count of places used stays as it was,
@@ -83,13 +102,15 @@ export default function PrivacyPage() {
       <p>
         To run the service: signing you in, generating and serving course material, tracking your own progress,
         granting access you bought or were invited to, sending invite and account emails, and paying sellers out. We
-        do not sell personal information and we do not run advertising or ad tracking.
+        also look at how the site is used, and at what breaks, to fix what is broken and to decide what to improve
+        next. We do not sell personal information and we do not run advertising or ad tracking.
       </p>
 
       <h2>Who we share it with</h2>
       <p>
         We rely on a small number of third-party service providers to operate the service. They may process personal
-        information only as needed to provide their service to us, and only on our instructions:
+        information only as needed to provide their service to us, and only on our instructions. Some of them
+        operate outside South Africa, so your information may be processed in other countries:
       </p>
       <ul>
         <li>
@@ -104,14 +125,23 @@ export default function PrivacyPage() {
         </li>
         <li>
           <b>AI/LLM providers</b> — course owners&rsquo; inputs, course material, and learner questions are processed
-          by AI models to generate lessons, translations, and replies.
+          by AI models to generate lessons, translations, and replies. AI also reads the usage and breakage
+          information described above, to point out problems in the product that we ought to look at.
+        </li>
+        <li>
+          <b>A product analytics and error-monitoring provider</b> stores the usage and breakage information
+          described above and turns it into the reports we read. We do not send them your name or your email
+          address. Their servers are in Europe, and the information reaches them through an address on this site
+          rather than one of their own.
         </li>
       </ul>
 
       <h2>Cookies and local storage</h2>
       <p>
-        We use them only to keep you signed in and to remember device preferences (theme, reading language, reading
-        position). No third-party advertising cookies.
+        We use them to keep you signed in, to remember how you like the site set up (theme, reading language, where
+        you had got to in a lesson), and to recognise your browser as one that has been here before, so that our
+        visitor counts are not nonsense. That last one is set by this site, not by an outside advertising network,
+        and there are no advertising cookies here at all.
       </p>
 
       <h2>Your rights</h2>

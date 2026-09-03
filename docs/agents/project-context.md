@@ -163,8 +163,12 @@ this section is the current state.
     baked-in value.
 - **Identity is the Convex user document ID** (immutable), read via `users.me` in
   `convex/users.ts` and passed to `posthog.identify` in
-  `src/app/ConvexClientProvider.tsx`. Email and name are person properties only,
-  never event properties. **`posthog.reset()` runs before Convex sign-out** at all
+  `src/app/ConvexClientProvider.tsx`, **and it is the only thing sent**. No person
+  properties at all: no email, no name (2026-09-03). Email and name were sent until
+  that date; they were dropped so that fault-diagnosis data, which includes what a
+  page looked like, is not directly identifying at the provider. `/privacy` promises
+  this in as many words, so the two move together. **`posthog.reset()` runs before
+  Convex sign-out** at all
   three sign-out sites: `Dashboard.tsx`, `CourseShell.tsx`, `SettingsPage.tsx`.
   Keep that ordering if you add a fourth, or the next visitor inherits the
   previous person.
