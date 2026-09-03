@@ -5,222 +5,219 @@
 <title>YWAM Potch: Growing in your relationship with the Holy Spirit (poster)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
 <style>
-  /* == Prophetic School POSTER. One fixed sheet, 1080 x 1920.
-       This file is the SOURCE. The artifact you hand around is the PNG rendered
-       from it, beside it in public/ as ywampotch-holy-spirit-poster.png.
+  /* == Prophetic School POSTER. One fixed sheet, 1080 x 1350 (4:5).
+       This file is the SOURCE; the artifact you hand around is the PNG beside it
+       in public/, rendered at 2x (2160 x 2700).
 
-       **Third shape, 2026-09-03.** v1 was a 297 x 420mm A3 print sheet, which
-       was unreadable on a phone. v2 was a fluid mobile-first page, which was
-       readable but was a website: it scrolled, it had a tappable button, it had
-       no edges. A poster is one composition you take in at a glance. So this is
-       a fixed canvas with a fixed aspect and nothing to scroll or tap.
+       **Fourth shape, 2026-09-03.** v1 A3 print sheet (unreadable on a phone),
+       v2 fluid mobile page (readable, but a website: it scrolled), v3 a 9:16
+       poster. v4 is squarer, is set in the app's own typeface, quotes the app's
+       real component CSS, and fixes three claims that were wrong.
 
-       **Why 1080 x 1920 (9:16).** It is the phone screen itself. Full screen on
-       a phone the whole poster is visible at once with nothing cut off, which is
-       the "readable on my phone" requirement, and it is also exactly what
-       WhatsApp status, an Instagram story and a Facebook story want, which is
-       how a poster like this actually travels. It prints too, on A4 portrait
-       with margins, since 9:16 is taller than A4's 1:1.41 and simply letterboxes.
+       **Why 4:5 and not 1:1.** 4:5 is the squarest ratio that still holds a
+       headline, the app and the QR without shrinking any of them into
+       decoration, and it is the tallest a feed post is allowed to be, so it
+       occupies the most screen a poster can. A true square is a one-line change
+       (`--h: 1080px`) but costs either the headline or the app card.
 
-       **The type is sized for the phone, not for this canvas.** 1080px of canvas
-       maps to roughly 390px of phone screen, a factor of ~2.77. So the body text
-       here is 46px, which lands at about 17px in the hand. Everything was picked
-       by dividing by 2.77 and asking whether that number is readable. Nothing on
-       this poster is small print except the contact line.
+       **Rendered at 2x for quality.** v3 was rendered 1:1 at 1080 wide, so a
+       phone with a 3x screen upscaled it and it looked soft. The PNG is now
+       2160 x 2700. The one hard limit is the banner logo, a 512px-wide raster:
+       it is placed at 380 CSS px so 2x asks for 760, a 1.5x upscale, which is
+       the least bad option available without a vector original.
 
-       Palette is the REAL seeded tenant theme (scripts/seed-tenants.ts:42-51),
-       so the poster, the landing page and the re-skinned lesson iframe are one
-       brand. Spectral for the heading voice, system sans for UI, as in the app.
+       == Styling is the app's, not an impression of it ==
+       Three things v3 got wrong and this fixes:
 
-       Copy is the tenant's own landing page (src/app/_landing/YwamPotch.tsx),
-       cut hard: a poster carries one idea, not a page's worth. Punctuation is
-       re-set (commas and colons for long dashes) per the operator's style rule.
+       1. **The typeface.** globals.css sets BOTH `--font-sans` and `--font-serif`
+          to Spectral, so the whole app, chrome included, is set in Spectral. v3
+          used a system sans for the UI bits, which is why the app card read as a
+          lookalike. Everything here is Spectral.
 
-       **The app proof is a ZOOMED crop, not a phone mockup.** A whole phone
-       screen shrunk into a poster makes its lesson prose 9px in the hand, i.e.
-       decoration pretending to be evidence. So the poster shows one real piece
-       of the reader at legible size: the top bar, the pinned lesson title, and
-       the in-lesson quiz with the chosen option gone green, as `.quiz`/`.opt`
-       render it (src/app/_components/PhoneMocks.tsx, lessonSrcDoc.ts). Short
-       strings, so they survive the shrink.
+       2. **The lesson components are quoted, not approximated.** `.quiz`, `.q`,
+          `.opts`, `.opt`, `.opt.correct` and `.fb` below carry the literal
+          values from lessons/_partials/head.html (radius 12px, padding 22px
+          24px, border #e7dccd, shadow `0 2px 14px #00000008`, options 17px on
+          #fff with a 1.5px #e2d6c5 border at radius 9px, `.opts` gap 9px), and
+          `h2` is the authored section heading (13px, .16em, uppercase,
+          accent2). Rather than re-typing those numbers at poster scale and
+          drifting, the card is authored at its REAL pixel sizes and then
+          `zoom`ed to fill the column, so what you see is the app's own
+          proportions enlarged.
 
-       Logos are the ministry's real assets in public/ beside this file, NOT the
-       app's logo source (the app reads a tenant logo from Convex storage, see
-       Brand.tsx). The banner carries its own blue background so it sits on the
-       blue band; the mark is a JPG on white so `mix-blend-mode: multiply` drops
-       the white into the paper instead of stamping a grey box on it.
+       3. **The correct-answer colours.** head.html does
+          `.opt.correct{background:var(--good); border-color:var(--good-b)}`, and
+          the app's own defaults (globals.css:23-24) are `--good:#e7f3ec` (a
+          light fill) and `--good-b:#3f8f63` (the strong border/text green). This
+          poster uses that semantic. NOTE: the seeded ywampotch palette
+          (scripts/seed-tenants.ts:49) has the two INVERTED, `good:#3f7d54` and
+          `good-b:#cfe6d6`, which renders a correct option as dark green text on
+          a dark green fill and the `.fb.ok` feedback as pale green on cream.
+          That reads as a real bug in that tenant's palette rather than an
+          intention, so it is flagged to the operator, not copied here.
 
-       QR is the public share link: scan and you are in lesson one, no sign-in in
-       the way. Verified live 2026-09-03. == */
+       == The claims are verified, and three of v3's were wrong ==
+       v3 said "At your own pace", "Ask mid-lesson" and "Open to anyone". The
+       last was simply false: this is a PAID course. Replaced with four facts
+       checked in the tree today:
+         - **56 lessons**: editions/prophetic-school/<lang>/pristine/lessons holds
+           0001-learning-to-listen through 0056-now-go-and-walk-it, contiguous.
+         - **A certificate**: the `certificates` table (convex/schema.ts:393)
+           and <CertificateCard>, which renders the learner's lesson count.
+         - **Reads offline**: public/sw.js caches lesson payloads and the
+           Offline Catalogue serves them with no network.
+         - **One payment, no expiry**: the entitlement row "Never expires"
+           (convex/schema.ts:598); there is no subscription anywhere in convex/.
+
+       **No price on the sheet.** A listing's amount lives in the `listings`
+       table, not in code (convex/market.ts), so this session cannot verify what
+       Prophetic School actually costs, and a wrong number on a poster is worse
+       than no number. Hand me the figure and it goes in the CTA.
+
+       **The free-lesson promise is exact.** convex/lib.ts:617,649: a Public link
+       on a PAID Edition grants `preview`, which serves "only the free first
+       Lesson". So the poster offers lesson one free and says plainly that the
+       school is one payment. It does not imply the course is free. Share link
+       200 on 2026-09-03, and the QR modules byte-match a fresh encode of it. == */
   :root {
     --paper:#f9f4ea; --card:#fffdf8; --ink:#1e2740; --soft:#6a7290; --line:#ece3d2;
     --accent:#1b2a80; --accent2:#3a52a8; --gold:#d8a93f; --hi:#e7ebf7;
-    --good:#3f7d54; --good-b:#cfe6d6;
-    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --serif: 'Spectral', Georgia, 'Times New Roman', serif;
+    /* The app's DEFAULT semantic: `good` is the light fill, `good-b` the strong
+       green. See the note above on the tenant seed having these inverted. */
+    --good:#e7f3ec; --good-b:#3f8f63; --good-ink:#235138;
+
+    /* The sheet. 1080 x 1350 is 4:5; set --h to 1080px for a true square. */
+    --w: 1080px; --h: 1350px;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: #55504a; }
-  /* `height: auto` is load-bearing, not tidiness: both <img> tags carry their
-     natural width/height attributes (good, they reserve layout space), so
-     setting only `width` in CSS leaves the attribute height in force and
-     stretches the image. Without this the footer mark rendered 118px wide by its
-     full 929px tall and pushed the whole poster off the sheet. */
+  /* `height: auto` is load-bearing: both <img> tags carry their natural
+     width/height attributes, so setting only `width` in CSS would leave the
+     attribute height in force and stretch the image. */
   img { display: block; height: auto; }
 
-  /* The sheet. Fixed, because that is what makes it a poster and not a page. */
   .poster {
-    width: 1080px; height: 1920px;
+    width: var(--w); height: var(--h);
     margin: 0 auto;
-    position: relative;
     overflow: hidden;
     display: flex; flex-direction: column;
-    font-family: var(--sans); color: var(--ink);
+    /* Spectral throughout, because the app is Spectral throughout. */
+    font-family: 'Spectral', Georgia, 'Times New Roman', serif;
+    color: var(--ink);
     background:
-      radial-gradient(900px 700px at 8% 6%, var(--hi) 0%, transparent 62%),
-      radial-gradient(800px 600px at 100% 100%, #f4ecdb 0%, transparent 58%),
+      radial-gradient(760px 520px at 6% 4%, var(--hi) 0%, transparent 62%),
+      radial-gradient(640px 460px at 100% 100%, #f4ecdb 0%, transparent 58%),
       var(--paper);
   }
 
   /* == Blue band + the official lockup == */
   .band {
     background: linear-gradient(155deg, #1b2a80, #0f1950);
-    padding: 38px 0 30px;
+    padding: 26px 0 20px;
     text-align: center;
   }
-  .band img { width: 560px; margin: 0 auto; }
+  /* 380px, not larger: the source is 512px wide, and at 2x output anything much
+     above this is visibly upscaled. */
+  .band img { width: 340px; margin: 0 auto; }
   .band p {
-    margin: 26px 0 0;
-    font-size: 28px; font-weight: 700; letter-spacing: .42em; text-transform: uppercase;
+    margin: 16px 0 0;
+    font-size: 21px; font-weight: 600; letter-spacing: .4em; text-transform: uppercase;
     color: #a8b6e8;
   }
 
-  .body { flex: 1; display: flex; flex-direction: column; padding: 0 68px 40px; }
+  .body { flex: 1; display: flex; flex-direction: column; padding: 0 60px 22px; }
 
-  /* == Headline == */
   h1 {
-    font-family: var(--serif);
-    margin: 34px 0 0;
-    font-size: 88px; line-height: 1.03; font-weight: 600; letter-spacing: -.03em;
+    margin: 26px 0 0;
+    font-size: 72px; line-height: 1.04; font-weight: 600; letter-spacing: -.028em;
   }
   h1 em { font-style: italic; color: var(--accent); }
-  .standfirst {
-    font-family: var(--serif);
-    margin: 24px 0 0;
-    font-size: 40px; line-height: 1.45;
-  }
-  .standfirst b { font-weight: 600; color: var(--accent); }
 
-  /* == The app, one zoomed crop of the real reader == */
+  /* == The app card ==
+        Authored at the app's REAL pixel sizes, then zoomed to fill the column,
+        so the proportions are the app's own rather than numbers re-picked by
+        hand. 460 * 1.55 = 713, sized to what the 4:5 sheet can spare. */
+  .app-scale { margin-top: 24px; width: 460px; zoom: 1.55; }
   .app {
-    margin-top: 30px;
     background: var(--paper);
-    border: 2px solid var(--line); border-radius: 26px;
-    overflow: hidden;
-    box-shadow: 0 4px 8px rgba(30,39,64,.06), 0 30px 70px rgba(30,39,64,.12);
+    border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px 18px;
   }
-  .topbar {
-    display: flex; align-items: center; gap: 14px;
-    border-bottom: 2px solid var(--line); padding: 18px 26px;
+  /* The authored section heading, verbatim from head.html. */
+  .app h2 {
+    font-size: 13px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent2); margin: 0 0 8px; font-weight: 600;
   }
-  .topbar svg { flex: none; }
-  .topbar .course { font-size: 30px; font-weight: 600; letter-spacing: -.01em; color: var(--accent); }
-  .screen { padding: 18px 26px 20px; }
-  .lessonhead {
-    display: flex; align-items: center; justify-content: space-between; gap: 20px;
-    border-bottom: 2px solid var(--line); padding-bottom: 16px;
+  /* `.quiz` verbatim from head.html. */
+  .quiz {
+    background: var(--card); border: 1px solid #e7dccd; border-radius: 12px;
+    padding: 22px 24px; margin: 0; box-shadow: 0 2px 14px #00000008;
+    line-height: 1.75;
   }
-  .lessonhead .title { font-size: 32px; font-weight: 600; }
-  .lessonhead .next {
-    flex: none; background: var(--accent); color: #fff;
-    border-radius: 10px; padding: 8px 14px; font-size: 24px; font-weight: 500; white-space: nowrap;
-  }
-  .quizcard {
-    margin-top: 18px;
-    background: var(--card);
-    border: 2px solid var(--line); border-radius: 16px; padding: 22px;
-  }
-  .quizcard .stem { font-size: 34px; font-weight: 600; line-height: 1.3; }
+  .quiz .q { font-weight: 600; margin-bottom: 4px; font-size: 17px; }
+  .opts { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
   .opt {
-    margin-top: 12px;
-    border: 2px solid var(--line); border-radius: 10px;
-    padding: 13px 18px; font-size: 32px; line-height: 1.25;
+    display: block; width: 100%; text-align: left; font: inherit; font-size: 17px;
+    color: var(--ink); background: #fff; border: 1.5px solid #e2d6c5;
+    border-radius: 9px; padding: 11px 15px; line-height: 1.4;
   }
-  .opt.chosen { border-color: var(--good); background: var(--good-b); }
-  .feedback { margin: 14px 0 0; font-size: 26px; line-height: 1.35; color: var(--good); }
+  .opt.correct { background: var(--good); border-color: var(--good-b); color: var(--good-ink); }
+  .fb { margin-top: 13px; font-size: 16px; line-height: 1.5; color: var(--good-b); }
 
-  /* == Three claims, one line each == */
-  /* One line, not a stacked list: three short phrases are all a poster has room
-     for once the headline and the app proof have taken their share. */
-  .claims {
-    margin-top: 24px;
-    display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  /* == Four verified facts, 2x2 because a 4:5 sheet is squarer == */
+  .facts {
+    margin-top: 22px;
+    display: flex; justify-content: space-between; gap: 14px;
     border-top: 2px solid var(--line); border-bottom: 2px solid var(--line);
     padding: 18px 0;
   }
-  .claims div { display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 600; }
-  .claims svg { width: 30px; height: 30px; color: var(--accent); flex: none; }
-  .claim { display: flex; align-items: center; gap: 24px; font-size: 40px; }
-  .claim .mark {
-    flex: none; width: 62px; height: 62px; border-radius: 15px;
-    background: rgba(216,169,63,.2); color: var(--accent);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .claim .mark svg { width: 34px; height: 34px; }
-  .claim b { font-weight: 600; }
-  .claim span { color: var(--soft); }
+  .fact { display: flex; align-items: center; gap: 10px; font-size: 23px; }
+  .fact svg { width: 24px; height: 24px; color: var(--accent); flex: none; }
+  .fact b { font-weight: 600; }
+  .fact span { color: var(--soft); }
 
   /* == The ask == */
   .cta {
     margin-top: auto;
-    display: flex; align-items: center; gap: 34px;
+    display: flex; align-items: center; gap: 26px;
     background: var(--card);
-    border: 2px solid var(--line); border-radius: 26px;
-    padding: 28px 34px;
-    box-shadow: 0 4px 8px rgba(30,39,64,.05), 0 24px 60px rgba(30,39,64,.09);
+    border: 1px solid var(--line); border-radius: 16px;
+    padding: 22px 26px;
+    box-shadow: 0 2px 14px #00000008;
   }
-  /* 41 modules across 300px is ~7px a module, which still scans after the
-     poster is shrunk to a phone screen. Do not make this smaller. */
-  .qr { flex: none; width: 250px; height: 250px; }
+  /* 41 modules across 190px is ~9px a module in the 2x output, which still
+     scans after the poster is shrunk onto a phone screen. */
+  .qr { flex: none; width: 168px; height: 168px; }
   .qr svg { width: 100%; height: 100%; display: block; }
   .cta .words { flex: 1; min-width: 0; }
   .cta .words b {
-    display: block; font-family: var(--serif);
-    font-size: 52px; font-weight: 600; letter-spacing: -.02em; line-height: 1.08;
+    display: block; font-size: 38px; font-weight: 600; letter-spacing: -.02em; line-height: 1.12;
   }
-  .cta .words p { margin: 16px 0 0; font-size: 30px; line-height: 1.4; color: var(--soft); }
+  .cta .words p { margin: 10px 0 0; font-size: 24px; line-height: 1.4; color: var(--soft); }
   .cta .words .url {
-    display: block; margin-top: 18px;
-    font-size: 36px; font-weight: 700; letter-spacing: -.01em; color: var(--accent);
+    display: block; margin-top: 12px;
+    font-size: 28px; font-weight: 600; letter-spacing: -.01em; color: var(--accent);
   }
 
-  /* == Sign-off == */
   .foot {
-    margin-top: 22px;
-    display: flex; align-items: center; justify-content: space-between; gap: 40px;
+    margin-top: 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 30px;
   }
-  .foot img {
-    width: 160px; flex: none;
-    /* White-background JPG on cream paper: multiply drops the white away. */
-    mix-blend-mode: multiply;
-  }
-  .foot p { margin: 0; font-size: 27px; line-height: 1.55; color: var(--soft); text-align: right; }
-  .foot p b { color: var(--ink); font-size: 30px; }
+  /* The mark is a JPG on WHITE: multiply drops its white box into the paper. */
+  .foot img { width: 90px; flex: none; mix-blend-mode: multiply; }
+  .foot p { margin: 0; font-size: 22px; line-height: 1.5; color: var(--soft); text-align: right; }
+  .foot p b { color: var(--ink); font-size: 24px; font-weight: 600; }
 
-  @page { size: A4 portrait; margin: 8mm; }
+  /* A4 portrait at 10mm margins is 190 x 277mm, i.e. 718 x 1047 CSS px. The
+     sheet is 1350 tall, so height binds: 1047/1350 = .775. `zoom`, not
+     `transform`, because a transform paints small but keeps its full layout box
+     and spills onto a second blank page. */
+  @page { size: A4 portrait; margin: 10mm; }
   @media print {
     html, body { background: none; }
-    /* A4 portrait at 8mm margins leaves 194 x 281mm of printable area, which
-       is 733 x 1062 CSS px. The sheet is 1920 tall, so height is the binding
-       constraint: 1062/1920 = .553. (An earlier .174 here was a guess and put
-       the poster in the top corner of an otherwise blank page.)
-
-       `zoom`, not `transform: scale()`: a transform is painted small but still
-       occupies its full 1920px in layout, so the document stayed two pages
-       long with the second one blank. `zoom` shrinks the layout box too. */
-    .poster { zoom: .553; }
+    .poster { zoom: .775; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 </style>
@@ -239,67 +236,62 @@
 
     <h1>Growing in your relationship with the <em>Holy&nbsp;Spirit</em>.</h1>
 
-    <p class="standfirst">
-      Hear God's voice with confidence and walk in your <b>creation design</b>. Self-paced,
-      on your phone.
-    </p>
 
-    <div class="app">
-      <div class="topbar">
-        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#6a7290" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-          <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
-        </svg>
-        <span class="course">Prophetic School</span>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1b2a80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </div>
-      <div class="screen">
-        <div class="lessonhead">
-          <span class="title">Testing what you hear</span>
-          <span class="next">Next lesson &rsaquo;</span>
-        </div>
-        <div class="quizcard">
-          <div class="stem">What does it mean to test a prophetic word?</div>
-          <div class="opt chosen">Weigh it against Scripture</div>
-          <div class="opt">Act on it immediately</div>
-          <div class="opt">Keep it to yourself</div>
-          <p class="feedback">That's it. Scripture is the measure a word is held against, never the other way round.</p>
+    <div class="app-scale">
+      <div class="app">
+        <h2>Weighing a word</h2>
+        <div class="quiz">
+          <div class="q">What does it mean to test a prophetic word?</div>
+          <div class="opts">
+            <div class="opt correct">Weigh it against Scripture</div>
+            <div class="opt">Act on it immediately</div>
+            <div class="opt">Keep it to yourself</div>
+          </div>
+          <div class="fb">That's it. Scripture is the measure a word is held against, never the other way round.</div>
         </div>
       </div>
     </div>
 
-    <div class="claims">
-      <div>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 16 14" />
+    <div class="facts">
+      <div class="fact">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 7C9.5 5.6 6.5 5.6 4 6.3v12c2.5-.7 5.5-.7 8 .7" />
+          <path d="M12 7c2.5-1.4 5.5-1.4 8-.7v12c-2.5-.7-5.5-.7-8 .7" />
+          <path d="M12 7v12" />
         </svg>
-        At your own pace
+        <div><b>56 lessons</b></div>
       </div>
-      <div>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M20.5 12a8.5 8.5 0 0 1-12.4 7.5L3.5 20.5l1.1-4.5A8.5 8.5 0 1 1 20.5 12z" />
+      <div class="fact">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="9" r="5.5" /><path d="M8.5 14 7 21l5-2.5L17 21l-1.5-7" />
         </svg>
-        Ask mid-lesson
+        <div><b>A certificate</b></div>
       </div>
-      <div>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" /><line x1="3" y1="12" x2="21" y2="12" />
-          <path d="M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18z" />
+      <div class="fact">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 15.5a4 4 0 0 1 1.2-7.7A5.5 5.5 0 0 1 16 7.5a3.8 3.8 0 0 1 3.4 6.6" />
+          <path d="M12 12v8" /><path d="M9 17l3 3 3-3" />
         </svg>
-        Open to anyone
+        <div><b>Reads offline</b></div>
+      </div>
+      <div class="fact">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 7.5V6a2 2 0 0 0-2-2H5.5A1.5 1.5 0 0 0 4 5.5v13A1.5 1.5 0 0 0 5.5 20H18a2 2 0 0 0 2-2v-1.5" />
+          <path d="M21 9.5h-6a2.5 2.5 0 0 0 0 5h6z" />
+        </svg>
+        <div><b>One payment</b></div>
       </div>
     </div>
 
     <div class="cta">
       <div class="qr">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 41 41" shape-rendering="crispEdges" role="img" aria-label="Scan to open Prophetic School">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 41 41" shape-rendering="crispEdges" role="img" aria-label="Scan to read lesson one of Prophetic School">
         <path stroke="#1e2740" d="M0 0.5h7m2 0h3m4 0h1m1 0h4m1 0h1m1 0h2m1 0h2m4 0h7M0 1.5h1m5 0h1m2 0h1m2 0h2m2 0h1m1 0h1m2 0h2m1 0h1m2 0h1m2 0h3m1 0h1m5 0h1M0 2.5h1m1 0h3m1 0h1m1 0h1m1 0h1m8 0h1m1 0h2m1 0h1m2 0h1m6 0h1m1 0h3m1 0h1M0 3.5h1m1 0h3m1 0h1m1 0h2m1 0h1m1 0h1m2 0h1m1 0h1m3 0h6m1 0h1m2 0h1m1 0h1m1 0h3m1 0h1M0 4.5h1m1 0h3m1 0h1m1 0h1m3 0h5m7 0h2m2 0h5m1 0h1m1 0h3m1 0h1M0 5.5h1m5 0h1m1 0h4m3 0h1m3 0h5m1 0h2m1 0h1m1 0h1m1 0h1m1 0h1m5 0h1M0 6.5h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7M8 7.5h5m1 0h1m1 0h1m4 0h2m3 0h1M0 8.5h1m1 0h5m3 0h6m1 0h1m2 0h1m1 0h1m1 0h3m2 0h1m2 0h1m1 0h5M0 9.5h4m1 0h1m2 0h1m3 0h3m1 0h1m2 0h5m2 0h1m1 0h1m2 0h2m5 0h1m1 0h1M0 10.5h3m2 0h4m1 0h1m3 0h1m1 0h1m3 0h3m1 0h1m1 0h2m1 0h2m1 0h5m2 0h1M0 11.5h2m1 0h2m2 0h1m1 0h2m1 0h3m1 0h2m1 0h2m1 0h2m2 0h2m2 0h4m2 0h2m1 0h2M2 12.5h1m3 0h2m1 0h1m6 0h1m1 0h2m1 0h1m1 0h3m1 0h3m1 0h3m3 0h3M1 13.5h2m5 0h2m1 0h4m3 0h1m1 0h2m1 0h4m3 0h2m2 0h1m1 0h5M0 14.5h3m2 0h2m3 0h2m2 0h2m2 0h2m5 0h1m1 0h1m2 0h1m2 0h1m2 0h1m1 0h1m1 0h1M2 15.5h2m3 0h2m1 0h2m1 0h2m4 0h3m3 0h2m1 0h2m4 0h1m1 0h2m1 0h1M1 16.5h3m1 0h3m2 0h8m1 0h2m6 0h1m2 0h2m1 0h1m1 0h1m2 0h1M2 17.5h2m3 0h3m5 0h5m1 0h2m1 0h1m2 0h2m1 0h1m1 0h1m1 0h4m1 0h2M3 18.5h1m2 0h1m2 0h1m1 0h1m1 0h1m1 0h3m2 0h2m2 0h1m1 0h2m3 0h1m2 0h1m1 0h2m1 0h1M2 19.5h2m3 0h1m1 0h1m1 0h1m2 0h6m1 0h1m5 0h2m5 0h1m1 0h1m1 0h1M0 20.5h2m4 0h5m3 0h2m5 0h1m2 0h3m1 0h4m3 0h1M0 21.5h1m1 0h1m1 0h1m2 0h3m1 0h1m2 0h2m2 0h3m3 0h1m2 0h1m3 0h2m1 0h1m1 0h1m2 0h2M1 22.5h4m1 0h2m1 0h1m1 0h1m5 0h3m1 0h1m1 0h1m2 0h2m1 0h1m3 0h5M0 23.5h2m5 0h1m1 0h2m7 0h1m2 0h2m1 0h1m2 0h1m7 0h3m1 0h2M3 24.5h2m1 0h5m2 0h1m1 0h3m1 0h1m3 0h7m1 0h1m1 0h4m1 0h1M2 25.5h1m6 0h1m1 0h1m4 0h1m2 0h3m1 0h2m3 0h1m1 0h2m3 0h1m1 0h1m2 0h1M0 26.5h1m2 0h1m2 0h5m3 0h2m4 0h3m1 0h1m1 0h3m3 0h3m1 0h1m2 0h1M0 27.5h1m2 0h1m1 0h1m2 0h1m6 0h5m4 0h2m1 0h2m2 0h3m1 0h3M0 28.5h2m1 0h2m1 0h1m4 0h1m2 0h2m1 0h1m2 0h4m2 0h1m2 0h4m2 0h1m1 0h3M0 29.5h2m1 0h1m1 0h1m2 0h1m5 0h1m3 0h1m2 0h1m2 0h1m1 0h1m1 0h4m1 0h4M0 30.5h1m1 0h5m2 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h2m2 0h2m1 0h1m4 0h3m1 0h2m1 0h2M0 31.5h1m2 0h1m1 0h1m1 0h3m4 0h3m4 0h2m1 0h7m2 0h2m1 0h2M0 32.5h1m1 0h1m1 0h7m6 0h1m2 0h1m1 0h1m3 0h2m4 0h8M8 33.5h1m1 0h1m2 0h3m2 0h2m3 0h2m2 0h1m4 0h1m3 0h2m1 0h2M0 34.5h7m3 0h3m1 0h1m1 0h1m1 0h1m3 0h1m1 0h1m1 0h1m1 0h2m2 0h1m1 0h1m1 0h1M0 35.5h1m5 0h1m1 0h2m2 0h1m1 0h3m2 0h2m2 0h2m2 0h1m2 0h3m3 0h3m1 0h1M0 36.5h1m1 0h3m1 0h1m1 0h1m2 0h1m1 0h2m3 0h1m2 0h3m3 0h10m1 0h2M0 37.5h1m1 0h3m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m1 0h1m2 0h1m5 0h2m5 0h1m1 0h1m3 0h2M0 38.5h1m1 0h3m1 0h1m1 0h1m1 0h1m2 0h1m2 0h1m2 0h1m1 0h2m1 0h2m1 0h2m1 0h1m2 0h5m1 0h1M0 39.5h1m5 0h1m2 0h1m3 0h1m3 0h2m1 0h3m1 0h1m1 0h1m1 0h1m3 0h2m2 0h2m1 0h1M0 40.5h7m1 0h2m1 0h1m4 0h2m1 0h1m2 0h1m1 0h3m2 0h1m1 0h1m2 0h3m1 0h1"/>
         </svg>
       </div>
       <div class="words">
-        <b>Scan it and start reading.</b>
-        <p>Straight into lesson one. Nothing to sign up for first.</p>
+        <b>Read lesson one, free.</b>
+        <p>No sign-up needed for the first lesson.</p>
         <span class="url">ywampotch.my-course.app</span>
       </div>
     </div>
