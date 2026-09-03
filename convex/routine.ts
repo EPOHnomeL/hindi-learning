@@ -13,7 +13,8 @@ import {
   type ActionCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, topicBySlug } from "./lib";
+import { getOwnedTopic, topicBySlug } from "./lib";
+import { assertAdmin } from "./adminSecret";
 import { isCallerAdmin, isCallerUncapped } from "./whitelist";
 
 // The next-lesson Routine (ADR 0008). One cloud Claude Code routine, fired two

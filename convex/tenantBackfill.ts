@@ -2,7 +2,8 @@ import { v } from "convex/values";
 import { action, internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { assertAdmin, topicBySlug } from "./lib";
+import { topicBySlug } from "./lib";
+import { assertAdmin } from "./adminSecret";
 
 // ---- Legacy course tenant backfill (whitelabel issue 23) --------------------
 //

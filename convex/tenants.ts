@@ -2,7 +2,7 @@ import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { assertAdmin } from "./lib";
+import { assertAdmin } from "./adminSecret";
 import { assertEmblemImage } from "./emblem";
 import { isReadySeller } from "./sellerStatus";
 import { isCallerAdmin } from "./whitelist";

@@ -2,7 +2,8 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { assertAdmin, getOwnedTopic, getViewableTopic, loadEdition, readableLang, topicBySlug } from "./lib";
+import { getOwnedTopic, getViewableTopic, loadEdition, readableLang, topicBySlug } from "./lib";
+import { assertAdmin } from "./adminSecret";
 import { assertTenantFlag } from "./tenantFlags";
 
 // The conversation loop (PRD §4–§5). Reader writes responses/progress/questions
