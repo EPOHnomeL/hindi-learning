@@ -6,27 +6,6 @@ import { shareLang, shareRole } from "./shareGrants";
 
 // Shared backend helpers. (Plain module — no Convex functions registered here.)
 
-// A 256-bit URL-safe token (hex) from Web Crypto — the credential a capability
-// link carries: a Public link (ADR 0013) or a Certificate link (ADR 0015). Long
-// enough that guessing is infeasible, so no rate-limiting is needed.
-export function mintToken(): string {
-  const bytes = new Uint8Array(32);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-// A cheap, stable 32-bit string hash (FNV-1a) as hex. Used only to detect
-// whether a source item changed since it was last translated (staleness), so a
-// re-translate can skip unchanged items — not for security. Synchronous, unlike
-// crypto.subtle, so it's usable inside a query/mutation without awaiting.
-export function hashString(s: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 0x01000193);
-  }
-  return (h >>> 0).toString(16);
-}
 
 // ---- Content blobs (see .scratch/html-blob-storage) -------------------------
 
@@ -753,52 +732,4 @@ export async function resolveEdition(
   if (effLang !== null) return { lang: effLang, level: await editionAccessLevel(ctx, topic, effLang, userId, false, grants) };
   const lang = requested ?? SOURCE_LANG;
   return { lang, level: await editionAccessLevel(ctx, topic, lang, userId, false, grants) };
-}
-
-// Where an OAuth sign-in is allowed to land, given the client-supplied
-// `redirectTo` and the deployment's SITE_URL. Wired in as Convex Auth's
-// `callbacks.redirect` (convex/auth.ts) because the library's default only ever
-// admits SITE_URL itself, and falls back to it when `redirectTo` is absent
-// (@convex-dev/auth implementation/redirects.js). Both are wrong for us now:
-// `https://ywampotch.my-course.app` does not start with `https://my-course.app`,
-// so a tenant sign-in would either throw or land the user on the apex — and under
-// ADR 0025 the session cookie is host-only, so the host the callback redirects to
-// IS the host they end up signed in on. Landing on the apex means the buyer who
-// started on the tenant subdomain is still signed out there.
-//
-// The rule: same origin as SITE_URL, or any single- or multi-label subdomain of
-// its apex. No tenant allow-list, deliberately — every `*.my-course.app` name is
-// the operator's own DNS to hand out, so DNS control is the trust boundary and
-// adding a tenant needs no change here. `www.` is stripped from the base because
-// tenant hosts hang off the apex, matching `appUrl` in payfast.ts.
-//
-// `redirectTo` is untrusted client input, so this is a real open-redirect guard:
-// the URL it returns carries a one-time session code as a query param
-// (implementation/index.js), and handing that to a foreign host hands over the
-// sign-in. Anything not provably ours throws rather than falling back to a
-// plausible-looking default.
-export function oauthRedirectUrl(redirectTo: string, siteUrl: string): string {
-  const invalid = () => new Error(`Invalid \`redirectTo\` ${redirectTo} for SITE_URL ${siteUrl}`);
-  let site: URL;
-  try {
-    site = new URL(siteUrl);
-  } catch {
-    throw new Error(`SITE_URL is not a valid URL: ${siteUrl}`);
-  }
-  // A leading `//` is protocol-relative, NOT a path: `new URL("//evil.com", site)`
-  // resolves to `https://evil.com/`. Reject before resolving so it can never be
-  // mistaken for the relative case below.
-  if (redirectTo.startsWith("//")) throw invalid();
-  let resolved: URL;
-  try {
-    resolved = new URL(redirectTo, site);
-  } catch {
-    throw invalid();
-  }
-  if (resolved.protocol !== site.protocol || resolved.port !== site.port) throw invalid();
-  const apex = site.hostname.replace(/^www\./, "");
-  const host = resolved.hostname;
-  // The dot boundary is what stops `my-course.app.evil.com` passing a suffix test.
-  if (host !== apex && host !== site.hostname && !host.endsWith(`.${apex}`)) throw invalid();
-  return resolved.toString();
 }

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { oauthRedirectUrl } from "./lib";
+import { oauthRedirectUrl } from "./authRedirect";
 
 // Where an OAuth sign-in is allowed to land. Under ADR 0025 the session cookie is
 // host-only, so the host the OAuth callback redirects to *is* the host the user

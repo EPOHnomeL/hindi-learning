@@ -5,7 +5,7 @@ import type { MutationCtx } from "./_generated/server";
 import { AccessCode } from "./accessCodeAuth";
 import { ACCESS_CODE_PROVIDER_ID } from "./accessCodeFormat";
 import { env } from "./env";
-import { oauthRedirectUrl } from "./lib";
+import { oauthRedirectUrl } from "./authRedirect";
 import { claimPendingShares } from "./shareGrants";
 import { ResendOTPPasswordReset } from "./passwordReset";
 

@@ -16,7 +16,7 @@ import {
   type MaterialisedContext,
 } from "./authoring";
 import { authorModel, chatComplete } from "./openrouterClient";
-import { hashString } from "./lib";
+import { hashString } from "./tokens";
 
 // The OpenRouter teaching runtime (ADR 0014). A course with `provider:
 // "openrouter"` routes its authoring here instead of firing the claude.ai
