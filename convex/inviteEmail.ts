@@ -46,10 +46,10 @@ export type Brand = {
 
 // The product name shown to recipients. Matches the my-course.app domain they
 // see in the From address and the link.
-const BRAND = "My Course";
+export const BRAND = "My Course";
 
 // Warm palette, aligned with the app (maroon accent, cream/brown).
-const C: Palette = {
+export const C: Palette = {
   page: "#f5efe6",
   card: "#ffffff",
   border: "#e7ddd4",
@@ -83,7 +83,7 @@ export function paletteFromTokens(light: Record<string, string>): Palette {
     accent: t("accent", C.accent),
   };
 }
-const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+export const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 // Minimal HTML entity escape — enough to keep a stray angle bracket or quote in
 // user-supplied text (course title, inviter email) from breaking the markup.
