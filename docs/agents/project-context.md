@@ -130,10 +130,23 @@ Gotchas:
 is stale from 2026-09-03.** The ADR stands as the record of what was decided;
 this section is the current state.
 
-- **EU Cloud, project `264778`.** Ingestion host is `https://eu.i.posthog.com`
-  (the `i.` host is ingestion, `eu.posthog.com` is the UI). The project token and
-  the host are a **matched pair per region**: a EU token against the US host is
-  rejected, not rerouted.
+- **EU Cloud, project `264778`.** The project token and the ingestion host are a
+  **matched pair per region**: an EU token against the US host is rejected, not
+  rerouted. Direct EU ingestion is `https://eu.i.posthog.com` (the `i.` host is
+  ingestion, `eu.posthog.com` is the UI).
+- **Ingestion goes through a managed reverse proxy, `https://t.my-course.app`**
+  (2026-09-03), configured PostHog-side under Settings, Managed reverse proxy. It
+  is a first-party CNAME, which is the whole point: ad blockers and browser
+  tracking-protection lists match on third-party `*.posthog.com` requests, so
+  direct ingestion silently loses a chunk of events.
+  - **`t` is therefore not available as a tenant slug.** `t.my-course.app` is a
+    CNAME to PostHog and never reaches Vercel, so a tenant added to
+    `TENANT_SLUGS` under that name would resolve in `src/lib/tenant.ts` and then
+    404 in the browser. There is a comment on the constant saying so.
+  - **A proxy api_host breaks posthog-js's `ui_host` inference**, so
+    `PostHogClient.tsx` names `https://eu.posthog.com` explicitly. Without it the
+    SDK reuses `api_host` verbatim and the toolbar and "view in PostHog" links
+    point at the proxy. If the proxy domain ever changes, that line does not.
 - **Browser only.** `posthog-js` in `package.json`; there is no server SDK and no
   server-side capture. The singleton is initialised by `initializePostHog()` in
   `src/app/PostHogClient.tsx`, mounted from `src/app/layout.tsx`.

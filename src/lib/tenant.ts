@@ -8,6 +8,9 @@
 // a tenant is an operator task — a CNAME + Vercel domain (ticket 05) + a seeded
 // `tenants` row (scripts/seed-tenants.ts) + an entry here — not a per-request
 // Convex read on the hot middleware path. Keep in sync with the seed script.
+// `t` is NOT available as a slug: t.my-course.app is a CNAME to PostHog (the
+// managed reverse proxy for analytics ingestion) and never reaches Vercel, so a
+// tenant named `t` would resolve here and 404 in the browser (2026-09-03).
 export const TENANT_SLUGS = ["upf", "ywampotch", "almighty-warriors", "yknot"] as const;
 export type TenantSlug = (typeof TENANT_SLUGS)[number];
 
