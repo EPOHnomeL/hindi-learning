@@ -2,7 +2,8 @@
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
 import schema from "./schema";
-import { loadEdition, SOURCE_LANG } from "./lib";
+import { loadEdition } from "./lib";
+import { SOURCE_LANG } from "./sourceLang";
 import type { Doc, Id } from "./_generated/dataModel";
 
 // The Edition reader (edition-deepening/01): the "translated row else English

@@ -3,7 +3,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { SOURCE_LANG, getOwnedTopic, livePublishedLangs } from "./lib";
+import { getOwnedTopic, livePublishedLangs } from "./lib";
+import { SOURCE_LANG } from "./sourceLang";
 import { langInfo } from "./languages";
 
 // Course publishing & the tenant catalogue (.scratch/course-publishing/PRD.md, as

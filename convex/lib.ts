@@ -1,13 +1,9 @@
 import { v } from "convex/values";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { SOURCE_LANG } from "./sourceLang";
 
 // Shared backend helpers. (Plain module — no Convex functions registered here.)
-
-// The source language every course is authored in (the medium the teach skill
-// writes). It is the default Edition: `translations` rows exist only for OTHER
-// languages, and a Share/pendingShare/Certificate with no `lang` reads as this.
-export const SOURCE_LANG = "en";
 
 // A Share's granted Edition language. Legacy Shares (pre course-translation)
 // carry no `lang` and grant the English edition.

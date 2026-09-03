@@ -9,10 +9,10 @@ import {
   getOwnedTopic,
   hashString,
   publishedLangs,
-  SOURCE_LANG,
   shareLang,
   topicBySlug,
 } from "./lib";
+import { SOURCE_LANG } from "./sourceLang";
 import { assertTenantFlag } from "./tenantFlags";
 import { isKnownLang, langInfo } from "./languages";
 import { chatComplete, translateModel, type ChatMessage } from "./openrouterClient";

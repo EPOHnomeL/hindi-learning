@@ -10,10 +10,10 @@ import {
   heldLangs,
   mintToken,
   normaliseEmail,
-  SOURCE_LANG,
   topicBySlug,
   translatedTitle,
 } from "./lib";
+import { SOURCE_LANG } from "./sourceLang";
 import { isReadySeller } from "./sellerStatus";
 import { topicLessonCounts } from "./progressCounts";
 import { langInfo } from "./languages";
