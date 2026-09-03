@@ -2,7 +2,7 @@
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
 import { api } from "../_generated/api";
-import { decodeEntities } from "../lib";
+import { decodeEntities } from "../contentBlobs";
 import schema from "../schema";
 import { asUser, seedMember, seedTopic, seedUser } from "./testHelpers";
 

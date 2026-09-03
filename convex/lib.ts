@@ -3,44 +3,9 @@ import type { QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { SOURCE_LANG } from "./sourceLang";
 import { shareLang, shareRole } from "./shareGrants";
+import { decodeEntities, pickContentBody, type ContentBody } from "./contentBlobs";
 
 // Shared backend helpers. (Plain module — no Convex functions registered here.)
-
-
-// ---- Content blobs (see .scratch/html-blob-storage) -------------------------
-
-// The read shape for a rendered body (Lesson / Reference / translated item): a
-// `contentUrl` the client fetches when the body lives in a content blob (all
-// source Lessons/References after the narrow step), or an inline `html` string
-// for a translated row still stored inline (the translation write-path migration
-// is a follow-up). Exactly one is present.
-export type ContentBody = { contentUrl: string; html?: undefined } | { contentUrl?: undefined; html: string };
-
-// The absolute URL of the `/content` HTTP route for a stored blob. Built from
-// CONVEX_SITE_URL (the deployment's `.convex.site` origin), which Convex injects
-// into every function's env. The storageId is an unguessable bearer capability;
-// callers only reach this after the query has authorized them.
-export function contentUrl(storageId: Id<"_storage">): string {
-  const base = process.env.CONVEX_SITE_URL ?? "";
-  return `${base}/content?id=${storageId}`;
-}
-
-// Resolve a row's body: the `/content` URL for its blob, else an inline `html`
-// string (translations still stored inline). Empty inline body when neither.
-export function contentBody(row: { htmlStorageId?: Id<"_storage">; html?: string }): ContentBody {
-  if (row.htmlStorageId) return { contentUrl: contentUrl(row.htmlStorageId) };
-  return { html: row.html ?? "" };
-}
-
-// Choose which body to serve for a translatable item: the translated row's when
-// it has one (blob or inline html), else the source row's blob (course-translation).
-export function pickContentBody(
-  translated: { htmlStorageId?: Id<"_storage">; html?: string } | null | undefined,
-  source: { htmlStorageId?: Id<"_storage"> },
-): ContentBody {
-  if (translated && (translated.htmlStorageId || translated.html)) return contentBody(translated);
-  return contentBody(source);
-}
 
 // Guards the PUBLISH_SECRET-protected mutations the teach CLI / cloud agent call.
 export function assertAdmin(secret: string) {
@@ -289,18 +254,6 @@ export async function readableLang(
   if (requested && held.has(requested)) return requested;
   if (held.has(SOURCE_LANG)) return SOURCE_LANG;
   return [...held].sort()[0]!;
-}
-
-// Titles are authored upstream from generated HTML and can arrive entity-encoded
-// (e.g. "Maps &amp; List"). Decode the handful of named/numeric entities that
-// show up in plain-text titles so the UI never renders a raw "&amp;".
-// ponytail: covers the common entities; extend the map if a new one appears.
-// (Lives here, not content.ts, so lib.loadEdition can decode without a cycle;
-// re-exported from content.ts for its existing importers.)
-export function decodeEntities(s: string): string {
-  return s.replace(/&(amp|lt|gt|quot|#39|apos);/g, (_, e) =>
-    ({ amp: "&", lt: "<", gt: ">", quot: '"', "#39": "'", apos: "'" })[e as string] ?? _,
-  );
 }
 
 // ---- The Edition reader (edition-deepening/01) ------------------------------
