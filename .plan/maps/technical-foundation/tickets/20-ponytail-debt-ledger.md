@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: []
+claimed_by: ponytail-debt-ledger-2026-09-03
+claimed_at: 2026-09-03T14:58:27+02:00
 ---
 # The 19 `ponytail:` markers have no ledger
 
