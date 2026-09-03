@@ -66,8 +66,8 @@ Write the result as JSON, e.g. `upf-theme.json`:
 {
   "light": { "paper": "#f6f8fb", "card": "#ffffff", "ink": "#1e2833", "soft": "#5b6b7b",
     "line": "#dde5ee", "accent": "#2f5d8a", "accent2": "#4a8f8a", "gold": "#c2953f",
-    "hi": "#e6eef7", "danger": "#c0432f", "good": "#3f7d54", "good-b": "#cfe6d6",
-    "bad": "#c0432f", "bad-b": "#f2d6cf" },
+    "hi": "#e6eef7", "danger": "#c0432f", "good": "#cfe6d6", "good-b": "#3f7d54",
+    "bad": "#f2d6cf", "bad-b": "#c0432f" },
   "dark": { "paper": "#151320", "ink": "#e7e2f2" }
 }
 ```

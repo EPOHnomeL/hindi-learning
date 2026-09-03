@@ -34,7 +34,7 @@ const TENANTS: Tenant[] = [
       light: {
         paper: "#f5f7fb", card: "#ffffff", ink: "#23385a", soft: "#5f6f8f", line: "#dbe2ee",
         accent: "#315087", accent2: "#4567af", gold: "#c2953f", hi: "#e6ecf5",
-        danger: "#c0432f", good: "#3f7d54", "good-b": "#cfe6d6", bad: "#c0432f", "bad-b": "#f2d6cf",
+        danger: "#c0432f", good: "#cfe6d6", "good-b": "#3f7d54", bad: "#f2d6cf", "bad-b": "#c0432f",
       },
     },
   },
@@ -46,7 +46,7 @@ const TENANTS: Tenant[] = [
       light: {
         paper: "#f9f4ea", card: "#fffdf8", ink: "#1e2740", soft: "#6a7290", line: "#ece3d2",
         accent: "#1b2a80", accent2: "#3a52a8", gold: "#d8a93f", hi: "#e7ebf7",
-        danger: "#c0432f", good: "#3f7d54", "good-b": "#cfe6d6", bad: "#c0432f", "bad-b": "#f2d6cf",
+        danger: "#c0432f", good: "#cfe6d6", "good-b": "#3f7d54", bad: "#f2d6cf", "bad-b": "#c0432f",
       },
     },
   },
@@ -59,7 +59,7 @@ const TENANTS: Tenant[] = [
       light: {
         paper: "#f6f6f6", card: "#ffffff", ink: "#1c1c1c", soft: "#6e6e6e", line: "#e3e3e3",
         accent: "#2d2d2d", accent2: "#565656", gold: "#2d2d2d", hi: "#ededed",
-        danger: "#c0432f", good: "#3f7d54", "good-b": "#cfe6d6", bad: "#c0432f", "bad-b": "#f2d6cf",
+        danger: "#c0432f", good: "#cfe6d6", "good-b": "#3f7d54", bad: "#f2d6cf", "bad-b": "#c0432f",
       },
     },
   },
@@ -68,14 +68,22 @@ const TENANTS: Tenant[] = [
     // Knot #a48a66 = primary accent/CTAs, Sails #49a2b7 = secondary/links, warm
     // greys for text/borders, pale blue highlight. Light-only — the brand is
     // specified for light backgrounds, so dark falls back to the app default.
-    // State colours (danger/good/bad) are app defaults: the brand has no red/green.
+    // State colours (danger/good/bad) follow the app's own semantic: the brand
+    // has no red/green of its own. `good`/`bad` are the PALE surfaces and
+    // `good-b`/`bad-b` their saturated borders (docs/agents/tenant-branding.md).
+    // All four palettes below had that pair INVERTED until 2026-09-03, copied
+    // from the worked example in that doc, which made a correct quiz answer
+    // render dark-green-on-dark-green in the lesson reader. validateTheme now
+    // rejects the swap. NOTE: re-running this script does NOT repair a tenant
+    // already in the database, since seedTenant is create-only; an existing
+    // tenant needs setTenantTheme / the admin theme editor.
     slug: "yknot",
     displayName: "Y-Knot",
     theme: {
       light: {
         paper: "#f8f8f8", card: "#ffffff", ink: "#111827", soft: "#858fa2", line: "#ede7e0",
         accent: "#a48a66", accent2: "#49a2b7", gold: "#a48a66", hi: "#e7faff",
-        danger: "#c0432f", good: "#3f7d54", "good-b": "#cfe6d6", bad: "#c0432f", "bad-b": "#f2d6cf",
+        danger: "#c0432f", good: "#cfe6d6", "good-b": "#3f7d54", bad: "#f2d6cf", "bad-b": "#c0432f",
       },
     },
   },
