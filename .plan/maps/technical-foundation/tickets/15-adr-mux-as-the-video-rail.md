@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: []
+claimed_by: adr-mux-video-rail-2026-09-03
+claimed_at: 2026-09-03T14:58:39+02:00
 ---
 
 > `/wayfinder .plan/maps/media-generation/tickets/04-adr-mux-as-the-video-rail.md`
