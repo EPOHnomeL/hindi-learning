@@ -5,8 +5,10 @@ import { useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import posthog from "posthog-js";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { isPostHogInitialized } from "../PostHogClient";
 import { Brand } from "./Brand";
 import { CompletionCelebration } from "./Certificate";
 import { Icon } from "./icons";
@@ -323,6 +325,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             </Link>
             <button
               onClick={() => {
+                if (isPostHogInitialized()) posthog.reset();
                 clearAccountLocalStateOnSignOut();
                 void signOut().then(() => router.replace("/"));
               }}

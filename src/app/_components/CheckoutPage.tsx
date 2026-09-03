@@ -4,7 +4,9 @@ import { useMutation, useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useState } from "react";
+import posthog from "posthog-js";
 import { api } from "../../../convex/_generated/api";
+import { isPostHogInitialized } from "../PostHogClient";
 import { langInfo } from "../../../convex/languages";
 import { eftAllowed, regionForCountry } from "../../../convex/regions";
 import { checkoutStep } from "./checkoutDerive";
@@ -65,6 +67,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
     setError(null);
     try {
       const { action, fields } = await startCheckout({ topicSlug, lang, country: country ?? undefined });
+      if (isPostHogInitialized()) posthog.capture("checkout_card_started");
       postToPayFast(action, fields);
     } catch {
       setError(t("checkoutFailed"));
@@ -190,6 +193,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
                     setError(null);
                     try {
                       setStartedEft(await startEft({ topicSlug, lang, country: country ?? undefined }));
+                      if (isPostHogInitialized()) posthog.capture("checkout_eft_started");
                     } catch {
                       setError(t("eftFailed"));
                     } finally {

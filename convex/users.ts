@@ -11,6 +11,7 @@ export const me = query({
   args: {},
   returns: v.union(
     v.object({
+      id: v.id("users"),
       name: v.union(v.string(), v.null()),
       email: v.union(v.string(), v.null()),
     }),
@@ -21,7 +22,7 @@ export const me = query({
     if (!userId) return null;
     const user = await ctx.db.get(userId);
     if (!user) return null;
-    return { name: user.name ?? null, email: user.email ?? null };
+    return { id: userId, name: user.name ?? null, email: user.email ?? null };
   },
 });
 

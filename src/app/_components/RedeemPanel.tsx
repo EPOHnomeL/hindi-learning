@@ -6,7 +6,9 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import posthog from "posthog-js";
 import { api } from "../../../convex/_generated/api";
+import { isPostHogInitialized } from "../PostHogClient";
 import { normaliseCode } from "../../../convex/voucherCode";
 import { SignIn } from "./SignIn";
 import { withLang } from "./editionUrl";
@@ -155,6 +157,7 @@ function SignedInRedeem({ code, setCode }: { code: string; setCode: (c: string) 
         /* nothing to clean up */
       }
       setDone(where);
+      if (isPostHogInitialized()) posthog.capture("voucher_redeemed");
     } catch (e) {
       setError(messageFor(e, t));
     } finally {

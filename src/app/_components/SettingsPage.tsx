@@ -5,8 +5,10 @@ import { useMutation, useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import posthog from "posthog-js";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { isPostHogInitialized } from "../PostHogClient";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { Icon } from "./icons";
 import { LocalePicker } from "./LocalePicker";
@@ -86,6 +88,7 @@ export function SettingsPage() {
 
         <button
           onClick={() => {
+            if (isPostHogInitialized()) posthog.reset();
             clearAccountLocalStateOnSignOut();
             void signOut().then(() => router.replace("/"));
           }}

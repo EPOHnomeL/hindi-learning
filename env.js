@@ -11,12 +11,16 @@ export const env = createEnv({
   client: {
     // The Convex deployment URL the browser client connects to.
     NEXT_PUBLIC_CONVEX_URL: z.string().url(),
+    NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: z.string().min(1).optional(),
+    NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
     // NEXT_PUBLIC_COOKIE_DOMAIN is gone: cookies are host-only so each tenant
     // subdomain has its own session, language and theme (ADR 0025). Don't add it
     // back — a parent `Domain` is exactly what shared one account across brands.
   },
   runtimeEnv: {
     NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL,
+    NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN,
+    NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
   },
   // Let Docker/CI image builds opt out of validation (create-t3-app convention).
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

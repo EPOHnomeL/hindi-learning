@@ -1,0 +1,255 @@
+{
+  "version": 1,
+  "runId": "a956865f-d0c2-4511-a923-1a56ebd89115",
+  "tasks": [
+    {
+      "id": "8373427c-e1f2-4360-b0c9-009fdea2f421",
+      "type": "warehouse",
+      "status": "running",
+      "dependsOn": [
+        "5dd1b944-b031-4dad-8907-eb59a64f9a76",
+        "f9b01550-698d-412e-bbac-082c3005c48e",
+        "6d9d33c4-4704-4352-bc24-a4428a07534d",
+        "4ed5b393-ed21-4772-820b-1910e9992b5f",
+        "f96fdf45-0811-4d0b-b18d-073dfef93b58",
+        "46942516-add4-4c37-a058-e7c44cba1157",
+        "b3a3cb10-745a-4610-bac8-8198c50c2f68"
+      ],
+      "inputs": {
+        "sources": [
+          {
+            "kind": "Convex",
+            "label": "Convex",
+            "mode": "in-cli",
+            "matchedSignal": "found `convex` in package.json"
+          }
+        ]
+      },
+      "attempts": 1,
+      "maxAttempts": 2,
+      "enqueuedBy": "orchestrator",
+      "optional": true,
+      "createdAt": "2026-09-03T10:05:07.390Z",
+      "startedAt": "2026-09-03T10:13:50.653Z"
+    },
+    {
+      "id": "5dd1b944-b031-4dad-8907-eb59a64f9a76",
+      "type": "install",
+      "label": "Add PostHog SDK",
+      "status": "done",
+      "dependsOn": [],
+      "inputs": {},
+      "attempts": 1,
+      "maxAttempts": 2,
+      "enqueuedBy": "orchestrator",
+      "createdAt": "2026-09-03T10:05:24.759Z",
+      "startedAt": "2026-09-03T10:05:46.501Z",
+      "handoff": {
+        "goals": "Install the PostHog SDK using the project’s package manager and ensure the dependency is declared for later integration steps.",
+        "did": "Inspected `package.json`, detected pnpm via the wizard tool, and found neither an existing PostHog dependency nor Next.js route handlers that send server-side events. Attempted `pnpm add posthog-js`; pnpm could not proceed because the existing `node_modules` is linked to `C:\\Users\\lemon\\AppData\\Local\\pnpm\\store\\v10` while this pnpm invocation expects `C:\\Users\\lemon\\.pnpm\\store\\v10`. Per the environment-failure fallback, added `posthog-js` at the known-good declaration `^1.407.2` to `package.json`. This makes the browser SDK importable as `posthog-js` once dependencies are installed; no server SDK was added because no server-side PostHog event code exists.",
+        "forNextAgent": "Use `posthog-js` for the client integration. The lockfile and node_modules were not updated because pnpm was blocked by the pre-existing store-location mismatch. Resolve the pnpm store/reinstall dependencies in the user environment before build verification. No PostHog configuration was written in this task.",
+        "filesTouched": [
+          "package.json"
+        ],
+        "evidence": "`detect_package_manager` reported pnpm and `pnpm add posthog-js` was attempted once. The command failed with `ERR_PNPM_UNEXPECTED_STORE`, explicitly identifying an existing node_modules store mismatch. The targeted manifest edit succeeded.",
+        "assumptions": "The absence of Next.js App Router route files and PostHog capture references means only the client SDK is needed at this installation step.",
+        "conflict": "`pnpm add posthog-js` could not update the lockfile because the project’s existing node_modules uses a different pnpm store location."
+      },
+      "finishedAt": "2026-09-03T10:06:11.486Z"
+    },
+    {
+      "id": "f9b01550-698d-412e-bbac-082c3005c48e",
+      "type": "init",
+      "label": "Initialize PostHog",
+      "status": "done",
+      "dependsOn": [],
+      "inputs": {},
+      "attempts": 1,
+      "maxAttempts": 2,
+      "enqueuedBy": "orchestrator",
+      "createdAt": "2026-09-03T10:05:27.658Z",
+      "startedAt": "2026-09-03T10:05:46.511Z",
+      "handoff": {
+        "goals": "Initialize PostHog once for the Next.js App Router client, configure its public environment variables, and document those variables for developers.",
+        "did": "Created `src/app/PostHogClient.tsx`, a browser-only client component that imports the singleton `posthog-js` SDK and calls `posthog.init()` once when both `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` and `NEXT_PUBLIC_POSTHOG_HOST` are present. It uses the configured host as `api_host`, enables exception capture, retains default capture behavior, and emits the prescribed development error if either configuration variable is absent; production remains a no-op. Mounted `<PostHogClient />` once in `src/app/layout.tsx`, so later client call sites must reach this same configured SDK via `import posthog from \"posthog-js\"`. Set the real public PostHog token and EU host in `.env.local` through `set_env_values`. Added placeholder documentation for both keys to `.env.example`. No CSP was detected, so no CSP directives (`script-src`, `connect-src`, or `worker-src`) were changed.",
+        "forNextAgent": "The app is on Next.js 15.2, below the 15.3 instrumentation-client threshold, so the root-mounted client component is intentional. Import the default `posthog` singleton from `posthog-js` in client components; do not construct or initialize another client. No server-side PostHog client was added in this initialization task.",
+        "filesTouched": [
+          "src/app/PostHogClient.tsx",
+          "src/app/layout.tsx",
+          ".env.local",
+          ".env.example"
+        ],
+        "evidence": "`check_env_keys` reported both `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` and `NEXT_PUBLIC_POSTHOG_HOST` as present in `.env.local`; final file reads confirmed the guarded initializer and `.env.example` documentation. `package.json` also contains `posthog-js` (^1.407.2). Per task instructions, no build, lint, typecheck, or tests were run.",
+        "assumptions": "The project does not ship a Content-Security-Policy: repository search found no application CSP configuration. The actual production deployment must supply the same two `NEXT_PUBLIC_POSTHOG_*` variables."
+      },
+      "finishedAt": "2026-09-03T10:06:41.281Z"
+    },
+    {
+      "id": "6d9d33c4-4704-4352-bc24-a4428a07534d",
+      "type": "identify",
+      "label": "Add user identification",
+      "status": "done",
+      "dependsOn": [
+        "5dd1b944-b031-4dad-8907-eb59a64f9a76",
+        "f9b01550-698d-412e-bbac-082c3005c48e"
+      ],
+      "inputs": {},
+      "attempts": 1,
+      "maxAttempts": 2,
+      "enqueuedBy": "orchestrator",
+      "createdAt": "2026-09-03T10:05:29.517Z",
+      "startedAt": "2026-09-03T10:06:47.608Z",
+      "handoff": {
+        "goals": "Wire PostHog user identification so browser events and exception capture are associated with the app's stable authenticated user ID, and reset that identity on logout.",
+        "did": "Updated `convex/users.ts` so the existing authenticated `users.me` query deliberately exposes the immutable Convex `users` document ID alongside the existing name/email profile fields. Updated `src/app/ConvexClientProvider.tsx` with a root-mounted client identity synchronizer: after Convex resolves an authenticated user (including after login/signup and on page refresh), it calls `posthog.identify()` using that document ID as the distinct ID and sends optional email/name only as person properties. It first confirms the shared PostHog client was initialized. Updated `src/app/PostHogClient.tsx` to expose that initialization state for guarded downstream SDK calls. Updated the three explicit sign-out boundaries in `src/app/_components/Dashboard.tsx`, `src/app/_components/CourseShell.tsx`, and `src/app/_components/SettingsPage.tsx` to call guarded `posthog.reset()` before their existing Convex sign-out flow. This ensures subsequent browser events and exception autocapture inherit the persisted identified identity until logout.",
+        "forNextAgent": "Client-side PostHog is initialized once by the root-mounted `PostHogClient`; client event/error callsites should import the singleton from `posthog-js` and do not need to identify per event. The root `PostHogIdentity` component identifies authenticated users from `api.users.me`; its ID is the stable Convex document ID, while email/name must remain person properties and never be included in capture event properties. All current `signOut()` callsites reset PostHog first. There is no server-side PostHog SDK or server event instrumentation in this project, so no tracing-header/server identity wiring was added.",
+        "filesTouched": [
+          "convex/users.ts",
+          "src/app/ConvexClientProvider.tsx",
+          "src/app/PostHogClient.tsx",
+          "src/app/_components/Dashboard.tsx",
+          "src/app/_components/CourseShell.tsx",
+          "src/app/_components/SettingsPage.tsx"
+        ],
+        "evidence": "Read the Convex auth callback and schema to confirm `getAuthUserId()` returns the stable `users` document ID and that email/name are optional profile fields. Reviewed the final identity component and all `signOut()` matches: the only three sign-out callsites each invoke guarded `posthog.reset()` before calling `signOut()`. Per task instruction, no build, lint, typecheck, or tests were run.",
+        "assumptions": "The root layout continues to render `PostHogClient` before `ConvexClientProvider`, as observed, so `PostHogIdentity` runs against the already configured singleton. Convex deployment/code generation will pick up the expanded `api.users.me` return shape in the normal project workflow."
+      },
+      "finishedAt": "2026-09-03T10:08:13.427Z"
+    },
+    {
+      "id": "4ed5b393-ed21-4772-820b-1910e9992b5f",
+      "type": "error-tracking",
+      "label": "Enable error tracking",
+      "status": "done",
+      "dependsOn": [
+        "5dd1b944-b031-4dad-8907-eb59a64f9a76",
+        "f9b01550-698d-412e-bbac-082c3005c48e"
+      ],
+      "inputs": {},
+      "attempts": 1,
+      "maxAttempts": 2,
+      "enqueuedBy": "orchestrator",
+      "createdAt": "2026-09-03T10:05:31.625Z",
+      "startedAt": "2026-09-03T10:06:47.611Z",
+      "handoff": {
+        "goals": "Ensure uncaught Next.js App Router errors reach PostHog through one global framework error boundary, without installing dependencies or running verification commands.",
+        "did": "Created `src/app/global-error.tsx`, the App Router global client error boundary. It initializes the existing PostHog singleton and uses `posthog.captureException(error)` in an effect to send errors handled by the global boundary to PostHog Error Tracking. Updated `src/app/PostHogClient.tsx` to expose an idempotent `initializePostHog()` helper, preserving the existing environment-variable guard, `capture_exceptions: true` initialization, and development error behavior. The helper now returns whether initialization is available, so the global boundary does not attempt a capture when production configuration is absent. This feeds PostHog Error Tracking with unhandled application failures via exception events.",
+        "forNextAgent": "The error boundary is intentionally `src/app/global-error.tsx` because this is a Next.js App Router project. It imports the default `posthog-js` singleton and reuses the existing initializer rather than constructing a second client. No manual component- or route-level exception capture was added. The existing dependency installation remains subject to the prior pnpm store mismatch noted by the install task.",
+        "filesTouched": [
+          "src/app/PostHogClient.tsx",
+          "src/app/global-error.tsx"
+        ],
+        "evidence": "Final file reads confirm `global-error.tsx` invokes `posthog.captureException(error)` only after `initializePostHog()` succeeds, and `PostHogClient.tsx` initializes with the configured environment values, `capture_exceptions: true`, and idempotence. Per task constraints, no build, tests, lint, or package installation commands were run.",
+        "assumptions": "Assumed the existing PostHog initialization from the prior task is the intended browser singleton and that App Router's `global-error.tsx` is the required framework-level boundary. The later build/review task should verify compilation."
+      },
+      "finishedAt": "2026-09-03T10:07:40.179Z"
+    },
+    {
+      "id": "f96fdf45-0811-4d0b-b18d-073dfef93b58",
+      "type": "capture",
+      "label": "Instrument learning events",
+      "status": "done",
+      "dependsOn": [
+        "6d9d33c4-4704-4352-bc24-a4428a07534d"
+      ],
+      "inputs": {},
+      "attempts": 1,
+      "maxAttempts": 2,
+      "enqueuedBy": "orchestrator",
+      "createdAt": "2026-09-03T10:05:33.202Z",
+      "startedAt": "2026-09-03T10:08:17.329Z",
+      "handoff": {
+        "goals": "Select and instrument meaningful product events in the Next.js App Router app, preserving the existing PostHog identity model and documenting the resulting event contract.",
+        "did": "Created `.posthog-wizard-cache/.posthog-events.json` with eight core events spanning authentication, access-code enrollment, voucher redemption, payment initiation, quiz responses, and lesson completion. In `src/app/_components/SignIn.tsx`, added guarded personless captures for password authentication submission and Google authentication start; properties only describe authentication flow and checkout intent. In `src/app/_components/JoinPanel.tsx`, added a guarded personless capture before access-code authentication; no access code or entered name is sent. In `src/app/_components/RedeemPanel.tsx`, captured successful voucher redemption after the authenticated mutation succeeds. In `src/app/_components/CheckoutPage.tsx`, captured successful card checkout creation immediately before redirect and successful EFT intent creation. In `src/app/_components/ArtifactView.tsx`, captured quiz answers with only the boolean correctness outcome and centralized lesson completion capture for advancing, finishing, and read-only next-lesson paths. All authenticated captures use the existing root PostHog identity; every capture is guarded by `isPostHogInitialized()` so missing optional configuration remains non-breaking.",
+        "forNextAgent": "No build, lint, typecheck, or tests were run, per task instructions. The event manifest is the source of truth for the eight new events. Authentication submission and access-code join events correctly remain personless because identity does not exist at those action points; successful redemption, checkout, quiz, and completion captures inherit the root Convex-backed PostHog identity. No PII, entered credentials, access/voucher codes, course text, names, or emails are included in capture properties.",
+        "filesTouched": [
+          ".posthog-wizard-cache/.posthog-events.json",
+          "src/app/_components/SignIn.tsx",
+          "src/app/_components/JoinPanel.tsx",
+          "src/app/_components/RedeemPanel.tsx",
+          "src/app/_components/CheckoutPage.tsx",
+          "src/app/_components/ArtifactView.tsx"
+        ],
+        "evidence": "Final reads confirmed all eight planned events in the manifest and a targeted source search found matching guarded `posthog.capture()` calls in each listed component. The reviewed properties are limited to `flow`, `checkout_intent`, `correct`, and `completion_action`; no PII is captured.",
+        "assumptions": "The root-mounted `PostHogClient` initializes before user actions occur and the existing `PostHogIdentity` synchronizer has identified authenticated Convex users, as established in the prior handoff."
+      },
+      "finishedAt": "2026-09-03T10:10:17.827Z"
+    },
+    {
+      "id": "46942516-add4-4c37-a058-e7c44cba1157",
+      "type": "review",
+      "label": "Review integration",
+      "status": "done",
+      "dependsOn": [
+        "5dd1b944-b031-4dad-8907-eb59a64f9a76",
+        "f9b01550-698d-412e-bbac-082c3005c48e",
+        "6d9d33c4-4704-4352-bc24-a4428a07534d",
+        "f96fdf45-0811-4d0b-b18d-073dfef93b58",
+        "4ed5b393-ed21-4772-820b-1910e9992b5f"
+      ],
+      "inputs": {},
+      "attempts": 1,
+      "maxAttempts": 2,
+      "enqueuedBy": "orchestrator",
+      "createdAt": "2026-09-03T10:05:35.456Z",
+      "startedAt": "2026-09-03T10:10:21.743Z",
+      "handoff": {
+        "goals": "Install the declared PostHog SDK, verify the project-defined build/typecheck/lint checks, and strictly review the upstream integration changeset across minimality, unrelated changes, codebase patterns, and framework example shape.",
+        "did": "Attempted the required single `pnpm install`; pnpm stopped at an interactive prompt asking to remove and reinstall the existing modules directory, so dependency provisioning did not complete. Reviewed every upstream changeset file (using the env-key tool for `.env` state), the changed query's callers, the framework reference, and neighboring component/config patterns. Made 6 review fixes: (1, Minimal/framework correctness) changed `src/app/PostHogClient.tsx` to initialize the external SDK in `useEffect` rather than during React render; (1, Codebase patterns) added both optional PostHog public variables to the existing `env.js` createEnv client schema/runtime map and consumed that typed config from the initializer; (4, Codebase patterns) normalized the new `posthog-js` import placement in `src/app/ConvexClientProvider.tsx`, `src/app/_components/Dashboard.tsx`, `src/app/_components/CourseShell.tsx`, and `src/app/_components/SettingsPage.tsx`. No event names, event properties, capture timing/locations, identity values, or logout behavior changed. Review dimensions: Minimal passes after the render-side-effect fix; Unrelated passes; Codebase patterns pass after config/import fixes; Example shapes pass for the Next.js 15.2 root-mounted singleton initializer, identity synchronization, guarded captures/resets, and global exception boundary.",
+        "forNextAgent": "The code integration is in place, but `posthog-js` is still not installed in `node_modules` and absent from the lockfile. In an interactive terminal, run `pnpm install`, approve pnpm's clean reinstall prompt (or reconcile the existing pnpm store linkage), then rerun `pnpm typecheck` and `pnpm build`. There is no lint script. The environment keys are present in `.env.local`; production deployment must set the same public variables.",
+        "filesTouched": [
+          "env.js",
+          "src/app/PostHogClient.tsx",
+          "src/app/ConvexClientProvider.tsx",
+          "src/app/_components/Dashboard.tsx",
+          "src/app/_components/CourseShell.tsx",
+          "src/app/_components/SettingsPage.tsx"
+        ],
+        "evidence": "`check_env_keys` reported both `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` and `NEXT_PUBLIC_POSTHOG_HOST` present in `.env.local`. `pnpm typecheck` ran and its only diagnostics were TS2307 module-resolution failures for uninstalled `posthog-js` imports. `pnpm build` reached Next.js compilation and failed only with webpack `Module not found: Can't resolve 'posthog-js'`. `package.json` declares `posthog-js` as `^1.407.2`. No lint script is defined, and tests were not run.",
+        "assumptions": "Because pnpm did not complete dependency provisioning, compilation beyond resolving `posthog-js` could not be observed. The reviewed source and framework patterns indicate no other integration-specific issue, but a successful install is required to prove that.",
+        "conflict": "`pnpm install` stopped at an interactive clean-reinstall prompt, leaving `posthog-js` uninstalled; consequently `pnpm typecheck` and `pnpm build` fail only on resolving that declared module."
+      },
+      "finishedAt": "2026-09-03T10:13:42.950Z"
+    },
+    {
+      "id": "b3a3cb10-745a-4610-bac8-8198c50c2f68",
+      "type": "dashboard",
+      "label": "Build learning dashboard",
+      "status": "done",
+      "dependsOn": [
+        "f96fdf45-0811-4d0b-b18d-073dfef93b58"
+      ],
+      "inputs": {},
+      "attempts": 1,
+      "maxAttempts": 2,
+      "enqueuedBy": "orchestrator",
+      "createdAt": "2026-09-03T10:05:37.105Z",
+      "startedAt": "2026-09-03T10:10:21.749Z",
+      "handoff": {
+        "goals": "Create a starter PostHog dashboard with a few insights based on the integration's captured events.",
+        "did": "Created the PostHog dashboard `Analytics basics (wizard)` (ID 931180) and attached five `(wizard)` insights: Authentication starts, Checkout starts by method, Learning activation funnel, Lesson completions, and Quiz answer accuracy. The views use only the eight events defined by the capture step and provide authentication, checkout, activation, progress, and answer-correctness coverage.",
+        "forNextAgent": "Dashboard URL: https://eu.posthog.com/project/264778/dashboard/931180. It has five attached insight tiles and will populate as production events arrive; no repository files were changed in this task.",
+        "filesTouched": [],
+        "evidence": "PostHog MCP returned dashboard ID 931180 and a successful saved insight response for each of the five insights, each showing `dashboards: [931180]` and a created dashboard tile.",
+        "reportSection": "## Starter analytics dashboard\n\nCreated [Analytics basics (wizard)](https://eu.posthog.com/project/264778/dashboard/931180) with five event-contract-based views: authentication starts, checkout starts by payment method, quiz-to-lesson activation funnel, daily lesson completions, and quiz answer accuracy. The insights are attached to the dashboard and will populate as events arrive."
+      },
+      "finishedAt": "2026-09-03T10:11:12.427Z"
+    },
+    {
+      "id": "9386ca75-03fd-4114-b992-f733063447f9",
+      "type": "report",
+      "label": "Report integration",
+      "status": "pending",
+      "dependsOn": [
+        "b3a3cb10-745a-4610-bac8-8198c50c2f68",
+        "46942516-add4-4c37-a058-e7c44cba1157",
+        "8373427c-e1f2-4360-b0c9-009fdea2f421"
+      ],
+      "inputs": {},
+      "attempts": 0,
+      "maxAttempts": 2,
+      "enqueuedBy": "orchestrator",
+      "createdAt": "2026-09-03T10:05:40.233Z"
+    }
+  ]
+}

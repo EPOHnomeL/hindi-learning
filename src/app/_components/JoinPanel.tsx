@@ -7,7 +7,9 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import posthog from "posthog-js";
 import { api } from "../../../convex/_generated/api";
+import { isPostHogInitialized } from "../PostHogClient";
 import { normaliseAccessCode } from "../../../convex/accessCodeFormat";
 import { CONSENT_VERSION } from "../../../convex/joinConsent";
 import { armInstallPrompt } from "./accountLocalState";
@@ -165,6 +167,7 @@ function Identity({ code }: { code: string }) {
         if (!ready) return;
         setBusy(true);
         setError(null);
+        if (isPostHogInitialized()) posthog.capture("access_code_join_submitted");
         try {
           await signIn("accessCode", { code, nickname, consentVersion: CONSENT_VERSION });
           // **Arm the install sheet for the course screen they are about to land on.**

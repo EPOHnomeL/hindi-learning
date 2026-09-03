@@ -6,7 +6,9 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import posthog from "posthog-js";
 import { api } from "../../../convex/_generated/api";
+import { isPostHogInitialized } from "../PostHogClient";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { LockedPane, Paygate } from "./Paygate";
 import { checkoutLink, publicCourseUrl, useEditionLang, withLang } from "./editionUrl";
@@ -477,11 +479,17 @@ function LessonView({
       const d = e.data as { __lesson?: boolean; type?: string; quizId?: string; answer?: unknown; correct?: unknown };
       if (d?.__lesson && d.type === "response" && d.quizId) {
         void recordResponse({ topicSlug, lessonKey, quizId: d.quizId, answer: String(d.answer ?? ""), correct: Boolean(d.correct) });
+        if (isPostHogInitialized()) posthog.capture("quiz_answered", { correct: Boolean(d.correct) });
       }
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [topicSlug, lessonKey, recordResponse, readOnly]);
+
+  const completeLesson = (completionAction: "advance" | "finish") => {
+    void setProgress({ topicSlug, lessonKey, status: "completed" });
+    if (isPostHogInitialized()) posthog.capture("lesson_completed", { completion_action: completionAction });
+  };
 
   if (lesson === undefined || html === undefined) return <ReaderSkeleton />;
   if (lesson === null) return <p className="text-soft">{t("lessonNotFound")}</p>;
@@ -537,7 +545,7 @@ function LessonView({
               <Link
                 href={withLang(`/courses/${topicSlug}/lessons/${nextLessonKey}`, lang)}
                 onClick={() => {
-                  if (!preview && !completed) void setProgress({ topicSlug, lessonKey, status: "completed" });
+                  if (!preview && !completed) completeLesson("advance");
                 }}
                 className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90"
               >
@@ -609,13 +617,13 @@ function LessonView({
                 : null
             }
             completed={completed}
-            onAdvance={() => void setProgress({ topicSlug, lessonKey, status: "completed" })}
+            onAdvance={() => completeLesson("advance")}
             finish={
               completed
                 ? null
                 : {
                     label: courseCompleted ? t("finishCourse") : t("markComplete"),
-                    onClick: () => void setProgress({ topicSlug, lessonKey, status: "completed" }),
+                    onClick: () => completeLesson("finish"),
                   }
             }
           />

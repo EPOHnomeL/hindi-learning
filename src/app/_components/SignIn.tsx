@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import posthog from "posthog-js";
+import { isPostHogInitialized } from "../PostHogClient";
 import { readLastAuthMethod, rememberAuthMethod, type AuthMethod } from "./accountLocalState";
 import { Logo } from "./Logo";
 import { CheckoutSteps } from "./Paygate";
@@ -150,6 +152,7 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
             setError(null);
             const formData = new FormData(e.currentTarget);
             formData.set("flow", flow);
+            if (isPostHogInitialized()) posthog.capture("auth_password_submitted", { flow, checkout_intent: buyIntent });
             try {
               await signIn("password", formData);
               // Only on success, and only after it — a failed attempt shouldn't
@@ -175,6 +178,7 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
               setBusy(true);
               setError(null);
               try {
+                if (isPostHogInitialized()) posthog.capture("auth_google_started", { checkout_intent: buyIntent });
                 // Written *before* the call, unlike the password path: `signIn`
                 // hands the browser to Google, so nothing after the await is
                 // guaranteed to run. The cost of being early is a stale hint if the

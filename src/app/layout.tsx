@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { ConvexClientProvider } from "./ConvexClientProvider";
+import { PostHogClient } from "./PostHogClient";
 import { AppTabs } from "./_components/AppTabs";
 import { RegisterServiceWorker } from "./_components/RegisterServiceWorker";
 import { headers } from "next/headers";
@@ -133,6 +134,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             Mirror the reader's isDevanagari handling: swap the body font to Noto
             Devanagari for the whole chrome. Latin text falls back within the stack. */}
         <body className={isDevanagari(locale) ? "font-deva" : undefined}>
+          <PostHogClient />
           {/* Messages + locale flow to every Client Component from the request
               config (getRequestConfig) — no props needed; the provider inherits
               them server-side. Server Components use getTranslations directly. */}

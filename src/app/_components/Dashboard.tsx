@@ -6,8 +6,10 @@ import { type FunctionReturnType } from "convex/server";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import posthog from "posthog-js";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { isPostHogInitialized } from "../PostHogClient";
 import { langInfo } from "../../../convex/languages";
 import { tenantPill } from "~/design/tenantPill";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
@@ -182,6 +184,7 @@ export function Dashboard() {
             )}
             <button
               onClick={() => {
+                if (isPostHogInitialized()) posthog.reset();
                 clearAccountLocalStateOnSignOut();
                 void signOut().then(() => router.replace("/"));
               }}
