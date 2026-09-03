@@ -105,7 +105,7 @@ export function OfflineHome() {
             <li key={c.slug}>
               <button
                 onClick={() => setTapped(true)}
-                className="w-full rounded-2xl border border-line bg-card p-5 text-left shadow-sm"
+                className="w-full rounded-2xl border border-line bg-card p-5 text-start shadow-sm"
               >
                 <span className="block text-lg font-semibold leading-snug text-ink">{c.title}</span>
                 {c.lessonCount !== undefined && c.completedCount !== undefined && (

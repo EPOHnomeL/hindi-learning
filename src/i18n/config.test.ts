@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_LOCALE, LOCALES, resolveLocale, withLocaleCookie } from "./config";
+import { langDir } from "../../convex/languages";
 
 // The chrome offer-set is locked by ticket 04: exactly the locales that have a
 // `messages/<code>.json` file (en/af/es/fr/hi/ur; Urdu joined 2026-09-03). resolveLocale is the pure guard
@@ -53,5 +54,31 @@ describe("withLocaleCookie", () => {
   it("leaves cookies whose names merely start the same alone", () => {
     // `hindi_lang_x` and the content-language key are different cookies.
     expect(withLocaleCookie("hindi_share_lang=tok:hi", "hi")).toBe("hindi_share_lang=tok:hi; hindi_lang=hi");
+  });
+});
+
+// The chrome direction seam (technical-foundation ticket 10). `<html dir>` is
+// langDir(locale) and nothing else, so the whole RTL flip is decidable from the
+// offer-set without a browser. convex/languages.test.ts already covers langDir
+// over the ~130-entry content registry; what is pinned here is the narrower
+// chrome claim: which of the SIX languages the app shell itself speaks paints
+// right-to-left.
+describe("chrome direction", () => {
+  it("paints Urdu right-to-left and every other offered locale left-to-right", () => {
+    const dirs = Object.fromEntries(LOCALES.map((code) => [code, langDir(code)]));
+    expect(dirs).toEqual({
+      en: "ltr",
+      af: "ltr",
+      es: "ltr",
+      fr: "ltr",
+      hi: "ltr",
+      ur: "rtl",
+    });
+  });
+
+  it("gives every offered locale a direction, so <html dir> is never empty", () => {
+    for (const code of LOCALES) {
+      expect(["ltr", "rtl"], code).toContain(langDir(code));
+    }
   });
 });

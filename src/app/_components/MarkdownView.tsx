@@ -20,7 +20,7 @@ export function Markdown({ source, className }: { source: string; className?: st
         if (b.kind === "list") {
           const Tag = b.ordered ? "ol" : "ul";
           return (
-            <Tag key={i} className={`ml-5 flex flex-col gap-1 ${b.ordered ? "list-decimal" : "list-disc"}`}>
+            <Tag key={i} className={`ms-5 flex flex-col gap-1 ${b.ordered ? "list-decimal" : "list-disc"}`}>
               {b.items.map((item, j) => (
                 <li key={j}>{renderSpans(item)}</li>
               ))}
@@ -36,7 +36,7 @@ export function Markdown({ source, className }: { source: string; className?: st
         }
         if (b.kind === "quote") {
           return (
-            <blockquote key={i} className="border-l-2 border-line pl-3 text-soft">
+            <blockquote key={i} className="border-s-2 border-line ps-3 text-soft">
               {renderSpans(b.spans)}
             </blockquote>
           );

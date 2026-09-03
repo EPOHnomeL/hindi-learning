@@ -31,7 +31,7 @@ export function LocalePicker({ className }: { className?: string }) {
         aria-label={t("language")}
         value={locale}
         onChange={(e) => setLocale(e.target.value)}
-        className="cursor-pointer border-0 bg-transparent pr-1 text-sm text-ink focus:outline-none"
+        className="cursor-pointer border-0 bg-transparent pe-1 text-sm text-ink focus:outline-none"
       >
         {LOCALES.map((code) => {
           const info = langInfo(code);

@@ -122,7 +122,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
           </span>
         </div>
         {price && (
-          <div className="shrink-0 text-right">
+          <div className="shrink-0 text-end">
             <span className="inline-block rounded-full bg-gold/15 px-2.5 py-1 text-xs font-bold tabular-nums text-gold">
               {price.main}
             </span>
@@ -200,7 +200,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
                       setBusy(false);
                     }
                   }}
-                  className="w-full rounded-[10px] border border-line px-4 py-3 text-left transition-colors hover:border-gold disabled:cursor-not-allowed disabled:opacity-45"
+                  className="w-full rounded-[10px] border border-line px-4 py-3 text-start transition-colors hover:border-gold disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <b className="block text-sm font-semibold text-ink">{t("methodEftTitle")}</b>
                   <span className="mt-0.5 block text-xs leading-relaxed text-soft">{t("methodEftDesc")}</span>
@@ -208,7 +208,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
                 <button
                   type="button"
                   onClick={() => void checkout()}
-                  className="w-full rounded-[10px] border border-line px-4 py-3 text-left transition-colors hover:border-gold disabled:cursor-not-allowed disabled:opacity-45"
+                  className="w-full rounded-[10px] border border-line px-4 py-3 text-start transition-colors hover:border-gold disabled:cursor-not-allowed disabled:opacity-45"
                 >
                   <b className="block text-sm font-semibold text-ink">
                     {busy && method === "card" ? t("redirecting") : t("methodCardTitle")}

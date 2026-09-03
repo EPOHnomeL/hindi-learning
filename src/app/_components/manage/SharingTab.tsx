@@ -165,7 +165,7 @@ function PublishToggle({
           }}
           className="peer sr-only"
         />
-        <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 peer-checked:after:translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
+        <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
       </label>
     </div>
   );
@@ -245,7 +245,7 @@ function PublicLinkToggle({
         </div>
         <label className="relative inline-flex shrink-0 cursor-pointer items-center">
           <input type="checkbox" checked={on} disabled={busy} onChange={(e) => run(e.target.checked)} className="peer sr-only" />
-          <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 peer-checked:after:translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
+          <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
         </label>
       </div>
 
@@ -801,7 +801,7 @@ function EditionDangerMenu({ topicSlug, edition }: { topicSlug: string; edition:
       {open && (
         <div
           role="menu"
-          className="pop-in absolute bottom-[calc(100%+6px)] left-0 z-50 min-w-56 rounded-xl border border-line bg-card p-1.5 shadow-xl"
+          className="pop-in absolute bottom-[calc(100%+6px)] start-0 z-50 min-w-56 rounded-xl border border-line bg-card p-1.5 shadow-xl"
         >
           {canRegenerate && (
             <MenuItem icon="refresh" onClick={() => pick("regenerate")}>
@@ -1001,7 +1001,7 @@ export function AddLanguagePanel({
       />
       {/* Fixed-height, scrollable list: the panel keeps its height whether the
           query matches 8 languages, one, or none. Empty query pre-fills. */}
-      <div className="h-[290px] overflow-y-auto pr-0.5">
+      <div className="h-[290px] overflow-y-auto pe-0.5">
         {matches.length > 0 ? (
           <ul className="flex flex-col gap-1.5">
             {matches.map((l) => (
@@ -1010,7 +1010,7 @@ export function AddLanguagePanel({
                   type="button"
                   disabled={busy}
                   onClick={() => add(l.code)}
-                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-left text-sm text-ink transition-colors hover:bg-hi"
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-start text-sm text-ink transition-colors hover:bg-hi"
                 >
                   {/* English name only; see the endonym note in ManageShell. */}
                   <span className="min-w-0 truncate">{l.name}</span>

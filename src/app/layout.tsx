@@ -1,7 +1,7 @@
 import "~/styles/globals.css";
 
 import { type Metadata, type Viewport } from "next";
-import { Spectral, Noto_Serif_Devanagari } from "next/font/google";
+import { Spectral, Noto_Serif_Devanagari, Noto_Naskh_Arabic } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale } from "next-intl/server";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
@@ -13,7 +13,7 @@ import { headers } from "next/headers";
 import { getTenantSlug, getTenantView } from "~/lib/tenant-server";
 import { buildTenantThemeCss } from "~/design/tokens";
 import { pwaThemeColor } from "~/lib/pwa";
-import { isDevanagari } from "../../convex/languages";
+import { isDevanagari, isRtl, langDir } from "../../convex/languages";
 
 // Per-host metadata (issue 11): a tenant serves its own favicon (and browser-tab
 // name), so the whitelabel site never shows the default "My Course" mark. Falls
@@ -64,6 +64,20 @@ const notoDeva = Noto_Serif_Devanagari({
   weight: ["400", "600"],
   variable: "--font-noto-deva",
 });
+// Escape hatch B, the Arabic-script twin of notoDeva: Spectral has no Arabic
+// glyphs either, so Urdu chrome would render as tofu without a face of its own.
+// Naskh rather than Nastaliq deliberately (technical-foundation ticket 09, s4):
+// Nastaliq is what an Urdu reader expects for running prose, but its sloping
+// baseline needs roughly double the line-height, and the chrome is full of
+// fixed-height controls (the bottom tab bar, buttons, badges, the line-clamped
+// card subtitles pinned at min-h-[38px]) that would clip or reflow. Naskh is the
+// ordinary face for Urdu UI for exactly that reason, and it needs no global
+// line-height change.
+const notoNaskh = Noto_Naskh_Arabic({
+  subsets: ["arabic"],
+  weight: ["400", "600"],
+  variable: "--font-noto-naskh",
+});
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   // Resolve the tenant server-side (issue 11): the slug is handed to the client
@@ -90,12 +104,21 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   // The active chrome locale, resolved from the cookie by getRequestConfig
   // (ticket 04): `<html lang>` reflects it so the document announces the right
   // language on first paint, and the locale seeds NextIntlClientProvider for
-  // every Client Component below. `dir` stays ltr — RTL is out of scope.
+  // every Client Component below. `dir` comes from the same locale via langDir(),
+  // so an RTL chrome language flips the whole document (2026-09-03, Urdu; this
+  // line previously said RTL was out of scope, and it no longer is). The lesson
+  // iframe is a separate document and keeps its own per-Edition direction, so
+  // RTL chrome around an LTR lesson is a supported pair, and so is its opposite.
   const locale = await getLocale();
 
   return (
     <ConvexAuthNextjsServerProvider>
-      <html lang={locale} className={`${spectral.variable} ${notoDeva.variable}`} suppressHydrationWarning>
+      <html
+        lang={locale}
+        dir={langDir(locale)}
+        className={`${spectral.variable} ${notoDeva.variable} ${notoNaskh.variable}`}
+        suppressHydrationWarning
+      >
         <head>
           {/* Tenant palette, before paint: the injected --color-* overrides supply
               both light and (partial) dark values; the dark-mode script below only
@@ -129,11 +152,14 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             }}
           />
         </head>
-        {/* Escape hatch A (ticket 04): a Devanagari chrome locale (Hindi) needs a
-            Devanagari-capable face — the Spectral body font has no such glyphs.
-            Mirror the reader's isDevanagari handling: swap the body font to Noto
-            Devanagari for the whole chrome. Latin text falls back within the stack. */}
-        <body className={isDevanagari(locale) ? "font-deva" : undefined}>
+        {/* The two script escape hatches, in priority order. Spectral carries only
+            Latin glyphs, so a chrome locale in another script renders as tofu
+            without a face of its own: Devanagari for Hindi (hatch A, ticket 04),
+            Naskh for Urdu and any other Arabic-script locale (hatch B, added
+            2026-09-03). Devanagari is tested first because the two sets are
+            disjoint and isDevanagari is the narrower question. Latin text inside
+            either falls back within the stack. */}
+        <body className={isDevanagari(locale) ? "font-deva" : isRtl(locale) ? "font-naskh" : undefined}>
           <PostHogClient />
           {/* Messages + locale flow to every Client Component from the request
               config (getRequestConfig) — no props needed; the provider inherits

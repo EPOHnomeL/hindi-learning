@@ -179,7 +179,7 @@ export function LessonMock({ copy }: { copy: PhoneMockCopy }) {
         )}
         {/* The pull-out, because a lesson isn't only prose — `.verse` in an
             authored lesson: a card ruled gold down its left edge. */}
-        <div className="mt-2 rounded-md border border-line border-l-[3px] border-l-gold bg-card px-2 py-1.5">
+        <div className="mt-2 rounded-md border border-line border-s-[3px] border-s-gold bg-card px-2 py-1.5">
           {copy.verse ? (
             <p className="text-[8px] leading-[1.55] text-ink">{copy.verse}</p>
           ) : (
@@ -238,23 +238,23 @@ export function AskMock({ copy }: { copy: PhoneMockCopy }) {
       <LessonHead copy={copy} />
       <div className="mt-2 space-y-2">
         {/* The learner's question — right-aligned, the universal "mine". */}
-        <div className="ml-6 rounded-md rounded-br-sm bg-hi px-2 py-1.5 text-[9px] leading-snug text-ink">
+        <div className="ms-6 rounded-md rounded-ee-sm bg-hi px-2 py-1.5 text-[9px] leading-snug text-ink">
           {copy.askedQuestion}
         </div>
         {/* The reply, inline and attributed with the same avatar treatment the
             reader uses. */}
-        <div className="mr-4 flex items-start gap-1.5">
+        <div className="me-4 flex items-start gap-1.5">
           <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
             <Icon name="book" className="h-2 w-2" />
           </span>
-          <span className="rounded-md rounded-bl-sm border border-line bg-card px-2 py-1.5">
+          <span className="rounded-md rounded-es-sm border border-line bg-card px-2 py-1.5">
             <span className="block text-[9px] leading-snug text-soft">{copy.askedReply}</span>
             <Prose widths={[92, 100, 88, 96, 70]} />
           </span>
         </div>
         {/* The follow-up, so the frame shows a conversation rather than a single
             answered question. */}
-        <div className="ml-6 rounded-md rounded-br-sm bg-hi px-2 py-1.5 text-[9px] leading-snug text-ink">
+        <div className="ms-6 rounded-md rounded-ee-sm bg-hi px-2 py-1.5 text-[9px] leading-snug text-ink">
           {copy.askedFollowUp}
         </div>
       </div>

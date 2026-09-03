@@ -157,7 +157,7 @@ function CourseSetupPane({ slug }: { slug: string }) {
               <h2 className="text-xl font-semibold tracking-tight text-accent">{t("setupFailedTitle")}</h2>
               <p className="text-sm leading-relaxed text-soft">{t("setupFailedBody")}</p>
               {view.error && (
-                <p className="mt-1 max-w-sm break-words rounded-lg bg-hi/60 px-3 py-2 text-left text-xs text-soft">
+                <p className="mt-1 max-w-sm break-words rounded-lg bg-hi/60 px-3 py-2 text-start text-xs text-soft">
                   {view.error}
                 </p>
               )}
@@ -197,7 +197,7 @@ function CourseSetupPane({ slug }: { slug: string }) {
             {/* The stages. Done ones tick and fade back, the live one is emphasised
                 and pulses, later ones sit dim: the shape of the whole job stays
                 visible, which is what makes a long wait legible. */}
-            <ol className="flex w-full flex-col gap-2 text-left">
+            <ol className="flex w-full flex-col gap-2 text-start">
               {SETUP_STAGES.map((stage, i) => {
                 const done = i < view.stageIndex;
                 const live = i === view.stageIndex;

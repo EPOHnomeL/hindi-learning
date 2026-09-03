@@ -6,6 +6,7 @@
   --font-sans: var(--font-spectral), Georgia, "Times New Roman", ui-serif, serif;
   --font-serif: var(--font-spectral), Georgia, "Times New Roman", serif;
   --font-deva: var(--font-noto-deva), "Noto Serif Devanagari", serif;
+  --font-naskh: var(--font-noto-naskh), "Noto Naskh Arabic", serif;
 
   --color-paper: #fbf7f0;
   --color-card: #fffdf9;
@@ -99,6 +100,10 @@ body {
 
 .font-deva {
   font-family: var(--font-deva);
+}
+
+.font-naskh {
+  font-family: var(--font-naskh);
 }
 
 /* Popover menu entrance (UI redesign): a small fade + rise so the card's ⋯

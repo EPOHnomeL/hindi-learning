@@ -56,9 +56,9 @@ export function ResourceItem({ resource, locked = false }: { resource: Resource;
   if (resourceOpenMode(filename, kind) === "dialog") {
     return (
       <>
-        <button type="button" onClick={() => setOpen(true)} className={`w-full text-left ${rowClass}`}>
+        <button type="button" onClick={() => setOpen(true)} className={`w-full text-start ${rowClass}`}>
           <span className="min-w-0 truncate">
-            <span aria-hidden className="mr-1 text-soft">📝</span>
+            <span aria-hidden className="me-1 text-soft">📝</span>
             {filename}
           </span>
           <StatusTag status={status} />
@@ -71,7 +71,7 @@ export function ResourceItem({ resource, locked = false }: { resource: Resource;
   return (
     <a href={url} target="_blank" rel="noopener noreferrer" className={rowClass}>
       <span className="min-w-0 truncate">
-        <span aria-hidden className="mr-1 text-soft">{kind === "url" ? "🔗" : "📄"}</span>
+        <span aria-hidden className="me-1 text-soft">{kind === "url" ? "🔗" : "📄"}</span>
         {filename}
       </span>
       <StatusTag status={status} />

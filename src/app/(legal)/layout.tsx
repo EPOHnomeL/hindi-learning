@@ -20,7 +20,7 @@ export default function LegalLayout({ children }: { children: React.ReactNode })
           </nav>
         </div>
       </header>
-      <article className="legal-prose mx-auto w-full max-w-3xl px-6 py-10 text-[15px] leading-relaxed [&_h1]:text-2xl [&_h1]:font-semibold [&_h1]:tracking-tight [&_h1]:text-accent [&_h2]:mt-8 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-accent [&_p]:mt-3 [&_ul]:mt-3 [&_ul]:list-disc [&_ul]:pl-6 [&_li]:mt-1 [&_a]:text-accent2 [&_a]:underline-offset-2 hover:[&_a]:underline">
+      <article className="legal-prose mx-auto w-full max-w-3xl px-6 py-10 text-[15px] leading-relaxed [&_h1]:text-2xl [&_h1]:font-semibold [&_h1]:tracking-tight [&_h1]:text-accent [&_h2]:mt-8 [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:text-accent [&_p]:mt-3 [&_ul]:mt-3 [&_ul]:list-disc [&_ul]:ps-6 [&_li]:mt-1 [&_a]:text-accent2 [&_a]:underline-offset-2 hover:[&_a]:underline">
         {children}
       </article>
       <footer className="border-t border-line">

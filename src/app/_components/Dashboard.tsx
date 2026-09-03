@@ -376,7 +376,7 @@ function CourseCard({ course }: { course: Course }) {
         <button
           onClick={() => setShowMission(true)}
           title={t("viewMission")}
-          className="line-clamp-2 min-h-[38px] text-left text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
+          className="line-clamp-2 min-h-[38px] text-start text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
         >
           {missionPreview(course.mission)}
         </button>
@@ -512,7 +512,7 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
         <button
           onClick={() => setShowMission(true)}
           title={t("viewMission")}
-          className="line-clamp-2 min-h-[38px] text-left text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
+          className="line-clamp-2 min-h-[38px] text-start text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
         >
           {missionPreview(course.mission)}
         </button>
@@ -669,7 +669,7 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
         <button
           onClick={() => setShowMission(true)}
           title={t("viewMission")}
-          className="line-clamp-2 min-h-[38px] text-left text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
+          className="line-clamp-2 min-h-[38px] text-start text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
         >
           {missionPreview(course.mission)}
         </button>
@@ -798,7 +798,7 @@ function AvailableCourseCard({ course }: { course: AvailableCourse }) {
         <button
           onClick={() => setShowMission(true)}
           title={t("viewMission")}
-          className="line-clamp-2 min-h-[38px] text-left text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
+          className="line-clamp-2 min-h-[38px] text-start text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
         >
           {missionPreview(course.mission)}
         </button>

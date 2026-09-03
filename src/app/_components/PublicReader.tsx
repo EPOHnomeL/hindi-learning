@@ -184,7 +184,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
         {menuOpen && <div onClick={() => setMenuOpen(false)} aria-hidden className="fixed inset-0 z-30 bg-black/40 md:hidden" />}
 
         <aside
-          className={`fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] transform flex-col overflow-y-auto overscroll-y-none border-t border-line rounded-t-2xl bg-paper p-4 transition-transform duration-300 md:static md:z-auto md:w-64 md:h-auto md:border-r md:border-t-0 md:rounded-t-none md:translate-y-0 md:translate-x-0 md:max-h-none md:transition-none ${
+          className={`fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] transform flex-col overflow-y-auto overscroll-y-none border-t border-line rounded-t-2xl bg-paper p-4 transition-transform duration-300 md:static md:z-auto md:w-64 md:h-auto md:border-e md:border-t-0 md:rounded-t-none md:translate-y-0 md:translate-x-0 md:max-h-none md:transition-none ${
             menuOpen ? "translate-y-0" : "translate-y-full"
           }`}
         >
@@ -246,7 +246,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
                   {t("resources")}
                   <svg
                     aria-hidden
-                    className="mr-1 transition-transform duration-200 group-open:rotate-180"
+                    className="me-1 transition-transform duration-200 group-open:rotate-180"
                     width="14"
                     height="14"
                     viewBox="0 0 24 24"
@@ -464,7 +464,7 @@ function GuestQuestions({ qa }: { qa: GuestCourse["questions"] }) {
           <li key={q.id} className="text-sm">
             <p className="font-medium text-ink">{q.text}</p>
             {q.reply ? (
-              <div className="mt-1.5 rounded-lg border-l-2 border-accent2 bg-hi px-3 py-2">
+              <div className="mt-1.5 rounded-lg border-s-2 border-accent2 bg-hi px-3 py-2">
                 <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-wider text-accent2">{t("teacher")}</p>
                 <Markdown source={q.reply} className="flex flex-col gap-2 text-sm leading-relaxed text-ink" />
               </div>

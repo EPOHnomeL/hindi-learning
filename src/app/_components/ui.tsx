@@ -48,7 +48,7 @@ export function IconButton({
   const body = (
     <>
       <Icon name={icon} />
-      {dot && <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-gold ring-2 ring-card" aria-hidden />}
+      {dot && <span className="absolute end-1 top-1 h-2 w-2 rounded-full bg-gold ring-2 ring-card" aria-hidden />}
     </>
   );
   if (href) {
@@ -162,7 +162,7 @@ export function Menu({
       {open && (
         <div
           role="menu"
-          className="pop-in absolute right-0 top-[calc(100%+6px)] z-50 min-w-[216px] rounded-xl border border-line bg-card p-1.5 shadow-xl"
+          className="pop-in absolute end-0 top-[calc(100%+6px)] z-50 min-w-[216px] rounded-xl border border-line bg-card p-1.5 shadow-xl"
         >
           {children(() => setOpen(false))}
         </div>
@@ -195,7 +195,7 @@ export function MenuItem({
   rel?: string;
 }) {
   const cls =
-    "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-sm text-ink transition-colors hover:bg-hi hover:text-accent";
+    "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-start text-sm text-ink transition-colors hover:bg-hi hover:text-accent";
   const body = (
     <>
       {icon && (
@@ -271,7 +271,7 @@ export function ReaderSkeleton({ aside = true }: { aside?: boolean }) {
 // Used only inside CourseSkeleton — where the real shell hasn't mounted yet.
 function SidebarSkeleton() {
   return (
-    <aside className="hidden w-64 shrink-0 flex-col gap-2 border-r border-line bg-paper p-4 md:flex">
+    <aside className="hidden w-64 shrink-0 flex-col gap-2 border-e border-line bg-paper p-4 md:flex">
       <div className="h-6 w-28 animate-pulse rounded bg-soft/20" />
       <div className="mt-4 flex flex-col gap-2">
         {Array.from({ length: 8 }).map((_, i) => (

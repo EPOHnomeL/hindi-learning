@@ -91,7 +91,7 @@ export function VoucherCard({
               setMode(m.key);
               setMinting(false);
             }}
-            className={`flex flex-col gap-1 rounded-lg border p-2.5 text-left transition-colors ${
+            className={`flex flex-col gap-1 rounded-lg border p-2.5 text-start transition-colors ${
               mode === m.key ? "border-accent bg-accent/5" : "border-line hover:bg-hi"
             }`}
           >
@@ -351,7 +351,7 @@ function BatchRow({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full flex-wrap items-center justify-between gap-2 text-left"
+        className="flex w-full flex-wrap items-center justify-between gap-2 text-start"
       >
         <div className="min-w-0">
           <b className="block truncate text-[13px] font-semibold text-ink">{batch.orgName}</b>
@@ -468,7 +468,7 @@ function AccessCodeRow({ code }: { code: FunctionReturnType<typeof api.accessCod
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full flex-wrap items-center justify-between gap-2 text-left"
+        className="flex w-full flex-wrap items-center justify-between gap-2 text-start"
       >
         <div className="min-w-0">
           <b className="block truncate text-[13px] font-semibold text-ink">{code.orgName}</b>

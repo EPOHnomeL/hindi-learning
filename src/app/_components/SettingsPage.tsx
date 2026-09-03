@@ -92,7 +92,7 @@ export function SettingsPage() {
             clearAccountLocalStateOnSignOut();
             void signOut().then(() => router.replace("/"));
           }}
-          className="mt-4 w-full rounded-2xl border border-line px-3 py-3.5 text-left text-sm text-danger active:bg-hi"
+          className="mt-4 w-full rounded-2xl border border-line px-3 py-3.5 text-start text-sm text-danger active:bg-hi"
         >
           {tc("signOut")}
         </button>

@@ -569,7 +569,7 @@ function LessonView({
               onClick={() => setEditing(true)}
               aria-label={t("editLesson")}
               title={t("editLesson")}
-              className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent/90"
+              className="absolute end-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent/90"
             >
               <Icon name="edit" className="h-4 w-4" /> {t("edit")}
             </button>
@@ -999,7 +999,7 @@ function ReferenceView({
             onClick={() => setEditing(true)}
             aria-label={t("editReference")}
             title={t("editReference")}
-            className="absolute right-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent/90"
+            className="absolute end-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent/90"
           >
             <Icon name="edit" className="h-4 w-4" /> {t("edit")}
           </button>
@@ -1083,7 +1083,7 @@ function QuestionBox({
           <li key={q.id} className="text-sm">
             <p className="font-medium text-ink">{q.text}</p>
             {q.reply ? (
-              <div className="mt-1.5 rounded-lg border-l-2 border-accent2 bg-hi px-3 py-2">
+              <div className="mt-1.5 rounded-lg border-s-2 border-accent2 bg-hi px-3 py-2">
                 <div className="mb-0.5 flex items-center justify-between gap-2">
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-accent2">{t("teacher")}</p>
                   {variant === "panel" && (

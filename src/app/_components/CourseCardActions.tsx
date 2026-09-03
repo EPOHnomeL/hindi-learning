@@ -26,7 +26,7 @@ import { IconButton, Menu, MenuItem } from "./ui";
 // self-hides otherwise, so no claim mutation is duplicated here. It just gets
 // menu-row styling via its className.
 const MENU_ROW =
-  "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-sm text-ink transition-colors hover:bg-hi hover:text-accent";
+  "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-start text-sm text-ink transition-colors hover:bg-hi hover:text-accent";
 
 export function CourseCardActions({
   slug,

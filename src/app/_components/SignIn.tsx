@@ -39,7 +39,7 @@ function GoogleMark() {
 // a dead spot on the button it overhangs.
 function LastUsedPill({ label }: { label: string }) {
   return (
-    <span className="pointer-events-none absolute -right-2 -top-2 whitespace-nowrap rounded-full border border-gold bg-card px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-accent shadow-sm">
+    <span className="pointer-events-none absolute -end-2 -top-2 whitespace-nowrap rounded-full border border-gold bg-card px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-accent shadow-sm">
       {label}
     </span>
   );

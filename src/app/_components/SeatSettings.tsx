@@ -94,7 +94,7 @@ function AddEmail({ hasEmail }: { hasEmail: boolean }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex w-full items-center justify-between px-3 py-3.5 text-left text-sm text-ink active:bg-hi"
+        className="flex w-full items-center justify-between px-3 py-3.5 text-start text-sm text-ink active:bg-hi"
       >
         <span>{t("emailAdd")}</span>
       </button>
@@ -189,7 +189,7 @@ function DeleteSeat() {
     <>
       <button
         onClick={() => setConfirming(true)}
-        className="flex w-full items-center justify-between px-3 py-3.5 text-left text-sm text-danger active:bg-hi"
+        className="flex w-full items-center justify-between px-3 py-3.5 text-start text-sm text-danger active:bg-hi"
       >
         <span>{t("seatDelete")}</span>
       </button>

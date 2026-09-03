@@ -31,7 +31,7 @@ export function NavItem({
   return (
     <Link
       href={href}
-      className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors md:py-1.5 ${
+      className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-start text-sm transition-colors md:py-1.5 ${
         active ? "bg-accent text-white" : locked ? "text-soft hover:bg-hi" : "text-ink hover:bg-hi"
       }`}
     >

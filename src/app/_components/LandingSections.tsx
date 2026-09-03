@@ -34,7 +34,7 @@ export function Faq({ items }: { items: FaqItem[] }) {
             <button
               onClick={() => setOpen(isOpen ? null : i)}
               aria-expanded={isOpen}
-              className="flex w-full items-center justify-between gap-4 py-5 text-left transition-colors hover:text-accent"
+              className="flex w-full items-center justify-between gap-4 py-5 text-start transition-colors hover:text-accent"
             >
               <span className="font-medium text-ink">{item.q}</span>
               {/* One chevron, rotated — not a swapped plus/minus pair, which needs
@@ -44,7 +44,7 @@ export function Faq({ items }: { items: FaqItem[] }) {
                 className={`h-4 w-4 shrink-0 text-soft transition-transform ${isOpen ? "rotate-180" : ""}`}
               />
             </button>
-            {isOpen && <p className="-mt-1 pb-5 pr-8 text-sm leading-relaxed text-soft">{item.a}</p>}
+            {isOpen && <p className="-mt-1 pb-5 pe-8 text-sm leading-relaxed text-soft">{item.a}</p>}
           </div>
         );
       })}

@@ -98,7 +98,7 @@ export function CheckoutSteps({ current }: { current: CheckoutStep }) {
             {/* A hairline instead of a chevron: at this size a "›" glyph sat on
                 a different baseline to the markers and read as punctuation
                 inside the label rather than a separator between steps. */}
-            {i > 0 && <span aria-hidden className="mr-0.5 h-px w-1.5 bg-line sm:mr-1 sm:w-2.5" />}
+            {i > 0 && <span aria-hidden className="me-0.5 h-px w-1.5 bg-line sm:me-1 sm:w-2.5" />}
             <span
               className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold sm:h-4.5 sm:w-4.5 ${
                 done
@@ -186,7 +186,7 @@ export function Paygate({
             which is the desktop shape this card already had. */}
         <div className="mt-5 flex flex-col gap-3 sm:flex-row-reverse sm:items-center sm:justify-end sm:gap-4">
           {price && (
-            <div className="sm:text-right">
+            <div className="sm:text-end">
               <span className="text-2xl font-semibold tabular-nums text-ink">{price.main}</span>
               {/* The anti-surprise line (ticket 11 §3). A buyer quoted $10 whose
                   statement then reads Rand is a chargeback waiting to happen, and

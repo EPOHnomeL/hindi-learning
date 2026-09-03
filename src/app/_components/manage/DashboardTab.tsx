@@ -259,7 +259,7 @@ function Stat({
       type="button"
       onClick={onGoTo}
       title={goToLabel}
-      className={`flex flex-col gap-1 rounded-xl border border-line bg-card px-3 py-2.5 text-left transition-colors hover:bg-hi ${className}`}
+      className={`flex flex-col gap-1 rounded-xl border border-line bg-card px-3 py-2.5 text-start transition-colors hover:bg-hi ${className}`}
     >
       <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-soft">
         <Icon name={icon} className="h-3.25 w-3.25 shrink-0" />
@@ -316,7 +316,7 @@ function BarList({ rows }: { rows: { key: string; label: string; count: number }
               style={{ width: `${barPercent(row.count, max)}%` }}
             />
           </span>
-          <span className="w-7 shrink-0 text-right text-[12.5px] font-semibold tabular-nums text-ink">
+          <span className="w-7 shrink-0 text-end text-[12.5px] font-semibold tabular-nums text-ink">
             {row.count}
           </span>
         </li>

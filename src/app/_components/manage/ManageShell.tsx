@@ -232,7 +232,7 @@ function EditionList({
               <button
                 type="button"
                 onClick={() => onSelect(ed.lang)}
-                className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-left text-sm transition-colors hover:bg-hi ${
+                className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2.5 text-start text-sm transition-colors hover:bg-hi ${
                   ed.lang === value ? "font-semibold text-accent" : "text-ink"
                 }`}
               >
@@ -249,7 +249,7 @@ function EditionList({
       <button
         type="button"
         onClick={onAdd}
-        className="mt-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-line px-2.5 py-2.5 text-left text-sm font-medium text-soft transition-colors hover:bg-hi hover:text-accent"
+        className="mt-1 flex w-full items-center gap-2 rounded-lg border border-dashed border-line px-2.5 py-2.5 text-start text-sm font-medium text-soft transition-colors hover:bg-hi hover:text-accent"
       >
         <Icon name="plus" className="h-4 w-4" /> {t("addLanguage")}
       </button>

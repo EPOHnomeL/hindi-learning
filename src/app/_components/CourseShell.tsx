@@ -262,7 +262,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
         <aside
           ref={drawerRef}
           style={drag === null ? undefined : { transform: `translateY(${drag}px)`, transition: "none" }}
-          className={`fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] transform flex-col overflow-y-auto overscroll-y-none border-t border-line rounded-t-2xl bg-paper p-4 pb-[5.75rem] transition-transform duration-300 md:static md:z-auto md:w-64 md:h-auto md:border-r md:border-t-0 md:rounded-t-none md:translate-y-0 md:translate-x-0 md:max-h-none md:p-4 md:transition-none ${
+          className={`fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] transform flex-col overflow-y-auto overscroll-y-none border-t border-line rounded-t-2xl bg-paper p-4 pb-[5.75rem] transition-transform duration-300 md:static md:z-auto md:w-64 md:h-auto md:border-e md:border-t-0 md:rounded-t-none md:translate-y-0 md:translate-x-0 md:max-h-none md:p-4 md:transition-none ${
             menuOpen ? "translate-y-0" : "translate-y-full"
           }`}
         >
@@ -318,10 +318,10 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
           <div className="mb-2 hidden items-center justify-between gap-2 md:flex">
             <Link
               href="/"
-              className="hidden md:flex -ml-1 items-center gap-1 rounded-lg px-1.5 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
+              className="hidden md:flex -ms-1 items-center gap-1 rounded-lg px-1.5 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
               aria-label={t("backToCoursesLabel")}
             >
-              <span aria-hidden>←</span> {t("backToCourses")}
+              <span aria-hidden className="inline-block rtl:-scale-x-100">←</span> {t("backToCourses")}
             </Link>
             <button
               onClick={() => {
@@ -329,7 +329,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
                 clearAccountLocalStateOnSignOut();
                 void signOut().then(() => router.replace("/"));
               }}
-              className="shrink-0 text-xs text-soft hover:text-accent ml-auto md:ml-0"
+              className="shrink-0 text-xs text-soft hover:text-accent ms-auto md:ms-0"
             >
               {tc("signOut")}
             </button>
@@ -468,7 +468,7 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
         {t("resources")}
         <svg
           aria-hidden
-          className="mr-1 transition-transform duration-200 group-open:rotate-180"
+          className="me-1 transition-transform duration-200 group-open:rotate-180"
           width="14"
           height="14"
           viewBox="0 0 24 24"
@@ -526,7 +526,7 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
                 <button
                   onClick={() => inputRef.current?.click()}
                   disabled={busy}
-                  className="flex-1 rounded-lg border border-dashed border-line px-2.5 py-2.5 text-left text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
+                  className="flex-1 rounded-lg border border-dashed border-line px-2.5 py-2.5 text-start text-sm text-soft hover:bg-hi disabled:opacity-60 md:py-1.5"
                 >
                   {busy ? t("working") : `+ ${t("uploadFile")}`}
                 </button>

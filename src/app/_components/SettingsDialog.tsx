@@ -101,7 +101,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                   key={code}
                   type="button"
                   onClick={() => setLocale(code)}
-                  className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-left transition-colors ${
+                  className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-start transition-colors ${
                     active ? "bg-hi" : "hover:bg-hi"
                   }`}
                 >
