@@ -74,6 +74,23 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
 
 <!-- one line per resolved ticket -->
 
+- [Build the Dashboard tab on the manage route](tickets/23-manage-dashboard-tab.md):
+  built and **walked at phone width on 2026-09-03**. Five stats over users-per-language
+  and a progress histogram, all read-only, all behind ONE owner-gated query
+  (`dashboard.courseStats`) rather than the per-Edition draw that would have fired
+  fourteen queries on a fourteen-language course. Seven bucket edges, not ten of 10%:
+  `0` and `100` are exact because they are the only two rungs an owner acts on, and
+  `100` compares lesson counts so 99.6% cannot present as finished. The scan is capped
+  at 8192 rows and **refuses to guess** past it (`truncated: true`, no buckets) rather
+  than under-count. Panels 25 and 26 ride the same query.
+- [The editor progress table on the course Dashboard](tickets/26-dashboard-editor-progress-table.md):
+  built and walked the same day. An editor's progress is **their own completion marks**,
+  which cannot see who edited what, because no write path records an editor. Grouped
+  under language headings rather than a four-column table, which is how the 360px layout
+  problem disappears, and **every language gets a row**, "No editor appointed" included,
+  because the empty cell was the point. The `translator-status-report` ladder did **not**
+  survive its first consumer: no rung is rendered anywhere, only counts plus the
+  Unreviewed qualifier.
 - [Build the reorganised sharing surface](tickets/19-build-editions-sharing.md):
   **shipped.** `/courses/[slug]/manage` is live with the four-tab shell, ticket 15's
   three groups, the merged voucher card and ticket 17's moves; `EditionsDialog` and
@@ -131,7 +148,9 @@ the [reader-experience](../reader-experience/map.md) effort resumes.
   same day, four of its tickets ruled out, because that report is now this tab. What is
   not specified is what a **fifth** thing on this tab would be, and at what point four
   panels in one 640px column stops being a glance and starts needing its own layout
-  decision. clears-with: 23
+  decision. Three of the four panels landed and were walked on 2026-09-03 (23 and 26);
+  the column is not crowded yet, and the question only becomes answerable once payout
+  makes it four. clears-with: 25
 - **Per-surface redesign directions**, one direction ticket per surface, in the
   inventory's priority order, cut once the foundation and the collapse plan exist.
   Two surfaces left this patch on 2026-08-27 and became tickets 14 to 20, the Editions

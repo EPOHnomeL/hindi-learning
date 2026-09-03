@@ -1,8 +1,6 @@
 ---
 type: task
 blocked_by: [23]
-claimed_by: editor-progress-table-2026-09-01
-claimed_at: 2026-09-01T15:52:55+02:00
 ---
 # The editor progress table on the course Dashboard
 
@@ -63,57 +61,7 @@ Use `/tdd` and `/ponytail`; read `dataviz` before drawing any progress meter.
 - [x] Copy through the message namespaces, no hardcoded English.
 - [x] No real name, email or roster row committed to the tree, fixtures included.
 - [x] `pnpm typecheck` green.
-- [ ] Walk it in a browser at phone width.
-
-### Where it stands (2026-09-01)
-
-Built and committed as `c748d08`. `pnpm typecheck` clean, 1001 tests pass.
-**The browser walk has NOT happened**, same reason as ticket 23: nothing was
-listening on port 3000 and the manage route needs a signed-in owner. No Answer
-until it is walked, so this ticket stays claimed.
-
-Worked out of frontier order at the operator's direction, while 23 still has no
-Answer. 23's code was already built and committed, so nothing technical was
-being waited on.
-
-**The four decisions, as ruled by the operator on 2026-09-01.**
-
-1. **What progress means.** The editor's OWN completion marks, the same
-   `progress` rows (`status: "completed"`) the learner histogram counts. Not the
-   derived ladder, not a count of translated units, and no new edit stamp. What
-   it CANNOT see: who edited what. No write path records an editor, so an editor
-   who reworks every lesson without marking any complete reads as zero. The
-   measurement is "how far they have read through it", offered as the proxy for
-   how far they have worked through it.
-2. **Whether the derived ladder survives.** It does not, and it is gone. There is
-   no Rostered/Invited/Busy/Finished rung on this surface at all; there are
-   counts, plus one qualifier. See the ticket 08 note below.
-3. **Languages with no editor.** They get a row, with "No editor appointed". The
-   empty cell was the point.
-4. **Names and the public repo.** The table reads `users.name` (falling back to
-   `users.email`) from Convex at runtime. Nothing real is committed: the tests
-   use `@example.com` and `@test.invalid` addresses only.
-
-**Two departures from this ticket's Todo, both deliberate.**
-
-- **No separate query.** The rows ride on 23's existing `courseStats`. The
-  `progress` scan is the dashboard's dominant read and was already in hand, so a
-  second owner-gated query would have doubled it for rows derived from the very
-  same documents. Still one owner-gated query, tested with the non-owner case;
-  it is just 23's.
-- **Not a four-column table.** Grouped under language headings instead, which is
-  how the ticket's own stated layout problem (four columns at 360px) goes away:
-  the language becomes the heading rather than a column.
-
-**A correction to this ticket's premise.** It says there is "no edit log and no
-edit stamp anywhere". Half true as of 2026-09-01: `applyTranslatedLessonEdit`
-(`convex/content/authoring.ts:399`) writes `htmlStorageId` and clears the inline
-`html`, while machine translations are stored inline, so a human edit to an
-Edition IS distinguishable from machine output. What genuinely does not exist is
-attribution: no write path records WHO edited. That is why option 1 above is a
-reading proxy rather than a measurement, and it is what a future
-`editedBy`/`editedAt` ticket would fix.
-
+- [x] Walk it in a browser at phone width.
 
 ## Done when
 
@@ -121,3 +69,79 @@ The Answer names what progress means and what it cannot see, states whether the
 derived ladder survived contact with this surface (and what that means for
 `translator-status-report` ticket 08), and records that the table was walked in a
 browser at phone width rather than only read.
+
+## Answer
+
+Built, walked and accepted. The foot of the course Dashboard carries editor
+progress, grouped under language headings, read-only, with every language shown
+whether or not it has an editor.
+
+Shipped in `c748d08` (2026-09-01). `pnpm typecheck` clean, 1001 tests passing at
+the time of the build.
+
+Worked out of frontier order at the operator's direction, while 23 still had no
+Answer. Nothing technical was being waited on: 23's code was already built and
+committed, and only its browser walk was outstanding.
+
+### Evidence: walked in a browser at phone width
+
+The operator opened the Dashboard in a browser at phone width and accepted both
+this table and 23's panels on 2026-09-03. A real walk, not a code read. The build
+session could not reach one (nothing listening on port 3000, and the manage route
+needs a signed-in owner), which is why this ticket sat claimed and answerless for
+two days.
+
+### What progress means here, and what it cannot see
+
+An editor's progress is **their own completion marks**: the same `progress` rows
+with `status: "completed"` that the learner histogram counts. Not the derived
+ladder, not a count of translated units, and no new edit stamp.
+
+What it **cannot** see is who edited what. No write path records an editor, so an
+editor who reworks every lesson without marking any complete reads as zero. The
+measurement is honestly "how far they have read through it", offered as a proxy
+for how far they have worked through it. A future `editedBy` / `editedAt` ticket
+is what would replace the proxy with a measurement.
+
+**A correction to this ticket's own premise.** The Question says there is "no edit
+log and no edit stamp anywhere". That was half true on 2026-09-01:
+`applyTranslatedLessonEdit` (`convex/content/authoring.ts:399`) writes
+`htmlStorageId` and clears the inline `html`, while machine translations are
+stored inline, so a human edit to an Edition IS distinguishable from machine
+output. What genuinely does not exist is **attribution**.
+
+### The derived ladder did not survive its first consumer
+
+There is no Rostered / Invited / Busy / Finished rung on this surface at all.
+There are counts, plus one qualifier.
+
+For `translator-status-report`: its ladder remains the settled model for anything
+that still wants one, but **nothing built uses it today**. Its "does Finished
+lie?" question was answered rather than dodged, and the ruling shipped in the same
+commit: published-or-priced are both **owner** acts, so a live Edition on which no
+editor holds a completion mark renders **Unreviewed** rather than Finished. That
+question now lives at
+[translation-and-locales 04](../../translation-and-locales/tickets/04-does-finished-lie.md)
+after the consolidation, not at this map's old ticket 08.
+
+### Languages with no editor get a row
+
+They render with "No editor appointed". The empty cell was the point of the table:
+a table of only appointed editors cannot show the gap an owner most needs to see.
+
+### Names, and the public repo
+
+The table reads `users.name` from Convex at runtime, falling back to `users.email`.
+Nothing real is committed: the tests use `@example.com` and `@test.invalid`
+addresses only.
+
+### Two deliberate departures from the Todo
+
+- **No separate query.** The rows ride on 23's existing `courseStats` as the
+  `editorRows` field (`convex/dashboard.ts:81`). The `progress` scan is the
+  dashboard's dominant read and was already in hand, so a second owner-gated query
+  would have doubled it for rows derived from the very same documents. Still one
+  owner-gated query, still tested with the non-owner case; it is just 23's.
+- **Not a four-column table.** Grouped under language headings instead, which is
+  how this ticket's own stated layout problem (four columns at 360px) goes away:
+  the language becomes the heading rather than a column.

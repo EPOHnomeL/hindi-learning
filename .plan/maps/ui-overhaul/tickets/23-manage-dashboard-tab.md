@@ -1,8 +1,6 @@
 ---
 type: task
 blocked_by: [19]
-claimed_by: dashboard-tab-build-2026-09-01
-claimed_at: 2026-09-01T11:08:02+02:00
 ---
 # Build the Dashboard tab on the manage route
 
@@ -72,35 +70,89 @@ its comment is explicit that "an owner sees their own progress; a Viewer sees th
 - [x] Copy through the message namespaces, no hardcoded English.
 - [x] Read the `dataviz` skill before writing any chart or bucket meter.
 - [x] `pnpm typecheck` green.
-- [ ] Walk it in a browser at phone width.
-
-### Where it stands (2026-09-01)
-
-Built and committed: `19c05b3` (the query and its tests), `0500c03` (the tab).
-The first box was already satisfied when this session opened, and its claim is
-stale: ticket 19 wired the Dashboard peer into the `tabs` array and added the
-`chart` icon (`src/app/_components/icons.tsx:129`) on 2026-08-27, so there was no
-icon to add. Only the placeholder in the `main` block was left to replace.
-`pnpm typecheck` clean, 995 tests pass. **The browser walk has NOT happened**,
-which is why this ticket is still claimed and has no Answer: nothing was
-listening on port 3000 in the build session, and the manage route needs a
-signed-in owner, so no walk was reachable. Reading the code is not the claim
-this ticket's Done-when asks for.
-
-To finish it: `pnpm dev`, open `/courses/<slug>/manage` at 360px, press the
-Dashboard tab, and react to the bucket edges (below). Then the Answer lands.
-
-**The bucket edges chosen, which are the thing to react to.** Seven buckets, not
-the ten-of-10% the Question sketched: `0` exact, `1-20`, `20-40`, `40-60`,
-`60-80`, `80-99`, `100` exact. 0% and 100% are the two rungs an owner acts on,
-so neither is diluted by a neighbour merely near it, and seven rows read at
-360px where twelve do not. 100% compares lesson COUNTS, never a rounded
-percentage, so 99.6% cannot present as finished in the bucket Certificates are
-minted from. They live in `PROGRESS_BUCKETS` in `convex/dashboard.ts`.
-
+- [x] Walk it in a browser at phone width.
 
 ## Done when
 
 Every box above is ticked and the Answer records that the tab was walked in a browser
 at phone width rather than only read, states the bucket edges chosen and why, and
 names the shape of the progress aggregate so 25 and 26 can follow it.
+
+## Answer
+
+Built, walked and accepted. The Dashboard tab is the fourth peer on the manage
+route: five stats over a users-per-language panel and a progress histogram, all
+read-only, all fed by ONE owner-gated query.
+
+Shipped in `19c05b3` (the query and its tests) and `0500c03` (the tab), both
+2026-09-01. `pnpm typecheck` clean, 995 tests passing at the time of the build.
+
+### Evidence: walked in a browser at phone width
+
+The operator opened the tab in a browser at phone width and accepted it on
+2026-09-03. That is a real walk, not a code read, which matters here: the build
+session could not reach one (nothing was listening on port 3000, and the manage
+route needs a signed-in owner), so the ticket was deliberately held open, claimed
+and answerless, for two days waiting on exactly this.
+
+The bucket edges were the thing put in front of the operator to react to, and
+they stand as built.
+
+### The bucket edges, and why seven and not ten
+
+`PROGRESS_BUCKETS` in `convex/dashboard.ts:30`: `0` exact, `1-20`, `20-40`,
+`40-60`, `60-80`, `80-99`, `100` exact.
+
+Seven, not the ten-of-10% the Question sketched, for three reasons:
+
+- **0% and 100% are the only two rungs an owner acts on** (nudge the untouched,
+  congratulate and certificate the finished), so each is its own exact bucket and
+  is never diluted by a neighbour merely near it.
+- **Seven rows read at 360px; twelve do not.** The manage route is phone first.
+- **100 compares lesson COUNTS, never a rounded percentage** (`progressBucket`,
+  `convex/dashboard.ts:38`), so 99.6% cannot present as finished in the bucket
+  Certificates are minted from.
+
+The five interior bands are half-open `[lo, hi)` and 20 points wide. The keys are
+stable strings and the array order is the render order; the client maps a key to
+its label and nothing infers an edge from a name.
+
+### The shape of the progress aggregate, for 25 and 26 to follow
+
+`dashboard.courseStats({ topicSlug })` is one owner-gated query for the whole
+tab, and it is course-wide on purpose: the obvious draw was
+`shares.listEditionAccess`, which is per Edition, so a fourteen-language course
+would have fired fourteen queries to paint one panel.
+
+It returns only what the client cannot already derive. `translate.editions` is
+already loaded by `ManageShell` and carries the edition list and each Edition's
+published flag, so the "editions" and "published" stats are counted client-side,
+not here. The server supplies the access rows, the prices and the histogram.
+
+The histogram itself is **one indexed range read** over `by_topic_user_lesson` at
+`topicId`, every reader's every row for this course, grouped by reader in memory.
+That is readers x lessons documents on every dashboard open, and it is capped:
+past `PROGRESS_SCAN_CAP` (8192, `convex/dashboard.ts:58`) the query **refuses to
+guess**, returning `truncated: true` and no buckets rather than a histogram
+computed from a partial scan that would silently under-count every reader the
+scan cut off. A denormalised per-reader counter is the fix if a real course ever
+trips it; nothing is close today (ticket 14 counted 68 Shares across 14 courses).
+
+**Panels 25 and 26 should ride this query, not add their own.** The `progress`
+scan is the dashboard's dominant read and is already in hand, so a second
+owner-gated query over the same documents would double it for nothing. 26 did
+exactly that (`editorRows` is a field on `courseStats`,
+`convex/dashboard.ts:81`), and 25's payout should follow unless the money path
+genuinely needs its own auth boundary.
+
+### One box that was already ticked when the build session opened
+
+The first Todo box asked for a Dashboard icon. There was none to add: ticket 19
+had already wired the Dashboard peer into the `tabs` array and added the `chart`
+icon (`src/app/_components/icons.tsx:129`) on 2026-08-27. Only the placeholder in
+the `main` block was left to replace. The box's premise was stale, not the box.
+
+### What is not on this tab
+
+Payout (ticket 25) is still unbuilt. The editor-by-language table (ticket 26)
+landed on 2026-09-01 in `c748d08` and sits at the foot of this body.
