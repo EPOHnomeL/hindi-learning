@@ -30,4 +30,13 @@ describe("matchAcceptLanguage", () => {
   it("maps Hindi (the Devanagari case)", () => {
     expect(matchAcceptLanguage("hi-IN,hi;q=0.9,en;q=0.8")).toBe("hi");
   });
+
+  // Urdu joined the offer-set on 2026-09-03, and this sniff reads LOCALES, so an
+  // Urdu browser stopped falling through to English the moment messages/ur.json
+  // landed. Pinned because it is the first RTL locale: the whole chrome flips on
+  // the strength of this mapping.
+  it("maps Urdu (the first RTL case)", () => {
+    expect(matchAcceptLanguage("ur")).toBe("ur");
+    expect(matchAcceptLanguage("ur-PK,ur;q=0.9,en;q=0.8")).toBe("ur");
+  });
 });

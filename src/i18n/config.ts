@@ -7,7 +7,7 @@
 // chrome language is: drop `messages/<code>.json`, add the code here. The parity
 // test (`messages/parity.test.ts`) keeps every file's keys in lockstep with
 // `en.json`; this array keeps the app's offer-set in lockstep with the files.
-export const LOCALES = ["en", "af", "es", "fr", "hi"] as const;
+export const LOCALES = ["en", "af", "es", "fr", "hi", "ur"] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
