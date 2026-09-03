@@ -24,18 +24,17 @@ import { Logo } from "./Logo";
 //     boundary ("Something went wrong"). Fade it, hide it, leave it in the DOM.
 export function PwaSplash({
   displayName,
-  logoUrl,
   faviconUrl,
 }: {
   displayName: string;
-  logoUrl: string | null;
   faviconUrl: string | null;
 }) {
-  // Logo, then favicon, then the shipped book mark: the same fallback order the
-  // /app-icon route uses, so the mark on the launch screen is the mark on the
-  // icon the learner just tapped. A tenant that uploaded only an emblem showed
-  // OUR book mark here before that second step existed.
-  const mark = logoUrl ?? faviconUrl;
+  // The FAVICON, not the header logo (operator's call, 2026-09-03). A launch
+  // screen wants the square emblem a tenant chose to be identified by at icon
+  // size, which is the same asset behind the installed app icon; the header
+  // logo is a wide lockup and reads as the wrong picture here. Falls back to
+  // the shipped book mark plus the display name when a tenant has no favicon.
+  const mark = faviconUrl;
   return (
     <div id="pwa-splash">
       <div id="pwa-splash-mark">

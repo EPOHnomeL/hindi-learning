@@ -862,8 +862,8 @@ html[data-theme="dark"] .cert-card--showcase {
     letter-spacing: -0.01em;
     color: var(--color-accent);
   }
-  /* Same slot rule as <Brand>: tenant marks run from ~1:1 stacked to ~7:1
-     banner, so cap both axes and contain rather than fixing a height. */
+  /* A favicon is square by convention but nothing enforces it, so cap both
+     axes and contain rather than fixing a height. */
   #pwa-splash-mark img {
     max-height: 6rem;
     max-width: 70vw;
