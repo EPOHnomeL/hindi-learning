@@ -244,7 +244,9 @@
     margin-top: 1.35rem; padding-top: 1.35rem; border-top: 1px solid var(--line);
     display: flex; align-items: center; gap: 1rem; text-align: left;
   }
-  .qr { flex: none; width: 5.5rem; height: 5.5rem; }
+  /* 7rem, not smaller: the code is 41 modules across, so 112px gives ~2.7px a
+     module. Below that a phone camera reading it off a screen starts to fail. */
+  .qr { flex: none; width: 7rem; height: 7rem; }
   .qr svg { width: 100%; height: 100%; display: block; }
   .qr-row p { margin: 0; font-size: .85rem; line-height: 1.5; color: var(--soft); }
   .qr-row b { display: block; color: var(--ink); font-size: .925rem; }
