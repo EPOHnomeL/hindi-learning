@@ -9,6 +9,7 @@ import { ConvexClientProvider } from "./ConvexClientProvider";
 import { PostHogClient } from "./PostHogClient";
 import { AppTabs } from "./_components/AppTabs";
 import { RegisterServiceWorker } from "./_components/RegisterServiceWorker";
+import { PwaSplash } from "./_components/PwaSplash";
 import { headers } from "next/headers";
 import { getTenantSlug, getTenantView } from "~/lib/tenant-server";
 import { buildTenantThemeCss } from "~/design/tokens";
@@ -160,6 +161,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             disjoint and isDevanagari is the narrower question. Latin text inside
             either falls back within the stack. */}
         <body className={isDevanagari(locale) ? "font-deva" : isRtl(locale) ? "font-naskh" : undefined}>
+          {/* First thing in the body, and outside every provider: the launch
+              screen an installed app draws for itself, so a whitelabel PWA opens
+              on its own mark with the platform named at the foot. Server markup
+              only, gated in CSS on display-mode, so a browser tab never sees it. */}
+          <PwaSplash displayName={tenant?.displayName ?? "My Course"} logoUrl={tenant?.logoUrl ?? null} />
           <PostHogClient />
           {/* Messages + locale flow to every Client Component from the request
               config (getRequestConfig) — no props needed; the provider inherits

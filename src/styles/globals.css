@@ -822,3 +822,63 @@ html[data-theme="dark"] .cert-card--showcase {
     print-color-adjust: exact;
   }
 }
+
+/* The installed app's own launch screen (PwaSplash). Absent from a browser tab
+   entirely: the display-mode query is what gates it, so no JS runs to decide
+   and no frame of it ever shows on the web. Inside an installed app it paints
+   with the document and is removed by the inline script a beat after load. */
+#pwa-splash {
+  display: none;
+}
+
+@media (display-mode: standalone) {
+  #pwa-splash {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    background: var(--color-paper);
+    transition: opacity 400ms ease-out;
+  }
+  #pwa-splash.is-gone {
+    opacity: 0;
+    pointer-events: none;
+  }
+  /* The mark sits slightly above centre, the way an OS splash does, so the
+     attribution at the foot doesn't read as crowding it. */
+  #pwa-splash-mark {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 3rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--color-accent);
+  }
+  /* Same slot rule as <Brand>: tenant logos run from ~1:1 stacked to ~7:1
+     banner, so cap both axes and contain rather than fixing a height. */
+  #pwa-splash-mark img {
+    max-height: 6rem;
+    max-width: 70vw;
+    object-fit: contain;
+  }
+  #pwa-splash-by {
+    position: absolute;
+    bottom: calc(2rem + env(safe-area-inset-bottom));
+    font-size: 0.8125rem;
+    letter-spacing: 0.02em;
+    color: var(--color-soft);
+  }
+}
+
+@media (display-mode: standalone) and (prefers-reduced-motion: reduce) {
+  #pwa-splash {
+    transition: none;
+  }
+}
