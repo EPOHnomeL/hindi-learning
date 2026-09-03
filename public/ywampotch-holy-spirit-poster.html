@@ -49,14 +49,21 @@
 
        3. **The correct-answer colours.** head.html does
           `.opt.correct{background:var(--good); border-color:var(--good-b)}` and
-          `.fb.ok{color:var(--good-b)}`, so `good` must be the pale surface and
-          `good-b` the saturated border. Building this poster turned up that ALL
-          FOUR seeded tenants had that pair inverted (and `bad`/`bad-b` with it),
-          copied from the worked example in docs/agents/tenant-branding.md, which
-          contradicted its own token table. A correct quiz answer was rendering
-          at 1.85:1 and the feedback line at 1.30:1 in the live reader. Fixed
-          2026-09-03 in the doc, the seed and `validateTheme` (which now rejects
-          the swap), so this poster shows the tenant's real greens at 6.9:1.
+          `.fb.ok{color:var(--good-b)}`, so `good` has to be the pale surface and
+          `good-b` the saturated border, which is what the token table in
+          docs/agents/tenant-branding.md specifies.
+
+          The seeded palettes have that pair the other way round
+          (scripts/seed-tenants.ts, `good:#3f7d54` / `good-b:#cfe6d6`, and
+          `bad`/`bad-b` with it), which in the live lesson reader renders a
+          correct quiz option as dark green text on a dark green fill (1.85:1)
+          and the feedback line as pale green on cream (1.30:1). Reported to the
+          operator on 2026-09-03 and deliberately NOT changed in code: this is a
+          poster, and the palette is the operator's call.
+
+          So this poster hardcodes the pair the right way round for itself only
+          (6.9:1 for the option text). It is the tenant's own two greens, just
+          in the roles the CSS expects, so nothing about the brand changes.
 
        == The claims are verified, and three of v3's were wrong ==
        v3 said "At your own pace", "Ask mid-lesson" and "Open to anyone". The
@@ -84,13 +91,11 @@
   :root {
     --paper:#f9f4ea; --card:#fffdf8; --ink:#1e2740; --soft:#6a7290; --line:#ece3d2;
     --accent:#1b2a80; --accent2:#3a52a8; --gold:#d8a93f; --hi:#e7ebf7;
-    /* The tenant's OWN state pair, now that it is the right way round: `good` is
-       the pale surface, `good-b` the saturated border, per
-       docs/agents/tenant-branding.md. Was inverted in the seed until 2026-09-03,
-       which is why this poster briefly used the app defaults instead; with the
-       seed corrected the poster can show the real ywampotch greens, which is
-       what a learner on that tenant actually sees. `--good-ink` is head.html's
-       literal `.opt.correct{color:#235138}`, 6.9:1 on this fill. */
+    /* The tenant's two greens, in the roles the lesson CSS expects: `good` the
+       pale surface, `good-b` the saturated border. The seed still has these
+       swapped (see note 3 above); this is local to the poster and changes no
+       code. `--good-ink` is head.html's literal `.opt.correct{color:#235138}`,
+       which lands at 6.9:1 on this fill. */
     --good:#cfe6d6; --good-b:#3f7d54; --good-ink:#235138;
 
     /* The sheet. 1080 x 1350 is 4:5; set --h to 1080px for a true square. */
