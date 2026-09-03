@@ -16,18 +16,23 @@ import { isPostHogInitialized } from "./PostHogClient";
 const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 // Identifies after Convex has resolved a signed-in account, including on a page
-// refresh. `id` is the immutable Convex user document ID; email and name remain
-// person properties, never event properties.
+// refresh. `id` is the immutable Convex user document ID, and it is the ONLY
+// thing we send: no email, no name, no person properties of any kind.
+//
+// That is a privacy commitment, not an oversight (2026-09-03). The analytics
+// provider holds fault-diagnosis data including what a page looked like, and
+// sending an email address alongside it would make every one of those records
+// directly identifying at the provider rather than only inside our own
+// database. The account reference means nothing without a Convex lookup we
+// control. `/privacy` says so in as many words, so do not add properties here
+// without changing that page in the same commit.
 function PostHogIdentity() {
   const user = useQuery(api.users.me);
 
   useEffect(() => {
     if (!user || !isPostHogInitialized()) return;
 
-    posthog.identify(user.id, {
-      ...(user.email ? { email: user.email } : {}),
-      ...(user.name ? { name: user.name } : {}),
-    });
+    posthog.identify(user.id);
   }, [user]);
 
   return null;
