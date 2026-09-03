@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: []
+claimed_by: empty-lib-ts-2026-09-03
+claimed_at: 2026-09-03T15:17:30+02:00
 ---
 # Finish emptying `lib.ts`
 
