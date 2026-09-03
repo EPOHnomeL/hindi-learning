@@ -103,18 +103,18 @@ rail in exchange for a collision probability that is currently negligible.
 it into `lib.ts`. ceiling: two call sites, ten lines. upgrade: the third caller.
 
 **ACCEPTED**, but **the hoist target named in the comment is wrong and should not be used.**
-`lib.ts` is being emptied down to the Edition and grant core by
-[technical-foundation/16](../.plan/maps/technical-foundation/tickets/16-empty-lib-ts.md) (open and
-unclaimed as of 2026-09-03, `lib.ts` still 855 lines), and
+`lib.ts` was emptied down to the Edition and grant core by
+[technical-foundation/16](../.plan/maps/technical-foundation/tickets/16-empty-lib-ts.md) (resolved
+2026-09-03: `lib.ts` went from 855 lines to 623, and holds only the Edition and grant core), and
 [17](../.plan/maps/technical-foundation/tickets/17-rename-lib-to-edition.md) then renames what is
-left to the Edition module. Hoisting a tenant-branding read into `lib.ts` now would add work to 16
+left to the Edition module. Hoisting a tenant-branding read into `lib.ts` now would undo 16
 and put a tenant concern inside a file whose whole point is that it holds only Edition and grant
 code. When the third caller appears, the target is the tenant side: `convex/tenants.ts`, or
 whichever module [18](../.plan/maps/technical-foundation/tickets/18-split-tenants-ts.md) splits it
 into. The same correction applies to any other marker naming `lib.ts` as a destination: `lib.ts`
 is a source in this map, never a sink.
 
-### `convex/lib.ts:369`
+### `convex/contentBlobs.ts:48`
 
 `decodeEntities` decodes a hand-written map of the handful of entities that show up in plain-text
 titles. ceiling: `amp`, `lt`, `gt`, `quot`, `#39`, `apos`. upgrade: extend the map when a new one

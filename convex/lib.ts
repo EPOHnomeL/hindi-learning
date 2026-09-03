@@ -5,7 +5,10 @@ import { SOURCE_LANG } from "./sourceLang";
 import { shareLang } from "./shareGrants";
 import { decodeEntities, pickContentBody, type ContentBody } from "./contentBlobs";
 
-// Shared backend helpers. (Plain module — no Convex functions registered here.)
+// The Edition and grant core: who holds which Edition of a Topic, which one to
+// serve them, how its rows read, and what the paygate withholds. (Plain module,
+// no Convex functions registered here.) Everything else that used to live here
+// moved to its own module in technical-foundation/16.
 
 // ---- Editions (course-translation) -----------------------------------------
 
