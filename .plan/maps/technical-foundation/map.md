@@ -129,7 +129,22 @@ blocked   (5):  03 05 10 11 17
 
 <!-- one line per resolved ticket -->
 
-_(none yet: chartered 2026-09-01.)_
+- [Chrome RTL strategy](tickets/09-chrome-rtl-strategy.md) 2026-09-03: the operator chose
+  the **full flip** over shipping Urdu LTR first. `dir` comes from `langDir()` in the
+  existing content-language registry rather than a second constant; the 73 physical
+  utilities are one session, not a campaign; there is no icon-mirroring rule because
+  there are no directional icons, only arrows living inside `en.json` strings; the chrome
+  face is **Noto Naskh Arabic**, not Nastaliq, whose line-height would clip every
+  fixed-height control; and acceptance splits layout (checkable by an English speaker)
+  from translation quality (not claimed). Two findings shrank the job: the mobile sidebar
+  is a bottom sheet on `translate-y`, so there is no drawer slide to mirror, and the
+  lesson iframe is a separate document, so chrome `dir` cannot leak into an Edition.
+- [Flip the app shell to RTL](tickets/10-rtl-app-shell.md) 2026-09-03: built in `7b3205b`.
+  Verified in a browser on the public surfaces (landing and legal prose flip, fonts swap,
+  LTR unchanged) and by unit test on the `langDir` seam. The authed surfaces and the
+  chrome/lesson cross-pairs are **read-only verification**: the dev deployment has no
+  `publicLinks` rows, so no Guest reader is reachable locally. See that ticket for the
+  dev-versus-prod CLI trap that makes this look like a share-locale bug when it is not.
 
 ## Not yet specified
 

@@ -41,7 +41,9 @@ catalogues and untranslated-English defects all pass.
   and [10](../technical-foundation/tickets/10-rtl-app-shell.md), moved there on
   2026-09-01 because they are physical-property debt across every surface rather than a
   language question. This map keeps only the message catalogue,
-  [08](tickets/08-urdu-message-catalogue.md), which ships **left-aligned** and says so.
+  [08](tickets/08-urdu-message-catalogue.md). It was charted to ship **left-aligned**
+  until the shell caught up; in the event the operator chose the full flip and both
+  landed on **2026-09-03**, so Urdu never shipped left-aligned at all.
 - **The revenue share touches the money rail.** Prod has taken real purchases since
   2026-07-29. [05](tickets/05-the-translator-revenue-share.md) decides a third split and
   who may set it; [07](tickets/07-build-the-translator-revenue-share.md) builds it. Use
@@ -108,8 +110,15 @@ blocked   (2):  03 07
 
 <!-- one line per resolved ticket -->
 
-_(none yet: chartered 2026-09-01. The four closed report tickets on the donor map are
-out of scope, not resolved, and are not this map's decisions.)_
+<!-- The four closed report tickets on the donor map are out of scope, not resolved,
+     and are not this map's decisions. -->
+
+- [Urdu message catalogue](tickets/08-urdu-message-catalogue.md) 2026-09-03: `messages/ur.json`
+  ships all 709 keys and `ur` joins `LOCALES`, making Urdu the sixth app-chrome language.
+  The picker and the `Accept-Language` sniff both needed no change, since each reads
+  `LOCALES`. ICU arguments and plural categories were checked with the real ICU parser,
+  not a regex, because plural branch text is braced too. Strings are LLM-drafted and
+  pending human review, as every non-English catalogue has been since `b2a4887`.
 
 ## Not yet specified
 

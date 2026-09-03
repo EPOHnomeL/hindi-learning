@@ -118,8 +118,10 @@ Globes, checks and locks must not mirror, and none of them do.
 
 The directional affordances that do exist are **text**, not icons:
 
-- Four `→` glyphs baked into `messages/en.json` strings (`Reader.nextLesson`,
-  `Reader.generateNext`, `Certificate.openPublicPage`, `Editions.viewArrow`). **Rule: a
+- Four `→` glyphs baked into `messages/en.json` strings (`Artifact.nextLesson`,
+  `Artifact.generateNext`, `Certificate.openPublicPage`, `Certificate.viewArrow`).
+  Namespaces corrected 2026-09-03 while building 10: the first draft of this
+  answer misattributed two of them to `Reader` and `Editions`. **Rule: a
   directional glyph inside a message is part of the message.** Each catalogue writes its
   own arrow, so `ur.json` carries `←` where `en.json` carries `→`. No CSS, no mirroring
   list, and it comes out right automatically for every future locale.
