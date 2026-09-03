@@ -102,6 +102,82 @@ beyond a one-off.
 
 A user who forgets their password can get back in end-to-end via an emailed OTP, and the hand-set temp-password workaround is retired.
 
+### Where it stands (2026-09-03)
+
+**Built, tested and committed. NOT walked end to end, so this ticket is still
+open** and deliberately carries no `## Answer`. The Done when above says a real
+user gets back in and the temp-password workaround is retired; nobody has seen
+that happen. Real accounts exist only on prod, so the only check that could
+close this is a prod operation, and it is the operator's to run.
+
+What was built:
+
+- `convex/resetEmail.ts` (+ `.test.ts`) is the pure renderer, a sibling of
+  `inviteEmail.ts` and testable the same way. It exports
+  `RESET_CODE_TTL_MINUTES = 15`, which is both what the email promises and what
+  the provider expires the code after. The email has **no link, no button and no
+  URL of any kind**: the code is the whole payload, so there is nothing for
+  Resend to wrap in a click-tracking domain and nothing a reader is asked to
+  trust. It is house-branded, not tenant-branded, because a reset is requested by
+  someone who is not signed in and the provider is handed an address and no
+  tenant.
+- `convex/passwordReset.ts` exports `ResendOTPPasswordReset`: eight digits from
+  the CSPRNG (bytes of 250 and up rejected, so `% 10` stays uniform), 15 minute
+  `maxAge`, sent over the existing Resend rail. One raw `fetch`, the same
+  `RESEND_API_KEY` and `INVITE_FROM_EMAIL`, no new dependency, no `"use node"`.
+  With `RESEND_API_KEY` unset it logs and no-ops like `sendInvite`. **One
+  deliberate divergence from `sendInvite`:** a non-2xx from Resend throws rather
+  than being swallowed. An invite is a courtesy on top of a grant that already
+  committed; this email *is* the reset, so a silent success would leave the user
+  waiting for a code that does not exist.
+- `convex/auth.ts` wires `reset: ResendOTPPasswordReset` onto the existing
+  `Password({ profile })`, with the comment the Scope asks for: the rail never
+  reaches `createOrUpdateUser`, `retrieveAccount` throws `InvalidAccountId` for
+  an unknown address, so reset cannot create an account and the Allowlist
+  sign-up gate is untouched.
+- `src/app/_components/SignIn.tsx` adds `"reset"` and `"reset-verification"` to
+  the `flow` union and a "Forgot your password?" line on the sign-in state.
+  Step one swallows its own failure and always advances to the code step, and
+  the copy says only "if that address has an account", so the form is not an
+  oracle for which addresses are registered. All copy went through the `Auth`
+  namespace in all six locales (en/af/es/fr/hi/ur).
+- `convex/passwordReset.test.ts` is the seam suite: the end-to-end walk with the
+  OTP read back off the sent email, the old secret dead afterwards
+  (`retrieveAccountWithCredentials` returns `InvalidSecret`), a wrong code
+  refused with the password unchanged and the real code still spendable, a reset
+  for an unknown address creating nothing and sending nothing, and the
+  unconfigured-Resend no-op.
+
+Commits, in order: `2265fee` (renderer), `ef95433` (provider and auth wiring),
+`45cd41a` (SignIn UI and copy). `fd8a44f` corrects a stale pointer in this
+ticket. `pnpm typecheck` is clean and `pnpm vitest run` is green at 1037 tests
+across 86 files.
+
+**What the operator has to do to finish it**, on **prod**
+(`capable-barracuda-769`), after this lands on `main` and Vercel has deployed:
+
+1. Confirm `RESEND_API_KEY` and `INVITE_FROM_EMAIL` are set on the prod Convex
+   deployment. Reading prod needs the key override, not `--prod`:
+   `CONVEX_DEPLOY_KEY="$PROD_CONVEX_DEPLOY_KEY" npx convex env get INVITE_FROM_EMAIL`.
+   Both already back the invite emails, so they should be there; confirm rather
+   than assume.
+2. On a real account you control, sign out, click "Forgot your password?", and
+   submit the address. Expect the code step, and an email whose subject leads
+   with eight digits.
+3. Enter the code and a new password. Expect to land **signed in**, with no
+   second trip through the sign-in form.
+4. Sign out and try the **old** password. Expect it to be refused.
+5. Try a wrong code on a fresh request. Expect the retry message, and the
+   account's password unchanged.
+6. Submit an address with no account. Expect the same code step and the same
+   copy as a real address, and no email.
+
+If all six hold, that is the Done when, and the ticket can be resolved with an
+`## Answer` that says the walk was done in a browser on prod and on what date.
+The temp-password workaround at the top of this ticket is retired at that point,
+not before.
+
+
 <!-- Migrated 2026-07-30 from GitHub issue #81 (filed 2026-07-24), when this repo retired
      its remote tracker; see docs/agents/issue-tracker.md. -->
 
