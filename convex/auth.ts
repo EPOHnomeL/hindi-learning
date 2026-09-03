@@ -6,6 +6,7 @@ import { AccessCode } from "./accessCodeAuth";
 import { ACCESS_CODE_PROVIDER_ID } from "./accessCodeFormat";
 import { env } from "./env";
 import { claimPendingShares, oauthRedirectUrl } from "./lib";
+import { ResendOTPPasswordReset } from "./passwordReset";
 
 // Convex Auth (PRD §6 — auth must "just work"). Email + password, plus Google.
 // No JWT/cookie plumbing of our own.
@@ -38,6 +39,20 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
       profile(params) {
         return { email: String(params.email ?? "").trim().toLowerCase() };
       },
+      // **Forgot password**, the emailed 8-digit OTP (technical-foundation ticket
+      // 21). Before this, a user who forgot their password was locked out for
+      // good: sign-in throws `InvalidSecret`, sign-up throws "account already
+      // exists", and the only way back in was the operator setting a temp password
+      // by hand.
+      //
+      // **This does not touch the sign-up gate, by construction.** The reset flow
+      // never reaches `createOrUpdateUser` below: it calls `retrieveAccount` for
+      // the address and throws `InvalidAccountId` when there is no row, so it can
+      // only ever repoint the secret on an account that already exists. It cannot
+      // create a `users` row, so nothing about the Allowlist, the Seat branch or
+      // the email-linking rules changes here. The seam test asserts exactly that,
+      // on the row counts.
+      reset: ResendOTPPasswordReset,
     }),
     // Credentials come off the environment — `setEnvDefaults` reads
     // AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET, set separately on dev and prod — so
