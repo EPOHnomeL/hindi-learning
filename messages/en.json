@@ -216,7 +216,17 @@
     "toggleToSignIn": "Already have an account? Sign in",
     "termsAgreement": "By creating an account you agree to the <terms>Terms</terms> and <privacy>Privacy Policy</privacy>.",
     "voucherPrompt": "Got a code from your organisation? <redeem>Redeem your voucher</redeem>.",
-    "joinPrompt": "No account? For guest or organisational sign in, <join>click here</join>."
+    "joinPrompt": "No account? For guest or organisational sign in, <join>click here</join>.",
+    "forgotPassword": "Forgot your password?",
+    "resetTitle": "Reset your password",
+    "resetLead": "Enter your email address and we'll send you a code to set a new password.",
+    "sendResetCode": "Send me a code",
+    "resetSent": "If that address has an account, a code is on its way. It expires in 15 minutes.",
+    "resetCode": "8-digit code",
+    "newPassword": "New password",
+    "setNewPassword": "Set new password",
+    "resetFailed": "That code is wrong or has expired. Check it and try again, or start over and ask for a new one.",
+    "backToSignIn": "Back to sign in"
   },
   "Checkout": {
     "referenceLockedTitle": "This reference is part of the full course",

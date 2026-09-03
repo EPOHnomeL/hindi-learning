@@ -69,9 +69,21 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
   // them a code - so the form opens on "Create account" for them too. NOT
   // `buyIntent` though: they are not mid-purchase, so the four-step checkout rail
   // and its copy would be describing something that is not happening.
-  const [flow, setFlow] = useState<"signIn" | "signUp">(
+  // `reset` and `reset-verification` are the two halves of the forgot-password
+  // walk (technical-foundation ticket 21), and they are named for the `flow` param
+  // Convex Auth's Password provider expects, because that is exactly what this
+  // value is posted as. Neither is ever an opening state: you can only arrive at
+  // them from the sign-in form.
+  const [flow, setFlow] = useState<"signIn" | "signUp" | "reset" | "reset-verification">(
     buyIntent || path?.startsWith("/redeem") ? "signUp" : "signIn",
   );
+  const isReset = flow === "reset" || flow === "reset-verification";
+  // The address the code was sent to, held across the step change: the second step
+  // asks only for the code and the new password, but the provider verifies the OTP
+  // against the address it was issued for, so it has to be posted again. Carried in
+  // state rather than a visible field so it cannot be edited between the steps into
+  // something the code was never minted for.
+  const [resetEmail, setResetEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   // Read in an effect, not during render: localStorage doesn't exist on the server,
@@ -153,23 +165,59 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
             const formData = new FormData(e.currentTarget);
             formData.set("flow", flow);
             if (isPostHogInitialized()) posthog.capture("auth_password_submitted", { flow, checkout_intent: buyIntent });
+            // **Step one of a reset tells the visitor nothing.** Convex Auth
+            // throws `InvalidAccountId` when the address has no account, so
+            // reporting the outcome here would turn this form into an oracle for
+            // which of your users' addresses are registered. The failure is
+            // swallowed and the code step is shown either way; the copy on it
+            // promises only "if that address has an account".
+            if (flow === "reset") {
+              try {
+                await signIn("password", formData);
+              } catch {
+                // Deliberately ignored. See above.
+              }
+              setResetEmail(String(formData.get("email") ?? ""));
+              setFlow("reset-verification");
+              setBusy(false);
+              return;
+            }
+            if (flow === "reset-verification") formData.set("email", resetEmail);
             try {
               await signIn("password", formData);
               // Only on success, and only after it — a failed attempt shouldn't
               // rewrite the hint. A sign-*up* counts too: it's how they'll come back.
+              // A completed reset counts as well: the provider signs the user in as
+              // part of verifying the code, and password is how they got back.
               rememberAuthMethod("password");
             } catch {
-              setError(flow === "signIn" ? t("signInFailed") : t("signUpFailed"));
+              setError(
+                flow === "signIn" ? t("signInFailed") : flow === "signUp" ? t("signUpFailed") : t("resetFailed"),
+              );
               setBusy(false);
             }
           }}
         >
-          <h2 className="text-xl font-semibold text-accent">{flow === "signIn" ? t("signIn") : t("createAccount")}</h2>
+          <h2 className="text-xl font-semibold text-accent">
+            {isReset ? t("resetTitle") : flow === "signIn" ? t("signIn") : t("createAccount")}
+          </h2>
           {buyIntent && flow === "signUp" && (
             <p className="-mt-1.5 text-sm text-soft">{t("buyIntent")}</p>
           )}
+          {/* On step two this is the only acknowledgement the request was made,
+              and it is deliberately conditional ("if that address has an
+              account"): a definite "we sent it" would leak the same fact the
+              swallowed error above is protecting. */}
+          {isReset && (
+            <p className="-mt-1.5 text-sm text-soft">{flow === "reset" ? t("resetLead") : t("resetSent")}</p>
+          )}
           {/* Shown in both toggle states: with email-linking (#111) a Google click
-              signs in and signs up identically, so there is nothing to choose. */}
+              signs in and signs up identically, so there is nothing to choose.
+              Hidden mid-reset: someone who is here because their password does not
+              work is not helped by a second way in, and a Google click would
+              abandon the code already sitting in their inbox. */}
+          {!isReset && (
+          <>
           <button
             type="button"
             disabled={busy}
@@ -209,10 +257,68 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
             {t("or")}
             <span className="h-px flex-1 bg-line" />
           </div>
+          </>
+          )}
+          {flow !== "reset-verification" && (
           <input name="email" type="email" placeholder={t("email")} autoComplete="email" required className="rounded-lg border border-line bg-card px-3 py-2.5 focus:border-gold focus:outline-none" />
+          )}
+          {!isReset && (
           <input name="password" type="password" placeholder={t("password")} autoComplete={flow === "signIn" ? "current-password" : "new-password"} required className="rounded-lg border border-line bg-card px-3 py-2.5 focus:border-gold focus:outline-none" />
+          )}
+          {/* The door out of the lockout. Only on sign-in: there is nothing to
+              reset while creating an account, and mid-reset it would point at the
+              step you are standing on. A quiet end-aligned line rather than a
+              button, so it does not compete with the two real ways in. */}
+          {flow === "signIn" && (
+            <button
+              type="button"
+              className="-mt-1 self-end text-sm text-soft hover:text-accent"
+              onClick={() => {
+                setError(null);
+                setFlow("reset");
+              }}
+            >
+              {t("forgotPassword")}
+            </button>
+          )}
+          {flow === "reset-verification" && (
+            <>
+              {/* `inputMode` and the digit pattern, not `type="number"`: a numeric
+                  keypad on a phone without the spinner, the scroll-wheel edits or
+                  the silent value loss a number input brings. `one-time-code` is
+                  what lets iOS and Android offer the code straight off the
+                  notification. */}
+              <input
+                name="code"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                autoComplete="one-time-code"
+                required
+                placeholder={t("resetCode")}
+                className="rounded-lg border border-line bg-card px-3 py-2.5 tracking-[0.3em] focus:border-gold focus:outline-none"
+              />
+              {/* `newPassword`, not `password`: it is the param name the Password
+                  provider reads for the `reset-verification` flow. */}
+              <input
+                name="newPassword"
+                type="password"
+                autoComplete="new-password"
+                required
+                placeholder={t("newPassword")}
+                className="rounded-lg border border-line bg-card px-3 py-2.5 focus:border-gold focus:outline-none"
+              />
+            </>
+          )}
           <button type="submit" disabled={busy} className="relative rounded-lg bg-accent px-3 py-2.5 font-medium text-white disabled:opacity-50">
-            {busy ? "…" : flow === "signIn" ? t("signIn") : t("signUp")}
+            {busy
+              ? "…"
+              : flow === "signIn"
+                ? t("signIn")
+                : flow === "signUp"
+                  ? t("signUp")
+                  : flow === "reset"
+                    ? t("sendResetCode")
+                    : t("setNewPassword")}
             {/* Only while signing in: on the "Create account" toggle a "Last used"
                 banner would be nonsense — you can't have last created this account. */}
             {!busy && flow === "signIn" && lastUsed === "password" && <LastUsedPill label={t("lastUsed")} />}
@@ -223,10 +329,12 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
             className="py-1 text-sm text-soft hover:text-accent"
             onClick={() => {
               setError(null);
+              // Mid-reset this is the way out, back to the form you came from,
+              // rather than the sign-up toggle it is the rest of the time.
               setFlow(flow === "signIn" ? "signUp" : "signIn");
             }}
           >
-            {flow === "signIn" ? t("toggleToSignUp") : t("toggleToSignIn")}
+            {isReset ? t("backToSignIn") : flow === "signIn" ? t("toggleToSignUp") : t("toggleToSignIn")}
           </button>
           {flow === "signUp" && (
             <p className="text-center text-xs text-soft">

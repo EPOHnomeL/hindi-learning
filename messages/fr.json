@@ -181,7 +181,17 @@
     "toggleToSignIn": "Vous avez déjà un compte ? Connectez-vous",
     "termsAgreement": "En créant un compte, vous acceptez les <terms>Conditions</terms> et la <privacy>Politique de confidentialité</privacy>.",
     "voucherPrompt": "Vous avez un code de votre organisation ? <redeem>Utilisez votre bon</redeem>.",
-    "joinPrompt": "Pas de compte ? Pour une connexion invité ou via votre organisation, <join>cliquez ici</join>."
+    "joinPrompt": "Pas de compte ? Pour une connexion invité ou via votre organisation, <join>cliquez ici</join>.",
+    "forgotPassword": "Mot de passe oublié ?",
+    "resetTitle": "Réinitialiser votre mot de passe",
+    "resetLead": "Indiquez votre adresse e-mail et nous vous enverrons un code pour choisir un nouveau mot de passe.",
+    "sendResetCode": "Envoyez-moi un code",
+    "resetSent": "Si cette adresse correspond à un compte, un code est en route. Il expire dans 15 minutes.",
+    "resetCode": "Code à 8 chiffres",
+    "newPassword": "Nouveau mot de passe",
+    "setNewPassword": "Enregistrer le mot de passe",
+    "resetFailed": "Ce code est incorrect ou a expiré. Vérifiez-le et réessayez, ou recommencez pour en demander un nouveau.",
+    "backToSignIn": "Retour à la connexion"
   },
   "Checkout": {
     "referenceLockedTitle": "Cette référence fait partie du cours complet",

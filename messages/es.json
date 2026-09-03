@@ -181,7 +181,17 @@
     "toggleToSignIn": "¿Ya tienes una cuenta? Inicia sesión",
     "termsAgreement": "Al crear una cuenta aceptas los <terms>Términos</terms> y la <privacy>Política de privacidad</privacy>.",
     "voucherPrompt": "¿Tienes un código de tu organización? <redeem>Canjea tu vale</redeem>.",
-    "joinPrompt": "¿No tienes cuenta? Para acceder como invitado o con tu organización, <join>haz clic aquí</join>."
+    "joinPrompt": "¿No tienes cuenta? Para acceder como invitado o con tu organización, <join>haz clic aquí</join>.",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "resetTitle": "Restablece tu contraseña",
+    "resetLead": "Escribe tu correo electrónico y te enviaremos un código para elegir una contraseña nueva.",
+    "sendResetCode": "Envíame un código",
+    "resetSent": "Si esa dirección tiene una cuenta, el código va en camino. Caduca en 15 minutos.",
+    "resetCode": "Código de 8 dígitos",
+    "newPassword": "Contraseña nueva",
+    "setNewPassword": "Guardar la contraseña",
+    "resetFailed": "Ese código es incorrecto o ha caducado. Revísalo e inténtalo de nuevo, o empieza otra vez y pide uno nuevo.",
+    "backToSignIn": "Volver al inicio de sesión"
   },
   "Checkout": {
     "referenceLockedTitle": "Esta referencia forma parte del curso completo",
