@@ -8,7 +8,11 @@ blocked_by: [16]
 
 Once [16](16-empty-lib-ts.md) has emptied it, `convex/lib.ts` holds one thing: the Edition
 reader, the grant resolver and the paywall. At that point the name `lib` actively misleads,
-and the rename is a one-line-per-import mechanical change across (currently) 32 sites.
+and the rename is a one-line-per-import mechanical change across **16 sites**, verified by
+grep on 2026-09-03. The "32" this line used to carry was never quite right and is now well
+out of date: ticket 16 counted 33 `from "./lib"` import statements before it started (three
+of the ticket's 32 were prose mentions in comments, not imports) and left 16 behind when it
+finished. Emptying the file halved the rename.
 
 **This is deliberately its own ticket, and deliberately blocked.** The
 [architecture-deepening](../../architecture-deepening/map.md) map recorded the rename as
