@@ -1991,7 +1991,7 @@ const FLAG_META: { key: TenantFlag; label: string; hint: string }[] = [
 // against a double-click mid-write. Keyed by slug at the call site so switching
 // tenants remounts with fresh state.
 function FlagToggles({ slug, flags }: { slug: string; flags: Partial<Record<TenantFlag, boolean>> }) {
-  const setFlags = useMutation(api.tenants.setTenantFlags);
+  const setFlags = useMutation(api.tenantFlags.setTenantFlags);
   const [busy, setBusy] = useState<TenantFlag | null>(null);
   const [error, setError] = useState<string | null>(null);
 

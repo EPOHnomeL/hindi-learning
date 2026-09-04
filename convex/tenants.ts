@@ -1,17 +1,11 @@
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import { assertAdmin } from "./adminSecret";
-import { isReadySeller } from "./sellerStatus";
 import { isCallerAdmin } from "./whitelist";
 import { tenantFlagsValidator, tenantThemeValidator } from "./schema";
+import { DEFAULT_TENANT_FLAGS } from "./tenantFlags";
 import { DEFAULT_TENANT_THEME, assertThemeTokens } from "./tenantTheme";
-
-// Flags default all on for a freshly-created tenant: the v1 no-regression
-// posture (ticket 04).
-const DEFAULT_TENANT_FLAGS = {
-  certificates: true, translations: true, publicLinks: true, qa: true, seeding: true,
-};
 
 // The dashboard sidebar's tenant list (issue 19): every tenant's slug + display
 // name, sorted by display name. **Sys-admin only** — a tenant admin has no picker
@@ -92,60 +86,6 @@ export const seedTenant = mutation({
 
     await ctx.db.insert("tenants", { slug, displayName, theme, flags });
     return { created: true };
-  },
-});
-
-// Toggle a tenant's feature flags from the dashboard (issue 21). A **patch**: only
-// the flags given are changed, the rest are left as-is — so the UI can send one
-// flag per switch without re-sending the whole set. **Sys-admin only** — gated by
-// `isCallerAdmin(ctx)` unscoped, not the scoped check: the flags decide what the
-// tenant may do *at all*, so flipping one widens the tenant's own grant, which is
-// provisioning and never a tenant admin's (the scoped gate used to admit them).
-// There's no confirm dialog and no destructive edit here — flag-off is
-// frozen-not-revoked (issue 04): the flip only changes what `assertTenantFlag`
-// (issue 17) permits on the CREATE path, granting nothing and deleting nothing.
-// Each flag is optional so a caller sends just the one it flips.
-export const setTenantFlags = mutation({
-  args: {
-    tenantSlug: v.string(),
-    flags: v.object({
-      certificates: v.optional(v.boolean()),
-      translations: v.optional(v.boolean()),
-      publicLinks: v.optional(v.boolean()),
-      qa: v.optional(v.boolean()),
-      seeding: v.optional(v.boolean()),
-      donations: v.optional(v.boolean()),
-    }),
-  },
-  returns: v.null(),
-  handler: async (ctx, { tenantSlug, flags }) => {
-    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
-    const tenant = await ctx.db
-      .query("tenants")
-      .withIndex("by_slug", (q) => q.eq("slug", tenantSlug))
-      .unique();
-    if (!tenant) throw new Error("tenant not found");
-    // `donations` is the one flag with a precondition (ADR 0027): it may not be
-    // switched ON unless a `donationPayee` is set AND that payee is a ready
-    // Seller (can-sell grant + SA bank details on file). This makes it
-    // structurally impossible to accrue donation debt with nowhere to send it —
-    // the same reasoning that stops an Edition being priced by an unready
-    // Seller. Switching it OFF is always allowed.
-    if (flags.donations === true) {
-      if (!tenant.donationPayee || !(await isReadySeller(ctx, tenant.donationPayee))) {
-        // ConvexError, not Error: a **production** deployment redacts a plain
-        // Error's message before it reaches the client and the operator gets a
-        // bare "Server Error" — which is what this precondition looked like the
-        // first time it fired for real. Only ConvexError's `data` crosses the
-        // wire in prod, so an instruction the operator is meant to act on has to
-        // be thrown as one.
-        throw new ConvexError(
-          "Set a donation payee who is an approved seller with payout details before enabling donations.",
-        );
-      }
-    }
-    await ctx.db.patch(tenant._id, { flags: { ...tenant.flags, ...flags } });
-    return null;
   },
 });
 

@@ -711,7 +711,7 @@ test("setTenantFlags patches only the given flags, leaving the rest intact", asy
   const t = convexTest(schema, modules);
   const sys = await seedAdmin(t, "sys@example.com");
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
-  await asUser(t, sys).mutation(api.tenants.setTenantFlags, { tenantSlug: "upf", flags: { qa: false } });
+  await asUser(t, sys).mutation(api.tenantFlags.setTenantFlags, { tenantSlug: "upf", flags: { qa: false } });
   const row = await t.run((ctx) =>
     ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
   );
@@ -724,7 +724,7 @@ test("setTenantFlags can toggle a flag back on", async () => {
   await t.mutation(api.tenants.seedTenant, {
     secret, slug: "upf", displayName: "UPF", theme: THEME, flags: { ...FLAGS, publicLinks: false },
   });
-  await asUser(t, sys).mutation(api.tenants.setTenantFlags, { tenantSlug: "upf", flags: { publicLinks: true } });
+  await asUser(t, sys).mutation(api.tenantFlags.setTenantFlags, { tenantSlug: "upf", flags: { publicLinks: true } });
   const row = await t.run((ctx) =>
     ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
   );
@@ -739,7 +739,7 @@ test("setTenantFlags: a tenant admin is refused even on their own tenant (sys-ad
   const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await expect(
-    asUser(t, upfAdmin).mutation(api.tenants.setTenantFlags, { tenantSlug: "upf", flags: { seeding: false } }),
+    asUser(t, upfAdmin).mutation(api.tenantFlags.setTenantFlags, { tenantSlug: "upf", flags: { seeding: false } }),
   ).rejects.toThrow(/forbidden/i);
   const upf = await t.run((ctx) =>
     ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
@@ -752,7 +752,7 @@ test("setTenantFlags: a plain member is refused", async () => {
   const member = await t.run((ctx) => ctx.db.insert("users", { email: "member@example.com" }));
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await expect(
-    asUser(t, member).mutation(api.tenants.setTenantFlags, { tenantSlug: "upf", flags: { qa: false } }),
+    asUser(t, member).mutation(api.tenantFlags.setTenantFlags, { tenantSlug: "upf", flags: { qa: false } }),
   ).rejects.toThrow(/forbidden/i);
 });
 
@@ -760,7 +760,7 @@ test("setTenantFlags rejects an unknown tenant slug", async () => {
   const t = convexTest(schema, modules);
   const sys = await seedAdmin(t, "sys@example.com");
   await expect(
-    asUser(t, sys).mutation(api.tenants.setTenantFlags, { tenantSlug: "ghost", flags: { qa: false } }),
+    asUser(t, sys).mutation(api.tenantFlags.setTenantFlags, { tenantSlug: "ghost", flags: { qa: false } }),
   ).rejects.toThrow(/not found/i);
 });
 

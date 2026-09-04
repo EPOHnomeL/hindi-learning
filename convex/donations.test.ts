@@ -375,12 +375,12 @@ test("the donations flag and payee are sys-admin-only and cannot be switched on 
     asUser(t, tenantAdmin).mutation(api.tenantDonations.setDonationPayee, { tenantSlug: "ywampotch", email: "ta@example.com" }),
   ).rejects.toThrow();
   await expect(
-    asUser(t, tenantAdmin).mutation(api.tenants.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } }),
+    asUser(t, tenantAdmin).mutation(api.tenantFlags.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } }),
   ).rejects.toThrow();
 
   const sys = asUser(t, admin);
   // The flag can't go on with no payee at all.
-  await expect(sys.mutation(api.tenants.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } }))
+  await expect(sys.mutation(api.tenantFlags.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } }))
     .rejects.toThrow();
   // A payee who isn't a ready Seller is refused — no seller row yet.
   await expect(sys.mutation(api.tenantDonations.setDonationPayee, { tenantSlug: "ywampotch", email: "payee@example.com" }))
@@ -393,7 +393,7 @@ test("the donations flag and payee are sys-admin-only and cannot be switched on 
   // Grant + bank details → the payee sticks, and only then may the flag go on.
   await t.run((ctx) => ctx.db.patch(sellerRow, { payout: PAYOUT }));
   await sys.mutation(api.tenantDonations.setDonationPayee, { tenantSlug: "ywampotch", email: "payee@example.com" });
-  await sys.mutation(api.tenants.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } });
+  await sys.mutation(api.tenantFlags.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } });
   let tenant = await t.run((ctx) => ctx.db.query("tenants").first());
   expect(tenant).toMatchObject({ donationPayee: payee, flags: { donations: true } });
 
@@ -420,7 +420,7 @@ test("the operator-facing refusals are ConvexError, so prod shows them instead o
   const sys = asUser(t, admin);
 
   for (const call of [
-    () => sys.mutation(api.tenants.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } }),
+    () => sys.mutation(api.tenantFlags.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } }),
     () => sys.mutation(api.tenantDonations.setDonationPayee, { tenantSlug: "ywampotch", email: "nobody@example.com" }),
     () => sys.mutation(api.tenantDonations.setDonationPayee, { tenantSlug: "ywampotch", email: "payee@example.com" }),
   ]) {
