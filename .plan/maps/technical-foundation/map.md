@@ -179,6 +179,70 @@ blocked   (5):  03 05 10 11 17
   chrome/lesson cross-pairs are **read-only verification**: the dev deployment has no
   `publicLinks` rows, so no Guest reader is reachable locally. See that ticket for the
   dev-versus-prod CLI trap that makes this look like a share-locale bug when it is not.
+- [Record the ADR: Mux is the video rail](tickets/15-adr-mux-as-the-video-rail.md)
+  2026-09-03: `docs/adr/0033`. Mux hosts all product video, marketing and learner-facing
+  alike, displacing Convex file storage, unlisted YouTube, Cloudflare Stream and R2 plus a
+  CDN. The ADR says plainly what drove it (momentum, on the strength of one 50 second
+  clip) and what was **not** costed (the paid-marketplace economics). Its unlock criterion
+  is Mux cost above 10 percent of the platform's net share of a course, which at the
+  expected shape trips at roughly 1.3 watch-throughs per buyer or any course past about
+  four hours. **Every figure in it is labelled estimated, not sourced**, and wants
+  correcting by a superseding note rather than an edit.
+- [The `ponytail:` markers have no ledger](tickets/20-ponytail-debt-ledger.md) 2026-09-03:
+  `docs/ponytail-debt.md`. **20 markers, not the 19 the ticket claimed.** 19 accepted, 1
+  needing a ticket after [23](tickets/23-tenant-token-mirror-has-no-test.md) closed the
+  other. Three calls worth carrying: `content/publish.ts`'s global slug assumption is safe
+  because `seedTopic` enforces uniqueness itself and `.unique()` fails loudly;
+  `routine.ts`'s marker is **factually stale** (Lesson rows carry no HTML since the
+  content-blob migration), which became ticket 22, still open, so it is named here as
+  prose rather than linked;
+  and `eft.ts`'s proposed hoist into `lib.ts` was **wrong**, because on this map `lib.ts`
+  is a source and never a sink.
+- [Finish emptying `lib.ts`](tickets/16-empty-lib-ts.md) 2026-09-03: 855 lines to **623**,
+  48 exports to 30, 33 import sites to 16. Seven modules, not the four scoped:
+  `shareGrants`, `tokens`, `authRedirect`, `contentBlobs`, `adminSecret`, `topicAccess`,
+  and `sourceLang`. That last one was the enabling move, extracted first because the grant
+  core reads `shareLang` which reads `SOURCE_LANG`, so leaving the constant behind would
+  have made two modules import each other. The topic resolvers moved out too: they return
+  `Doc<"topics">`, so their subject is the Topic row, and an `edition.ts` holding "give me
+  the topic for this slug" is the misnaming 17 exists to avoid. No re-export shims.
+- [Rename `lib.ts` to `edition.ts`](tickets/17-rename-lib-to-edition.md) 2026-09-04: 16
+  import sites, halved by 16 from the 32 the ticket used to claim. `git mv` at 98 percent
+  similarity, so `git log --follow` still reaches the history. No API path changed, because
+  the file registers zero Convex functions and nothing referenced `api.lib.`, which is why
+  it needed no deploy window. 26 files of prose repointed, three of them already stale
+  before this ticket.
+- [Split `convex/tenants.ts`](tickets/18-split-tenants-ts.md) 2026-09-04: 738 lines to
+  **149**, 22 exports to 5, 97 of 186 `api.tenants.X` references repointed into
+  `tenantTheme`, `tenantAssignment`, `tenantDonations` and a grown `tenantFlags`. 16's
+  circular-import trap recurred as `normaliseEmail`, fixed by deleting a third private copy
+  rather than minting a root module. **Seeding is deliberately not a module**: the
+  secret-guarded twins moved with their pairs, because splitting two write paths that must
+  never drift is worse than a long file. **This one did change 16 public `api.` paths**, so
+  it carried a real deploy window.
+- [Cost instrumentation](tickets/12-cost-instrumentation.md) 2026-09-04: `generationRuns`
+  gains optional `inputTokens`, `outputTokens` and `model`, written as a set so **absent
+  means unknown and never zero**, plus an admin-gated `tokenUsageByTopic`. The aggregate
+  returns no single total on purpose: it reports `runs`, `runsWithoutUsage` and sums over
+  measured runs only, so the number reads as a floor. **Only the OpenRouter seam reports
+  real counts**; the cloud claude.ai Routine cannot, because Claude Code does not hand its
+  totals to a shell it spawns, so most production runs are unmeasured until ADR 0014's
+  runtime lands. No price, currency or cap anywhere. The admin list has **never been
+  rendered for a human**.
+- [Forgot-password flow](tickets/21-forgot-password-flow.md) 2026-09-04: an emailed
+  8-digit OTP, `ResendOTPPasswordReset` over the existing Resend rail, no new dependency,
+  and an email with no link or URL at all so there is nothing for Resend to wrap in a
+  tracking domain. **Walked end to end on prod on 2026-09-04**, including the old password
+  working before the reset and being refused after. The 2026-07-15 lockout is now
+  self-service and the hand-set temp-password workaround is retired. Two unspecified
+  behaviours recorded: a second code invalidates the first, and signing out drops the card
+  back to the request step.
+- [The tenant token mirror has no test](tickets/23-tenant-token-mirror-has-no-test.md)
+  2026-09-04: two assertions in `src/design/tokens.test.ts`, no new file, no shared module.
+  The lists had **not** drifted, so nothing was quietly fixed. `DEFAULT_TENANT_THEME` was
+  covered as well, being a second hand-mirror of `globals.css` with the same blast radius.
+  The lazy fix worked because a test can import across the Convex runtime boundary that a
+  Convex function cannot, and the test was **proved able to fail** before being trusted.
 
 ## Not yet specified
 
@@ -190,11 +254,6 @@ blocked   (5):  03 05 10 11 17
   obviously not yet a ticket: nobody has established what it splits *into*, and the answer
   probably depends on [03](tickets/03-shadcn-foundation.md) settling the component
   vocabulary first. `clears-with: 03`
-- **`convex/translate.ts` is 1212 lines**, the largest file in `convex/`, and it holds two
-  `ponytail:` markers (Q&A translation dropped in the routine cut-over; a full scan of the
-  lock table). Whether it wants the 16-and-18 treatment or something else is unclear until
-  [20](tickets/20-ponytail-debt-ledger.md) says what its shortcuts actually cost.
-  `clears-with: 20`
 - **Six of the 30 ADRs are still `status: proposed`.** Two of the six are handled by name
   ([14](tickets/14-adr-superseding-0016-payfast-merchant-model.md),
   [19](tickets/19-adr-0014-citation-scope.md)). Whether the rest need a sweep, or whether
@@ -219,9 +278,6 @@ blocked   (5):  03 05 10 11 17
   [translation-and-locales](../translation-and-locales/map.md) is actively adding Editions.
   Which term dominates is unclear until more than one non-English Edition sees real traffic.
   `clears-with: 01`
-- **No architecture tests, and no boundary enforcement.** Nothing stops the next junk
-  drawer forming, and 16 to 18 fix instances rather than the pattern. Too coarse to ticket
-  until the splits are done and the real seams are known. `clears-with: 16`
 
 ## Out of scope
 
