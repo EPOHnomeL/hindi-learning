@@ -1887,13 +1887,13 @@ function RowActionButton({ label, busyLabel, run, aria }: { label: string; busyL
 // approved seller with payout bank details on file, and clearing the payee also
 // switches the Donations flag off, so the two can never disagree.
 function DonationPayee({ slug }: { slug: string }) {
-  const current = useQuery(api.tenants.donationPayeeEmail, { tenantSlug: slug });
+  const current = useQuery(api.tenantDonations.donationPayeeEmail, { tenantSlug: slug });
   // The only accounts the server would accept — a picker rather than a text
   // field, so the two rejections below ("no account", "not a ready seller")
   // become unreachable by construction instead of something the operator
   // discovers by typing an email and being told no.
   const candidates = useQuery(api.sellers.readySellerEmails);
-  const setPayee = useMutation(api.tenants.setDonationPayee);
+  const setPayee = useMutation(api.tenantDonations.setDonationPayee);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

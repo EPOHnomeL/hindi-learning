@@ -372,7 +372,7 @@ test("the donations flag and payee are sys-admin-only and cannot be switched on 
 
   // A tenant admin must not redirect their own tenant's donation income.
   await expect(
-    asUser(t, tenantAdmin).mutation(api.tenants.setDonationPayee, { tenantSlug: "ywampotch", email: "ta@example.com" }),
+    asUser(t, tenantAdmin).mutation(api.tenantDonations.setDonationPayee, { tenantSlug: "ywampotch", email: "ta@example.com" }),
   ).rejects.toThrow();
   await expect(
     asUser(t, tenantAdmin).mutation(api.tenants.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } }),
@@ -383,23 +383,23 @@ test("the donations flag and payee are sys-admin-only and cannot be switched on 
   await expect(sys.mutation(api.tenants.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } }))
     .rejects.toThrow();
   // A payee who isn't a ready Seller is refused — no seller row yet.
-  await expect(sys.mutation(api.tenants.setDonationPayee, { tenantSlug: "ywampotch", email: "payee@example.com" }))
+  await expect(sys.mutation(api.tenantDonations.setDonationPayee, { tenantSlug: "ywampotch", email: "payee@example.com" }))
     .rejects.toThrow();
   // Granted can-sell, but still no bank details: still refused.
   const sellerRow = await t.run((ctx) => ctx.db.insert("sellers", { userId: payee }));
-  await expect(sys.mutation(api.tenants.setDonationPayee, { tenantSlug: "ywampotch", email: "payee@example.com" }))
+  await expect(sys.mutation(api.tenantDonations.setDonationPayee, { tenantSlug: "ywampotch", email: "payee@example.com" }))
     .rejects.toThrow();
 
   // Grant + bank details → the payee sticks, and only then may the flag go on.
   await t.run((ctx) => ctx.db.patch(sellerRow, { payout: PAYOUT }));
-  await sys.mutation(api.tenants.setDonationPayee, { tenantSlug: "ywampotch", email: "payee@example.com" });
+  await sys.mutation(api.tenantDonations.setDonationPayee, { tenantSlug: "ywampotch", email: "payee@example.com" });
   await sys.mutation(api.tenants.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } });
   let tenant = await t.run((ctx) => ctx.db.query("tenants").first());
   expect(tenant).toMatchObject({ donationPayee: payee, flags: { donations: true } });
 
   // Clearing the payee also switches the flag off — a live flag with no payee
   // would fail at donor time instead of at configuration time.
-  await sys.mutation(api.tenants.setDonationPayee, { tenantSlug: "ywampotch" });
+  await sys.mutation(api.tenantDonations.setDonationPayee, { tenantSlug: "ywampotch" });
   tenant = await t.run((ctx) => ctx.db.query("tenants").first());
   expect(tenant!.donationPayee).toBeUndefined();
   expect(tenant!.flags.donations).toBe(false);
@@ -421,8 +421,8 @@ test("the operator-facing refusals are ConvexError, so prod shows them instead o
 
   for (const call of [
     () => sys.mutation(api.tenants.setTenantFlags, { tenantSlug: "ywampotch", flags: { donations: true } }),
-    () => sys.mutation(api.tenants.setDonationPayee, { tenantSlug: "ywampotch", email: "nobody@example.com" }),
-    () => sys.mutation(api.tenants.setDonationPayee, { tenantSlug: "ywampotch", email: "payee@example.com" }),
+    () => sys.mutation(api.tenantDonations.setDonationPayee, { tenantSlug: "ywampotch", email: "nobody@example.com" }),
+    () => sys.mutation(api.tenantDonations.setDonationPayee, { tenantSlug: "ywampotch", email: "payee@example.com" }),
   ]) {
     const err = await call().catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ConvexError);
