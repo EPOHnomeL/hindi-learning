@@ -3,7 +3,7 @@ import type { QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 
 // Paid marketplace: Seller readiness (ADR 0016). (Plain module — no Convex
-// functions registered here.) Split out of `lib.ts` by
+// functions registered here.) Split out of `edition.ts` (then `lib.ts`) by
 // architecture-deepening/02: who may SELL is independent of the Edition access
 // stack that decides who may READ.
 

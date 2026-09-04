@@ -85,7 +85,7 @@ async function seedPricedEdition(
   await asUser(t, seller).mutation(api.sellers.savePayoutDetails, PAYOUT);
   for (const lang of langs) {
     // A non-English Edition has to be HELD before it can be priced, and for the
-    // owner "held" means a `ready` translation job (lib.ts heldLangs) — the row
+    // owner "held" means a `ready` translation job (edition.ts heldLangs) — the row
     // `reportTranslation` leaves behind at the end of a successful run.
     if (lang !== "en") {
       await t.run((ctx) =>

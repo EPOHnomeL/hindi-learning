@@ -19,7 +19,7 @@ import { langInfo } from "./languages";
 
 // The Guest's token → Edition lookup: a Public link fixes exactly one Edition
 // (there is no selection ladder Guest-side — cf. the authed `resolveEdition` seam
-// in lib.ts, which is a different, request-vs-held resolver).
+// in edition.ts, which is a different, request-vs-held resolver).
 async function guestEditionFromToken(ctx: QueryCtx, token: string): Promise<{ topic: Doc<"topics">; lang: string } | null> {
   if (!token) return null;
   const link = await ctx.db

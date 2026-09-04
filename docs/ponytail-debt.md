@@ -86,7 +86,7 @@ extracting them. ceiling: two copies. upgrade: a third bank-details form.
 working money-adjacent function for no behaviour change. Both copies share
 `payoutDetailsValidator` already, so the schema half of the duplication is already hoisted; what
 is duplicated is five lines of trim-and-digits checking. Note for whoever hits the third form:
-the natural home is beside `payoutDetailsValidator`, not `lib.ts` (see the `eft.ts:473` row).
+the natural home is beside `payoutDetailsValidator`, not the Edition core (see the `eft.ts:473` row).
 
 ### `convex/eft.ts:196`
 
@@ -100,19 +100,20 @@ rail in exchange for a collision probability that is currently negligible.
 ### `convex/eft.ts:473` (load-bearing)
 
 `tenantBrand` duplicates the one-row `by_slug` tenant read from `shares.ts` rather than hoisting
-it into `lib.ts`. ceiling: two call sites, ten lines. upgrade: the third caller.
+it into a shared module. ceiling: two call sites, ten lines. upgrade: the third caller.
 
-**ACCEPTED**, but **the hoist target named in the comment is wrong and should not be used.**
+**ACCEPTED**, but **the hoist target the comment originally named, `lib.ts`, was wrong and is gone.**
 `lib.ts` was emptied down to the Edition and grant core by
 [technical-foundation/16](../.plan/maps/technical-foundation/tickets/16-empty-lib-ts.md) (resolved
 2026-09-03: `lib.ts` went from 855 lines to 623, and holds only the Edition and grant core), and
-[17](../.plan/maps/technical-foundation/tickets/17-rename-lib-to-edition.md) then renames what is
-left to the Edition module. Hoisting a tenant-branding read into `lib.ts` now would undo 16
+[17](../.plan/maps/technical-foundation/tickets/17-rename-lib-to-edition.md) then renamed what is
+left to `convex/edition.ts` (2026-09-04). Hoisting a tenant-branding read into it would undo 16
 and put a tenant concern inside a file whose whole point is that it holds only Edition and grant
 code. When the third caller appears, the target is the tenant side. [18](../.plan/maps/technical-foundation/tickets/18-split-tenants-ts.md)
 split `convex/tenants.ts` on 2026-09-04, so pick the module that matches the read:
-`convex/tenantTheme.ts` for a branding/palette read like this one. The same correction applies to any other marker naming `lib.ts` as a destination: `lib.ts`
-is a source in this map, never a sink.
+`convex/tenantTheme.ts` for a branding/palette read like this one. The comment itself was repointed to `tenantTheme.ts` on 2026-09-04. The same correction applies to
+any other marker naming `lib.ts` (now `edition.ts`) as a destination: it is a source in this map,
+never a sink.
 
 ### `convex/contentBlobs.ts:48`
 

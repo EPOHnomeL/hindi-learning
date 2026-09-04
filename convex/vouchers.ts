@@ -32,7 +32,7 @@ import { isCallerAdmin } from "./whitelist";
 //      provenance back fails a test rather than quietly ending the anonymity the
 //      organisation actually bought.
 //
-// The grant walk in `lib.ts` is deliberately untouched: a voucher mints an
+// The grant walk in `edition.ts` is deliberately untouched: a voucher mints an
 // ordinary Entitlement and the walk already treats its presence as access.
 
 // ---- Minting (ticket 02) ------------------------------------------------------

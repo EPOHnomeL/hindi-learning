@@ -1,7 +1,7 @@
 // Content blobs (see .scratch/html-blob-storage): the read shape of a rendered
 // body, the `/content` URL that serves one, and the entity decode every title
 // passes through. (Plain module, no Convex functions registered here.) Split out
-// of `lib.ts` by technical-foundation/16: how a body is addressed is independent
+// of `edition.ts` (then `lib.ts`) by technical-foundation/16: how a body is addressed is independent
 // of who may read it.
 
 import type { Id } from "./_generated/dataModel";
@@ -43,7 +43,7 @@ export function pickContentBody(
 // (e.g. "Maps &amp; List"). Decode the handful of named/numeric entities that
 // show up in plain-text titles so the UI never renders a raw "&amp;".
 // ponytail: covers the common entities; extend the map if a new one appears.
-// (Lives beside the content-blob helpers rather than in `lib.ts`, which reads it
+// (Lives beside the content-blob helpers rather than in `edition.ts`, which reads it
 // through this module; nothing re-exports it.)
 export function decodeEntities(s: string): string {
   return s.replace(/&(amp|lt|gt|quot|#39|apos);/g, (_, e) =>

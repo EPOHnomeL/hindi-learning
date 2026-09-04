@@ -1,5 +1,5 @@
 // The OAuth sign-in redirect guard. (Plain module, no Convex functions registered
-// here.) Split out of `lib.ts` by technical-foundation/16, into the module its
+// here.) Split out of `edition.ts` (then `lib.ts`) by technical-foundation/16, into the module its
 // existing test file `authRedirect.test.ts` was already named for.
 
 // Where an OAuth sign-in is allowed to land, given the client-supplied

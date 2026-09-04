@@ -46,18 +46,18 @@ The `topics` row also carries `provider` (`claude`/`openrouter`, [ADR 0014](/doc
 ## Content API
 
 All learner-facing reads resolve the Topic through one of two helpers in
-[lib.ts](/convex/lib.ts#L21-L40) — `getOwnedTopic` for writes (owner-scoped) and `getViewableTopic`
+[topicAccess.ts](/convex/topicAccess.ts) — `getOwnedTopic` for writes (owner-scoped) and `getViewableTopic`
 for reads (owner **or** [[Viewer]] via a Share). This is the one authorization seam.
 
 **Reads** ([content.ts](/convex/content.ts#L27-L180)): `listTopics`, `dashboard` (cards with live
-lesson/completed counts via [`topicLessonCounts`](/convex/lib.ts#L46-L59)), `listLessons` /
+lesson/completed counts via [`topicLessonCounts`](/convex/progressCounts.ts)), `listLessons` /
 `getLesson` (non-superseded only), `listReferences` / `getReference`.
 
 **Learner writes** ([content.ts](/convex/content.ts#L75-L115)): `seedTopic` ([[Seed]] a Topic from a
 title + "why"), `editMission`, `renameTopic` (title only — slug is immutable, the publish/routine key).
 
 **Publish writes** ([content.ts](/convex/content.ts#L189-L310), all `PUBLISH_SECRET`-guarded via
-[`assertAdmin`](/convex/lib.ts#L7-L10)): `ensureTopic`, `publishMission`, `publishLesson`,
+[`assertAdmin`](/convex/adminSecret.ts)): `ensureTopic`, `publishMission`, `publishLesson`,
 `publishLearningRecord`, `upsertReference`. These are the Hub end of the
 [publish path](04-publishing-workspace.md).
 
@@ -71,7 +71,7 @@ capability minted only *after* a query authorises the caller, so the route needs
 The publish path uploads the HTML to storage first (`generateContentUploadUrl`) and passes only the id
 into the mutation, so HTML never rides through a Convex function. (The old inline `html` column was
 migrated out — see [backfill.ts](/convex/backfill.ts); only some transitional `translations` rows still
-carry inline `html`, and [`pickContentBody`](/convex/lib.ts) serves whichever is present.)
+carry inline `html`, and [`pickContentBody`](/convex/contentBlobs.ts) serves whichever is present.)
 
 ## Resource lifecycle
 
@@ -87,7 +87,7 @@ URL string itself.
   ([content.ts:244](/convex/content.ts#L231-L260)). To "fix" a lesson you author a new one that
   `supersedes` the old. References are the opposite — mutable, upserted by `contentHash`.
 - **Reads are owner-scoped by `(ownerId, slug)`**, not by slug alone, so identical slugs across users
-  never leak. The global `topicBySlug` ([lib.ts:12](/convex/lib.ts#L12-L17)) is only for the publish
+  never leak. The global `topicBySlug` ([topicAccess.ts](/convex/topicAccess.ts)) is only for the publish
   path and the still-global Routine.
 - **Optional fields are legacy accommodations**, not real optionality — `ownerId`, `seq`, `status`,
   `seed`, `mission` are optional purely so the pre-existing Hindi row survived the schema push.

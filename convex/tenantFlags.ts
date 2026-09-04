@@ -6,7 +6,7 @@ import { tenantFlagsValidator } from "./schema";
 import { isReadySeller } from "./sellerStatus";
 import { isCallerAdmin } from "./whitelist";
 
-// Whitelabel feature flags (issue 04 / 17). Split out of `lib.ts` by
+// Whitelabel feature flags (issue 04 / 17). Split out of `edition.ts` (then `lib.ts`) by
 // architecture-deepening/02: flag gating is unrelated to the Edition access
 // stack that file exists for. The dashboard's flag write and the defaults a new
 // tenant starts from joined it from `tenants.ts` in technical-foundation/18, so

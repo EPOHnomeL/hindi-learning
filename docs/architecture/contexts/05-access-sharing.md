@@ -38,8 +38,8 @@ would bypass the gate.
 ## Sharing (read gate)
 
 The read-side authorization lives in one helper —
-[`getViewableTopic`](/convex/lib.ts): return the Topic if the caller **owns** it, else if their
-**grant walk** ([`grantsFor`](/convex/lib.ts)) is non-empty — i.e. they hold *any* Edition of it, by
+[`getViewableTopic`](/convex/topicAccess.ts): return the Topic if the caller **owns** it, else if their
+**grant walk** ([`grantsFor`](/convex/edition.ts)) is non-empty — i.e. they hold *any* Edition of it, by
 `shares` row, `entitlements` row, `enrollments` row, or a free **published** Edition (see below). Every content read query
 (`listLessons`, `getLesson`, `listReferences`, `getReference`) routes through it. Writes route through
 `getOwnedTopic` instead, so a Viewer is read-only by construction — the one exception is
@@ -50,12 +50,12 @@ recipient's **email**, and a language. It grants access to one **[[Edition]]** (
 [ADR 0020](/docs/adr/0020-editor-rights-as-a-share-role.md)) and, so a not-yet-registered invitee can
 actually sign up, **admits the email to the Allowlist**. If the account exists it inserts a `shares`
 row ("shared"); if not, a `pendingShares` row ("pending") that becomes a real Share automatically on
-sign-up ([`claimPendingShares`](/convex/lib.ts) inside the auth callback). So an invite is no longer a
+sign-up ([`claimPendingShares`](/convex/shareGrants.ts) inside the auth callback). So an invite is no longer a
 dead letter — but it still does not *bypass* the Allowlist, it opens it for that one email.
 
 **Roles ([ADR 0020](/docs/adr/0020-editor-rights-as-a-share-role.md)).** A Share is created as a
 **[[Viewer]]** (read-only) and can be promoted to **[[Editor]]** (`setShareRole`). An Editor may correct
-the *text* of the one Edition granted to them — [`getEditableTopic`](/convex/lib.ts) authorises the
+the *text* of the one Edition granted to them — [`getEditableTopic`](/convex/topicAccess.ts) authorises the
 in-place hover-pencil edit for the owner **or** an editor-Share on that exact language (an editor-Share
 for lang X never authorises lang Y). Everything else stays owner-only. `revokeShare` /
 `listEditionAccess` manage the roster; [`listSharedTopics`](/convex/shares.ts) powers the Viewer's
@@ -83,7 +83,7 @@ allowlist**; a missing token returns a uniform null (no enumeration). `/share/[t
 publishing needs a real Edition (English source or a `ready` translation job), unpublishing is
 un-gated.
 
-The read consequence lives in the grant walk: [`freePublishedLangs`](/convex/lib.ts) (listed, minus
+The read consequence lives in the grant walk: [`freePublishedLangs`](/convex/edition.ts) (listed, minus
 priced, minus languages whose Edition has gone away) enters `grantsFor` at the **lowest** precedence as
 a `viewer`, so a free published Edition reads exactly like a Share for **any signed-in** account — no
 join click, no stored row — while Shares/Entitlements/enrollments keep their own badge. It is a **live**

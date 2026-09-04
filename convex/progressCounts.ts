@@ -2,7 +2,7 @@ import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 
 // Per-reader Lesson progress counts. (Plain module — no Convex functions
-// registered here.) Split out of `lib.ts` by architecture-deepening/02: the
+// registered here.) Split out of `edition.ts` (then `lib.ts`) by architecture-deepening/02: the
 // dashboard/card counts read `lessons` + `progress` and know nothing about
 // Editions, grants or the paygate.
 

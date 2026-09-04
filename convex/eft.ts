@@ -473,9 +473,9 @@ async function scheduleAccessEmail(
 // The tenant's email brand, so a YWAM Potch buyer gets a YWAM Potch email rather
 // than a house-branded one immediately after paying them money. Same one-row
 // `by_slug` read as `shares.ts`'s copy; `undefined` for the default site.
-// ponytail: duplicated from shares.ts rather than hoisted into lib.ts — two call
-// sites, ten lines, and hoisting would touch the working invite path. Hoist on the
-// third caller.
+// ponytail: duplicated from shares.ts rather than hoisted into a shared module,
+// two call sites, ten lines, and hoisting would touch the working invite path.
+// Hoist on the third caller, into `tenantTheme.ts`, never the Edition core.
 async function tenantBrand(
   ctx: MutationCtx,
   slug: string | undefined,

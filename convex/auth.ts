@@ -72,7 +72,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
     // Send an OAuth sign-in back to the host it started on. The library's default
     // admits only SITE_URL, which under ADR 0025's host-only cookies would leave a
     // buyer who signed in on `ywampotch.my-course.app` signed in on the apex and
-    // still signed out where they started. See `oauthRedirectUrl` in lib.ts for the
+    // still signed out where they started. See `oauthRedirectUrl` in authRedirect.ts for the
     // host rule and why it is a security boundary.
     async redirect({ redirectTo }) {
       const siteUrl = env().SITE_URL;

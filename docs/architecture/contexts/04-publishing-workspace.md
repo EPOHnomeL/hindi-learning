@@ -78,4 +78,4 @@ sync. The prompts themselves are documented in [Teaching Intelligence](06-ai-tea
 - **Lesson immutability is enforced at the Hub**, not the script — re-publishing a key silently no-ops;
   to change a lesson, author a superseding one.
 - **All publish/operator mutations are `PUBLISH_SECRET`-gated** ([_env.ts](/scripts/_env.ts#L46-L78) →
-  [`assertAdmin`](/convex/lib.ts#L7-L10)); the secret must be set both locally and in Convex env.
+  [`assertAdmin`](/convex/adminSecret.ts)); the secret must be set both locally and in Convex env.

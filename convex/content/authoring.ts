@@ -473,7 +473,7 @@ export const editTranslatedLesson = action({
 // on their own Edition able to fix every Lesson and neither the grammar sheet nor
 // the glossary. Nothing about References made that necessary: the reader has
 // always served a translated Reference (`loadEdition(...).reference` in
-// convex/lib.ts) and `publishTranslation` has always written the rows. Only the
+// convex/edition.ts) and `publishTranslation` has always written the rows. Only the
 // in-app write path was missing.
 //
 // A plain mutation, not an action: References carry no quiz, so there is no

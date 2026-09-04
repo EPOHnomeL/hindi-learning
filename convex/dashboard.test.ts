@@ -194,7 +194,7 @@ test("a reader with progress but no grant row is still a learner", async () => {
   const owner = await seedUser(t, "owner@example.com");
   const topicId = await seedCourse(t, owner, 10);
   // The free published Edition path grants access with no row about the reader
-  // at all (convex/lib.ts grantsFor), so their progress is the only evidence.
+  // at all (convex/edition.ts grantsFor), so their progress is the only evidence.
   const anon = await seedUser(t, "anon@example.com");
   await complete(t, topicId, anon, 10);
 

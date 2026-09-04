@@ -1,6 +1,6 @@
 // Opaque-string primitives: the capability token a link carries, and the cheap
 // fingerprint the translator uses to spot a changed source item. (Plain module,
-// no Convex functions registered here.) Split out of `lib.ts` by
+// no Convex functions registered here.) Split out of `edition.ts` (then `lib.ts`) by
 // technical-foundation/16: neither has anything to say about Editions or grants.
 
 // A 256-bit URL-safe token (hex) from Web Crypto — the credential a capability

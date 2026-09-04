@@ -6,10 +6,10 @@ import { grantsFor } from "./edition";
 
 // The four Topic resolvers: by slug, and the three that hand back a Topic only if
 // the caller may own, read or edit it. (Plain module, no Convex functions
-// registered here.) Split out of `lib.ts` by technical-foundation/16. Their
+// registered here.) Split out of `edition.ts` (then `lib.ts`) by technical-foundation/16. Their
 // subject is the Topic row, not the Edition: each returns `Doc<"topics"> | null`,
 // and the two that consult the grant walk are consumers of the Edition core
-// rather than part of it, so the dependency points one way, into `lib.ts`.
+// rather than part of it, so the dependency points one way, into `edition.ts`.
 
 export async function topicBySlug(ctx: QueryCtx, slug: string): Promise<Doc<"topics"> | null> {
   return await ctx.db

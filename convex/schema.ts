@@ -559,7 +559,7 @@ export default defineSchema({
   // `published: false` both read as unlisted). Owner-only to write
   // (catalogue.setEditionPublished). Two consequences, both per-Edition: the
   // catalogue lists it, and — while the Edition is FREE — any signed-in caller
-  // reads it as a Viewer (convex/lib.ts). Not to be confused with a **Public
+  // reads it as a Viewer (convex/edition.ts). Not to be confused with a **Public
   // link** (`publicLinks`, anonymous bearer token) or with the teach→Hub
   // "publish" push. `by_topic_lang` is the per-Edition lookup both consequences
   // use; `by_topic` lists a course's published Editions (and cascades on delete).

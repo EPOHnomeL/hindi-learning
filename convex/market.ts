@@ -18,7 +18,7 @@ import { chargeCents, regionForCountry } from "./regions";
 // Paid marketplace (ADR 0016, PayFast rail — .scratch/payfast-payments) — the
 // Edition **listing** (price) and **Entitlement** grants. A listing's PRESENCE
 // makes an Edition paid; an Entitlement is a buyer's permanent right to read one
-// paid Edition past its free Preview (the access resolver in lib.ts reads both).
+// paid Edition past its free Preview (the access resolver in edition.ts reads both).
 //
 // Pricing (set/clearEditionPrice) is the **Seller** action: the course OWNER,
 // once they are a ready Seller (can-sell grant + payout bank details), prices

@@ -1,5 +1,5 @@
 // The shared-secret admin guard. (Plain module, no Convex functions registered
-// here.) Split out of `lib.ts` by technical-foundation/16: a PUBLISH_SECRET check
+// here.) Split out of `edition.ts` (then `lib.ts`) by technical-foundation/16: a PUBLISH_SECRET check
 // is not part of the Edition access stack, and its nine callers are spread across
 // the write paths rather than the reader.
 

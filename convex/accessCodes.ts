@@ -37,7 +37,7 @@ import { isCallerAdmin } from "./whitelist";
 // byte-identical to an Admin comp. `accessCodes.test.ts` pins its key set
 // positively, so a future refactor that "tidies up" by adding the code id back
 // fails a test rather than quietly ending the promise made to the organisation's
-// members. `lib.ts`'s grant walk is untouched: a Seat mints an ordinary Entitlement
+// members. `edition.ts`'s grant walk is untouched: a Seat mints an ordinary Entitlement
 // and the walk already treats its presence as access.
 
 // The hard ceiling on one code's capacity. Not a commercial limit: it is about a

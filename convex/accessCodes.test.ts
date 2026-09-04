@@ -433,7 +433,7 @@ test("the grant walk is untouched: a Seat reads a priced edition like any entitl
   await join(t, { code, nickname: "Thandi" });
   const [seat] = await seatRows(t);
 
-  // `lib.ts`'s grant walk was not edited for this rail and does not need to be: a
+  // `edition.ts`'s grant walk was not edited for this rail and does not need to be: a
   // Seat mints an ordinary Entitlement and the walk already treats its presence as
   // access. A ticket that finds itself editing the walk has drifted.
   const mine = await asUser(t, seat!.userId!).query(api.market.myPurchases, {});

@@ -4,7 +4,7 @@ import { SOURCE_LANG } from "./sourceLang";
 
 // Share and email primitives: how a Share row's absent fields read, how an email
 // is keyed, and how a pending invite becomes a real Share. (Plain module, no
-// Convex functions registered here.) Split out of `lib.ts` by
+// Convex functions registered here.) Split out of `edition.ts` (then `lib.ts`) by
 // technical-foundation/16: the invite rail is not the Edition access stack that
 // file exists for.
 

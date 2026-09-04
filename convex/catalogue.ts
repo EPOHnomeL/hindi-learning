@@ -59,7 +59,7 @@ export const setEditionPublished = mutation({
 // The signed-in home's **available courses**: every published course in the
 // member's own tenant, minus the ones they already own (those are their library).
 // Nothing else is filtered out — a free published Edition already reads as a
-// Viewer (lib.ts), so there is no join step to gate the card on.
+// Viewer (edition.ts), so there is no join step to gate the card on.
 //
 // Tenant scope is **symmetric** and follows the **host being browsed**, passed in
 // by the caller (`useTenantSlug()`, resolved server-side from the host — the client
