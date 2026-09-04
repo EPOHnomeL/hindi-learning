@@ -82,3 +82,52 @@ test("a run that cannot report usage leaves the fields ABSENT, not zero", async 
   expect(run.outputTokens).toBeUndefined();
   expect(run.model).toBeUndefined();
 });
+
+test("tokenUsageByTopic sums a Topic's runs and counts the ones it cannot account for", async () => {
+  const t = convexTest(schema, modules);
+  const admin = await seedAdmin(t, "admin@example.com");
+  const hindi = await seedTopic(t, admin, "hindi");
+  await seedTopic(t, admin, "spanish");
+
+  await t.mutation(api.routine.reportGeneration, {
+    secret,
+    topicSlug: "hindi",
+    outcome: "published",
+    usage: { inputTokens: 1000, outputTokens: 200, model: "z-ai/glm-5.3-flash" },
+  });
+  await t.mutation(api.routine.reportGeneration, {
+    secret,
+    topicSlug: "hindi",
+    outcome: "published",
+    usage: { inputTokens: 500, outputTokens: 100, model: "z-ai/glm-5.3-flash" },
+  });
+  // A third run on the same Topic with no counts at all.
+  await t.mutation(api.routine.reportGeneration, { secret, topicSlug: "hindi", outcome: "nothing" });
+  // Another Topic's run must not leak into Hindi's total.
+  await t.mutation(api.routine.reportGeneration, {
+    secret,
+    topicSlug: "spanish",
+    outcome: "published",
+    usage: { inputTokens: 7, outputTokens: 7, model: "other/model" },
+  });
+
+  const rows = await asUser(t, admin).query(api.routine.tokenUsageByTopic, {});
+  const hindiRow = rows.find((r) => r.topicSlug === "hindi");
+  expect(hindiRow).toEqual({
+    topicSlug: "hindi",
+    topicTitle: "hindi",
+    inputTokens: 1500,
+    outputTokens: 300,
+    runs: 3,
+    runsWithoutUsage: 1,
+    models: ["z-ai/glm-5.3-flash"],
+  });
+  expect(rows.find((r) => r.topicSlug === "spanish")).toMatchObject({ inputTokens: 7, runsWithoutUsage: 0 });
+});
+
+test("tokenUsageByTopic is Admin-only", async () => {
+  const t = convexTest(schema, modules);
+  const user = await seedUser(t, "u@example.com");
+  await expect(asUser(t, user).query(api.routine.tokenUsageByTopic, {})).rejects.toThrow();
+  await expect(t.query(api.routine.tokenUsageByTopic, {})).rejects.toThrow();
+});

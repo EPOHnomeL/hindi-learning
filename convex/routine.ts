@@ -268,6 +268,81 @@ export const runHistory = query({
   },
 });
 
+// How many Generation Runs the token aggregate scans. Same shape of defence as
+// HISTORY_LIMIT: an operator measurement must not turn into an unbounded scan.
+const TOKEN_RUN_SCAN = 1000;
+
+// Per-Topic token usage (cost instrumentation, technical-foundation/12), for the
+// operator ONLY: sys-admin gated here, exactly like the run history it sits
+// beside, and never reachable by an owner or a reader. It sums `inputTokens` and
+// `outputTokens` over each Topic's runs within the most recent TOKEN_RUN_SCAN
+// runs, newest-first.
+//
+// `runsWithoutUsage` is the honesty column and the reason there is no single
+// "total cost" number: a run whose runtime could not count its own tokens is
+// recorded with the fields ABSENT, and this counts those rather than adding a
+// zero. Today every cloud claude.ai Routine run lands in that column, so a Topic
+// showing `runs: 12, runsWithoutUsage: 12` has not been measured at all, which is
+// a different statement from "it cost nothing". Read a sum as a floor.
+//
+// Measurement only: tokens and model names, no price, no currency, no threshold.
+export const tokenUsageByTopic = query({
+  args: {},
+  returns: v.array(
+    v.object({
+      topicSlug: v.string(),
+      topicTitle: v.string(),
+      inputTokens: v.number(),
+      outputTokens: v.number(),
+      runs: v.number(),
+      runsWithoutUsage: v.number(),
+      models: v.array(v.string()),
+    }),
+  ),
+  handler: async (ctx) => {
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
+    const runs = await ctx.db.query("generationRuns").order("desc").take(TOKEN_RUN_SCAN);
+
+    type Row = {
+      topicSlug: string;
+      topicTitle: string;
+      inputTokens: number;
+      outputTokens: number;
+      runs: number;
+      runsWithoutUsage: number;
+      models: string[];
+    };
+    const byTopic = new Map<Id<"topics">, Row>();
+    for (const r of runs) {
+      let row = byTopic.get(r.topicId);
+      if (!row) {
+        const topic = await ctx.db.get(r.topicId);
+        row = {
+          topicSlug: topic?.slug ?? "(deleted)",
+          topicTitle: topic?.title ?? "(deleted course)",
+          inputTokens: 0,
+          outputTokens: 0,
+          runs: 0,
+          runsWithoutUsage: 0,
+          models: [],
+        };
+        byTopic.set(r.topicId, row);
+      }
+      row.runs += 1;
+      // Absent counts are unknown, so they move the "not accounted for" tally
+      // rather than the sums.
+      if (r.inputTokens === undefined || r.outputTokens === undefined) {
+        row.runsWithoutUsage += 1;
+        continue;
+      }
+      row.inputTokens += r.inputTokens;
+      row.outputTokens += r.outputTokens;
+      if (r.model !== undefined && !row.models.includes(r.model)) row.models.push(r.model);
+    }
+    return [...byTopic.values()].sort((a, b) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens));
+  },
+});
+
 // Generation + translation usage over time, bucketed by day, for the admin
 // Generation tab's activity graph (.scratch/admin-sales follow-up). Two series
 // on one count axis:
