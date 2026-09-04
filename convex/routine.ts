@@ -100,6 +100,13 @@ async function generationRow(ctx: QueryCtx, topicId: Id<"topics">): Promise<Doc<
 // to `endedAt` when the lock never stamped one (e.g. a fire that failed before it
 // armed), so the row always has a bracket. The produced-Lesson fields are supplied
 // only for a `published` run (the Frontier the run advanced to).
+//
+// `usage` is what the run reported it SPENT (technical-foundation/12). It is
+// optional as a whole and never partially written: a run that cannot count its
+// tokens leaves all three fields absent, which reads as unknown rather than as a
+// free run. See the `usage` arg on `reportGeneration` for which seam can fill it.
+export type RunUsage = { inputTokens: number; outputTokens: number; model: string };
+
 async function recordRun(
   ctx: MutationCtx,
   args: {
@@ -109,6 +116,7 @@ async function recordRun(
     error?: string;
     producedLessonKey?: string;
     producedLessonTitle?: string;
+    usage?: RunUsage;
   },
 ): Promise<void> {
   const endedAt = Date.now();
@@ -120,6 +128,7 @@ async function recordRun(
     ...(args.error !== undefined ? { error: args.error } : {}),
     ...(args.producedLessonKey !== undefined ? { producedLessonKey: args.producedLessonKey } : {}),
     ...(args.producedLessonTitle !== undefined ? { producedLessonTitle: args.producedLessonTitle } : {}),
+    ...(args.usage ?? {}),
   });
 }
 
@@ -433,8 +442,17 @@ export const reportGeneration = mutation({
     // Folded into the Topic here so there's no extra call — the estimate is part
     // of "here's how this run ended". Advisory only; it never gates authoring.
     estimatedLessons: v.optional(v.number()),
+    // What the run spent (technical-foundation/12). Optional as a WHOLE, so a
+    // runtime that cannot see its own token counts simply omits it and the run
+    // is recorded as unknown rather than as zero. Only a runtime the provider
+    // answers with a usage object can supply it: today the in-Convex OpenRouter
+    // authoring action, not the cloud claude.ai Routine. Measurement only, so
+    // nothing downstream prices, caps or bills on it.
+    usage: v.optional(
+      v.object({ inputTokens: v.number(), outputTokens: v.number(), model: v.string() }),
+    ),
   },
-  handler: async (ctx, { secret, topicSlug, outcome, error, estimatedLessons }) => {
+  handler: async (ctx, { secret, topicSlug, outcome, error, estimatedLessons, usage }) => {
     assertAdmin(secret);
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) throw new Error("topic not found");
@@ -464,6 +482,7 @@ export const reportGeneration = mutation({
       error: outcome === "failed" ? (error ?? "run failed") : undefined,
       producedLessonKey: produced?.key,
       producedLessonTitle: produced?.title,
+      usage,
     });
 
     // Fire-and-pray continuation (Admin). Only a `published` lesson on a live,

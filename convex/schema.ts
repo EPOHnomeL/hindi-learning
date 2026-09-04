@@ -327,8 +327,16 @@ export default defineSchema({
   // claimed) — via one `recordRun` helper, never patched or deleted (insert-once,
   // like lessons/learningRecords/certificates). `startedAt`/`endedAt` bracket the
   // run; `producedLessonKey`/`Title` name the Frontier Lesson a `published` run
-  // advanced to (absent otherwise). No trigger/provider/token fields (kept lean;
-  // the token seam is internal-course-studio/03's). The live "busy now" view reads
+  // advanced to (absent otherwise).
+  //
+  // Token usage (technical-foundation/12, 2026-09-04): `inputTokens`,
+  // `outputTokens` and `model` are what the run REPORTED it spent. All three are
+  // optional and written as a set: **absent means UNKNOWN, never zero**. Only a
+  // runtime that gets counts back from its provider can fill them, which today
+  // is the in-Convex OpenRouter path alone; the cloud claude.ai Routine reports
+  // an outcome and no counts, so its rows stay unknown until the
+  // provider-agnostic runtime of ADR 0014 lands. Measurement only: no price, no
+  // currency, no cap lives on this row. The live "busy now" view reads
   // the lock, NOT this table — the hot acquire path is untouched. `by_topic`
   // supports a future per-course view; the global history query reads the default
   // `_creationTime` order (newest-first).
@@ -340,6 +348,9 @@ export default defineSchema({
     error: v.optional(v.string()),
     producedLessonKey: v.optional(v.string()),
     producedLessonTitle: v.optional(v.string()),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
+    model: v.optional(v.string()),
   }).index("by_topic", ["topicId"]),
 
   // A Share: grants one person access to one **Edition** — a (Topic, language)
