@@ -52,7 +52,7 @@ async function scheduleInvite(
 // Resolve a tenant's invite-email brand from its slug (whitelabel issue 14): the
 // `displayName`, the raw **light** theme tokens (the email action derives its
 // palette from them), and the logo's absolute URL (null when unset → wordmark).
-// The same one-row `by_slug` read `tenants.getTheme` uses; returns `undefined`
+// The same one-row `by_slug` read `tenantTheme.getTheme` uses; returns `undefined`
 // for the default site (no slug / unknown slug), so the invite stays house-branded.
 async function tenantBrand(
   ctx: MutationCtx,

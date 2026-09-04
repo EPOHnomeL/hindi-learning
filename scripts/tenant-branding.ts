@@ -44,7 +44,7 @@ function looksLikeColor(v: unknown): v is string {
 }
 
 // Validate a mapped tenant theme against the 14-token contract (mirrors
-// convex/tenants.ts assertThemeTokens, plus a colour-shape sanity pass). Returns
+// convex/tenantTheme.ts assertThemeTokens, plus a colour-shape sanity pass). Returns
 // a list of human-readable problems — empty means valid. Pure, so it's unit-
 // tested; the CLI just prints what this returns.
 export function validateTheme(theme: MaybeTheme): string[] {

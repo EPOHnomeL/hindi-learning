@@ -109,9 +109,9 @@ it into `lib.ts`. ceiling: two call sites, ten lines. upgrade: the third caller.
 [17](../.plan/maps/technical-foundation/tickets/17-rename-lib-to-edition.md) then renames what is
 left to the Edition module. Hoisting a tenant-branding read into `lib.ts` now would undo 16
 and put a tenant concern inside a file whose whole point is that it holds only Edition and grant
-code. When the third caller appears, the target is the tenant side: `convex/tenants.ts`, or
-whichever module [18](../.plan/maps/technical-foundation/tickets/18-split-tenants-ts.md) splits it
-into. The same correction applies to any other marker naming `lib.ts` as a destination: `lib.ts`
+code. When the third caller appears, the target is the tenant side. [18](../.plan/maps/technical-foundation/tickets/18-split-tenants-ts.md)
+split `convex/tenants.ts` on 2026-09-04, so pick the module that matches the read:
+`convex/tenantTheme.ts` for a branding/palette read like this one. The same correction applies to any other marker naming `lib.ts` as a destination: `lib.ts`
 is a source in this map, never a sink.
 
 ### `convex/contentBlobs.ts:48`
@@ -140,7 +140,7 @@ fields it declares. upgrade: grow it as typed fields, like `userPrefs`.
 **ACCEPTED.** Typed fields with a validator beat an untyped bag, and the upgrade path is
 "add a field", which is the cheapest possible one.
 
-### `convex/tenants.ts:16`
+### `convex/tenantTheme.ts:20`
 
 `TENANT_THEME_TOKENS` is hand-mirrored from `src/design/tokens.ts` because Convex functions
 cannot import from `src/`. ceiling: the two lists must be kept in sync by hand. upgrade: keep them
@@ -154,6 +154,12 @@ guards them: `src/design/tokens.test.ts` checks the src list against a local lit
 `convex/tenants.test.ts` checks a tenant row against the Convex list. No test compares the two
 files, so a token added on one side ships silently wrong on the other. A test can read across the
 boundary even though the runtime cannot, which is the laziest fix available.
+
+Moved 2026-09-04 by [18](../.plan/maps/technical-foundation/tickets/18-split-tenants-ts.md):
+the marker and `TENANT_THEME_TOKENS` were at `convex/tenants.ts:16` when 23 was filed and are
+now at `convex/tenantTheme.ts:20`. The Convex-side list itself is unchanged, byte for byte, and
+the assertion 23 names still lives in `convex/tenants.test.ts`, which now imports the list from
+`./tenantTheme`.
 
 ### `convex/translate.ts:105`
 
@@ -250,7 +256,7 @@ instruction not to grow the shortcut instead of replacing it.
 ## Totals
 
 20 markers, 6 with no trigger. 18 accepted, 2 needing a ticket
-(`convex/routine.ts:838`, `convex/tenants.ts:16`).
+(`convex/routine.ts:838`, `convex/tenantTheme.ts:20`).
 
 Harvested for
 [technical-foundation/20](../.plan/maps/technical-foundation/tickets/20-ponytail-debt-ledger.md).

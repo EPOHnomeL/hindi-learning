@@ -18,7 +18,7 @@ import { assertAdmin } from "./adminSecret";
 const artifactTableV = v.union(v.literal("lessons"), v.literal("references"), v.literal("translations"));
 const artifactRefV = v.object({ table: artifactTableV, id: v.string() });
 
-// Assign an existing course to a tenant: the operator twin of tenants.assignCourse
+// Assign an existing course to a tenant: the operator twin of tenantAssignment.assignCourse
 // (that one is identity-guarded for the dashboard; this is secret-guarded for the
 // script). Refuses to steal a course already owned by another tenant, matching
 // assignCourse. Idempotent for a course already on this tenant.

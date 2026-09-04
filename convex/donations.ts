@@ -57,7 +57,7 @@ export { USD_ZAR_RATE, zarCentsFromUsdCents };
 
 // The tenant a donation is solicited for, and the payee it would be owed to —
 // or a reason it cannot be taken. **The same gate the flag toggle enforces**
-// (tenants.setTenantFlags), re-run here at the moment of the ask: a payee whose
+// (tenantFlags.setTenantFlags), re-run here at the moment of the ask: a payee whose
 // seller grant or bank details were revoked after the flag went on must not
 // keep collecting, so readiness is checked live and never cached into the flag.
 export async function donationTarget(

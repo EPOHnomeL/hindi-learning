@@ -194,7 +194,7 @@ async function freshCode(ctx: MutationCtx): Promise<string> {
 // `/redeem` turns the tag into a translated sentence. Two reasons it is a tag
 // rather than the sentence itself: a PRODUCTION deployment redacts a plain
 // `Error`'s message to "Server Error" (only a ConvexError's `data` survives the
-// trip, see `tenants.ts`), and the member reading it may not be reading the app
+// trip, see `tenantFlags.ts`), and the member reading it may not be reading the app
 // in English. The distinctions matter more here than anywhere else in the rail -
 // "already used", "no such code" and "you already have this" send the member to
 // three different places, and one blurred message sends them to none.

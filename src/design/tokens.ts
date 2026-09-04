@@ -25,7 +25,7 @@ export type Token = (typeof TENANT_THEME_TOKENS)[number];
 // optional and may be partial (unspecified tokens fall back to the default dark
 // palette). Hyphenated token names (`good-b`, `bad-b`) are why the Convex-side
 // theme validator stays a loose record rather than a fixed object — the exact
-// key set is enforced in code (see convex/tenants.ts assertThemeTokens, which
+// key set is enforced in code (see convex/tenantTheme.ts assertThemeTokens, which
 // mirrors this list because Convex functions can't import from src/).
 export type TenantTheme = {
   light: Record<Token, string>;

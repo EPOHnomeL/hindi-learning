@@ -7,6 +7,12 @@ import { tenantFlagsValidator, tenantThemeValidator } from "./schema";
 import { DEFAULT_TENANT_FLAGS } from "./tenantFlags";
 import { DEFAULT_TENANT_THEME, assertThemeTokens } from "./tenantTheme";
 
+// The tenant row's own lifecycle: list, create, seed, and remove. What a tenant
+// *is*, not what it looks like or what it holds. The rest of the old `tenants.ts`
+// was split out by technical-foundation/18: the palette and brand assets are in
+// `tenantTheme.ts`, the feature flags in `tenantFlags.ts`, the donation payee in
+// `tenantDonations.ts`, and course/member allocation in `tenantAssignment.ts`.
+
 // The dashboard sidebar's tenant list (issue 19): every tenant's slug + display
 // name, sorted by display name. **Sys-admin only** — a tenant admin has no picker
 // (they're locked to their own tenant), so this list is never theirs to see. The

@@ -192,7 +192,7 @@ async function blobText(ctx: ActionCtx, id: Id<"_storage">): Promise<string | nu
 // message before it reaches the client, so `e.message` becomes "[CONVEX
 // A(content/authoring:editLesson)] … Server Error" and every one of these
 // sentences was replaced by that noise on the live site — the same trap the
-// donation-flag precondition fell into (see `convex/tenants.ts`). Only
+// donation-flag precondition fell into (see `convex/tenantFlags.ts`). Only
 // ConvexError's `data` crosses the wire in prod.
 //
 // The *guard* failures above (`unauthenticated`, `topic not found`, `lesson not

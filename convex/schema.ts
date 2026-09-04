@@ -17,7 +17,7 @@ export const payoutDetailsValidator = v.object({
 // plus optional brand assets. `light`/`dark` are loose records — not a fixed
 // v.object — because CSS-friendly hyphenated token names (good-b, bad-b) can't
 // be object keys in a validator; the exact key set is checked in code against
-// the token list (see convex/tenants.ts assertThemeTokens). `dark` is optional
+// the token list (see convex/tenantTheme.ts assertThemeTokens). `dark` is optional
 // and partial (else the default dark palette applies). Assets are raster blobs,
 // mint-new-never-overwrite; absent → displayName wordmark / shared /icon.svg.
 export const tenantThemeValidator = v.object({
