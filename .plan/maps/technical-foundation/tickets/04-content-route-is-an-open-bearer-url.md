@@ -62,3 +62,29 @@ implementation tickets exist - including what it costs in caching and what the r
 change.
 
 <!-- Moved 2026-09-01 from `marketplace/12` into the technical-foundation map, which groups this repo’s scalability, refactoring and code-architecture work. Renumbered to 04 because `blocked_by` is map-local and the old numbers collided. Inbound links across `.plan/` were repointed in the same commit. -->
+
+## Evidence, gathered 2026-09-04
+
+The premise was confirmed against **production**, not reasoned about. Reading a
+lesson on `ywampotch.my-course.app` puts exactly one content request on the wire:
+
+```
+https://capable-barracuda-769.eu-west-1.convex.site/content?id=<storageId>
+```
+
+That URL was then fetched from a fresh `curl`, outside the browser, with **no
+cookies, no session and no headers of any kind**. It returned `200`, 27197 bytes
+of `text/html`, the complete lesson body. Possession of the id is the whole
+authorisation, exactly as the design intent says.
+
+Two honest limits on this evidence, so nobody over-reads it:
+
+- The lesson used was the **free preview lesson**, which anyone may read anyway.
+  So this demonstrates the mechanism, NOT a paywall bypass. Proving the stronger
+  claim needs a paid lesson's id, which needs a purchase.
+- It says nothing about how long an id stays valid, because one fetch cannot show
+  that. The `storage.getUrl` links are noted elsewhere as permanent
+  (`docs/agents/project-context.md`), which is the thing to check next.
+
+What this does settle is that the question is real and current: the endpoint is
+open today, on prod, and the id is a bearer capability in the plainest sense.
