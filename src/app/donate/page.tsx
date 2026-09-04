@@ -31,7 +31,7 @@ export default async function DonatePage() {
   // control" — which is right for a palette and wrong here: reusing it would turn
   // a transient Convex blip into a 404 on a working donation page. Let the fetch
   // throw (a 500 the operator can see) and 404 only on a genuine flag-off.
-  const tenant = await fetchQuery(api.tenants.getTheme, { slug });
+  const tenant = await fetchQuery(api.tenantTheme.getTheme, { slug });
 
   // Fail closed by absence, the same posture the flag has everywhere else. On a
   // site that doesn't take donations this page genuinely does not exist — which

@@ -9,7 +9,7 @@ import type { TenantSlug } from "~/lib/tenant";
 // The resolved tenant (displayName, palette, logoUrl, faviconUrl, flags), or
 // `null` for the default site / an unseeded host. `undefined` while the client
 // query is still loading — only reachable on a tenant host.
-export type Tenant = FunctionReturnType<typeof api.tenants.getTheme>;
+export type Tenant = FunctionReturnType<typeof api.tenantTheme.getTheme>;
 type TenantCtx = Tenant | undefined;
 
 const Ctx = createContext<TenantCtx>(undefined);
@@ -29,7 +29,7 @@ const SlugCtx = createContext<TenantSlug | null>(null);
 export function TenantProvider({ slug, children }: { slug: TenantSlug | null; children: ReactNode }) {
   // Skip the query on the default site — there is no tenant to resolve, so the
   // context settles to `null` rather than sitting on a loading `undefined`.
-  const tenant = useQuery(api.tenants.getTheme, slug ? { slug } : "skip");
+  const tenant = useQuery(api.tenantTheme.getTheme, slug ? { slug } : "skip");
   const value: TenantCtx = slug ? tenant : null;
   return (
     <SlugCtx.Provider value={slug}>

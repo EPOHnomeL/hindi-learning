@@ -1473,7 +1473,7 @@ function NewTenantForm({ onCreated }: { onCreated: (slug: string) => void }) {
 // actually wants — their member roster and their payouts — are separate builds
 // (prior review items 5 and 6), each blocked on its own open decision.
 function TenantDetail({ slug, role, onRemoved }: { slug: string; role: "sys" | "tenant"; onRemoved?: () => void }) {
-  const view = useQuery(api.tenants.getTheme, { slug });
+  const view = useQuery(api.tenantTheme.getTheme, { slug });
   const displayName = view?.displayName ?? slug;
   const isSys = role === "sys";
 
@@ -2039,7 +2039,7 @@ function FlagToggles({ slug, flags }: { slug: string; flags: Partial<Record<Tena
 
 // The tenant view getTheme resolves (issue 11) — a non-null tenant's resolved
 // palette + brand asset urls, which the editor seeds from.
-type TenantThemeView = NonNullable<FunctionReturnType<typeof api.tenants.getTheme>>;
+type TenantThemeView = NonNullable<FunctionReturnType<typeof api.tenantTheme.getTheme>>;
 type Palette = Record<string, string>;
 
 // Short human labels for the structured token fields — the semantic role of each
@@ -2109,7 +2109,7 @@ function validatePalette(raw: unknown, name: string, complete: boolean): Palette
 // so local edits never bleed across tenants and the live getTheme never clobbers
 // an in-progress edit.
 function ThemeEditor({ slug, view }: { slug: string; view: TenantThemeView }) {
-  const save = useMutation(api.tenants.updateTenantTheme);
+  const save = useMutation(api.tenantTheme.updateTenantTheme);
 
   // Editable palettes seeded from the tenant's current theme: light is complete
   // (all 14); dark is a partial override map (only the tokens the tenant set).
@@ -2373,7 +2373,7 @@ function TokenField({
 // single text input + save, mirroring the theme editor's own save button
 // rather than autosaving on change.
 function MottoEditor({ slug, motto }: { slug: string; motto: string | null }) {
-  const save = useMutation(api.tenants.updateTenantMotto);
+  const save = useMutation(api.tenantTheme.updateTenantMotto);
   const [value, setValue] = useState(motto ?? "");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -2453,7 +2453,7 @@ function AssetSlot({
   currentUrl: string | null;
 }) {
   const generateUploadUrl = useMutation(api.resources.generateUploadUrl);
-  const setAsset = useMutation(api.tenants.setTenantAsset);
+  const setAsset = useMutation(api.tenantTheme.setTenantAsset);
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

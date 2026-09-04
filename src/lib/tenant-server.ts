@@ -24,7 +24,7 @@ export async function getTenantView() {
   const slug = await getTenantSlug();
   if (!slug) return null;
   try {
-    return await fetchQuery(api.tenants.getTheme, { slug });
+    return await fetchQuery(api.tenantTheme.getTheme, { slug });
   } catch (err) {
     // This fetch sits in the root layout, so it runs on every route. A theme read
     // is best-effort branding, never access control — so a transient Convex error

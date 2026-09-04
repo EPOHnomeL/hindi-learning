@@ -60,6 +60,7 @@ import type * as shares from "../shares.js";
 import type * as sourceLang from "../sourceLang.js";
 import type * as tenantBackfill from "../tenantBackfill.js";
 import type * as tenantFlags from "../tenantFlags.js";
+import type * as tenantTheme from "../tenantTheme.js";
 import type * as tenants from "../tenants.js";
 import type * as tokens from "../tokens.js";
 import type * as topicAccess from "../topicAccess.js";
@@ -129,6 +130,7 @@ declare const fullApi: ApiFromModules<{
   sourceLang: typeof sourceLang;
   tenantBackfill: typeof tenantBackfill;
   tenantFlags: typeof tenantFlags;
+  tenantTheme: typeof tenantTheme;
   tenants: typeof tenants;
   tokens: typeof tokens;
   topicAccess: typeof topicAccess;

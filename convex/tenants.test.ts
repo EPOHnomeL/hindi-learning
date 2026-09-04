@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { TENANT_THEME_TOKENS } from "./tenants";
+import { TENANT_THEME_TOKENS } from "./tenantTheme";
 import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -190,7 +190,7 @@ const LIGHT2 = {
 test("setTenantTheme overwrites an existing tenant's palette", async () => {
   const t = convexTest(schema, modules);
   await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
-  await t.mutation(api.tenants.setTenantTheme, { secret, slug: "yknot", theme: { light: LIGHT2 } });
+  await t.mutation(api.tenantTheme.setTenantTheme, { secret, slug: "yknot", theme: { light: LIGHT2 } });
   const row = await t.run((ctx) =>
     ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "yknot")).unique(),
   );
@@ -206,7 +206,7 @@ test("setTenantTheme preserves logo/favicon and clears a stale dark when none is
       theme: { light: LIGHT, dark: { paper: "#111" }, logo }, flags: FLAGS,
     }),
   );
-  await t.mutation(api.tenants.setTenantTheme, { secret, slug: "yknot", theme: { light: LIGHT2 } });
+  await t.mutation(api.tenantTheme.setTenantTheme, { secret, slug: "yknot", theme: { light: LIGHT2 } });
   const row = await t.run((ctx) =>
     ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "yknot")).unique(),
   );
@@ -218,7 +218,7 @@ test("setTenantTheme preserves logo/favicon and clears a stale dark when none is
 test("setTenantTheme sets a partial dark when supplied", async () => {
   const t = convexTest(schema, modules);
   await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
-  await t.mutation(api.tenants.setTenantTheme, {
+  await t.mutation(api.tenantTheme.setTenantTheme, {
     secret, slug: "yknot", theme: { light: LIGHT2, dark: { paper: "#111", ink: "#eee" } },
   });
   const row = await t.run((ctx) =>
@@ -233,7 +233,7 @@ test("setTenantTheme rejects a theme missing a required light token", async () =
   const light: Record<string, string> = { ...LIGHT2 };
   delete light["gold"];
   await expect(
-    t.mutation(api.tenants.setTenantTheme, { secret, slug: "yknot", theme: { light } }),
+    t.mutation(api.tenantTheme.setTenantTheme, { secret, slug: "yknot", theme: { light } }),
   ).rejects.toThrow(/missing/i);
 });
 
@@ -241,14 +241,14 @@ test("setTenantTheme refuses an incorrect secret", async () => {
   const t = convexTest(schema, modules);
   await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
   await expect(
-    t.mutation(api.tenants.setTenantTheme, { secret: "wrong", slug: "yknot", theme: { light: LIGHT2 } }),
+    t.mutation(api.tenantTheme.setTenantTheme, { secret: "wrong", slug: "yknot", theme: { light: LIGHT2 } }),
   ).rejects.toThrow(/unauthorized/i);
 });
 
 test("setTenantTheme rejects an unknown tenant slug", async () => {
   const t = convexTest(schema, modules);
   await expect(
-    t.mutation(api.tenants.setTenantTheme, { secret, slug: "ghost", theme: { light: LIGHT2 } }),
+    t.mutation(api.tenantTheme.setTenantTheme, { secret, slug: "ghost", theme: { light: LIGHT2 } }),
   ).rejects.toThrow(/not found/i);
 });
 
@@ -262,7 +262,7 @@ test("updateTenantTheme: a sys admin repaints any tenant's palette", async () =>
   const t = convexTest(schema, modules);
   const sys = await seedAdmin(t, "sys@example.com");
   await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
-  await asUser(t, sys).mutation(api.tenants.updateTenantTheme, { tenantSlug: "yknot", theme: { light: LIGHT2 } });
+  await asUser(t, sys).mutation(api.tenantTheme.updateTenantTheme, { tenantSlug: "yknot", theme: { light: LIGHT2 } });
   const row = await t.run((ctx) =>
     ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "yknot")).unique(),
   );
@@ -276,7 +276,7 @@ test("updateTenantTheme: a tenant admin repaints their own tenant but not anothe
   await t.mutation(api.tenants.seedTenant, { secret, slug: "ywampotch", displayName: "YW", theme: THEME, flags: FLAGS });
 
   // Own tenant → allowed.
-  await asUser(t, upfAdmin).mutation(api.tenants.updateTenantTheme, { tenantSlug: "upf", theme: { light: LIGHT2 } });
+  await asUser(t, upfAdmin).mutation(api.tenantTheme.updateTenantTheme, { tenantSlug: "upf", theme: { light: LIGHT2 } });
   const own = await t.run((ctx) =>
     ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
   );
@@ -284,7 +284,7 @@ test("updateTenantTheme: a tenant admin repaints their own tenant but not anothe
 
   // Another tenant → refused (acceptance: a tenant admin can't edit another's theme).
   await expect(
-    asUser(t, upfAdmin).mutation(api.tenants.updateTenantTheme, { tenantSlug: "ywampotch", theme: { light: LIGHT2 } }),
+    asUser(t, upfAdmin).mutation(api.tenantTheme.updateTenantTheme, { tenantSlug: "ywampotch", theme: { light: LIGHT2 } }),
   ).rejects.toThrow(/forbidden/i);
 });
 
@@ -293,7 +293,7 @@ test("updateTenantTheme: a plain member is refused", async () => {
   const member = await t.run((ctx) => ctx.db.insert("users", { email: "member@example.com" }));
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await expect(
-    asUser(t, member).mutation(api.tenants.updateTenantTheme, { tenantSlug: "upf", theme: { light: LIGHT2 } }),
+    asUser(t, member).mutation(api.tenantTheme.updateTenantTheme, { tenantSlug: "upf", theme: { light: LIGHT2 } }),
   ).rejects.toThrow(/forbidden/i);
 });
 
@@ -309,7 +309,7 @@ test("updateTenantTheme: preserves logo/favicon, clears a stale dark, sets a par
   );
 
   // No dark given → stale dark cleared, asset preserved.
-  await asUser(t, sys).mutation(api.tenants.updateTenantTheme, { tenantSlug: "yknot", theme: { light: LIGHT2 } });
+  await asUser(t, sys).mutation(api.tenantTheme.updateTenantTheme, { tenantSlug: "yknot", theme: { light: LIGHT2 } });
   let row = await t.run((ctx) =>
     ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "yknot")).unique(),
   );
@@ -318,7 +318,7 @@ test("updateTenantTheme: preserves logo/favicon, clears a stale dark, sets a par
   expect(row?.theme.dark).toBeUndefined();
 
   // A supplied partial dark is stored.
-  await asUser(t, sys).mutation(api.tenants.updateTenantTheme, {
+  await asUser(t, sys).mutation(api.tenantTheme.updateTenantTheme, {
     tenantSlug: "yknot", theme: { light: LIGHT2, dark: { paper: "#111", ink: "#eee" } },
   });
   row = await t.run((ctx) =>
@@ -335,7 +335,7 @@ test("updateTenantTheme: rejects a theme missing a required light token", async 
   const light: Record<string, string> = { ...LIGHT2 };
   delete light["gold"];
   await expect(
-    asUser(t, sys).mutation(api.tenants.updateTenantTheme, { tenantSlug: "yknot", theme: { light } }),
+    asUser(t, sys).mutation(api.tenantTheme.updateTenantTheme, { tenantSlug: "yknot", theme: { light } }),
   ).rejects.toThrow(/missing/i);
 });
 
@@ -343,7 +343,7 @@ test("updateTenantTheme: rejects an unknown tenant slug", async () => {
   const t = convexTest(schema, modules);
   const sys = await seedAdmin(t, "sys@example.com");
   await expect(
-    asUser(t, sys).mutation(api.tenants.updateTenantTheme, { tenantSlug: "ghost", theme: { light: LIGHT2 } }),
+    asUser(t, sys).mutation(api.tenantTheme.updateTenantTheme, { tenantSlug: "ghost", theme: { light: LIGHT2 } }),
   ).rejects.toThrow(/not found/i);
 });
 
@@ -358,7 +358,7 @@ test("getTheme returns the resolved frontend view for a seeded slug", async () =
     secret, slug: "yknot", displayName: "Y-Knot", theme: { light: LIGHT, dark }, flags: FLAGS,
   });
 
-  const view = await t.query(api.tenants.getTheme, { slug: "yknot" });
+  const view = await t.query(api.tenantTheme.getTheme, { slug: "yknot" });
   expect(view).toMatchObject({
     displayName: "Y-Knot",
     theme: { light: LIGHT, dark },
@@ -372,7 +372,7 @@ test("getTheme returns the resolved frontend view for a seeded slug", async () =
 test("getTheme returns null for an unknown slug (default site / not a tenant)", async () => {
   const t = convexTest(schema, modules);
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
-  expect(await t.query(api.tenants.getTheme, { slug: "nope" })).toBeNull();
+  expect(await t.query(api.tenantTheme.getTheme, { slug: "nope" })).toBeNull();
 });
 
 test("getTheme resolves logo and favicon storage ids to urls", async () => {
@@ -383,7 +383,7 @@ test("getTheme resolves logo and favicon storage ids to urls", async () => {
     ctx.db.insert("tenants", { slug: "upf", displayName: "UPF", theme: { light: LIGHT, logo, favicon }, flags: FLAGS }),
   );
 
-  const view = await t.query(api.tenants.getTheme, { slug: "upf" });
+  const view = await t.query(api.tenantTheme.getTheme, { slug: "upf" });
   expect(typeof view?.logoUrl).toBe("string");
   expect(typeof view?.faviconUrl).toBe("string");
   // The palette-only theme is returned without the storage ids (surfaced as urls).
@@ -402,10 +402,10 @@ test("setTenantAsset: a sys admin sets a tenant logo and favicon", async () => {
 
   const logo = await storeImage(t);
   const favicon = await storeImage(t, "image/webp");
-  await asUser(t, sys).mutation(api.tenants.setTenantAsset, {
+  await asUser(t, sys).mutation(api.tenantTheme.setTenantAsset, {
     tenantSlug: "upf", asset: "logo", storageId: logo, contentType: "image/png",
   });
-  await asUser(t, sys).mutation(api.tenants.setTenantAsset, {
+  await asUser(t, sys).mutation(api.tenantTheme.setTenantAsset, {
     tenantSlug: "upf", asset: "favicon", storageId: favicon, contentType: "image/webp",
   });
 
@@ -425,7 +425,7 @@ test("setTenantAsset: an SVG upload is refused (XSS on the anonymous page)", asy
 
   const svg = await storeImage(t, "image/svg+xml");
   await expect(
-    asUser(t, sys).mutation(api.tenants.setTenantAsset, {
+    asUser(t, sys).mutation(api.tenantTheme.setTenantAsset, {
       tenantSlug: "upf", asset: "logo", storageId: svg, contentType: "image/svg+xml",
     }),
   ).rejects.toThrow(/PNG|JPEG|WebP/i);
@@ -439,12 +439,12 @@ test("setTenantAsset: a tenant admin can set their own tenant but not another's"
 
   const logo = await storeImage(t);
   // Own tenant → allowed.
-  await asUser(t, upfAdmin).mutation(api.tenants.setTenantAsset, {
+  await asUser(t, upfAdmin).mutation(api.tenantTheme.setTenantAsset, {
     tenantSlug: "upf", asset: "logo", storageId: logo, contentType: "image/png",
   });
   // Another tenant → refused.
   await expect(
-    asUser(t, upfAdmin).mutation(api.tenants.setTenantAsset, {
+    asUser(t, upfAdmin).mutation(api.tenantTheme.setTenantAsset, {
       tenantSlug: "ywampotch", asset: "logo", storageId: logo, contentType: "image/png",
     }),
   ).rejects.toThrow(/forbidden/i);
@@ -456,7 +456,7 @@ test("setTenantAsset: a plain member is refused", async () => {
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   const logo = await storeImage(t);
   await expect(
-    asUser(t, member).mutation(api.tenants.setTenantAsset, {
+    asUser(t, member).mutation(api.tenantTheme.setTenantAsset, {
       tenantSlug: "upf", asset: "logo", storageId: logo, contentType: "image/png",
     }),
   ).rejects.toThrow(/forbidden/i);
@@ -468,11 +468,11 @@ test("setTenantAsset: mint-new — a new logo swaps the id and leaves the old bl
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
 
   const first = await storeImage(t);
-  await asUser(t, sys).mutation(api.tenants.setTenantAsset, {
+  await asUser(t, sys).mutation(api.tenantTheme.setTenantAsset, {
     tenantSlug: "upf", asset: "logo", storageId: first, contentType: "image/png",
   });
   const second = await storeImage(t);
-  await asUser(t, sys).mutation(api.tenants.setTenantAsset, {
+  await asUser(t, sys).mutation(api.tenantTheme.setTenantAsset, {
     tenantSlug: "upf", asset: "logo", storageId: second, contentType: "image/png",
   });
 
@@ -491,7 +491,7 @@ test("setTenantAsset: an unknown tenant slug is rejected", async () => {
   const sys = await seedAdmin(t, "sys@example.com");
   const logo = await storeImage(t);
   await expect(
-    asUser(t, sys).mutation(api.tenants.setTenantAsset, {
+    asUser(t, sys).mutation(api.tenantTheme.setTenantAsset, {
       tenantSlug: "ghost", asset: "logo", storageId: logo, contentType: "image/png",
     }),
   ).rejects.toThrow(/not found/i);
@@ -503,7 +503,7 @@ test("seedTenantAsset: a correct secret sets the logo without an auth identity",
   const t = convexTest(schema, modules);
   await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
   const logo = await storeImage(t, "image/webp");
-  await t.mutation(api.tenants.seedTenantAsset, {
+  await t.mutation(api.tenantTheme.seedTenantAsset, {
     secret, tenantSlug: "yknot", asset: "logo", storageId: logo, contentType: "image/webp",
   });
   const row = await t.run((ctx) =>
@@ -518,7 +518,7 @@ test("seedTenantAsset: refuses an incorrect secret", async () => {
   await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
   const logo = await storeImage(t);
   await expect(
-    t.mutation(api.tenants.seedTenantAsset, {
+    t.mutation(api.tenantTheme.seedTenantAsset, {
       secret: "wrong", tenantSlug: "yknot", asset: "logo", storageId: logo, contentType: "image/png",
     }),
   ).rejects.toThrow(/unauthorized/i);
@@ -529,7 +529,7 @@ test("seedTenantAsset: refuses an SVG (XSS on the anonymous page)", async () => 
   await t.mutation(api.tenants.seedTenant, { secret, slug: "yknot", displayName: "Y-Knot", theme: THEME, flags: FLAGS });
   const svg = await storeImage(t, "image/svg+xml");
   await expect(
-    t.mutation(api.tenants.seedTenantAsset, {
+    t.mutation(api.tenantTheme.seedTenantAsset, {
       secret, tenantSlug: "yknot", asset: "logo", storageId: svg, contentType: "image/svg+xml",
     }),
   ).rejects.toThrow(/PNG|JPEG|WebP/i);

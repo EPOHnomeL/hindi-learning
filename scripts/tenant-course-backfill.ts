@@ -118,7 +118,7 @@ async function main(argv: string[]): Promise<void> {
 
   const defaults = extractRootPalette(readFileSync("lessons/_partials/head.html", "utf8"));
 
-  const tenant = await client.query(api.tenants.getTheme, { slug: tenantSlug });
+  const tenant = await client.query(api.tenantTheme.getTheme, { slug: tenantSlug });
   if (!tenant) throw new Error(`No tenant with slug "${tenantSlug}" — seed it first (pnpm seed-tenants).`);
   const subs = buildSubstitutions(defaults, tenant.theme);
 
