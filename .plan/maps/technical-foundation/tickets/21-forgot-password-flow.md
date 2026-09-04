@@ -1,8 +1,6 @@
 ---
 type: task
 blocked_by: []
-claimed_by: forgot-password-otp-2026-09-03
-claimed_at: 2026-09-03T15:00:46+02:00
 ---
 
 # Forgot-password flow (email OTP reset)
@@ -104,11 +102,9 @@ A user who forgets their password can get back in end-to-end via an emailed OTP,
 
 ### Where it stands (2026-09-03)
 
-**Built, tested and committed. NOT walked end to end, so this ticket is still
-open** and deliberately carries no `## Answer`. The Done when above says a real
-user gets back in and the temp-password workaround is retired; nobody has seen
-that happen. Real accounts exist only on prod, so the only check that could
-close this is a prod operation, and it is the operator's to run.
+**Built, tested and committed on 2026-09-03, then walked on prod on 2026-09-04.**
+The walk is recorded in the `## Answer` below; this section is kept as the record
+of what was built and why, which the Answer does not repeat.
 
 What was built:
 
@@ -207,3 +203,66 @@ not before.
 <!-- Moved 2026-09-01 from auth-sessions/01 during the .plan consolidation (33 map dirs to 7 active maps).
      Renumbered because blocked_by is map-local; the old number stays that ticket's identity in the donor
      map's history. It joins 08 (review session management), which came out of auth-sessions/02 on 2026-09-01. That map held only these two, so the directory is gone. -->
+
+## Answer
+
+**A user who forgets their password can now get back in on their own, and the
+hand-set temp-password workaround is retired.** Walked end to end on production
+on 2026-09-04, in a browser, against a real account.
+
+### Evidence: walked on prod, not read
+
+Driven against `https://ywampotch.my-course.app` (prod deployment
+`capable-barracuda-769`) on the account `jvorster63+claude@gmail.com`. The
+operator supplied the codes from that inbox, which is itself the proof that the
+Resend rail really sends: no test could cover delivery, and this is the one link
+that had never been exercised.
+
+Every acceptance criterion, checked in order:
+
+1. **Request a code, enter it with a new password, end up signed in.** Confirmed.
+   The reset landed the session directly, with no second trip through the sign-in
+   form, exactly as Convex Auth's verification is supposed to.
+2. **The old password stops working.** Confirmed, and confirmed against a real
+   baseline rather than an assumption: the old password was used to sign in
+   successfully BEFORE the reset, and after the reset the same value gave
+   "Sign-in failed. Check your email and password." The new password then worked.
+3. **A wrong or expired code fails with a friendly error and can be retried.**
+   Confirmed: "That code is wrong or has expired. Check it and try again, or
+   start over and ask for a new one." The form stayed on the code step, so a
+   retry costs nothing.
+4. **Reset for a non-existent email reveals nothing.** Confirmed with
+   `definitely-no-such-account-9f2a1c@example.invalid`: the form advanced to the
+   identical code step with the identical copy, "If that address has an account,
+   a code is on its way. It expires in 15 minutes." Nothing distinguishes it from
+   the real case.
+5. **Allowlist unchanged, reset cannot create an account.** Verified in the code
+   (the rail never reaches `createOrUpdateUser`; `retrieveAccount` throws
+   `InvalidAccountId`) and unfalsified by the walk: the non-existent address
+   produced no account. This one is a code claim plus an absence of contrary
+   evidence, not a positive observation, and is recorded as such.
+6. **`RESEND_API_KEY` unset logs and no-ops.** NOT covered by this walk and not
+   coverable by it: it is a local-dev condition and the key is set on prod. It
+   stays a code-and-test claim.
+
+### One behaviour found in the walk that no criterion asked for
+
+**Requesting a second code invalidates the first.** Discovered by accident: a
+code issued minutes earlier was rejected as "wrong or has expired" once a fresh
+one had been requested for the same account. That is the right behaviour, it is
+Convex Auth's rather than ours, and it is worth writing down because the ticket
+never specified it and a future session could otherwise read it as a bug.
+
+### A wrinkle worth knowing for the next walk
+
+Signing out returns the card to the `reset` request step, not the
+`reset-verification` step, so a pending code cannot be entered after a sign-out
+without requesting a new one. Harmless, and arguably correct, but it means the
+walk has to be done in one sitting.
+
+### What this retires
+
+The interim workaround in the Question above, `npx convex run auth:store` with a
+hand-set secret, is no longer the only way back in for a locked-out user, and
+should not be used again except as a genuine break-glass. The 2026-07-15 lockout
+that motivated this ticket would now be self-service.
