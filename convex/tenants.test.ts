@@ -551,7 +551,7 @@ test("courseAssignment: splits a tenant's own courses from the assignable (defau
   await seedTopic(t, "hebrew", "Hebrew"); // default-only → assignable
   await seedTopic(t, "latin", "Latin", "other"); // another tenant's → neither list
 
-  const view = await asUser(t, sys).query(api.tenants.courseAssignment, { tenantSlug: "upf" });
+  const view = await asUser(t, sys).query(api.tenantAssignment.courseAssignment, { tenantSlug: "upf" });
   expect(view.assigned.map((c) => c.title)).toEqual(["Greek"]);
   expect(view.available.map((c) => c.title)).toEqual(["Hebrew"]);
 });
@@ -562,10 +562,10 @@ test("assignCourse sets the tenantSlug; unassignCourse clears it back to unset",
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   const topicId = await seedTopic(t, "greek", "Greek");
 
-  await asUser(t, sys).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId });
+  await asUser(t, sys).mutation(api.tenantAssignment.assignCourse, { tenantSlug: "upf", topicId });
   expect(await t.run((ctx) => ctx.db.get(topicId)).then((r) => r?.tenantSlug)).toBe("upf");
 
-  await asUser(t, sys).mutation(api.tenants.unassignCourse, { tenantSlug: "upf", topicId });
+  await asUser(t, sys).mutation(api.tenantAssignment.unassignCourse, { tenantSlug: "upf", topicId });
   expect(await t.run((ctx) => ctx.db.get(topicId)).then((r) => r?.tenantSlug)).toBeUndefined();
 });
 
@@ -575,7 +575,7 @@ test("assignCourse refuses stealing a course already owned by another tenant", a
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   const topicId = await seedTopic(t, "greek", "Greek", "other");
   await expect(
-    asUser(t, sys).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId }),
+    asUser(t, sys).mutation(api.tenantAssignment.assignCourse, { tenantSlug: "upf", topicId }),
   ).rejects.toThrow(/another tenant/i);
 });
 
@@ -593,13 +593,13 @@ test("assignCourse: a tenant admin is refused even on their own tenant (sys-admi
   const own = await seedTopic(t, "greek", "Greek");
 
   await expect(
-    asUser(t, upfAdmin).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId: own }),
+    asUser(t, upfAdmin).mutation(api.tenantAssignment.assignCourse, { tenantSlug: "upf", topicId: own }),
   ).rejects.toThrow(/forbidden/i);
   await expect(
-    asUser(t, member).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId: own }),
+    asUser(t, member).mutation(api.tenantAssignment.assignCourse, { tenantSlug: "upf", topicId: own }),
   ).rejects.toThrow(/forbidden/i);
   // The sys admin still may.
-  await asUser(t, sys).mutation(api.tenants.assignCourse, { tenantSlug: "upf", topicId: own });
+  await asUser(t, sys).mutation(api.tenantAssignment.assignCourse, { tenantSlug: "upf", topicId: own });
   expect(await t.run((ctx) => ctx.db.get(own)).then((r) => r?.tenantSlug)).toBe("upf");
 });
 
@@ -611,9 +611,9 @@ test("unassignCourse: a tenant admin is refused even on their own tenant (sys-ad
   const own = await seedTopic(t, "greek", "Greek", "upf");
 
   await expect(
-    asUser(t, upfAdmin).mutation(api.tenants.unassignCourse, { tenantSlug: "upf", topicId: own }),
+    asUser(t, upfAdmin).mutation(api.tenantAssignment.unassignCourse, { tenantSlug: "upf", topicId: own }),
   ).rejects.toThrow(/forbidden/i);
-  await asUser(t, sys).mutation(api.tenants.unassignCourse, { tenantSlug: "upf", topicId: own });
+  await asUser(t, sys).mutation(api.tenantAssignment.unassignCourse, { tenantSlug: "upf", topicId: own });
   expect(await t.run((ctx) => ctx.db.get(own)).then((r) => r?.tenantSlug)).toBeUndefined();
 });
 
@@ -629,7 +629,7 @@ test("courseAssignment: a tenant admin sees their assigned courses but never the
   await seedTopic(t, "greek", "Greek", "upf");
   await seedTopic(t, "hebrew", "Hebrew"); // the pool — not theirs to see
 
-  const view = await asUser(t, upfAdmin).query(api.tenants.courseAssignment, { tenantSlug: "upf" });
+  const view = await asUser(t, upfAdmin).query(api.tenantAssignment.courseAssignment, { tenantSlug: "upf" });
   expect(view.assigned.map((c) => c.title)).toEqual(["Greek"]);
   expect(view.available).toEqual([]);
 });
@@ -639,7 +639,7 @@ test("courseAssignment: a tenant admin is still refused another tenant's courses
   const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
   await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "AW", theme: THEME, flags: FLAGS });
   await expect(
-    asUser(t, upfAdmin).query(api.tenants.courseAssignment, { tenantSlug: "aw" }),
+    asUser(t, upfAdmin).query(api.tenantAssignment.courseAssignment, { tenantSlug: "aw" }),
   ).rejects.toThrow(/forbidden/i);
 });
 
@@ -656,7 +656,7 @@ test("memberAssignment: lists a tenant's own members and the assignable (unassig
   await t.mutation(internal.whitelist.seedEmail, { email: "cara@example.com", tenantSlug: "other" }); // another tenant's
   void sys;
 
-  const view = await asUser(t, sys).query(api.tenants.memberAssignment, { tenantSlug: "upf" });
+  const view = await asUser(t, sys).query(api.tenantAssignment.memberAssignment, { tenantSlug: "upf" });
   expect(view.assigned.map((m) => m.email)).toEqual(["amy@example.com"]);
   expect(view.available.map((m) => m.email)).toEqual(["ben@example.com"]);
 });
@@ -667,13 +667,13 @@ test("assignMember sets the whitelist row's tenantSlug; unassignMember clears it
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await t.mutation(internal.whitelist.seedEmail, { email: "ben@example.com" });
 
-  await asUser(t, sys).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ben@example.com" });
+  await asUser(t, sys).mutation(api.tenantAssignment.assignMember, { tenantSlug: "upf", email: "ben@example.com" });
   const after = await t.run((ctx) =>
     ctx.db.query("whitelist").withIndex("by_email", (q) => q.eq("email", "ben@example.com")).unique(),
   );
   expect(after?.tenantSlug).toBe("upf");
 
-  await asUser(t, sys).mutation(api.tenants.unassignMember, { tenantSlug: "upf", email: "ben@example.com" });
+  await asUser(t, sys).mutation(api.tenantAssignment.unassignMember, { tenantSlug: "upf", email: "ben@example.com" });
   const cleared = await t.run((ctx) =>
     ctx.db.query("whitelist").withIndex("by_email", (q) => q.eq("email", "ben@example.com")).unique(),
   );
@@ -687,10 +687,10 @@ test("assignMember refuses to scope a sys admin, and refuses stealing another te
   await t.mutation(internal.whitelist.seedEmail, { email: "cara@example.com", tenantSlug: "other" });
 
   await expect(
-    asUser(t, sys).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "sys@example.com" }),
+    asUser(t, sys).mutation(api.tenantAssignment.assignMember, { tenantSlug: "upf", email: "sys@example.com" }),
   ).rejects.toThrow(/sys admin/i);
   await expect(
-    asUser(t, sys).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "cara@example.com" }),
+    asUser(t, sys).mutation(api.tenantAssignment.assignMember, { tenantSlug: "upf", email: "cara@example.com" }),
   ).rejects.toThrow(/another tenant/i);
 });
 
@@ -699,7 +699,7 @@ test("assignMember refuses an email that isn't on the Allowlist", async () => {
   const sys = await seedAdmin(t, "sys@example.com");
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await expect(
-    asUser(t, sys).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ghost@example.com" }),
+    asUser(t, sys).mutation(api.tenantAssignment.assignMember, { tenantSlug: "upf", email: "ghost@example.com" }),
   ).rejects.toThrow(/allowlist/i);
 });
 
@@ -770,7 +770,7 @@ test("unassignMember refuses a tenant admin (clearing the slug would promote the
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await t.mutation(internal.whitelist.seedEmail, { email: "upfadmin@example.com", isAdmin: true, tenantSlug: "upf" });
   await expect(
-    asUser(t, sys).mutation(api.tenants.unassignMember, { tenantSlug: "upf", email: "upfadmin@example.com" }),
+    asUser(t, sys).mutation(api.tenantAssignment.unassignMember, { tenantSlug: "upf", email: "upfadmin@example.com" }),
   ).rejects.toThrow(/tenant admin/i);
 });
 
@@ -787,18 +787,18 @@ test("assignMember / unassignMember: a tenant admin is refused on their own tena
   await t.mutation(internal.whitelist.seedEmail, { email: "ben@example.com" });
 
   await expect(
-    asUser(t, upfAdmin).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ben@example.com" }),
+    asUser(t, upfAdmin).mutation(api.tenantAssignment.assignMember, { tenantSlug: "upf", email: "ben@example.com" }),
   ).rejects.toThrow(/forbidden/i);
   await expect(
-    asUser(t, plain).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ben@example.com" }),
+    asUser(t, plain).mutation(api.tenantAssignment.assignMember, { tenantSlug: "upf", email: "ben@example.com" }),
   ).rejects.toThrow(/forbidden/i);
 
   // The sys admin still may — and the tenant admin can't undo it either.
-  await asUser(t, sys).mutation(api.tenants.assignMember, { tenantSlug: "upf", email: "ben@example.com" });
+  await asUser(t, sys).mutation(api.tenantAssignment.assignMember, { tenantSlug: "upf", email: "ben@example.com" });
   await expect(
-    asUser(t, upfAdmin).mutation(api.tenants.unassignMember, { tenantSlug: "upf", email: "ben@example.com" }),
+    asUser(t, upfAdmin).mutation(api.tenantAssignment.unassignMember, { tenantSlug: "upf", email: "ben@example.com" }),
   ).rejects.toThrow(/forbidden/i);
-  await asUser(t, sys).mutation(api.tenants.unassignMember, { tenantSlug: "upf", email: "ben@example.com" });
+  await asUser(t, sys).mutation(api.tenantAssignment.unassignMember, { tenantSlug: "upf", email: "ben@example.com" });
 });
 
 // The assignable pool `memberAssignment` returns is every unassigned, non-admin
@@ -811,7 +811,7 @@ test("memberAssignment: a tenant admin is refused even on their own tenant (sys-
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await t.mutation(internal.whitelist.seedEmail, { email: "ben@example.com" });
   await expect(
-    asUser(t, upfAdmin).query(api.tenants.memberAssignment, { tenantSlug: "upf" }),
+    asUser(t, upfAdmin).query(api.tenantAssignment.memberAssignment, { tenantSlug: "upf" }),
   ).rejects.toThrow(/forbidden/i);
 });
 
@@ -941,10 +941,10 @@ test("setTenantAdmin: a sys admin promotes an assigned member, then revokes back
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await seedMember(t, "m@example.com", "upf");
 
-  await asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: true });
+  await asUser(t, sys).mutation(api.tenantAssignment.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: true });
   expect(await adminScopeOf(t, "m@example.com")).toEqual({ isAdmin: true, tenantSlug: "upf" });
 
-  await asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: false });
+  await asUser(t, sys).mutation(api.tenantAssignment.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: false });
   expect(await adminScopeOf(t, "m@example.com")).toEqual({ isAdmin: false, tenantSlug: "upf" });
 });
 
@@ -954,7 +954,7 @@ test("setTenantAdmin: promoting an unassigned admitted email assigns + promotes 
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await seedMember(t, "free@example.com"); // admitted, no tenant
 
-  await asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "free@example.com", makeAdmin: true });
+  await asUser(t, sys).mutation(api.tenantAssignment.setTenantAdmin, { tenantSlug: "upf", email: "free@example.com", makeAdmin: true });
   expect(await adminScopeOf(t, "free@example.com")).toEqual({ isAdmin: true, tenantSlug: "upf" });
 });
 
@@ -964,7 +964,7 @@ test("setTenantAdmin: a tenant admin is refused (sys-admin only mints admins)", 
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await seedMember(t, "m@example.com", "upf");
   await expect(
-    asUser(t, upfAdmin).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: true }),
+    asUser(t, upfAdmin).mutation(api.tenantAssignment.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: true }),
   ).rejects.toThrow(/forbidden/i);
 });
 
@@ -973,7 +973,7 @@ test("setTenantAdmin: refuses an email that isn't on the Allowlist", async () =>
   const sys = await seedAdmin(t, "sys@example.com");
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await expect(
-    asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "ghost@example.com", makeAdmin: true }),
+    asUser(t, sys).mutation(api.tenantAssignment.setTenantAdmin, { tenantSlug: "upf", email: "ghost@example.com", makeAdmin: true }),
   ).rejects.toThrow(/Allowlist/i);
 });
 
@@ -983,7 +983,7 @@ test("setTenantAdmin: refuses promoting a sys admin", async () => {
   await seedAdmin(t, "sys2@example.com"); // another sys admin
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await expect(
-    asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "sys2@example.com", makeAdmin: true }),
+    asUser(t, sys).mutation(api.tenantAssignment.setTenantAdmin, { tenantSlug: "upf", email: "sys2@example.com", makeAdmin: true }),
   ).rejects.toThrow(/sys admin/i);
 });
 
@@ -994,7 +994,7 @@ test("setTenantAdmin: refuses promoting a member of another tenant", async () =>
   await t.mutation(api.tenants.seedTenant, { secret, slug: "aw", displayName: "AW", theme: THEME, flags: FLAGS });
   await seedMember(t, "m@example.com", "aw");
   await expect(
-    asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: true }),
+    asUser(t, sys).mutation(api.tenantAssignment.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: true }),
   ).rejects.toThrow(/another tenant/i);
 });
 
@@ -1004,6 +1004,6 @@ test("setTenantAdmin: revoking someone who isn't an admin of this tenant throws"
   await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
   await seedMember(t, "m@example.com", "upf");
   await expect(
-    asUser(t, sys).mutation(api.tenants.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: false }),
+    asUser(t, sys).mutation(api.tenantAssignment.setTenantAdmin, { tenantSlug: "upf", email: "m@example.com", makeAdmin: false }),
   ).rejects.toThrow(/isn't an admin/i);
 });

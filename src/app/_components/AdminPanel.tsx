@@ -1558,9 +1558,9 @@ function TenantSection({ title, hint, children }: { title: string; hint: string;
 // independently: `courseAssignment` returns them an empty `available` (the pool's
 // titles are never sent), and assign/unassignCourse refuse them outright.
 function TenantCourses({ slug, canAllocate }: { slug: string; canAllocate: boolean }) {
-  const data = useQuery(api.tenants.courseAssignment, { tenantSlug: slug });
-  const assign = useMutation(api.tenants.assignCourse);
-  const unassign = useMutation(api.tenants.unassignCourse);
+  const data = useQuery(api.tenantAssignment.courseAssignment, { tenantSlug: slug });
+  const assign = useMutation(api.tenantAssignment.assignCourse);
+  const unassign = useMutation(api.tenantAssignment.unassignCourse);
 
   if (data === undefined) {
     return (
@@ -1618,10 +1618,10 @@ function TenantCourses({ slug, canAllocate }: { slug: string; canAllocate: boole
 // unconditionally the sys admin's: the old per-row `myAdminScope` re-check that hid
 // grant/revoke from a tenant admin is gone with the tier that needed it.
 function TenantMembers({ slug }: { slug: string }) {
-  const data = useQuery(api.tenants.memberAssignment, { tenantSlug: slug });
-  const assign = useMutation(api.tenants.assignMember);
-  const unassign = useMutation(api.tenants.unassignMember);
-  const setAdmin = useMutation(api.tenants.setTenantAdmin);
+  const data = useQuery(api.tenantAssignment.memberAssignment, { tenantSlug: slug });
+  const assign = useMutation(api.tenantAssignment.assignMember);
+  const unassign = useMutation(api.tenantAssignment.unassignMember);
+  const setAdmin = useMutation(api.tenantAssignment.setTenantAdmin);
 
   if (data === undefined) {
     return (

@@ -58,6 +58,7 @@ import type * as sellers from "../sellers.js";
 import type * as shareGrants from "../shareGrants.js";
 import type * as shares from "../shares.js";
 import type * as sourceLang from "../sourceLang.js";
+import type * as tenantAssignment from "../tenantAssignment.js";
 import type * as tenantBackfill from "../tenantBackfill.js";
 import type * as tenantFlags from "../tenantFlags.js";
 import type * as tenantTheme from "../tenantTheme.js";
@@ -128,6 +129,7 @@ declare const fullApi: ApiFromModules<{
   shareGrants: typeof shareGrants;
   shares: typeof shares;
   sourceLang: typeof sourceLang;
+  tenantAssignment: typeof tenantAssignment;
   tenantBackfill: typeof tenantBackfill;
   tenantFlags: typeof tenantFlags;
   tenantTheme: typeof tenantTheme;
