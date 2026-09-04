@@ -14,7 +14,11 @@ import { useEffect } from "react";
 export function RegisterServiceWorker() {
   useEffect(() => {
     if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
-    const register = () => void navigator.serviceWorker.register("/sw.js");
+    // The worker is a progressive enhancement, so swallow a failed registration
+    // (e.g. a dropped network fetching /sw.js). Left floating, its rejection
+    // surfaces as an unhandled "TypeError: Failed to fetch" that PostHog reports.
+    const register = () =>
+      void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
     if (document.readyState === "complete") {
       register();
       return;
