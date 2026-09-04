@@ -5,6 +5,7 @@ import type { Doc } from "./_generated/dataModel";
 import { assertAdmin } from "./adminSecret";
 import { assertEmblemImage } from "./emblem";
 import { isReadySeller } from "./sellerStatus";
+import { normaliseEmail } from "./shareGrants";
 import { isCallerAdmin } from "./whitelist";
 import { tenantFlagsValidator, tenantThemeValidator } from "./schema";
 
@@ -484,12 +485,6 @@ export const seedTenantAsset = mutation({
 // admin only; `memberAssignment` is sys-admin only outright, since its pool is
 // platform-wide personal data. Reads that touch the growable `topics`/`users` tables
 // go through the `by_tenant` index — never a full scan.
-
-// Trim + lower-case, the one email normalisation the Allowlist stores and looks
-// up on (mirrors whitelist.ts's private `normaliseEmail`; not exported there).
-function normaliseEmail(email: string): string {
-  return email.trim().toLowerCase();
-}
 
 // The Courses section's read: a tenant's own courses plus the pool it may still
 // assign from (default-only courses — those carrying no tenant). A course owned
