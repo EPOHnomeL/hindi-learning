@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: []
+claimed_by: tenant-token-mirror-test-2026-09-04
+claimed_at: 2026-09-04T11:00:29+02:00
 ---
 # The Convex tenant token mirror has no test holding it to the frontend
 
