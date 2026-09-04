@@ -190,8 +190,7 @@ blocked   (5):  03 05 10 11 17
   correcting by a superseding note rather than an edit.
 - [The `ponytail:` markers have no ledger](tickets/20-ponytail-debt-ledger.md) 2026-09-03:
   `docs/ponytail-debt.md`. **20 markers, not the 19 the ticket claimed.** 19 accepted, 1
-  needing a ticket after [23](tickets/23-tenant-token-mirror-has-no-test.md) closed the
-  other. Three calls worth carrying: `content/publish.ts`'s global slug assumption is safe
+  needing a ticket after 23 closed the other, which has its own entry below. Three calls worth carrying: `content/publish.ts`'s global slug assumption is safe
   because `seedTopic` enforces uniqueness itself and `.unique()` fails loudly;
   `routine.ts`'s marker is **factually stale** (Lesson rows carry no HTML since the
   content-blob migration), which became ticket 22, still open, so it is named here as
