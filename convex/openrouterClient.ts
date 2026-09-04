@@ -33,9 +33,22 @@ export type ChatOptions = {
   reasoning?: "none";
 };
 
-// One round-trip: send the messages, return the assistant's text content.
+// What the provider says the call cost, in tokens (cost instrumentation,
+// technical-foundation/12). `undefined` when the response carried no usable
+// `usage` object: that is UNKNOWN, never zero, and the caller must keep the
+// distinction when it records the run. Counts only, no price: pricing is out of
+// scope here and lives nowhere in this repo.
+export type ChatUsage = { inputTokens: number; outputTokens: number };
+
+// One round-trip: send the messages, return the assistant's text content plus
+// whatever usage the provider reported alongside it.
 // Throws on a missing key or a non-OK response so the caller can report `failed`.
-export async function chatComplete({ model, messages, webSearch, reasoning }: ChatOptions): Promise<string> {
+export async function chatComplete({
+  model,
+  messages,
+  webSearch,
+  reasoning,
+}: ChatOptions): Promise<{ content: string; usage: ChatUsage | undefined }> {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("OPENROUTER_API_KEY not set");
 
@@ -62,8 +75,15 @@ export async function chatComplete({ model, messages, webSearch, reasoning }: Ch
   }
   if (!res.ok) throw new Error(`openrouter ${res.status}: ${await res.text()}`);
 
-  const json = (await res.json()) as { choices?: { message?: { content?: unknown } }[] };
+  const json = (await res.json()) as {
+    choices?: { message?: { content?: unknown } }[];
+    usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
+  };
   const content = json.choices?.[0]?.message?.content;
   if (typeof content !== "string") throw new Error("openrouter: no message content in response");
-  return content;
+  const inputTokens = json.usage?.prompt_tokens;
+  const outputTokens = json.usage?.completion_tokens;
+  const usage =
+    typeof inputTokens === "number" && typeof outputTokens === "number" ? { inputTokens, outputTokens } : undefined;
+  return { content, usage };
 }

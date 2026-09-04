@@ -27,7 +27,7 @@ test("chatComplete posts to OpenRouter with auth + model, returns the message co
   const { calls } = stubFetch("hello world");
   const out = await chatComplete({ model: "z-ai/glm-4.7", messages: [{ role: "user", content: "hi" }] });
 
-  expect(out).toBe("hello world");
+  expect(out.content).toBe("hello world");
   expect(calls).toHaveLength(1);
   expect(calls[0]!.url).toBe("https://openrouter.ai/api/v1/chat/completions");
   const headers = calls[0]!.init.headers as Record<string, string>;
@@ -62,7 +62,7 @@ test("chatComplete retries once without reasoning when the endpoint mandates it"
   );
 
   const out = await chatComplete({ model: "google/gemini-3.5-flash", messages: [{ role: "user", content: "hi" }], reasoning: "none" });
-  expect(out).toBe("traduit");
+  expect(out.content).toBe("traduit");
   expect(bodies).toHaveLength(2);
   expect(JSON.parse(bodies[0]!).reasoning).toEqual({ effort: "none" });
   expect(JSON.parse(bodies[1]!).reasoning).toBeUndefined();
@@ -95,4 +95,30 @@ test("model slugs come from env with GLM/Gemini defaults", () => {
   process.env.OPENROUTER_TRANSLATE_MODEL = "custom/translate";
   expect(authorModel()).toBe("custom/author");
   expect(translateModel()).toBe("custom/translate");
+});
+
+// Cost instrumentation (technical-foundation/12): the provider answers with a
+// `usage` object, and the client hands it back instead of dropping it. Absent or
+// non-numeric usage is UNKNOWN (undefined), never zero.
+test("chatComplete returns the provider's token usage when it sends one", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [{ message: { content: "hi" } }],
+            usage: { prompt_tokens: 812, completion_tokens: 91 },
+          }),
+          { status: 200 },
+        ),
+    ),
+  );
+  const out = await chatComplete({ model: "m", messages: [] });
+  expect(out).toEqual({ content: "hi", usage: { inputTokens: 812, outputTokens: 91 } });
+});
+
+test("chatComplete reports usage as undefined when the response carries none", async () => {
+  stubFetch("hi");
+  expect((await chatComplete({ model: "m", messages: [] })).usage).toBeUndefined();
 });

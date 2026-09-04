@@ -914,7 +914,10 @@ async function translateField(content: string, langName: string, mode: "html" | 
   if (content.trim() === "") return content;
   const messages = buildTranslateMessages(content, langName, mode);
   if (translationBackend() === "openrouter") {
-    return await chatComplete({ model: translateModel(), messages, reasoning: "none" });
+    // Usage is reported by the client but not recorded here: the cost seam
+    // (technical-foundation/12) instruments Routine RUNS, per Topic, and a
+    // translation job is a different unit with its own job rows.
+    return (await chatComplete({ model: translateModel(), messages, reasoning: "none" })).content;
   }
   return await geminiComplete({ model: geminiTranslateModel(), messages });
 }

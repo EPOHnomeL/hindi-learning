@@ -113,6 +113,24 @@ export const authorTopic = internalAction({
     if (!secret) throw new Error("PUBLISH_SECRET not set");
     const model = authorModel();
 
+    // What this run spent, summed across its model calls (cost instrumentation,
+    // technical-foundation/12). A bootstrap run makes two calls, so the run's
+    // cost is their total. `reported` stays false until a call actually comes
+    // back with counts: a run nobody could count reports NO usage rather than a
+    // zero, so the operator aggregate can tell the two apart.
+    const spent = { inputTokens: 0, outputTokens: 0, reported: false };
+    const call = async (opts: Parameters<typeof chatComplete>[0]) => {
+      const { content, usage } = await chatComplete(opts);
+      if (usage) {
+        spent.inputTokens += usage.inputTokens;
+        spent.outputTokens += usage.outputTokens;
+        spent.reported = true;
+      }
+      return content;
+    };
+    const runUsage = () =>
+      spent.reported ? { inputTokens: spent.inputTokens, outputTokens: spent.outputTokens, model } : undefined;
+
     try {
       const context = (await ctx.runQuery(internal.routine.materialiseForProvider, { topicSlug })) as ProviderContext | null;
       if (!context) {
@@ -143,7 +161,7 @@ export const authorTopic = internalAction({
 
         // Step 1 — draft the Mission (web-grounded), in memory (not yet published).
         const startedAt = Date.now();
-        const missionRaw = await chatComplete({ model, messages: buildMissionMessages(context), webSearch: true });
+        const missionRaw = await call({ model, messages: buildMissionMessages(context), webSearch: true });
         const { mission } = parseMissionResult(missionRaw);
 
         if (Date.now() - startedAt > SETUP_BUDGET_MS) throw new Error("setup exceeded time budget before lesson 1");
@@ -151,7 +169,7 @@ export const authorTopic = internalAction({
         // Step 2 — author Lesson 1 (web-grounded), injecting the drafted mission into
         // the prompt context (no Frontier → seq 1) without publishing it yet.
         const withMission: ProviderContext = { ...context, topic: { ...context.topic, mission, status: "active" } };
-        const raw = await chatComplete({ model, messages: buildOngoingMessages(withMission), webSearch: true });
+        const raw = await call({ model, messages: buildOngoingMessages(withMission), webSearch: true });
         const result = parseAuthoringResult(raw);
 
         // All model work succeeded — now publish. Lesson (+ record + refs) first,
@@ -164,13 +182,14 @@ export const authorTopic = internalAction({
           topicSlug,
           outcome: "published",
           estimatedLessons: result.estimatedLessons,
+          usage: runUsage(),
         });
         return null;
       }
 
       // Ongoing single-pass: one GLM 4.2 call that judges completion, authors the
       // next lesson (unless complete), and batches replies (no web search).
-      const raw = await chatComplete({ model, messages: buildOngoingMessages(context) });
+      const raw = await call({ model, messages: buildOngoingMessages(context) });
       const result = parseAuthoringResult(raw);
 
       // Answer open questions regardless of the author-vs-complete branch.
@@ -186,6 +205,7 @@ export const authorTopic = internalAction({
           topicSlug,
           outcome: "nothing",
           estimatedLessons: result.estimatedLessons,
+          usage: runUsage(),
         });
         return null;
       }
@@ -196,11 +216,12 @@ export const authorTopic = internalAction({
         topicSlug,
         outcome: "published",
         estimatedLessons: result.estimatedLessons,
+        usage: runUsage(),
       });
       return null;
     } catch (e) {
       const error = e instanceof Error ? e.message : String(e);
-      await ctx.runMutation(api.routine.reportGeneration, { secret, topicSlug, outcome: "failed", error });
+      await ctx.runMutation(api.routine.reportGeneration, { secret, topicSlug, outcome: "failed", error, usage: runUsage() });
       return null;
     }
   },

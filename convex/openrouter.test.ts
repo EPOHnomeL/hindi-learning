@@ -275,3 +275,72 @@ test("a Lesson-1 failure after the mission draft leaves the course SEEDED (re-fi
   const lessons2 = await t.run((ctx) => ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect());
   expect(lessons2).toHaveLength(1);
 });
+
+// Cost instrumentation (technical-foundation/12): the OpenRouter runtime is the
+// one authoring seam whose provider hands back real token counts, so its runs
+// land on the Generation Run row with numbers on them.
+test("an OpenRouter run records the tokens its provider reported, on the run row", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await seedOngoing(t);
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    lessonHtml: LESSON_FRAGMENT,
+                    learningRecord: "# Lesson 2\nlearned the aorist",
+                    estimatedLessons: 9,
+                    references: [],
+                  }),
+                },
+              },
+            ],
+            usage: { prompt_tokens: 4321, completion_tokens: 765 },
+          }),
+          { status: 200 },
+        ),
+    ),
+  );
+
+  await t.action(internal.openrouter.authorTopic, { topicSlug: "glm" });
+
+  const runs = await t.run((ctx) =>
+    ctx.db.query("generationRuns").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect(),
+  );
+  expect(runs).toHaveLength(1);
+  expect(runs[0]).toMatchObject({
+    outcome: "published",
+    inputTokens: 4321,
+    outputTokens: 765,
+    model: "z-ai/glm-5.3-flash",
+  });
+});
+
+// The honest gap, held as a test: a provider that answers with no usage object
+// leaves the run UNKNOWN. Nothing invents a zero.
+test("a run whose provider reports no usage leaves the run row's tokens absent", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await seedOngoing(t);
+  stubModel(
+    JSON.stringify({
+      lessonHtml: LESSON_FRAGMENT,
+      learningRecord: "# Lesson 2\nlearned the aorist",
+      estimatedLessons: 9,
+      references: [],
+    }),
+  );
+
+  await t.action(internal.openrouter.authorTopic, { topicSlug: "glm" });
+
+  const runs = await t.run((ctx) =>
+    ctx.db.query("generationRuns").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect(),
+  );
+  expect(runs[0]!.inputTokens).toBeUndefined();
+  expect(runs[0]!.outputTokens).toBeUndefined();
+  expect(runs[0]!.model).toBeUndefined();
+});
