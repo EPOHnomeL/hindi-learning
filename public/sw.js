@@ -63,9 +63,17 @@ self.addEventListener("fetch", (event) => {
       caches.open(STATIC_CACHE).then(async (cache) => {
         const hit = await cache.match(event.request);
         if (hit) return hit;
-        const res = await fetch(event.request);
-        if (res.ok) await cache.put(event.request, res.clone());
-        return res;
+        try {
+          const res = await fetch(event.request);
+          if (res.ok) await cache.put(event.request, res.clone());
+          return res;
+        } catch {
+          // Network dropped on a cache miss. Resolve with a network-error
+          // Response so respondWith never rejects: a rejected respondWith turns
+          // a transient drop into an uncaught "TypeError: Failed to fetch". The
+          // hashed chunk is simply unavailable until the network returns.
+          return Response.error();
+        }
       }),
     );
   } else if (kind === "navigation") {
