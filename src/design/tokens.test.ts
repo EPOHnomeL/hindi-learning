@@ -1,6 +1,10 @@
 // @vitest-environment node
 import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
+import {
+  DEFAULT_TENANT_THEME,
+  TENANT_THEME_TOKENS as CONVEX_THEME_TOKENS,
+} from "../../convex/tenantTheme";
 import { TENANT_THEME_TOKENS, buildTenantThemeCss, deriveDarkFromLight } from "./tokens";
 
 // The emitted dark rule, sliced off its own selector — NOT off the first
@@ -110,4 +114,46 @@ test("buildTenantThemeCss lets an authored dark token beat the derived one", () 
   // A token neither authored nor derived (a quiz state) is still absent, so it falls
   // through to the globals.css default dark via the cascade.
   expect(darkBlock).not.toContain("--color-bad-b:");
+});
+
+// ---------------------------------------------------------------------------
+// The Convex mirror (technical-foundation 23).
+//
+// Convex functions cannot import from `src/`, so `convex/tenantTheme.ts` hand-
+// mirrors two things that live here: the 14-token list, and the house default
+// light palette a freshly-created tenant starts from. A *test* can read across
+// that boundary even though the runtime cannot, which is why the mirror is
+// guarded here rather than deduplicated into a shared module.
+//
+// `src/design/tokens.ts` and `src/styles/globals.css` are CANONICAL. If either
+// assertion below fails, fix the Convex copy to match, never the other way
+// round. Silent drift ships as a colour flash or a wrong brand colour on first
+// paint for a freshly created tenant, which is the exact failure the mirror
+// exists to prevent.
+
+test("convex/tenantTheme.ts mirrors the canonical token list exactly", () => {
+  expect(
+    [...CONVEX_THEME_TOKENS],
+    "convex/tenantTheme.ts TENANT_THEME_TOKENS has drifted from src/design/tokens.ts. " +
+      "src/design/tokens.ts is CANONICAL (Convex cannot import from src/, so the list is " +
+      "hand-mirrored); edit the Convex copy to match it.",
+  ).toEqual([...TENANT_THEME_TOKENS]);
+});
+
+test("convex DEFAULT_TENANT_THEME.light mirrors the globals.css light palette exactly", () => {
+  // The `@theme` block is the default light palette every non-tenant surface
+  // renders; a new tenant is seeded with a copy of it.
+  const css = readFileSync("src/styles/globals.css", "utf8");
+  const themeBlock = css.slice(css.indexOf("@theme"), css.indexOf("}", css.indexOf("@theme")));
+  const canonical = Object.fromEntries(
+    [...themeBlock.matchAll(/--color-([\w-]+):\s*([^;]+);/g)].map(([, tok, val]) => [tok!, val!.trim()]),
+  );
+
+  const expected = Object.fromEntries(TENANT_THEME_TOKENS.map((t) => [t, canonical[t]]));
+  expect(
+    DEFAULT_TENANT_THEME.light,
+    "convex/tenantTheme.ts DEFAULT_TENANT_THEME.light has drifted from the light-mode " +
+      "--color-* values in src/styles/globals.css. globals.css is CANONICAL; edit the " +
+      "Convex copy to match it.",
+  ).toEqual(expected);
 });
