@@ -127,6 +127,7 @@ function GenerationManager() {
       <GenerationUsageChart />
       <GeneratingNow />
       <RunHistory />
+      <TokenUsage />
     </div>
   );
 }
@@ -417,6 +418,55 @@ function RunHistory() {
               </li>
             );
           })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// Per-Topic token usage (cost instrumentation, technical-foundation/12). Operator
+// only: `tokenUsageByTopic` is sys-admin gated server-side, and this panel is the
+// only place it is read. Deliberately a plain list of counts, with no price and no
+// currency anywhere: this measures, it does not bill.
+//
+// "n of m runs not measured" is the point of the surface as much as the totals
+// are. A run whose runtime cannot count its own tokens is recorded as unknown,
+// and the cloud claude.ai Routine is exactly that runtime today, so the totals
+// are a floor rather than a bill.
+function TokenUsage() {
+  const rows = useQuery(api.routine.tokenUsageByTopic);
+  return (
+    <section className="mt-12">
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold tracking-tight text-accent">Tokens</h2>
+        <p className="mt-0.5 text-sm text-soft">Reported usage per course. Runs that cannot report are counted, not guessed.</p>
+      </div>
+      {rows === undefined ? (
+        <ul className="flex flex-col gap-2" aria-busy>
+          {[0, 1].map((i) => (
+            <li key={i} className="h-14 animate-pulse rounded-xl border border-line bg-card" />
+          ))}
+        </ul>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-soft">No runs recorded yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {rows.map((r) => (
+            <li key={r.topicSlug} className="rounded-xl border border-line bg-card px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="min-w-0 truncate text-sm font-medium text-ink">{r.topicTitle}</span>
+                <span className="shrink-0 text-xs tabular-nums text-soft">
+                  {r.inputTokens.toLocaleString()} in · {r.outputTokens.toLocaleString()} out
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-soft">
+                {r.runsWithoutUsage > 0
+                  ? `${r.runsWithoutUsage} of ${r.runs} runs not measured`
+                  : `${r.runs} run${r.runs === 1 ? "" : "s"} measured`}
+                {r.models.length > 0 && ` · ${r.models.join(", ")}`}
+              </p>
+            </li>
+          ))}
         </ul>
       )}
     </section>
