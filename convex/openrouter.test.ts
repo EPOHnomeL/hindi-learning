@@ -127,6 +127,27 @@ test("ongoing single-pass authors the next lesson, wraps+shuffles it, publishes 
   expect((await t.run((ctx) => ctx.db.get(topicId)))?.estimatedLessons).toBe(9);
 });
 
+test("the prompt carries the Frontier body and the Reference bodies, not a URL and not undefined", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await seedOngoing(t);
+  await t.run(async (ctx) => {
+    const sid = await ctx.storage.store(new Blob(["<p>alpha means first</p>"], { type: "text/html" }));
+    await ctx.db.insert("references", { topicId, key: "glossary", title: "Glossary", htmlStorageId: sid, contentHash: "h1" });
+  });
+  const { bodies } = stubModelSequence([JSON.stringify({ complete: true, estimatedLessons: 3 })]);
+
+  await t.action(internal.openrouter.authorTopic, { topicSlug: "glm" });
+
+  // Bodies live in content blobs and a query cannot read blob bytes, so the action
+  // resolves them before building the prompt. Asserted on the wire, because the
+  // defect it replaces (2026-09-04) type-checked clean and only showed up here.
+  const prompt = bodies[0].messages[1].content as string;
+  expect(prompt).toContain("### Frontier lesson HTML (style + continuity anchor)");
+  expect(prompt).toContain("<p>one</p>"); // the Frontier lesson's stored body
+  expect(prompt).toContain("<p>alpha means first</p>"); // the Reference's stored body
+  expect(prompt).not.toContain("undefined");
+});
+
 test("a run that judges the mission met completes the course (no emblem), authors nothing, reports the estimate", async () => {
   const t = convexTest(schema, modules);
   const { topicId } = await seedOngoing(t);

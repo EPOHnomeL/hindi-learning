@@ -947,6 +947,10 @@ async function collectTopicContext(ctx: QueryCtx, topic: Doc<"topics">, owner: D
           seq: l.seq,
           title: l.title,
           htmlUrl: l.htmlStorageId ? await ctx.storage.getUrl(l.htmlStorageId) : null,
+          // The blob id beside the signed URL: the CLI seam fetches the URL, the
+          // in-deployment OpenRouter action reads the bytes straight off storage
+          // (an action can, a query cannot) rather than round-tripping HTTP.
+          htmlStorageId: l.htmlStorageId ?? null,
         })),
     );
     const learningRecords = (
@@ -958,6 +962,7 @@ async function collectTopicContext(ctx: QueryCtx, topic: Doc<"topics">, owner: D
           key: r.key,
           title: r.title,
           htmlUrl: r.htmlStorageId ? await ctx.storage.getUrl(r.htmlStorageId) : null,
+          htmlStorageId: r.htmlStorageId ?? null, // see the lessons projection above
         }),
       ),
     );

@@ -182,12 +182,17 @@ export function parseAuthoringResult(raw: string): AuthoringResult {
 
 // ---- Prompt building --------------------------------------------------------
 
-// The materialised context the action injects (subset of routine.materialiseForProvider).
+// The materialised context the action injects: the PROMPT's shape, not the
+// query's. `routine.materialiseForProvider` hands back content-blob ids (a query
+// cannot read blob bytes), and the action resolves the bodies the prompt needs
+// before calling in here. Only the Frontier lesson's body is carried, which is
+// all serializeContext ever read; declaring `html` on every lesson is what let an
+// `as` cast at the seam hide a shape mismatch until 2026-09-04.
 export type MaterialisedContext = {
   topic: { slug: string; title: string; status: string; mission: string | null; seed: string | null };
-  lessons: { key: string; seq: number; title: string; html: string }[];
+  lessons: { key: string; seq: number; title: string }[];
   learningRecords: { key: string; seq: number; markdown: string }[];
-  references: { key: string; title: string; html: string }[];
+  references: { key: string; title: string; html: string | null }[];
   resources: { filename: string; kind: string; url: string | null; processed: unknown }[];
   capture: {
     openQuestions: { id: string; lessonKey: string; text: string }[];
@@ -195,6 +200,10 @@ export type MaterialisedContext = {
     progress: { lessonKey: string; status: string }[];
   };
   frontier: { key: string; seq: number } | null;
+  // The Frontier lesson's stored body, resolved by the action. Null when there is
+  // no Frontier or its blob is missing, in which case the anchor section is left
+  // out rather than printed empty.
+  frontierHtml: string | null;
 };
 
 // The single-pass output contract, appended to the ported teach instructions.
@@ -244,7 +253,7 @@ and nothing else (no prose, no code fence), with these fields:
 // Frontier lesson (a style/continuity anchor); prior lessons as a title list to
 // stay within the action's size/time budget.
 function serializeContext(c: MaterialisedContext): string {
-  const frontierHtml = c.frontier ? c.lessons.find((l) => l.key === c.frontier!.key)?.html ?? "" : "";
+  const frontierHtml = c.frontierHtml ?? "";
   const lines = [
     `## Course: ${c.topic.title} (${c.topic.slug})`,
     `Status: ${c.topic.status}`,
@@ -255,7 +264,11 @@ function serializeContext(c: MaterialisedContext): string {
     `\n### Learning records`,
     c.learningRecords.length ? c.learningRecords.map((r) => `#### ${r.key}\n${r.markdown}`).join("\n\n") : "(none yet)",
     `\n### References`,
-    c.references.length ? c.references.map((r) => `#### ${r.title} (${r.key})\n${r.html}`).join("\n\n") : "(none yet)",
+    // An unreadable body prints the heading alone: the model still knows the
+    // Reference exists and may cross-link it, and nothing prints "undefined".
+    c.references.length
+      ? c.references.map((r) => `#### ${r.title} (${r.key})${r.html ? `\n${r.html}` : ""}`).join("\n\n")
+      : "(none yet)",
     // The learner's own uploaded/linked primary sources — ground claims in these
     // (AUTHORING.md §6). A single-pass model can't fetch URLs, so it works from any
     // extracted `processed` text; the filename/URL still tells it what exists.

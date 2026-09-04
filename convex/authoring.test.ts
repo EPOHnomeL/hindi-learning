@@ -162,3 +162,41 @@ test("buildOngoingMessages targets seq 1 when there is no Frontier (first lesson
   const [, user] = buildOngoingMessages(SEEDED_CTX);
   expect(user.content).toContain("lesson number 1");
 });
+
+// A course with a Frontier: the shape the ongoing path actually runs on. The
+// builder tests only ever saw SEEDED_CTX (empty lessons, empty references), which
+// is why the seam below could rot unseen.
+const ONGOING_CTX: MaterialisedContext = {
+  topic: { slug: "greek", title: "Koine Greek", status: "active", mission: "# Mission\nread the NT", seed: null },
+  lessons: [{ key: "0001-intro", seq: 1, title: "Intro" }],
+  learningRecords: [{ key: "0001-intro", seq: 1, markdown: "# Intro\ncovered the alphabet" }],
+  references: [{ key: "glossary", title: "Glossary", html: "<p>alpha means first</p>" }],
+  resources: [],
+  capture: { openQuestions: [], responses: [], progress: [{ lessonKey: "0001-intro", status: "completed" }] },
+  frontier: { key: "0001-intro", seq: 1 },
+  frontierHtml: "<h1>alpha beta</h1>",
+};
+
+test("buildOngoingMessages carries the Frontier body as the style anchor and every Reference body in full", () => {
+  const [, user] = buildOngoingMessages(ONGOING_CTX);
+  expect(user.content).toContain("### Frontier lesson HTML (style + continuity anchor)");
+  expect(user.content).toContain("<h1>alpha beta</h1>");
+  expect(user.content).toContain("<p>alpha means first</p>");
+  expect(user.content).toContain("lesson number 2");
+  // The defect this shape closes (found 2026-09-04): the context declared `html`
+  // while `routine.materialiseForProvider` returned `htmlUrl`, and an `as` cast in
+  // openrouter.ts hid the mismatch, so the anchor section vanished and every
+  // Reference serialised as the literal string "undefined".
+  expect(user.content).not.toContain("undefined");
+});
+
+test("a Reference whose body could not be read prints its heading, never the string undefined", () => {
+  const [, user] = buildOngoingMessages({
+    ...ONGOING_CTX,
+    references: [{ key: "glossary", title: "Glossary", html: null }],
+    frontierHtml: null,
+  });
+  expect(user.content).toContain("#### Glossary (glossary)");
+  expect(user.content).not.toContain("undefined");
+  expect(user.content).not.toContain("### Frontier lesson HTML"); // no body, no anchor section
+});

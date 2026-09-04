@@ -1,4 +1,5 @@
 import { v } from "convex/values";
+import type { FunctionReturnType } from "convex/server";
 import { internalAction, type ActionCtx } from "./_generated/server";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -31,7 +32,47 @@ import { hashString } from "./tokens";
 // `failed` cleanly (lock clears) instead of being killed mid-flight.
 const SETUP_BUDGET_MS = 8 * 60 * 1000;
 
+// What the context query hands back, taken from the query itself rather than
+// re-declared here. Re-declaring it is what went wrong: this file used to assert
+// `as ProviderContext` over the result, and the assertion silently outranked a
+// real mismatch (the query returns blob URLs and ids, the prompt type wanted
+// bodies), so every authoring prompt shipped without its Frontier anchor and with
+// "undefined" in place of each Reference. Never cast this seam.
+type ProviderSource = NonNullable<FunctionReturnType<typeof internal.routine.materialiseForProvider>>;
+
 type ProviderContext = MaterialisedContext & { topicId: Id<"topics">; ownerEmail: string | null };
+
+// Read one content blob as text. A missing or unreadable blob yields null, so a
+// gap in the context is a section the prompt leaves out rather than a broken run.
+async function blobText(ctx: ActionCtx, storageId: Id<"_storage"> | null): Promise<string | null> {
+  if (!storageId) return null;
+  const blob = await ctx.storage.get(storageId);
+  return blob ? await blob.text() : null;
+}
+
+// Turn the query's context into the prompt's context: resolve the Frontier
+// lesson's body (the style and continuity anchor) and every Reference body from
+// storage. Only an action can read blob bytes, which is why this lives here and
+// not in `routine.collectTopicContext`.
+async function resolveBodies(ctx: ActionCtx, source: ProviderSource): Promise<ProviderContext> {
+  const frontierStorageId = source.frontier
+    ? source.lessons.find((l) => l.key === source.frontier!.key)?.htmlStorageId ?? null
+    : null;
+  return {
+    topicId: source.topicId,
+    ownerEmail: source.ownerEmail,
+    topic: source.topic,
+    lessons: source.lessons.map((l) => ({ key: l.key, seq: l.seq, title: l.title })),
+    learningRecords: source.learningRecords,
+    references: await Promise.all(
+      source.references.map(async (r) => ({ key: r.key, title: r.title, html: await blobText(ctx, r.htmlStorageId) })),
+    ),
+    resources: source.resources,
+    capture: source.capture,
+    frontier: source.frontier,
+    frontierHtml: await blobText(ctx, frontierStorageId),
+  };
+}
 
 // Wrap the model's lean fragment into a stored document + shuffle its quizzes,
 // then publish the lesson and its learning record via the existing mutations.
@@ -132,7 +173,8 @@ export const authorTopic = internalAction({
       spent.reported ? { inputTokens: spent.inputTokens, outputTokens: spent.outputTokens, model } : undefined;
 
     try {
-      const context = (await ctx.runQuery(internal.routine.materialiseForProvider, { topicSlug })) as ProviderContext | null;
+      const source = await ctx.runQuery(internal.routine.materialiseForProvider, { topicSlug });
+      const context = source ? await resolveBodies(ctx, source) : null;
       if (!context) {
         await ctx.runMutation(api.routine.reportGeneration, {
           secret,
