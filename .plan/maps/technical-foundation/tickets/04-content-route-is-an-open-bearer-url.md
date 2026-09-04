@@ -20,8 +20,12 @@ caching would expose and discovered the exposure already exists.
 
 The paygate lives entirely at the *query that hands out the storage id* (`readLesson` and friends,
 behind `resolveEdition` and the Entitlement checks). Once the id has been handed over, the content
-is public. `convex/lib.ts` states the design intent plainly: *"The storageId is an unguessable
-bearer capability; callers only reach this after the query has authorized them."*
+is public. The design intent is stated plainly in `convex/contentBlobs.ts:18`: *"The storageId is
+an unguessable bearer capability; callers only reach this after the query has authorized them."*
+(Corrected 2026-09-04: this line pointed at `convex/lib.ts`, which no longer exists. Ticket 16
+moved the content blob helpers, and that sentence with them, into `contentBlobs.ts`; ticket 17
+then renamed what was left of `lib.ts` to `edition.ts`, which is where `readLesson` and
+`resolveEdition` live now.)
 
 So this is **deliberate**, not an oversight, and unguessable-id-as-capability is a real pattern.
 The question is whether its consequences are still the ones you want, because they are stronger
