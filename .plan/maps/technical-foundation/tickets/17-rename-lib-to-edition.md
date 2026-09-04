@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: [16]
+claimed_by: rename-lib-to-edition-2026-09-04
+claimed_at: 2026-09-04T10:53:39+02:00
 ---
 # Rename `lib.ts` to `edition.ts`
 
