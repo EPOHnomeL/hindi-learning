@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: []
+claimed_by: split-tenants-ts-2026-09-03
+claimed_at: 2026-09-04T08:01:07+02:00
 ---
 # Split `convex/tenants.ts`
 
