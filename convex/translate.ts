@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
 import { action, internalAction, internalMutation, internalQuery, mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { publishedLangs } from "./lib";
+import { publishedLangs } from "./edition";
 import { getEditableTopic, getOwnedTopic, topicBySlug } from "./topicAccess";
 import { assertAdmin } from "./adminSecret";
 import { hashString } from "./tokens";

@@ -4,7 +4,7 @@ import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
-import { loadEdition } from "./lib";
+import { loadEdition } from "./edition";
 import { getOwnedTopic, topicBySlug } from "./topicAccess";
 import { assertAdmin } from "./adminSecret";
 import { mintToken } from "./tokens";

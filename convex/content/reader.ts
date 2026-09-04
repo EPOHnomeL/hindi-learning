@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { query, type QueryCtx } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { buildPaywall, paywallValidator, heldLangs, lessonsToc, loadEdition, readLesson, readReference, referencesToc, resolveEdition } from "../lib";
+import { buildPaywall, paywallValidator, heldLangs, lessonsToc, loadEdition, readLesson, readReference, referencesToc, resolveEdition } from "../edition";
 import { getEditableTopic, topicBySlug } from "../topicAccess";
 import { SOURCE_LANG } from "../sourceLang";
 import { teacherQaOn } from "../capture";

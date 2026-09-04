@@ -2,7 +2,7 @@
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
 import schema from "./schema";
-import { loadEdition } from "./lib";
+import { loadEdition } from "./edition";
 import { SOURCE_LANG } from "./sourceLang";
 import type { Doc, Id } from "./_generated/dataModel";
 

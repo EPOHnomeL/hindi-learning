@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { buildPaywall, editionAccessLevel, lessonsToc, paywallValidator, loadEdition, readLesson, readReference, referencesToc, type EditionAccess } from "./lib";
+import { buildPaywall, editionAccessLevel, lessonsToc, paywallValidator, loadEdition, readLesson, readReference, referencesToc, type EditionAccess } from "./edition";
 import { SOURCE_LANG } from "./sourceLang";
 import { teacherQaOn } from "./capture";
 import { langInfo } from "./languages";

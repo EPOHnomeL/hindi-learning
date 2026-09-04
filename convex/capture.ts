@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { loadEdition, readableLang } from "./lib";
+import { loadEdition, readableLang } from "./edition";
 import { getOwnedTopic, getViewableTopic, topicBySlug } from "./topicAccess";
 import { assertAdmin } from "./adminSecret";
 import { assertTenantFlag } from "./tenantFlags";

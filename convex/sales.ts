@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { isCallerAdmin } from "./whitelist";
-import { translatedTitle } from "./lib";
+import { translatedTitle } from "./edition";
 import type { Doc } from "./_generated/dataModel";
 
 // The Sales report is revenue PER COURSE PER EDITION, so only sale rows belong

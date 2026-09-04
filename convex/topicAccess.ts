@@ -2,7 +2,7 @@ import type { QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { SOURCE_LANG } from "./sourceLang";
 import { shareLang, shareRole } from "./shareGrants";
-import { grantsFor } from "./lib";
+import { grantsFor } from "./edition";
 
 // The four Topic resolvers: by slug, and the three that hand back a Topic only if
 // the caller may own, read or edit it. (Plain module, no Convex functions

@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { livePublishedLangs } from "./lib";
+import { livePublishedLangs } from "./edition";
 import { getOwnedTopic } from "./topicAccess";
 import { SOURCE_LANG } from "./sourceLang";
 import { langInfo } from "./languages";

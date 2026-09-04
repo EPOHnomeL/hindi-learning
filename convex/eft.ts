@@ -4,7 +4,7 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { editionPrice, hasEntitlement, translatedTitle } from "./lib";
+import { editionPrice, hasEntitlement, translatedTitle } from "./edition";
 import { topicBySlug } from "./topicAccess";
 import { normaliseEmail } from "./shareGrants";
 import { SOURCE_LANG } from "./sourceLang";

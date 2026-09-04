@@ -5,10 +5,13 @@ import { SOURCE_LANG } from "./sourceLang";
 import { shareLang } from "./shareGrants";
 import { decodeEntities, pickContentBody, type ContentBody } from "./contentBlobs";
 
-// The Edition and grant core: who holds which Edition of a Topic, which one to
-// serve them, how its rows read, and what the paygate withholds. (Plain module,
-// no Convex functions registered here.) Everything else that used to live here
-// moved to its own module in technical-foundation/16.
+// `convex/edition.ts`: the Edition reader, the grant resolver and the paywall.
+// Who holds which Edition of a Topic, which one to serve them, how its rows read,
+// and what the paygate withholds. (Plain module, no Convex functions registered
+// here.) Everything else that used to live here moved to its own module in
+// technical-foundation/16; technical-foundation/17 then renamed the file from
+// `lib.ts`, because with only this subject left the old name described a junk
+// drawer that no longer exists.
 
 // ---- Editions (course-translation) -----------------------------------------
 

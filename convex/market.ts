@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { editionPrice, hasEntitlement, heldLangs, translatedTitle } from "./lib";
+import { editionPrice, hasEntitlement, heldLangs, translatedTitle } from "./edition";
 import { getOwnedTopic, topicBySlug } from "./topicAccess";
 import { mintToken } from "./tokens";
 import { normaliseEmail } from "./shareGrants";

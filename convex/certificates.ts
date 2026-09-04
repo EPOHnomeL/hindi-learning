@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { holdsSeat, loadEdition, readableLang } from "./lib";
+import { holdsSeat, loadEdition, readableLang } from "./edition";
 import { getViewableTopic } from "./topicAccess";
 import { mintToken } from "./tokens";
 import { SOURCE_LANG } from "./sourceLang";
