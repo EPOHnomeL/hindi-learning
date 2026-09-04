@@ -144,23 +144,24 @@ fields it declares. upgrade: grow it as typed fields, like `userPrefs`.
 ### `convex/tenantTheme.ts:20`
 
 `TENANT_THEME_TOKENS` is hand-mirrored from `src/design/tokens.ts` because Convex functions
-cannot import from `src/`. ceiling: the two lists must be kept in sync by hand. upgrade: keep them
-in sync, or have issue 09 re-export a Convex-side copy, when issue 09 lands.
+cannot import from `src/`. ceiling: the two lists must be kept in sync by hand. upgrade: a test
+that reads both copies and fails when they disagree.
 
-**NEEDS A TICKET**, filed 2026-09-03 as [technical-foundation 23](../.plan/maps/technical-foundation/tickets/23-tenant-token-mirror-has-no-test.md): add a test that asserts the two token lists are identical, because the
-marker's own trigger has already fired and nothing caught it. Verified 2026-09-03: issue 09 has
-landed, `src/design/tokens.ts` exists and declares itself the ONE canonical list, and the Convex
-copy is still a hand-written mirror. The two agree today (both are the same 14 names), but nothing
-guards them: `src/design/tokens.test.ts` checks the src list against a local literal, and
-`convex/tenants.test.ts` checks a tenant row against the Convex list. No test compares the two
-files, so a token added on one side ships silently wrong on the other. A test can read across the
-boundary even though the runtime cannot, which is the laziest fix available.
+**ACCEPTED, covered by a test** as of 2026-09-04, via
+[technical-foundation 23](../.plan/maps/technical-foundation/tickets/23-tenant-token-mirror-has-no-test.md).
+The marker's own trigger (issue 09 landing) had already fired and nothing caught it. The fix is
+the lazy one the ticket called for: `src/design/tokens.test.ts` now imports the Convex copy
+across the runtime boundary a Convex *function* cannot cross, and asserts it equals the
+canonical list, naming `src/design/tokens.ts` as canonical in the failure message. The second
+hand mirror in the same file, `DEFAULT_TENANT_THEME.light`, is covered by the same pair of tests
+against the `@theme` block of `src/styles/globals.css`, since it could drift the same silent way.
+Both were proved to fail by perturbing the Convex copy. The duplication stays: the runtime
+boundary is the reason it exists, and a loud test buys the safety for a fraction of a refactor.
 
-Moved 2026-09-04 by [18](../.plan/maps/technical-foundation/tickets/18-split-tenants-ts.md):
-the marker and `TENANT_THEME_TOKENS` were at `convex/tenants.ts:16` when 23 was filed and are
-now at `convex/tenantTheme.ts:20`. The Convex-side list itself is unchanged, byte for byte, and
-the assertion 23 names still lives in `convex/tenants.test.ts`, which now imports the list from
-`./tenantTheme`.
+Verified 2026-09-04: the two lists agreed byte for byte when the test was written, and so did the
+default palette. The marker and `TENANT_THEME_TOKENS` moved from `convex/tenants.ts:16` to
+`convex/tenantTheme.ts:20` on 2026-09-04 when
+[18](../.plan/maps/technical-foundation/tickets/18-split-tenants-ts.md) split `tenants.ts`.
 
 ### `convex/translate.ts:105`
 
@@ -256,8 +257,8 @@ instruction not to grow the shortcut instead of replacing it.
 
 ## Totals
 
-20 markers, 6 with no trigger. 18 accepted, 2 needing a ticket
-(`convex/routine.ts:838`, `convex/tenantTheme.ts:20`).
+20 markers, 6 with no trigger. 19 accepted, 1 needing a ticket (`convex/routine.ts:838`).
+`convex/tenantTheme.ts:20` became accepted on 2026-09-04 once a drift test covered it.
 
 Harvested for
 [technical-foundation/20](../.plan/maps/technical-foundation/tickets/20-ponytail-debt-ledger.md).

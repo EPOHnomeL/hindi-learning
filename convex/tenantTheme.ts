@@ -17,9 +17,11 @@ import { tenantFlagsValidator, tenantThemeValidator } from "./schema";
 // define a partial subset (the rest fall back to the default dark palette). The
 // Convex validator keeps `light`/`dark` as loose records (hyphenated names like
 // good-b can't be v.object keys), so the exact key set is enforced here in code.
-// ponytail: issue 09 mints the frontend src/design/tokens.ts as the single
-// source of truth — convex can't import from src/, so this list mirrors it;
-// keep the two in sync (or have 09 re-export a convex-side copy) when 09 lands.
+// ponytail: the frontend src/design/tokens.ts is the single source of truth for
+// this list; convex can't import from src/, so this is a hand mirror of it.
+// Guarded, not deduplicated: src/design/tokens.test.ts imports both copies and
+// fails when they disagree (a test can cross the runtime boundary the runtime
+// cannot), so drift is loud rather than a silent first-paint colour flash.
 export const TENANT_THEME_TOKENS = [
   "paper", "card", "ink", "soft", "line", "accent", "accent2", "gold",
   "hi", "danger", "good", "good-b", "bad", "bad-b",
@@ -30,7 +32,8 @@ export const TENANT_THEME_TOKENS = [
 // <style> and getTheme never break before the operator opens the theme editor
 // (ticket 20) to paint the real brand. These are the light-mode `--color-*`
 // values from src/styles/globals.css — Convex can't import from src/, so they're
-// mirrored here (like TENANT_THEME_TOKENS); the dark palette is left to fall back
+// mirrored here (like TENANT_THEME_TOKENS, and held to globals.css by the same
+// drift test in src/design/tokens.test.ts); the dark palette is left to fall back
 // to the shared default dark (a tenant dark is opt-in, per 03).
 export const DEFAULT_TENANT_THEME = {
   light: {
