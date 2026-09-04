@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: []
+claimed_by: cost-instrumentation-2026-09-04
+claimed_at: 2026-09-04T08:15:07+02:00
 ---
 
 # Cost instrumentation (tokens per Routine run)
