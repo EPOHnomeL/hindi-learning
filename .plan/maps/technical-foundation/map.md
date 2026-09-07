@@ -22,8 +22,8 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
 - **This map carries build tickets, deliberately.** wayfinder's default is plan-don't-do,
   and this is the Notes override the convention requires. Refactors are not decisions with
   a build queued behind them; the decision is usually trivial and the work is the whole
-  point. Tickets 01, 03, 06, 10, 12, 15, 16, 17, 18 and 20 are execution. The grillings
-  (02, 04, 05, 07, 08, 09, 11, 13, 14, 19) are genuine open decisions.
+  point. Tickets 01, 03, 06, 10, 12, 15, 16, 17, 18, 20 and 26 to 34 are execution. The
+  grillings (02, 04, 05, 07, 08, 09, 11, 13, 14, 19) are genuine open decisions.
 - **Verify before reasoning.** Every size and count on this map was measured on 2026-09-01
   and is written with that date. Re-measure before acting: `lib.ts` grew from ~25 import
   sites to 32 while sitting un-ticketed.
@@ -89,6 +89,34 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
   a scope transfer, not moved here: the flag is a tenant switch, and the switch map owns it.
 - `urdu-chrome-locale` kept only its message-catalogue ticket; its RTL spine is
   [09](tickets/09-chrome-rtl-strategy.md) and [10](tickets/10-rtl-app-shell.md) here.
+- **Tickets 26 to 34 came from an architecture review dated 2026-09-04**, triaged in on
+  2026-09-07. What a later session needs to know about that provenance:
+  - **Every claim was re-verified in the tree on 2026-09-07 before its ticket was
+    written**, and each ticket says so. The review is a source, not an authority, and it
+    was already three days stale when triaged.
+  - **The review's own top recommendation is not a ticket, because it was already
+    fixed.** Its candidate 1 (the `as ProviderContext` cast that shipped every OpenRouter
+    authoring prompt without its Frontier anchor and with the literal string `undefined`
+    per Reference) was closed by `93d7e4b` on 2026-09-04, about three hours after the
+    review was written. Do not go looking for it.
+  - **The review correctly ruled four things out before scanning**, and that still holds:
+    the Edition read surface is a reached destination in
+    [edition-deepening](../edition-deepening/map.md) (all four tickets resolved), all five
+    candidates of the earlier [architecture-deepening](../architecture-deepening/map.md)
+    review landed, and `translate.ts`, `materialiseTopic` and boundary tests were already
+    [24](tickets/24-split-translate-ts.md),
+    [22](tickets/22-materialise-read-amplification.md) and
+    [25](tickets/25-architecture-boundary-tests.md).
+  - **Its six sub-card findings are in `## Not yet specified` below, not in tickets.**
+    That was a triage call, made because none was sharp enough alone; the reasoning is
+    recorded with them.
+  - **Three tickets carry a live defect rather than only duplication**, which is why they
+    are worth doing ahead of the rest: [26](tickets/26-one-publish-door-for-the-quiz-guard.md)
+    (a shipping script bypasses the quiz-structure guard),
+    [27](tickets/27-iframe-bridge-as-one-source-checked-module.md) (any frame on the page
+    can post a fake quiz response and have it recorded) and
+    [28](tickets/28-one-predicate-for-holding-an-edition.md) (`claimSeat` burns a capped
+    seat on a member who already holds the Edition).
 
 ## Where the tickets came from
 
@@ -117,6 +145,20 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
 | 19 | ADR 0014 is cited more narrowly than its scope | new, was un-ticketed debt |
 | 20 | The 19 `ponytail:` markers have no ledger | new, was un-ticketed debt |
 | 21 | Forgot-password flow (email OTP reset) | `auth-sessions/01` |
+| 26 | One publish door for the quiz-structure guard | 2026-09-04 architecture review, candidate 2 |
+| 27 | The iframe bridge as one source-checked module | same review, candidate 3 |
+| 28 | One predicate for "does this caller already hold this Edition?" | same review, candidate 4 |
+| 29 | One Ledger writer for the money event | same review, candidate 5 |
+| 30 | Collapse the two bulk-seat rails onto one deal core | same review, candidate 6 |
+| 31 | One model-call interface, two adapters | same review, candidate 7 |
+| 32 | One mutation-run module behind the busy/error triples | same review, candidate 8 |
+| 33 | One Reader Course module, two adapters | same review, candidate 9 |
+| 34 | AdminPanel's pure cores, lifted out | same review, candidate 10 |
+
+Tickets 22 to 25 were filed from this map's own fog and debt harvest (see their bodies).
+Tickets 26 to 34 were triaged in on 2026-09-07 out of an architecture review dated
+2026-09-04; see the Notes entry below for what that review was and which of its candidates
+did **not** become tickets.
 
 Ticket 21 arrived later the same day, in the consolidation that took `.plan` from 33 map
 directories to 7 active maps. It joins [08](tickets/08-review-session-management.md), which
@@ -131,7 +173,7 @@ that map made its own leftovers invisible. All five claims were re-verified in t
 
 ## The dependency graph
 
-Five edges, and each one exists because doing the work in the other order wastes it.
+Seven edges, and each one exists because doing the work in the other order wastes it.
 
 ```
 02 iframe/quiz architecture  ->  03 shadcn foundation
@@ -139,10 +181,12 @@ Five edges, and each one exists because doing the work in the other order wastes
 09 RTL strategy              ->  10 RTL app shell
 12 cost instrumentation      ->  11 off-peak generation
 16 empty lib.ts              ->  17 rename to edition.ts
-
-frontier (16):  01 02 04 06 07 08 09 12 13 14 15 16 18 19 20 21
-blocked   (5):  03 05 10 11 17
+27 iframe bridge module      ->  33 Reader Course module
+29 one Ledger writer         ->  30 collapse the bulk-seat rails
 ```
+
+No frontier or blocked list is written here: both are derived, and the copy that used to
+sit in this block was stale within days of being written.
 
 - **02 to 03**: 02 decides whether the quiz becomes React. If it does, the component set
   must include quiz primitives, and a foundation built first is a foundation that cannot
@@ -158,6 +202,12 @@ blocked   (5):  03 05 10 11 17
   which is what 12 builds. **This edge is new**, added at charting.
 - **16 to 17**: the rename was explicitly declined until the file is emptied, because
   `edition.ts` would misname a junk drawer more precisely than `lib` does.
+- **27 to 33**: 33's target shape has `ArtifactView` reduced to a frame owning no queries,
+  and that frame is what 27 builds. Doing 33 first moves four message listeners into a
+  shape 27 then re-cuts. **Added 2026-09-07 at triage.**
+- **29 to 30**: both bulk rails reach the payout split through the shared ledger writer 29
+  builds, so collapsing the mirror first means writing the shared deal module against five
+  hand-assembled ledger rows and then rewriting it. **Added 2026-09-07 at triage.**
 
 ## Decisions so far
 
@@ -248,11 +298,51 @@ blocked   (5):  03 05 10 11 17
 <!-- in-scope fog: real, but not sharp enough to ticket. The test is whether the question
      can be phrased precisely now, not whether it can be answered now. -->
 
-- **`AdminPanel.tsx` is 2617 lines**, more than twice the next largest file in the repo
-  (`ArtifactView.tsx`, 1149). Measured 2026-09-01. It is obviously too big and just as
-  obviously not yet a ticket: nobody has established what it splits *into*, and the answer
-  probably depends on [03](tickets/03-shadcn-foundation.md) settling the component
-  vocabulary first. `clears-with: 03`
+- **What the five `AdminPanel.tsx` tabs split into.** The file is **2667 lines**
+  (re-measured 2026-09-07; it was 2617 on 2026-09-01 and grew by 50 while un-ticketed),
+  still more than twice the next largest file in the repo (`ArtifactView.tsx`, 1141).
+  **Half of this patch graduated on 2026-09-07** into
+  [34](tickets/34-adminpanel-pure-cores-lifted-out.md): the pure cores and the chart
+  primitive need nothing from 03 and can move now. What remains fog is the rest, the
+  `{Allowlist,Sales,Payouts,Tenants,Generation}Tab` split, which still waits on
+  [03](tickets/03-shadcn-foundation.md) settling the component vocabulary.
+  `clears-with: 03`
+- **Six sub-card findings from the 2026-09-04 architecture review**, all verified real by
+  that review and all judged smaller than a ticket. Kept together because none is sharp
+  enough alone and several may turn out to be one job:
+  - **A tenant core.** Thirteen production `by_slug` fetch-else-throw prologues across
+    five tenant modules with no `tenantBySlug`, though `topicAccess.ts:14-19` provides
+    exactly that for Topics. `tenantBrand` exists as byte-identical private copies at
+    `shares.ts:57` and `eft.ts:479` under a standing `ponytail:` note, and the
+    secret-guarded and identity-guarded theme writes are one body twice
+    (`tenantTheme.ts:85-105` and `:116-135`) where the guard wants to be a parameter.
+    This is the closest of the six to being ticketable now.
+  - **The dashboard's four course cards.** `pct` verbatim at `Dashboard.tsx:336,490,650`
+    and the locale-else-en-else-first Edition chain verbatim at `:496,653,775`, one of
+    them commented as mirroring the server's `preferred` with no test on either side.
+  - **Five ways to seed a form from a live query**: a ref guard, a nullish chain, two
+    `useState` initialisers, and a remount key imposed by the call site.
+    `SharingTab.tsx:517-518` names the failure mode in its own words, a form that opened
+    blank would silently withdraw the regional prices on every edit.
+  - **Per-device state.** Thirteen key constants across nine files over `localStorage`,
+    `sessionStorage` and cookies, with the sign-out sweep resting on an untyped prefix and
+    `layout.tsx:136-137` admitting one cookie name is a literal inside an inline script
+    that no rename tool can see.
+  - **The orchestration protocol, twice.** `routine.ts` and `translate.ts` each implement
+    the same stale window, acquire, fail-release, claim-with-heartbeat, report and
+    fire-POST, with four of the six headers declaring themselves mirrors, and a counter bug
+    fixed on the translation rail only. The review rated this *worth exploring* rather than
+    *strong*, because the two lock tables and outcome vocabularies genuinely differ and the
+    lift is not small. **Re-read this one against
+    [24](tickets/24-split-translate-ts.md)**, which will move the translate half.
+  - **Smaller repeats in the Convex read path**: the ready-translation-job-else-refuse gate
+    written three times with the same error string, the lang-to-chip projection four times,
+    and `shares.listSharedTopics` and `market.myPurchases` as the same 45-line card query
+    over a different grant table.
+
+  These are recorded rather than ticketed on purpose. The next session to touch any of the
+  named files should fold the relevant one in rather than filing six tickets nobody picks
+  up. No `clears-with:` on any of them: none has a plausible anchor on this map.
 - **Six of the 30 ADRs are still `status: proposed`.** Two of the six are handled by name
   ([14](tickets/14-adr-superseding-0016-payfast-merchant-model.md),
   [19](tickets/19-adr-0014-citation-scope.md)). Whether the rest need a sweep, or whether
