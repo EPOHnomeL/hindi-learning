@@ -251,15 +251,34 @@ this section is the current state.
     *dev* `CONVEX_DEPLOY_KEY`, and the env var **wins over `--prod`**: `npx convex
     env get X --prod` prints *"Ignoring `--prod` … using deployment from
     CONVEX_DEPLOY_KEY"* and answers for **dev**, which reads exactly like a prod
-    answer. `.env.local` also holds `PROD_CONVEX_DEPLOY_KEY`, so to read prod:
+    answer.
+
+    **Correction, 2026-09-07: `.env.local` does NOT hold `PROD_CONVEX_DEPLOY_KEY`.**
+    This paragraph used to give this recipe:
 
     ```sh
+    # STALE, does not work: PROD_CONVEX_DEPLOY_KEY is not set
     CONVEX_DEPLOY_KEY="$PROD_CONVEX_DEPLOY_KEY" npx convex env get PAYFAST_MODE
     ```
 
-    Same override applies to `convex env list` / `convex logs`. Prefer fetching the
-    one var you need over dumping the whole env — the PayFast merchant key and
-    passphrase live there too.
+    The variable is absent, so the override expands to the empty string, the CLI
+    falls back to `CONVEX_DEPLOYMENT`, and the command **answers for dev while
+    looking exactly like a prod answer**. That is the very trap the paragraph above
+    warns about, caused by the paragraph itself. Verified 2026-09-07 by listing the
+    key names in `.env.local`: `CONVEX_DEPLOYMENT`, `CONVEX_DEPLOY_KEY`,
+    `CONVEX_PROD_URL`, `NEXT_PUBLIC_CONVEX_SITE_URL`, `NEXT_PUBLIC_CONVEX_URL`,
+    `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`, `OWNER_EMAIL`,
+    `PUBLISH_SECRET`. No prod deploy key among them.
+
+    **So an agent cannot read prod from this checkout.** `CONVEX_PROD_URL` is
+    present, but reading data or env needs a deploy or admin key that is not here.
+    Two honest routes: ask the operator to read it off the Convex dashboard, or ask
+    them to put a prod key in the environment for the session. Do not run a
+    `--prod` flag or an empty-string override and report the result as prod.
+
+    Whoever restores a working recipe should replace this correction with it, and
+    date it. Prefer fetching the one var you need over dumping the whole env: the
+    PayFast merchant key and passphrase live there too.
 
 ## Bulk access: there are TWO rails, not one (2026-08-23; renamed 2026-08-25)
 
