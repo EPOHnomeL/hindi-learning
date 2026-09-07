@@ -16,7 +16,7 @@
 // Bump VERSION on any change to this file: activate purges caches under other
 // versions, and skipWaiting/clients.claim make a deploy take effect on the next
 // launch rather than the one after.
-const VERSION = "v1";
+const VERSION = "v2";
 const STATIC_CACHE = "static-" + VERSION;
 const SHELL_CACHE = "shell-" + VERSION;
 
@@ -37,10 +37,19 @@ function route(url, mode) {
 self.__route = route;
 
 self.addEventListener("install", (event) => {
+  // The offline shell is a nicety, not the worker's reason to exist, so a shell
+  // that will not cache must not fail the install. cache.add("/") rejects on any
+  // non-2xx (a redirect, a 503 mid-deploy) or a dropped network, and caches.open
+  // rejects where storage is denied; a rejected waitUntil fails install, which
+  // reaches the page as an unhandled rejection on register() carrying the bare
+  // message "Rejected". Install without the shell instead: rule 2 is
+  // network-first anyway, so the only loss is the offline fallback, and the next
+  // successful "/" navigation puts it back (see the fetch handler below).
   event.waitUntil(
     caches
       .open(SHELL_CACHE)
       .then((cache) => cache.add("/"))
+      .catch(() => undefined)
       .then(() => self.skipWaiting()),
   );
 });

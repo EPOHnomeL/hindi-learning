@@ -10,20 +10,44 @@ type Route = "static" | "navigation" | "network";
 let route: (url: string, mode: string) => Route;
 let listeners: Record<string, unknown>;
 
-beforeAll(() => {
+// Evaluate public/sw.js in a fresh vm and hand back its captured handlers, so a
+// test can stub `caches` per case. `caches` defaults to {}, which is enough for
+// the routing tests since they never touch it.
+function loadWorker(caches: unknown = {}) {
   const src = readFileSync("public/sw.js", "utf8");
+  const captured: Record<string, unknown> = {};
+  let skipWaiting = 0;
   const self: Record<string, unknown> = {
     addEventListener: (type: string, fn: unknown) => {
-      listeners[type] = fn;
+      captured[type] = fn;
     },
     location: { origin: "https://ywampotch.my-course.app" },
-    skipWaiting: () => undefined,
+    skipWaiting: () => {
+      skipWaiting += 1;
+    },
     clients: { claim: () => undefined },
   };
-  listeners = {};
-  const ctx = createContext({ self, location: self.location, caches: {}, fetch: () => undefined, URL });
+  const ctx = createContext({ self, location: self.location, caches, fetch: () => undefined, URL });
   runInContext(src, ctx);
-  route = (self as { __route?: typeof route }).__route!;
+  return { self, listeners: captured, skipWaitingCount: () => skipWaiting };
+}
+
+// Fire the captured install handler and return whatever it passed to waitUntil,
+// so a test can assert the install promise settles rather than rejecting.
+function install(handlers: Record<string, unknown>): Promise<unknown> {
+  let waited: Promise<unknown> = Promise.resolve();
+  (handlers.install as (e: { waitUntil: (p: Promise<unknown>) => void }) => void)({
+    waitUntil: (p) => {
+      waited = p;
+    },
+  });
+  return waited;
+}
+
+beforeAll(() => {
+  const loaded = loadWorker();
+  listeners = loaded.listeners;
+  route = (loaded.self as { __route?: typeof route }).__route!;
 });
 
 it("registers install, activate and fetch handlers", () => {
@@ -57,5 +81,35 @@ describe("the three rules", () => {
   it("same-origin non-static non-navigation is network only", () => {
     expect(route(`${origin}/app-icon?size=192`, "no-cors")).toBe("network");
     expect(route(`${origin}/manifest.webmanifest`, "cors")).toBe("network");
+  });
+});
+
+// A failed offline shell must not fail the install. Before this was guarded, a
+// rejected cache.add("/") rejected waitUntil, the install failed, and the
+// register() call in RegisterServiceWorker reported it as an unhandled
+// "Error: Rejected" (PostHog report 01a06afd).
+describe("install tolerates a shell that will not cache", () => {
+  it("caches / and activates on the happy path", async () => {
+    const added: string[] = [];
+    const worker = loadWorker({
+      open: () => Promise.resolve({ add: (req: string) => (added.push(req), Promise.resolve()) }),
+    });
+    await expect(install(worker.listeners)).resolves.toBeUndefined();
+    expect(added).toEqual(["/"]);
+    expect(worker.skipWaitingCount()).toBe(1);
+  });
+
+  it("still activates when cache.add rejects (non-2xx or dropped network)", async () => {
+    const worker = loadWorker({
+      open: () => Promise.resolve({ add: () => Promise.reject(new Error("Request failed")) }),
+    });
+    await expect(install(worker.listeners)).resolves.toBeUndefined();
+    expect(worker.skipWaitingCount()).toBe(1);
+  });
+
+  it("still activates when caches.open rejects (storage denied)", async () => {
+    const worker = loadWorker({ open: () => Promise.reject(new Error("SecurityError")) });
+    await expect(install(worker.listeners)).resolves.toBeUndefined();
+    expect(worker.skipWaitingCount()).toBe(1);
   });
 });
