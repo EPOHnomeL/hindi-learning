@@ -75,7 +75,7 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
   // value is posted as. Neither is ever an opening state: you can only arrive at
   // them from the sign-in form.
   const [flow, setFlow] = useState<"signIn" | "signUp" | "reset" | "reset-verification">(
-    buyIntent || path?.startsWith("/redeem") ? "signUp" : "signIn",
+    buyIntent || path?.startsWith("/redeem") || path === "/sign-up" ? "signUp" : "signIn",
   );
   const isReset = flow === "reset" || flow === "reset-verification";
   // The address the code was sent to, held across the step change: the second step
