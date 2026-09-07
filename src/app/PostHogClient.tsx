@@ -3,6 +3,7 @@
 import posthog from "posthog-js";
 import { useEffect } from "react";
 import { env } from "../../env.js";
+import { dropFramelessNetworkRejection } from "../lib/posthogBeforeSend";
 
 let isInitialized = false;
 
@@ -37,6 +38,10 @@ export function initializePostHog() {
     ui_host: "https://eu.posthog.com",
     defaults: "2026-01-30",
     capture_exceptions: true,
+    // Drop frameless unhandled network rejections before they reach error
+    // tracking: they arrive with no stack, so they are untriageable and recur
+    // on every flaky connection.
+    before_send: dropFramelessNetworkRejection,
     debug: process.env.NODE_ENV === "development",
   });
   isInitialized = true;
