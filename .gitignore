@@ -81,3 +81,24 @@ HANDOFF*.md
 /posthog-self-driving-report.md
 
 resources/
+
+# .scratch/ is the retired issue tracker (2026-07-30, docs/agents/issue-tracker.md).
+# Its committed .md files stay as the historical record, but the render output
+# that earlier poster and demo sessions left beside them (screenshots, poster
+# proofs, video captures, intermediate frames, the scripts and logs) came to 32 MB
+# of regenerable binaries as of 2026-09-07. A binary committed here inflates every
+# future clone forever, even once deleted. Listed by extension rather than as
+# ".scratch/** plus negations", because a blanket un-ignore of *.md there would
+# override the deliberate HANDOFF*.md rule above. Already-tracked files, including
+# .scratch/ui-redesign/design-source-of-truth.html, are unaffected by gitignore.
+.scratch/**/*.png
+.scratch/**/*.jpg
+.scratch/**/*.svg
+.scratch/**/*.pdf
+.scratch/**/*.mp4
+.scratch/**/*.webm
+.scratch/**/*.log
+.scratch/**/*.mjs
+.scratch/**/*.json
+.scratch/**/*.txt
+.scratch/**/*.html
