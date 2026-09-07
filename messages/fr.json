@@ -528,7 +528,8 @@
     "modeEachIdentity": "Un échange n’enregistre que le fait qu’il a eu lieu : ni nom, ni liste.",
     "usersIntro": "Toutes les personnes avec qui ce cours est partagé, et ce qu’elles peuvent faire. Groupé par langue pour l’instant.",
     "poster": "Affiche",
-    "posterOpen": "Ouvrir une affiche imprimable pour cette édition"
+    "posterOpen": "Ouvrir une affiche imprimable pour cette édition",
+    "posterNeedsCompleted": "L’affiche sera disponible une fois la génération du cours terminée"
   },
   "ManageDashboard": {
     "loadError": "Ce cours n'a pas pu être chargé.",

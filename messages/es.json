@@ -528,7 +528,8 @@
     "modeEachIdentity": "Un canje solo registra que ocurrió: sin nombres, sin lista.",
     "usersIntro": "Todas las personas con las que se ha compartido este curso y lo que pueden hacer. Por ahora agrupado por idioma.",
     "poster": "Póster",
-    "posterOpen": "Abrir un póster imprimible de esta edición"
+    "posterOpen": "Abrir un póster imprimible de esta edición",
+    "posterNeedsCompleted": "El póster estará disponible cuando el curso termine de generarse"
   },
   "ManageDashboard": {
     "loadError": "No se pudo cargar este curso.",

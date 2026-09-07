@@ -77,7 +77,7 @@ export function SharingTab({
         <PublishToggle topicSlug={topicSlug} lang={edition.lang} published={edition.published} notify={notify} />
       </Group>
       <Group label={t("groupHandTo")}>
-        <PublicLinkToggle topicSlug={topicSlug} lang={edition.lang} publicToken={edition.publicToken} notify={notify} />
+        <PublicLinkToggle topicSlug={topicSlug} lang={edition.lang} publicToken={edition.publicToken} completed={completed} notify={notify} />
         <InviteByEmail topicSlug={topicSlug} lang={edition.lang} />
       </Group>
       <Group label={t("groupCosts")}>
@@ -179,11 +179,15 @@ function PublicLinkToggle({
   topicSlug,
   lang,
   publicToken,
+  completed,
   notify,
 }: {
   topicSlug: string;
   lang: string;
   publicToken: string | null;
+  // Whether the course has finished generating: the poster prints the lesson
+  // count as a fact, so it waits for the count to stop moving.
+  completed: boolean;
   notify: (message: string) => void;
 }) {
   const t = useTranslations("Editions");
@@ -192,6 +196,7 @@ function PublicLinkToggle({
   const [copied, setCopied] = useState(false);
   const [qrBusy, setQrBusy] = useState(false);
   const on = publicToken != null;
+  const posterOn = on && completed;
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const url = publicToken ? `${origin}/share/${publicToken}` : null;
 
@@ -293,16 +298,18 @@ function PublicLinkToggle({
         </button>
         {/* The course poster (course-poster spec): a new tab on the anonymous
             poster route, keyed by this Edition's token, so it exists only while
-            the link is on and its QR always opens something. A real anchor, not
-            window.open, so the new tab is never popup-blocked; inert while off. */}
+            the link is on and its QR always opens something, and only once the
+            course has finished generating (2026-09-07), so the lesson count it
+            prints is final. A real anchor, not window.open, so the new tab is
+            never popup-blocked; inert while off. */}
         <a
-          href={on && publicToken ? `/poster/${publicToken}` : undefined}
+          href={posterOn && publicToken ? `/poster/${publicToken}` : undefined}
           target="_blank"
           rel="noopener noreferrer"
-          aria-disabled={!on}
-          title={t("posterOpen")}
+          aria-disabled={!posterOn}
+          title={on && !completed ? t("posterNeedsCompleted") : t("posterOpen")}
           className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
-            on ? "border-line bg-hi text-ink hover:bg-line/40" : "pointer-events-none cursor-not-allowed border-line/60 bg-soft/10 text-soft/50"
+            posterOn ? "border-line bg-hi text-ink hover:bg-line/40" : "pointer-events-none cursor-not-allowed border-line/60 bg-soft/10 text-soft/50"
           }`}
         >
           <Icon name="poster" className="h-3.5 w-3.5" /> {t("poster")}

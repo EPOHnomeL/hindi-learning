@@ -528,7 +528,8 @@
     "modeEachIdentity": "A redemption records only that it happened: no names, no roster.",
     "usersIntro": "Everyone this course has been shared with, and what they can do. Grouped by language for now.",
     "poster": "Poster",
-    "posterOpen": "Open a printable poster for this edition"
+    "posterOpen": "Open a printable poster for this edition",
+    "posterNeedsCompleted": "The poster is available once the course has finished generating"
   },
   "ManageDashboard": {
     "loadError": "This course could not be loaded.",

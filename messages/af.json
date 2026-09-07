@@ -528,7 +528,8 @@
     "modeEachIdentity": "’n Inlossing teken net aan dat dit gebeur het: geen name, geen lys nie.",
     "usersIntro": "Almal met wie hierdie kursus gedeel is, en wat hulle kan doen. Vir eers per taal gegroepeer.",
     "poster": "Plakkaat",
-    "posterOpen": "Open ’n drukbare plakkaat vir hierdie uitgawe"
+    "posterOpen": "Open ’n drukbare plakkaat vir hierdie uitgawe",
+    "posterNeedsCompleted": "Die plakkaat is beskikbaar sodra die kursus klaar gegenereer is"
   },
   "ManageDashboard": {
     "loadError": "Hierdie kursus kon nie gelaai word nie.",
