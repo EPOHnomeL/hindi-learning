@@ -4,7 +4,7 @@ Status: shipped — admission gate + admin portal delivered (78780d1, 455d2e3, 4
 
 > Vocabulary follows [`CONTEXT.md`](../../CONTEXT.md) — in particular the new
 > **Allowlist** and **Admin** terms added for this feature. Decision recorded in
-> [ADR 0011](../../docs/adr/0011-allowlist-in-convex-admin-portal.md): the
+> [ADR 0034](../../docs/adr/0034-allowlist-in-convex-admin-portal.md): the
 > Allowlist moves from the `AUTH_ALLOWED_EMAILS` env var into a Convex table,
 > managed by a single in-app Admin, gating **sign-up only**.
 

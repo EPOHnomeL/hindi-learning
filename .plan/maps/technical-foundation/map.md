@@ -22,11 +22,18 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
 - **This map carries build tickets, deliberately.** wayfinder's default is plan-don't-do,
   and this is the Notes override the convention requires. Refactors are not decisions with
   a build queued behind them; the decision is usually trivial and the work is the whole
-  point. Tickets 01, 03, 06, 10, 12, 15, 16, 17, 18, 20 and 26 to 34 are execution. The
+  point. Tickets 01, 03, 06, 10, 12, 15, 16, 17, 18, 20 and 26 to 37 are execution. The
   grillings (02, 04, 05, 07, 08, 09, 11, 13, 14, 19) are genuine open decisions.
 - **Verify before reasoning.** Every size and count on this map was measured on 2026-09-01
   and is written with that date. Re-measure before acting: `lib.ts` grew from ~25 import
   sites to 32 while sitting un-ticketed.
+- **Prod row counts, measured 2026-09-07** on `capable-barracuda-769` (eu-west-1):
+  **441** `lessons` rows with a body, **84** `references`, **1476** `translations`.
+  This corrects the "~1400 lessons" figure that [02](tickets/02-lesson-quiz-architecture.md)
+  and its `ui-overhaul` ancestor both carried: 1400 was the *translations* number.
+  Anything reasoning about the cost of touching every lesson should reason about 441.
+  The read route is in `docs/agents/project-context.md` and it is the only one an agent in
+  this checkout has — there is still no prod deploy key here.
 - **`pnpm typecheck` is the cheap check** and needs no server. Never stop the dev server.
 - **The RTL flip has a one-line hold, and one landmine if you remove it wrongly**
   (2026-09-03, while the operator checks whether the reorder is wanted at all).
@@ -154,6 +161,9 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
 | 32 | One mutation-run module behind the busy/error triples | same review, candidate 8 |
 | 33 | One Reader Course module, two adapters | same review, candidate 9 |
 | 34 | AdminPanel's pure cores, lifted out | same review, candidate 10 |
+| 35 | A publish-time validator for an orphaned quiz answer key | the answer to 02 |
+| 36 | `pnpm bundle:authoring` has been broken since 2026-08-27 | the answer to 02 |
+| 37 | What crosses the lesson boundary: tokens, and one breakpoint | the answer to 02 |
 
 Tickets 22 to 25 were filed from this map's own fog and debt harvest (see their bodies).
 Tickets 26 to 34 were triaged in on 2026-09-07 out of an architecture review dated
@@ -173,7 +183,7 @@ that map made its own leftovers invisible. All five claims were re-verified in t
 
 ## The dependency graph
 
-Seven edges, and each one exists because doing the work in the other order wastes it.
+Eight edges, and each one exists because doing the work in the other order wastes it.
 
 ```
 02 iframe/quiz architecture  ->  03 shadcn foundation
@@ -183,6 +193,7 @@ Seven edges, and each one exists because doing the work in the other order waste
 16 empty lib.ts              ->  17 rename to edition.ts
 27 iframe bridge module      ->  33 Reader Course module
 29 one Ledger writer         ->  30 collapse the bulk-seat rails
+36 repair bundle:authoring   ->  37 what crosses the boundary
 ```
 
 No frontier or blocked list is written here: both are derived, and the copy that used to
@@ -208,10 +219,31 @@ sit in this block was stale within days of being written.
 - **29 to 30**: both bulk rails reach the payout split through the shared ledger writer 29
   builds, so collapsing the mirror first means writing the shared deal module against five
   hand-assembled ledger rows and then rewriting it. **Added 2026-09-07 at triage.**
+- **36 to 37**: 37 has to edit `lessons/_partials/head.html`, and the bundler that carries
+  that partial into the authoring prompt currently throws. Shipping a partial edit through
+  a dead bundler changes what future lessons look like without changing what the model is
+  told to author. **Added 2026-09-07 with 02's answer.**
 
 ## Decisions so far
 
 <!-- one line per resolved ticket -->
+
+- [Does the lesson body, and the quiz, come out of the iframe](tickets/02-lesson-quiz-architecture.md) 2026-09-07: **no, and that is now decided rather
+  than tolerated** — `docs/adr/0035`. The quiz does not become React and no structured quiz
+  data is introduced: the answer key stays in the authored HTML and the server never scores,
+  because quiz correctness here is **deliberately self-reported formative data** that gates
+  no certificate, no money and no access. So the third sub-question answers **neither**:
+  no migration and no compatibility path, and the 441 published lessons are untouched.
+  The prose stays in the iframe and `allow-scripts`-without-`allow-same-origin` is a
+  permanent boundary. One breakpoint, **768px**, matching Tailwind `md`. The design system
+  reaches a lesson **only as CSS custom properties**, across the bridge
+  `injectTenantPaletteCss` already provides. This **narrows**
+  [03](tickets/03-shadcn-foundation.md) — no quiz primitives, lesson interior out of scope —
+  and the narrowing is written into 03's own body. Three build tickets were filed rather
+  than folded in, because a resolved decision ticket on this map renders as *shipped*; they
+  are named in 02's own Answer. **Not done, deliberately:** the `e.source` guard stays with
+  27, and no behavioural measurement was taken — reopening server-side scoring would need
+  those numbers first, and a superseding ADR rather than an implementation.
 
 - [Chrome RTL strategy](tickets/09-chrome-rtl-strategy.md) 2026-09-03: the operator chose
   the **full flip** over shipping Urdu LTR first. `dir` comes from `langDir()` in the
@@ -362,6 +394,16 @@ sit in this block was stale within days of being written.
   configuration change, not a code change. Not free, since it moves data residency, which is
   a question about the courses' learners rather than about cost. Deliberately floating with
   no anchor: no ticket here sharpens it.
+- **1194 `translations` rows carry inline `html` with no blob**, measured on prod
+  2026-09-07 by the same walk that produced the row counts above (`stranded` in
+  `backfill:verifyHtmlBlobs`). Against 272 blob-only and 10 matched, that is most of the
+  table. Two readings, and this session could not tell them apart: either the content-blob
+  migration reached `lessons` and `references` (441 and 84, **all** blob-only) and never
+  finished on `translations`, or inline is simply how a translation body is meant to be
+  stored — `tenantBackfill.setTranslationInlineHtml` exists and writes exactly that.
+  Whichever it is, the two tables disagree and nothing in the tree says which is intended.
+  Recorded rather than ticketed because the question is *which shape is correct*, and that
+  is a decision, not a defect. No `clears-with:` — no ticket here sharpens it.
 - **Whether the residual read scales with Editions or with readers.** The hot read is per
   (Topic, language), so each new Edition multiplies it, and
   [translation-and-locales](../translation-and-locales/map.md) is actively adding Editions.

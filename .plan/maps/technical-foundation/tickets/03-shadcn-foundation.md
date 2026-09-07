@@ -27,6 +27,25 @@ Adopt **shadcn/ui** on the existing Tailwind v4 setup and **reconcile** it with 
 
 [02, does the lesson body and the quiz come out of the iframe](02-lesson-quiz-architecture.md). **Corrected 2026-09-01:** this ticket said "None, can start immediately" while it lived in `internal-course-studio`, where the iframe question was not on the map. It is now, and it decides whether the component set must include quiz primitives, so building the foundation first risks a set that cannot reach the product’s highest-traffic surface.
 
+## Narrowed by 02 — 2026-09-07
+
+[02](02-lesson-quiz-architecture.md) is answered, and it makes this ticket **smaller**,
+not bigger. Written here so it does not have to be read there:
+
+- **No quiz primitives.** The quiz stays authored HTML inside the iframe; the server
+  never scores it. Nothing in the component set has to render a quiz.
+- **The lesson interior is out of scope for the design system entirely.** This ticket
+  covers the app chrome. The iframe is a permanent boundary
+  ([ADR 0035](../../../../docs/adr/0035-lesson-iframe-is-a-permanent-boundary.md)).
+- **One channel across the boundary: CSS custom properties**, via
+  `injectTenantPaletteCss`. If a shadcn decision cannot be expressed as a token value,
+  it does not reach a lesson. Widening that bridge is
+  [37](37-what-crosses-the-lesson-boundary.md)'s job, not this one's.
+- **One breakpoint: 768px**, Tailwind `md`. Do not introduce a second number.
+
+The `blocked_by: [02]` edge has cleared. The reconciliation with `ui-overhaul/03` that
+the map's Notes demand is still this ticket's to do.
+
 ## Comments
 
 ### EPOHnomeL — 2026-07-10

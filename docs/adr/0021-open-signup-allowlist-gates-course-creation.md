@@ -1,7 +1,7 @@
 # Sign-up is open; the Allowlist gates course creation; checkout is auth-first
 
 Supersedes the *admission* semantics of
-[ADR 0011](0011-allowlist-in-convex-admin-portal.md): anyone may create an
+[ADR 0034](0034-allowlist-in-convex-admin-portal.md): anyone may create an
 account, and the **Allowlist** now answers "who may **create courses**" instead
 of "who may sign up". The portal, the `whitelist` table, the single
 non-removable **Admin**, and the normalised `by_email` lookup all stand

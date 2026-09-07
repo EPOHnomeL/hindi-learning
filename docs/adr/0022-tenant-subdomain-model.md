@@ -10,12 +10,12 @@
 
 accepted — decisions agreed with the operator (jvorster63@gmail.com) 2026-07-15;
 two-tier admin model implemented in whitelabel issue 08 (2026-07-17). Supersedes
-[ADR 0011](0011-allowlist-in-convex-admin-portal.md)'s one-Admin invariant.
+[ADR 0034](0034-allowlist-in-convex-admin-portal.md)'s one-Admin invariant.
 
 ## Context
 
 The app is single-site today: one Vercel app on `my-course.app`, one site-wide
-[[Allowlist]] (`whitelist` table), exactly one [[Admin]] (ADR 0011), global
+[[Allowlist]] (`whitelist` table), exactly one [[Admin]] (ADR 0034), global
 users/courses. Whitelabel v1 turns it multi-brand: one deployment serving
 **upf, ywampotch, almighty-warriors, yknot**, each on `<slug>.my-course.app`
 (subdomains already live over HTTPS via four explicit CNAMEs — ticket 05), each
@@ -80,7 +80,7 @@ indexed string equality, no join on the hot course-list path.
   on yknot's site is bought/viewed on `yknot.my-course.app`; the payment *rails*
   (merchant account, sender domain) are deferred (see §5).
 
-### 4. Two-tier admin model (supersedes ADR 0011's one-Admin invariant)
+### 4. Two-tier admin model (supersedes ADR 0034's one-Admin invariant)
 
 Roles encoded on the `whitelist` row by scope — reuse `isAdmin`, add `tenantSlug`:
 
@@ -96,7 +96,7 @@ Roles encoded on the `whitelist` row by scope — reuse `isAdmin`, add `tenantSl
   **their** members, edit **their** theme + flags, assign courses/users to
   **their** subdomain. Cannot create tenants or reach other tenants.
 - **Multiple tenant admins per tenant allowed** — no cap. This **retires ADR
-  0011's exactly-one-Admin invariant**; ADR 0011 must be superseded.
+  0011's exactly-one-Admin invariant**; ADR 0034 must be superseded.
 - `isCallerAdmin` becomes **scope-aware**: "is sys admin" (global) and "is admin
   *of tenant X*"; sys admin passes every tenant-scoped check.
 - **Allowlist is per-tenant data.** `whitelist.tenantSlug?` added; the sign-up
@@ -198,7 +198,7 @@ theme/language carry across subdomains. Mechanics:
 - **Schema migration:** add `tenants` table; add `tenantSlug?` to `topics`
   (index `by_tenant`), `users`, `whitelist`. Backfill: existing rows stay
   default (null) — safe. Seed four tenants + their tenant admins + sys admin.
-- **Supersede ADR 0011** (one-Admin invariant → two-tier scoped roles).
+- **Supersede ADR 0034** (one-Admin invariant → two-tier scoped roles).
 - **Ticket 06** grows a tenant-admin-facing surface (was operator-only).
 - **Implementation detail to nail at build:** how the host/tenant reaches the
   sign-up callback (client passes slug through sign-up params; spoof-limited by

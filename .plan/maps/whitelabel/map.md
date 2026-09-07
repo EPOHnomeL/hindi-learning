@@ -98,7 +98,7 @@ issue per session in dependency order) is the next work — not another `/wayfin
   = shared dataset, subdomain is a **visibility filter**: default lists all, subdomain lists its own;
   user↔subdomain gates admission + home only (access stays grant-based); **skin follows the host**;
   cross-host links redirect to canonical host. **Two-tier admin** — sys admin + tenant admins
-  (scope change, see Out of scope) on `whitelist` via `isAdmin`+`tenantSlug`; **retires ADR 0011's
+  (scope change, see Out of scope) on `whitelist` via `isAdmin`+`tenantSlug`; **retires ADR 0034's
   one-Admin invariant**. Invite emails tenant-aware at v1; middleware host-label resolution; tenant
   slug a spoof-safe Convex arg; `*.localhost` for dev. Unblocks 03 + 04.
 - [Scope per-tenant branding & theming](tickets/03-scope-per-tenant-theming.md) — theme is an **inline
@@ -135,7 +135,7 @@ issue per session in dependency order) is the next work — not another `/wayfin
   is both** — JSON import (matches how a design handoff actually arrives) plus structured per-token
   fields for fine-tuning. **Assignment pickers live inside the tenant's own tab** (tenant-centric,
   not item-centric). **Only tenant removal needs a confirm, and it's a hard block** (not a cascade)
-  while any course/member still references the tenant — mirrors ADR 0011's refuse-to-remove-the-
+  while any course/member still references the tenant — mirrors ADR 0034's refuse-to-remove-the-
   one-Admin pattern; 04's flag-off rule already covers the other "existing grants" safety question.
   Ran a `/prototype` pass for the one open layout question (three structurally different
   tenant-detail layouts, mounted on the real `/admin` route, mock data, then deleted once judged):
@@ -152,7 +152,7 @@ issue per session in dependency order) is the next work — not another `/wayfin
   (passes only a matching scoped check). `isCallerAdmin`'s no-arg semantics are unchanged, so every
   existing caller was unaffected. `removeEmail` refuses to drop a sys admin only when it is the
   **last** one. The ADR graduated as **0022**, not 0021 — that number was taken in the interim —
-  and ADR 0011's one-Admin invariant is formally superseded.
+  and ADR 0034's one-Admin invariant is formally superseded.
 - [Design token contract cleanup](tickets/09-design-token-contract-cleanup.md) — `src/design/tokens.ts`
   is the contract: the 14 names, the per-surface prefix rule, the token semantics. Both stylesheets
   were reconciled **additively, zero visual change** (`globals.css` gained `good`/`bad`, `head.html`

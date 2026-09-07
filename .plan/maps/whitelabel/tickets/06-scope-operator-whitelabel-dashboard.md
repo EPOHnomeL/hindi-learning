@@ -53,7 +53,7 @@ lower-effort alternative); `layout.tsx` has no tenant-context provider yet.
 5. **Safety — only tenant removal needs a confirm, and it's a hard block, not a cascade.** 04
    settled flag-off (frozen-not-revoked). Tenant removal is the one destructive action: **blocked
    outright** (button disabled + explanation) while any `topics`/`whitelist`/`users` row references
-   the `tenantSlug` — mirrors ADR 0011's refuse-to-remove-the-one-Admin; no cascade-delete exists
+   the `tenantSlug` — mirrors ADR 0034's refuse-to-remove-the-one-Admin; no cascade-delete exists
    anywhere else, stays consistent.
 6. **Screen-level sketch — ran `/prototype`** over three tenant-detail layouts (sub-tabbed detail,
    stacked scroll, two-column split), mounted on the real `/admin` route with mock data, then

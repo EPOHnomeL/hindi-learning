@@ -7,7 +7,7 @@ blocked_by: [07]
 ## Question
 
 Today's `isCallerAdmin` (`convex/whitelist.ts:63`) is global-only — it answers "is this the one
-Admin" and nothing else. ADR 0021 §4 retires that one-Admin invariant (supersede ADR 0011) for
+Admin" and nothing else. ADR 0021 §4 retires that one-Admin invariant (supersede ADR 0034) for
 sys admin + per-tenant admins. The dashboard (19–22) cannot be scope-gated until this lands. Scope:
 
 - `whitelist.tenantSlug?` (added in 07) encodes scope: absent + `isAdmin` = sys admin; present +
@@ -19,14 +19,14 @@ sys admin + per-tenant admins. The dashboard (19–22) cannot be scope-gated unt
   it blocks removing the last **sys admin** while tenant-admin rows are freely added/removed.
 - Sign-up admission: a user signing up under `<slug>.my-course.app` must have a matching `whitelist`
   row with that `tenantSlug` (default to: an entry admits exactly the host it was added under).
-- Promote the ADR draft; mark ADR 0011 superseded.
+- Promote the ADR draft; mark ADR 0034 superseded.
 
 ## Done when
 
 `isCallerAdmin(ctx)` still returns true only for sys admins (existing Routine/content gates
 unaffected); `isCallerAdmin(ctx, "ywampotch")` is true for a sys admin and any ywampotch tenant
 admin, false for a upf tenant admin or plain member; the last-sys-admin removal guard holds while
-tenant-admin rows are freely managed; the ADR is promoted and ADR 0011 marked superseded.
+tenant-admin rows are freely managed; the ADR is promoted and ADR 0034 marked superseded.
 
 ## Answer
 
@@ -44,7 +44,7 @@ auth-gate core only, not the sign-up plumbing.
 - **`seedEmail`/`admitEmail`** gained an optional `tenantSlug` so tenant-admin/member rows are
   bootstrappable from CLI/tests. `addEmail` stays sys-admin-gated and default-site-only.
 - **ADRs** — the draft graduated to `docs/adr/0022-tenant-subdomain-model.md` (not 0021: that
-  number was taken by the open-sign-up ADR in the interim). ADR 0011's banner records the
+  number was taken by the open-sign-up ADR in the interim). ADR 0034's banner records the
   one-Admin-invariant supersession.
 
 **Deferred** (flagged in ADR 0022 §4, not in this issue's AC): sign-up host→`users.tenantSlug`

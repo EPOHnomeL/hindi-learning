@@ -26,14 +26,14 @@ The Routine authors a **buffer of one**: both the daily `dailyFire` cron (04:23 
 
 - An **Admin** can mark a Topic for **full overnight generation**: the Routine loops and authors Lessons until the Mission's "success looks like" outcomes are met (**Completion**), **bypassing** the Frontier buffer-of-one gate.
 - Runs in **off-peak / midnight hours** (a new or segmented cron) to avoid daytime load and usage spikes.
-- **Admin-only.** Because it removes the buffer-of-one cost throttle, it must **not** be available to ordinary owners — gate on the **Admin** capability ([ADR 0011](../../../../docs/adr/0011-allowlist-in-convex-admin-portal.md)).
+- **Admin-only.** Because it removes the buffer-of-one cost throttle, it must **not** be available to ordinary owners — gate on the **Admin** capability ([ADR 0034](../../../../docs/adr/0034-allowlist-in-convex-admin-portal.md)).
 - **Cost + rate guardrails**: a per-run Lesson cap so a single overnight run cannot spike Claude usage without bound (roadmap Costing).
 - **Idempotent** and safe to re-run; respects **Completion** (stops when the course is done) and the Routine's existing lock (no double-authoring).
 
 ## Depends on
 
 - The Routine gate/lock ([ADR 0008](../../../../docs/adr/0008-next-lesson-routine-gate-in-convex.md)).
-- The **Admin** capability ([ADR 0011](../../../../docs/adr/0011-allowlist-in-convex-admin-portal.md)).
+- The **Admin** capability ([ADR 0034](../../../../docs/adr/0034-allowlist-in-convex-admin-portal.md)).
 - Cost controls (roadmap Costing; a deleted GitHub issue 08, see the migration note below). **Now a real edge:** [12, cost instrumentation](12-cost-instrumentation.md) blocks this ticket, because the buffer-of-one gate exists as a cost throttle and removing it cannot be priced without per-run token numbers.
 
 ## Notes
@@ -82,7 +82,7 @@ schedules the finisher. Ruling the scheduled half out of scope is a legitimate o
   and only once the learner has completed the Frontier. A course is built incrementally as the
   learner advances, which bounds Claude usage.
 - **So this ticket is asking to remove a safety mechanism.** That is why it is Admin-only
-  (ADR 0011 allowlist) and why a **per-run Lesson cap** is not optional — without it a single
+  (ADR 0034 allowlist) and why a **per-run Lesson cap** is not optional — without it a single
   overnight run can spike usage without bound.
 - The on-demand admin finisher already shipped; what remains is the *scheduled, off-peak*
   half. Verify what exists before building.

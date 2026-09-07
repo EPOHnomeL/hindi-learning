@@ -9,7 +9,7 @@ adrs: [0011, 0013, 0015, 0017, 0020, 0023, 0024]
 # Access & Sharing
 
 Independent gates: **who may sign up** (the [[Allowlist]], governed by one [[Admin]] —
-[ADR 0011](/docs/adr/0011-allowlist-in-convex-admin-portal.md)), **who may read an [[Edition]] they
+[ADR 0034](/docs/adr/0034-allowlist-in-convex-admin-portal.md)), **who may read an [[Edition]] they
 don't own** ([[Share]]s — [[Viewer]] or [[Editor]] — and account-less [[Public link]]s for [[Guest]]s),
 and the [[Certificate]] a completed course earns. Sharing governs reads/edits; the allowlist governs
 sign-up.

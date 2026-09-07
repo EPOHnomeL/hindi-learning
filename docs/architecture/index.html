@@ -1238,7 +1238,9 @@
 
       // Authored ADR list. We don't have a server-side directory listing,
       // so this is the manual index. When you add an ADR, add it here too.
-      // (NB: two ADRs share number 0011 — a known numbering collision in docs/adr/.)
+      // Backfilled 2026-09-07: 0016 and 0022-0033 had been written without being
+      // registered here, so the bank showed 18 of the 31 ADRs. The 0011 collision
+      // is gone too — the Allowlist ADR was renumbered to 0034 the same day.
       const ADRS = [
         { num: "0001", slug: "asynchronous-hub-mediated-teaching-loop",            title: "Asynchronous, hub-mediated teaching loop" },
         { num: "0002", slug: "local-workspace-source-of-truth-neon-mirror-via-mcp", title: "Local workspace source of truth; Neon mirror via MCP" },
@@ -1247,17 +1249,31 @@
         { num: "0008", slug: "next-lesson-routine-gate-in-convex",                 title: "Next-lesson Routine: gate in Convex" },
         { num: "0009", slug: "content-source-of-truth-in-convex-routine-pulls-context", title: "Content source of truth in Convex; Routine pulls context" },
         { num: "0010", slug: "teaching-compute-swappable-adapter",                 title: "Teaching compute is a swappable adapter" },
-        { num: "0011", slug: "allowlist-in-convex-admin-portal",                   title: "Allowlist in Convex, managed by an Admin" },
         { num: "0011", slug: "app-driven-theme-into-sandboxed-lesson-iframe",      title: "App-driven theme into the sandboxed lesson iframe" },
         { num: "0012", slug: "app-router-url-addressable-navigation",              title: "URL-addressable navigation via the App Router" },
         { num: "0013", slug: "public-link-shares",                                 title: "Public-link Shares" },
         { num: "0014", slug: "provider-agnostic-teaching-runtime-two-lines",       title: "Provider-agnostic teaching runtime (two lines)" },
         { num: "0015", slug: "course-completion-and-certificates",                 title: "Course completion & certificates" },
+        { num: "0016", slug: "paid-course-marketplace-stripe-connect-facilitator", title: "Paid course marketplace: Stripe Connect facilitator" },
         { num: "0017", slug: "topic-emblem-on-certificates",                       title: "Topic Emblem on certificates" },
-        { num: "0018", slug: "lesson-count-estimate-advisory",                     title: "Lesson-count estimate is advisory" },
+        { num: "0018", slug: "lesson-count-estimate-advisory",                     title: "The lesson-count estimate is advisory" },
         { num: "0019", slug: "quiz-option-shuffle",                                title: "Quiz option shuffle" },
         { num: "0020", slug: "editor-rights-as-a-share-role",                      title: "Editor rights as a Share role" },
         { num: "0021", slug: "open-signup-allowlist-gates-course-creation",        title: "Open sign-up; Allowlist gates course creation; auth-first checkout" },
+        { num: "0022", slug: "tenant-subdomain-model",                             title: "Tenant & subdomain model (whitelabel v1)" },
+        { num: "0023", slug: "self-enroll-access-primitive",                       title: "Self-enroll as a first-class access primitive" },
+        { num: "0024", slug: "publish-at-the-edition-grain",                       title: "Publish at the Edition grain, not as a course status" },
+        { num: "0025", slug: "per-tenant-session-isolation",                       title: "Per-tenant session isolation" },
+        { num: "0026", slug: "manual-eft-payment-rail",                            title: "A manual EFT payment rail beside PayFast" },
+        { num: "0027", slug: "per-tenant-donation-rail",                           title: "A per-tenant donation rail on the shared Ledger" },
+        { num: "0028", slug: "landing-interest-list-first-public-mutation",        title: "The landing interest list, and the first public mutation" },
+        { num: "0029", slug: "seller-minted-voucher-rail",                         title: "Seller-minted voucher rail" },
+        { num: "0030", slug: "installable-per-tenant-app",                         title: "Installable per-tenant app (PWA)" },
+        { num: "0031", slug: "shared-capped-access-codes-and-nickname-seats",      title: "Shared capped Access Codes and nickname Seats" },
+        { num: "0032", slug: "uncapped-authors-without-admin",                     title: "Uncapped authors without Admin" },
+        { num: "0033", slug: "mux-is-the-product-wide-video-rail",                 title: "Mux is the product-wide video rail" },
+        { num: "0034", slug: "allowlist-in-convex-admin-portal",                   title: "Allowlist in Convex, managed by an Admin (was 0011)" },
+        { num: "0035", slug: "lesson-iframe-is-a-permanent-boundary",              title: "The lesson iframe is a permanent boundary; the quiz stays authored HTML" },
       ];
 
       // Map Mermaid node id (in overview.md) → context slug

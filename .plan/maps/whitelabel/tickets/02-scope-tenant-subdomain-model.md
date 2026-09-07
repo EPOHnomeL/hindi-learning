@@ -24,7 +24,7 @@ shared dataset, tenant = a visibility filter via a subdomain field, not hard par
   subdomain — 404, redirect, render anyway? What does a Share/Public link mean across a subdomain
   boundary? What does "user connected to a subdomain" gate?
 - **Auth & admission:** Allowlist and Admin become per-tenant — how does that interact with the
-  single Convex Auth install and the exactly-one-Admin invariant (ADR 0011)?
+  single Convex Auth install and the exactly-one-Admin invariant (ADR 0034)?
 - **Cross-cutting singletons:** Resend sender domain, invite-email copy, certificate branding,
   PayFast/Paystack merchant accounts (flag, don't solve), the Routine's owner-email env.
 - Local dev story for subdomains (`*.localhost`)?
@@ -56,7 +56,7 @@ Resolved 2026-07-15 (opus grilling). Deliverable: **ADR 0021 draft — Tenant & 
    canonical host (rails deferred).
 4. **Two-tier admin model** (⚠️ scope change): **sys admin** (global, `jvorster63@gmail.com`) +
    **tenant admin** (scoped, e.g. `ywampotchtpm@gmail.com`). Encoded on `whitelist` via `isAdmin`
-   + new `tenantSlug`. Multiple tenant admins per tenant allowed → **retires ADR 0011's one-Admin
+   + new `tenantSlug`. Multiple tenant admins per tenant allowed → **retires ADR 0034's one-Admin
    invariant**. `isCallerAdmin` becomes scope-aware. Allowlist becomes per-tenant; one account →
    one tenant.
 5. **Singletons:** invite/notification email → **tenant-aware at v1** (brand name + canonical-host

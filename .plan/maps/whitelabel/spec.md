@@ -51,7 +51,7 @@ stays exactly what it is today (ownership, Shares, public links).
 
 One new table, three new optional fields on existing tables. Full detail:
 [ADR 0021 draft](adr-0021-draft-tenant-subdomain-model.md) (graduates to `docs/adr/0021-*.md` at
-build start — supersedes ADR 0011's one-Admin invariant).
+build start — supersedes ADR 0034's one-Admin invariant).
 
 ```ts
 // convex/schema.ts — new
@@ -127,7 +127,7 @@ Routine on-demand fire are hardwired-on (not flags).
 Roles live on the `whitelist` row: **sys admin** (`isAdmin: true`, no `tenantSlug`) reaches every
 tenant and is the only role that creates/removes tenants; **tenant admin** (`isAdmin: true`,
 `tenantSlug` set) reaches only their own tenant — members, theme, flags, assignment. Multiple
-tenant admins per tenant allowed (retires ADR 0011's exactly-one-Admin invariant — supersede it).
+tenant admins per tenant allowed (retires ADR 0034's exactly-one-Admin invariant — supersede it).
 `isCallerAdmin` becomes scope-aware: `isCallerAdmin(ctx, tenantSlug?)`.
 
 ### 6. Operator + tenant-admin dashboard (ticket 06)

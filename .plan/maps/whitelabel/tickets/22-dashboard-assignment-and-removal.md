@@ -15,7 +15,7 @@ three pieces before the dashboard covers every v1 surface. Ground truth: 06 deci
 - **Assigned members:** same shape, keyed by email against `whitelist.tenantSlug`.
 - **Remove tenant:** a destructive action, **blocked outright** (disabled + explanation, not just a
   confirm) whenever the tenant still has any `topics`/`whitelist`/`users` row referencing its
-  `tenantSlug` — mirrors ADR 0011's refuse-to-remove-the-one-Admin; no cascade-delete introduced.
+  `tenantSlug` — mirrors ADR 0034's refuse-to-remove-the-one-Admin; no cascade-delete introduced.
   Only an empty tenant can be removed, behind a plain confirm.
 - All mutations scope-checked by `isCallerAdmin(ctx, tenantSlug)`.
 
@@ -45,7 +45,7 @@ assignment is a one-field patch, removal is a refuse-to-remove guard, no cascade
   email already be on the Allowlist, refuses to scope a sys admin, refuses to steal another tenant's
   member. `unassignMember` refuses a **tenant admin** (clearing its slug would promote it to sys
   admin — that goes through the Allowlist).
-- **`tenantReferenceCounts` + `removeTenant`** — the guard mirrors ADR 0011: `removeTenant` is
+- **`tenantReferenceCounts` + `removeTenant`** — the guard mirrors ADR 0034: `removeTenant` is
   **blocked outright** while `courses + members + users > 0` (all counted via indexed reads —
   `topics.by_tenant`, `whitelist.by_tenant`, a new `users.by_tenant`), only deletes an empty tenant.
   The UI reads the same counts to disable + explain; the mutation re-derives them.

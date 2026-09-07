@@ -1,3 +1,11 @@
+<!-- Renumbered 0011 -> 0034 on 2026-09-07. Two ADRs were both numbered 0011: this
+     one and 0011-app-driven-theme-into-sandboxed-lesson-iframe.md, which keeps the
+     number. Nothing about the decision below changed; only its file name and the
+     citations pointing at it. Every "ADR 0011" still in the tree now means the
+     iframe theme ADR. 0012 was not available (it is the App Router ADR), so this
+     took the next free number after 0033. Inbound links across docs/, .plan/ and
+     .scratch/ were repointed in the same commit. -->
+
 # The Allowlist lives in Convex and is managed by an in-app Admin, gating sign-up only
 
 > **Superseded in part by

@@ -1,7 +1,7 @@
 # scheduled-authoring/01: Off-peak scheduling for course generation (on-demand admin finisher shipped)
 
 **Status:** needs-triage (to-scope — captured 2026-07-08; not built)
-**Depends on:** the Routine gate/lock ([ADR 0008](../../../docs/adr/0008-next-lesson-routine-gate-in-convex.md)); the **Admin** capability ([ADR 0011](../../../docs/adr/0011-allowlist-in-convex-admin-portal.md)); cost controls (roadmap Costing; multi-topic [issue 08](../../multi-topic/issues/08-whitelist-and-button-gating.md))
+**Depends on:** the Routine gate/lock ([ADR 0008](../../../docs/adr/0008-next-lesson-routine-gate-in-convex.md)); the **Admin** capability ([ADR 0034](../../../docs/adr/0034-allowlist-in-convex-admin-portal.md)); cost controls (roadmap Costing; multi-topic [issue 08](../../multi-topic/issues/08-whitelist-and-button-gating.md))
 **Labels:** needs-triage
 **Imported:** from GitHub #32 on 2026-07-15 (created 2026-07-10; GitHub issue deleted after import)
 
@@ -23,7 +23,7 @@ To refine at triage.
 
 - An **Admin** can mark a Topic for **full overnight generation**: the Routine loops and authors Lessons until the Mission's "success looks like" outcomes are met (**Completion**), **bypassing** the Frontier buffer-of-one gate.
 - Runs in **off-peak / midnight hours** (a new or segmented cron) to avoid daytime load and usage spikes.
-- **Admin-only.** Because it removes the buffer-of-one cost throttle, it must **not** be available to ordinary owners — gate on the **Admin** capability ([ADR 0011](../../../docs/adr/0011-allowlist-in-convex-admin-portal.md)).
+- **Admin-only.** Because it removes the buffer-of-one cost throttle, it must **not** be available to ordinary owners — gate on the **Admin** capability ([ADR 0034](../../../docs/adr/0034-allowlist-in-convex-admin-portal.md)).
 - **Cost + rate guardrails**: a per-run Lesson cap so a single overnight run cannot spike Claude usage without bound (roadmap Costing).
 - **Idempotent** and safe to re-run; respects **Completion** (stops when the course is done) and the Routine's existing lock (no double-authoring).
 

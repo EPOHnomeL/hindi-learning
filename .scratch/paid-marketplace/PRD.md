@@ -6,7 +6,7 @@ Status: done (payment rail superseded — see ../payfast-payments/PRD.md)
 > **Preview**, **Edition**, plus Topic, Guest, Viewer, Public link, Allowlist, Admin,
 > Certificate. Direction: [ADR 0016](../../docs/adr/0016-paid-course-marketplace-stripe-connect-facilitator.md).
 > Also respects [ADR 0001](../../docs/adr/0001-asynchronous-hub-mediated-teaching-loop.md)
-> (no LLM in the web app), [ADR 0011](../../docs/adr/0011-allowlist-in-convex-admin-portal.md)
+> (no LLM in the web app), [ADR 0034](../../docs/adr/0034-allowlist-in-convex-admin-portal.md)
 > (Allowlist / Admin portal), [ADR 0013](../../docs/adr/0013-public-link-shares.md)
 > (Public link), and [ADR 0015](../../docs/adr/0015-course-completion-and-certificates.md)
 > (account-bound Certificates). Deferred economics: [issue 01](issues/01-authoring-cost-and-model-provider-strategy.md).

@@ -10,7 +10,7 @@
 ## Why
 
 Parent: [`../PRD.md`](../PRD.md). Decision:
-[ADR 0011](../../../docs/adr/0011-allowlist-in-convex-admin-portal.md).
+[ADR 0034](../../../docs/adr/0034-allowlist-in-convex-admin-portal.md).
 Vocabulary: **Allowlist**, **Admin** in [`CONTEXT.md`](../../../CONTEXT.md).
 
 Status: done (commits 78780d1 backend, 455d2e3 auth gate). Ops follow-up

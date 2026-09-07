@@ -30,7 +30,7 @@ That collides with three shipped concepts:
 - **Guest / Public link** ([ADR 0013](0013-public-link-shares.md)) grant
   *anonymous, full, free* read of a whole Topic. A paygate makes access
   **entitlement-gated**, not "hold the token → read everything".
-- **The Allowlist** ([ADR 0011](0011-allowlist-in-convex-admin-portal.md)) gates
+- **The Allowlist** ([ADR 0034](0034-allowlist-in-convex-admin-portal.md)) gates
   account creation to a private-alpha list — incompatible with selling to the
   public, who must be able to buy without the Admin hand-admitting each one.
 - **Progress / Certificates** require accounts; a **Guest**'s state is

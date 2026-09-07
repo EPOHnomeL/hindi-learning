@@ -270,15 +270,56 @@ this section is the current state.
     `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`, `OWNER_EMAIL`,
     `PUBLISH_SECRET`. No prod deploy key among them.
 
-    **So an agent cannot read prod from this checkout.** `CONVEX_PROD_URL` is
-    present, but reading data or env needs a deploy or admin key that is not here.
-    Two honest routes: ask the operator to read it off the Convex dashboard, or ask
-    them to put a prod key in the environment for the session. Do not run a
-    `--prod` flag or an empty-string override and report the result as prod.
+    **There is no key-based route, but there IS a data route (2026-09-07).**
+    `CONVEX_PROD_URL` is present, and reading prod *env vars* or running
+    `npx convex` against prod still needs a deploy or admin key that is not here —
+    so for env vars the honest routes remain: ask the operator to read it off the
+    Convex dashboard, or ask them to put a prod key in the environment for the
+    session. Never run a `--prod` flag or an empty-string override and report the
+    result as prod.
 
-    Whoever restores a working recipe should replace this correction with it, and
-    date it. Prefer fetching the one var you need over dumping the whole env: the
-    PayFast merchant key and passphrase live there too.
+    **To read prod DATA, call a `PUBLISH_SECRET`-guarded public function over HTTP.**
+    The `PUBLISH_SECRET` in `.env.local` is the prod one (verified 2026-09-07 — the
+    call below succeeded against prod), and a public Convex function needs only the
+    deployment URL. Run it from the repo root so `convex/browser` resolves:
+
+    ```js
+    // probe.mjs — `set -a; . ./.env.local; set +a; node ./probe.mjs`
+    import { ConvexHttpClient } from "convex/browser";
+    const c = new ConvexHttpClient(process.env.CONVEX_PROD_URL);
+    let cursor = null, total = 0;
+    for (;;) {
+      const r = await c.action("backfill:verifyHtmlBlobs", {
+        secret: process.env.PUBLISH_SECRET, table: "lessons", cursor,
+      });
+      total += r.bodies;
+      if (r.isDone) break;
+      cursor = r.cursor;
+    }
+    console.log(total);
+    ```
+
+    Caveats, all learned on 2026-09-07 doing this for `technical-foundation/02`:
+
+    - **`verifyHtmlBlobs` is read-only**, walks 50 rows a page, and accepts
+      `lessons`, `references` or `translations`. It counts rows **with a body**, not
+      all rows — there is no row-count function, and `pageToBackfill` is an
+      `internalQuery` so it cannot be called this way.
+    - **It downloads the blob for any row that has BOTH inline `html` and a
+      `htmlStorageId`.** On `lessons` and `references` today that is zero rows, so
+      the walk is cheap; on a table where it is not, this bills real Database I/O.
+    - **Print the host you hit** (`new URL(url).host`) in the same output as the
+      numbers. That is the only thing standing between a dev answer and a reported
+      prod one, and it is the mistake this whole section exists to prevent.
+    - **Delete the probe file.** `/tmp` is not resolvable from node here (Git Bash
+      maps it, node does not), so it has to be written into the repo root.
+
+    The counts that came back, for whoever wants them without re-running it:
+    **441** `lessons` with a body, **84** `references`, **1476** `translations`
+    (of which 1194 are inline-html-with-no-blob).
+
+    Prefer fetching the one var you need over dumping the whole env: the PayFast
+    merchant key and passphrase live there too.
 
 ## Bulk access: there are TWO rails, not one (2026-08-23; renamed 2026-08-25)
 
