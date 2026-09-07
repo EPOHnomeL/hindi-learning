@@ -1,0 +1,168 @@
+<!doctype html>
+<!--
+  Course poster: the generic template, extracted from .scratch/poster/poster.html
+  (the hand-made "Growing your relationship with the Holy Spirit" sheet for
+  ywampotch, 2026-09-03 to 2026-09-07). 1080x1350 (4:5) sheet, rendered at 2x for
+  print and social.
+
+  Every {{slot}} is filled from platform data; the table in poster-template.md
+  beside this file says where each one comes from and which are optional. The
+  CSS custom properties in :root are the poster's own palette; the "tenant
+  mapping" block underneath shows how the tenant's 14-token theme fills them, so
+  the same sheet re-skins itself for upf, yknot, or any tenant.
+
+  Scripts: Newsreader and Inter carry Latin. An Edition in Devanagari or an
+  Arabic-script language swaps the headline and tagline faces for Noto Serif
+  Devanagari or Noto Naskh Arabic (the app's own escape-hatch fonts) and the sheet
+  flips to dir="rtl" where the Edition is RTL.
+-->
+<html lang="{{lang}}" dir="{{dir}}" data-script="{{script}}">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Inter:wght@400;500;600;700&family=Noto+Serif+Devanagari:wght@400;600&family=Noto+Naskh+Arabic:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  /* ---- Poster palette (the hand-made sheet's literal values) ---------------- */
+  :root {
+    --cream: #FAF6EC;
+    --cream-2: #F3ECDB;
+    --navy: #1E2A5E;
+    --navy-2: #2B3A78;
+    --gold: #C79A3C;
+    --gold-soft: #E4CB8E;
+    --slate: #5C6478;
+    --card: #ffffff;
+    --serif: "Newsreader", Georgia, serif;
+    --sans: "Inter", system-ui, sans-serif;
+  }
+  /* ---- Tenant mapping: the same sheet on any tenant's 14-token theme --------
+     cream   <- paper        navy   <- accent      gold      <- gold
+     cream-2 <- hi           navy-2 <- accent2     gold-soft <- gold at 55% over card
+     slate   <- soft         card   <- card
+     The ywampotch seed (paper #f9f4ea, accent #1b2a80, accent2 #3a52a8, gold
+     #d8a93f, soft #6a7290, card #fffdf8) lands within a few points of the values
+     above, which is why the hand-made poster reads as the tenant's brand. */
+  html[data-script="deva"] { --serif: "Noto Serif Devanagari", serif; }
+  html[data-script="arab"] { --serif: "Noto Naskh Arabic", serif; }
+  html[data-script="deva"] h1, html[data-script="arab"] h1 { line-height: 1.25; letter-spacing: 0; }
+  html[data-script="arab"] .sub, html[data-script="deva"] .sub { font-style: normal; line-height: 1.6; }
+  html[data-script="deva"] .eyebrow, html[data-script="arab"] .eyebrow,
+  html[data-script="deva"] .cta-kicker, html[data-script="arab"] .cta-kicker,
+  html[data-script="deva"] .langs, html[data-script="arab"] .langs { letter-spacing: .06em; text-transform: none; }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1350px; overflow: hidden; }
+  body {
+    font-family: var(--sans);
+    color: var(--navy);
+    background:
+      radial-gradient(ellipse 900px 620px at 50% -10%, color-mix(in srgb, var(--gold-soft) 55%, transparent), transparent 70%),
+      radial-gradient(ellipse 700px 500px at 50% 112%, color-mix(in srgb, var(--gold-soft) 40%, transparent), transparent 70%),
+      var(--cream);
+    position: relative;
+  }
+  .frame { position: absolute; inset: 28px; border: 1.5px solid color-mix(in srgb, var(--gold) 55%, transparent); border-radius: 6px; pointer-events: none; }
+  .frame::after { content: ""; position: absolute; inset: 8px; border: 1px solid color-mix(in srgb, var(--gold) 28%, transparent); border-radius: 3px; }
+  .page { position: relative; height: 100%; padding: 70px 90px 74px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+
+  /* Slot: tenant logo. Any aspect: a square mark fills the height, a wide
+     banner (YWAM about 7:1) is clamped by width and sits shorter. */
+  .logo { max-height: 150px; max-width: 420px; width: auto; height: auto; display: block; object-fit: contain; }
+  .logo-fallback { font-family: var(--serif); font-weight: 600; font-size: 40px; letter-spacing: -.01em; }
+
+  .eyebrow { margin-top: 22px; font-size: 15px; font-weight: 600; letter-spacing: .32em; text-transform: uppercase; color: var(--gold); }
+
+  h1 { margin-top: 22px; font-family: var(--serif); font-weight: 500; font-size: 78px; line-height: 1.02; letter-spacing: -.012em; color: var(--navy); text-wrap: balance; }
+  h1 em { font-style: italic; font-weight: 400; color: var(--navy-2); }
+  /* Long titles shrink rather than push the card off the sheet. */
+  h1[data-len="long"] { font-size: 62px; }
+  h1[data-len="xlong"] { font-size: 50px; }
+
+  .sub { margin-top: 26px; font-family: var(--serif); font-style: italic; font-size: 29px; line-height: 1.3; color: var(--slate); max-width: 860px; }
+
+  .rule { margin: 34px auto 30px; width: 120px; height: 2px; background: linear-gradient(90deg, transparent, var(--gold), transparent); position: relative; }
+  .rule::after { content: ""; position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; transform: translate(-50%,-50%) rotate(45deg); background: var(--gold); }
+
+  .points { list-style: none; display: grid; grid-template-columns: 1fr; gap: 16px; font-size: 26px; font-weight: 500; line-height: 1.25; color: var(--navy); }
+  .points li { display: flex; align-items: center; justify-content: center; gap: 16px; }
+  .points li::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--gold); flex: none; }
+
+  .card {
+    margin-top: 40px; width: 900px; background: var(--card);
+    border: 1.5px solid var(--gold-soft); border-radius: 22px;
+    box-shadow: 0 24px 60px -30px color-mix(in srgb, var(--navy) 35%, transparent), 0 2px 0 color-mix(in srgb, var(--gold) 25%, transparent);
+    padding: 28px 40px 28px 28px;
+    display: grid; grid-template-columns: 300px 1fr; gap: 36px; align-items: center; text-align: start;
+  }
+  .qr-wrap { width: 300px; height: 300px; border-radius: 14px; overflow: hidden; border: 1px solid var(--cream-2); background: #fff; }
+  .qr-wrap img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+  .cta-kicker { font-size: 14px; font-weight: 700; letter-spacing: .28em; text-transform: uppercase; color: var(--gold); }
+  .cta-title { margin-top: 10px; font-family: var(--serif); font-weight: 500; font-size: 40px; line-height: 1.08; color: var(--navy); }
+  .cta-or { margin-top: 14px; font-size: 19px; color: var(--slate); line-height: 1.35; }
+  .url { margin-top: 12px; display: inline-block; background: var(--navy); color: #fff; font-weight: 600; font-size: 22px; letter-spacing: .02em; padding: 14px 22px; border-radius: 12px; direction: ltr; unicode-bidi: isolate; }
+  .price { margin-top: 14px; font-size: 18px; color: var(--slate); }
+  .price strong { color: var(--navy); font-weight: 700; }
+
+  .footer { margin-top: auto; padding-top: 30px; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+  .footer .langs { font-size: 14px; font-weight: 600; letter-spacing: .26em; text-transform: uppercase; color: var(--slate); text-align: start; line-height: 1.7; }
+  .footer .langs strong { color: var(--navy); }
+  /* Slot: the tenant's name, as a wordmark. The hand-made sheet put the YWAM
+     banner here because the tenant has two logo files; the platform has one
+     logo asset per tenant, so the footer carries the display name and motto. */
+  .footer .brand { text-align: end; }
+  .footer .brand b { display: block; font-family: var(--serif); font-size: 26px; font-weight: 600; color: var(--navy); letter-spacing: -.01em; }
+  .footer .brand span { display: block; font-size: 13px; color: var(--slate); margin-top: 2px; }
+</style>
+</head>
+<body>
+  <div class="frame"></div>
+  <main class="page">
+    <!-- slot: tenant logo (tenants.theme.logo resolved to logoUrl); fallback: displayName wordmark -->
+    <img class="logo" src="{{logoUrl}}" alt="{{tenantName}}">
+
+    <!-- slot: eyebrow. Chrome copy from messages/<locale>.json; the "first lesson free" half appears only when paywall.previewKey is set -->
+    <div class="eyebrow">{{eyebrow}}</div>
+
+    <!-- slot: Edition title (publicCourse.title, already in the Edition's language).
+         The italic <em> is an optional emphasis span the owner marks in the poster
+         panel; with none marked the whole title is roman. -->
+    <h1 data-len="{{titleLen}}">{{titleHtml}}</h1>
+
+    <!-- slot: tagline. publicCourse.mission (Edition language, English fallback); owner may overwrite in the panel; hidden when null -->
+    <p class="sub">{{tagline}}</p>
+
+    <div class="rule"></div>
+
+    <!-- slot: points, up to 3 lines. In order: the owner's highlights (0 to 2,
+         typed in the poster panel), then derived facts to fill to 3:
+           "{n} lessons" (publicCourse.lessons.length),
+           "Certificate on completion" (tenant flags.certificates),
+           "Read it on your phone, offline" (PWA, always true) -->
+    <ul class="points">
+      {{#points}}<li>{{.}}</li>{{/points}}
+    </ul>
+
+    <section class="card">
+      <!-- slot: QR encodes the Edition's public link URL (publicCourseUrl(token, tenantSlug)), 300 CSS px, margin 2 -->
+      <div class="qr-wrap"><img src="{{qrDataUrl}}" alt="{{qrAlt}}"></div>
+      <div>
+        <!-- chrome copy -->
+        <div class="cta-kicker">{{ctaKicker}}</div>
+        <div class="cta-title">{{ctaTitle}}</div>
+        <p class="cta-or">{{ctaOr}}</p>
+        <!-- slot: canonical host of the course's tenant (or the apex) -->
+        <div class="url">{{host}}</div>
+        <!-- slot: price, from publicCourse.paywall (amount, currency, previewKey). Whole block hidden on a free Edition. -->
+        <p class="price"><strong>{{priceLabel}}</strong> {{priceSuffix}}</p>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <!-- slot: language count, the Edition's live sibling languages (ready, and public or published), with the first two native names -->
+      <div class="langs">{{langsLine1}}<br>{{langsLine2}}</div>
+      <!-- slot: tenants.displayName and tenants.motto -->
+      <div class="brand"><b>{{tenantName}}</b><span>{{tenantMotto}}</span></div>
+    </footer>
+  </main>
+</body>
+</html>
