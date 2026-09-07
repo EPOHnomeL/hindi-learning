@@ -3,18 +3,28 @@
 // A ChunkLoadError means the browser asked for a JavaScript chunk this document
 // expects and did not get it. Two ways that happens here, and both are ordinary:
 //
-//   1. A deploy landed while the tab was open. Chunk names are content-hashed,
+//   1. The network stalled or dropped on a cache miss. public/sw.js resolves that
+//      case with `Response.error()` on purpose (a rejected respondWith would be
+//      worse), so the chunk is simply unavailable until the network returns.
+//      This is the one we have actually observed in production: all three events
+//      on 2026-09-04 were webpack's `timeout:` or `(error: ...)` variants, never
+//      a 404, and they sit in one two-minute window a day after the nearest
+//      deploy. Note the worker's fetch guard was already live when they fired
+//      (c2049dd, 2026-09-04), which is why guarding the worker is not on its own
+//      enough and this file exists.
+//   2. A deploy landed while the tab was open. Chunk names are content-hashed,
 //      so the old document references files the new deploy no longer serves, and
-//      the next lazy import 404s.
-//   2. The network dropped on a cache miss. public/sw.js resolves that case with
-//      `Response.error()` on purpose (a rejected respondWith would be worse), so
-//      the chunk is simply unavailable until the network returns.
+//      the next lazy import 404s. Plausible and worth handling, but not what the
+//      reported failures were.
 //
 // Neither is a bug in the page, and both are cured by loading the document
 // again: navigations are network-first in the worker, so a reload fetches fresh
 // HTML naming chunks that exist. Before 2026-09-07 nothing did that, and the
 // error fell through to global-error.tsx, whose `reset()` re-renders the same
-// tree and re-requests the same missing chunk, so the page was dead.
+// tree and re-requests the same missing chunk, so the page was dead. That last
+// step is observed, not inferred: on 2026-09-04 at 03:36:37Z a user clicked this
+// boundary's "Try again" button and the identical ChunkLoadError was captured
+// 35ms later, then they left the site. See PR #123 for the full evidence.
 
 // Chunk failures reach us under several names depending on who threw: webpack's
 // loader sets `name`, while a native dynamic import rejects with a plain
