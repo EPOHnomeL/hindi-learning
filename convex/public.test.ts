@@ -237,3 +237,62 @@ test("publicCourse: Teacher Q&A off withholds the owner's questions from the pay
   await asUser(t, owner).mutation(api.capture.setTeacherQa, { topicSlug: "hindi", enabled: true });
   expect((await t.query(api.public.publicCourse, { token: token! }))?.questions).toMatchObject([{ text: "why?", reply: "because" }]);
 });
+
+// ---- The course poster (course-poster spec) --------------------------------
+//
+// The poster's footer prints "available in N languages" from the Edition's live
+// siblings. "Live" is the publish grain (ADR 0024): a ready Edition that is
+// reachable by a Public link or listed in the catalogue. Nothing here leaks past
+// what the signed-in catalogue already shows.
+
+test("publicCourse.languages lists the live Editions: ready, and public or published", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi");
+  await t.run(async (ctx) => {
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" });
+    // Three ready Editions besides English: Spanish and Urdu carry Public links,
+    // Afrikaans is only listed in the catalogue.
+    for (const lang of ["es", "ur", "af"]) {
+      await ctx.db.insert("translationJobs", { topicId, lang, status: "ready", total: 1, done: 1, failed: 0 });
+    }
+    await ctx.db.insert("publicLinks", { topicId, lang: "es", token: "tok-es" });
+    await ctx.db.insert("publicLinks", { topicId, lang: "ur", token: "tok-ur" });
+    await ctx.db.insert("publishedEditions", { topicId, lang: "af", published: true });
+    // A translating Edition is not an Edition yet, and a ready one nobody can
+    // reach is not live.
+    await ctx.db.insert("translationJobs", { topicId, lang: "fr", status: "translating", total: 3, done: 1, failed: 0 });
+    await ctx.db.insert("publicLinks", { topicId, lang: "fr", token: "tok-fr" });
+    await ctx.db.insert("translationJobs", { topicId, lang: "de", status: "ready", total: 1, done: 1, failed: 0 });
+  });
+  // The English source is live through the legacy per-Topic token.
+  const english = await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true });
+
+  const pub = await t.query(api.public.publicCourse, { token: english! });
+  expect(pub!.languages).toEqual([
+    { lang: "af", native: "Afrikaans" },
+    { lang: "en", native: "English" },
+    { lang: "es", native: "Español" },
+    { lang: "ur", native: "اردو" },
+  ]);
+  // The same list from a sibling's token: it describes the course, not the link.
+  expect((await t.query(api.public.publicCourse, { token: "tok-ur" }))!.languages).toHaveLength(4);
+});
+
+test("publicCourse.languages: an unreachable English source is not live, and a revoked token is still null", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi");
+  await t.run(async (ctx) => {
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" });
+    await ctx.db.insert("translationJobs", { topicId, lang: "es", status: "ready", total: 1, done: 1, failed: 0 });
+    await ctx.db.insert("publicLinks", { topicId, lang: "es", token: "tok-es" });
+  });
+  // No English link and no English listing: only Spanish is live.
+  expect((await t.query(api.public.publicCourse, { token: "tok-es" }))!.languages).toEqual([{ lang: "es", native: "Español" }]);
+
+  const english = await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: true });
+  expect((await t.query(api.public.publicCourse, { token: english! }))!.languages).toHaveLength(2);
+  await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: false });
+  expect(await t.query(api.public.publicCourse, { token: english! })).toBeNull();
+});

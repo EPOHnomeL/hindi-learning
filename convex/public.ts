@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { buildPaywall, editionAccessLevel, lessonsToc, paywallValidator, loadEdition, readLesson, readReference, referencesToc, type EditionAccess } from "./edition";
+import { buildPaywall, editionAccessLevel, lessonsToc, paywallValidator, loadEdition, publishedLangs, readLesson, readReference, referencesToc, type EditionAccess } from "./edition";
 import { SOURCE_LANG } from "./sourceLang";
 import { teacherQaOn } from "./capture";
 import { langInfo } from "./languages";
@@ -66,6 +66,27 @@ export const publicEditionLang = query({
   returns: v.union(v.null(), v.string()),
   handler: async (ctx, { token }) => (await guestEditionFromToken(ctx, token))?.lang ?? null,
 });
+
+// The course's LIVE Editions (course-poster): the languages a stranger can actually
+// read today, i.e. a ready Edition that is reachable by a Public link or listed in
+// the tenant catalogue (the publish grain, ADR 0024). The poster's footer counts
+// and names these, so it says "available in N languages" only for languages that
+// are true on the day it prints. Nothing here is new information: the signed-in
+// catalogue and the Editions panel already show every one of these facts. Sorted
+// by code; the poster model orders them for display.
+async function liveLanguages(ctx: QueryCtx, topic: Doc<"topics">): Promise<{ lang: string; native: string }[]> {
+  const jobs = await ctx.db.query("translationJobs").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect();
+  const ready = new Set([SOURCE_LANG, ...jobs.filter((j) => j.status === "ready").map((j) => j.lang)]);
+  const links = await ctx.db.query("publicLinks").withIndex("by_topic", (q) => q.eq("topicId", topic._id)).collect();
+  const reachable = new Set(links.map((l) => l.lang));
+  // Legacy: the pre-translation per-Topic token is the English link.
+  if (topic.publicToken) reachable.add(SOURCE_LANG);
+  for (const lang of await publishedLangs(ctx, topic._id)) reachable.add(lang);
+  return [...ready]
+    .filter((lang) => reachable.has(lang))
+    .sort((a, b) => a.localeCompare(b))
+    .map((lang) => ({ lang, native: langInfo(lang).native }));
+}
 
 // Everything a Guest needs to render the course shell + read-only panels, in one
 // reactive bundle: the sidebar lists, Resources, and the owner's Progress and
@@ -134,6 +155,9 @@ export const publicCourse = query({
       // Lesson is the free Preview, so a Guest sees the paygate. On a free
       // Edition it is absent and the Guest reads everything, exactly as today.
       paywall: v.optional(paywallValidator),
+      // The course's live Editions (course-poster): the poster's language line.
+      // See liveLanguages for what "live" means and why it leaks nothing.
+      languages: v.array(v.object({ lang: v.string(), native: v.string() })),
     }),
   ),
   handler: async (ctx, { token }) => {
@@ -221,6 +245,7 @@ export const publicCourse = query({
       questions: preview ? [] : questions,
       teacherQa: qaOn,
       paywall,
+      languages: await liveLanguages(ctx, topic),
     };
   },
 });
