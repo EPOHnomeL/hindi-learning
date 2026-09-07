@@ -526,7 +526,9 @@
     "modeEachTitle": "Un code par personne",
     "modeEachBilling": "Des codes à usage unique, un par membre. Facturé d’avance pour tout le lot.",
     "modeEachIdentity": "Un échange n’enregistre que le fait qu’il a eu lieu : ni nom, ni liste.",
-    "usersIntro": "Toutes les personnes avec qui ce cours est partagé, et ce qu’elles peuvent faire. Groupé par langue pour l’instant."
+    "usersIntro": "Toutes les personnes avec qui ce cours est partagé, et ce qu’elles peuvent faire. Groupé par langue pour l’instant.",
+    "poster": "Affiche",
+    "posterOpen": "Ouvrir une affiche imprimable pour cette édition"
   },
   "ManageDashboard": {
     "loadError": "Ce cours n'a pas pu être chargé.",
@@ -807,5 +809,37 @@
     "needsConnection": "Les leçons nécessitent une connexion. Reconnectez-vous et réessayez.",
     "nothingSaved": "Vous êtes hors ligne et rien n'est encore enregistré sur cet appareil.",
     "retry": "Réessayer"
+  },
+  "Poster": {
+    "eyebrowPaid": "Cours en ligne · Première leçon gratuite",
+    "eyebrowFree": "Cours en ligne · Gratuit",
+    "lessons": "{n, plural, one {# leçon} other {# leçons}}",
+    "certificate": "Certificat à la fin",
+    "offline": "Lisez-le sur votre téléphone, hors ligne",
+    "ctaKicker": "Lancez-vous",
+    "ctaTitle": "Scannez le code pour ouvrir le cours",
+    "ctaOr": "ou créez un compte sur",
+    "priceSuffix": "pour le cours complet · première leçon gratuite",
+    "langsLine1": "Disponible en <strong>{count, plural, one {# langue} other {# langues}}</strong>",
+    "langsNames": "{names}",
+    "langsMore": "{names} et {more} autres",
+    "qrAlt": "Code QR vers le cours",
+    "loading": "Chargement…",
+    "notFound": "Affiche introuvable",
+    "notFoundBody": "Ce lien est désactivé ou a été régénéré. Demandez-en un nouveau au propriétaire du cours.",
+    "panelTitle": "Affiche",
+    "panelBody": "Les modifications ici ne concernent que ce rendu. Rien n’est enregistré.",
+    "highlight1": "Ligne forte 1",
+    "highlight2": "Ligne forte 2",
+    "highlightPlaceholder": "De quoi parle le cours, avec vos mots",
+    "taglineLabel": "Accroche",
+    "taglinePlaceholder": "Laissez vide pour imprimer la mission du cours",
+    "emphasise": "Mettre les mots sélectionnés en italique",
+    "emphasiseHint": "Sélectionnez des mots dans le titre de l’affiche, puis appuyez ici.",
+    "clearEmphasis": "Retirer l’italique",
+    "downloadPng": "Télécharger le PNG",
+    "downloading": "Création du PNG…",
+    "print": "Imprimer",
+    "pngError": "Impossible de créer le PNG. Réessayez."
   }
 }

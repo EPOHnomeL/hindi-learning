@@ -526,7 +526,9 @@
     "modeEachTitle": "Een kode elk",
     "modeEachBilling": "Eenmalige kodes, een per lid. Vooraf gefaktureer vir die hele groep.",
     "modeEachIdentity": "’n Inlossing teken net aan dat dit gebeur het: geen name, geen lys nie.",
-    "usersIntro": "Almal met wie hierdie kursus gedeel is, en wat hulle kan doen. Vir eers per taal gegroepeer."
+    "usersIntro": "Almal met wie hierdie kursus gedeel is, en wat hulle kan doen. Vir eers per taal gegroepeer.",
+    "poster": "Plakkaat",
+    "posterOpen": "Open ’n drukbare plakkaat vir hierdie uitgawe"
   },
   "ManageDashboard": {
     "loadError": "Hierdie kursus kon nie gelaai word nie.",
@@ -807,5 +809,37 @@
     "needsConnection": "Lesse benodig 'n verbinding. Koppel weer en probeer weer.",
     "nothingSaved": "Jy is vanlyn en niks is nog op hierdie toestel gestoor nie.",
     "retry": "Probeer weer"
+  },
+  "Poster": {
+    "eyebrowPaid": "Aanlyn kursus · Eerste les gratis",
+    "eyebrowFree": "Aanlyn kursus · Gratis",
+    "lessons": "{n, plural, one {# les} other {# lesse}}",
+    "certificate": "Sertifikaat by voltooiing",
+    "offline": "Lees dit op jou foon, vanlyn",
+    "ctaKicker": "Spring dadelik in",
+    "ctaTitle": "Skandeer die kode om die kursus te open",
+    "ctaOr": "of skep ’n rekening by",
+    "priceSuffix": "vir die volle kursus · eerste les gratis",
+    "langsLine1": "Beskikbaar in <strong>{count, plural, one {# taal} other {# tale}}</strong>",
+    "langsNames": "{names}",
+    "langsMore": "{names} en {more} meer",
+    "qrAlt": "QR-kode na die kursus",
+    "loading": "Laai…",
+    "notFound": "Plakkaat nie gevind nie",
+    "notFoundBody": "Hierdie skakel is af of is hernu. Vra die kursuseienaar vir ’n nuwe een.",
+    "panelTitle": "Plakkaat",
+    "panelBody": "Wysigings hier vorm net hierdie weergawe. Niks word gestoor nie.",
+    "highlight1": "Hoogtepunt reël 1",
+    "highlight2": "Hoogtepunt reël 2",
+    "highlightPlaceholder": "Waaroor die kursus gaan, in jou woorde",
+    "taglineLabel": "Slagspreuk",
+    "taglinePlaceholder": "Laat leeg om die kursusmissie te druk",
+    "emphasise": "Kursiveer die gekose woorde",
+    "emphasiseHint": "Kies ’n reeks woorde in die plakkaat se titel en druk dan hier.",
+    "clearEmphasis": "Verwyder kursief",
+    "downloadPng": "Laai PNG af",
+    "downloading": "Maak die PNG…",
+    "print": "Druk",
+    "pngError": "Kon nie die PNG maak nie. Probeer weer."
   }
 }

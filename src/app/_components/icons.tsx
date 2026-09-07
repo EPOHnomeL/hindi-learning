@@ -32,7 +32,8 @@ export type IconName =
   | "users"
   | "chat"
   | "chart"
-  | "qr";
+  | "qr"
+  | "poster";
 
 const PATHS: Record<IconName, ReactNode> = {
   edit: (
@@ -141,6 +142,12 @@ const PATHS: Record<IconName, ReactNode> = {
       <rect x="3" y="14" width="7" height="7" rx="1" />
       <path d="M14 14h3v3h-3z" />
       <path d="M20 14v3M14 20h7" />
+    </>
+  ),
+  poster: (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M8 8h8M8 12h8M8 16h5" />
     </>
   ),
   users: (

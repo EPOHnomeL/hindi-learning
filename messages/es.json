@@ -526,7 +526,9 @@
     "modeEachTitle": "Un código por persona",
     "modeEachBilling": "Códigos de un solo uso, uno por miembro. Se factura por adelantado el lote completo.",
     "modeEachIdentity": "Un canje solo registra que ocurrió: sin nombres, sin lista.",
-    "usersIntro": "Todas las personas con las que se ha compartido este curso y lo que pueden hacer. Por ahora agrupado por idioma."
+    "usersIntro": "Todas las personas con las que se ha compartido este curso y lo que pueden hacer. Por ahora agrupado por idioma.",
+    "poster": "Póster",
+    "posterOpen": "Abrir un póster imprimible de esta edición"
   },
   "ManageDashboard": {
     "loadError": "No se pudo cargar este curso.",
@@ -807,5 +809,37 @@
     "needsConnection": "Las lecciones necesitan conexión. Reconéctate e inténtalo de nuevo.",
     "nothingSaved": "Sin conexión y aún no hay nada guardado en este dispositivo.",
     "retry": "Reintentar"
+  },
+  "Poster": {
+    "eyebrowPaid": "Curso en línea · Primera lección gratis",
+    "eyebrowFree": "Curso en línea · Gratis",
+    "lessons": "{n, plural, one {# lección} other {# lecciones}}",
+    "certificate": "Certificado al completar",
+    "offline": "Léelo en tu teléfono, sin conexión",
+    "ctaKicker": "Empieza ya",
+    "ctaTitle": "Escanea el código para abrir el curso",
+    "ctaOr": "o crea una cuenta en",
+    "priceSuffix": "por el curso completo · primera lección gratis",
+    "langsLine1": "Disponible en <strong>{count, plural, one {# idioma} other {# idiomas}}</strong>",
+    "langsNames": "{names}",
+    "langsMore": "{names} y {more} más",
+    "qrAlt": "Código QR del curso",
+    "loading": "Cargando…",
+    "notFound": "Póster no encontrado",
+    "notFoundBody": "Este enlace está desactivado o se regeneró. Pide uno nuevo al dueño del curso.",
+    "panelTitle": "Póster",
+    "panelBody": "Los cambios aquí solo afectan a esta impresión. No se guarda nada.",
+    "highlight1": "Línea destacada 1",
+    "highlight2": "Línea destacada 2",
+    "highlightPlaceholder": "De qué trata el curso, en tus palabras",
+    "taglineLabel": "Lema",
+    "taglinePlaceholder": "Déjalo vacío para imprimir la misión del curso",
+    "emphasise": "Poner en cursiva las palabras seleccionadas",
+    "emphasiseHint": "Selecciona unas palabras en el título del póster y pulsa aquí.",
+    "clearEmphasis": "Quitar cursiva",
+    "downloadPng": "Descargar PNG",
+    "downloading": "Creando el PNG…",
+    "print": "Imprimir",
+    "pngError": "No se pudo crear el PNG. Inténtalo de nuevo."
   }
 }

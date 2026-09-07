@@ -291,6 +291,22 @@ function PublicLinkToggle({
         >
           <Icon name="qr" className="h-3.5 w-3.5" /> {t("qrCode")}
         </button>
+        {/* The course poster (course-poster spec): a new tab on the anonymous
+            poster route, keyed by this Edition's token, so it exists only while
+            the link is on and its QR always opens something. A real anchor, not
+            window.open, so the new tab is never popup-blocked; inert while off. */}
+        <a
+          href={on && publicToken ? `/poster/${publicToken}` : undefined}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-disabled={!on}
+          title={t("posterOpen")}
+          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+            on ? "border-line bg-hi text-ink hover:bg-line/40" : "pointer-events-none cursor-not-allowed border-line/60 bg-soft/10 text-soft/50"
+          }`}
+        >
+          <Icon name="poster" className="h-3.5 w-3.5" /> {t("poster")}
+        </a>
       </div>
     </div>
   );

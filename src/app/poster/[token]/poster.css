@@ -1,0 +1,110 @@
+/* The course poster sheet (course-poster spec): the hand-made ywampotch poster
+   generalised, ported from .plan/maps/course-poster/assets/poster-template.html.
+   The template is the visual truth; this file is its CSS with a `poster-` prefix
+   and the palette moved onto custom properties the page sets inline from the
+   tenant's tokens:
+     cream  <- paper   cream2 <- hi      navy <- accent   navy2 <- accent2
+     gold   <- gold    slate  <- soft    card <- card     gold-soft <- gold 55% over card
+   1080 x 1350 CSS px (4:5), rasterised at 2x for the PNG and printed as one page. */
+
+.poster-sheet {
+  --gold-soft: color-mix(in srgb, var(--gold) 55%, var(--card));
+  --serif: var(--font-newsreader), Georgia, serif;
+  --sans: var(--font-inter), system-ui, sans-serif;
+  width: 1080px;
+  height: 1350px;
+  overflow: hidden;
+  position: relative;
+  box-sizing: border-box;
+  font-family: var(--sans);
+  color: var(--navy);
+  background:
+    radial-gradient(ellipse 900px 620px at 50% -10%, color-mix(in srgb, var(--gold-soft) 55%, transparent), transparent 70%),
+    radial-gradient(ellipse 700px 500px at 50% 112%, color-mix(in srgb, var(--gold-soft) 40%, transparent), transparent 70%),
+    var(--cream);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.poster-sheet * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+/* Script escape hatches, as in the template: only the serif face swaps. */
+.poster-sheet[data-script="deva"] { --serif: var(--font-noto-deva), "Noto Serif Devanagari", serif; }
+.poster-sheet[data-script="arab"] { --serif: var(--font-noto-naskh), "Noto Naskh Arabic", serif; }
+.poster-sheet[data-script="deva"] h1, .poster-sheet[data-script="arab"] h1 { line-height: 1.25; letter-spacing: 0; }
+.poster-sheet[data-script="deva"] .poster-sub, .poster-sheet[data-script="arab"] .poster-sub { font-style: normal; line-height: 1.6; }
+.poster-sheet[data-script="deva"] .poster-eyebrow, .poster-sheet[data-script="arab"] .poster-eyebrow,
+.poster-sheet[data-script="deva"] .poster-cta-kicker, .poster-sheet[data-script="arab"] .poster-cta-kicker,
+.poster-sheet[data-script="deva"] .poster-langs, .poster-sheet[data-script="arab"] .poster-langs { letter-spacing: .06em; text-transform: none; }
+
+.poster-frame { position: absolute; inset: 28px; border: 1.5px solid color-mix(in srgb, var(--gold) 55%, transparent); border-radius: 6px; pointer-events: none; }
+.poster-frame::after { content: ""; position: absolute; inset: 8px; border: 1px solid color-mix(in srgb, var(--gold) 28%, transparent); border-radius: 3px; }
+.poster-page { position: relative; height: 100%; padding: 70px 90px 74px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+
+/* Tenant logo, any aspect, contained and never cropped (ADR 0030). */
+.poster-logo { max-height: 150px; max-width: 420px; width: auto; height: auto; display: block; object-fit: contain; }
+.poster-logo-fallback { font-family: var(--serif); font-weight: 600; font-size: 40px; letter-spacing: -.01em; }
+
+.poster-eyebrow { margin-top: 22px; font-size: 15px; font-weight: 600; letter-spacing: .32em; text-transform: uppercase; color: var(--gold); }
+
+.poster-sheet h1 { margin-top: 22px; font-family: var(--serif); font-weight: 500; font-size: 78px; line-height: 1.02; letter-spacing: -.012em; color: var(--navy); text-wrap: balance; }
+.poster-sheet h1 em { font-style: italic; font-weight: 400; color: var(--navy2); }
+/* Long titles shrink rather than push the card off the sheet. */
+.poster-sheet h1[data-len="long"] { font-size: 62px; }
+.poster-sheet h1[data-len="xlong"] { font-size: 50px; }
+
+.poster-sub { margin-top: 26px; font-family: var(--serif); font-style: italic; font-size: 29px; line-height: 1.3; color: var(--slate); max-width: 860px; }
+
+.poster-rule { margin: 34px auto 30px; width: 120px; height: 2px; background: linear-gradient(90deg, transparent, var(--gold), transparent); position: relative; }
+.poster-rule::after { content: ""; position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; transform: translate(-50%, -50%) rotate(45deg); background: var(--gold); }
+
+.poster-points { list-style: none; display: grid; grid-template-columns: 1fr; gap: 16px; font-size: 26px; font-weight: 500; line-height: 1.25; color: var(--navy); }
+.poster-points li { display: flex; align-items: center; justify-content: center; gap: 16px; }
+.poster-points li::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--gold); flex: none; }
+
+.poster-card {
+  margin-top: 40px; width: 900px; background: var(--card);
+  border: 1.5px solid var(--gold-soft); border-radius: 22px;
+  box-shadow: 0 24px 60px -30px color-mix(in srgb, var(--navy) 35%, transparent), 0 2px 0 color-mix(in srgb, var(--gold) 25%, transparent);
+  padding: 28px 40px 28px 28px;
+  display: grid; grid-template-columns: 300px 1fr; gap: 36px; align-items: center; text-align: start;
+}
+.poster-qr { width: 300px; height: 300px; border-radius: 14px; overflow: hidden; border: 1px solid var(--cream2); background: #fff; }
+.poster-qr img { width: 100%; height: 100%; display: block; image-rendering: pixelated; }
+.poster-cta-kicker { font-size: 14px; font-weight: 700; letter-spacing: .28em; text-transform: uppercase; color: var(--gold); }
+.poster-cta-title { margin-top: 10px; font-family: var(--serif); font-weight: 500; font-size: 40px; line-height: 1.08; color: var(--navy); }
+.poster-cta-or { margin-top: 14px; font-size: 19px; color: var(--slate); line-height: 1.35; }
+.poster-url { margin-top: 12px; display: inline-block; background: var(--navy); color: #fff; font-weight: 600; font-size: 22px; letter-spacing: .02em; padding: 14px 22px; border-radius: 12px; direction: ltr; unicode-bidi: isolate; }
+.poster-price { margin-top: 14px; font-size: 18px; color: var(--slate); }
+.poster-price strong { color: var(--navy); font-weight: 700; }
+
+.poster-footer { margin-top: auto; padding-top: 30px; width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.poster-langs { font-size: 14px; font-weight: 600; letter-spacing: .26em; text-transform: uppercase; color: var(--slate); text-align: start; line-height: 1.7; }
+.poster-langs strong { color: var(--navy); }
+.poster-brand { text-align: end; }
+.poster-brand b { display: block; font-family: var(--serif); font-size: 26px; font-weight: 600; color: var(--navy); letter-spacing: -.01em; }
+.poster-brand span { display: block; font-size: 13px; color: var(--slate); margin-top: 2px; }
+
+/* ---- Around the sheet: the page it sits on ------------------------------------
+   The sheet keeps its 1080 px canvas everywhere (that is what prints and what the
+   PNG captures); on screen it is scaled down to fit the viewport width. `--s` is
+   measured by the page; the negative margin hands the space a transform does not
+   release back to the chrome below. */
+.poster-stage { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; gap: 24px; padding: 24px 16px 56px; }
+.poster-scale { width: 1080px; height: 1350px; flex: none; transform-origin: top center; transform: scale(var(--s, 1)); margin-bottom: calc(1350px * (var(--s, 1) - 1)); }
+.poster-scale .poster-sheet { box-shadow: 0 30px 80px -30px rgb(0 0 0 / 0.35); }
+
+/* Print: the sheet, alone, as one page of its own size. The page box overrides
+   the certificate's A4 landscape in globals.css (this stylesheet loads after it). */
+@media print {
+  @page { size: 1080px 1350px; margin: 0; }
+  /* Only the sheet stays in flow: the page's own chrome and anything else the
+     root layout mounts beside it (the tab bar and its spacer) would push the
+     1350 px sheet onto a second page. */
+  body > :not(:has(.poster-sheet)), .poster-stage > :not(.poster-scale) { display: none !important; }
+  .poster-stage { display: block; padding: 0; min-height: 0; }
+  .poster-scale { transform: none !important; margin: 0 !important; }
+  .poster-sheet { box-shadow: none !important; }
+}

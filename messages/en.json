@@ -526,7 +526,9 @@
     "modeEachTitle": "One code each",
     "modeEachBilling": "Single-use codes, one per member. Billed upfront for the whole batch.",
     "modeEachIdentity": "A redemption records only that it happened: no names, no roster.",
-    "usersIntro": "Everyone this course has been shared with, and what they can do. Grouped by language for now."
+    "usersIntro": "Everyone this course has been shared with, and what they can do. Grouped by language for now.",
+    "poster": "Poster",
+    "posterOpen": "Open a printable poster for this edition"
   },
   "ManageDashboard": {
     "loadError": "This course could not be loaded.",
@@ -807,5 +809,37 @@
     "needsConnection": "Lessons need a connection. Reconnect and try again.",
     "nothingSaved": "You are offline and nothing is saved on this device yet.",
     "retry": "Retry"
+  },
+  "Poster": {
+    "eyebrowPaid": "Online course · First lesson free",
+    "eyebrowFree": "Online course · Free",
+    "lessons": "{n, plural, one {# lesson} other {# lessons}}",
+    "certificate": "Certificate on completion",
+    "offline": "Read it on your phone, offline",
+    "ctaKicker": "Jump straight in",
+    "ctaTitle": "Scan the code to open the course",
+    "ctaOr": "or create an account at",
+    "priceSuffix": "for the full course · first lesson free",
+    "langsLine1": "Available in <strong>{count, plural, one {# language} other {# languages}}</strong>",
+    "langsNames": "{names}",
+    "langsMore": "{names} and {more} more",
+    "qrAlt": "QR code to the course",
+    "loading": "Loading…",
+    "notFound": "Poster not found",
+    "notFoundBody": "This link is off or was regenerated. Ask the course owner for a new one.",
+    "panelTitle": "Poster",
+    "panelBody": "Edits here shape this render only. Nothing is saved.",
+    "highlight1": "Highlight line 1",
+    "highlight2": "Highlight line 2",
+    "highlightPlaceholder": "What the course is about, in your words",
+    "taglineLabel": "Tagline",
+    "taglinePlaceholder": "Leave empty to print the course mission",
+    "emphasise": "Italicise the selected words",
+    "emphasiseHint": "Select a run of words in the poster’s title, then press this.",
+    "clearEmphasis": "Clear italics",
+    "downloadPng": "Download PNG",
+    "downloading": "Making the PNG…",
+    "print": "Print",
+    "pngError": "Couldn’t make the PNG. Try again."
   }
 }
