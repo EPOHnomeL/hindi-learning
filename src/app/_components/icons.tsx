@@ -34,7 +34,9 @@ export type IconName =
   | "chart"
   | "qr"
   | "poster"
-  | "sliders";
+  | "sliders"
+  | "certificate"
+  | "arrow";
 
 const PATHS: Record<IconName, ReactNode> = {
   edit: (
@@ -149,6 +151,25 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <rect x="4" y="3" width="16" height="18" rx="2" />
       <path d="M8 8h8M8 12h8M8 16h5" />
+    </>
+  ),
+  // A square certificate: sheet, two ruled lines, a rosette with ribbon tails.
+  // The course card's certificate chip (2026-09-08) wears this rather than the
+  // `award` medal, which reads as a generic badge; this one reads as a document
+  // you can hold, which is what the learner is actually collecting.
+  certificate: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2.5" />
+      <path d="M7 8h10M7 11.5h5" />
+      <circle cx="15" cy="15" r="2.4" />
+      <path d="m13.6 16.9-.9 2.6 2.3-1.2 2.3 1.2-.9-2.6" />
+    </>
+  ),
+  // The open cue's arrow, at the foot of every openable course card.
+  arrow: (
+    <>
+      <path d="M5 12h14" />
+      <polyline points="12 5 19 12 12 19" />
     </>
   ),
   // Three labelled faders: the "manage this course" affordance beside "Open
