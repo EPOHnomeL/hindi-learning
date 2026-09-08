@@ -6,7 +6,8 @@ import type { Id } from "../_generated/dataModel";
 import { getEditableTopic, getOwnedTopic, topicBySlug } from "../topicAccess";
 import { SOURCE_LANG } from "../sourceLang";
 import { assertTenantFlag } from "../tenantFlags";
-import { itemHash, quizStructureMatches } from "../translate";
+import { itemHash } from "../translate";
+import { quizVerdict } from "../quizGate";
 import { isCallerUncapped, isEmailAdmitted } from "../whitelist";
 
 // A learner may seed at most one new course per this window — an anti-abuse / cost
@@ -242,10 +243,10 @@ export const editLesson = action({
     // be verified against it — refuse rather than accept a possibly-structural
     // change. (A lesson with no stored body yet has nothing to preserve.)
     if (target.storageId) {
-      const oldHtml = await blobText(ctx, target.storageId);
-      if (oldHtml === null || !quizStructureMatches(oldHtml, newHtml)) {
+      const verdict = quizVerdict(await blobText(ctx, target.storageId), newHtml);
+      if (verdict !== "ok") {
         await ctx.storage.delete(storageId);
-        throw new ConvexError(oldHtml === null ? REFUSAL.unreadableCurrent : REFUSAL.quizStructure);
+        throw new ConvexError(verdict === "unreadable" ? REFUSAL.unreadableCurrent : REFUSAL.quizStructure);
       }
     }
     // Guard passed. If the swap itself fails (e.g. the lesson was superseded in the
@@ -448,10 +449,10 @@ export const editTranslatedLesson = action({
     const newHtml = await blobText(ctx, storageId);
     if (newHtml === null) throw new ConvexError(REFUSAL.unreadableUpload);
     if (target.sourceStorageId) {
-      const srcHtml = await blobText(ctx, target.sourceStorageId);
-      if (srcHtml === null || !quizStructureMatches(srcHtml, newHtml)) {
+      const verdict = quizVerdict(await blobText(ctx, target.sourceStorageId), newHtml);
+      if (verdict !== "ok") {
         await ctx.storage.delete(storageId);
-        throw new ConvexError(srcHtml === null ? REFUSAL.unreadableSource : REFUSAL.quizStructure);
+        throw new ConvexError(verdict === "unreadable" ? REFUSAL.unreadableSource : REFUSAL.quizStructure);
       }
     }
     try {

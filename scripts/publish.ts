@@ -14,6 +14,7 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import { shuffleQuizOptions } from "../convex/quizShuffle";
+import { unresolvableAnswerKeys } from "../convex/quizGate";
 import { convexUrl, ownerEmail, publishSecret, topicArg } from "./_env";
 
 const PROD = process.argv.includes("--prod");
@@ -112,6 +113,15 @@ if (existsSync(`${base}/MISSION.md`)) {
 for (const f of filesIn(`${base}/lessons`, ".html")) {
   const html = assembleLesson(readFileSync(`${base}/lessons/${f}`, "utf8"));
   const key = f.replace(/\.html$/, "");
+  // Refused here, before the upload, because a Lesson is immutable once published
+  // (ADR 0003) and the server never scores (ADR 0035), so an answer key naming no
+  // option is unpassable forever and only a republish fixes it. See ticket 35.
+  const unresolvable = unresolvableAnswerKeys(html);
+  if (unresolvable.length > 0) {
+    console.error(`lesson     ${key} REFUSED: answer key names no option (${unresolvable.join(", ")})`);
+    process.exitCode = 1;
+    continue;
+  }
   const seq = Number(key.match(/^(\d+)/)?.[1] ?? 0);
   const storageId = await uploadHtml(html);
   const result = await client.mutation(api.content.publish.publishLesson, {
