@@ -7,6 +7,7 @@ import { grantEdition, survivesTheOwner } from "./grants";
 import { publishedLangs } from "./publishedEditions";
 import { topicBySlug } from "./topicAccess";
 import { platformFeeBps } from "./payfast";
+import { assertOrganisation, freshDealCode, logDealPayment, ownDeal, unsettledDeals } from "./bulkDeal";
 import { offGateway, recordMoneyEvent } from "./moneyEvent";
 import { getSeller, sellerStatusOf } from "./sellerStatus";
 import { mintCode, normaliseCode } from "./voucherCode";
@@ -109,12 +110,7 @@ export const mintBatch = mutation({
       throw new Error(`a batch is between 1 and ${MAX_SEATS} seats`);
     }
     if (!Number.isInteger(total) || total <= 0) throw new Error("a batch needs the total you agreed");
-    const org = orgName.trim();
-    const contact = orgContact.trim();
-    // These two are how the Seller and the sysadmin tell one batch from another
-    // months later, and the contact is the Ledger row's `buyerEmail` - a blank one
-    // would put an anonymous money event in the payouts view.
-    if (!org || !contact) throw new Error("the buying organisation's name and billing contact are both required");
+    const { org, contact } = assertOrganisation(orgName, orgContact);
 
     const ledgerId = await recordMoneyEvent(ctx, {
       kind: "batch",
@@ -143,27 +139,11 @@ export const mintBatch = mutation({
     });
 
     for (let i = 0; i < seats; i++) {
-      await ctx.db.insert("vouchers", { batchId, code: await freshCode(ctx) });
+      await ctx.db.insert("vouchers", { batchId, code: await freshDealCode(ctx, "vouchers", mintCode) });
     }
     return batchId;
   },
 });
-
-// A code no voucher already holds. Convex has no uniqueness constraint, so this is
-// enforced on read exactly as the EFT rail enforces its reference: retry rather
-// than throw. Bounded, because at 32^8 five clashes in a row is not bad luck, it
-// is a broken RNG, and looping on that would hang the mutation instead.
-async function freshCode(ctx: MutationCtx): Promise<string> {
-  for (let i = 0; i < 5; i++) {
-    const code = mintCode();
-    const clash = await ctx.db
-      .query("vouchers")
-      .withIndex("by_code", (q) => q.eq("code", code))
-      .first();
-    if (!clash) return code;
-  }
-  throw new Error("could not mint a unique code");
-}
 
 // ---- Redemption (ticket 03) ---------------------------------------------------
 
@@ -301,14 +281,12 @@ export const pendingBatches = query({
   ),
   handler: async (ctx) => {
     if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
-    // An ABSENT `paymentRef` is the queue - the same shape the Ledger row's
-    // `unpaid` status has, read from the side that the sysadmin acts on. Indexed
-    // rather than filtered, and capped anyway: a hand-reconciled queue is small by
-    // definition, and one that is not is a signal rather than a page to paginate.
-    const rows = await ctx.db
-      .query("voucherBatches")
-      .withIndex("by_payment_ref", (q) => q.eq("paymentRef", undefined))
-      .take(500);
+    // An ABSENT `paymentRef` is the queue, the same shape the Ledger row's
+    // `unpaid` status has, read from the side the sysadmin acts on. The
+    // index-not-filter discipline and the cap are `unsettledDeals`', shared with
+    // the Access Code rail (ticket 30); what each line SAYS is per-rail and stays
+    // below.
+    const rows = await unsettledDeals(ctx, "voucherBatches");
     return await Promise.all(
       rows.map(async (b) => {
         const [seller, topic, codes] = await Promise.all([
@@ -354,20 +332,12 @@ export const logBatchPayment = mutation({
   args: { batchId: v.id("voucherBatches"), reference: v.string() },
   returns: v.null(),
   handler: async (ctx, { batchId, reference }) => {
-    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
-    const ref = reference.trim();
-    // The whole point is being able to point at the bank statement line later.
-    if (!ref) throw new Error("the bank reference or transaction id is required");
     const batch = await ctx.db.get(batchId);
     if (!batch) throw new Error("that batch does not exist");
-    if (batch.paymentRef !== undefined) return null;
-
-    await ctx.db.patch(batchId, { paymentRef: ref });
-    // Only an `unpaid` row moves. A batch whose row was somehow already `owed` or
-    // `paid` keeps its state rather than being re-owed, which is the same posture
-    // `markPaid` takes from the other end of the same lifecycle.
-    const row = await ctx.db.get(batch.ledgerId);
-    if (row?.status === "unpaid") await ctx.db.patch(batch.ledgerId, { status: "owed" });
+    // The admin gate, the blank-reference refusal, the idempotency and the
+    // unpaid-to-owed flip are all `logDealPayment`'s, shared with the Access Code
+    // rail (ticket 30). A batch always has a Ledger row, unlike a zero-seat code.
+    await logDealPayment(ctx, { id: batchId, paymentRef: batch.paymentRef, ledgerId: batch.ledgerId }, reference);
     return null;
   },
 });
@@ -478,16 +448,14 @@ export const batchCodes = query({
   },
 });
 
-// The caller's own batch, or a throw. Codes are the one thing in this rail that a
-// Seller could use against another Seller, so ownership is checked server-side on
-// every read of them rather than by which batches a page happens to list.
-async function ownBatch(ctx: QueryCtx, batchId: Id<"voucherBatches">): Promise<Doc<"voucherBatches">> {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) throw new Error("sign in to see your batches");
-  const batch = await ctx.db.get(batchId);
-  if (!batch || batch.sellerId !== userId) throw new Error("that batch isn't yours");
-  return batch;
-}
+// The caller's own batch, or a throw. The check itself is `ownDeal`, shared with
+// the Access Code rail (ticket 30); the wording stays here because a refusal that
+// says "access code" about a batch reads like a bug.
+const ownBatch = (ctx: QueryCtx, batchId: Id<"voucherBatches">) =>
+  ownDeal(ctx, "voucherBatches", batchId, {
+    signIn: "sign in to see your batches",
+    notYours: "that batch isn't yours",
+  });
 
 // ---- Voiding (ticket 07) --------------------------------------------------------
 
