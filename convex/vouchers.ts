@@ -3,7 +3,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { hasEntitlement, publishedLangs } from "./edition";
+import { grantEdition, survivesTheOwner } from "./grants";
+import { publishedLangs } from "./publishedEditions";
 import { topicBySlug } from "./topicAccess";
 import { platformFeeBps } from "./payfast";
 import { offGateway, recordMoneyEvent } from "./moneyEvent";
@@ -241,12 +242,7 @@ export const redeem = mutation({
     // one of those really would buy the member nothing.
     const alreadyHas = new ConvexError("voucher/already-have-access");
     if (topic.ownerId === userId) throw alreadyHas;
-    if (await hasEntitlement(ctx, batch.topicId, userId, batch.lang)) throw alreadyHas;
-    const enrolled = await ctx.db
-      .query("enrollments")
-      .withIndex("by_topic_user", (q) => q.eq("topicId", batch.topicId).eq("userId", userId))
-      .collect();
-    if (enrolled.some((e) => e.lang === batch.lang)) throw alreadyHas;
+    if (await survivesTheOwner(ctx, batch.topicId, userId, batch.lang)) throw alreadyHas;
 
     // The seat. **No provenance of any kind** - no batch id, no voucher id, no
     // `pfPaymentId`, no `eftRef` - so this row is byte-identical to an Admin comp
@@ -254,7 +250,7 @@ export const redeem = mutation({
     // operator could list the redeemers by elimination, and the promise the
     // organisation bought would be theatre. `vouchers.test.ts` asserts these
     // absences positively; do not delete that assertion as redundant.
-    await ctx.db.insert("entitlements", { userId, topicId: batch.topicId, lang: batch.lang });
+    await grantEdition(ctx, { userId, topicId: batch.topicId, lang: batch.lang });
     // The whole state machine: the code is spent, and the row says nothing else.
     await ctx.db.patch(voucher._id, { redeemedAt: Date.now() });
 

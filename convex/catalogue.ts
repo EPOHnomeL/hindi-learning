@@ -3,7 +3,8 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { QueryCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { livePublishedLangs } from "./edition";
+import { livePublishedLangs } from "./publishedEditions";
+import { heldPersonally } from "./grants";
 import { getOwnedTopic } from "./topicAccess";
 import { SOURCE_LANG } from "./sourceLang";
 import { langInfo } from "./languages";
@@ -150,29 +151,3 @@ export const list = query({
   },
 });
 
-// Does this caller already hold this Topic personally, by any route that is not
-// "it happens to be free right now"?
-//
-// Three reads on three `by_topic_user`-shaped indexes rather than one call into the
-// grant walk, because the walk deliberately answers a different question (what may
-// this caller READ) and the answer includes a free published Edition. Language is
-// ignored on purpose: the catalogue card is one course with its Editions as chips, so
-// a caller holding any one of them would otherwise be shown a card whose primary
-// action opens the Edition they already have.
-async function heldPersonally(ctx: QueryCtx, topicId: Id<"topics">, userId: Id<"users">): Promise<boolean> {
-  const entitlement = await ctx.db
-    .query("entitlements")
-    .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
-    .first();
-  if (entitlement) return true;
-  const share = await ctx.db
-    .query("shares")
-    .withIndex("by_topic_viewer", (q) => q.eq("topicId", topicId).eq("viewerId", userId))
-    .first();
-  if (share) return true;
-  const enrollment = await ctx.db
-    .query("enrollments")
-    .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
-    .first();
-  return enrollment !== null;
-}

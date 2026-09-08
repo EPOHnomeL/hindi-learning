@@ -2,7 +2,8 @@ import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { editionPrice, hasEntitlement, heldLangs, translatedTitle } from "./edition";
+import { editionPrice, heldLangs, translatedTitle } from "./edition";
+import { grantEdition, hasEntitlement, revokeEdition } from "./grants";
 import { getOwnedTopic, topicBySlug } from "./topicAccess";
 import { mintToken } from "./tokens";
 import { normaliseEmail } from "./shareGrants";
@@ -218,9 +219,7 @@ export const grantEntitlement = mutation({
       .withIndex("email", (q) => q.eq("email", normaliseEmail(email)))
       .unique();
     if (!user) throw new Error(`no account for ${email} — the buyer must sign up first`);
-    if (!(await hasEntitlement(ctx, topic._id, user._id, lang))) {
-      await ctx.db.insert("entitlements", { userId: user._id, topicId: topic._id, lang });
-    }
+    await grantEdition(ctx, { userId: user._id, topicId: topic._id, lang });
     return null;
   },
 });
@@ -241,11 +240,7 @@ export const revokeEntitlement = mutation({
       .withIndex("email", (q) => q.eq("email", normaliseEmail(email)))
       .unique();
     if (!user) return null;
-    const rows = await ctx.db
-      .query("entitlements")
-      .withIndex("by_topic_user", (q) => q.eq("topicId", topic._id).eq("userId", user._id))
-      .collect();
-    for (const e of rows) if (e.lang === lang) await ctx.db.delete(e._id);
+    await revokeEdition(ctx, { userId: user._id, topicId: topic._id, lang });
     return null;
   },
 });
@@ -289,9 +284,7 @@ export const fulfillPurchase = internalMutation({
       .withIndex("email", (q) => q.eq("email", email))
       .unique();
     if (!user) throw new Error(`no account for intent email — cannot fulfil ${pfPaymentId}`);
-    if (!(await hasEntitlement(ctx, topicId, user._id, lang))) {
-      await ctx.db.insert("entitlements", { userId: user._id, topicId, lang, pfPaymentId });
-    }
+    await grantEdition(ctx, { userId: user._id, topicId, lang, pfPaymentId });
     // The Ledger row — what this sale means in money. A throw here rolls back
     // the grant AND the payfastEvents row, so PayFast's retry re-runs it whole.
     const topic = await ctx.db.get(topicId);

@@ -5,6 +5,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { ACCESS_CODE_PROVIDER_ID, mintAccessCodeString, seatAccountId } from "./accessCodeFormat";
 import { CONSENT_VERSION } from "./joinConsent";
+import { grantEdition } from "./grants";
 import { platformFeeBps } from "./payfast";
 import { offGateway, recordMoneyEvent } from "./moneyEvent";
 import { sellableTopic } from "./vouchers";
@@ -382,7 +383,29 @@ export const claimSeat = internalMutation({
       consentedAt: Date.now(),
       consentVersion,
     });
-    await ctx.db.insert("entitlements", { userId, topicId: code.topicId, lang: code.lang });
+    // **The seat is taken, the grant is granted once.** This rail ran no hold
+    // check at all before 2026-09-08, and it goes through the one Entitlement
+    // writer now so that "one row per (user, Edition)" is structural here as it is
+    // on the other four rails.
+    //
+    // **Not a live defect, and the review's claim that it was is corrected here.**
+    // The 2026-09-04 architecture review and ticket 28 both said a member who had
+    // already bought this Edition would get a duplicate row through this path.
+    // Checked in the tree on 2026-09-08: they cannot. `accessCodeAuth.ts` mints a
+    // fresh account per (code, nickname) through `createAccount`, and a returning
+    // nickname is short-circuited by `forJoin`'s `seatUserId` before it ever
+    // reaches here, so the `userId` arriving at this line has never held anything.
+    // The guard is worth its one index read anyway: the invariant currently rests
+    // on an account-minting scheme two files away, and this is what makes it rest
+    // on this line instead.
+    //
+    // If a caller ever does arrive already entitled, the operator decided on
+    // 2026-09-08 what happens: the seat is still consumed and no second row is
+    // written. The `seats` row is the organisation's cohort record and the
+    // Entitlement is the access, so an already-entitled member still belongs in
+    // the cohort, which also matches ADR 0031 decision 6 (a seat that has been
+    // taken is taken). ADR 0031's row shape is untouched; only the row count.
+    await grantEdition(ctx, { userId, topicId: code.topicId, lang: code.lang });
     // Where the member has just been let in, so `/join` can send them straight into
     // the Edition instead of leaving them on a success message with nowhere to go.
     return { topicSlug: topic.slug, lang: code.lang, courseTitle: topic.title };

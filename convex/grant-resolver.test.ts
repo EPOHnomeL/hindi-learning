@@ -2,7 +2,7 @@
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
 import schema from "./schema";
-import { grantsFor } from "./edition";
+import { grantsFor } from "./grants";
 import type { Id } from "./_generated/dataModel";
 
 // The Edition grant resolver (edition-deepening/02). `grantsFor` is the ONE walk

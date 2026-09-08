@@ -4,7 +4,8 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { hasEntitlement, translatedTitle } from "./edition";
+import { translatedTitle } from "./edition";
+import { grantEdition } from "./grants";
 import { topicBySlug } from "./topicAccess";
 import { normaliseEmail } from "./shareGrants";
 import { SOURCE_LANG } from "./sourceLang";
@@ -381,14 +382,12 @@ export const confirmEftPayment = mutation({
     const topic = await ctx.db.get(intent.topicId);
     if (!topic?.ownerId) throw new Error(`the course behind ${ref} has no owner to owe`);
 
-    if (!(await hasEntitlement(ctx, intent.topicId, intent.userId, intent.lang))) {
-      await ctx.db.insert("entitlements", {
-        userId: intent.userId,
-        topicId: intent.topicId,
-        lang: intent.lang,
-        eftRef: ref,
-      });
-    }
+    await grantEdition(ctx, {
+      userId: intent.userId,
+      topicId: intent.topicId,
+      lang: intent.lang,
+      eftRef: ref,
+    });
 
     // The money, recorded the way the card rail records it — same table, same
     // `owed` status, same split — so Sales and Payouts need no EFT special case.
