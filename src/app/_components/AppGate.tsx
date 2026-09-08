@@ -2,6 +2,7 @@
 
 import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
 import { usePathname } from "next/navigation";
+import { PublicCourseFallback } from "./PublicReader";
 import { SignIn } from "./SignIn";
 import { CourseSkeleton, DashboardSkeleton } from "./ui";
 
@@ -17,9 +18,12 @@ export function AppGate({ children }: { children: React.ReactNode }) {
   return (
     <main className="min-h-screen bg-paper text-ink">
       <AuthLoading>{onCourse ? <CourseSkeleton /> : <DashboardSkeleton />}</AuthLoading>
-      <Unauthenticated>
-        <SignIn />
-      </Unauthenticated>
+      {/* Signed out on a course URL, the course itself may be public: a published
+          AND priced Edition serves the Guest reader on `/courses/<slug>` with its
+          free Preview (2026-09-08), so a shared course link opens rather than
+          walling. `PublicCourseFallback` renders `SignIn` itself for every other
+          course, so a private or published-free course still asks for an account. */}
+      <Unauthenticated>{onCourse ? <PublicCourseFallback /> : <SignIn />}</Unauthenticated>
       <Authenticated>{children}</Authenticated>
     </main>
   );
