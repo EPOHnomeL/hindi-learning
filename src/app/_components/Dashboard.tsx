@@ -323,9 +323,6 @@ function TenantPill({ tenantSlug }: { tenantSlug: string | null }) {
 function CourseCard({ course }: { course: Course }) {
   const t = useTranslations("Dashboard");
   const [showMission, setShowMission] = useState(false);
-  const requestSetup = useAction(api.routine.requestSetup);
-  const [setup, setSetup] = useState<"idle" | "starting" | "started" | "error">("idle");
-
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
   const complete = course.status === "completed";
   const seeded = course.status === "seeded";
@@ -338,16 +335,6 @@ function CourseCard({ course }: { course: Course }) {
     const i = langInfo(code);
     return { lang: i.code, native: i.native, rtl: !!i.rtl };
   });
-
-  const startSetup = async () => {
-    setSetup("starting");
-    try {
-      await requestSetup({ topicSlug: course.slug });
-      setSetup("started");
-    } catch {
-      setSetup("error");
-    }
-  };
 
   return (
     <article
@@ -418,19 +405,23 @@ function CourseCard({ course }: { course: Course }) {
           one, and the door to the manage route. */}
       <div className="flex items-center gap-2">
         {seeded ? (
-          <button
-            onClick={() => void startSetup()}
-            disabled={setup === "starting" || setup === "started"}
-            className="flex-1 rounded-lg bg-gold/20 px-3 py-2 text-sm font-medium text-accent transition-colors hover:bg-gold/30 disabled:opacity-70"
+          // A seeded course has nothing to open, so its one action goes to the
+          // course, which with no lessons IS the setting-up page (CourseSetupPane):
+          // stages, elapsed clock, and the honest three states off the generation
+          // lock. Navigation, NOT a mutation (2026-09-08). This button used to fire
+          // `requestSetup` straight from the dashboard, which was a blind second
+          // door: setup has almost always already been fired for this course (the
+          // create flow fires it in the background before it navigates away), so
+          // the button's real effect was usually to re-fire a run, reported through
+          // nothing but its own label flicking to "Started". If the fire genuinely
+          // never landed, the pane says so and offers the ONE deliberate retry, on
+          // the screen that shows what is actually happening.
+          <Link
+            href={`/courses/${course.slug}`}
+            className="flex-1 rounded-lg bg-gold/20 px-3 py-2 text-center text-sm font-medium text-accent transition-colors hover:bg-gold/30"
           >
-            {setup === "starting"
-              ? t("startingSetup")
-              : setup === "started"
-                ? t("setupStarted")
-                : setup === "error"
-                  ? t("setupError")
-                  : t("setUpNow")}
-          </button>
+            {t("setUpNow")}
+          </Link>
         ) : (
           <CourseCardActions slug={course.slug} openHref={`/courses/${course.slug}`} openLabel={t("openCourse")} />
         )}
