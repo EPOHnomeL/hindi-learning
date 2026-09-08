@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { readFileSync } from "node:fs";
 import { expect, test } from "vitest";
 import { lessonMessage } from "./lessonSrcDoc";
 
@@ -100,4 +101,51 @@ test("no listener casts e.data any more", () => {
     .filter(([, s]) => /e\.data as \{[^}]*__lesson/.test(s))
     .map(([p]) => p);
   expect(offenders).toEqual([]);
+});
+
+// ---- what crosses the boundary: the one breakpoint (ticket 37) ------------------
+
+test("the injected justify block sets 768px AND unsets the 641 to 767 band", async () => {
+  // The trap ticket 37 exists to document. The injected block lands immediately
+  // before `</head>`, AFTER the copy baked into every already-published lesson's
+  // stored HTML, and that baked copy says 641px. Published lessons are immutable
+  // (ADR 0003; 441 of them on prod, measured 2026-09-07), so raising the injected
+  // rule to 768px on its own changes nothing between 641px and 767px: the baked
+  // rule still matches there and nothing overrides it.
+  //
+  // So both rules must be present. Delete the second one and this fails, which is
+  // the only thing standing between "looks correct" and "does nothing on the 441
+  // lessons that matter".
+  const { buildSrcDoc } = await import("./lessonSrcDoc");
+  const stored = `<!DOCTYPE html><html><head><style>@media (min-width: 641px){.wrap p{text-align:justify; hyphens:auto}}</style></head><body><div class="wrap"><p>x</p></div></body></html>`;
+  const doc = buildSrcDoc(stored, { quiz: true });
+
+  expect(doc).toContain("@media (min-width: 768px){.wrap p{text-align:justify; hyphens:auto}}");
+  expect(doc).toContain("@media (min-width: 641px) and (max-width: 767.98px){.wrap p{text-align:start; hyphens:manual}}");
+  // And the injected pair comes AFTER the baked rule, which is what lets it win
+  // on source order at equal specificity.
+  expect(doc.lastIndexOf("min-width: 641px){.wrap p{text-align:justify")).toBeLessThan(
+    doc.indexOf("min-width: 768px){.wrap p{text-align:justify"),
+  );
+});
+
+test("the unset uses a logical alignment, so an RTL Edition is not pinned left", async () => {
+  const { buildSrcDoc } = await import("./lessonSrcDoc");
+  const doc = buildSrcDoc("<p>x</p>", { quiz: true });
+  expect(doc).toContain("text-align:start");
+  expect(doc).not.toContain("text-align:left; hyphens:manual");
+});
+
+test("the partials carry the one breakpoint too, for lessons published from now on", () => {
+  // These cannot reach the 441 already stored, whose HTML is immutable, which is
+  // why the injected pair above exists at all.
+  const head = readFileSync("lessons/_partials/head.html", "utf8");
+  const refHead = readFileSync("lessons/_partials/reference-head.html", "utf8");
+  for (const [name, css] of [
+    ["head.html", head],
+    ["reference-head.html", refHead],
+  ] as const) {
+    expect(css, `${name} must not carry a 640/641 breakpoint`).not.toMatch(/(min|max)-width:\s*64[01]px/);
+  }
+  expect(head).toContain("@media (min-width: 768px){ .wrap p{text-align:justify; hyphens:auto} }");
 });

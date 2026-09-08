@@ -306,13 +306,29 @@ function injectLessonOptionInk(html: string): string {
   return i === -1 ? LESSON_OPTION_INK_CSS + html : html.slice(0, i) + LESSON_OPTION_INK_CSS + html.slice(i);
 }
 
-// Justified prose. Added to head.html for newly published lessons; this carries
-// it to the lessons ALREADY stored, whose HTML has the old rule baked in
-// (published lessons are immutable — ADR 0003). Above the mobile breakpoint
-// only: at a phone's measure, justification opens rivers of whitespace between
-// words, so narrow screens stay ragged-right. Paragraphs only — headings, the
-// `.sub` deck and the pills are divs and stay as authored.
-const LESSON_JUSTIFY_CSS = `<style>@media (min-width: 641px){.wrap p{text-align:justify; hyphens:auto}}</style>`;
+// Justified prose, above the ONE breakpoint: **768px**, matching Tailwind `md`
+// (ADR 0035, via ticket 02). Below it, at a phone's measure, justification opens
+// rivers of whitespace between words, so narrow screens stay ragged-right.
+// Paragraphs only, since headings, the `.sub` deck and the pills are divs and
+// stay as authored.
+//
+// **Two rules, and the second one is the whole point** (ticket 37). This is
+// injected immediately before `</head>`, which puts it AFTER the copy baked into
+// every already-published lesson's stored HTML, and that baked copy says 641px.
+// Published lessons are immutable (ADR 0003), so it cannot be edited: there are
+// 441 of them with a body on prod, measured 2026-09-07. Raising this rule to
+// 768px on its own therefore does nothing at all in the 641 to 767px band, where
+// the baked rule still matches and nothing overrides it. So the injected block
+// both sets justification above 768px AND explicitly unsets it across that band.
+//
+// `text-align:start` rather than `left` for the unset, because a translated
+// Edition renders RTL and `left` would pin its prose to the wrong edge.
+// `hyphens:manual` is the initial value, so it undoes the baked `auto`.
+const LESSON_JUSTIFY_CSS =
+  `<style>` +
+  `@media (min-width: 768px){.wrap p{text-align:justify; hyphens:auto}}` +
+  `@media (min-width: 641px) and (max-width: 767.98px){.wrap p{text-align:start; hyphens:manual}}` +
+  `</style>`;
 
 function injectLessonJustify(html: string): string {
   const i = html.indexOf("</head>");
@@ -366,9 +382,24 @@ const TENANT_LESSON_DARK_CSS = `
 // the lesson design system's namespace (head.html), not the app chrome's --color-*
 // — via the shared token builder. Rides the same before-</head> rail as the
 // dark/Devanagari injections, and is injected LAST so it sits closest to </head>
-// (winning any source-order tie on top of its :root:root specificity). Moves only
-// the 14 contract vars: head.html hardcodes dozens of hex beyond them, so legacy
-// content is re-skinned partially by design — full fidelity is issue 23's job.
+// (winning any source-order tie on top of its :root:root specificity).
+//
+// **What it covers, corrected on 2026-09-08.** The comment here used to say it
+// moves "only the 14 contract vars", which stopped being true when
+// `TENANT_LESSON_DARK_CSS` was added below: the DARK surfaces head.html hardcodes
+// (cards, borders, quiz options, paradigm headers, the parked card, the
+// singular/plural cells) are re-pointed at the live tokens, so a navy tenant's
+// lesson no longer comes out navy-paper with brown cards on top.
+//
+// **Still not covered: the LIGHT-mode literals.** head.html hardcodes dozens of
+// warm-paper hexes outside the dark block, and they do not follow a tenant
+// palette. That is ticket 37's remaining half and it is deliberately NOT done
+// here: it repaints reading material on every lesson of every tenant host, the
+// surface-versus-semantic split has to be made per selector, and it wants a human
+// look at a real lesson rather than a green test. Two families must stay fixed
+// whenever it is done, and are not oversights: the grammar mark colours
+// (`mark.r/v/b` green, `mark.c/j` blue) and `.note.devo` purple are semantic
+// colour-coding a reader learns, not surfaces.
 function injectTenantPaletteCss(html: string, palette: TenantTheme): string {
   const style = `<style>${buildTenantThemeCss(palette, "")}${TENANT_LESSON_DARK_CSS}</style>`;
   const i = html.indexOf("</head>");
