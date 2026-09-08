@@ -283,19 +283,14 @@ export function Frame({
     iframeRef.current?.contentWindow?.postMessage(themeMessage(theme), "*");
   }, [theme, srcDoc]);
 
-  // On mobile the iframe is sized to its content so the whole page scrolls as one
-  // surface; on desktop it fills its column and scrolls internally. The measured
-  // height is ignored above md (the style is only applied while `mobile`).
-  const [mobile, setMobile] = useState(false);
+  // The iframe is sized to its content at EVERY breakpoint, so the artifact and
+  // whatever follows it (the end-of-lesson Next card) scroll as one surface in the
+  // pane's own scroller. Desktop used to fill the column and scroll internally
+  // instead, which pinned that card to the bottom of the screen rather than the
+  // bottom of the lesson (2026-09-08). Until the first height message lands, the
+  // min-height below holds the frame open.
   const [contentH, setContentH] = useState<number | null>(null);
   useEffect(() => setContentH(null), [srcDoc]);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    const update = () => setMobile(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       const d = e.data as { __lesson?: boolean; type?: string; height?: unknown };
@@ -346,7 +341,7 @@ export function Frame({
   }, [router, resources]);
 
   // Full-bleed on mobile (edge-to-edge, no side border/rounding); a bordered card
-  // that fills and scrolls internally on desktop.
+  // on desktop. Content-height at both, scrolling with the pane around it.
   return (
     <>
       <iframe
@@ -360,9 +355,9 @@ export function Frame({
           postScroll(id);
           if (reference && id) setTimeout(() => postScroll(id), 350);
         }}
-        scrolling={mobile ? "no" : undefined}
-        style={mobile && contentH ? { height: contentH, overflow: "hidden" } : undefined}
-        className={`w-full border-y border-line bg-card md:min-h-[60vh] md:flex-1 md:rounded-xl md:border ${contentH ? "" : "min-h-[60vh]"}`}
+        scrolling="no"
+        style={contentH ? { height: contentH, overflow: "hidden" } : undefined}
+        className={`w-full shrink-0 border-y border-line bg-card md:rounded-xl md:border ${contentH ? "" : "min-h-[60vh]"}`}
       />
       {mdResource && (
         <MarkdownResourceDialog title={mdResource.title} url={mdResource.url} onClose={() => setMdResource(null)} />
@@ -515,7 +510,7 @@ function LessonView({
   return (
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
       {/* Lesson column — fills the available height on desktop; grows with content on mobile. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3 md:overflow-y-auto">
         {/* Title + actions: a sticky bar under the mobile header; inline on desktop.
             Rises to the top edge in step with the header as it hides on scroll. */}
         <div
@@ -979,7 +974,7 @@ function ReferenceView({
     );
   }
   return (
-    <div className="flex flex-col gap-0 md:h-full md:gap-3">
+    <div className="flex flex-col gap-0 md:h-full md:gap-3 md:overflow-y-auto">
       <h2
         className={`sticky z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
           navHidden ? "top-0" : "top-12"

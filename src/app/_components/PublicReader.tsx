@@ -362,7 +362,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
 
   return (
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
-      <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3 md:overflow-y-auto">
         <div
           className={`sticky z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
             navHidden ? "top-0" : "top-12"
@@ -508,7 +508,7 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
     );
   }
   return (
-    <div className="flex flex-col gap-0 md:h-full md:gap-3">
+    <div className="flex flex-col gap-0 md:h-full md:gap-3 md:overflow-y-auto">
       <h2
         className={`sticky z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
           navHidden ? "top-0" : "top-12"
