@@ -10,12 +10,14 @@ import { api } from "../../../convex/_generated/api";
 import { langInfo } from "../../../convex/languages";
 import { Frame, useCardTarget, useContentHtml } from "./ArtifactView";
 import { Brand } from "./Brand";
-import { checkoutLink } from "./editionUrl";
+import { checkoutLink, useEditionLang } from "./editionUrl";
+import { guestArgs, guestHref, guestRoute, guestScope, type GuestSource } from "./guestSource";
 import { LessonFootCard } from "./LessonFoot";
 import { NavItem } from "./NavItem";
 import { Markdown } from "./MarkdownView";
 import { LockedPane, Paygate } from "./Paygate";
 import { ResourceItem } from "./ResourceItem";
+import { SignIn } from "./SignIn";
 import { useTheme } from "./ThemeContext";
 import { CourseSkeleton, ReaderSkeleton } from "./ui";
 import { useHideOnScroll } from "./useHideOnScroll";
@@ -24,7 +26,14 @@ import { Welcome, useWelcomeDismissed } from "./Welcome";
 import { guestProgress, latchFirstOpen } from "./welcomeDerive";
 import { tenantHomeHref, type TenantSlug } from "~/lib/tenant";
 
-// The Guest reader (issue 07 / ADR 0013): the read-only `/share/[token]` view an
+// Two public entrances render this reader (guestSource.ts, 2026-09-08):
+// `/share/<token>`, the bearer-token link, and `/courses/<slug>`, the course's
+// own URL, which serves it to a signed-out visitor when the Edition is published
+// AND priced. The second is the same reader on a prettier link: the free Preview
+// plus the paygate. Everything below is entrance-agnostic and takes a
+// `GuestSource`; only the query args, the hrefs and the storage scope differ.
+//
+// The Guest reader (issue 07 / ADR 0013): the read-only view an
 // anonymous Guest sees. It mirrors the authed reader's shape but reaches data
 // through the token (api.public.*), shows no write controls, and has no auth
 // chrome (no sign-out, no "Courses"). The lesson iframe stays interactive so a
@@ -40,7 +49,7 @@ const DONE_KEY = "hindi:guest-done";
 // The course bundle + token, plus the Guest's per-device completed set, fetched/
 // loaded once in the layout and read by the panes.
 type GuestCtx = {
-  token: string;
+  src: GuestSource;
   course: GuestCourse;
   completed: ReadonlySet<string>;
   markComplete: (lessonKey: string) => void;
@@ -58,9 +67,12 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 // The persistent sidebar + pane shell, fixed by the URL token. Fetches the
 // course bundle once; an unknown/revoked token renders a friendly dead-end.
-export function PublicCourseShell({ token, children }: { token: string; children: React.ReactNode }) {
+export function PublicCourseShell({ src, children }: { src: GuestSource; children: React.ReactNode }) {
   const t = useTranslations("Reader");
-  const course = useQuery(api.public.publicCourse, { token });
+  const course = useQuery(api.public.publicCourse, guestArgs(src));
+  // The Guest's per-device state is scoped to the Edition they are reading, on
+  // whichever entrance they came in by (guestSource.ts).
+  const scope = guestScope(src);
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
   const navHidden = useHideOnScroll();
@@ -76,19 +88,19 @@ export function PublicCourseShell({ token, children }: { token: string; children
   const [doneLoaded, setDoneLoaded] = useState(false);
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(`${DONE_KEY}:${token}`);
+      const raw = localStorage.getItem(`${DONE_KEY}:${scope}`);
       if (raw) setCompleted(new Set(JSON.parse(raw) as string[]));
     } catch {
       /* unavailable or corrupt storage — start empty */
     }
     setDoneLoaded(true);
-  }, [token]);
+  }, [scope]);
 
   // First open of this Public link on this device? Latched once the stored set has
   // been read (`undefined` = still loading, so no verdict yet), then held for the
   // mount so pressing "Next lesson" mid-read can't yank the panel away.
   const [firstOpen, setFirstOpen] = useState<boolean | null>(null);
-  const [dismissed, dismiss] = useWelcomeDismissed(token);
+  const [dismissed, dismiss] = useWelcomeDismissed(scope);
   useEffect(() => {
     setFirstOpen((prev) =>
       latchFirstOpen(prev, doneLoaded ? guestProgress(completed) : undefined, course?.lessons.length),
@@ -100,22 +112,21 @@ export function PublicCourseShell({ token, children }: { token: string; children
         if (prev.has(lessonKey)) return prev;
         const next = new Set(prev).add(lessonKey);
         try {
-          localStorage.setItem(`${DONE_KEY}:${token}`, JSON.stringify([...next]));
+          localStorage.setItem(`${DONE_KEY}:${scope}`, JSON.stringify([...next]));
         } catch {
           /* ignore */
         }
         return next;
       });
     },
-    [token],
+    [scope],
   );
 
   if (course === undefined) return <CourseSkeleton />;
   if (course === null) return <Centered>{t("linkUnavailable")}</Centered>;
 
   const isRef = pathname.includes("/references/");
-  const activeKey = decodeURIComponent(pathname.split("/").pop() ?? "");
-  const base = `/share/${token}`;
+  const activeKey = decodeURIComponent((pathname.split("?")[0] ?? "").split("/").pop() ?? "");
 
   // Paid marketplace (ADR 0016): a Public link to a PAID Edition serves a Guest
   // only the free Preview + the table of contents (`publicCourse.paywall` is
@@ -142,7 +153,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
   const showWelcome = firstOpen === true && !dismissed && !isRef;
 
   return (
-    <Ctx.Provider value={{ token, course, completed, markComplete }}>
+    <Ctx.Provider value={{ src, course, completed, markComplete }}>
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
         <header
           className={`sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 transition-transform duration-300 md:hidden ${
@@ -219,7 +230,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
             {course.lessons.map((l) => (
               <NavItem
                 key={l.key}
-                href={`${base}/lessons/${l.key}`}
+                href={guestHref(src, `/lessons/${l.key}`)}
                 active={!isRef && activeKey === l.key}
                 done={completed.has(l.key)}
                 locked={l.locked}
@@ -233,7 +244,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
               <p className="px-2 pt-4 text-xs font-semibold uppercase tracking-wider text-accent2">{t("references")}</p>
             )}
             {course.references.map((r) => (
-              <NavItem key={r.key} href={`${base}/references/${r.key}`} active={isRef && activeKey === r.key} locked={r.locked}>
+              <NavItem key={r.key} href={guestHref(src, `/references/${r.key}`)} active={isRef && activeKey === r.key} locked={r.locked}>
                 {r.title}
               </NavItem>
             ))}
@@ -279,7 +290,7 @@ export function PublicCourseShell({ token, children }: { token: string; children
               course={course.title}
               lessonCount={course.lessons.length}
               mission={course.mission}
-              next={startLesson && { seq: startLesson.seq, title: startLesson.title, href: `${base}/lessons/${startLesson.key}` }}
+              next={startLesson && { seq: startLesson.seq, title: startLesson.title, href: guestHref(src, `/lessons/${startLesson.key}`) }}
               homeHref={homeHref}
               onDismiss={dismiss}
             />
@@ -308,14 +319,15 @@ function ThemeToggle() {
 }
 
 // `/share/[token]` — redirect to the first Lesson, mirroring CourseIndex.
-export function PublicCourseIndex({ token }: { token: string }) {
+export function PublicCourseIndex({ src }: { src: GuestSource }) {
   const t = useTranslations("Reader");
-  const course = useQuery(api.public.publicCourse, { token });
+  const course = useQuery(api.public.publicCourse, guestArgs(src));
   const router = useRouter();
   const first = course ? firstLessonKey(course.lessons) : null;
+  const firstHref = first ? guestHref(src, `/lessons/${first}`) : null;
   useEffect(() => {
-    if (first) router.replace(`/share/${token}/lessons/${first}`);
-  }, [first, token, router]);
+    if (firstHref) router.replace(firstHref);
+  }, [firstHref, router]);
 
   if (course === undefined) return <ReaderSkeleton />;
   if (course === null) return <Centered>{t("linkUnavailable")}</Centered>;
@@ -324,12 +336,12 @@ export function PublicCourseIndex({ token }: { token: string }) {
   return <ReaderSkeleton />;
 }
 
-export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKey: string }) {
+export function PublicLessonPane({ src, lessonKey }: { src: GuestSource; lessonKey: string }) {
   const t = useTranslations("Reader");
   const { theme } = useTheme();
   const navHidden = useHideOnScroll();
   const { course, completed, markComplete } = useGuestCourse();
-  const lesson = useQuery(api.public.publicLesson, { token, key: lessonKey });
+  const lesson = useQuery(api.public.publicLesson, { ...guestArgs(src), key: lessonKey });
   const html = useContentHtml(lesson);
   const qa = course.questions.filter((q) => q.lessonKey === lessonKey);
   const next = nextLessonKey(course.lessons, lessonKey);
@@ -371,7 +383,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
           {next && (
             <Link
-              href={`/share/${token}/lessons/${next}`}
+              href={guestHref(src, `/lessons/${next}`)}
               onClick={() => markComplete(lessonKey)}
               className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90"
             >
@@ -397,7 +409,7 @@ export function PublicLessonPane({ token, lessonKey }: { token: string; lessonKe
             Next link. Not on a paid Preview: the next lesson there is locked,
             and the top-bar link already carries the paygate hop. */}
         {!preview && (
-          <GuestLessonFoot course={course} lessonKey={lessonKey} completed={completed} markComplete={markComplete} token={token} />
+          <GuestLessonFoot course={course} lessonKey={lessonKey} completed={completed} markComplete={markComplete} src={src} />
         )}
         {/* Q&A sits past the paygate — withheld from a paid-Edition Guest. */}
         {!preview && teacherQa && (
@@ -425,13 +437,13 @@ function GuestLessonFoot({
   lessonKey,
   completed,
   markComplete,
-  token,
+  src,
 }: {
   course: GuestCourse;
   lessonKey: string;
   completed: ReadonlySet<string>;
   markComplete: (lessonKey: string) => void;
-  token: string;
+  src: GuestSource;
 }) {
   const nextKey = nextLessonKey(course.lessons, lessonKey);
   const next = nextKey ? course.lessons.find((l) => l.key === nextKey) : undefined;
@@ -440,7 +452,7 @@ function GuestLessonFoot({
       next={
         next
           ? {
-              href: `/share/${token}/lessons/${next.key}`,
+              href: guestHref(src, `/lessons/${next.key}`),
               seq: next.seq,
               title: next.title.split(TITLE_SEP)[0]!.trim(),
             }
@@ -478,17 +490,17 @@ function GuestQuestions({ qa }: { qa: GuestCourse["questions"] }) {
   );
 }
 
-export function PublicReferencePane({ token, refKey }: { token: string; refKey: string }) {
+export function PublicReferencePane({ src, refKey }: { src: GuestSource; refKey: string }) {
   const t = useTranslations("Reader");
   const { theme } = useTheme();
   const { course } = useGuestCourse();
   const navHidden = useHideOnScroll();
-  const ref = useQuery(api.public.publicReference, { token, key: refKey });
+  const ref = useQuery(api.public.publicReference, { ...guestArgs(src), key: refKey });
   const html = useContentHtml(ref);
   const cardTarget = useCardTarget(refKey);
   // A Guest is already on the course's public page, so the card share always has a
   // destination (reference-cards/03): the `/share/<token>` landing on this host.
-  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/share/${token}` : null;
+  const shareUrl = typeof window !== "undefined" ? `${window.location.origin}${guestHref(src)}` : null;
   const share = shareUrl ? { courseTitle: course.title, url: shareUrl } : null;
   if (ref === undefined || html === undefined) return <ReaderSkeleton aside={false} />;
   if (ref === null) return <p className="text-soft">{t("referenceNotFound")}</p>;
@@ -518,5 +530,33 @@ export function PublicReferencePane({ token, refKey }: { token: string; refKey: 
       </h2>
       <Frame html={html} withBridge={false} theme={theme} themeCss dir={course.dir} lang={course.lang} resources={course.resources} reference cardTarget={cardTarget} share={share} />
     </div>
+  );
+}
+
+// The signed-out branch of every `/courses/...` route (AppGate). A course whose
+// Edition is published AND priced is public on its own URL, so a stranger who
+// follows that link gets the Guest reader with its free Preview instead of a
+// login wall. Everything else, a private course, an unpublished one, a published
+// FREE one, resolves to null here and the visitor is asked to create an account,
+// which is the gate that has always been there.
+export function PublicCourseFallback() {
+  const pathname = usePathname() ?? "";
+  const lang = useEditionLang();
+  const route = guestRoute(pathname);
+  const src: GuestSource | null = route ? { slug: route.slug, lang } : null;
+  const course = useQuery(api.public.publicCourse, src ? guestArgs(src) : "skip");
+  if (!route || !src) return <SignIn />;
+  if (course === undefined) return <CourseSkeleton />;
+  if (course === null) return <SignIn />;
+  return (
+    <PublicCourseShell src={src}>
+      {route.kind === "index" ? (
+        <PublicCourseIndex src={src} />
+      ) : route.kind === "lesson" ? (
+        <PublicLessonPane src={src} lessonKey={route.key} />
+      ) : (
+        <PublicReferencePane src={src} refKey={route.key} />
+      )}
+    </PublicCourseShell>
   );
 }

@@ -18,5 +18,5 @@ export default async function PublicCourseLayout({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  return <PublicCourseShell token={token}>{children}</PublicCourseShell>;
+  return <PublicCourseShell src={{ token }}>{children}</PublicCourseShell>;
 }
