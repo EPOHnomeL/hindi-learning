@@ -2,10 +2,10 @@
 
 import { type FunctionReturnType } from "convex/server";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { Icon, type IconName } from "../icons";
-import { IconButton } from "../ui";
+import { IconButton, Modal } from "../ui";
 
 // Shared pieces of the manage route (ui-overhaul 16/19), split out so the shell
 // and its tabs can import them without importing each other.
@@ -42,23 +42,25 @@ export function EditionBadges({ edition }: { edition: Edition }) {
 // list, add-a-language, and the turn-on-selling flow.
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const t = useTranslations("Common");
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => ref.current?.showModal(), []);
+  // The bottom-sheet layout is the only thing this adds to `Modal`: the shell
+  // classes. The mechanics and the backdrop are shared (ticket 39's candidate).
   return (
-    <dialog
-      ref={ref}
+    <Modal
       onClose={onClose}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close();
-      }}
-      className="m-0 mt-auto w-full max-w-none rounded-t-2xl border border-line bg-paper p-0 text-ink shadow-xl backdrop:bg-black/50 sm:m-auto sm:w-[92vw] sm:max-w-md sm:rounded-2xl"
+      shell="m-0 mt-auto w-full max-w-none rounded-t-2xl bg-paper sm:m-auto sm:w-[92vw] sm:max-w-md sm:rounded-2xl"
     >
-      <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-        <h2 className="min-w-0 truncate text-sm font-semibold text-accent">{title}</h2>
-        <IconButton icon="x" label={t("close")} variant="ghost" onClick={() => ref.current?.close()} />
-      </div>
-      <div className="max-h-[75dvh] overflow-y-auto px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">{children}</div>
-    </dialog>
+      {(close) => (
+        <>
+          <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+            <h2 className="min-w-0 truncate text-sm font-semibold text-accent">{title}</h2>
+            <IconButton icon="x" label={t("close")} variant="ghost" onClick={close} />
+          </div>
+          <div className="max-h-[75dvh] overflow-y-auto px-4 py-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+            {children}
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
 

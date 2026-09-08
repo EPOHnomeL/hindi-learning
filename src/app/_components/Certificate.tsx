@@ -8,7 +8,7 @@ import { publicCourseUrl as buildPublicCourseUrl, useEditionLang } from "./editi
 import { langDir } from "../../../convex/languages";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Icon } from "./icons";
-import { IconButton } from "./ui";
+import { IconButton, Modal } from "./ui";
 import { useTenant } from "./TenantContext";
 // The resolved Emblem (ADR 0017) as the read seams return it — an image resolves
 // to a same-origin URL, otherwise a glyph (a subject emoji or the generic default).
@@ -373,22 +373,18 @@ function CertificateDialog({
   onClose: () => void;
 }) {
   const t = useTranslations("Certificate");
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => ref.current?.showModal(), []);
 
+  // The shell was hand-rolled here, with a `black/40` backdrop where the shared
+  // one is `black/50`. Ticket 39: the mechanics are `Modal`'s and this keeps its
+  // own header, which is the half that genuinely differs.
   return (
-    <dialog
-      ref={ref}
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close();
-      }}
-      className="m-auto w-[92vw] max-w-lg rounded-2xl border border-line bg-paper p-0 text-ink shadow-xl backdrop:bg-black/40"
-    >
+    <Modal onClose={onClose} shell="m-auto w-[92vw] max-w-lg rounded-2xl bg-paper">
+      {(close) => (
+        <>
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2">
         <h2 className="text-sm font-semibold text-accent">{certificate ? t("yourCertificate") : t("claimYours")}</h2>
         <button
-          onClick={() => ref.current?.close()}
+          onClick={close}
           aria-label={t("close")}
           className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
         >
@@ -398,7 +394,9 @@ function CertificateDialog({
       <div className="px-6 py-6">
         <CertificateBody topicSlug={topicSlug} certificate={certificate} />
       </div>
-    </dialog>
+        </>
+      )}
+    </Modal>
   );
 }
 

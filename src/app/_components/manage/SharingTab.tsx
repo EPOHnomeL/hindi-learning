@@ -931,51 +931,32 @@ function RemoveEditionConfirm({
 // "Are you sure?" for re-translating a ready edition: carries the engine picker
 // inside the confirm, seeded from the engine that last produced this edition.
 // Switching engines forces a full redo server-side; the same engine is a cheap
-// resume/repair. Its own <dialog> shell (not ConfirmDialog) so the engine
-// toggle can sit above the buttons.
+// resume/repair.
+//
+// **It had its own <dialog> shell purely because `ConfirmDialog` took a `body:
+// string` and had no slot for the engine toggle.** Ticket 39 widened
+// `ConfirmDialog` (a ReactNode body and an `extra` slot), which is what let this
+// twin go: the whole reason it forked was an interface too narrow to say what it
+// needed.
 function RetranslateConfirm({ topicSlug, edition, onClose }: { topicSlug: string; edition: Edition; onClose: () => void }) {
-  const t = useTranslations("Common");
   const te = useTranslations("Editions");
-  const start = useAction(api.translate.startTranslation);
   const [engine, setEngine] = useState<Engine>(edition.engine);
-  const [busy, setBusy] = useState(false);
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => ref.current?.showModal(), []);
+  const { run, busy, error } = useMutationRun(useAction(api.translate.startTranslation), te("updateError"));
   return (
-    <dialog
-      ref={ref}
+    <ConfirmDialog
+      title={te("confirmRetranslateTitle")}
+      body={
+        <>
+          {te("confirmRetranslateBody", { native: edition.name })}
+          {error && <span className="mt-2 block text-danger">{error}</span>}
+        </>
+      }
+      extra={<EngineToggle value={engine} onChange={setEngine} disabled={busy} />}
+      confirmLabel={busy ? te("retranslating") : te("confirmRetranslate")}
+      confirmDisabled={busy}
+      onConfirm={() => void run({ topicSlug, lang: edition.lang, engine }).then((ok) => ok !== undefined && onClose())}
       onClose={onClose}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close();
-      }}
-      className="m-auto w-[92vw] max-w-md rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/50"
-    >
-      <div className="px-6 py-5">
-        <h2 className="text-base font-semibold text-accent">{te("confirmRetranslateTitle")}</h2>
-        <p className="mt-2 text-sm leading-relaxed text-soft">{te("confirmRetranslateBody", { native: edition.name })}</p>
-        <div className="mt-4">
-          <EngineToggle value={engine} onChange={setEngine} disabled={busy} />
-        </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            onClick={() => ref.current?.close()}
-            className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi"
-          >
-            {t("cancel")}
-          </button>
-          <button
-            onClick={() => {
-              setBusy(true);
-              void start({ topicSlug, lang: edition.lang, engine }).then(onClose, () => setBusy(false));
-            }}
-            disabled={busy}
-            className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-          >
-            {busy ? te("retranslating") : te("confirmRetranslate")}
-          </button>
-        </div>
-      </div>
-    </dialog>
+    />
   );
 }
 

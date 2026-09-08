@@ -80,12 +80,52 @@ export function IconButton({
   );
 }
 
-// One reusable modal built on the native <dialog>, so Esc-to-close, the backdrop,
-// and focus trapping come for free. Renders a titled header (with a close button)
-// above the body; pass a wider `className` (e.g. "max-w-2xl") when the content
-// needs more room. Closing goes through the element's own `close()`, which fires
-// the `close` event → `onClose` (the caller unmounts), so backdrop click, Esc, and
-// the X all funnel through one path.
+// **The one native-<dialog>.** Eight call sites opened a modal and each repeated
+// the same mechanics by hand: the ref, the `showModal()` on mount, the `onClose`,
+// and the `e.target === ref.current` backdrop close. The backdrop had already
+// drifted, `black/50` in three of them and `black/40` in the other three, and
+// `ArtifactView` carried a `ponytail:` note waiting for a third use of its
+// near-twin while the third, fourth and fifth uses already existed.
+//
+// This owns the mechanics and the invariants (the border, the shadow, and ONE
+// backdrop). `shell` carries only what genuinely varies between a centred dialog,
+// a bottom sheet and a confirm: the width, the surface and the corners. It must
+// not carry a `backdrop:` utility, which is the drift this exists to end, and a
+// test in `ui.test.ts` asserts no other file reaches for `<dialog` at all.
+//
+// `children` is a render-prop given `close`, matching `Menu` below, because the
+// headers genuinely differ (a plain X, an IconButton, a row of extra actions) and
+// each of them needs to close. Closing always goes through the element's own
+// `close()`, which fires the `close` event and calls `onClose`, so backdrop
+// click, Esc and the X all funnel through one path.
+export function Modal({
+  onClose,
+  shell,
+  children,
+}: {
+  onClose: () => void;
+  shell: string;
+  children: (close: () => void) => ReactNode;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => ref.current?.showModal(), []);
+  const close = () => ref.current?.close();
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === ref.current) close(); // backdrop click
+      }}
+      className={`border border-line p-0 text-ink shadow-xl backdrop:bg-black/50 ${shell}`}
+    >
+      {children(close)}
+    </dialog>
+  );
+}
+
+// The centred dialog with a titled header: the common case. Pass a wider `className`
+// (e.g. "max-w-2xl") when the content needs more room.
 export function Dialog({
   title,
   onClose,
@@ -100,25 +140,20 @@ export function Dialog({
   bodyClassName?: string;
 }) {
   const t = useTranslations("Common");
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => ref.current?.showModal(), []);
   return (
-    <dialog
-      ref={ref}
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close(); // backdrop click
-      }}
-      className={`m-auto w-[92vw] ${className ?? "max-w-lg"} rounded-2xl border border-line bg-paper p-0 text-ink shadow-xl backdrop:bg-black/50`}
-    >
-      {title !== undefined && (
-        <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-          <h2 className="min-w-0 truncate text-sm font-semibold text-accent">{title}</h2>
-          <IconButton icon="x" label={t("close")} variant="ghost" onClick={() => ref.current?.close()} />
-        </div>
+    <Modal onClose={onClose} shell={`m-auto w-[92vw] ${className ?? "max-w-lg"} rounded-2xl bg-paper`}>
+      {(close) => (
+        <>
+          {title !== undefined && (
+            <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+              <h2 className="min-w-0 truncate text-sm font-semibold text-accent">{title}</h2>
+              <IconButton icon="x" label={t("close")} variant="ghost" onClick={close} />
+            </div>
+          )}
+          <div className={bodyClassName ?? "max-h-[80vh] overflow-y-auto px-6 py-5"}>{children}</div>
+        </>
       )}
-      <div className={bodyClassName ?? "max-h-[80vh] overflow-y-auto px-6 py-5"}>{children}</div>
-    </dialog>
+    </Modal>
   );
 }
 
@@ -326,49 +361,49 @@ export function DashboardSkeleton() {
 
 // A native-<dialog> yes/no confirm for destructive actions (e.g. "Mark course
 // complete"). Shared by CourseShell and the course settings dialog.
+// `body` takes a ReactNode and there is an `extra` slot above the buttons, which
+// is the whole reason the hand-rolled twins existed: `SharingTab`'s retranslate
+// confirm needed one control above the buttons, and a `body: string` with no node
+// slot left it no choice but to re-implement the entire shell.
 export function ConfirmDialog({
   title,
   body,
+  extra,
   confirmLabel,
   confirmDisabled = false,
   onConfirm,
   onClose,
 }: {
   title: string;
-  body: string;
+  body: ReactNode;
+  extra?: ReactNode;
   confirmLabel: string;
   confirmDisabled?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }) {
   const t = useTranslations("Common");
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => ref.current?.showModal(), []);
   return (
-    <dialog
-      ref={ref}
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close();
-      }}
-      className="m-auto w-[92vw] max-w-md rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/50"
-    >
-      <div className="px-6 py-5">
-        <h2 className="text-base font-semibold text-accent">{title}</h2>
-        <p className="mt-2 text-sm leading-relaxed text-soft">{body}</p>
-        <div className="mt-5 flex justify-end gap-2">
-          <button onClick={() => ref.current?.close()} className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi">
-            {t("cancel")}
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={confirmDisabled}
-            className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-          >
-            {confirmLabel}
-          </button>
+    <Modal onClose={onClose} shell="m-auto w-[92vw] max-w-md rounded-2xl bg-card">
+      {(close) => (
+        <div className="px-6 py-5">
+          <h2 className="text-base font-semibold text-accent">{title}</h2>
+          <div className="mt-2 text-sm leading-relaxed text-soft">{body}</div>
+          {extra !== undefined && <div className="mt-4">{extra}</div>}
+          <div className="mt-5 flex justify-end gap-2">
+            <button onClick={close} className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi">
+              {t("cancel")}
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={confirmDisabled}
+              className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+            >
+              {confirmLabel}
+            </button>
+          </div>
         </div>
-      </div>
-    </dialog>
+      )}
+    </Modal>
   );
 }

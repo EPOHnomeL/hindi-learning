@@ -18,7 +18,7 @@ import { LessonFootCard } from "./LessonFoot";
 import { Markdown } from "./MarkdownView";
 import { MarkdownResourceDialog } from "./ResourceItem";
 import { cardIdFromHash, composeCardShare, editionToEdit, resolveArtifactClick, resourceTarget } from "./readerDerive";
-import { ReaderSkeleton } from "./ui";
+import { Modal, ReaderSkeleton } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useTenant } from "./TenantContext";
 import { useHideOnScroll } from "./useHideOnScroll";
@@ -757,11 +757,17 @@ function ContentEditor({
     }
   }
 
+  // **The one modal that is deliberately NOT a `Modal`** (ticket 39), and the
+  // reason is a behaviour rather than a style: this is a prose editor, so it has
+  // no backdrop-click close. A stray click beside an editor that closed it would
+  // throw away unsaved work, which is exactly what `Modal` gives every other
+  // modal for free and must not give this one. Its own `showModal` and its own
+  // `<dialog>` say so on purpose; `ui.test.ts` records it as the single exception.
   return (
     <dialog
       ref={dialogRef}
       onClose={onClose}
-      className="m-auto flex h-[90vh] w-[96vw] max-w-4xl flex-col rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
+      className="m-auto flex h-[90vh] w-[96vw] max-w-4xl flex-col rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/50"
     >
       <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
         <h2 className="min-w-0 truncate text-base font-semibold text-ink">{t("editHeading", { label: t(label) })}</h2>
@@ -1103,33 +1109,31 @@ function QuestionBox({
   );
 }
 
-// One Q&A opened in a comfortable reading width — the desktop ask column is only
-// md:w-80, too narrow for long replies. ponytail: a near-twin of Dashboard's
-// MissionDialog (native <dialog> → free Esc/backdrop/focus-trap); extract to a
-// shared module if a third use appears.
+// One Q&A opened in a comfortable reading width: the desktop ask column is only
+// md:w-80, too narrow for long replies.
+//
+// **The `ponytail:` marker here said to extract if a third use appeared.** It
+// had appeared: by 2026-09-08 there were five hand-rolled modal shells, not two.
+// `Modal` in `./ui` is that extraction (ticket 39), and this is a caller of it
+// with its own header, which is the only part that was ever specific to a Q&A.
 function QaDialog({ question, reply, onClose }: { question: string; reply: string; onClose: () => void }) {
   const t = useTranslations("Artifact");
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => ref.current?.showModal(), []);
   return (
-    <dialog
-      ref={ref}
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close(); // click outside the content = backdrop
-      }}
-      className="m-auto w-[92vw] max-w-2xl rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
-    >
-      <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-3">
-        <h2 className="min-w-0 text-base font-semibold text-ink">{question}</h2>
-        <button onClick={() => ref.current?.close()} aria-label={t("close")} className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
-          ✕
-        </button>
-      </div>
-      <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
-        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent2">{t("teacher")}</p>
-        <Markdown source={reply} className="flex flex-col gap-3 text-base leading-relaxed text-ink" />
-      </div>
-    </dialog>
+    <Modal onClose={onClose} shell="m-auto w-[92vw] max-w-2xl rounded-2xl bg-card">
+      {(close) => (
+        <>
+          <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-3">
+            <h2 className="min-w-0 text-base font-semibold text-ink">{question}</h2>
+            <button onClick={close} aria-label={t("close")} className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
+              ✕
+            </button>
+          </div>
+          <div className="max-h-[80vh] overflow-y-auto px-6 py-5">
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-accent2">{t("teacher")}</p>
+            <Markdown source={reply} className="flex flex-col gap-3 text-base leading-relaxed text-ink" />
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }

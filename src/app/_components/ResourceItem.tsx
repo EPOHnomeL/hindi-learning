@@ -1,10 +1,11 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon } from "./icons";
 import { Markdown } from "./MarkdownView";
 import { resourceOpenMode } from "./readerDerive";
+import { Modal } from "./ui";
 
 // One Resource in a reader sidebar. Shared by the authed reader (CourseShell) and
 // the Guest reader (PublicReader) — both list the same row shape. A PDF or an
@@ -85,12 +86,10 @@ export function ResourceItem({ resource, locked = false }: { resource: Resource;
 // CORS), we fall back to opening the raw file directly.
 export function MarkdownResourceDialog({ title, url, onClose }: { title: string; url: string; onClose: () => void }) {
   const t = useTranslations("Resource");
-  const ref = useRef<HTMLDialogElement>(null);
   const [state, setState] = useState<
     { status: "loading" } | { status: "ready"; text: string } | { status: "error" }
   >({ status: "loading" });
 
-  useEffect(() => ref.current?.showModal(), []);
   useEffect(() => {
     let alive = true;
     fetch(url)
@@ -102,15 +101,13 @@ export function MarkdownResourceDialog({ title, url, onClose }: { title: string;
     };
   }, [url]);
 
+  // Hand-rolled shell, `black/40` backdrop. Ticket 39: `Modal` owns the
+  // mechanics; the header keeps its extra "raw file" action, which is why this
+  // is a render-prop rather than a `Dialog`.
   return (
-    <dialog
-      ref={ref}
-      onClose={onClose}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close(); // click on the backdrop
-      }}
-      className="m-auto w-[92vw] max-w-2xl rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/40"
-    >
+    <Modal onClose={onClose} shell="m-auto w-[92vw] max-w-2xl rounded-2xl bg-card">
+      {(close) => (
+        <>
       <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
         <h2 className="min-w-0 truncate text-base font-semibold text-accent">{title}</h2>
         <div className="flex shrink-0 items-center gap-1">
@@ -124,7 +121,7 @@ export function MarkdownResourceDialog({ title, url, onClose }: { title: string;
             {t("raw")} ↗
           </a>
           <button
-            onClick={() => ref.current?.close()}
+            onClick={close}
             aria-label={t("close")}
             className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
           >
@@ -144,6 +141,8 @@ export function MarkdownResourceDialog({ title, url, onClose }: { title: string;
         )}
         {state.status === "ready" && <Markdown source={state.text} />}
       </div>
-    </dialog>
+        </>
+      )}
+    </Modal>
   );
 }
