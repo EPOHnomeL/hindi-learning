@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { editionPrice, hasEntitlement, heldLangs, translatedTitle } from "./edition";
 import { getOwnedTopic, topicBySlug } from "./topicAccess";
@@ -11,7 +10,8 @@ import { SOURCE_LANG } from "./sourceLang";
 import { isReadySeller } from "./sellerStatus";
 import { topicLessonCounts } from "./progressCounts";
 import { langInfo } from "./languages";
-import { appUrl, buildCheckoutFields, platformFeeBps, processUrl, sellingEnabled, splitNet } from "./payfast";
+import { appUrl, buildCheckoutFields, platformFeeBps, processUrl, sellingEnabled } from "./payfast";
+import { oncePerPayment, purchasableEdition, recordMoneyEvent } from "./moneyEvent";
 import { isCallerAdmin } from "./whitelist";
 import { chargeCents, regionForCountry } from "./regions";
 
@@ -259,18 +259,6 @@ export const revokeEntitlement = mutation({
 // double-writes the Ledger. PayFast is mocked at the HTTP boundary; this
 // mutation is pure Convex and fully tested.
 
-// Whether this PayFast payment has already been processed. Records it (inside
-// the same transaction as the mint, so a rollback un-records it) and returns
-// true if it was seen before — the caller no-ops on true.
-async function alreadyProcessed(ctx: MutationCtx, pfPaymentId: string): Promise<boolean> {
-  const seen = await ctx.db
-    .query("payfastEvents")
-    .withIndex("by_pf_payment_id", (q) => q.eq("pfPaymentId", pfPaymentId))
-    .unique();
-  if (seen) return true;
-  await ctx.db.insert("payfastEvents", { pfPaymentId });
-  return false;
-}
 
 // Grant access on a verified COMPLETE payment AND record what the operator now
 // owes the Seller — one seam, one transaction ("money in + what we owe"). The
@@ -294,12 +282,7 @@ export const fulfillPurchase = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, { pfPaymentId, topicId, lang, email: rawEmail, gross, fee, net }) => {
-    // Internal (only the verified ITN calls this), but money is money: the
-    // amounts must be sane non-negative integer cents.
-    for (const n of [gross, fee, net]) {
-      if (!Number.isInteger(n) || n < 0) throw new Error("ledger amounts must be non-negative integer cents");
-    }
-    if (await alreadyProcessed(ctx, pfPaymentId)) return null;
+    if (await oncePerPayment(ctx, pfPaymentId)) return null;
     const email = normaliseEmail(rawEmail);
     const user = await ctx.db
       .query("users")
@@ -313,20 +296,16 @@ export const fulfillPurchase = internalMutation({
     // the grant AND the payfastEvents row, so PayFast's retry re-runs it whole.
     const topic = await ctx.db.get(topicId);
     if (!topic?.ownerId) throw new Error("sold course has no owner to owe");
-    const { sellerShare, platformShare } = splitNet(net, platformFeeBps());
-    await ctx.db.insert("ledger", {
-      topicId,
-      lang,
-      sellerId: topic.ownerId,
-      buyerEmail: email,
-      gross,
-      fee,
-      net,
-      sellerShare,
-      platformShare,
-      pfPaymentId,
+    await recordMoneyEvent(ctx, {
       kind: "sale",
       status: "owed",
+      topicId,
+      lang,
+      payeeId: topic.ownerId,
+      buyerEmail: email,
+      amounts: { gross, fee, net },
+      platformBps: platformFeeBps(),
+      pfPaymentId,
     });
     return null;
   },
@@ -428,15 +407,9 @@ export const startCheckout = mutation({
     // users.email is stored normalised at sign-up; normalise again anyway so the
     // intent row can never disagree with the ITN's comparison.
     const email = normaliseEmail(user.email);
-    const topic = await topicBySlug(ctx, topicSlug);
-    if (!topic) throw new Error("this edition isn't for sale");
-    const listing = await editionPrice(ctx, topic._id, lang);
-    if (!listing) throw new Error("this edition isn't for sale");
-    // The Seller must still be ready (grant + payout bank details): a sale with
-    // nowhere to send the Seller's cut must never start.
-    if (!topic.ownerId || !(await isReadySeller(ctx, topic.ownerId))) {
-      throw new Error("this course isn't available for purchase right now");
-    }
+    // On sale right now, with a Seller who has somewhere to be paid out to. The
+    // EFT rail opens with the same gate, through the same function.
+    const { topic, listing } = await purchasableEdition(ctx, topicSlug, lang);
 
     const merchantId = process.env.PAYFAST_MERCHANT_ID;
     const merchantKey = process.env.PAYFAST_MERCHANT_KEY;

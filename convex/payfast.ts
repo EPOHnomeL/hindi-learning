@@ -245,17 +245,9 @@ export function platformFeeBps(): number {
   return env().PLATFORM_FEE_BPS;
 }
 
-// Split a sale's net (cents, from the ITN's amount_net) into the Seller's and
-// the platform's shares. The bps is the PLATFORM's cut — its name, and the
-// prior rail's convention (1500 meant a 15% platform take-rate); the PRD's
-// literal formula handed the bps to the seller, which at the decided 5000 is
-// identical but at any other value inverts the economics, so the name wins.
-// The shares always sum back to net and never go negative — rounding neither
-// loses nor mints a cent, even on a fixed-fee-heavy cheap sale.
-export function splitNet(netCents: number, bps: number): { sellerShare: number; platformShare: number } {
-  const platformShare = Math.round((netCents * bps) / 10_000);
-  return { sellerShare: netCents - platformShare, platformShare };
-}
+// The payout split moved to `moneyEvent.ts` on 2026-09-08. It never belonged
+// here: the donation, Voucher Batch and Access Code rails all split a net and
+// none of them touches a gateway. This module is the PayFast wire format.
 
 // ---- ZAR formatting -----------------------------------------------------------------
 

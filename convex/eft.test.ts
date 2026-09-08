@@ -428,8 +428,9 @@ test("confirming mints the Entitlement and the Ledger row a manual sale needs", 
   expect(ent).toMatchObject({ lang: "en", eftRef: ref });
   expect(ent!.pfPaymentId).toBeUndefined();
 
-  // No gateway took a cut, so fee is 0 and net == gross; the 50/50 split still
-  // comes from `splitNet`, so the payout arithmetic is the card rail's.
+  // No gateway took a cut, so fee is 0 and net == gross; the 50/50 split comes
+  // from the shared money-event writer, so the payout arithmetic IS the card
+  // rail's rather than a copy that agrees with it (ticket 29).
   const [row] = await ledgerRows(t);
   expect(row).toMatchObject({
     topicId,

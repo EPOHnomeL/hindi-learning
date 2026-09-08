@@ -4,15 +4,15 @@ import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { editionPrice, hasEntitlement, translatedTitle } from "./edition";
+import { hasEntitlement, translatedTitle } from "./edition";
 import { topicBySlug } from "./topicAccess";
 import { normaliseEmail } from "./shareGrants";
 import { SOURCE_LANG } from "./sourceLang";
 import { langInfo } from "./languages";
-import { appUrl, platformFeeBps, splitNet } from "./payfast";
+import { appUrl, platformFeeBps } from "./payfast";
+import { offGateway, purchasableEdition, recordMoneyEvent } from "./moneyEvent";
 import { eftAllowed, regionForCountry } from "./regions";
 import { payoutDetailsValidator } from "./schema";
-import { isReadySeller } from "./sellerStatus";
 import { isCallerAdmin } from "./whitelist";
 
 // The **manual EFT rail** (ywampotch-launch PRD part 2): a second payment rail
@@ -180,15 +180,9 @@ export const startEftPurchase = mutation({
     }
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("sign in to pay by EFT — a purchase attaches to your account");
-    const topic = await topicBySlug(ctx, topicSlug);
-    if (!topic) throw new Error("this edition isn't for sale");
-    const listing = await editionPrice(ctx, topic._id, lang);
-    if (!listing) throw new Error("this edition isn't for sale");
-    // Same invariant as the card rail: never sell a seat whose Seller has nowhere
-    // to be paid out to.
-    if (!topic.ownerId || !(await isReadySeller(ctx, topic.ownerId))) {
-      throw new Error("this course isn't available for purchase right now");
-    }
+    // Same gate as the card rail, and now through the same function rather than a
+    // comment saying it is the same.
+    const { topic, listing } = await purchasableEdition(ctx, topicSlug, lang);
 
     const existing = await pendingIntent(ctx, userId, topic._id, lang);
     if (existing) return { ref: existing.ref, amount: existing.amount, bank: bankOf(row) };
@@ -398,21 +392,18 @@ export const confirmEftPayment = mutation({
 
     // The money, recorded the way the card rail records it — same table, same
     // `owed` status, same split — so Sales and Payouts need no EFT special case.
-    const gross = intent.amount;
-    const { sellerShare, platformShare } = splitNet(gross, platformFeeBps());
-    await ctx.db.insert("ledger", {
-      topicId: intent.topicId,
-      lang: intent.lang,
-      sellerId: topic.ownerId,
-      buyerEmail: normaliseEmail(user.email ?? ""),
-      gross,
-      fee: 0,
-      net: gross,
-      sellerShare,
-      platformShare,
-      eftRef: ref,
+    // Through the same writer as the card rail now, rather than a copy of it, so
+    // this rail also gets the non-negative-integer cents check it never had.
+    await recordMoneyEvent(ctx, {
       kind: "sale",
       status: "owed",
+      topicId: intent.topicId,
+      lang: intent.lang,
+      payeeId: topic.ownerId,
+      buyerEmail: normaliseEmail(user.email ?? ""),
+      amounts: offGateway(intent.amount),
+      platformBps: platformFeeBps(),
+      eftRef: ref,
     });
 
     await ctx.db.patch(intent._id, { status: "confirmed" });

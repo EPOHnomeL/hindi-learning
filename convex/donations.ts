@@ -4,7 +4,8 @@ import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { normaliseEmail } from "./shareGrants";
 import { isReadySeller } from "./sellerStatus";
-import { appUrl, buildCheckoutFields, processUrl, randFromCents, sellingEnabled, splitNet } from "./payfast";
+import { appUrl, buildCheckoutFields, processUrl, randFromCents, sellingEnabled } from "./payfast";
+import { oncePerPayment, recordMoneyEvent } from "./moneyEvent";
 import { USD_ZAR_RATE, zarCentsFromUsdCents } from "./rates";
 
 // The **donation rail** (ADR 0027) — the other way money enters the platform.
@@ -170,15 +171,7 @@ export const fulfillDonation = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, { pfPaymentId, tenantSlug, donorEmail, gross, fee, net }) => {
-    for (const n of [gross, fee, net]) {
-      if (!Number.isInteger(n) || n < 0) throw new Error("ledger amounts must be non-negative integer cents");
-    }
-    const seen = await ctx.db
-      .query("payfastEvents")
-      .withIndex("by_pf_payment_id", (q) => q.eq("pfPaymentId", pfPaymentId))
-      .unique();
-    if (seen) return null;
-    await ctx.db.insert("payfastEvents", { pfPaymentId });
+    if (await oncePerPayment(ctx, pfPaymentId)) return null;
 
     const target = await donationTarget(ctx, tenantSlug);
     // A donation that arrives with no valid payee is a genuine payment we cannot
@@ -186,19 +179,17 @@ export const fulfillDonation = internalMutation({
     // banking it silently with nobody owed.
     if ("error" in target) throw new Error(`cannot attribute donation ${pfPaymentId}: ${target.error}`);
 
-    const { sellerShare, platformShare } = splitNet(net, DONATION_FEE_BPS);
-    await ctx.db.insert("ledger", {
-      // No topicId, no lang: a donation buys no Edition.
-      sellerId: target.payeeId,
-      buyerEmail: normaliseEmail(donorEmail),
-      gross,
-      fee,
-      net,
-      sellerShare,
-      platformShare,
-      pfPaymentId,
+    // No topicId, no lang: a donation buys no Edition (ADR 0027). The tenth
+    // rather than the half is this rail's own rate, which is why the bps is the
+    // caller's to pass.
+    await recordMoneyEvent(ctx, {
       kind: "donation",
       status: "owed",
+      payeeId: target.payeeId,
+      buyerEmail: normaliseEmail(donorEmail),
+      amounts: { gross, fee, net },
+      platformBps: DONATION_FEE_BPS,
+      pfPaymentId,
     });
     return null;
   },

@@ -5,7 +5,8 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { hasEntitlement, publishedLangs } from "./edition";
 import { topicBySlug } from "./topicAccess";
-import { platformFeeBps, splitNet } from "./payfast";
+import { platformFeeBps } from "./payfast";
+import { offGateway, recordMoneyEvent } from "./moneyEvent";
 import { getSeller, sellerStatusOf } from "./sellerStatus";
 import { mintCode, normaliseCode } from "./voucherCode";
 import { isCallerAdmin } from "./whitelist";
@@ -114,22 +115,18 @@ export const mintBatch = mutation({
     // would put an anonymous money event in the payouts view.
     if (!org || !contact) throw new Error("the buying organisation's name and billing contact are both required");
 
-    const { sellerShare, platformShare } = splitNet(total, platformFeeBps());
-    const ledgerId = await ctx.db.insert("ledger", {
-      topicId: topic._id,
-      lang,
-      sellerId: userId,
-      buyerEmail: contact,
-      gross: total,
-      fee: 0,
-      net: total,
-      sellerShare,
-      platformShare,
+    const ledgerId = await recordMoneyEvent(ctx, {
       kind: "batch",
       // The guard, and the reason ticket 01 landed first: `owedPayouts` reads the
       // `by_status` index for `owed`, so this row is invisible to payouts with no
       // filter anybody could later forget to apply.
       status: "unpaid",
+      topicId: topic._id,
+      lang,
+      payeeId: userId,
+      buyerEmail: contact,
+      amounts: offGateway(total),
+      platformBps: platformFeeBps(),
     });
 
     const batchId = await ctx.db.insert("voucherBatches", {

@@ -5,7 +5,8 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { ACCESS_CODE_PROVIDER_ID, mintAccessCodeString, seatAccountId } from "./accessCodeFormat";
 import { CONSENT_VERSION } from "./joinConsent";
-import { platformFeeBps, splitNet } from "./payfast";
+import { platformFeeBps } from "./payfast";
+import { offGateway, recordMoneyEvent } from "./moneyEvent";
 import { sellableTopic } from "./vouchers";
 import { isCallerAdmin } from "./whitelist";
 
@@ -471,19 +472,15 @@ export const stopCode = mutation({
     }
 
     const total = taken * code.pricePerSeat;
-    const { sellerShare, platformShare } = splitNet(total, platformFeeBps());
-    const ledgerId = await ctx.db.insert("ledger", {
-      topicId: code.topicId,
-      lang: code.lang,
-      sellerId: code.sellerId,
-      buyerEmail: code.orgContact,
-      gross: total,
-      fee: 0,
-      net: total,
-      sellerShare,
-      platformShare,
+    const ledgerId = await recordMoneyEvent(ctx, {
       kind: "batch",
       status: "unpaid",
+      topicId: code.topicId,
+      lang: code.lang,
+      payeeId: code.sellerId,
+      buyerEmail: code.orgContact,
+      amounts: offGateway(total),
+      platformBps: platformFeeBps(),
     });
     // One patch, one row, one transaction: `stoppedAt` and `ledgerId` land together
     // or not at all.

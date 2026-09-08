@@ -68,7 +68,7 @@ not a per-page-view reader query. The ticket should say: fix the comment first, 
 whether the `learningRecords` collect is worth splitting at all, with the run frequency as the
 denominator. Likely answer is no, which is a fine answer once written down.
 
-### `convex/eft.ts:27` `no-trigger`
+### `convex/eft.ts:30` `no-trigger`
 
 `getRow` uses `.first()` on `operatorBank`, a table with at most one row: no index, no key.
 ceiling: the singleton stays a singleton. upgrade: none stated.
@@ -77,7 +77,7 @@ ceiling: the singleton stays a singleton. upgrade: none stated.
 sold the course), the schema comment at `schema.ts:726` says so, and a full scan of a one-row
 table is free. If the singleton ever stops being one, `schema.ts:726` is the marker that fires.
 
-### `convex/eft.ts:56` (load-bearing)
+### `convex/eft.ts:59` (load-bearing)
 
 `saveOperatorBank` repeats the five validation lines from `sellers.savePayoutDetails` rather than
 extracting them. ceiling: two copies. upgrade: a third bank-details form.
@@ -86,9 +86,18 @@ extracting them. ceiling: two copies. upgrade: a third bank-details form.
 working money-adjacent function for no behaviour change. Both copies share
 `payoutDetailsValidator` already, so the schema half of the duplication is already hoisted; what
 is duplicated is five lines of trim-and-digits checking. Note for whoever hits the third form:
-the natural home is beside `payoutDetailsValidator`, not the Edition core (see the `eft.ts:473` row).
+the natural home is beside `payoutDetailsValidator`, not the Edition core (see the `eft.ts:467` row).
 
-### `convex/eft.ts:196`
+**Still accepted on 2026-09-08, and one correction.**
+[technical-foundation/29](../.plan/maps/technical-foundation/tickets/29-one-ledger-writer-for-the-money-event.md)
+asserted that this marker "carries a note anticipating exactly this" and that the third caller had
+arrived, and it asked for the ledger entry to be closed. Checked in the tree before acting on it:
+this marker is about the five **bank-details validation** lines shared with
+`sellers.savePayoutDetails`, and has nothing to do with the ledger writer. There are still two
+bank-details forms, not three, so the trigger has not fired and the entry stands. The ledger
+writer landed as `convex/moneyEvent.ts` and carried no marker of its own.
+
+### `convex/eft.ts:193`
 
 The EFT reference is minted with a bounded retry loop rather than a counter table, because Convex
 has no uniqueness constraint. ceiling: about 390k suffixes per course prefix, five attempts.
@@ -97,7 +106,7 @@ upgrade: a course selling enough for collisions to be routine.
 **ACCEPTED.** The alternative is a counter row, which is a write-contention hotspot on the money
 rail in exchange for a collision probability that is currently negligible.
 
-### `convex/eft.ts:473` (load-bearing)
+### `convex/eft.ts:467` (load-bearing)
 
 `tenantBrand` duplicates the one-row `by_slug` tenant read from `shares.ts` rather than hoisting
 it into a shared module. ceiling: two call sites, ten lines. upgrade: the third caller.
