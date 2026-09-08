@@ -6,8 +6,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const fetchQuery = vi.hoisted(() => vi.fn());
 vi.mock("convex/nextjs", () => ({ fetchQuery }));
 
-const { readShareLocaleMemo, shareEditionLocale, shareLocaleMemo, shareTokenFromPath } =
-  await import("./shareLocale");
+const {
+  courseEditionLocale,
+  courseSlugFromPath,
+  editionHint,
+  editionHintLocale,
+  editionHintScope,
+  readShareLocaleMemo,
+  shareEditionLocale,
+  shareLocaleMemo,
+  shareTokenFromPath,
+} = await import("./shareLocale");
 
 describe("shareTokenFromPath", () => {
   it("reads the token off the Guest reader's URLs", () => {
@@ -95,5 +104,104 @@ describe("share locale memo", () => {
     const memo = shareLocaleMemo("a/b:c", "fr");
     expect(memo).not.toContain("/");
     expect(readShareLocaleMemo(memo, "a/b:c")).toBe("fr");
+  });
+});
+
+// ---- The course-URL entrance (2026-09-08) --------------------------------
+
+describe("courseSlugFromPath", () => {
+  it("reads the slug off the public course reader's URLs", () => {
+    expect(courseSlugFromPath("/courses/hindi")).toBe("hindi");
+    expect(courseSlugFromPath("/courses/hindi/lessons/0001-a")).toBe("hindi");
+    expect(courseSlugFromPath("/courses/hindi/references/grammar")).toBe("hindi");
+  });
+
+  it("is null for the owner console and every non-reader path", () => {
+    expect(courseSlugFromPath("/courses/hindi/manage")).toBeNull();
+    expect(courseSlugFromPath("/courses")).toBeNull();
+    expect(courseSlugFromPath("/share/abc123")).toBeNull();
+    expect(courseSlugFromPath("/settings")).toBeNull();
+  });
+});
+
+describe("courseEditionLocale", () => {
+  beforeEach(() => {
+    fetchQuery.mockReset();
+  });
+
+  it("adopts the Edition the slug entrance serves", async () => {
+    fetchQuery.mockResolvedValue("hi");
+    await expect(courseEditionLocale("hindi", null)).resolves.toBe("hi");
+  });
+
+  it("passes an explicit ?lang through, and omits it when there is none", async () => {
+    fetchQuery.mockResolvedValue("es");
+    await courseEditionLocale("hindi", "es");
+    expect(fetchQuery).toHaveBeenLastCalledWith(expect.anything(), { slug: "hindi", lang: "es" });
+    await courseEditionLocale("hindi", null);
+    expect(fetchQuery).toHaveBeenLastCalledWith(expect.anything(), { slug: "hindi" });
+  });
+
+  it("declines a course with no public slug entrance, and a code we ship no chrome for", async () => {
+    fetchQuery.mockResolvedValue(null);
+    await expect(courseEditionLocale("private", null)).resolves.toBeNull();
+    fetchQuery.mockResolvedValue("te");
+    await expect(courseEditionLocale("hindi", null)).resolves.toBeNull();
+  });
+
+  it("swallows a backend failure, like its share twin", async () => {
+    fetchQuery.mockImplementation(async () => {
+      throw new Error("convex down");
+    });
+    await expect(courseEditionLocale("hindi", null)).resolves.toBeNull();
+  });
+});
+
+// The asymmetry is the whole point: a share link overrides a stored locale on
+// every request, a course URL only ever speaks on a device that has no locale
+// yet, because a signed-in reader with a picker reads at that same URL.
+describe("editionHint", () => {
+  it("hints from a share link whether or not a locale is stored", () => {
+    expect(editionHint("/share/abc/lessons/0001", null, false)).toEqual({ kind: "share", token: "abc" });
+    expect(editionHint("/share/abc/lessons/0001", null, true)).toEqual({ kind: "share", token: "abc" });
+  });
+
+  it("hints from a course URL only on a first touch, carrying the requested Edition", () => {
+    expect(editionHint("/courses/hindi", "es", false)).toEqual({ kind: "course", slug: "hindi", lang: "es" });
+    expect(editionHint("/courses/hindi", "es", true)).toBeNull();
+  });
+
+  it("has nothing to say about any other path", () => {
+    expect(editionHint("/settings", null, false)).toBeNull();
+    expect(editionHint("/courses/hindi/manage", null, false)).toBeNull();
+  });
+});
+
+describe("editionHintScope", () => {
+  it("keys a share hint by its token and a course hint by slug and language", () => {
+    expect(editionHintScope({ kind: "share", token: "abc" })).toBe("abc");
+    expect(editionHintScope({ kind: "course", slug: "hindi", lang: "es" })).toBe("course:hindi:es");
+    expect(editionHintScope({ kind: "course", slug: "hindi", lang: null })).toBe("course:hindi:");
+  });
+
+  it("round-trips through the memo, so turning pages costs no Convex read", () => {
+    const scope = editionHintScope({ kind: "course", slug: "hindi", lang: "es" });
+    expect(readShareLocaleMemo(shareLocaleMemo(scope, "es"), scope)).toBe("es");
+    // A different Edition of the same course is a miss, not a stale hit.
+    expect(readShareLocaleMemo(shareLocaleMemo(scope, "es"), "course:hindi:")).toBeNull();
+  });
+});
+
+describe("editionHintLocale", () => {
+  beforeEach(() => {
+    fetchQuery.mockReset();
+  });
+
+  it("asks the right query for each entrance", async () => {
+    fetchQuery.mockResolvedValue("hi");
+    await expect(editionHintLocale({ kind: "share", token: "abc" })).resolves.toBe("hi");
+    expect(fetchQuery).toHaveBeenLastCalledWith(expect.anything(), { token: "abc" });
+    await expect(editionHintLocale({ kind: "course", slug: "hindi", lang: null })).resolves.toBe("hi");
+    expect(fetchQuery).toHaveBeenLastCalledWith(expect.anything(), { slug: "hindi" });
   });
 });

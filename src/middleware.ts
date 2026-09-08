@@ -4,10 +4,11 @@ import { resolveTenantSlug, TENANT_SLUG_HEADER } from "./lib/tenant";
 import { LOCALE_COOKIE, LOCALE_COOKIE_MAX_AGE, withLocaleCookie } from "./i18n/config";
 import { matchAcceptLanguage } from "./i18n/acceptLanguage";
 import {
+  editionHint,
+  editionHintLocale,
+  editionHintScope,
   readShareLocaleMemo,
-  shareEditionLocale,
   shareLocaleMemo,
-  shareTokenFromPath,
   SHARE_LOCALE_COOKIE,
 } from "./i18n/shareLocale";
 import { AUTH_COOKIE_MAX_AGE_SECONDS } from "./lib/sessionLifetime";
@@ -48,23 +49,29 @@ export default convexAuthNextjsMiddleware(
     // re-run. An explicit pick always overrides later.
     //
     // Two signals, in this order:
-    //   1. the Public link's Edition language, which wins on every request under
-    //      `/share/<token>` whether or not a locale is stored (i18n/shareLocale.ts):
-    //      a Guest reading that Edition reads its language, and before 2026-09-03
-    //      being first-touch only meant any device with a stored locale, every owner
-    //      checking their own link included, read a Hindi link in English chrome.
-    //      Applied per request, NOT persisted over a stored locale, so it never
-    //      rewrites the language the visitor picked for the rest of the site. The
-    //      lookup is memoised per token in a session cookie, so turning pages inside
-    //      the reader costs no extra Convex read.
+    //   1. the Edition language of the course being read, from EITHER public
+    //      entrance (i18n/shareLocale.ts): the `/share/<token>` link, and since
+    //      2026-09-08 the course's own `/courses/<slug>` URL, which serves the same
+    //      Guest reader for a published, priced Edition. A Guest reading that
+    //      Edition reads its language, and before 2026-09-03 being first-touch only
+    //      meant any device with a stored locale, every owner checking their own
+    //      link included, read a Hindi link in English chrome.
+    //      Under `/share` it is applied per request, NOT persisted over a stored
+    //      locale, so it never rewrites the language the visitor picked for the rest
+    //      of the site. Under `/courses` it is first-touch ONLY, because a
+    //      signed-in reader with an app-language picker reads at that same URL and
+    //      their pick has to stay sovereign (see shareLocale.ts for the full
+    //      reasoning). The lookup is memoised per Edition in a session cookie, so
+    //      turning pages inside the reader costs no extra Convex read.
     //   2. Accept-Language, the browser's own claim (English if nothing matches).
     //      First-touch only: it can never override a stored locale.
     const stored = request.cookies.get(LOCALE_COOKIE)?.value;
-    const shareToken = shareTokenFromPath(request.nextUrl.pathname);
-    const memo = shareToken ? request.cookies.get(SHARE_LOCALE_COOKIE)?.value : undefined;
-    const memoed = shareToken ? readShareLocaleMemo(memo, shareToken) : null;
-    const shareLocale = shareToken ? (memoed ?? (await shareEditionLocale(shareToken))) : null;
-    const derived = shareLocale ?? (stored ? null : matchAcceptLanguage(request.headers.get("accept-language")));
+    const hint = editionHint(request.nextUrl.pathname, request.nextUrl.searchParams.get("lang"), !!stored);
+    const scope = hint ? editionHintScope(hint) : null;
+    const memo = scope ? request.cookies.get(SHARE_LOCALE_COOKIE)?.value : undefined;
+    const memoed = scope ? readShareLocaleMemo(memo, scope) : null;
+    const hinted = hint ? (memoed ?? (await editionHintLocale(hint))) : null;
+    const derived = hinted ?? (stored ? null : matchAcceptLanguage(request.headers.get("accept-language")));
     if (derived && derived !== stored) {
       headers.set("cookie", withLocaleCookie(headers.get("cookie"), derived));
     }
@@ -82,11 +89,11 @@ export default convexAuthNextjsMiddleware(
         // language (ADR 0025). Next defaults an omitted domain to host-only.
       });
     }
-    // Memoise the token lookup for the rest of the visit (browser-session cookie,
+    // Memoise the Edition lookup for the rest of the visit (browser-session cookie,
     // no max-age). Skipped when the memo already says this, so the header is not
     // re-sent on every page of the reader.
-    if (shareToken && shareLocale && !memoed) {
-      response.cookies.set(SHARE_LOCALE_COOKIE, shareLocaleMemo(shareToken, shareLocale), {
+    if (scope && hinted && !memoed) {
+      response.cookies.set(SHARE_LOCALE_COOKIE, shareLocaleMemo(scope, hinted), {
         path: "/",
         sameSite: "lax",
       });

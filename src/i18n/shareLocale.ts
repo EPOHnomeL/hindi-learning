@@ -1,6 +1,7 @@
 import { fetchQuery } from "convex/nextjs";
 import { api } from "../../convex/_generated/api";
 import { offeredLocale, type Locale } from "./config";
+import { guestRoute } from "../app/_components/guestSource";
 
 // Cookie-writer #3's Public-link half. A Guest arriving on `/share/<token>` holds
 // a link to exactly ONE Edition (course-translation), so the language that
@@ -71,4 +72,69 @@ export function readShareLocaleMemo(value: string | undefined | null, token: str
   if (cut < 0) return null;
   if (value.slice(0, cut) !== encodeURIComponent(token)) return null;
   return offeredLocale(value.slice(cut + 1));
+}
+
+// ---- The course-URL entrance (2026-09-08) --------------------------------
+//
+// `/courses/<slug>` serves the same Guest reader to a signed-out visitor when the
+// Edition is published AND priced (convex/public.ts), so it deserves the same
+// chrome hint: a stranger following a shared course link should not read a Hindi
+// shopfront in English chrome.
+//
+// It differs from the `/share` half in ONE way, deliberately: it is **first touch
+// only**, never a per-request override. `/share` can override a stored locale on
+// every request because the Guest reader carries no app-language picker, so there
+// is no pick for the override to fight. `/courses` is not like that: the very same
+// URL is where a SIGNED-IN reader reads, and they do have a picker. Overriding
+// there would silently undo their choice on every page they turn, and the cookie
+// records a value rather than who wrote it, so nothing downstream could tell the
+// two apart. First touch only keeps the picker sovereign and still gives a
+// cookieless stranger the course's language on first paint.
+
+// The Guest reader course path's slug, or null when the path is not one. The
+// parser of record is `guestRoute` (app/_components/guestSource.ts), the same one
+// the client uses to decide what to render, so `/courses/<slug>/manage` and every
+// non-reader path are excluded here for free.
+export function courseSlugFromPath(pathname: string): string | null {
+  return guestRoute(pathname)?.slug ?? null;
+}
+
+// The chrome locale a public course URL implies, or null when there isn't one:
+// a course whose slug entrance is shut (unpublished, or published and free), or an
+// Edition language we ship no chrome for. Never throws, for the same reason
+// `shareEditionLocale` doesn't.
+export async function courseEditionLocale(slug: string, lang: string | null): Promise<Locale | null> {
+  try {
+    const served = await fetchQuery(api.public.publicCourseLang, { slug, ...(lang ? { lang } : {}) });
+    return offeredLocale(served);
+  } catch {
+    return null;
+  }
+}
+
+// ---- One hint for both entrances -----------------------------------------
+
+// The Edition-language hint a request carries, if any. `hasStoredLocale` is what
+// enforces the asymmetry above: a share token hints regardless, a course URL only
+// on a device with no locale yet.
+export type EditionHint = { kind: "share"; token: string } | { kind: "course"; slug: string; lang: string | null };
+
+export function editionHint(pathname: string, lang: string | null, hasStoredLocale: boolean): EditionHint | null {
+  const token = shareTokenFromPath(pathname);
+  if (token) return { kind: "share", token };
+  if (hasStoredLocale) return null;
+  const slug = courseSlugFromPath(pathname);
+  return slug ? { kind: "course", slug, lang } : null;
+}
+
+// The memo key for a hint. A course hint includes the requested language, because
+// the same slug serves a different Edition under a different `?lang=`.
+export function editionHintScope(hint: EditionHint): string {
+  return hint.kind === "share" ? hint.token : `course:${hint.slug}:${hint.lang ?? ""}`;
+}
+
+export async function editionHintLocale(hint: EditionHint): Promise<Locale | null> {
+  return hint.kind === "share"
+    ? await shareEditionLocale(hint.token)
+    : await courseEditionLocale(hint.slug, hint.lang);
 }
