@@ -139,6 +139,19 @@ async function liveLanguages(ctx: QueryCtx, topic: Doc<"topics">): Promise<{ lan
     .map((lang) => ({ lang, native: langInfo(lang).native }));
 }
 
+// The twin of `publicEditionLang` for the slug entrance: the language of the
+// Edition `/courses/<slug>` would serve a signed-out visitor, or null when that
+// URL is not public (unpublished, or published and free). The middleware asks for
+// it on a cookieless request so the chrome paints in the course's language on
+// first paint, exactly as it does for a Public link. Same cheapness and the same
+// "reveals nothing" contract: no content, no access resolution beyond the price
+// check the entrance already makes.
+export const publicCourseLang = query({
+  args: { slug: v.string(), lang: v.optional(v.string()) },
+  returns: v.union(v.null(), v.string()),
+  handler: async (ctx, { slug, lang }) => (await guestEditionFromSlug(ctx, slug, lang ?? null))?.lang ?? null,
+});
+
 // Everything a Guest needs to render the course shell + read-only panels, in one
 // reactive bundle: the sidebar lists, Resources, and the owner's Progress and
 // Q&A (full mirror, ADR 0013). Per-artifact HTML is fetched on demand by

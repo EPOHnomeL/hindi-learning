@@ -296,3 +296,93 @@ test("publicCourse.languages: an unreachable English source is not live, and a r
   await asUser(t, owner).mutation(api.shares.setTopicPublic, { topicSlug: "hindi", isPublic: false });
   expect(await t.query(api.public.publicCourse, { token: english! })).toBeNull();
 });
+
+// ---- The slug entrance (2026-09-08) ---------------------------------------
+// `/courses/<slug>` serves the same Guest reader with no token, but only for an
+// Edition that is published AND priced. Everything else stays behind sign-in.
+
+async function publish(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, lang: string) {
+  await t.run((ctx) => ctx.db.insert("publishedEditions", { topicId, lang, published: true }));
+}
+async function price(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, lang: string) {
+  await t.run((ctx) => ctx.db.insert("listings", { topicId, lang, amount: 19900, currency: "zar" }));
+}
+
+test("a published, priced course is readable by slug: the Preview opens, the rest is paygated", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi");
+  const sid = await t.run(async (ctx) => {
+    const sid = await ctx.storage.store(new Blob(["<p>lesson</p>"], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", htmlStorageId: sid });
+    await ctx.db.insert("lessons", { topicId, key: "0002-b", seq: 2, title: "B", htmlStorageId: sid });
+    return sid;
+  });
+  await publish(t, topicId, "en");
+  await price(t, topicId, "en");
+
+  // No identity and no token: a stranger on the course's own URL.
+  const course = await t.query(api.public.publicCourse, { slug: "hindi" });
+  expect(course).toMatchObject({
+    title: "Hindi",
+    lang: "en",
+    paywall: { amount: 19900, currency: "zar", previewKey: "0001-a" },
+    lessons: [
+      { key: "0001-a", locked: false },
+      { key: "0002-b", locked: true },
+    ],
+  });
+
+  // The free first Lesson serves its body; the next one is a locked marker.
+  expect(await t.query(api.public.publicLesson, { slug: "hindi", key: "0001-a" })).toMatchObject({
+    locked: false,
+    contentUrl: expect.stringContaining(`/content?id=${sid}`),
+  });
+  expect(await t.query(api.public.publicLesson, { slug: "hindi", key: "0002-b" })).toMatchObject({ locked: true });
+});
+
+test("the slug entrance stays shut for a free, an unpublished and an unknown course", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi");
+  await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" }));
+
+  // Priced but never published: not a shopfront, so not public.
+  await price(t, topicId, "en");
+  expect(await t.query(api.public.publicCourse, { slug: "hindi" })).toBeNull();
+
+  // Published but free: free access is worth an account, so the sign-in gate holds.
+  await t.run(async (ctx) => {
+    const listing = await ctx.db.query("listings").first();
+    if (listing) await ctx.db.delete(listing._id);
+  });
+  await publish(t, topicId, "en");
+  expect(await t.query(api.public.publicCourse, { slug: "hindi" })).toBeNull();
+
+  expect(await t.query(api.public.publicCourse, { slug: "no-such-course" })).toBeNull();
+  expect(await t.query(api.public.publicCourse, { slug: "" })).toBeNull();
+  expect(await t.query(api.public.publicLesson, { slug: "hindi", key: "0001-a" })).toBeNull();
+});
+
+test("publicCourseLang reports the Edition the slug entrance serves, honouring an explicit ?lang", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi");
+  await t.run(async (ctx) => {
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A" });
+    await ctx.db.insert("translationJobs", { topicId, lang: "es", status: "ready", total: 1, done: 1, failed: 0 });
+  });
+  await publish(t, topicId, "en");
+  await publish(t, topicId, "es");
+  await price(t, topicId, "en");
+  await price(t, topicId, "es");
+
+  // No preference lands on the English source Edition.
+  expect(await t.query(api.public.publicCourseLang, { slug: "hindi" })).toBe("en");
+  // An explicit request for a published Edition is honoured.
+  expect(await t.query(api.public.publicCourseLang, { slug: "hindi", lang: "es" })).toBe("es");
+  // An unpublished language falls back rather than 404ing the visitor.
+  expect(await t.query(api.public.publicCourseLang, { slug: "hindi", lang: "ur" })).toBe("en");
+  // A course with no public slug entrance offers no hint at all.
+  expect(await t.query(api.public.publicCourseLang, { slug: "no-such-course" })).toBeNull();
+});
