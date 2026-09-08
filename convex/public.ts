@@ -1,7 +1,8 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { buildPaywall, editionAccessLevel, lessonsToc, paywallValidator, loadEdition, publishedLangs, readLesson, readReference, referencesToc, type EditionAccess } from "./edition";
+import { buildPaywall, editionAccessLevel, editionPrice, lessonsToc, livePublishedLangs, paywallValidator, loadEdition, publishedLangs, readLesson, readReference, referencesToc, type EditionAccess } from "./edition";
+import { topicBySlug } from "./topicAccess";
 import { SOURCE_LANG } from "./sourceLang";
 import { teacherQaOn } from "./capture";
 import { langInfo } from "./languages";
@@ -37,6 +38,56 @@ async function guestEditionFromToken(ctx: QueryCtx, token: string): Promise<{ to
   return topic ? { topic, lang: SOURCE_LANG } : null;
 }
 
+// The SECOND Guest entrance (2026-09-08): the course's own pretty URL,
+// `/courses/<slug>`, serving the same Guest reader as `/share/<token>` with no
+// bearer token, so a course can be shared on a link that reads like a course.
+//
+// It opens for exactly one kind of Edition: **published AND priced**. That is the
+// shopfront case, where the free Preview (the first Lesson) is the advertisement
+// and everything past it is the paygate, so nothing is given away here that the
+// paygate was not already giving away on `/share`. A published FREE Edition
+// deliberately does NOT open here: free access is worth an account, so the
+// sign-in gate stays and the surface asks the visitor to create one. An
+// unpublished course is not public at all. Both resolve to null, and the client
+// falls back to `SignIn`.
+//
+// `requested` is the reader's `?lang=` (course-translation), honoured when that
+// Edition is published; otherwise the English source Edition, else the lowest
+// published code, so a URL carrying no language still lands somewhere real.
+async function guestEditionFromSlug(
+  ctx: QueryCtx,
+  slug: string,
+  requested: string | null,
+): Promise<{ topic: Doc<"topics">; lang: string } | null> {
+  if (!slug) return null;
+  const topic = await topicBySlug(ctx, slug);
+  if (!topic) return null;
+  const live = await livePublishedLangs(ctx, topic._id);
+  const lang =
+    requested && live.has(requested) ? requested : live.has(SOURCE_LANG) ? SOURCE_LANG : [...live].sort()[0];
+  if (!lang) return null;
+  // Priced only. The presence of a `listings` row is the single source of truth
+  // for "paid" (edition.ts); a free published Edition falls through to sign-in.
+  if ((await editionPrice(ctx, topic._id, lang)) === null) return null;
+  return { topic, lang };
+}
+
+// Where a Guest read came from: the bearer-token link, or the course's own URL.
+// One shared arg shape across the three queries below, so both entrances render
+// the identical reader and the client only picks which fields it sends.
+const guestSource = {
+  token: v.optional(v.string()),
+  slug: v.optional(v.string()),
+  lang: v.optional(v.string()),
+};
+type GuestSource = { token?: string; slug?: string; lang?: string };
+
+async function guestEdition(ctx: QueryCtx, src: GuestSource) {
+  if (src.token) return await guestEditionFromToken(ctx, src.token);
+  if (src.slug) return await guestEditionFromSlug(ctx, src.slug, src.lang ?? null);
+  return null;
+}
+
 // The Guest's Edition plus their access level (paid marketplace, ADR 0016). A
 // valid Public link is the Guest's grant: on a FREE Edition it resolves to
 // `viewer` (today's anonymous full read); on a PAID Edition it resolves to
@@ -45,9 +96,9 @@ async function guestEditionFromToken(ctx: QueryCtx, token: string): Promise<{ to
 // for the authed reader — this seam only supplies the token-based grant.
 async function resolveGuestEdition(
   ctx: QueryCtx,
-  token: string,
+  src: GuestSource,
 ): Promise<{ topic: Doc<"topics">; lang: string; level: EditionAccess } | null> {
-  const resolved = await guestEditionFromToken(ctx, token);
+  const resolved = await guestEdition(ctx, src);
   if (!resolved) return null;
   const level = await editionAccessLevel(ctx, resolved.topic, resolved.lang, null, true);
   return { ...resolved, level };
@@ -96,7 +147,7 @@ async function liveLanguages(ctx: QueryCtx, topic: Doc<"topics">): Promise<{ lan
 // resources); kept as an explicit allowlist here so a Guest can never see a
 // field the authed side adds without it being deliberately re-listed.
 export const publicCourse = query({
-  args: { token: v.string() },
+  args: guestSource,
   // Explicit output allowlist — this is anonymous, public-internet-facing, so a
   // Guest can never receive a field unless it's listed here.
   returns: v.union(
@@ -160,8 +211,8 @@ export const publicCourse = query({
       languages: v.array(v.object({ lang: v.string(), native: v.string() })),
     }),
   ),
-  handler: async (ctx, { token }) => {
-    const resolved = await resolveGuestEdition(ctx, token);
+  handler: async (ctx, src) => {
+    const resolved = await resolveGuestEdition(ctx, src);
     if (!resolved) return null;
     const { topic, lang, level } = resolved;
     // On a paid Edition a Guest is `preview`: the table of contents (Lesson &
@@ -253,7 +304,7 @@ export const publicCourse = query({
 // One Lesson's HTML for a Guest. Null for an unknown/wrong token, an unknown key,
 // or a superseded Lesson (mirrors the authed getLesson).
 export const publicLesson = query({
-  args: { token: v.string(), key: v.string() },
+  args: { ...guestSource, key: v.string() },
   // A locked marker (paid Edition, past the Preview) OR the body: `contentUrl`
   // (content blob) or inline `html` during the migration — exactly one body form
   // is present (see .scratch/html-blob-storage).
@@ -268,8 +319,8 @@ export const publicLesson = query({
       html: v.optional(v.string()),
     }),
   ),
-  handler: async (ctx, { token, key }) => {
-    const resolved = await resolveGuestEdition(ctx, token);
+  handler: async (ctx, { key, ...src }) => {
+    const resolved = await resolveGuestEdition(ctx, src);
     if (!resolved) return null;
     // Same shared reader core as the authed getLesson (edition-deepening/04); this
     // adapter only resolves the Guest principal via its Public-link token.
@@ -279,7 +330,7 @@ export const publicLesson = query({
 
 // One Reference's HTML for a Guest. Null for an unknown/wrong token or key.
 export const publicReference = query({
-  args: { token: v.string(), key: v.string() },
+  args: { ...guestSource, key: v.string() },
   returns: v.union(
     v.null(),
     v.object({
@@ -290,8 +341,8 @@ export const publicReference = query({
       html: v.optional(v.string()),
     }),
   ),
-  handler: async (ctx, { token, key }) => {
-    const resolved = await resolveGuestEdition(ctx, token);
+  handler: async (ctx, { key, ...src }) => {
+    const resolved = await resolveGuestEdition(ctx, src);
     if (!resolved) return null;
     return await readReference(ctx, resolved.topic, resolved.lang, resolved.level, key);
   },
