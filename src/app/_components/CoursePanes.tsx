@@ -260,12 +260,9 @@ function RestartButton({ onClick, busy, label }: { onClick: () => Promise<void>;
 }
 
 // A single Lesson. Reads `frontierKey` from the course context for the
-// "generate next lesson" affordance, and marks its replies seen on open.
+// "generate next lesson" affordance.
 export function LessonPane({ slug, lessonKey }: { slug: string; lessonKey: string }) {
-  const { markSeen, frontierKey, canWrite, canEdit, completed, nextKey, dir, contentLang } = useCourse();
-  useEffect(() => {
-    markSeen(lessonKey);
-  }, [lessonKey, markSeen]);
+  const { frontierKey, canWrite, canEdit, completed, nextKey, dir, contentLang } = useCourse();
   return (
     <ArtifactView
       kind="lesson"
