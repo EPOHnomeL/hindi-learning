@@ -14,18 +14,15 @@ import { langInfo } from "../../../convex/languages";
 import { tenantPill } from "~/design/tenantPill";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { catalogueCacheKey, DASHBOARD_CACHE_KEY, TENANT_NAME_CACHE_KEY, writeCache } from "./offlineCache";
-import { CourseCertMenu } from "./Certificate";
 import { checkoutLink, withLang } from "./editionUrl";
 import { Icon } from "./icons";
 import { formatPrice } from "./Paygate";
 import { Logo } from "./Logo";
-import { Markdown } from "./MarkdownView";
 import { missionPreview } from "./markdown";
 import { SettingsDialog } from "./SettingsDialog";
-import { CourseCardActions } from "./CourseCardActions";
+import { CardFoot, CardTitleLink } from "./CourseCardParts";
 import { SiteFooter } from "./SiteFooter";
 import { useTenant, useTenantSlug } from "./TenantContext";
-import { Dialog } from "./ui";
 import { useResourceUpload } from "./useResourceUpload";
 
 type Course = {
@@ -322,7 +319,6 @@ function TenantPill({ tenantSlug }: { tenantSlug: string | null }) {
 
 function CourseCard({ course }: { course: Course }) {
   const t = useTranslations("Dashboard");
-  const [showMission, setShowMission] = useState(false);
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
   const complete = course.status === "completed";
   const seeded = course.status === "seeded";
@@ -337,13 +333,22 @@ function CourseCard({ course }: { course: Course }) {
   });
 
   return (
+    // A seeded course has no lesson to open, so it is NOT a click-through card:
+    // no `.open-card`, no stretched title link, and its one action stays a named
+    // button. Every other owned course opens by clicking anywhere on it.
     <article
-      className={`flex flex-col rounded-2xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md ${
-        complete ? "border-gold/55" : "border-line"
-      }`}
+      className={`relative flex flex-col rounded-2xl border bg-card p-5 shadow-sm hover:shadow-md ${
+        seeded ? "transition-shadow" : "open-card"
+      } ${complete ? "border-gold/55 hover:border-gold" : "border-line hover:border-accent/45"}`}
     >
       <div className="mb-2.5 flex items-start justify-between gap-2.5">
-        <h2 className="min-w-0 text-lg font-semibold leading-snug tracking-tight text-ink">{course.title}</h2>
+        {seeded ? (
+          <h2 className="min-w-0 text-lg font-semibold leading-snug tracking-tight text-ink">{course.title}</h2>
+        ) : (
+          <CardTitleLink href={`/courses/${course.slug}`} className="tracking-tight">
+            {course.title}
+          </CardTitleLink>
+        )}
         {/* Tenant (default host only) sits before the state pill: whose course it is
             reads before what state it's in, and the two never conflict for the slot. */}
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
@@ -353,13 +358,9 @@ function CourseCard({ course }: { course: Course }) {
       </div>
 
       {course.mission ? (
-        <button
-          onClick={() => setShowMission(true)}
-          title={t("viewMission")}
-          className="line-clamp-2 min-h-[38px] text-start text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
-        >
+        <p className="line-clamp-2 min-h-[38px] text-[13.5px] leading-snug text-soft">
           {missionPreview(course.mission)}
-        </button>
+        </p>
       ) : (
         <p className="min-h-[38px] text-[13.5px] text-soft">
           {seeded ? t("preparingMission") : t("noMission")}
@@ -400,35 +401,31 @@ function CourseCard({ course }: { course: Course }) {
 
       <div className="min-h-[14px] flex-1" />
 
-      {/* Actions. A seeded course only offers "Set up now"; otherwise the named
-          row in CourseCardActions: Open course, the certificate once there is
-          one, and the door to the manage route. */}
-      <div className="flex items-center gap-2">
-        {seeded ? (
-          // A seeded course has nothing to open, so its one action goes to the
-          // course, which with no lessons IS the setting-up page (CourseSetupPane):
-          // stages, elapsed clock, and the honest three states off the generation
-          // lock. Navigation, NOT a mutation (2026-09-08). This button used to fire
-          // `requestSetup` straight from the dashboard, which was a blind second
-          // door: setup has almost always already been fired for this course (the
-          // create flow fires it in the background before it navigates away), so
-          // the button's real effect was usually to re-fire a run, reported through
-          // nothing but its own label flicking to "Started". If the fire genuinely
-          // never landed, the pane says so and offers the ONE deliberate retry, on
-          // the screen that shows what is actually happening.
-          <Link
-            href={`/courses/${course.slug}`}
-            className="flex-1 rounded-lg bg-gold/20 px-3 py-2 text-center text-sm font-medium text-accent transition-colors hover:bg-gold/30"
-          >
-            {t("setUpNow")}
-          </Link>
-        ) : (
-          <CourseCardActions slug={course.slug} openHref={`/courses/${course.slug}`} openLabel={t("openCourse")} />
-        )}
-      </div>
+      {/* A seeded course's one action goes to the course, which with no lessons
+          IS the setting-up page (CourseSetupPane): stages, elapsed clock, and the
+          honest three states off the generation lock. Navigation, NOT a mutation
+          (2026-09-08). This button used to fire `requestSetup` straight from the
+          dashboard, which was a blind second door: setup has almost always
+          already been fired for this course (the create flow fires it in the
+          background before it navigates away), so the button's real effect was
+          usually to re-fire a run, reported through nothing but its own label
+          flicking to "Started". If the fire genuinely never landed, the pane says
+          so and offers the ONE deliberate retry, on the screen that shows what is
+          actually happening.
 
-      {showMission && course.mission && (
-        <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />
+          It stays a button rather than becoming the card's cue because a seeded
+          course is not an openable course: it has no lesson behind it, and the
+          two cards on this screen that cannot be opened are the two that need a
+          decision, so they are the only ones that shout. */}
+      {seeded ? (
+        <Link
+          href={`/courses/${course.slug}`}
+          className="mt-3.5 rounded-lg bg-gold/20 px-3 py-2 text-center text-sm font-medium text-accent transition-colors hover:bg-gold/30"
+        >
+          {t("setUpNow")}
+        </Link>
+      ) : (
+        <CardFoot slug={course.slug} manage certificate />
       )}
     </article>
   );
@@ -452,15 +449,15 @@ function SharedSection() {
   );
 }
 
-// A shared course (Viewer): attributed to its owner, read-only — Open course is
-// the only action (no Edit, no Editions/sharing). Once the Viewer finishes it, a
-// ⋯ appears with their own certificate. They read the single edition shared to
-// them (viewer-cannot-switch-edition); the chips are informational.
+// A shared course (Viewer): attributed to its owner, read-only. Clicking the card
+// opens it, and that is the only thing on it besides the Viewer's own certificate
+// once they finish (no manage door, no editions, no sharing). The certificate used
+// to be a second kebab here; it is the same chip the owned card wears now. They
+// read the single edition shared to them (viewer-cannot-switch-edition); the chips
+// are informational.
 function SharedCourseCard({ course }: { course: SharedCourse }) {
   const t = useTranslations("Dashboard");
-  const [showMission, setShowMission] = useState(false);
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
-  const allDone = course.lessonCount > 0 && course.completedCount === course.lessonCount;
   // Open in the active UI language when the Viewer holds that Edition; else the
   // Edition the card's title is shown in — English if held, else their first
   // Edition (mirrors listSharedTopics' `preferred`).
@@ -472,22 +469,18 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
       : course.langs[0]?.lang;
 
   return (
-    <article className="flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+    <article className="open-card relative flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm hover:border-accent/45 hover:shadow-md">
       <div className="mb-2 flex items-start justify-between gap-2">
-        <h2 className="min-w-0 text-lg font-semibold leading-snug text-ink">{course.title}</h2>
+        <CardTitleLink href={withLang(`/courses/${course.slug}`, openLang)}>{course.title}</CardTitleLink>
         <span className="shrink-0 rounded-full bg-hi px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-accent">
           {t("sharedBadge")}
         </span>
       </div>
 
       {course.mission && (
-        <button
-          onClick={() => setShowMission(true)}
-          title={t("viewMission")}
-          className="line-clamp-2 min-h-[38px] text-start text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
-        >
+        <p className="line-clamp-2 min-h-[38px] text-[13.5px] leading-snug text-soft">
           {missionPreview(course.mission)}
-        </button>
+        </p>
       )}
 
       <p className="mt-1 text-xs text-soft">
@@ -519,19 +512,7 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
 
       <div className="min-h-[14px] flex-1" />
 
-      <div className="flex items-center gap-2">
-        <Link
-          href={withLang(`/courses/${course.slug}`, openLang)}
-          className="flex-1 rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
-        >
-          {t("openCourse")}
-        </Link>
-        {allDone && <CourseCertMenu topicSlug={course.slug} />}
-      </div>
-
-      {showMission && course.mission && (
-        <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />
-      )}
+      <CardFoot slug={course.slug} certificate />
     </article>
   );
 }
@@ -612,15 +593,14 @@ function PurchasedSection() {
 }
 
 // A purchased course: an entitled buyer is a first-class reader (own progress,
-// own certificate), so this mirrors SharedCourseCard — Open course is the only
-// action — but carries a gold "Purchased" badge and no owner attribution. They
-// read the Edition(s) they bought (chips are informational); buying another
-// language is a separate purchase.
+// own certificate), so this mirrors SharedCourseCard, clicking the card opens it
+// and the certificate chip is the only other thing on it, but it carries a gold
+// "Purchased" badge and no owner attribution. They read the Edition(s) they
+// bought (chips are informational); buying another language is a separate
+// purchase.
 function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
   const t = useTranslations("Dashboard");
-  const [showMission, setShowMission] = useState(false);
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
-  const allDone = course.lessonCount > 0 && course.completedCount === course.lessonCount;
   const locale = useLocale();
   const openLang = course.langs.some((l) => l.lang === locale)
     ? locale
@@ -629,22 +609,18 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
       : course.langs[0]?.lang;
 
   return (
-    <article className="flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+    <article className="open-card relative flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm hover:border-accent/45 hover:shadow-md">
       <div className="mb-2 flex items-start justify-between gap-2">
-        <h2 className="min-w-0 text-lg font-semibold leading-snug text-ink">{course.title}</h2>
+        <CardTitleLink href={withLang(`/courses/${course.slug}`, openLang)}>{course.title}</CardTitleLink>
         <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
           <Icon name="check" className="h-3 w-3" /> {t("purchased")}
         </span>
       </div>
 
       {course.mission && (
-        <button
-          onClick={() => setShowMission(true)}
-          title={t("viewMission")}
-          className="line-clamp-2 min-h-[38px] text-start text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
-        >
+        <p className="line-clamp-2 min-h-[38px] text-[13.5px] leading-snug text-soft">
           {missionPreview(course.mission)}
-        </button>
+        </p>
       )}
 
       <p className="mt-1 text-xs text-soft">{t("yoursForLife")}</p>
@@ -672,19 +648,7 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
 
       <div className="min-h-[14px] flex-1" />
 
-      <div className="flex items-center gap-2">
-        <Link
-          href={withLang(`/courses/${course.slug}`, openLang)}
-          className="flex-1 rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
-        >
-          {t("openCourse")}
-        </Link>
-        {allDone && <CourseCertMenu topicSlug={course.slug} />}
-      </div>
-
-      {showMission && course.mission && (
-        <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />
-      )}
+      <CardFoot slug={course.slug} certificate />
     </article>
   );
 }
@@ -740,7 +704,6 @@ function AvailableSection() {
 // moves to their own list once they start it.
 function AvailableCourseCard({ course }: { course: AvailableCourse }) {
   const t = useTranslations("Dashboard");
-  const [showMission, setShowMission] = useState(false);
   // Open the Edition matching the app language when the course has one, else
   // English, else its first — the same preference SharedCourseCard uses.
   const locale = useLocale();
@@ -751,9 +714,9 @@ function AvailableCourseCard({ course }: { course: AvailableCourse }) {
       : course.langs[0]?.lang;
 
   return (
-    <article className="flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
+    <article className="open-card relative flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm hover:border-accent/45 hover:shadow-md">
       <div className="mb-2 flex items-start justify-between gap-2">
-        <h2 className="min-w-0 text-lg font-semibold leading-snug text-ink">{course.title}</h2>
+        <CardTitleLink href={withLang(`/courses/${course.slug}`, openLang)}>{course.title}</CardTitleLink>
         {course.price ? (
           <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
             <Icon name="tag" className="h-3 w-3" />
@@ -767,39 +730,17 @@ function AvailableCourseCard({ course }: { course: AvailableCourse }) {
       </div>
 
       {course.mission && (
-        <button
-          onClick={() => setShowMission(true)}
-          title={t("viewMission")}
-          className="line-clamp-2 min-h-[38px] text-start text-[13.5px] leading-snug text-soft transition-colors hover:text-accent"
-        >
+        <p className="line-clamp-2 min-h-[38px] text-[13.5px] leading-snug text-soft">
           {missionPreview(course.mission)}
-        </button>
+        </p>
       )}
 
       <LangChips langs={course.langs} />
 
       <div className="min-h-[14px] flex-1" />
 
-      <Link
-        href={withLang(`/courses/${course.slug}`, openLang)}
-        className="mt-3.5 rounded-lg bg-accent px-3 py-2 text-center text-sm font-medium text-white transition-colors hover:bg-accent/90"
-      >
-        {t("openCourse")}
-      </Link>
-
-      {showMission && course.mission && (
-        <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />
-      )}
+      <CardFoot slug={course.slug} />
     </article>
-  );
-}
-
-// The Mission rendered as Markdown in the shared Dialog primitive.
-function MissionDialog({ title, mission, onClose }: { title: string; mission: string; onClose: () => void }) {
-  return (
-    <Dialog title={title} onClose={onClose} className="max-w-2xl">
-      <Markdown source={mission} />
-    </Dialog>
   );
 }
 

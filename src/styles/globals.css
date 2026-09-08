@@ -224,6 +224,74 @@ html[data-theme="dark"] .setup-bar::after {
   animation: setup-dot 1.6s ease-in-out infinite;
 }
 
+/* ---------------------------------------------------------------------------
+   The dashboard course card's "open" affordance (2026-09-08, prototype variant
+   A). The card body IS the link: `.open-card` is the <article>, and a stretched
+   anchor on the course title covers it, so middle click, cmd click and "copy
+   link" all keep working and the card is one keyboard tab stop whose accessible
+   name is the course title. Colour states stay in Tailwind on the components;
+   what lives here is the part that cannot be a utility.
+
+   The cue is quiet until hover ONLY where hover exists, and that is gated on the
+   POINTER, never on a width breakpoint: a touchscreen laptop and a tablet in
+   landscape are both wider than `md` and neither can hover, so a width-gated cue
+   would leave both of them with a 55%-grey hint and no way to reveal it.
+
+   A card that cannot be opened (a seeded course still setting up, a course
+   awaiting an EFT) does not get this class at all: it keeps a named button.
+   --------------------------------------------------------------------------- */
+.open-card {
+  transition:
+    box-shadow 180ms,
+    border-color 180ms,
+    transform 180ms;
+}
+.open-card__arrow {
+  transition: transform 180ms;
+}
+@media (hover: hover) and (pointer: fine) {
+  .open-card:hover {
+    transform: translateY(-2px);
+  }
+  .open-card__cue {
+    opacity: 0.55;
+    transition: opacity 180ms;
+  }
+  .open-card:hover .open-card__cue,
+  .open-card:focus-within .open-card__cue {
+    opacity: 1;
+  }
+  .open-card:hover .open-card__arrow,
+  .open-card:focus-within .open-card__arrow {
+    transform: translateX(3px);
+  }
+}
+/* No hover: the press is the only feedback the device can give, so it has to be
+   there. The cue is already fully lit (no rule dims it outside the query above). */
+@media (hover: none) {
+  .open-card:active {
+    transform: scale(0.985);
+    background: var(--color-hi);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .open-card {
+    transition:
+      box-shadow 180ms,
+      border-color 180ms;
+  }
+  .open-card:hover,
+  .open-card:active {
+    transform: none;
+  }
+  .open-card__arrow,
+  .open-card:hover .open-card__arrow,
+  .open-card:focus-within .open-card__arrow {
+    transform: none;
+    transition: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .setup-card,
   .setup-halo,

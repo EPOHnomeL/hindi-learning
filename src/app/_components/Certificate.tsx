@@ -8,7 +8,7 @@ import { publicCourseUrl as buildPublicCourseUrl, useEditionLang } from "./editi
 import { langDir } from "../../../convex/languages";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Icon } from "./icons";
-import { IconButton, Menu, MenuItem } from "./ui";
+import { IconButton } from "./ui";
 import { useTenant } from "./TenantContext";
 // The resolved Emblem (ADR 0017) as the read seams return it — an image resolves
 // to a same-origin URL, otherwise a glyph (a subject emoji or the generic default).
@@ -220,13 +220,16 @@ function CertificateShowcase({ learnerName, courseTitle, lessonCount, issuedAt, 
   );
 }
 
-// The owned-course card's certificate chip (2026-09-08): the same two states as
-// CertificateControl below, as one 38px icon button sitting in the card's action
-// row beside "Open course". It replaced a row in the card's overflow menu, which
-// is how a learner who had just finished a course found their certificate behind
-// two taps and a glyph that named nothing. A gold dot marks one still unclaimed.
-// Self-hides when there is no certificate to offer, so an unfinished course
-// shows two buttons, not a dead third.
+// The course card's certificate chip (2026-09-08), and the ONLY certificate
+// affordance on the dashboard: one 38px gold chip at the foot of the card, on
+// every card kind that can carry a certificate (owned, shared, purchased). It
+// replaced two different overflow menus, which is how a learner who had just
+// finished a course found their certificate behind two taps and a glyph that
+// named nothing. Two states, mirroring what the caller holds: earned opens the
+// standalone public page in a new tab, eligible opens the claim dialog with a
+// gold dot on the chip. Self-hides when there is no certificate to offer, so an
+// unfinished course shows no dead chip. Owner and Viewer alike, since
+// myCertificate is owner-or-Viewer gated server-side.
 export function CertificateChip({ topicSlug }: { topicSlug: string }) {
   const t = useTranslations("Certificate");
   const data = useQuery(api.certificates.myCertificate, { topicSlug });
@@ -235,12 +238,14 @@ export function CertificateChip({ topicSlug }: { topicSlug: string }) {
   const { certificate, eligible } = data;
   if (!certificate && !eligible) return null;
 
-  // Earned: a real anchor to the standalone public page, in a new tab (see the
-  // popup-blocker note on CertificateControl). Eligible: the claim dialog.
+  // Earned: a REAL anchor to the standalone public page (the shareable, printable
+  // surface), in a new tab. Not `window.open`: with a features string that opens a
+  // *popup*, which browsers silently blocked on the deployed domain while it
+  // "worked" on localhost. Eligible: the claim dialog.
   if (certificate) {
     return (
       <IconButton
-        icon="award"
+        icon="certificate"
         label={t("viewYours")}
         href={`/certificate/${certificate.token}`}
         target="_blank"
@@ -251,106 +256,8 @@ export function CertificateChip({ topicSlug }: { topicSlug: string }) {
   }
   return (
     <>
-      <IconButton icon="award" label={t("claimYours")} dot onClick={() => setOpen(true)} className="text-gold" />
+      <IconButton icon="certificate" label={t("claimYours")} dot onClick={() => setOpen(true)} className="text-gold" />
       {open && <CertificateDialog topicSlug={topicSlug} certificate={null} onClose={() => setOpen(false)} />}
-    </>
-  );
-}
-
-// The reader/dashboard affordance for a completed course. Shows "Claim your
-// certificate" when the caller is eligible, "View your certificate" once earned,
-// and nothing otherwise (no access, or lessons still unfinished). Opens a dialog
-// that either claims (name → mint) or displays the earned Certificate. Owner and
-// Viewer alike — myCertificate is owner-or-Viewer gated server-side.
-export function CertificateControl({ topicSlug, className }: { topicSlug: string; className?: string }) {
-  const t = useTranslations("Certificate");
-  const data = useQuery(api.certificates.myCertificate, { topicSlug });
-  const [open, setOpen] = useState(false);
-  if (!data) return null;
-  const { certificate, eligible } = data;
-  if (!certificate && !eligible) return null;
-
-  const btnClass =
-    className ??
-    "rounded-lg bg-gold/20 px-3 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-gold/30";
-
-  // Earned: "View" opens the standalone public certificate page in a new tab —
-  // the shareable, printable surface — rather than an in-app dialog. A real anchor
-  // (not window.open) so the new tab is never popup-blocked: window.open with a
-  // features string opens a *popup*, which browsers silently blocked on the
-  // deployed domain (it "worked" only on localhost). `inline-flex … justify-center`
-  // makes the anchor lay out like the button it replaces — a centred label, and
-  // full-width when the caller passes `w-full`. Eligible but not yet earned: open
-  // the claim dialog.
-  if (certificate) {
-    return (
-      <a
-        href={`/certificate/${certificate.token}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={`inline-flex items-center justify-center gap-2 ${btnClass}`}
-      >
-        <Icon name="award" className="h-4 w-4" /> {t("viewYours")}
-      </a>
-    );
-  }
-  return (
-    <>
-      <button onClick={() => setOpen(true)} className={`inline-flex items-center justify-center gap-2 ${btnClass}`}>
-        <Icon name="award" className="h-4 w-4" /> {t("claimYours")}
-      </button>
-      {open && <CertificateDialog topicSlug={topicSlug} certificate={null} onClose={() => setOpen(false)} />}
-    </>
-  );
-}
-
-// A completed course card's ⋯ overflow (UI redesign): the certificate lives here
-// rather than as a full-width bar on the card face. Renders "View certificate"
-// (opens the standalone public page in a new tab) once earned, or "Claim
-// certificate" (opens the claim dialog) while eligible — with a gold dot on the ⋯
-// trigger to flag the unclaimed one. Self-hides (no ⋯ at all) when there's no
-// certificate to offer, so the card never shows an empty menu. Owner and Viewer
-// alike — myCertificate is owner-or-Viewer gated server-side.
-export function CourseCertMenu({ topicSlug }: { topicSlug: string }) {
-  const t = useTranslations("Certificate");
-  const data = useQuery(api.certificates.myCertificate, { topicSlug });
-  const [claiming, setClaiming] = useState(false);
-  if (!data) return null;
-  const { certificate, eligible } = data;
-  if (!certificate && !eligible) return null;
-  const unclaimed = !certificate && eligible;
-
-  return (
-    <>
-      <Menu triggerLabel={t("triggerLabel")} dot={unclaimed}>
-        {(close) =>
-          certificate ? (
-            <MenuItem
-              icon="award"
-              iconTone="gold"
-              trailingIcon="ext"
-              href={`/certificate/${certificate.token}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={close}
-            >
-              {t("view")}
-            </MenuItem>
-          ) : (
-            <MenuItem
-              icon="award"
-              iconTone="gold"
-              onClick={() => {
-                close();
-                setClaiming(true);
-              }}
-            >
-              {t("claim")}
-            </MenuItem>
-          )
-        }
-      </Menu>
-      {claiming && <CertificateDialog topicSlug={topicSlug} certificate={null} onClose={() => setClaiming(false)} />}
     </>
   );
 }
@@ -514,7 +421,7 @@ function fireConfetti() {
 // session), never merely because they loaded a course they'd already finished. That
 // on-load auto-open surprised learners — every already-finished Viewer got the card
 // flung open the moment the owner ended the course, or on any fresh device — so the
-// trigger is now the click itself; the persistent CertificateControl (View / Claim)
+// trigger is now the click itself; the dashboard's CertificateChip (view / claim)
 // is the way to open it any other time. `window.open` from this (non-click) effect
 // is popup-blocked by some browsers, so when the tab doesn't open we fall back to a
 // small, dismissible banner — a one-click, never-blocked anchor.
