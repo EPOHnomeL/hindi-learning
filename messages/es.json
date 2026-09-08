@@ -306,7 +306,8 @@
     "ending": "Finalizando…",
     "teacherQa": "Preguntas al profesor",
     "teacherQaOn": "Activado: los estudiantes pueden hacer preguntas en una lección y leer tus respuestas",
-    "teacherQaOff": "Desactivado: el canal de preguntas está oculto en todo el curso"
+    "teacherQaOff": "Desactivado: el canal de preguntas está oculto en todo el curso",
+    "updateError": "No se pudo actualizar — inténtalo de nuevo."
   },
   "Artifact": {
     "copied": "Copiado — pégalo donde quieras ✓",

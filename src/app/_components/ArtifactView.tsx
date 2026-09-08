@@ -1,7 +1,7 @@
 "use client";
 
 import { useAction, useMutation, useQuery } from "convex/react";
-import { ConvexError } from "convex/values";
+import { refusalMessage } from "./mutationRun";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -654,12 +654,11 @@ function LessonView({
 // like the storage PUT, or a redacted guard error nobody should be reading) gets
 // the caller's own localised fallback rather than Convex's internals. Mirrors
 // `mutationError` in AdminPanel.
-function saveError(e: unknown, fallback: string): string {
-  if (e instanceof ConvexError && typeof e.data === "string") return e.data;
-  // A local throw carries its own message (the upload PUT), and it is already localised.
-  if (e instanceof Error && !/\[CONVEX/.test(e.message)) return e.message;
-  return fallback;
-}
+// This was `saveError`, the second copy, and its extra local-Error branch is the
+// one `refusalMessage` kept: an upload PUT throws locally with an
+// already-localised message, and showing the generic fallback there loses real
+// information. Shared since 2026-09-08 (ticket 32).
+const saveError = refusalMessage;
 
 // The owner's in-place prose editor (course-content-editing). A modal holding an
 // edit iframe that renders the item with its authored CSS/layout — the same

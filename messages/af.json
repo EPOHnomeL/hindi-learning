@@ -306,7 +306,8 @@
     "ending": "Beëindig tans…",
     "teacherQa": "Onderwyser V&A",
     "teacherQaOn": "Aan: leerders kan vrae oor ’n les vra en jou antwoorde lees",
-    "teacherQaOff": "Af: die vraagkanaal is oral in hierdie kursus versteek"
+    "teacherQaOff": "Af: die vraagkanaal is oral in hierdie kursus versteek",
+    "updateError": "Kon nie opdateer nie — probeer asseblief weer."
   },
   "Artifact": {
     "copied": "Gekopieer — plak dit enige plek ✓",

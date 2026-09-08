@@ -51,7 +51,8 @@
     "ending": "Ending…",
     "teacherQa": "Teacher Q&A",
     "teacherQaOn": "On: learners can ask questions on a lesson and read your replies",
-    "teacherQaOff": "Off: the question channel is hidden everywhere in this course"
+    "teacherQaOff": "Off: the question channel is hidden everywhere in this course",
+    "updateError": "Couldn’t update — please try again."
   },
   "Dashboard": {
     "complete": "Complete",

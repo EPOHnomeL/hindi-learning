@@ -306,7 +306,8 @@
     "ending": "Clôture…",
     "teacherQa": "Questions au professeur",
     "teacherQaOn": "Activé : les apprenants peuvent poser des questions sur une leçon et lire vos réponses",
-    "teacherQaOff": "Désactivé : le canal de questions est masqué dans tout le cours"
+    "teacherQaOff": "Désactivé : le canal de questions est masqué dans tout le cours",
+    "updateError": "Impossible de mettre à jour — veuillez réessayer."
   },
   "Artifact": {
     "copied": "Copié — collez-le où vous voulez ✓",

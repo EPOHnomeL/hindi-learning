@@ -1,7 +1,7 @@
 "use client";
 
 import { Authenticated, AuthLoading, Unauthenticated, useMutation } from "convex/react";
-import { ConvexError } from "convex/values";
+import { refusalTag } from "./mutationRun";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -278,7 +278,7 @@ function CodeForm({
 // the organisation for another, and already having access means the code was NOT
 // consumed and can be passed to somebody who needs it.
 function messageFor(e: unknown, t: (key: string) => string): string {
-  const tag = e instanceof ConvexError && typeof e.data === "string" ? e.data : "";
+  const tag = refusalTag(e);
   switch (tag) {
     case "voucher/code-unknown":
       return t("errUnknown");

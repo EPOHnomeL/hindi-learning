@@ -13,20 +13,12 @@ import { TENANT_THEME_TOKENS, type Token } from "../../design/tokens";
 import { salesRange, type SalesPreset } from "./salesRange";
 import { colorVar, rankLanguages, VIZ_SLOTS } from "./salesChart";
 import { axisTicks, labelIndices, niceMax } from "./dayChart";
-import { ConvexError } from "convex/values";
+import { refusalMessage, useMutationRun } from "./mutationRun";
 
-// The message to show the operator when a mutation refuses.
-//
-// **A production Convex deployment redacts a plain `Error`'s message** before it
-// reaches the client — `e.message` is then the useless "[CONVEX M(...)] Server
-// Error" string, which is exactly what the donation-flag precondition looked
-// like the first time it fired in prod. Only `ConvexError`'s `data` survives the
-// trip, so that is what we read first; a server that threw a plain Error gets
-// the caller's own fallback rather than Convex's internal one.
-function mutationError(e: unknown, fallback: string): string {
-  if (e instanceof ConvexError && typeof e.data === "string") return e.data;
-  return fallback;
-}
+// `mutationError` lived here and recorded the first of the production incidents
+// that taught this codebase how a Convex refusal reaches the client. It is
+// `refusalMessage` in `./mutationRun` since 2026-09-08 (ticket 32), along with
+// the three other copies of it.
 
 // The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
 // dashboard is now scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
@@ -926,7 +918,7 @@ function BatchQueueRow({ batch }: { batch: FunctionReturnType<typeof api.voucher
           try {
             await log({ batchId: batch.batchId, reference });
           } catch (err) {
-            setError(mutationError(err, "Failed - retry"));
+            setError(refusalMessage(err, "Failed - retry"));
             setBusy(false);
           }
         }}
@@ -1049,7 +1041,7 @@ function AccessCodeQueueRow({ code }: { code: FunctionReturnType<typeof api.acce
           try {
             await log({ accessCodeId: code.accessCodeId, reference });
           } catch (err) {
-            setError(mutationError(err, "Failed - retry"));
+            setError(refusalMessage(err, "Failed - retry"));
             setBusy(false);
           }
         }}
@@ -1948,22 +1940,18 @@ function DonationPayee({ slug }: { slug: string }) {
   // become unreachable by construction instead of something the operator
   // discovers by typing an email and being told no.
   const candidates = useQuery(api.sellers.readySellerEmails);
-  const setPayee = useMutation(api.tenantDonations.setDonationPayee);
   const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // This and `FlagToggles` below are siblings that each carried their own copy of
+  // the dance, which is ticket 32's pattern in miniature. One hook now.
+  const { run, busy, error } = useMutationRun(
+    useMutation(api.tenantDonations.setDonationPayee),
+    "Couldn't set that payee.",
+  );
 
   async function save(next: string | undefined) {
-    setError(null);
-    setBusy(true);
-    try {
-      await setPayee({ tenantSlug: slug, email: next });
-      setEmail("");
-    } catch (e) {
-      setError(mutationError(e, "Couldn't set that payee."));
-    } finally {
-      setBusy(false);
-    }
+    // The field clears only on success, so a refused save leaves the operator's
+    // typing where they can see what was rejected.
+    if ((await run({ tenantSlug: slug, email: next })) !== undefined) setEmail("");
   }
 
   return (
@@ -2046,20 +2034,20 @@ const FLAG_META: { key: TenantFlag; label: string; hint: string }[] = [
 // against a double-click mid-write. Keyed by slug at the call site so switching
 // tenants remounts with fresh state.
 function FlagToggles({ slug, flags }: { slug: string; flags: Partial<Record<TenantFlag, boolean>> }) {
-  const setFlags = useMutation(api.tenantFlags.setTenantFlags);
-  const [busy, setBusy] = useState<TenantFlag | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { run, busy: writing, error } = useMutationRun(
+    useMutation(api.tenantFlags.setTenantFlags),
+    "Couldn't update that flag.",
+  );
+  // Which flag is mid-write, not merely that one is: the per-key busy flag is
+  // what stops a double-click on ONE switch, and the shared hook cannot know
+  // which row asked. So this keeps the key and takes the rest from the hook.
+  const [pending, setPending] = useState<TenantFlag | null>(null);
+  const busy = writing ? pending : null;
 
   async function toggle(key: TenantFlag, next: boolean) {
-    setError(null);
-    setBusy(key);
-    try {
-      await setFlags({ tenantSlug: slug, flags: { [key]: next } });
-    } catch (e) {
-      setError(mutationError(e, "Couldn't update that flag."));
-    } finally {
-      setBusy(null);
-    }
+    setPending(key);
+    await run({ tenantSlug: slug, flags: { [key]: next } });
+    setPending(null);
   }
 
   return (

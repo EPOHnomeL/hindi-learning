@@ -2,7 +2,7 @@
 
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Authenticated, AuthLoading, Unauthenticated, useQuery } from "convex/react";
-import { ConvexError } from "convex/values";
+import { refusalTag } from "./mutationRun";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -316,7 +316,7 @@ function AlreadyIn() {
 // survives a production deployment, which is why the server throws tags rather than
 // sentences, and why anything untagged falls through to a generic line here.
 function messageFor(e: unknown, t: (key: string) => string): string {
-  const tag = e instanceof ConvexError && typeof e.data === "string" ? e.data : "";
+  const tag = refusalTag(e);
   switch (tag) {
     case "access/code-unknown":
       return t("errUnknown");
