@@ -106,6 +106,18 @@ export function priceLabel(amount: number, currency: string, locale: string): st
   }
 }
 
+// The mission as a tagline, or null. A course's mission can be a whole brief
+// (prophetic-school's is a Markdown document with headings and bullets, seen on
+// 2026-09-07) and a wall gets one sentence, so only a short plain line qualifies:
+// no line breaks, no Markdown markers, at most 160 characters. Anything else
+// leaves the slot empty for the owner to fill for this render.
+export function missionTagline(mission: string | null): string | null {
+  const line = mission?.trim() ?? "";
+  if (!line || line.length > 160) return null;
+  if (/[\r\n]/.test(line) || /[#*_`>[\]]/.test(line) || /^-\s/.test(line)) return null;
+  return line;
+}
+
 function splitTitle(title: string, emphasis: PosterEdits["emphasis"]): PosterModel["title"] {
   if (!emphasis) return { before: title, em: "", after: "" };
   const start = Math.max(0, Math.min(emphasis.start, title.length));
@@ -144,7 +156,7 @@ export function posterModel(
   const named = ordered.slice(0, 2).map((l) => l.native);
   const langs = ordered.length ? { count: ordered.length, named, more: ordered.length - named.length } : null;
 
-  const tagline = edits.tagline?.trim() ? edits.tagline.trim() : course.mission;
+  const tagline = edits.tagline?.trim() ? edits.tagline.trim() : missionTagline(course.mission);
 
   return {
     locale,

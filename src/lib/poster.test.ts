@@ -101,6 +101,26 @@ describe("posterModel", () => {
     expect(model({ lang: "af" }).locale).toBe("af");
   });
 
+  it("a mission that is a document rather than a line is not a tagline", () => {
+    // prophetic-school's real mission (2026-09-07): Markdown headings, bullets,
+    // several paragraphs. That is the course's brief, not a sentence for a wall.
+    const doc = [
+      "# Mission: Growing in the Holy Spirit",
+      "",
+      "## Why",
+      "I want a living, day-to-day walk with the Holy Spirit.",
+      "",
+      "## Success looks like",
+      "- I sit down to listen",
+    ].join("\n");
+    expect(model({ mission: doc }).tagline).toBeNull();
+    expect(model({ mission: "Read *Premchand* in the original." }).tagline).toBeNull();
+    expect(model({ mission: "A".repeat(161) }).tagline).toBeNull();
+    expect(model({ mission: "  A living, day-to-day walk with Him.  " }).tagline).toBe("A living, day-to-day walk with Him.");
+    // The owner can still supply one for this render.
+    expect(model({ mission: doc }, ywam, { ...noEdits, tagline: "Walk with Him." }).tagline).toBe("Walk with Him.");
+  });
+
   it("the owner's tagline overrides the mission for this render only; blank falls back", () => {
     expect(model().tagline).toBe("A living, day-to-day walk with Him.");
     expect(model({}, ywam, { ...noEdits, tagline: "  Walk with Him.  " }).tagline).toBe("Walk with Him.");
