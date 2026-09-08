@@ -187,6 +187,58 @@ export function themeMessage(theme: Theme): { __lessonTheme: true; theme: Theme 
   return { __lessonTheme: true, theme };
 }
 
+// ---- the inbound half of the bridge -------------------------------------------
+
+// **What a lesson may say to the app.** Ticket 27 (candidate 3 of the 2026-09-04
+// architecture review): half the protocol lived here as typed builders and the
+// other half was four independent `window` message listeners in
+// `ArtifactView.tsx`, each casting `e.data` inline with its own shape.
+//
+// Casting is what let the two halves drift. `e.data` from a sandboxed frame is
+// attacker-controlled in principle and untyped in fact, and **two of the four
+// listeners never checked `e.source` at all** (the height listener and the quiz
+// response listener), so any frame on the page could resize a lesson or record a
+// quiz answer against the reader's Progress. The share and navigate listeners
+// did check. That is exactly the kind of gap a cast-per-listener produces.
+export type LessonMessage =
+  | { type: "shareCard"; term: string; definition: string }
+  | { type: "height"; height: number }
+  | { type: "navigate"; href: string; newTab: boolean }
+  | { type: "response"; quizId: string; answer: string; correct: boolean };
+
+// Parse one raw `MessageEvent` as a message from THIS frame, or `null` for
+// anything else: another frame, a message that is not a lesson's, an unknown
+// type, or a known type whose payload is the wrong shape.
+//
+// The `frame` argument is not optional and is not defaulted, which is the point:
+// a caller cannot install a listener without saying which frame it trusts.
+// `null` trusts nothing, so a listener bound before the iframe mounts drops
+// messages instead of accepting them from anywhere.
+export function lessonMessage(e: MessageEvent, frame: Window | null | undefined): LessonMessage | null {
+  if (!frame || e.source !== frame) return null;
+  const d = e.data as { __lesson?: unknown; type?: unknown } | null | undefined;
+  if (!d || d.__lesson !== true || typeof d.type !== "string") return null;
+  const raw = d as Record<string, unknown>;
+  switch (d.type) {
+    case "shareCard":
+      // The term and definition are stringified rather than required to be
+      // strings: the bridge reads them out of the DOM, so an empty definition is
+      // ordinary and must not drop the whole message.
+      return { type: "shareCard", term: String(raw.term ?? ""), definition: String(raw.definition ?? "") };
+    case "height":
+      return typeof raw.height === "number" ? { type: "height", height: raw.height } : null;
+    case "navigate":
+      return typeof raw.href === "string" ? { type: "navigate", href: raw.href, newTab: Boolean(raw.newTab) } : null;
+    case "response":
+      // A response with no quizId cannot be recorded against anything.
+      return typeof raw.quizId === "string" && raw.quizId !== ""
+        ? { type: "response", quizId: raw.quizId, answer: String(raw.answer ?? ""), correct: Boolean(raw.correct) }
+        : null;
+    default:
+      return null;
+  }
+}
+
 // Dark palette for References. Unlike lessons (whose dark CSS ships in head.html),
 // references are raw authored HTML carrying only a light :root{} palette plus a
 // few hardcoded light colors. This override flips the shared CSS variables AND

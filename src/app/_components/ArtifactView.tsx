@@ -5,14 +5,14 @@ import { refusalMessage } from "./mutationRun";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import posthog from "posthog-js";
 import { api } from "../../../convex/_generated/api";
 import { isPostHogInitialized } from "../PostHogClient";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { LockedPane, Paygate } from "./Paygate";
 import { checkoutLink, publicCourseUrl, useEditionLang, withLang } from "./editionUrl";
-import { buildEditDoc, buildSrcDoc, replaceBodyInner, replaceTitleDisplay, scrollToCardMessage, themeMessage, type Theme } from "./lessonSrcDoc";
+import { buildEditDoc, buildSrcDoc, lessonMessage, replaceBodyInner, replaceTitleDisplay, scrollToCardMessage, themeMessage, type Theme } from "./lessonSrcDoc";
 import { Icon } from "./icons";
 import { LessonFootCard } from "./LessonFoot";
 import { Markdown } from "./MarkdownView";
@@ -151,6 +151,7 @@ export function Frame({
   cardTarget,
   share,
   teacherQa,
+  onResponse,
 }: {
   html: string;
   withBridge: boolean;
@@ -179,6 +180,14 @@ export function Frame({
   // caller already holds. `false` hides the lesson's green ask block; `true` and
   // absence build the document exactly as authored.
   teacherQa?: boolean;
+  // A quiz answered inside the frame (ticket 27). The listener lives HERE, in the
+  // component that owns the iframe, because only this component can say which
+  // frame a message must have come from. It used to sit in `LessonView`, which
+  // renders this one and has no ref to the frame at all, so it could not check
+  // `e.source` even in principle: any frame on the page could record a quiz
+  // answer against the reader's Progress. Absent means nothing is recorded, which
+  // is the Guest reader and a read-only Viewer.
+  onResponse?: (r: { quizId: string; answer: string; correct: boolean }) => void;
 }) {
   const t = useTranslations("Artifact");
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -239,15 +248,14 @@ export function Frame({
   // link + brand are read via refs. Only messages from THIS iframe count.
   useEffect(() => {
     function onShare(e: MessageEvent) {
-      if (e.source !== iframeRef.current?.contentWindow) return;
-      const d = e.data as { __lesson?: boolean; type?: string; term?: unknown; definition?: unknown };
-      if (!(d?.__lesson && d.type === "shareCard")) return;
+      const m = lessonMessage(e, iframeRef.current?.contentWindow);
+      if (m?.type !== "shareCard") return;
       const s = shareRef.current;
       if (!s) return; // no public link → nothing to share (also: no buttons injected)
-      const term = String(d.term ?? "");
+      const term = m.term;
       const snippet = composeCardShare({
         term,
-        definition: String(d.definition ?? ""),
+        definition: m.definition,
         courseTitle: s.courseTitle,
         brand: brandRef.current,
         url: s.url,
@@ -276,6 +284,19 @@ export function Frame({
     return () => window.removeEventListener("message", onShare);
   }, []);
 
+  // A quiz answer, from this frame only. `onResponseRef` so a changing callback
+  // never re-binds the listener.
+  const onResponseRef = useRef(onResponse);
+  onResponseRef.current = onResponse;
+  useEffect(() => {
+    function onQuiz(e: MessageEvent) {
+      const m = lessonMessage(e, iframeRef.current?.contentWindow);
+      if (m?.type === "response") onResponseRef.current?.(m);
+    }
+    window.addEventListener("message", onQuiz);
+    return () => window.removeEventListener("message", onQuiz);
+  }, []);
+
   // Push theme changes into the already-loaded iframe (no reload). Also fires
   // when srcDoc changes (lesson switch) so a freshly loaded frame is in sync.
   useEffect(() => {
@@ -293,8 +314,11 @@ export function Frame({
   useEffect(() => setContentH(null), [srcDoc]);
   useEffect(() => {
     function onMsg(e: MessageEvent) {
-      const d = e.data as { __lesson?: boolean; type?: string; height?: unknown };
-      if (d?.__lesson && d.type === "height" && typeof d.height === "number") setContentH(d.height);
+      // This listener had no `e.source` check until 2026-09-08, so any frame on
+      // the page could resize the lesson. `lessonMessage` cannot be called
+      // without naming the frame it trusts.
+      const m = lessonMessage(e, iframeRef.current?.contentWindow);
+      if (m?.type === "height") setContentH(m.height);
     }
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
@@ -306,12 +330,11 @@ export function Frame({
   // in a new tab so the lesson stays put. Only messages from THIS iframe count.
   useEffect(() => {
     function onNav(e: MessageEvent) {
-      if (e.source !== iframeRef.current?.contentWindow) return;
-      const d = e.data as { __lesson?: boolean; type?: string; href?: unknown; newTab?: unknown };
-      if (!(d?.__lesson && d.type === "navigate" && typeof d.href === "string")) return;
+      const m = lessonMessage(e, iframeRef.current?.contentWindow);
+      if (m?.type !== "navigate") return;
       let url: URL;
       try {
-        url = new URL(d.href);
+        url = new URL(m.href);
       } catch {
         return;
       }
@@ -330,10 +353,10 @@ export function Frame({
           return;
         }
         const path = action.path + url.search + url.hash;
-        if (d.newTab) window.open(path, "_blank", "noopener,noreferrer");
+        if (m.newTab) window.open(path, "_blank", "noopener,noreferrer");
         else router.push(path);
       } else {
-        window.open(d.href, "_blank", "noopener,noreferrer");
+        window.open(m.href, "_blank", "noopener,noreferrer");
       }
     }
     window.addEventListener("message", onNav);
@@ -468,18 +491,17 @@ function LessonView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson?.key, header?.role]);
 
-  useEffect(() => {
-    if (readOnly) return; // Viewers' quiz attempts aren't recorded against the owner.
-    function onMessage(e: MessageEvent) {
-      const d = e.data as { __lesson?: boolean; type?: string; quizId?: string; answer?: unknown; correct?: unknown };
-      if (d?.__lesson && d.type === "response" && d.quizId) {
-        void recordResponse({ topicSlug, lessonKey, quizId: d.quizId, answer: String(d.answer ?? ""), correct: Boolean(d.correct) });
-        if (isPostHogInitialized()) posthog.capture("quiz_answered", { correct: Boolean(d.correct) });
-      }
-    }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, [topicSlug, lessonKey, recordResponse, readOnly]);
+  // What to do with a quiz answer, handed to the `Frame` that owns the iframe
+  // rather than listened for here (ticket 27). `undefined` for a read-only
+  // Viewer, whose attempts are not recorded against the owner, and the absence
+  // is what switches it off rather than an early `return` inside a listener.
+  const onResponse = useCallback(
+    (r: { quizId: string; answer: string; correct: boolean }) => {
+      void recordResponse({ topicSlug, lessonKey, ...r });
+      if (isPostHogInitialized()) posthog.capture("quiz_answered", { correct: r.correct });
+    },
+    [topicSlug, lessonKey, recordResponse],
+  );
 
   const completeLesson = (completionAction: "advance" | "finish") => {
     void setProgress({ topicSlug, lessonKey, status: "completed" });
@@ -557,7 +579,18 @@ function LessonView({
             keyboard until focus landed. No hover state gates it now, at any
             breakpoint. */}
         <div className="relative flex min-h-0 flex-1 flex-col">
-          <Frame html={html} withBridge theme={theme} dir={dir} lang={contentLang} resources={resources} teacherQa={header?.teacherQa} />
+          <Frame
+            html={html}
+            withBridge
+            theme={theme}
+            dir={dir}
+            lang={contentLang}
+            resources={resources}
+            teacherQa={header?.teacherQa}
+            // Absent for a read-only Viewer, whose quiz attempts are not
+            // recorded against the owner. The absence is the switch.
+            onResponse={readOnly ? undefined : onResponse}
+          />
           {canEdit && (
             <button
               type="button"
