@@ -33,7 +33,8 @@ export type IconName =
   | "chat"
   | "chart"
   | "qr"
-  | "poster";
+  | "poster"
+  | "sliders";
 
 const PATHS: Record<IconName, ReactNode> = {
   edit: (
@@ -148,6 +149,18 @@ const PATHS: Record<IconName, ReactNode> = {
     <>
       <rect x="4" y="3" width="16" height="18" rx="2" />
       <path d="M8 8h8M8 12h8M8 16h5" />
+    </>
+  ),
+  // Three labelled faders: the "manage this course" affordance beside "Open
+  // course" (2026-09-08). It used to be the globe, which reads as "public" or
+  // "language" and said nothing about the users, settings and dashboard peers
+  // waiting behind it.
+  sliders: (
+    <>
+      <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h10M18 18h2" />
+      <circle cx="16" cy="6" r="2" />
+      <circle cx="10" cy="12" r="2" />
+      <circle cx="16" cy="18" r="2" />
     </>
   ),
   users: (

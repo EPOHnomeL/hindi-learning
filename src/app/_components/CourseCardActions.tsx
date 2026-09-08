@@ -74,7 +74,7 @@ export function CourseCardActions({
       {/* One tap beside "Open course" goes to the manage route (ui-overhaul 16),
           which replaced the Editions & sharing dialog on 2026-08-27. Ticket 24
           redesigns this card. */}
-      <IconButton icon="globe" label={ted("manageCourse")} href={`/courses/${slug}/manage`} />
+      <IconButton icon="sliders" label={ted("manageCourse")} href={`/courses/${slug}/manage`} />
 
       <Menu triggerLabel={t("moreActionsFor", { title })} dot={dot}>
         {(close) => (
