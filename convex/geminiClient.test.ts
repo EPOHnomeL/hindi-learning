@@ -2,6 +2,12 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { geminiComplete, geminiTranslateModel } from "./geminiClient";
 
+// Only what is vendor-specific about Gemini. The shared policy (missing key,
+// post-once-retry-once, non-OK, empty completion, usage normalisation) moved to
+// `modelCall.test.ts` with the policy itself on 2026-09-08 (ticket 31): these
+// assertions and `openrouterClient.test.ts`'s were the same tests twice, because
+// the code they covered was the same code twice.
+
 // A captured fetch call, so we can assert on URL / headers / body.
 type Captured = { url: string; init: RequestInit };
 function stubFetch(parts: string[]): { calls: Captured[] } {
@@ -35,7 +41,7 @@ test("geminiComplete posts to the native generateContent endpoint with the key, 
     ],
   });
 
-  expect(out).toBe("bonjour");
+  expect(out.content).toBe("bonjour");
   expect(calls).toHaveLength(1);
   expect(calls[0]!.url).toBe(
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent",
@@ -54,7 +60,7 @@ test("geminiComplete posts to the native generateContent endpoint with the key, 
 test("geminiComplete concatenates every text part of the first candidate", async () => {
   stubFetch(["hola ", "mundo"]);
   const out = await geminiComplete({ model: "m", messages: [{ role: "user", content: "hi" }] });
-  expect(out).toBe("hola mundo");
+  expect(out.content).toBe("hola mundo");
 });
 
 test("geminiComplete retries once without thinkingConfig when a model rejects the thinking control", async () => {
@@ -73,31 +79,37 @@ test("geminiComplete retries once without thinkingConfig when a model rejects th
   );
 
   const out = await geminiComplete({ model: "gemini-x", messages: [{ role: "user", content: "hi" }] });
-  expect(out).toBe("traduit");
+  expect(out.content).toBe("traduit");
   expect(bodies).toHaveLength(2);
   expect(JSON.parse(bodies[0]!).generationConfig.thinkingConfig).toEqual({ thinkingLevel: "minimal" });
   expect(JSON.parse(bodies[1]!).generationConfig?.thinkingConfig).toBeUndefined();
-});
-
-test("geminiComplete does not retry an unrelated 400", async () => {
-  const fetchMock = vi.fn(
-    async () => new Response(JSON.stringify({ error: { message: "invalid argument: contents" } }), { status: 400 }),
-  );
-  vi.stubGlobal("fetch", fetchMock);
-  await expect(geminiComplete({ model: "m", messages: [] })).rejects.toThrow(/400/);
-  expect(fetchMock).toHaveBeenCalledTimes(1);
-});
-
-test("geminiComplete throws on a non-OK response and when the key is missing", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 429 })));
-  await expect(geminiComplete({ model: "m", messages: [] })).rejects.toThrow(/429/);
-
-  delete process.env.GOOGLE_AI_API_KEY;
-  await expect(geminiComplete({ model: "m", messages: [] })).rejects.toThrow(/GOOGLE_AI_API_KEY/);
 });
 
 test("the translate model comes from env with a gemini-3.5-flash default", () => {
   expect(geminiTranslateModel()).toBe("gemini-3.5-flash");
   process.env.GEMINI_TRANSLATE_MODEL = "gemini-2.5-flash-lite";
   expect(geminiTranslateModel()).toBe("gemini-2.5-flash-lite");
+});
+
+test("thought tokens are counted as output, because that is how they are billed", () => {
+  // The cost finding this client exists for: `minimal` minimises thinking rather
+  // than switching it off, so a non-zero thought count is real spend. Dropping it
+  // would report a translation run as cheaper than the invoice.
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            candidates: [{ content: { parts: [{ text: "hola" }] } }],
+            usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 40, thoughtsTokenCount: 25 },
+          }),
+          { status: 200 },
+        ),
+    ),
+  );
+  return expect(geminiComplete({ model: "m", messages: [] })).resolves.toEqual({
+    content: "hola",
+    usage: { inputTokens: 100, outputTokens: 65 },
+  });
 });

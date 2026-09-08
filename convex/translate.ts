@@ -914,13 +914,18 @@ function translationBackend(): TranslationBackend {
 async function translateField(content: string, langName: string, mode: "html" | "text"): Promise<string> {
   if (content.trim() === "") return content;
   const messages = buildTranslateMessages(content, langName, mode);
-  if (translationBackend() === "openrouter") {
-    // Usage is reported by the client but not recorded here: the cost seam
-    // (technical-foundation/12) instruments Routine RUNS, per Topic, and a
-    // translation job is a different unit with its own job rows.
-    return (await chatComplete({ model: translateModel(), messages, reasoning: "none" })).content;
-  }
-  return await geminiComplete({ model: geminiTranslateModel(), messages });
+  // A dispatch, and nothing more. Both clients return `{ content, usage }` since
+  // ticket 31, so the two arms differ only in which vendor they name.
+  const reply =
+    translationBackend() === "openrouter"
+      ? await chatComplete({ model: translateModel(), messages, reasoning: "none" })
+      : await geminiComplete({ model: geminiTranslateModel(), messages });
+  // Usage is now visible on BOTH rails (`complete` logs it), and still not
+  // persisted on either. Ticket 12 instruments Routine RUNS in `generationRuns`,
+  // per Topic; a translation job is a different unit with its own
+  // `translationJobs` row and no usage columns, so recording it is schema work on
+  // that table and its own ticket. Deliberately not smuggled in here.
+  return reply.content;
 }
 
 // Items translated per action invocation. A big course can't finish inside one
