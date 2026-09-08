@@ -13,9 +13,19 @@ import { readFileSync, writeFileSync } from "node:fs";
 // The teach instructions, in the order they compose into the system prompt. Paths
 // resolve against the repo root (`.agents/skills/teach/` is the real skill dir;
 // `.claude/skills` symlinks into it).
+//
+// Ownership matters here. `.agents/skills/teach/` is owned by the skills CLI, and
+// `npx skills update` deletes from it: `e242e50` (2026-08-27) removed `AUTHORING.md`
+// upstream and left this bundler unable to start for eleven days. So the authoring
+// *contract*, the one doc that is this repo's lesson mechanics rulebook rather than
+// upstream teaching judgement, now lives in `lessons/` beside the template and
+// partials it describes, where the CLI cannot reach it. The five below are the live
+// skill: copying them here would create exactly the drift this file exists to
+// prevent, so they stay pointed at the skill and `bundleAuthoringAssets` refuses
+// loudly if the CLI takes another one.
 const TEACH_DOCS = [
   ".agents/skills/teach/SKILL.md",
-  ".agents/skills/teach/AUTHORING.md",
+  "lessons/AUTHORING.md",
   ".agents/skills/teach/MISSION-FORMAT.md",
   ".agents/skills/teach/LEARNING-RECORD-FORMAT.md",
   ".agents/skills/teach/GLOSSARY-FORMAT.md",
@@ -25,7 +35,7 @@ const HEAD_PARTIAL = "lessons/_partials/head.html";
 const FOOT_PARTIAL = "lessons/_partials/foot.html";
 const REFERENCE_HEAD_PARTIAL = "lessons/_partials/reference-head.html";
 
-const OUTPUT = "convex/authoringAssets.generated.ts";
+export const OUTPUT = "convex/authoringAssets.generated.ts";
 
 // Pure renderer — the whole determinism guarantee lives here, so it's unit-tested
 // without touching the filesystem. `docs` are the verbatim teach files in order;
@@ -60,13 +70,38 @@ export const REFERENCE_HEAD = ${JSON.stringify(referenceHead.trim())};
 `;
 }
 
+// Reads one source, and names it when it is gone. `readFileSync`'s own ENOENT
+// reports `open '<absolute path>'` and nothing about why the repo wanted that file,
+// which is what made the 2026-08-27 breakage read as an unrelated crash.
+export function readSource(rel: string): string {
+  try {
+    return readFileSync(rel, "utf8");
+  } catch (e) {
+    throw new Error(
+      `bundle:authoring cannot read the authoring source "${rel}". ` +
+        `If it lives under .agents/skills/, the skills CLI has deleted it upstream: ` +
+        `recover the content, move it somewhere this repo owns (as lessons/AUTHORING.md is), ` +
+        `and repoint TEACH_DOCS. Cause: ${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+}
+
+// The bundle end to end: read every source off disk and render the module. This is
+// the interface the test drives, so "the bundler still runs" and "the generated file
+// is fresh" become one assertion instead of a script nothing ever executes.
+export function bundleAuthoringAssets(teachDocs: readonly string[] = TEACH_DOCS): string {
+  const docs = teachDocs.map((rel) => ({ rel, content: readSource(rel) }));
+  return renderAssetsModule(
+    docs,
+    readSource(HEAD_PARTIAL),
+    readSource(FOOT_PARTIAL),
+    readSource(REFERENCE_HEAD_PARTIAL),
+  );
+}
+
 // Runnable only when invoked directly (not when imported by a test).
 if (process.argv[1] && process.argv[1].endsWith("bundle-authoring-assets.ts")) {
-  const docs = TEACH_DOCS.map((rel) => ({ rel, content: readFileSync(rel, "utf8") }));
-  const head = readFileSync(HEAD_PARTIAL, "utf8");
-  const foot = readFileSync(FOOT_PARTIAL, "utf8");
-  const referenceHead = readFileSync(REFERENCE_HEAD_PARTIAL, "utf8");
-  const next = renderAssetsModule(docs, head, foot, referenceHead);
+  const next = bundleAuthoringAssets();
 
   let current = "";
   try {
@@ -78,6 +113,6 @@ if (process.argv[1] && process.argv[1].endsWith("bundle-authoring-assets.ts")) {
     console.log(`${OUTPUT} already up to date.`);
   } else {
     writeFileSync(OUTPUT, next);
-    console.log(`Wrote ${OUTPUT} from ${docs.length} teach docs + 3 partials.`);
+    console.log(`Wrote ${OUTPUT} from ${TEACH_DOCS.length} teach docs + 3 partials.`);
   }
 }
