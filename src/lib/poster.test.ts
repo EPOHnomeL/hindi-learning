@@ -42,7 +42,7 @@ describe("posterModel", () => {
     const m = model();
     expect(m.eyebrow).toBe("eyebrowPaid");
     expect(m.price).toEqual({ label: priceLabel(10000, "ZAR", "en"), suffix: "priceSuffix" });
-    expect(m.price!.label).toMatch(/^R\s?100$/);
+    expect(m.price!.label).toBe("R100");
   });
 
   it("a free Edition gets the free eyebrow and no price block", () => {
@@ -65,9 +65,12 @@ describe("posterModel", () => {
 
   it("sizes the title by length", () => {
     expect(titleLen("Hindi")).toBe("");
-    expect(titleLen("Growing your relationship with the Holy Spirit")).toBe("long");
-    expect(titleLen("A sixty character title that goes on and on and on and on ok")).toBe("xlong");
-    expect(model({ title: "A sixty character title that goes on and on and on and on ok" }).titleLen).toBe("xlong");
+    // The hand-made poster's title: three lines at full size.
+    expect(titleLen("Growing your relationship with the Holy Spirit")).toBe("");
+    expect(titleLen("A sixty character title that goes on and on and on and on ok")).toBe("long");
+    const eighty = "An eighty character course title that would need a fourth line at the full size";
+    expect(titleLen(eighty)).toBe("xlong");
+    expect(model({ title: eighty }).titleLen).toBe("xlong");
   });
 
   it("splits the title around the owner's emphasis and ignores an empty or out-of-range run", () => {
@@ -156,8 +159,10 @@ describe("posterModel", () => {
 
 describe("priceLabel", () => {
   it("prints whole units when there are no cents and two decimals otherwise", () => {
-    expect(priceLabel(10000, "zar", "en")).toMatch(/^R\s?100$/);
+    expect(priceLabel(10000, "zar", "en")).toBe("R100");
     expect(priceLabel(1250, "USD", "en")).toBe("$12.50");
+    // A trailing symbol keeps its locale spacing.
+    expect(priceLabel(10000, "zar", "fr")).toMatch(/^100\s+R$/);
   });
 
   it("falls back to a plain amount for a currency Intl refuses", () => {

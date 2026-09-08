@@ -76,11 +76,14 @@ const DEFAULT_PALETTE: Record<string, string> = {
 const DEFAULT_SITE_NAME = "My Course";
 const DEFAULT_SITE_MARK = "/icon.svg";
 
-// A title over 34 characters shrinks one step, over 52 two steps, so every
-// course fits the fixed 1080 x 1350 canvas (spec story 26).
+// The title shrinks one step over 52 characters and two over 70, so every course
+// fits the fixed 1080 x 1350 canvas (spec story 26). At the full 78 px the sheet
+// holds about 22 characters a line and three lines beside a tagline and three
+// points (the hand-made poster's 46-character title is exactly that), so the
+// first step comes only where a fourth line would.
 export function titleLen(title: string): PosterTitleLen {
   const n = [...title.trim()].length;
-  return n > 52 ? "xlong" : n > 34 ? "long" : "";
+  return n > 70 ? "xlong" : n > 52 ? "long" : "";
 }
 
 export function posterScript(lang: string): PosterScript {
@@ -88,8 +91,10 @@ export function posterScript(lang: string): PosterScript {
 }
 
 // The price as the poster prints it: the Edition's own currency, its narrow
-// symbol, whole units unless the amount has cents (R 100, not R 100,00), in the
-// poster's locale. Falls back to a plain "100 ZAR" for a currency Intl rejects.
+// symbol, whole units unless the amount has cents (R100, not R100,00), in the
+// poster's locale. A leading symbol is set tight against the figure, as a price
+// tag does ("R100", "$12.50"); a trailing one keeps the locale's space ("100 R").
+// Falls back to a plain "100 ZAR" for a currency Intl rejects.
 export function priceLabel(amount: number, currency: string, locale: string): string {
   const major = amount / 100;
   const fraction = amount % 100 === 0 ? 0 : 2;
@@ -100,7 +105,9 @@ export function priceLabel(amount: number, currency: string, locale: string): st
       currencyDisplay: "narrowSymbol",
       minimumFractionDigits: fraction,
       maximumFractionDigits: fraction,
-    }).format(major);
+    })
+      .format(major)
+      .replace(/^(\D+?)\s+(?=\d)/u, "$1");
   } catch {
     return `${major.toFixed(fraction)} ${currency.toUpperCase()}`;
   }

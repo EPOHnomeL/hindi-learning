@@ -150,6 +150,10 @@ export function PosterPage({ token, fontClass }: { token: string; fontClass: str
             ) : (
               <div className="poster-logo-fallback">{m.tenantName}</div>
             )}
+            {/* The body centres in whatever the logo and footer leave, so a sheet
+                with no tagline and no highlights does not float up and leave a
+                void above the footer; a full sheet lays out as the template. */}
+            <div className="poster-body">
             <div className="poster-eyebrow">{m.eyebrow}</div>
             <h1 ref={titleRef} data-len={m.titleLen}>
               {m.title.before}
@@ -177,6 +181,7 @@ export function PosterPage({ token, fontClass }: { token: string; fontClass: str
                 )}
               </div>
             </section>
+            </div>
             <footer className="poster-footer">
               <div className="poster-langs">
                 {m.langs && (
