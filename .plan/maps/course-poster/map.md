@@ -46,6 +46,13 @@ is the scope, drafted 2026-09-07 from the hand-made ywampotch poster.
   the running app: the owner panel, the emphasis selection, and whether the tenant
   logo's Convex storage URL allows the cross-origin fetch the rasteriser needs (it
   falls back to an empty image slot if not).
+- **The mission is a tagline only when it reads as one (2026-09-07).** The first
+  real render of prophetic-school showed its mission is a Markdown brief (headings,
+  bullets, several paragraphs), which flooded the sheet and pushed the card off the
+  canvas. The model now takes the mission as the tagline only when it is a single
+  plain line of at most 160 characters with no Markdown markers; otherwise the slot
+  stays empty until the owner types one for the render. Tested in
+  `src/lib/poster.test.ts`.
 
 ## Not yet specified
 
