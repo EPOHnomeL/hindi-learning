@@ -22,6 +22,7 @@ import { useTheme } from "./ThemeContext";
 import { CourseSkeleton, ReaderSkeleton } from "./ui";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { firstLessonKey, nextLessonKey, resumeLessonKey } from "./readerDerive";
+import { useStoredSet } from "./useStoredSet";
 import { Welcome, useWelcomeDismissed } from "./Welcome";
 import { guestProgress, latchFirstOpen } from "./welcomeDerive";
 import { tenantHomeHref, type TenantSlug } from "~/lib/tenant";
@@ -81,20 +82,13 @@ export function PublicCourseShell({ src, children }: { src: GuestSource; childre
   // The Guest's completed lessons (per device, per token). Loaded from localStorage
   // on mount; `markComplete` adds one and persists. No account, so this is all
   // client-side.
-  const [completed, setCompleted] = useState<Set<string>>(new Set());
-  // Whether that load has happened yet. The welcome panel (welcome/01) turns on an
-  // EMPTY completed set, and the set starts empty before localStorage is read — so
-  // without this a returning Guest would get a flash of "welcome" on every visit.
-  const [doneLoaded, setDoneLoaded] = useState(false);
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(`${DONE_KEY}:${scope}`);
-      if (raw) setCompleted(new Set(JSON.parse(raw) as string[]));
-    } catch {
-      /* unavailable or corrupt storage — start empty */
-    }
-    setDoneLoaded(true);
-  }, [scope]);
+  // Keyed by Public-link scope, so a different link is a different set.
+  // `loaded` is why the hook exposes it: the welcome panel turns on an EMPTY
+  // completed set, and the set is empty before localStorage has been read, so
+  // without it a returning Guest gets a flash of "welcome" on every visit.
+  const done = useStoredSet(`${DONE_KEY}:${scope}`);
+  const completed = done.values;
+  const doneLoaded = done.loaded;
 
   // First open of this Public link on this device? Latched once the stored set has
   // been read (`undefined` = still loading, so no verdict yet), then held for the
@@ -106,21 +100,7 @@ export function PublicCourseShell({ src, children }: { src: GuestSource; childre
       latchFirstOpen(prev, doneLoaded ? guestProgress(completed) : undefined, course?.lessons.length),
     );
   }, [doneLoaded, completed, course?.lessons.length]);
-  const markComplete = useCallback(
-    (lessonKey: string) => {
-      setCompleted((prev) => {
-        if (prev.has(lessonKey)) return prev;
-        const next = new Set(prev).add(lessonKey);
-        try {
-          localStorage.setItem(`${DONE_KEY}:${scope}`, JSON.stringify([...next]));
-        } catch {
-          /* ignore */
-        }
-        return next;
-      });
-    },
-    [scope],
-  );
+  const markComplete = useCallback((lessonKey: string) => done.add(lessonKey), [done]);
 
   if (course === undefined) return <CourseSkeleton />;
   if (course === null) return <Centered>{t("linkUnavailable")}</Centered>;

@@ -22,6 +22,7 @@ import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { useResourceUpload } from "./useResourceUpload";
 import { completedKeys, frontierKey, nextLessonKey, resumeLessonKey, seenAfterOpening } from "./readerDerive";
+import { useStoredSet } from "./useStoredSet";
 import { Welcome, useWelcomeDismissed } from "./Welcome";
 import { latchFirstOpen, welcomeVariant } from "./welcomeDerive";
 
@@ -108,15 +109,9 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   // Answered-question ids already seen (client-only, per device). A lesson with a
   // reply not in this set gets a notification dot; opening that lesson marks its
   // answers seen and clears the dot.
-  const [seen, setSeen] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SEEN_KEY);
-      if (raw) setSeen(new Set(JSON.parse(raw) as string[]));
-    } catch {
-      /* unavailable or corrupt storage — start empty */
-    }
-  }, []);
+  // The load, the add and the two empty catches were hand-written here and again
+  // in `PublicReader`. `useStoredSet` is that routine, once.
+  const seen = useStoredSet(SEEN_KEY);
 
   // Paid marketplace (ADR 0016): WHICH items are locked is the server's call —
   // `listLessons`/`listReferences` carry a per-item `locked` from the same rule
@@ -153,19 +148,11 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   // Stable per `questions` so the Lesson page's open-effect fires on lesson change
   // or a newly-arrived reply, not on every render.
   const markSeen = useCallback(
-    (lessonKey: string) => {
-      setSeen((prev) => {
-        const next = seenAfterOpening(questions ?? [], lessonKey, prev);
-        if (next === prev) return prev;
-        try {
-          localStorage.setItem(SEEN_KEY, JSON.stringify([...next]));
-        } catch {
-          /* ignore */
-        }
-        return next;
-      });
-    },
-    [questions],
+    // `seenAfterOpening` returns the SAME set when a lesson has no new replies,
+    // and `update` treats that as nothing to do, so an open with no new answers
+    // writes nothing.
+    (lessonKey: string) => seen.update((prev) => seenAfterOpening(questions ?? [], lessonKey, prev)),
+    [questions, seen],
   );
 
   // The welcome panel's "start here" lesson: the caller's resume point, or — on a
