@@ -9,7 +9,7 @@ import {
   pfParamString,
   platformFeeBps,
   processUrl,
-  randFromCents,
+  payfastAmountField,
   sellingDisabled,
   sellingEnabled,
   signFields,
@@ -206,10 +206,10 @@ test("platformFeeBps defaults to 5000 and rejects out-of-bounds values", () => {
 
 // ---- ZAR formatting ------------------------------------------------------------
 
-test("randFromCents renders cents as 2-decimal Rand", () => {
-  expect(randFromCents(150000)).toBe("1500.00");
-  expect(randFromCents(999)).toBe("9.99");
-  expect(randFromCents(5)).toBe("0.05");
+test("payfastAmountField renders cents as 2-decimal Rand", () => {
+  expect(payfastAmountField(150000)).toBe("1500.00");
+  expect(payfastAmountField(999)).toBe("9.99");
+  expect(payfastAmountField(5)).toBe("0.05");
 });
 
 test("centsFromRand parses PayFast amount strings to integer cents (fees arrive negative)", () => {

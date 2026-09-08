@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { LANGUAGES } from "../../../../convex/languages";
 import { Icon } from "../icons";
+import { toMajor } from "~/lib/money";
 import { formatPrice } from "../Paygate";
 import { ConfirmDialog, MenuItem } from "../ui";
 import { EmptyPanel, Sheet, type Edition, type Engine } from "./shared";
@@ -536,10 +537,10 @@ function PriceEditor({
   const t = useTranslations("Editions");
   const setPrice = useMutation(api.market.setEditionPrice);
   const clearPrice = useMutation(api.market.clearEditionPrice);
-  const major = (minor: number | undefined) => (minor === undefined ? "" : (minor / 100).toFixed(2));
+  const major = (minor: number | undefined) => (minor === undefined ? "" : toMajor(minor).toFixed(2));
   // Seeded from what was last saved: a save writes all three fields, so a form
   // that opened blank would silently withdraw the regional prices on every edit.
-  const [amount, setAmount] = useState(current ? (current.amount / 100).toFixed(2) : "");
+  const [amount, setAmount] = useState(current ? toMajor(current.amount).toFixed(2) : "");
   const [usd, setUsd] = useState(major(current?.usdAmount));
   const [eur, setEur] = useState(major(current?.eurAmount));
   const [busy, setBusy] = useState(false);

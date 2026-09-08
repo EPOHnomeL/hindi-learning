@@ -2,6 +2,7 @@
 
 import { useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
+import { formatMoney } from "~/lib/money";
 import Link from "next/link";
 import { type ReactNode } from "react";
 import { api } from "../../../convex/_generated/api";
@@ -30,16 +31,15 @@ export type Paywall = {
   eurAmount?: number;
 };
 
-// Minor units → a localised currency string (e.g. 120000 "zar" → "R 1 200,00").
-// Assumes a 2-decimal currency (ZAR is); `Intl` renders the symbol and grouping
-// for the viewer's locale.
+// Minor units to a localised currency string, in the viewer's own locale.
+//
+// Kept as a name because thirty-odd call sites use it, but it is now the shared
+// `formatMoney` and nothing else: one R100 Edition used to print three different
+// ways across the product (`src/lib/money.ts` has the detail). The only change
+// visible here is the narrow symbol, so ZAR reads `R 1 200,00` rather than
+// `ZAR 1 200,00` in the locales that spell the code out.
 export function formatPrice(amount: number, currency: string): string {
-  const major = amount / 100;
-  try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency: currency.toUpperCase() }).format(major);
-  } catch {
-    return `${major.toFixed(2)} ${currency.toUpperCase()}`;
-  }
+  return formatMoney(amount, currency);
 }
 
 // What this buyer is quoted, formatted: their own currency's figure, plus the

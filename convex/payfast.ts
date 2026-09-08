@@ -227,7 +227,7 @@ export function buildCheckoutFields(opts: {
     notify_url: opts.notifyUrl,
     ...(opts.email ? { email_address: opts.email } : {}),
     ...(opts.mPaymentId ? { m_payment_id: opts.mPaymentId } : {}),
-    amount: randFromCents(opts.amountCents),
+    amount: payfastAmountField(opts.amountCents),
     item_name: opts.itemName.slice(0, 100),
     custom_str1: opts.custom1,
     custom_str2: opts.custom2,
@@ -251,9 +251,16 @@ export function platformFeeBps(): number {
 
 // ---- ZAR formatting -----------------------------------------------------------------
 
-// Cents → the 2-decimal Rand string PayFast's `amount` fields carry ("1500.00").
-// Integer math — no float rounding at the money boundary.
-export function randFromCents(cents: number): string {
+// Cents to the 2-decimal Rand string PayFast's `amount` fields carry ("1500.00").
+// Integer math, so there is no float rounding at the money boundary.
+//
+// **This is WIRE format, not display**, and the name says so since 2026-09-08.
+// It looked like a fourth money formatter beside `formatMoney`, `formatPrice`
+// and the admin log's, and it is not one: no symbol, no grouping, no locale, a
+// dot decimal separator because that is what the gateway parses, and a value
+// that goes into a signed field where changing the spelling breaks the
+// signature. Display money lives in `src/lib/money.ts`.
+export function payfastAmountField(cents: number): string {
   return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
 }
 

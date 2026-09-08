@@ -8,6 +8,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { SellerStatus } from "../../../convex/sellerStatus";
 import type { TenantFlag } from "../../../convex/tenantFlags";
+import { formatMoney } from "~/lib/money";
 import { TENANT_THEME_TOKENS, type Token } from "../../design/tokens";
 import { salesRange, type SalesPreset } from "./salesRange";
 import { colorVar, rankLanguages, VIZ_SLOTS } from "./salesChart";
@@ -1182,9 +1183,13 @@ function OperatorBankForm() {
   );
 }
 
-// Rand formatting for ledger amounts (cents → "R 1 234.56").
+// Ledger amounts, in the shared spelling. The hardcoded `R ` prefix is gone:
+// every row in this panel is Rand today, but the currency beats a prefix that is
+// right by coincidence. `en-ZA` stays explicit, because a cash log the operator
+// reconciles against a bank statement must not change shape with the browser's
+// locale.
 function formatRand(cents: number): string {
-  return `R ${(cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatMoney(cents, "ZAR", { locale: "en-ZA" });
 }
 
 function PayoutRow({ owed }: { owed: FunctionReturnType<typeof api.ledger.owedPayouts>[number] }) {

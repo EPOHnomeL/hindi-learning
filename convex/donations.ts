@@ -4,7 +4,7 @@ import type { QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { normaliseEmail } from "./shareGrants";
 import { isReadySeller } from "./sellerStatus";
-import { appUrl, buildCheckoutFields, processUrl, randFromCents, sellingEnabled } from "./payfast";
+import { appUrl, buildCheckoutFields, processUrl, payfastAmountField, sellingEnabled } from "./payfast";
 import { oncePerPayment, recordMoneyEvent } from "./moneyEvent";
 import { USD_ZAR_RATE, zarCentsFromUsdCents } from "./rates";
 
@@ -212,6 +212,6 @@ export const config = query({
     minUsdCents: MIN_DONATION_USD_CENTS,
     usdZarRate: USD_ZAR_RATE,
     feeBps: DONATION_FEE_BPS,
-    exampleZar: randFromCents(zarCentsFromUsdCents(MIN_DONATION_USD_CENTS)),
+    exampleZar: payfastAmountField(zarCentsFromUsdCents(MIN_DONATION_USD_CENTS)),
   }),
 });
