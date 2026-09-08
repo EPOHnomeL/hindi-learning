@@ -6,51 +6,28 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { EmblemSection } from "./Certificate";
 import { Icon } from "./icons";
-import { ConfirmDialog, Dialog, IconButton } from "./ui";
+import { ConfirmDialog, IconButton } from "./ui";
 
-// The consolidated "Course settings" dialog (UI redesign): Details, the
-// certificate emblem, and the completion lifecycle. Details follows a target
-// Edition (`lang`): on a translated Edition it edits that Edition's title &
-// mission (replacing the old title pencil); on the English source it edits the
-// source. The dialog self-resolves the served Edition from `lang` via
-// `courseHeader`, so a caller just passes a language.
+// "Course settings" (UI redesign): Details, the certificate emblem, and the
+// completion lifecycle. Details follows a target Edition (`lang`): on a
+// translated Edition it edits that Edition's title & mission (replacing the old
+// title pencil); on the English source it edits the source. It self-resolves the
+// served Edition from `lang` via `courseHeader`, so a caller just passes a
+// language.
 //
-// CORRECTED 2026-08-27 (ui-overhaul 17). This comment used to claim two entry
-// points, the reader and the dashboard, and an Editor who "sees only Details".
-// There is ONE caller: Dashboard.tsx, the owner's course-card kebab, and it never
-// passes `owner`. So the `owner={false}` branch below, the Editor's Details-only
-// view, is currently DEAD CODE: nothing renders it. Commit e228ba5 (2026-08-23)
-// removed the reader's door when it trimmed the reader drawer to lessons,
-// references and resources, and that commit message records the cost in its own
-// words, "a translated Edition Editor loses the Details door".
+// It has ONE home as of 2026-09-08: the manage route's Course settings tab. The
+// dashboard card's kebab was the other door, and both it and the dialog wrapper
+// this file used to export went with it, so there is no longer a second place to
+// change a course from.
 //
-// The branch is kept rather than deleted because ui-overhaul 17 decided the door
-// returns in the reader, Details only, gated on the per-Edition `canEdit` that
-// `courseHeader` already computes server side (ADR 0020). Ticket 20 revives it.
-// Everything outside Details stays owner-only.
-export function CourseSettingsDialog({
-  topicSlug,
-  status,
-  onClose,
-  owner = true,
-  lang = null,
-}: {
-  topicSlug: string;
-  status: "seeded" | "active" | "completed";
-  onClose: () => void;
-  owner?: boolean;
-  lang?: string | null;
-}) {
-  const t = useTranslations("CourseSettings");
-  return (
-    <Dialog title={t("title")} onClose={onClose}>
-      <CourseSettingsBody topicSlug={topicSlug} status={status} owner={owner} lang={lang} />
-    </Dialog>
-  );
-}
-
-// The dialog's interior, shared with the manage route's Course settings tab
-// (ui-overhaul 19); ticket 20 redesigns it.
+// The `owner={false}` branch below, an Editor's Details-only view, is DEAD CODE:
+// nothing renders it. Commit e228ba5 (2026-08-23) removed the reader's door when
+// it trimmed the reader drawer to lessons, references and resources, and that
+// commit message records the cost in its own words, "a translated Edition Editor
+// loses the Details door". The branch is kept rather than deleted because
+// ui-overhaul 17 decided the door returns in the reader, Details only, gated on
+// the per-Edition `canEdit` that `courseHeader` already computes server side (ADR
+// 0020). Ticket 20 revives it.
 export function CourseSettingsBody({
   topicSlug,
   status,

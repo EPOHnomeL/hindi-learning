@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../../convex/_generated/api";
@@ -76,10 +76,14 @@ export function ManageShell({ slug }: { slug: string }) {
         <div className="flex items-center gap-2">
           <IconButton icon="chevron" label={t("backToCourses")} href="/" className="[&_svg]:rotate-90" variant="ghost" />
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-accent">{t("manageCourse")}</h1>
-          {/* The edition button governs the Sharing peer alone, and a one-edition
-              course shows none at all (its "Add a language" lives at the Sharing
-              tab's foot instead). */}
-          {tab === "sharing" && editions.length > 1 && active && (
+          {/* The edition button governs the Sharing and Course settings peers,
+              both of which act on one edition (Settings joined them on
+              2026-09-08, when the dashboard card's kebab door to Course settings
+              closed and this became the only way to edit a translated edition's
+              title and mission). Users and Dashboard are course-wide, and a
+              one-edition course shows no button at all (its "Add a language"
+              lives at the Sharing tab's foot instead). */}
+          {(tab === "sharing" || tab === "settings") && editions.length > 1 && active && (
             <button
               type="button"
               aria-haspopup="dialog"
@@ -132,7 +136,7 @@ export function ManageShell({ slug }: { slug: string }) {
         ) : tab === "users" ? (
           <UsersTab topicSlug={slug} editions={editions} />
         ) : tab === "settings" ? (
-          <SettingsTab topicSlug={slug} />
+          <SettingsTab topicSlug={slug} lang={lang} />
         ) : (
           <DashboardTab topicSlug={slug} editions={editions} onGoTo={setTab} />
         )}
@@ -177,15 +181,72 @@ export function ManageShell({ slug }: { slug: string }) {
   );
 }
 
-// The Course settings peer. Its interior is the existing dialog body verbatim;
-// ticket 20 redesigns it. Status comes from the owner's own topics list.
-function SettingsTab({ topicSlug }: { topicSlug: string }) {
+// The Course settings peer, and as of 2026-09-08 the ONLY door to course
+// settings: the dashboard card's kebab closed, so Details here edits whichever
+// edition the header's button names, which is what the dashboard dialog used to
+// do by following the UI language. Status comes from the owner's own topics list.
+// Ticket 20 redesigns the interior.
+function SettingsTab({ topicSlug, lang }: { topicSlug: string; lang: string }) {
   const t = useTranslations("CourseSettings");
   const topics = useQuery(api.content.reader.listTopics);
   const topic = topics?.find((x) => x.slug === topicSlug) ?? null;
   if (topics === undefined) return <p className="text-[12.5px] text-soft">{t("loading")}</p>;
   if (!topic) return null;
-  return <CourseSettingsBody topicSlug={topicSlug} status={topic.status} />;
+  return (
+    <>
+      <CourseSettingsBody topicSlug={topicSlug} status={topic.status} lang={lang} />
+      <AdminGenerationSection topicSlug={topicSlug} courseCompleted={topic.status === "completed"} />
+    </>
+  );
+}
+
+// The admin's "fire and pray": generate the remaining curriculum in one go, and
+// cancel a run in flight. Self-gated on `amIAdmin`, and rendered for nobody else.
+// It lived in the dashboard card's kebab until that menu went (2026-09-08); this
+// is the course-wide settings surface, which is where the rest of the course
+// lifecycle already sits.
+function AdminGenerationSection({ topicSlug, courseCompleted }: { topicSlug: string; courseCompleted: boolean }) {
+  const t = useTranslations("Dashboard");
+  const amAdmin = useQuery(api.whitelist.amIAdmin);
+  const status = useQuery(api.routine.generationStatus, { topicSlug });
+  const finish = useAction(api.routine.finishGenerating);
+  const cancel = useAction(api.routine.cancelFinishGenerating);
+  const [busy, setBusy] = useState(false);
+  if (!amAdmin || courseCompleted) return null;
+
+  const generating = busy || status?.status === "generating";
+  const cancelling = status?.cancelRequested === true;
+  const failed = status?.status === "failed";
+
+  return (
+    <div className="mt-5 border-t border-line pt-5">
+      {/* No heading: the button says what it does, and this is the only admin
+          control on the page. Adding one would mean a new message key in six
+          catalogues to name a section of one. */}
+      <button
+        type="button"
+        disabled={generating && cancelling}
+        onClick={() => {
+          if (generating) {
+            if (!cancelling) void cancel({ topicSlug });
+            return;
+          }
+          setBusy(true);
+          void finish({ topicSlug }).finally(() => setBusy(false));
+        }}
+        className="flex w-full items-center gap-2 rounded-xl border border-line bg-card px-3 py-2.5 text-start text-sm text-ink transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
+      >
+        <Icon name={generating ? "x" : "refresh"} className="h-4 w-4 shrink-0 text-soft" />
+        {generating
+          ? cancelling
+            ? t("cancelling")
+            : t("cancelGeneration")
+          : failed
+            ? t("finishGeneratingRetry")
+            : t("finishGenerating")}
+      </button>
+    </div>
+  );
 }
 
 // The edition sheet's list: every edition with badges and a tick, filterable
