@@ -13,6 +13,7 @@ import { SOURCE_LANG } from "./sourceLang";
 import { assertTenantFlag } from "./tenantFlags";
 import { topicLessonCounts } from "./progressCounts";
 import { editionChip, editionLabel } from "./languages";
+import { preferEdition } from "./editionPreference";
 import { appUrl } from "./payfast";
 import type { InviteKind } from "./inviteEmail";
 
@@ -412,10 +413,11 @@ export const listSharedTopics = query({
         // they mark lessons), not the owner's.
         const counts = await topicLessonCounts(ctx, topic._id, userId);
         const langList = [...langSet].sort();
-        // Show the card title in a language the Viewer actually holds (English if
-        // they hold it, else their first Edition) — an English-only Viewer of a
-        // Spanish-only share shouldn't see an English title they can't read.
-        const preferred = langList.includes(SOURCE_LANG) ? SOURCE_LANG : langList[0]!;
+        // Title the card in a language the Viewer actually holds: an English-only
+        // Viewer of a Spanish-only share should not see an English title they
+        // cannot read. Same ladder the card's Open link uses, minus the locale
+        // rung, which a server query cannot know.
+        const preferred = preferEdition(langList)!;
         // The card title in the Viewer's preferred Edition (translated else source),
         // via the shared Edition reader — decoded, unlike the old inline lookup.
         const title = await loadEdition(ctx, topic, preferred).title();

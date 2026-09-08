@@ -11,6 +11,7 @@ import { SOURCE_LANG } from "./sourceLang";
 import { isReadySeller } from "./sellerStatus";
 import { topicLessonCounts } from "./progressCounts";
 import { editionChip, editionLabel } from "./languages";
+import { preferEdition } from "./editionPreference";
 import { appUrl, buildCheckoutFields, platformFeeBps, processUrl, sellingEnabled } from "./payfast";
 import { oncePerPayment, purchasableEdition, recordMoneyEvent } from "./moneyEvent";
 import { isCallerAdmin } from "./whitelist";
@@ -180,7 +181,7 @@ export const myPurchases = query({
         if (!topic) return null;
         const counts = await topicLessonCounts(ctx, topic._id, userId);
         const langList = [...langSet].sort();
-        const preferred = langList.includes(SOURCE_LANG) ? SOURCE_LANG : langList[0]!;
+        const preferred = preferEdition(langList)!;
         const title = await translatedTitle(ctx, topic._id, preferred, topic.title);
         return {
           slug: topic.slug,
