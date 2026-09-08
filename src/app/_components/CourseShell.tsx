@@ -408,7 +408,14 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               purchase={variant === "first-open" ? null : { confirmed: variant === "purchase-complete" }}
             />
           )}
-          <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+          {/* The desktop pane's scroller. Everything under this layout, the
+              lesson reader and the manage route alike, used to sit in an
+              `md:overflow-hidden` section with no scroller of its own, so on
+              desktop a page taller than the viewport was simply clipped: the
+              manage route's Dashboard tab could not be scrolled to at all
+              (2026-09-08). The reader's own columns scroll internally, so this
+              only ever engages for the pages that don't. */}
+          <div className="flex min-h-0 flex-1 flex-col md:overflow-y-auto">{children}</div>
         </section>
       </div>
       {/* Completion celebration (ADR 0015): fires once per device when the caller
