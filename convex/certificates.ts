@@ -9,7 +9,7 @@ import { mintToken } from "./tokens";
 import { SOURCE_LANG } from "./sourceLang";
 import { assertTenantFlag } from "./tenantFlags";
 import { topicLessonCounts } from "./progressCounts";
-import { langInfo } from "./languages";
+import { langDir } from "./languages";
 import { resolveEmblem, resolvedEmblemValidator, snapshotEmblem } from "./emblem";
 
 // The earned-Certificate shape shared by the authed seams (`myCertificate` and
@@ -247,7 +247,7 @@ export const publicCertificate = query({
       issuedAt: row._creationTime,
       lessonCount: row.lessonCount,
       lang,
-      dir: langInfo(lang).rtl ? ("rtl" as const) : ("ltr" as const),
+      dir: langDir(lang),
       emblem: await resolveEmblem(ctx, row.emblem),
       course: topic?.publicToken
         ? { shareToken: topic.publicToken, tenantSlug: topic.tenantSlug ?? null }

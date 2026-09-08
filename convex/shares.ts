@@ -12,7 +12,7 @@ import { normaliseEmail, shareLang, shareRole } from "./shareGrants";
 import { SOURCE_LANG } from "./sourceLang";
 import { assertTenantFlag } from "./tenantFlags";
 import { topicLessonCounts } from "./progressCounts";
-import { langInfo } from "./languages";
+import { editionChip, editionLabel } from "./languages";
 import { appUrl } from "./payfast";
 import type { InviteKind } from "./inviteEmail";
 
@@ -38,7 +38,7 @@ async function scheduleInvite(
     to,
     kind,
     courseTitle: topic.title,
-    langName: editionLang === SOURCE_LANG ? "English" : langInfo(editionLang).name,
+    langName: editionLabel(editionLang),
     inviterEmail,
     role,
     link,
@@ -425,15 +425,7 @@ export const listSharedTopics = query({
           ownerEmail: owner?.email ?? null,
           mission: topic.mission ?? null,
           ...counts,
-          langs: langList.map((l) => {
-            const i = langInfo(l);
-            return {
-              lang: l,
-              name: l === SOURCE_LANG ? "English" : i.name,
-              native: l === SOURCE_LANG ? "English" : i.native,
-              rtl: l === SOURCE_LANG ? false : !!i.rtl,
-            };
-          }),
+          langs: langList.map(editionChip),
         };
       }),
     );

@@ -10,7 +10,7 @@ import { normaliseEmail } from "./shareGrants";
 import { SOURCE_LANG } from "./sourceLang";
 import { isReadySeller } from "./sellerStatus";
 import { topicLessonCounts } from "./progressCounts";
-import { langInfo } from "./languages";
+import { editionChip, editionLabel } from "./languages";
 import { appUrl, buildCheckoutFields, platformFeeBps, processUrl, sellingEnabled } from "./payfast";
 import { oncePerPayment, purchasableEdition, recordMoneyEvent } from "./moneyEvent";
 import { isCallerAdmin } from "./whitelist";
@@ -187,15 +187,7 @@ export const myPurchases = query({
           title,
           mission: topic.mission ?? null,
           ...counts,
-          langs: langList.map((l) => {
-            const i = langInfo(l);
-            return {
-              lang: l,
-              name: l === SOURCE_LANG ? "English" : i.name,
-              native: l === SOURCE_LANG ? "English" : i.native,
-              rtl: l === SOURCE_LANG ? false : !!i.rtl,
-            };
-          }),
+          langs: langList.map(editionChip),
         };
       }),
     );
@@ -421,7 +413,7 @@ export const startCheckout = mutation({
     await ctx.db.insert("checkoutIntents", { mPaymentId, email, topicId: topic._id, lang, amount: amountCents });
 
     const title = await translatedTitle(ctx, topic._id, lang, topic.title);
-    const editionName = lang === SOURCE_LANG ? "English" : langInfo(lang).name;
+    const editionName = editionLabel(lang);
     const back = `/courses/${topicSlug}${lang === SOURCE_LANG ? "" : `?lang=${lang}`}`;
     const fields = buildCheckoutFields({
       merchantId,

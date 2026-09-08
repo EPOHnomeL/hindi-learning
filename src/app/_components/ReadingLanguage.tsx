@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
+import { langDir } from "../../../convex/languages";
 import { LANG_KEY, withLang } from "./editionUrl";
 import { Icon } from "./icons";
 
@@ -65,7 +66,7 @@ export function ReadingLanguage({
         className="min-w-0 flex-1 cursor-pointer border-0 bg-transparent text-sm font-medium text-ink focus:outline-none"
       >
         {editions.map((ed) => (
-          <option key={ed.lang} value={ed.lang} dir={ed.rtl ? "rtl" : "ltr"}>
+          <option key={ed.lang} value={ed.lang} dir={langDir(ed.lang)}>
             {ed.native}
           </option>
         ))}

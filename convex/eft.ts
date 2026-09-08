@@ -9,7 +9,7 @@ import { grantEdition } from "./grants";
 import { topicBySlug } from "./topicAccess";
 import { normaliseEmail } from "./shareGrants";
 import { SOURCE_LANG } from "./sourceLang";
-import { langInfo } from "./languages";
+import { editionLabel } from "./languages";
 import { appUrl, platformFeeBps } from "./payfast";
 import { offGateway, purchasableEdition, recordMoneyEvent } from "./moneyEvent";
 import { eftAllowed, regionForCountry } from "./regions";
@@ -288,7 +288,7 @@ export const myPendingIntents = query({
             slug: topic.slug,
             title: await translatedTitle(ctx, topic._id, r.lang, topic.title),
             lang: r.lang,
-            langName: r.lang === SOURCE_LANG ? "English" : langInfo(r.lang).name,
+            langName: editionLabel(r.lang),
             ref: r.ref,
             amount: r.amount,
           };
@@ -436,7 +436,7 @@ async function scheduleAccessEmail(
   ctx: MutationCtx,
   { intent, topic, buyerEmail }: { intent: Doc<"eftIntents">; topic: Doc<"topics">; buyerEmail: string },
 ): Promise<void> {
-  const langName = intent.lang === SOURCE_LANG ? "English" : langInfo(intent.lang).name;
+  const langName = editionLabel(intent.lang);
   const seller = topic.ownerId ? await ctx.db.get(topic.ownerId) : null;
   await ctx.scheduler.runAfter(0, internal.email.sendInvite, {
     to: normaliseEmail(buyerEmail),

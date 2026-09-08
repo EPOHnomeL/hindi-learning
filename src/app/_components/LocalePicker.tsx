@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { langInfo } from "../../../convex/languages";
+import { langDir, langInfo } from "../../../convex/languages";
 import { LOCALES } from "~/i18n/config";
 import { useSetLocale } from "~/i18n/locale-client";
 import { Icon } from "./icons";
@@ -36,7 +36,7 @@ export function LocalePicker({ className }: { className?: string }) {
         {LOCALES.map((code) => {
           const info = langInfo(code);
           return (
-            <option key={code} value={code} dir={info.rtl ? "rtl" : "ltr"}>
+            <option key={code} value={code} dir={langDir(code)}>
               {info.native}
             </option>
           );

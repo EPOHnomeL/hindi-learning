@@ -7,7 +7,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { langInfo } from "../../../convex/languages";
+import { langInfo, nonSourceEditionName } from "../../../convex/languages";
 import { Frame, useCardTarget, useContentHtml } from "./ArtifactView";
 import { Brand } from "./Brand";
 import { checkoutLink, useEditionLang } from "./editionUrl";
@@ -352,7 +352,7 @@ export function PublicLessonPane({ src, lessonKey }: { src: GuestSource; lessonK
 
   // Paid marketplace: on a paid Edition's Public link a Guest gets the paygate for
   // every Lesson past the free Preview (the reader returns `locked`).
-  const editionName = course.lang !== "en" ? langInfo(course.lang).native : undefined;
+  const editionName = nonSourceEditionName(course.lang);
   if (lesson.locked) {
     return (
       <LockedPane title={lesson.title}>
@@ -513,7 +513,7 @@ export function PublicReferencePane({ src, refKey }: { src: GuestSource; refKey:
         <Paygate
           kind="reference"
           paywall={course.paywall ?? null}
-          editionName={course.lang !== "en" ? langInfo(course.lang).native : undefined}
+          editionName={nonSourceEditionName(course.lang)}
           checkoutHref={checkoutLink(course.slug, course.lang)}
         />
       </LockedPane>

@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { langInfo } from "../../../convex/languages";
+import { langDir, langInfo } from "../../../convex/languages";
 import { LOCALES } from "~/i18n/config";
 import { useSetLocale } from "~/i18n/locale-client";
 import { Icon } from "./icons";
@@ -106,7 +106,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                   }`}
                 >
                   <span className="flex flex-col">
-                    <span className="text-sm text-ink" dir={info.rtl ? "rtl" : "ltr"}>
+                    <span className="text-sm text-ink" dir={langDir(code)}>
                       {info.native}
                     </span>
                     {info.name !== info.native && <span className="text-xs text-soft">{info.name}</span>}

@@ -10,7 +10,7 @@ import posthog from "posthog-js";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { isPostHogInitialized } from "../PostHogClient";
-import { langInfo } from "../../../convex/languages";
+import { editionChip } from "../../../convex/languages";
 import { tenantPill } from "~/design/tenantPill";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { catalogueCacheKey, DASHBOARD_CACHE_KEY, TENANT_NAME_CACHE_KEY, writeCache } from "./offlineCache";
@@ -327,10 +327,7 @@ function CourseCard({ course }: { course: Course }) {
   const pricing = useQuery(api.market.editionPricing, complete ? { topicSlug: course.slug } : "skip");
   const priced = pricing && pricing.length > 0 ? pricing : null;
 
-  const editions = course.editions.map((code) => {
-    const i = langInfo(code);
-    return { lang: i.code, native: i.native, rtl: !!i.rtl };
-  });
+  const editions = course.editions.map(editionChip);
 
   return (
     // A seeded course has no lesson to open, so it is NOT a click-through card:

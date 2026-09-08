@@ -7,7 +7,7 @@ import { getEditableTopic, topicBySlug } from "../topicAccess";
 import { SOURCE_LANG } from "../sourceLang";
 import { teacherQaOn } from "../capture";
 import { topicLessonCounts } from "../progressCounts";
-import { langInfo } from "../languages";
+import { editionChip, langDir } from "../languages";
 
 // Lessons & references. Reader queries are auth-gated and owner-scoped: a Topic
 // is resolved by (owner = signed-in user, slug), so one learner never sees
@@ -19,15 +19,7 @@ import { langInfo } from "../languages";
 // ready translation; Viewer: their granted languages), with display metadata.
 async function switcherEditions(ctx: QueryCtx, topic: Doc<"topics">, userId: Id<"users">) {
   const held = await heldLangs(ctx, topic, userId);
-  return [...held].sort().map((l) => {
-    const i = langInfo(l);
-    return {
-      lang: l,
-      name: l === SOURCE_LANG ? "English" : i.name,
-      native: l === SOURCE_LANG ? "English" : i.native,
-      rtl: l === SOURCE_LANG ? false : !!i.rtl,
-    };
-  });
+  return [...held].sort().map(editionChip);
 }
 
 // The canonical tenant of a course, by its route slug — the one datum the
@@ -204,7 +196,7 @@ export const courseHeader = query({
       canEdit,
       status: topic.status ?? "active",
       lang: effLang,
-      dir: langInfo(effLang).rtl ? ("rtl" as const) : ("ltr" as const),
+      dir: langDir(effLang),
       editions,
       paywall,
       // Public link when the course is publicly shared (the legacy per-Topic English

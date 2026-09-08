@@ -1,5 +1,17 @@
-import { describe, expect, it } from "vitest";
-import { LANGUAGES, isDevanagari, isKnownLang, isRtl, langDir, langInfo } from "./languages";
+/// <reference types="vite/client" />
+import { describe, expect, it, test } from "vitest";
+import {
+  LANGUAGES,
+  editionChip,
+  editionLabel,
+  isDevanagari,
+  isKnownLang,
+  isRtl,
+  langDir,
+  langInfo,
+  nonSourceEditionName,
+} from "./languages";
+import { SOURCE_LANG } from "./sourceLang";
 
 // Romanized (-Latn) Editions: every non-Latin-script language in the picker has
 // a Latin-script sibling, so a learner can read e.g. Hindi, Urdu, or Nepali in
@@ -74,4 +86,65 @@ describe("romanized editions", () => {
     expect(info.name).not.toBe("hi-Latn");
     expect(info.native).not.toBe("hi-Latn");
   });
+});
+
+// ---- Edition presentation (the 2026-09-08 architecture walk) -------------------
+//
+// `langInfo` was shallow: fifteen call sites turned it into one of exactly three
+// shapes by hand. These pin the three, and pin the two things the hand-written
+// copies disagreed about.
+
+test("editionChip is the one projection the Edition-facing surfaces wanted", () => {
+  expect(editionChip("es")).toEqual({ lang: "es", name: "Spanish", native: "Español", rtl: false });
+  expect(editionChip("ur")).toEqual({ lang: "ur", name: "Urdu", native: "اردو", rtl: true });
+  // A code outside the picker still resolves, via langInfo's fallback.
+  expect(editionChip("xx")).toEqual({ lang: "xx", name: "xx", native: "xx", rtl: false });
+});
+
+test("the source Edition is labelled English, and its rtl is false rather than absent", () => {
+  // Three sites wrote this override out. It is a no-op today, because the
+  // registry carries `en` as English/English, and it is kept so that changing
+  // SOURCE_LANG to an unlisted code cannot start labelling the source Edition
+  // with its bare code.
+  expect(editionChip(SOURCE_LANG)).toEqual({ lang: "en", name: "English", native: "English", rtl: false });
+  expect(editionLabel(SOURCE_LANG)).toBe("English");
+  expect(editionLabel("hi")).toBe("Hindi");
+});
+
+test("nonSourceEditionName badges a translation and leaves the source unbadged", () => {
+  // Three client components wrote this out and all three compared the literal
+  // "en" rather than SOURCE_LANG. The literal is what this deletes.
+  expect(nonSourceEditionName(SOURCE_LANG)).toBeUndefined();
+  expect(nonSourceEditionName("hi")).toBe("हिन्दी");
+});
+
+test("langDir is the only spelling of a language's direction", () => {
+  // Three server sites open-coded `langInfo(x).rtl ? "rtl" : "ltr"` while this
+  // function already existed and was called from the client.
+  expect(langDir("en")).toBe("ltr");
+  expect(langDir("ur")).toBe("rtl");
+  expect(langDir("ur-PK")).toBe("rtl");
+  expect(langDir("xx")).toBe("ltr");
+});
+
+test("no caller re-derives an Edition chip, a label or a direction by hand", () => {
+  // The boundary. Each of these patterns had three to five copies before
+  // 2026-09-08; a new one means the projection has started spreading again.
+  const files = {
+    ...(import.meta.glob("./**/*.ts", { query: "?raw", import: "default", eager: true }) as Record<string, string>),
+    ...(import.meta.glob("../src/**/*.{ts,tsx}", { query: "?raw", import: "default", eager: true }) as Record<
+      string,
+      string
+    >),
+  };
+  const src = Object.entries(files).filter(([p]) => !p.includes(".test.") && p !== "./languages.ts");
+
+  const patterns: [string, RegExp][] = [
+    ["the source-language English override", /SOURCE_LANG \? "English"/],
+    ['a literal "en" comparison for the source Edition', /lang !== "en" \?/],
+    ["an open-coded text direction", /\.rtl \? \("?rtl"?/],
+  ];
+  for (const [what, re] of patterns) {
+    expect(src.filter(([, s]) => re.test(s)).map(([p]) => p), what).toEqual([]);
+  }
 });

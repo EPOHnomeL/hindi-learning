@@ -7,7 +7,7 @@ import { livePublishedLangs } from "./publishedEditions";
 import { heldPersonally } from "./grants";
 import { getOwnedTopic } from "./topicAccess";
 import { SOURCE_LANG } from "./sourceLang";
-import { langInfo } from "./languages";
+import { editionChip } from "./languages";
 
 // Course publishing & the tenant catalogue (.scratch/course-publishing/PRD.md, as
 // amended — publishing is a per-Edition ROW, not a course status).
@@ -140,9 +140,11 @@ export const list = query({
         // the order the Editions panel and the reader's switcher already use.
         langs: [...listed]
           .sort((a, b) => (a === SOURCE_LANG ? -1 : b === SOURCE_LANG ? 1 : a.localeCompare(b)))
+          // The Catalogue card shows the native name only, so it takes two of
+          // the chip's three fields rather than spelling the projection again.
           .map((lang) => {
-            const info = langInfo(lang);
-            return { lang, native: info.native, rtl: !!info.rtl };
+            const { native, rtl } = editionChip(lang);
+            return { lang, native, rtl };
           }),
         price: cheapest ? { amount: cheapest.amount, currency: cheapest.currency } : null,
       });
