@@ -8,7 +8,7 @@ import { publicCourseUrl as buildPublicCourseUrl, useEditionLang } from "./editi
 import { langDir } from "../../../convex/languages";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { Icon } from "./icons";
-import { Menu, MenuItem } from "./ui";
+import { IconButton, Menu, MenuItem } from "./ui";
 import { useTenant } from "./TenantContext";
 // The resolved Emblem (ADR 0017) as the read seams return it — an image resolves
 // to a same-origin URL, otherwise a glyph (a subject emoji or the generic default).
@@ -217,6 +217,43 @@ function CertificateShowcase({ learnerName, courseTitle, lessonCount, issuedAt, 
       </div>
     </div>
     </div>
+  );
+}
+
+// The owned-course card's certificate chip (2026-09-08): the same two states as
+// CertificateControl below, as one 38px icon button sitting in the card's action
+// row beside "Open course". It replaced a row in the card's overflow menu, which
+// is how a learner who had just finished a course found their certificate behind
+// two taps and a glyph that named nothing. A gold dot marks one still unclaimed.
+// Self-hides when there is no certificate to offer, so an unfinished course
+// shows two buttons, not a dead third.
+export function CertificateChip({ topicSlug }: { topicSlug: string }) {
+  const t = useTranslations("Certificate");
+  const data = useQuery(api.certificates.myCertificate, { topicSlug });
+  const [open, setOpen] = useState(false);
+  if (!data) return null;
+  const { certificate, eligible } = data;
+  if (!certificate && !eligible) return null;
+
+  // Earned: a real anchor to the standalone public page, in a new tab (see the
+  // popup-blocker note on CertificateControl). Eligible: the claim dialog.
+  if (certificate) {
+    return (
+      <IconButton
+        icon="award"
+        label={t("viewYours")}
+        href={`/certificate/${certificate.token}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-gold"
+      />
+    );
+  }
+  return (
+    <>
+      <IconButton icon="award" label={t("claimYours")} dot onClick={() => setOpen(true)} className="text-gold" />
+      {open && <CertificateDialog topicSlug={topicSlug} certificate={null} onClose={() => setOpen(false)} />}
+    </>
   );
 }
 

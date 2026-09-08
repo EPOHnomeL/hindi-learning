@@ -15,7 +15,6 @@ import { tenantPill } from "~/design/tenantPill";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { catalogueCacheKey, DASHBOARD_CACHE_KEY, TENANT_NAME_CACHE_KEY, writeCache } from "./offlineCache";
 import { CourseCertMenu } from "./Certificate";
-import { CourseSettingsDialog } from "./CourseSettings";
 import { checkoutLink, withLang } from "./editionUrl";
 import { Icon } from "./icons";
 import { formatPrice } from "./Paygate";
@@ -324,12 +323,6 @@ function TenantPill({ tenantSlug }: { tenantSlug: string | null }) {
 function CourseCard({ course }: { course: Course }) {
   const t = useTranslations("Dashboard");
   const [showMission, setShowMission] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  // Course settings follows the UI language: when the course has an Edition in
-  // the active locale, Details edits that translated Edition (else the English
-  // source). Mirrors the reader, which follows the Edition being read.
-  const locale = useLocale();
-  const settingsLang = locale !== "en" && course.editions.includes(locale) ? locale : "en";
   const requestSetup = useAction(api.routine.requestSetup);
   const [setup, setSetup] = useState<"idle" | "starting" | "started" | "error">("idle");
 
@@ -420,11 +413,9 @@ function CourseCard({ course }: { course: Course }) {
 
       <div className="min-h-[14px] flex-1" />
 
-      {/* Actions. A seeded course only offers "Set up now"; otherwise one row of
-          three targets (mobile bottom nav, 2026-08-23): Open, the reading
-          language, and one kebab holding the certificate, Course settings,
-          Editions & sharing and the admin generation controls. The card had
-          grown five targets, including two identical kebabs side by side. */}
+      {/* Actions. A seeded course only offers "Set up now"; otherwise the named
+          row in CourseCardActions: Open course, the certificate once there is
+          one, and the door to the manage route. */}
       <div className="flex items-center gap-2">
         {seeded ? (
           <button
@@ -441,22 +432,12 @@ function CourseCard({ course }: { course: Course }) {
                   : t("setUpNow")}
           </button>
         ) : (
-          <CourseCardActions
-            slug={course.slug}
-            title={course.title}
-            openHref={`/courses/${course.slug}`}
-            openLabel={t("openCourse")}
-            courseCompleted={complete}
-            onOpenSettings={() => setSettingsOpen(true)}
-          />
+          <CourseCardActions slug={course.slug} openHref={`/courses/${course.slug}`} openLabel={t("openCourse")} />
         )}
       </div>
 
       {showMission && course.mission && (
         <MissionDialog title={course.title} mission={course.mission} onClose={() => setShowMission(false)} />
-      )}
-      {settingsOpen && (
-        <CourseSettingsDialog topicSlug={course.slug} status={course.status} lang={settingsLang} onClose={() => setSettingsOpen(false)} />
       )}
     </article>
   );

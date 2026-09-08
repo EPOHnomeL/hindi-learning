@@ -1,66 +1,31 @@
 "use client";
 
-import { useAction, useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { useState } from "react";
-import { api } from "../../../convex/_generated/api";
-import { CertificateControl } from "./Certificate";
-import { IconButton, Menu, MenuItem } from "./ui";
+import { CertificateChip } from "./Certificate";
+import { IconButton } from "./ui";
 
-// The owned-course card's single action row (mobile bottom nav, 2026-08-23):
+// The owned-course card's single action row:
 //
-//   [ Open course ................ ] [ globe ] [ kebab ]
+//   [ Open course ................ ] [ award ] [ sliders ]
 //
-// The card had grown up to five tap targets in one row on a phone, including
-// TWO visually identical kebabs side by side (the certificate menu and the
-// admin menu), which is unreadable. This collapses to three: the primary
-// action, Editions & sharing, and one overflow holding everything else, with a
-// dot when something inside wants attention. The globe opened a reading-language
-// menu until 2026-08-25; it now opens the Editions & sharing dialog directly,
-// which is where a learner picks a language now that the home screen has no
-// global language select.
-//
-// `CertificateControl` is reused rather than reimplemented: it already handles
-// both states (view an earned certificate, claim an eligible one) and
-// self-hides otherwise, so no claim mutation is duplicated here. It just gets
-// menu-row styling via its className.
-const MENU_ROW =
-  "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-start text-sm text-ink transition-colors hover:bg-hi hover:text-accent";
-
+// Three named targets, no overflow menu (2026-09-08). The kebab it replaces held
+// three unrelated things: the certificate, Course settings and the admin's
+// "Finish generating course". The certificate is now its own chip, so the one
+// reward the learner earned is not hidden behind a glyph that names nothing;
+// Course settings and the admin control both moved to the manage route, where
+// every other course-wide setting already lives (the Course settings tab). One
+// home for settings, and nothing left for a menu to hold.
 export function CourseCardActions({
   slug,
-  title,
   openHref,
   openLabel,
-  courseCompleted,
-  onOpenSettings,
 }: {
   slug: string;
-  title: string;
   openHref: string;
   openLabel: string;
-  // True once the course is `completed` (ADR 0015): authoring has stopped, so
-  // the kebab never offers the admin's "Finish generating course" there.
-  courseCompleted: boolean;
-  onOpenSettings: () => void;
 }) {
-  const t = useTranslations("Dashboard");
-  const tcs = useTranslations("CourseSettings");
   const ted = useTranslations("Editions");
-  const cert = useQuery(api.certificates.myCertificate, { topicSlug: slug });
-  const amAdmin = useQuery(api.whitelist.amIAdmin);
-  const status = useQuery(api.routine.generationStatus, { topicSlug: slug });
-  const finish = useAction(api.routine.finishGenerating);
-  const cancel = useAction(api.routine.cancelFinishGenerating);
-  const [busy, setBusy] = useState(false);
-
-  const generating = busy || status?.status === "generating";
-  const cancelling = status?.cancelRequested === true;
-  const failed = status?.status === "failed";
-  // Something in the overflow wants attention: an unclaimed certificate, or a
-  // generation run that fell over.
-  const dot = (!!cert && !cert.certificate && cert.eligible) || (failed && !courseCompleted);
 
   return (
     <div className="flex items-center gap-2">
@@ -71,53 +36,11 @@ export function CourseCardActions({
         {openLabel}
       </Link>
 
-      {/* One tap beside "Open course" goes to the manage route (ui-overhaul 16),
-          which replaced the Editions & sharing dialog on 2026-08-27. Ticket 24
-          redesigns this card. */}
-      <IconButton icon="sliders" label={ted("manageCourse")} href={`/courses/${slug}/manage`} />
+      <CertificateChip topicSlug={slug} />
 
-      <Menu triggerLabel={t("moreActionsFor", { title })} dot={dot}>
-        {(close) => (
-          <>
-            <CertificateControl topicSlug={slug} className={MENU_ROW} />
-            <MenuItem
-              icon="settings"
-              onClick={() => {
-                close();
-                onOpenSettings();
-              }}
-            >
-              {tcs("title")}
-            </MenuItem>
-            {/* Admin "fire and pray": generate the remaining curriculum in one
-                go. Self-gated; lives in this one kebab rather than beside it. */}
-            {amAdmin &&
-              !courseCompleted &&
-              (generating ? (
-                <MenuItem
-                  icon="x"
-                  onClick={() => {
-                    close();
-                    if (!cancelling) void cancel({ topicSlug: slug });
-                  }}
-                >
-                  {cancelling ? t("cancelling") : t("cancelGeneration")}
-                </MenuItem>
-              ) : (
-                <MenuItem
-                  icon="refresh"
-                  onClick={() => {
-                    close();
-                    setBusy(true);
-                    void finish({ topicSlug: slug }).finally(() => setBusy(false));
-                  }}
-                >
-                  {failed ? t("finishGeneratingRetry") : t("finishGenerating")}
-                </MenuItem>
-              ))}
-          </>
-        )}
-      </Menu>
+      {/* One tap beside "Open course" goes to the manage route (ui-overhaul 16),
+          which replaced the Editions & sharing dialog on 2026-08-27. */}
+      <IconButton icon="sliders" label={ted("manageCourse")} href={`/courses/${slug}/manage`} />
     </div>
   );
 }

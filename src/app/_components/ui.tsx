@@ -24,6 +24,8 @@ export function IconButton({
   dot,
   className,
   title,
+  target,
+  rel,
   ariaHasPopup,
   ariaExpanded,
   href,
@@ -41,6 +43,10 @@ export function IconButton({
   // Renders a Link instead of a button (e.g. the manage route's back arrow, or
   // the course card's door to /manage). Same chip, real navigation.
   href?: string;
+  // For an `href` that leaves the app (the course card's certificate chip opens
+  // the standalone public certificate page in a new tab).
+  target?: string;
+  rel?: string;
 }) {
   const cls = `relative inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] border text-soft transition-colors after:absolute after:-inset-[3px] after:content-[''] hover:border-transparent hover:bg-hi hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-soft ${
     variant === "ghost" ? "border-transparent" : "border-line"
@@ -53,7 +59,7 @@ export function IconButton({
   );
   if (href) {
     return (
-      <Link href={href} aria-label={label} title={title ?? label} className={cls}>
+      <Link href={href} target={target} rel={rel} aria-label={label} title={title ?? label} className={cls}>
         {body}
       </Link>
     );
