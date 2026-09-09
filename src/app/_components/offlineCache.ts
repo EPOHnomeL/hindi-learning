@@ -32,6 +32,25 @@ export function readCache<T>(storage: Storage, key: string): T | null {
   }
 }
 
+// How many course cards this browser saw last time, for sizing the home grid's
+// placeholder (perceived-performance ticket 06).
+//
+// The dashboard already writes its list here on every resolve, for the Offline
+// Catalogue. Reusing it costs one read and no new key, and it is the ONLY honest
+// answer to "how many cards will there be?" available before the query lands.
+//
+// Clamped to 1..6. The list can be long and a screenful of placeholders for a
+// learner with two courses is a worse first paint than too few; the floor keeps
+// a brand new account from painting nothing at all.
+//
+// `null` when nothing is cached (a first-ever visit, or after the sign-out
+// sweep), which the caller reads as "use the default".
+export function cachedCourseCount(storage: Storage): number | null {
+  const cached = readCache<unknown[]>(storage, DASHBOARD_CACHE_KEY);
+  if (!Array.isArray(cached) || cached.length === 0) return null;
+  return Math.min(cached.length, 6);
+}
+
 export function writeCache(storage: Storage, key: string, value: unknown): void {
   try {
     storage.setItem(key, JSON.stringify(value));

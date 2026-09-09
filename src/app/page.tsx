@@ -8,6 +8,7 @@ import { Landing } from "~/app/_components/Landing";
 import { OfflineHome, useOffline } from "~/app/_components/OfflineHome";
 import { DashboardSkeleton } from "~/app/_components/ui";
 import { useTenantSlug } from "~/app/_components/TenantContext";
+import { useCourseGridCount } from "~/app/_components/useCourseGridCount";
 import { useEffect, useRef } from "react";
 import { landingFor } from "~/app/_landing/registry";
 
@@ -25,6 +26,9 @@ export default function HomePage() {
   // gated tree for the Offline Catalogue (installable-app 05); reconnecting
   // swaps back without a reload.
   const offline = useOffline();
+  // How many placeholder cards the course grid draws while it waits. Six was a
+  // guess that disagreed with Dashboard's own three (ticket 06).
+  const gridCards = useCourseGridCount(6);
 
   // Coming back online after an offline spell reloads the document once. Not
   // cosmetic: an offline BOOT makes the Convex Auth client drop its localStorage
@@ -58,7 +62,11 @@ export default function HomePage() {
       ) : (
         <>
           <AuthLoading>
-            <DashboardSkeleton />
+            {/* Sized from the last-known-good list, exactly as Dashboard's own
+                in-flight grid is, so the auth wait and the query wait draw the
+                same shape and the load no longer jumps between them
+                (perceived-performance ticket 06). */}
+            <DashboardSkeleton cards={gridCards} />
           </AuthLoading>
           <Unauthenticated>
             <TenantLanding />

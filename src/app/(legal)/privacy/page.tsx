@@ -14,7 +14,7 @@ export default function PrivacyPage() {
   return (
     <>
       <h1>Privacy Policy</h1>
-      <p className="text-soft">Last updated: 3 September 2026</p>
+      <p className="text-soft">Last updated: 9 September 2026</p>
 
       <h2>What we collect</h2>
       <ul>
@@ -30,6 +30,11 @@ export default function PrivacyPage() {
           <b>How you use the site:</b> which pages you open, what you click, and the ordinary things your browser
           sends with every visit, like the kind of device and browser you are on and a rough idea of which country
           you are in. This is how we tell which parts of a course people actually use.
+        </li>
+        <li>
+          <b>How fast the site is for you:</b> how long a page takes to become readable and to respond when you
+          tap it. These are timings only, measured on your device and sent without anything you typed or read, and
+          we use them to find the screens that are slow on real phones and connections rather than on ours.
         </li>
         <li>
           <b>When something breaks:</b> a record of what the page was doing at the time, so that we can see the
