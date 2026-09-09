@@ -92,11 +92,26 @@ this is the first evidence against it.
 **About 17% off, not the estimated 58%.** Two candidate explanations, in the order
 they should be checked:
 
-1. **`784eb70` may not be live in prod.** It landed 2026-08-11, three days into this
-   cycle. `.scratch/docs-reconciliation/FINDINGS.md` records that pushing `main` runs
-   `npx convex deploy` inside the Vercel build, so it very probably is live, but that
-   is inference and not a verified push. Cheapest thing to rule out first.
-2. **The residual is exactly what ticket 01 predicted.** Verified by reading the code
+1. **`784eb70` may not be live in prod. RULED OUT 2026-09-09.** It landed 2026-08-11,
+   three days into this cycle, and the doubt was worth checking because it was cheap.
+   It is live. `git merge-base --is-ancestor 784eb70 origin/main` passes and **331
+   commits** sit on `origin/main` after it, so `main` has been pushed many times since
+   the change landed. The build command that every one of those pushes ran is
+   `npx convex deploy --cmd 'pnpm run build'`, which is recorded in three independent
+   places in the tree (`README.md`, `docs/routine.md`,
+   `docs/agents/project-context.md`) and confirmed against a real Vercel build log on
+   2026-07-29 (`.scratch/docs-reconciliation/FINDINGS.md`). So prod has been running
+   the narrowed `map()` for essentially the whole Aug 8 to Sep 8 cycle.
+
+   Two honest limits, so this is not over-read: it is verified from git plus the
+   recorded build command, **not** by querying the prod deployment, because this
+   checkout still has no prod deploy key. And it does not explain the gap, it only
+   removes the cheap explanation for it.
+2. **The residual is exactly what ticket 01 predicted. Now the STANDING explanation,
+   candidate 1 having been ruled out (2026-09-09).** Re-verified by reading the code
+   on 2026-09-09: `listLessons` still calls `loadEdition(...).map(["lesson"])` at
+   `convex/content/reader.ts:226`, and `listReferences` the same with `["reference"]`
+   at `:258`. Nothing has changed on that path. Originally: verified by reading the code
    on 2026-08-27: `listLessons` still calls `loadEdition(...).map(["lesson"])`
    (`convex/content/reader.ts`), and `lessonsToc` reads one whole inline
    `translations.html` body per lesson to return one title string. The narrowing in

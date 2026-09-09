@@ -23,7 +23,7 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
   and this is the Notes override the convention requires. Refactors are not decisions with
   a build queued behind them; the decision is usually trivial and the work is the whole
   point. Tickets 01, 03, 06, 10, 12, 15, 16, 17, 18, 20 and 26 to 37 are execution. The
-  grillings (02, 04, 05, 07, 08, 09, 11, 13, 14, 19) are genuine open decisions.
+  grillings (02, 04, 05, 07, 08, 09, 11, 13, 14, 19, 38) are genuine open decisions.
 - **Two tickets are PART built and stay open (2026-09-08).** They are named here rather
   than in `## Decisions so far`, which may only index tickets with an `## Answer`. Each
   ticket's own body records what landed and what is left, so neither is re-done from
@@ -53,6 +53,26 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
   Anything reasoning about the cost of touching every lesson should reason about 441.
   The read route is in `docs/agents/project-context.md` and it is the only one an agent in
   this checkout has — there is still no prod deploy key here.
+- **Three cost questions on this map are OPERATOR-GATED, not un-worked (2026-09-09).**
+  Written here so no further session re-opens them, re-plans them, or quietly builds
+  around them. Each needs a Convex **dashboard** read, and a session in this checkout
+  cannot do any of them: verified 2026-09-09 that the Convex CLI exposes no usage or
+  billing command (`npx convex --help`), and there is still no prod deploy key here.
+  - **Read the Aug 8 to Sep 8 2026 invoice.** It closed on 2026-09-08 and nobody has
+    read it. It is the first closed bill that fully contains `784eb70`, so it is the
+    first real test of that change, and it may move several numbers in
+    [the baseline](assets/convex-cost-baseline.md).
+  - **Drill Database I/O per deployment** to find the unattributed ~60% (the fog patch
+    below). Ten minutes of dashboard work, and it gates whether
+    [01](tickets/01-slim-the-row-listlessons-collects.md) is even aimed at the
+    majority of the I/O.
+  - **Decide EU versus US hosting** (the fog patch below). This one may end the cost
+    thread outright.
+
+  Until they are answered, **do not start a session on cost-motivated code.** The whole
+  bill is $3 to $4 a month and 01 is worth about $0.60 of it, so the user-experience
+  argument is the only one that survives contact with the number. That is the framing
+  [38](tickets/38-cache-a-course-toc-on-the-device.md) is filed under.
 - **`pnpm typecheck` is the cheap check** and needs no server. Never stop the dev server.
 - **The RTL flip has a one-line hold, and one landmine if you remove it wrongly**
   (2026-09-03, while the operator checks whether the reorder is wanted at all).
@@ -183,6 +203,7 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
 | 35 | A publish-time validator for an orphaned quiz answer key | the answer to 02 |
 | 36 | `pnpm bundle:authoring` has been broken since 2026-08-27 | the answer to 02 |
 | 37 | What crosses the lesson boundary: tokens, and one breakpoint | the answer to 02 |
+| 38 | Cache a course's table of contents on the device | the 2026-09-09 Convex-cost handoff, section 6 |
 
 Tickets 22 to 25 were filed from this map's own fog and debt harvest (see their bodies).
 Tickets 26 to 34 were triaged in on 2026-09-07 out of an architecture review dated
