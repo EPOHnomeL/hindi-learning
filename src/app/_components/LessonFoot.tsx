@@ -26,6 +26,10 @@ import Link from "next/link";
 // itself, inline, found by scrolling to the foot of the page like every other
 // way forward in this reader. No `finish` (already complete, or a Guest) → the
 // end of the lesson is simply the end of the page.
+// Reading width on desktop (`md:max-w-2xl`, centred), full-bleed on mobile. It
+// took the whole lesson column when it first reached desktop on 2026-09-01,
+// which put a green bar the width of the pane under a lesson body that sits in a
+// centred column of its own (fixed 2026-09-09).
 export function LessonFootCard({
   next,
   completed,
@@ -42,7 +46,7 @@ export function LessonFootCard({
   if (!next) {
     if (!finish) return null;
     return (
-      <div className="px-3 pb-1 pt-4">
+      <div className="px-3 pb-1 pt-4 md:mx-auto md:w-full md:max-w-2xl">
         <button
           type="button"
           onClick={finish.onClick}
@@ -58,7 +62,7 @@ export function LessonFootCard({
   }
 
   return (
-    <div className="px-3 pb-1 pt-4">
+    <div className="px-3 pb-1 pt-4 md:mx-auto md:w-full md:max-w-2xl">
       <Link
         href={next.href}
         onClick={() => {
