@@ -60,10 +60,35 @@ const spectral = Spectral({
   style: ["normal", "italic"],
   variable: "--font-spectral",
 });
+// Escape hatch A, for Devanagari chrome (ticket 04).
+//
+// **`preload: false` is the whole point of this object** (perceived-performance
+// ticket 02). All three families are declared here and all three variables go on
+// <html>, so next/font preloaded all three on EVERY route: measured on
+// 2026-09-09 against a real build, Devanagari 400 is 127 KB and Naskh 400 is
+// 94 KB, both fetched at preload priority, competing with the JS during LCP, by
+// a visitor whose locale renders neither of them. Latin locales are most of the
+// traffic and paid 221 KB for glyphs they never draw.
+//
+// These two are ESCAPE HATCHES, not the body face: they apply only when
+// `isDevanagari(locale)` or `isRtl(locale)` puts `font-deva` / `font-naskh` on
+// <body> further down this file. So the font is unreferenced on the pages that
+// were preloading it, which is exactly the case `preload: false` is for.
+//
+// The cost, named rather than hidden: a Hindi or Urdu visitor now gets this face
+// one swap later than before, because it is discovered in CSS rather than
+// preloaded. `font-display: swap` (next/font's default) means fallback text
+// first, then the real face. **That swap has NOT yet been walked in a browser
+// on a Hindi or Urdu load** (2026-09-09): the preload removal is verified
+// against the emitted build, the swap's appearance on the fixed-height chrome
+// is not, and perceived-performance/02 stays open until a human has looked at
+// it. Spectral keeps its preload, because it is the face nearly every visitor
+// actually reads.
 const notoDeva = Noto_Serif_Devanagari({
   subsets: ["devanagari"],
   weight: ["400", "600"],
   variable: "--font-noto-deva",
+  preload: false,
 });
 // Escape hatch B, the Arabic-script twin of notoDeva: Spectral has no Arabic
 // glyphs either, so Urdu chrome would render as tofu without a face of its own.
@@ -74,10 +99,12 @@ const notoDeva = Noto_Serif_Devanagari({
 // card subtitles pinned at min-h-[38px]) that would clip or reflow. Naskh is the
 // ordinary face for Urdu UI for exactly that reason, and it needs no global
 // line-height change.
+// `preload: false` for the same reason as notoDeva above; see that comment.
 const notoNaskh = Noto_Naskh_Arabic({
   subsets: ["arabic"],
   weight: ["400", "600"],
   variable: "--font-noto-naskh",
+  preload: false,
 });
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
