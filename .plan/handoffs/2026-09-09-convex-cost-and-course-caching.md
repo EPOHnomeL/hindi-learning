@@ -172,3 +172,78 @@ today.
 
 Steps 1 to 3 are a single short session and are mostly dashboard reading, not
 code. Do not let a session start at step 4.
+
+---
+
+## 8. What was executed against this handoff, 2026-09-09
+
+Same day it was written, in one session. **Steps 1 to 3 of section 7 were NOT done,
+and cannot be done from a checkout.** Everything that was not gated on them was.
+
+### Blocked, and now recorded as blocked rather than un-worked
+
+Steps 1, 2 and 3 all need a Convex **dashboard** read. Verified rather than assumed:
+`npx convex --help` on 1.45.0 exposes no usage or billing command (`dev`, `deploy`,
+`run`, `data`, `insights`, `env`, ... and nothing for the invoice), and this checkout
+has no prod deploy key. So they need the **operator**, not another session.
+
+They are now written into the technical-foundation map's `## Notes` as
+operator-gated, with the standing instruction not to start a cost-motivated code
+session before them, so the next session does not re-plan them or quietly build
+around them.
+
+### Step 1's cheap half was closed anyway
+
+The invoice is unread, but the baseline's **candidate explanation 1** for why the
+mid-cycle read came in 17% down instead of the estimated 58%, namely *"`784eb70` may
+not be live in prod"*, is answerable from git and is now **ruled out**. It is live:
+`784eb70` is an ancestor of `origin/main` with 331 commits after it, and every one of
+those pushes ran `npx convex deploy --cmd 'pnpm run build'` (recorded in `README.md`,
+`docs/routine.md` and `docs/agents/project-context.md`, and confirmed against a real
+Vercel build log on 2026-07-29). Prod has been running the narrowed `map()` for
+essentially the whole Aug 8 to Sep 8 cycle.
+
+That leaves **candidate 2 as the standing explanation**, and it was re-verified in the
+code on 2026-09-09: `listLessons` still calls `loadEdition(...).map(["lesson"])` at
+`convex/content/reader.ts:226`. Recorded in the baseline.
+
+### Ticket 22's unconditional half is done
+
+Its first `Done when` was explicitly *"true regardless of what is decided below"*, so
+it needed nothing from steps 1 to 3. The stale `ponytail:` marker above
+`collectTopicContext` is corrected in the tree with an absolute date. **Two things
+were stale, not one:** the claim itself (no Lesson HTML crosses that query, and the
+header sentence "Lessons + References (with HTML)" was wrong the same way), and
+**this handoff's and the ticket's own line number**, which said `convex/routine.ts:838`
+when the marker is at **933**.
+
+Ticket 22 stays **open**: its second `Done when` is the measured call, and nothing
+here measured anything.
+
+### Section 6's ticket was filed after all, as
+[technical-foundation/38](../maps/technical-foundation/tickets/38-cache-a-course-toc-on-the-device.md)
+
+This reverses section 6's "no ticket was filed, deliberately", and the reason is that
+section 6 and section 7 step 5 disagree. Section 6 withholds the ticket until sections
+3 and 4 are answered; step 5 says to charter it *"separately, on user-experience
+grounds and not cost"*. Both of section 6's open premises are **cost** premises, so
+under step 5's framing they gate the reads-saved half of the question only, not the
+question. Step 5 is the more specific instruction and it is the one followed.
+
+38 carries the section 6 question verbatim as its `## Question`, plus the section 2
+correction (bodies are already cached, the metadata is the cost), the section 5 table
+of what exists, and both premises written down as operator-gated so nobody re-derives
+them. It also names something section 6 did not: 38's reads-saved option and ticket
+**01 are two routes to the same 1.16 GB** and may substitute for each other, so they
+should be priced against each other rather than both built.
+
+### Not done, and why
+
+- **Step 4** (is 01 worth doing) is gated on steps 1 to 3 by this handoff's own
+  instruction: *"do not let a session start at step 4."* Untouched.
+- **Step 5's other half, resolving [04](../maps/technical-foundation/tickets/04-content-route-is-an-open-bearer-url.md)**,
+  is a genuine decision for the operator, not an agent: it trades a year-long
+  `immutable` cache and permanent shareable lesson URLs against POPIA-adjacent
+  exposure on paid content, for a product with around ten lifetime sales. 04 already
+  has its prod evidence gathered (2026-09-04) and is on the frontier. It needs a
+  human to pick, not more research.
