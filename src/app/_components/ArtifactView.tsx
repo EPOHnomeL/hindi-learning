@@ -107,6 +107,67 @@ export function ArtifactView({
 // Returns `undefined` while the query is loading OR a blob fetch is in flight
 // (caller shows a loading state), `null` when the query found nothing or the
 // fetch failed, and the HTML string once ready.
+// **Bodies already fetched this session, keyed by their `/content` URL**
+// (perceived-performance ticket 05).
+//
+// The HTTP cache alone was not enough. A blob is served `immutable` with a
+// one-year max-age (`convex/http.ts`), so the bytes came off disk with no
+// network, but the fetched value lived in component-local `useState`, which dies
+// with the unmount. So going BACK to a lesson read a minute ago re-entered the
+// `undefined` branch and painted the reader skeleton again for content the device
+// already held. The cache is read synchronously during render below, which is
+// what removes the skeleton entirely rather than merely shortening it.
+//
+// No invalidation rule, and none is needed: a body is addressed by its
+// `storageId` and a superseding body gets a new id, hence a new URL. The key IS
+// the version.
+//
+// **This is not offline reading.** It persists nothing and dies with the tab, so
+// the revocation question that `technical-foundation/05` turns on (a copy on a
+// device an Entitlement revocation cannot reach) does not arise here.
+const bodyCache = new Map<string, string>();
+// One concurrent fetch per URL, so the reader and a prefetch racing for the same
+// body do not open two requests for it.
+const bodyInFlight = new Map<string, Promise<string | null>>();
+// A ceiling, because a long session across a large course would otherwise hold
+// every lesson it touched. Lesson bodies run tens of KB, so 24 is a couple of MB
+// at worst, and back-navigation depth in a reader is realistically far shorter
+// than that. `Map` iterates in insertion order, so the oldest entry evicts.
+const BODY_CACHE_MAX = 24;
+
+function loadContent(url: string): Promise<string | null> {
+  const hit = bodyCache.get(url);
+  if (hit !== undefined) return Promise.resolve(hit);
+  const existing = bodyInFlight.get(url);
+  if (existing) return existing;
+  const load = fetch(url)
+    .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+    .then((html) => {
+      bodyCache.set(url, html);
+      if (bodyCache.size > BODY_CACHE_MAX) {
+        const oldest = bodyCache.keys().next().value;
+        if (oldest !== undefined) bodyCache.delete(oldest);
+      }
+      return html;
+    })
+    // A failed fetch is NOT cached: the next attempt should be a real attempt,
+    // since the usual cause is a dropped connection rather than a bad URL.
+    .catch(() => null)
+    .finally(() => bodyInFlight.delete(url));
+  bodyInFlight.set(url, load);
+  return load;
+}
+
+// Pull a body into the cache before anything asks to render it. Fire-and-forget
+// by design: a failed warm costs nothing, because the reader will fetch it for
+// real when it gets there. A falsy `url` is a deliberate no-op, which is what a
+// locked Lesson resolves to (the server returns `html: ""` and no `contentUrl`
+// past the free Preview), so a `preview` caller cannot prefetch paid content
+// even by accident.
+export function warmContent(url: string | null | undefined): void {
+  if (url) void loadContent(url);
+}
+
 export function useContentHtml(
   body: { html?: string; contentUrl?: string } | null | undefined,
 ): string | null | undefined {
@@ -119,18 +180,24 @@ export function useContentHtml(
   useEffect(() => {
     if (!url) return;
     let live = true;
-    fetch(url)
-      .then((r) => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
-      .then((html) => live && setFetched({ url, html }))
-      .catch(() => {
-        if (live) setFetched({ url, html: null });
-      });
+    void loadContent(url).then((html) => {
+      if (live) setFetched({ url, html });
+    });
     return () => {
       live = false;
     };
   }, [url]);
   if (body == null) return body; // undefined: query loading · null: not found
-  if (url) return fetched?.url === url ? fetched.html : undefined; // undefined: fetching/stale · string: ready · null: error
+  if (url) {
+    // The cache read happens HERE, during render, and that placement is the
+    // ticket. Waiting for the effect to run and set state would still cost one
+    // render in the `undefined` branch, which is one frame of skeleton over
+    // content the device already has. Reading it synchronously means a revisited
+    // or pre-warmed lesson never shows a placeholder at all.
+    const cached = bodyCache.get(url);
+    if (cached !== undefined) return cached;
+    return fetched?.url === url ? fetched.html : undefined; // undefined: fetching/stale · string: ready · null: error
+  }
   return body.html ?? ""; // translation still stored inline
 }
 
@@ -503,6 +570,29 @@ function LessonView({
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
   // The next lesson's row (for the end-of-lesson card's number and title).
   const nextLesson = nextLessonKey ? (lessons?.find((l) => l.key === nextLessonKey) ?? null) : null;
+
+  // **Warm the next lesson** (perceived-performance ticket 05). Forward is how
+  // the reader is actually used: finish this one, go to the next. Holding a
+  // subscription for it means the Convex round trip is already paid when the
+  // click comes, and warming its blob puts the body in `bodyCache`, so the two
+  // remaining round trips of a lesson navigation both collapse to nothing.
+  //
+  // **One lesson ahead, deliberately.** Warming the whole course would turn
+  // opening a 132-lesson course into 132 subscriptions and 132 blob fetches,
+  // which trades a perceived win for a real cost on metered mobile data. The
+  // learner can only read one lesson next.
+  //
+  // `"skip"` on the last lesson and for a `preview` caller. The preview guard is
+  // belt and braces rather than the real control: `readLesson` returns
+  // `html: ""` and no `contentUrl` for a locked Lesson, so the warm below would
+  // be a no-op anyway. Skipping also spares a subscription nobody can use.
+  const nextBody = useQuery(
+    api.content.reader.getLesson,
+    nextLessonKey && !preview ? { topicSlug, key: nextLessonKey, lang: lang ?? undefined } : "skip",
+  );
+  useEffect(() => {
+    warmContent(nextBody?.contentUrl);
+  }, [nextBody?.contentUrl]);
 
   // In-place prose edit (course-content-editing / ADR 0020). Editing the source
   // (English) edition patches the Lesson blob (`editLesson`); editing a translated
