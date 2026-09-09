@@ -38,6 +38,24 @@ export function initializePostHog() {
     ui_host: "https://eu.posthog.com",
     defaults: "2026-01-30",
     capture_exceptions: true,
+    // Core Web Vitals from the field (perceived-performance ticket 01). Until
+    // 2026-09-09 the only performance numbers this project had came from local
+    // production builds on a developer connection, which says nothing about a
+    // mid-range Android phone on South African mobile data. That is the
+    // population every perceived-performance ticket is actually for, so every
+    // one of them would otherwise resolve on "it should be faster" rather than
+    // "it is".
+    //
+    // `web_vitals` ONLY, and `network_timing` deliberately left off. Web vitals
+    // are page-level timings (LCP, INP, CLS) and carry no request contents;
+    // network_timing captures per-request resource timing, which is both a
+    // bigger payload and a different privacy question than the one `/privacy`
+    // answers today. If it is ever wanted, it needs its own line on that page.
+    //
+    // This adds NO person property. The identity commitment in
+    // `ConvexClientProvider.tsx` still holds: the Convex user document ID and
+    // nothing else, no email and no name.
+    capture_performance: { web_vitals: true },
     // Drop frameless unhandled network rejections before they reach error
     // tracking: they arrive with no stack, so they are untriageable and recur
     // on every flaky connection.
