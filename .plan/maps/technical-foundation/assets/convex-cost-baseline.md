@@ -92,15 +92,183 @@ this is the first evidence against it.
 **About 17% off, not the estimated 58%.** Two candidate explanations, in the order
 they should be checked:
 
-1. **`784eb70` may not be live in prod.** It landed 2026-08-11, three days into this
-   cycle. `.scratch/docs-reconciliation/FINDINGS.md` records that pushing `main` runs
-   `npx convex deploy` inside the Vercel build, so it very probably is live, but that
-   is inference and not a verified push. Cheapest thing to rule out first.
-2. **The residual is exactly what ticket 01 predicted.** Verified by reading the code
+1. **`784eb70` may not be live in prod. RULED OUT 2026-09-09.** It landed 2026-08-11,
+   three days into this cycle, and the doubt was worth checking because it was cheap.
+   It is live. `git merge-base --is-ancestor 784eb70 origin/main` passes and **331
+   commits** sit on `origin/main` after it, so `main` has been pushed many times since
+   the change landed. The build command that every one of those pushes ran is
+   `npx convex deploy --cmd 'pnpm run build'`, which is recorded in three independent
+   places in the tree (`README.md`, `docs/routine.md`,
+   `docs/agents/project-context.md`) and confirmed against a real Vercel build log on
+   2026-07-29 (`.scratch/docs-reconciliation/FINDINGS.md`). So prod has been running
+   the narrowed `map()` for essentially the whole Aug 8 to Sep 8 cycle.
+
+   Two honest limits, so this is not over-read: it is verified from git plus the
+   recorded build command, **not** by querying the prod deployment, because this
+   checkout still has no prod deploy key. And it does not explain the gap, it only
+   removes the cheap explanation for it.
+2. **The residual is exactly what ticket 01 predicted. Now the STANDING explanation,
+   candidate 1 having been ruled out (2026-09-09).** Re-verified by reading the code
+   on 2026-09-09: `listLessons` still calls `loadEdition(...).map(["lesson"])` at
+   `convex/content/reader.ts:226`, and `listReferences` the same with `["reference"]`
+   at `:258`. Nothing has changed on that path. Originally: verified by reading the code
    on 2026-08-27: `listLessons` still calls `loadEdition(...).map(["lesson"])`
    (`convex/content/reader.ts`), and `lessonsToc` reads one whole inline
    `translations.html` body per lesson to return one title string. The narrowing in
    `784eb70` removed the other four kinds; it could not make the lesson rows thin.
+
+### The 2026-09-09 dashboard read, by function, all deployments in `my-course`
+
+Supplied by the operator as four dashboard screenshots (Function Calls, Database I/O,
+Compute, Data Egress), which is the read this map had been unable to get. **This is the
+first by-function data since the baseline, and it changes the ranking.**
+
+**Period and scope, CONFIRMED by the operator's dashboard on 2026-09-09:** the range
+selector reads **Sep 08, 2026 to Oct 08, 2026** and the project selector reads **All
+Projects**. So this is the open cycle, read on its second day, across every project on
+the team. Two things follow, and the second is the more useful:
+
+- **The window is about 1.25 days**, cross-checked two independent ways that agree to
+  0.4%: 9,300 function calls against the baseline's 229,987 per month is a factor of
+  **24.7**, and 1.25 elapsed days of a 31-day cycle is a factor of **24.8**. That
+  agreement is also evidence the traffic in the window is *representative* rather than
+  a spike, since calls per day match the baseline month almost exactly. Multiply by
+  **24.7** for a monthly figure.
+- **It is NOT prod-filtered and NOT project-filtered.** The baseline's by-function
+  table was filtered to prod, which is where its unattributed 60% came from. This one
+  is not, which is why it can speak to that question at all (see below).
+
+**Treat the composition as reliable and the projection as weak.** A day-and-a-half
+window is a bad basis for a monthly number, and this particular window contains a
+translation run (`publishTranslation` and `publishTranslationChecked` at 261 calls
+each), which is bursty rather than steady traffic.
+
+Database I/O, project total **166.97 MB**:
+
+| Function | I/O | Calls | Per call | Baseline |
+|---|---|---|---|---|
+| `content/reader.listLessons` | **67.92 MB** (40.7%) | 441 | 154 KB | 1.16 GB/mo |
+| `public.publicCourse` | **40.36 MB** (24.2%) | 157 | **257 KB** | 59.65 MB/mo |
+| `translate.publishTranslation` | 10.41 MB | 261 | 40 KB | 28.14 MB/mo |
+| `certificates.myCertificate` | 7.67 MB | **1.1K** | 7 KB | not listed |
+| `content/reader.dashboard` | 4.81 MB | | | 4.16 MB/mo |
+| `content/reader.courseHeader` | 4.66 MB | 414 | 11 KB | 28.05 MB/mo |
+| `content/reader.listReferences` | 4.25 MB | 230 | 18 KB | **1.13 GB/mo** |
+| `dashboard.courseStats` | 2.94 MB | | | not listed |
+| `capture.myProgress` | 2.65 MB | 274 | | not listed |
+| `catalogue.list` | 2.47 MB | | | not listed |
+| `routine.materialiseTopic` | 1.23 MB | | | 1.24 MB/mo |
+| `capture.myQuestions` | **530.23 KB** | 132 | 4 KB | **1.15 GB/mo** |
+| `content/reader.dashboard` (Dev) | 660.7 KB | 298 | | |
+
+#### What this settles
+
+- **`capture.myQuestions` is FIXED.** 1.15 GB/month to 530 KB in a day and a half, from
+  the bill's #2 line to about #23. `784eb70` did exactly what it was expected to do
+  here. Whatever the period, that is a collapse of two to three orders of magnitude.
+- **`content/reader.listReferences` is largely fixed.** 1.13 GB/month to 4.25 MB, now
+  #7. The 23-rows-instead-of-155 prediction in `784eb70`'s notes holds up.
+- **`content/reader.listLessons` is NOT fixed and is now dominant**, at 40.7% of the
+  deployment's I/O and 154 KB per call. Exactly what ticket 01 predicted: the narrowing
+  removed the other kinds and could not make the lesson rows thin. Straight-lined it is
+  about **1.7 GB/month, worse in absolute terms than the 1.16 GB baseline**. Read that
+  as "not improving" rather than as a precise regression, given the window, and note it
+  is consistent with the open question of whether this read scales with Editions, which
+  have been added since.
+- **Compute and Data Egress have essentially gone to zero.** Egress is **6 bytes**
+  total against a 2 GB / $0.34 baseline line; compute is 0.00309 GB-hours against 1
+  GB-hour / $0.43, and even at 25x that is 0.077. Two of the six bill lines have
+  stopped mattering. Top compute line is `translate.publishTranslationChecked`.
+
+#### Two findings the baseline did not have
+
+- **`public.publicCourse` is the new #2 line and nothing owns it.** 24.2% of the I/O at
+  **257 KB per call, the worst per-call amplification in the list**, up from a barely
+  noticeable 59.65 MB/month. The cause is the same one ticket 01 is about: it calls
+  `ed.map(["title", "lesson", "reference", "question"])` (`convex/public.ts`), the
+  full four-kind Guest mirror, so it collects the same fat `translations` rows and gets
+  no benefit from the `784eb70` narrowing because it genuinely declares the fat kinds.
+  **Ticket 01's `Done when` named only `listLessons` and `listReferences`**, and has
+  been widened to include this, because the table split fixes all three at once while a
+  kinds-narrowing fix would miss a quarter of the I/O.
+- **`certificates.myCertificate` is the chattiest function in the deployment**, 1.1K
+  prod calls plus 298 dev, well above `listLessons`'s 441. Cheap per call (7 KB), so it
+  is a function-calls question rather than an I/O one, and function calls were 15% and
+  $0.66 of the baseline bill. The cause is structural: `CertificateChip` mounts its own
+  `useQuery(api.certificates.myCertificate)` per course card
+  (`src/app/_components/CourseCardParts.tsx:97`), so one dashboard load fans out one
+  subscription per card. Recorded as fog on the map, not ticketed.
+
+#### What it does NOT settle
+
+- **The unattributed share.** This read is one project, `my-course (hindi-learning)`,
+  and the account reportedly has 9 deployments. Within this project, **non-prod is
+  negligible**: Dev is 660.7 KB of 166.97 MB, about 0.4%. That **weakens the leading
+  hypothesis** for the missing 60%, which was that the non-prod deployments explain it.
+  Other projects were not visible in the screenshots.
+- **The invoice is still unread.** These are dashboard cycle-to-date figures, not a
+  closed bill, so the actual Aug 8 to Sep 8 charge is still unknown.
+- **EU versus US hosting**, which remains the largest single lever and is untouched by
+  any of this.
+
+### What US hosting would actually cost, and why "$0 bill" was too optimistic
+
+**Corrected 2026-09-09.** This file and the technical-foundation map both said US
+hosting would be "a $0 bill" at this traffic. **At the I/O this read projects, it would
+not be.** The arithmetic below is derived from this file's own invoice rather than from
+a pricing page, and it changes the recommendation in a way that matters.
+
+The mechanism is confirmed from the dashboard itself now, not just from
+convex.dev/pricing. The Usage page carries this banner verbatim:
+
+> **EU region usage is billed on-demand.** Included plan limits only apply to US-hosted
+> deployments. All usage on EU deployments is charged at on-demand rates, plus a 30%
+> regional surcharge.
+
+Projected monthly figures, at the 24.7 factor derived above:
+
+| Line | Projected | Starter allowance | US verdict |
+|---|---|---|---|
+| Database I/O | **4.03 GB** | 1 GB | **3.03 GB over** |
+| Function calls | 230K | 1M | within, $0 |
+| Database storage | ~137 MB | 0.5 GB shared | within |
+| File storage | ~338 MB | 0.5 GB shared | within |
+| Compute | 0.076 GB-hours | n/a | negligible |
+| Data egress | 148 B | n/a | negligible |
+
+Rates derived from this file's own invoice: $2.57 for 9 GB is **$0.286/GB** with the
+30% surcharge, so **$0.220/GB** without it.
+
+| Scenario | Estimated bill |
+|---|---|
+| **EU today** | ~$2.17/month |
+| **US, nothing else changed** | **~$0.67/month** (I/O overage only) |
+| EU + ticket 01 | ~$1.42/month |
+| **US + ticket 01** | **~$0.09/month** |
+
+**The consequence, and it reverses how this file framed the choice.** The map said US
+hosting "competes with this entire map". It does not: **the two are complementary, and
+only together do they reach ~$0.** Moving to US alone leaves I/O 4x over its allowance,
+so the bill lands at about $0.67 rather than nothing. Ticket 01 alone, in the EU, saves
+about $0.75 and leaves a bill. **Ticket 01 is what pulls I/O near the 1 GB allowance
+the US move unlocks**, and 01 now covers 64.9% of the I/O (`listLessons` 40.7% plus
+`public.publicCourse` 24.2%), which is what makes the combination work.
+
+Three honest limits on all of the above:
+
+- **The projection rests on a 1.25-day window**, and that window contains a translation
+  run. The two calibrations agreeing is reassuring about the traffic being typical, not
+  proof of it.
+- **The rates are derived from one invoice**, not verified against convex.dev/pricing in
+  this session, and the allowance figures are this file's own (1M calls, 1 GB I/O, 0.5
+  GB storage). Re-check before anyone acts on the dollar figures.
+- **Storage headroom on US is tight.** 137 MB database plus 338 MB file storage is 475
+  MB against a 512 MB allowance. It fits today with about 7% to spare; it would start
+  billing storage too if content grows.
+
+**None of this decides the question**, which is data residency and POPIA for the
+courses' learners, not cents. It only makes the cost side of it honest: the prize for
+moving is about **$1.50/month today, or the whole bill if ticket 01 ships with it.**
 
 ### Roughly 60% of the I/O has never been attributed to a function
 
@@ -162,7 +330,10 @@ optimisation, because there is no free tier to fall back into. See the new fog p
   know what drives its own destination metric. Likeliest candidate is the non-prod
   deployments, which in the EU bill at exactly the same rate as prod, but that is a
   guess and the dashboard answers it directly.
-- **Whether moving deployments to a US region beats every optimisation here.** US
+- **Whether moving deployments to a US region beats every optimisation here. Costed
+  2026-09-09, and the answer is "no, it COMPLEMENTS them".** See the section above: the
+  "$0 bill" figure below was too optimistic, and US hosting alone lands at about $0.67
+  because I/O stays 4x over its allowance. Original text follows. US
   usage draws on the included allowances; at this traffic that is a $0 bill, versus the
   cents that ticket 01 is worth. It is a configuration change, not a code change, and
   it competes with this entire map. Not free: it moves data residency, and that is a
