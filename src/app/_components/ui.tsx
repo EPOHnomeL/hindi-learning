@@ -340,7 +340,13 @@ export function CourseSkeleton() {
 // The dashboard placeholder (header + course-card grid). Shown by the auth gate
 // while the session resolves, since the dashboard is the home landing. Mirrors
 // Dashboard's container, header, and grid.
-export function DashboardSkeleton() {
+// `cards` sizes the grid (perceived-performance ticket 06). It defaults to the
+// six this always drew, for the callers with nothing better to go on (the auth
+// gate on a non-course route, and the manage tab's stats placeholder). The home
+// page passes the count this browser saw last time, via `useCourseGridCount`, so
+// the placeholder and the real grid are the same height and the load stops
+// jumping.
+export function DashboardSkeleton({ cards = 6 }: { cards?: number } = {}) {
   return (
     <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
       <header className="mb-8 flex items-center gap-3">
@@ -351,7 +357,7 @@ export function DashboardSkeleton() {
         </div>
       </header>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy>
-        {Array.from({ length: 6 }).map((_, i) => (
+        {Array.from({ length: cards }).map((_, i) => (
           <div key={i} className="h-44 animate-pulse rounded-2xl border border-line bg-soft/20" />
         ))}
       </div>

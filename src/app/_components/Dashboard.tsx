@@ -15,6 +15,7 @@ import { preferEdition } from "../../../convex/editionPreference";
 import { tenantPill } from "~/design/tenantPill";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { catalogueCacheKey, DASHBOARD_CACHE_KEY, TENANT_NAME_CACHE_KEY, writeCache } from "./offlineCache";
+import { useCourseGridCount } from "./useCourseGridCount";
 import { checkoutLink, withLang } from "./editionUrl";
 import { Icon } from "./icons";
 import { formatPrice } from "./Paygate";
@@ -92,6 +93,9 @@ export function Dashboard() {
   // directly above the course they paid for, which reads as the payment having
   // been lost.
   const pending = useQuery(api.eft.myPendingIntents);
+  // Placeholder count for the in-flight grid, from the same source page.tsx uses
+  // for its AuthLoading skeleton, so the two agree (ticket 06).
+  const gridCards = useCourseGridCount(6);
   const { signOut } = useAuthActions();
   const router = useRouter();
   const tc = useTranslations("Common");
@@ -193,9 +197,18 @@ export function Dashboard() {
         </header>
 
         {courses === undefined ? (
+          // Sized from the last-known-good list, and matching what page.tsx drew
+          // during AuthLoading a moment earlier (perceived-performance ticket
+          // 06). This used to be a hardcoded three against that skeleton's six,
+          // so a cold load painted the course area at three different heights
+          // before any content arrived.
+          //
+          // `bg-soft/20`, not `bg-card`: the fill has to lift off paper to read
+          // as a placeholder at all, which is the convention `ui.tsx` records and
+          // this one call site had drifted from.
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy>
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-44 animate-pulse rounded-2xl border border-line bg-card" />
+            {Array.from({ length: gridCards }).map((_, i) => (
+              <div key={i} className="h-44 animate-pulse rounded-2xl border border-line bg-soft/20" />
             ))}
           </div>
         ) : emptyLibrary ? (
@@ -209,6 +222,18 @@ export function Dashboard() {
           </div>
         )}
 
+        {/* **These four reserve no space while they load, deliberately**
+            (perceived-performance ticket 06, which asked the question and this is
+            the answer). Each renders null for both `undefined` and `[]`, so they
+            do pop in. Reserving for them anyway would be worse, not better: most
+            learners hold no shared course, no purchase and no pending transfer,
+            so three placeholders that resolve to nothing would collapse the page
+            on nearly every load, and a collapse is a bigger shift than the
+            appearance it replaced. Nothing available before the query lands can
+            tell those cases apart, unlike the course grid, which has a
+            last-known-good count.
+            What makes that acceptable is position: all four sit BELOW the course
+            grid, so they push only the footer, never content being read. */}
         <SharedSection />
         {/* Above Purchased, deliberately: a transfer you are waiting on is more
             urgent than the courses you already hold, and it must not sit below
