@@ -332,11 +332,20 @@ export const logBatchPayment = mutation({
   args: { batchId: v.id("voucherBatches"), reference: v.string() },
   returns: v.null(),
   handler: async (ctx, { batchId, reference }) => {
+    // **Authorise before reading.** `logDealPayment` gates too, but it cannot gate
+    // before this lookup, and collapsing the two rails onto it briefly put the
+    // existence check first here: a non-admin caller of this public mutation could
+    // then tell an id that exists from one that does not, before being refused.
+    // Convex ids are opaque so the leak was small, but the order is the point, and
+    // the Access Code rail already gated first. The double check costs one index
+    // read on an admin-only path and means the shared writer can never be reached
+    // ungated from a future rail.
+    if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
     const batch = await ctx.db.get(batchId);
     if (!batch) throw new Error("that batch does not exist");
-    // The admin gate, the blank-reference refusal, the idempotency and the
-    // unpaid-to-owed flip are all `logDealPayment`'s, shared with the Access Code
-    // rail (ticket 30). A batch always has a Ledger row, unlike a zero-seat code.
+    // The blank-reference refusal, the idempotency and the unpaid-to-owed flip are
+    // `logDealPayment`'s, shared with the Access Code rail (ticket 30). A batch
+    // always has a Ledger row, unlike a zero-seat code.
     await logDealPayment(ctx, { id: batchId, paymentRef: batch.paymentRef, ledgerId: batch.ledgerId }, reference);
     return null;
   },

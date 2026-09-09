@@ -2,6 +2,7 @@
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
 import schema from "./schema";
+import { api } from "./_generated/api";
 import { assertOrganisation, freshDealCode, logDealPayment, unsettledDeals } from "./bulkDeal";
 import { mintCode } from "./voucherCode";
 import { mintAccessCodeString } from "./accessCodeFormat";
@@ -256,4 +257,115 @@ test("nothing outside the deal module re-implements a mechanism it owns", async 
       what,
     ).toEqual([]);
   }
+});
+
+test("a non-admin is refused before either rail reveals whether the id exists", async () => {
+  // Collapsing the two rails onto `logDealPayment` briefly put the existence
+  // check ahead of the admin gate on the voucher rail, so a non-admin caller of
+  // that public mutation could tell a real batch id from a made-up one by which
+  // refusal came back. Convex ids are opaque, so the leak was small; the order is
+  // the point, and this is what stops it flipping back.
+  const t = convexTest(schema, modules);
+  const stranger = await seedUser(t, "stranger@example.com");
+  const seller = await seedUser(t, "seller@example.com");
+  const topicId = await t.run((ctx) => ctx.db.insert("topics", { ownerId: seller, slug: "s", title: "S" }));
+  const { batchId, codeId } = await t.run(async (ctx) => {
+    const ledgerId = await ctx.db.insert("ledger", {
+      topicId,
+      lang: "en",
+      sellerId: seller,
+      buyerEmail: "b@x.test",
+      gross: 100,
+      fee: 0,
+      net: 100,
+      sellerShare: 50,
+      platformShare: 50,
+      kind: "batch",
+      status: "unpaid",
+    });
+    return {
+      batchId: await ctx.db.insert("voucherBatches", {
+        topicId,
+        lang: "en",
+        sellerId: seller,
+        seats: 1,
+        total: 100,
+        orgName: "Org",
+        orgContact: "b@x.test",
+        ledgerId,
+        voided: false,
+      }),
+      codeId: await ctx.db.insert("accessCodes", {
+        topicId,
+        lang: "en",
+        sellerId: seller,
+        code: "GRP-ZZZ-ZZZ-ZZZ",
+        capacity: 1,
+        pricePerSeat: 100,
+        orgName: "Org",
+        orgContact: "b@x.test",
+        stoppedAt: Date.now(),
+      }),
+    };
+  });
+
+  // An id that is well-formed but GONE, which is the only way to see the leak: a
+  // real id and a fake one must give a non-admin the SAME refusal. Asserting only
+  // on a real id passes either way, because the writer gates too and both orders
+  // then answer "forbidden".
+  const { goneBatch, goneCode } = await t.run(async (ctx) => {
+    const b = await ctx.db.insert("voucherBatches", {
+      topicId,
+      lang: "en",
+      sellerId: seller,
+      seats: 1,
+      total: 100,
+      orgName: "Gone",
+      orgContact: "g@x.test",
+      ledgerId: (await ctx.db.query("ledger").first())!._id,
+      voided: false,
+    });
+    const c = await ctx.db.insert("accessCodes", {
+      topicId,
+      lang: "en",
+      sellerId: seller,
+      code: "GRP-YYY-YYY-YYY",
+      capacity: 1,
+      pricePerSeat: 100,
+      orgName: "Gone",
+      orgContact: "g@x.test",
+      stoppedAt: Date.now(),
+    });
+    await ctx.db.delete(b);
+    await ctx.db.delete(c);
+    return { goneBatch: b, goneCode: c };
+  });
+
+  const asStranger = t.withIdentity({ subject: `${stranger}|session` });
+
+  // Voucher rail: both ids, both callers, one refusal.
+  await expect(asStranger.mutation(api.vouchers.logBatchPayment, { batchId, reference: "REF" })).rejects.toThrow(
+    /forbidden/,
+  );
+  await expect(
+    asStranger.mutation(api.vouchers.logBatchPayment, { batchId: goneBatch, reference: "REF" }),
+  ).rejects.toThrow(/forbidden/);
+  await expect(t.mutation(api.vouchers.logBatchPayment, { batchId: goneBatch, reference: "REF" })).rejects.toThrow(
+    /forbidden/,
+  );
+
+  // Access Code rail: same.
+  await expect(
+    asStranger.mutation(api.accessCodes.logAccessCodePayment, { accessCodeId: codeId, reference: "REF" }),
+  ).rejects.toThrow(/forbidden/);
+  await expect(
+    asStranger.mutation(api.accessCodes.logAccessCodePayment, { accessCodeId: goneCode, reference: "REF" }),
+  ).rejects.toThrow(/forbidden/);
+  await expect(
+    t.mutation(api.accessCodes.logAccessCodePayment, { accessCodeId: goneCode, reference: "REF" }),
+  ).rejects.toThrow(/forbidden/);
+
+  // Nothing was written on the way to any of those refusals.
+  expect((await t.run((ctx) => ctx.db.get(batchId)))!.paymentRef).toBeUndefined();
+  expect((await t.run((ctx) => ctx.db.get(codeId)))!.paymentRef).toBeUndefined();
 });

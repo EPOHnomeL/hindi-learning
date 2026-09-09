@@ -599,6 +599,10 @@ export const logAccessCodePayment = mutation({
     // unpaid-to-owed flip are `logDealPayment`'s, shared with the voucher rail
     // (ticket 30). The not-yet-stopped refusal below is this rail's own, because a
     // live code has no bill: a Batch is billed at mint, a code at stop.
+    //
+    // Gated here as well as inside the writer, deliberately: authorising before the
+    // lookup is what stops a non-admin distinguishing an id that exists from one
+    // that does not. See the same note on `vouchers.logBatchPayment`.
     if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
     const code = await ctx.db.get(accessCodeId);
     if (!code) throw new Error("that access code does not exist");
