@@ -53,3 +53,22 @@ either decision.
 `translate.ts`, this is a behaviour change inside it. They are independent, but whichever
 runs second rebases on the other; 24's discipline (moves never share a commit with
 behaviour changes) means this ticket's change should be its own commit either way.
+
+## Answer
+
+2026-09-08, built. `convex/quizGate.ts` holds `quizStructureMatches` (the pure core) and
+`quizVerdict` (the policy: ok / mismatch / unreadable), and all six call sites ask it.
+The dead branch in `publishTranslation` is **deleted, not commented**, and the mutation is
+an `internalMutation`, so `publishTranslationChecked` and `translateTopic` are the only
+doors. The boundary is asserted on the source text rather than on `api`/`internal`, which
+are lazy proxies that answer `in` for any name at all.
+
+The test that pinned the bypass open was rewritten, as this ticket said it must be: it now
+asserts the public door refuses the same body.
+
+**Not done, and it could not be:** `topics/_devanagari/publish.ts` does not exist in this
+checkout. `topics/` is gitignored, so there was nothing to repoint. Any materialised
+workspace script calling the mutation directly must now use the checked action, which the
+committed scripts already did.
+
+Verified by test. `pnpm typecheck` and the full suite green.

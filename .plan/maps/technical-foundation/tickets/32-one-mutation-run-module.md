@@ -50,3 +50,41 @@ restyling.
 in the repo** (verified 2026-09-07: 28 `.test.ts`, 0 `.test.tsx`). A hook is testable
 without a rendered tree, which is most of why this shape is worth having, but confirm what
 the current config can actually run before promising a test in the Answer.
+
+## Answer
+
+2026-09-08, built. `src/app/_components/mutationRun.ts` is `refusalTag`, `refusalMessage`
+and `useMutationRun`. All four copies of the unwrap are gone, and the two panels that map a
+tag onto localised copy keep their own `switch` while sharing only the extraction.
+`manage/VoucherCard` had known the rule and given up on it, discarding the thrown value
+entirely, which threw away the tagged refusals that DID survive the trip along with the
+redacted ones that did not.
+
+**Writing the tests found two latent defects in the copy being made shared**, both in this
+ticket's own case list and neither previously covered anywhere: a `ConvexError` IS an
+`Error`, and with object `data` its `message` is that object's JSON, so the old shape would
+have printed raw JSON into the UI; and an empty `Error` message was returned as the
+message, which a control rendering `error && ...` shows as nothing at all, reading as
+success.
+
+**Ten silent call sites, not seven.** The review missed `SharingTab`'s publish and
+public-link toggles and `ManageShell`'s generation control. All ten surface the message
+now, and the boundary test fails on the *shape* rather than trusting a count, while allowing
+a chain that does handle its refusal. Two were worse than silent: `AddLanguagePanel` called
+`onAdded(code)` unconditionally, so a refused translation listed an Edition that was never
+created.
+
+`AdminPanel`'s `DonationPayee` and `FlagToggles` are the demonstration. `FlagToggles` keeps
+its own per-key `pending`, because which switch is mid-write is what stops a double-click on
+one row and the shared hook cannot know which row asked.
+
+**Only the pure half is tested, and this ticket asked us to check before promising a test.**
+`vitest.config.ts` runs edge-runtime and the repo has no `.test.tsx` at all (28 `.test.ts`,
+0 `.test.tsx`, checked 2026-09-08). Exercising the hook would mean a React testing
+dependency and a second environment, which is a bigger decision than this ticket.
+`refusalTag` and `refusalMessage` carry every fact the incidents taught.
+
+No restyling: how a control displays a message stays 03's business.
+
+Verified by test for the unwrap, by reading for the ten call sites. `pnpm typecheck` and the
+full suite green.

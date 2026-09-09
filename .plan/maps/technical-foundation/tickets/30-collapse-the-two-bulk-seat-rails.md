@@ -54,3 +54,27 @@ ADR. Say so explicitly in the Answer.
 `claimSeat`'s missing hold check, which lives in the half of `accessCodes.ts` this ticket
 leaves per-rail. They do not collide, but if 28 has not run, do not silently "fix" the
 hold check here; that is 28's Answer to write.
+
+## Answer
+
+2026-09-08, built on top of 29. `convex/bulkDeal.ts` takes the five mechanisms that are
+genuinely the same thing: `assertOrganisation`, `freshDealCode`, `ownDeal`,
+`logDealPayment` and `unsettledDeals`.
+
+Each rail keeps exactly what ADR 0031 says differs, and each difference is named at the
+seam rather than implied: when the Ledger row is written (which is why `logDealPayment`
+takes `ledgerId` as optional, since a zero-seat code settles to nothing), per-seat against
+per-deal price and the not-yet-stopped refusal that falls out of it, and whether a Seat row
+exists. The two code SHAPES are also deliberately not shared, because both rails can be
+live on one Edition at once and a `GRP` code must not be mistakable for a `MYC` one.
+
+**No superseding ADR, and this says why**, as the ticket asked. ADR 0031 *named* this cost
+rather than deciding it. A shared implementation leaves every substantive constraint of that
+ADR standing: no provenance on the Entitlement, a derived seat count, no restart after a
+stop.
+
+No behaviour change: the 43 existing tests across both rails pass unmodified, which is the
+evidence that this was a move. `claimSeat`'s hold check was 28's and is untouched here, per
+this ticket's own sequencing note.
+
+Verified by test. `pnpm typecheck` and the full suite green.

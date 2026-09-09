@@ -60,3 +60,37 @@ not propose that** and neither should its Answer.
 ADR 0014 is cited more narrowly than its scope. If 19 has resolved, its answer governs how
 this ticket may lean on 0014; if it has not, do not settle that question here as a side
 effect.
+
+## Answer
+
+2026-09-08, built. `convex/modelCall.ts` is the shared policy and each client is reduced
+to its wire format.
+
+**The question this ticket said to answer rather than assume: the policy IS genuinely
+identical.** Read side by side, both clients require a key, build the request, post, and on
+a 400 whose body complains about the reasoning control drop that control and post once
+more; then refuse a non-OK response, refuse an empty completion, normalise the usage. Every
+difference is wire format, and each now lives in its adapter with a name: the endpoint and
+headers, which control gets dropped (`reasoning.effort` against `thinkingLevel`), what a
+reasoning complaint looks like in that vendor's prose, and where content and token counts
+sit in the response.
+
+**One behavioural difference was real, and is now explicit rather than incidental.**
+OpenRouter only sends the control when a caller asks for it, so a 400 with nothing to drop
+must not be retried; the Gemini client always sends it. `sendsReasoningControl` is that
+difference, and a test drives the branch.
+
+`geminiComplete` returns `{ content, usage }` like its sibling, so the translate rail can
+now see its token spend instead of logging and dropping it, and Gemini's thought tokens are
+counted as output because that is how they are billed. Both rails log usage identically,
+unknown reported as unknown rather than zero.
+
+**Decided and recorded, as the ticket asked:** translation usage is NOT persisted. Ticket
+12 instruments Routine runs in `generationRuns`, per Topic; a translation job is a
+different unit with its own `translationJobs` row and no usage columns, so recording it is
+schema work on that table and its own ticket.
+
+ADR 0014 is honoured, not reopened, and 19 has not resolved, so nothing here settles how
+narrowly 0014 may be cited.
+
+Verified by test. `pnpm typecheck` and the full suite green.

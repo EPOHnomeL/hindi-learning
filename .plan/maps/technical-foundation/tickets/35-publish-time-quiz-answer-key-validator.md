@@ -56,3 +56,26 @@ the quiz, a test proves the refusal (and proves it can fail), and the existing 2
 authored quizzes still publish.
 
 <!-- Filed 2026-09-07 out of the answer to 02. -->
+
+## Answer
+
+2026-09-08, built, in `convex/quizGate.ts` beside the structure gate.
+`unresolvableAnswerKeys(html)` returns the keys that name no option, so a caller can say
+which quiz is broken.
+
+Both publish paths refuse **before the row exists**, which matters because a Lesson is
+immutable (ADR 0003) and the only repair is a republish: the teach CLI
+(`scripts/publish.ts`, before the upload) and the OpenRouter authoring action
+(`convex/openrouter.ts`, before the blob is stored).
+
+This is a referential check on the authored markup and not scoring, so ADR 0035 is
+untouched: the server still never decides whether a learner's answer was right.
+
+The tests read the markup contract off `lessons/AUTHORING.md` and the feedback script off
+`lessons/_partials/foot.html`, so the validator and the contract cannot drift apart
+silently. One test pins that ADR 0019's publish-time shuffle can never invalidate a key,
+and one pins that the wrapped document's own `getAttribute('data-correct')` is not mistaken
+for an answer key. Each quiz's key resolves against its OWN options, which a naive
+whole-document scan gets wrong.
+
+Verified by test. `pnpm typecheck` and the full suite green.

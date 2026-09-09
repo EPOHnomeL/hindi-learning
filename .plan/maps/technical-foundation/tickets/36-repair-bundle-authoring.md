@@ -53,3 +53,26 @@ goes missing (proved by making it fail).
 
 <!-- Filed 2026-09-07 out of the answer to 02: it blocks 37, which has to edit
      lessons/_partials/head.html and cannot ship that edit while the bundler is dead. -->
+
+## Answer
+
+2026-09-08, built. `pnpm bundle:authoring` exits 0 again.
+
+The authoring contract lives at `lessons/AUTHORING.md`, beside the template and partials it
+describes, in a directory this repo owns rather than one `npx skills update` can delete.
+**The other five teach docs stay pointed at the skill on purpose**, which is this ticket's
+"check the other five" answered: copying them here would manufacture the drift the bundler
+exists to prevent, so instead the bundler refuses loudly if the CLI takes another one.
+
+The bundle is reachable as one function, `bundleAuthoringAssets`, so the suite runs the real
+thing. That is the actual fix: the old test exercised `renderAssetsModule` against fixtures
+and stayed green for eleven days while the bundler could not start. One assertion now covers
+both failure modes, a missing source and a stale generated file, and a second test proves the
+missing-source path throws with the source named rather than a bare absolute-path ENOENT.
+
+Regenerating folded in twelve days of skill drift, frozen since 2026-08-27.
+
+This unblocked 37, which had to edit `lessons/_partials/head.html`.
+
+Verified by test, including one proved able to fail. `pnpm typecheck` and the full suite
+green.

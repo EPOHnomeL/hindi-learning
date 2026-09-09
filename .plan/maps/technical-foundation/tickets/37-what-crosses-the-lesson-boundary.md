@@ -58,3 +58,37 @@ unset, and the behaviour is checked on a lesson published **before** this change
 700px wide — the only width where the trap above shows.
 
 <!-- Filed 2026-09-07 out of the answer to 02. -->
+
+**Part 2 landed on 2026-09-08 and part 1 did not, so the ticket stays open.** No
+`## Answer`, because the `## Done when` above wants both.
+
+**Part 2, the one breakpoint, is built** (commit `feat(lesson): one breakpoint at the
+lesson boundary, 768px`). `lessonSrcDoc.ts` injects two rules, not one, which is the trap
+this ticket exists to document: it sets justification above 768px AND explicitly unsets it
+across the 641 to 767px band, because the injected block lands after the 641px copy baked
+into all 441 stored lessons and nothing else would override it there. The unset is
+`text-align:start`, not `left`, so an RTL Edition is not pinned to the wrong edge. A test
+asserts both rules are present and that the pair lands after the baked one, so deleting
+the second fails rather than looking correct. The three partial rules moved to 768px too,
+reaching lessons published from now on, and `pnpm bundle:authoring` regenerated the bundle
+(which is what 36 unblocked).
+
+**Not verified in a browser.** This ticket asks for a check at 700px on a lesson published
+before the change, which is the only width where the trap shows. The CSS is pinned by test;
+the 700px walk has not been done.
+
+**Part 1, widening the token bridge, is NOT done, and one claim in the Question is now
+corrected.** `injectTenantPaletteCss`'s own comment said it moves "only the 14 contract
+vars". That stopped being true when `TENANT_LESSON_DARK_CSS` was added: head.html's
+hardcoded DARK surfaces (cards, borders, quiz options, paradigm headers, the parked card,
+the singular/plural cells) are already re-pointed at the live tokens, so a navy tenant's
+lesson no longer comes out navy-paper with brown cards. The stale comment was fixed at the
+seam on 2026-09-08.
+
+What is genuinely left is the LIGHT-mode literals, dozens of warm-paper hexes outside the
+dark block. It was declined for this session on purpose: it repaints reading material on
+every lesson of every tenant host, the surface-versus-semantic split has to be made per
+selector, and it wants a human looking at a real lesson rather than a green test. The two
+families that must stay fixed are named at the seam so the next session does not have to
+rediscover them: the grammar mark colours and `.note.devo` purple are semantic
+colour-coding a reader learns, not surfaces.
