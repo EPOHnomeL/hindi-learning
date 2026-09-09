@@ -117,6 +117,93 @@ they should be checked:
    `translations.html` body per lesson to return one title string. The narrowing in
    `784eb70` removed the other four kinds; it could not make the lesson rows thin.
 
+### The 2026-09-09 dashboard read, by function, all deployments in `my-course`
+
+Supplied by the operator as four dashboard screenshots (Function Calls, Database I/O,
+Compute, Data Egress), which is the read this map had been unable to get. **This is the
+first by-function data since the baseline, and it changes the ranking.**
+
+**Which period this is, derived rather than given.** The screenshots carry no date
+range. It is **not** the closed Aug 8 to Sep 8 cycle: that cycle had already logged
+**204K function calls** by the mid-cycle read on 2026-08-27, and this read shows
+**9.3K** in total. So it is the cycle that opened 2026-09-08, read on 2026-09-09,
+which is **about one to one and a half days**. The calibration that follows: 9,300
+calls against the baseline's 229,987 per month is a factor of about **24.7**, so
+multiply by roughly 25 for a monthly figure.
+
+**Treat the composition as reliable and the projection as weak.** A day-and-a-half
+window is a bad basis for a monthly number, and this particular window contains a
+translation run (`publishTranslation` and `publishTranslationChecked` at 261 calls
+each), which is bursty rather than steady traffic.
+
+Database I/O, project total **166.97 MB**:
+
+| Function | I/O | Calls | Per call | Baseline |
+|---|---|---|---|---|
+| `content/reader.listLessons` | **67.92 MB** (40.7%) | 441 | 154 KB | 1.16 GB/mo |
+| `public.publicCourse` | **40.36 MB** (24.2%) | 157 | **257 KB** | 59.65 MB/mo |
+| `translate.publishTranslation` | 10.41 MB | 261 | 40 KB | 28.14 MB/mo |
+| `certificates.myCertificate` | 7.67 MB | **1.1K** | 7 KB | not listed |
+| `content/reader.dashboard` | 4.81 MB | | | 4.16 MB/mo |
+| `content/reader.courseHeader` | 4.66 MB | 414 | 11 KB | 28.05 MB/mo |
+| `content/reader.listReferences` | 4.25 MB | 230 | 18 KB | **1.13 GB/mo** |
+| `dashboard.courseStats` | 2.94 MB | | | not listed |
+| `capture.myProgress` | 2.65 MB | 274 | | not listed |
+| `catalogue.list` | 2.47 MB | | | not listed |
+| `routine.materialiseTopic` | 1.23 MB | | | 1.24 MB/mo |
+| `capture.myQuestions` | **530.23 KB** | 132 | 4 KB | **1.15 GB/mo** |
+| `content/reader.dashboard` (Dev) | 660.7 KB | 298 | | |
+
+#### What this settles
+
+- **`capture.myQuestions` is FIXED.** 1.15 GB/month to 530 KB in a day and a half, from
+  the bill's #2 line to about #23. `784eb70` did exactly what it was expected to do
+  here. Whatever the period, that is a collapse of two to three orders of magnitude.
+- **`content/reader.listReferences` is largely fixed.** 1.13 GB/month to 4.25 MB, now
+  #7. The 23-rows-instead-of-155 prediction in `784eb70`'s notes holds up.
+- **`content/reader.listLessons` is NOT fixed and is now dominant**, at 40.7% of the
+  deployment's I/O and 154 KB per call. Exactly what ticket 01 predicted: the narrowing
+  removed the other kinds and could not make the lesson rows thin. Straight-lined it is
+  about **1.7 GB/month, worse in absolute terms than the 1.16 GB baseline**. Read that
+  as "not improving" rather than as a precise regression, given the window, and note it
+  is consistent with the open question of whether this read scales with Editions, which
+  have been added since.
+- **Compute and Data Egress have essentially gone to zero.** Egress is **6 bytes**
+  total against a 2 GB / $0.34 baseline line; compute is 0.00309 GB-hours against 1
+  GB-hour / $0.43, and even at 25x that is 0.077. Two of the six bill lines have
+  stopped mattering. Top compute line is `translate.publishTranslationChecked`.
+
+#### Two findings the baseline did not have
+
+- **`public.publicCourse` is the new #2 line and nothing owns it.** 24.2% of the I/O at
+  **257 KB per call, the worst per-call amplification in the list**, up from a barely
+  noticeable 59.65 MB/month. The cause is the same one ticket 01 is about: it calls
+  `ed.map(["title", "lesson", "reference", "question"])` (`convex/public.ts`), the
+  full four-kind Guest mirror, so it collects the same fat `translations` rows and gets
+  no benefit from the `784eb70` narrowing because it genuinely declares the fat kinds.
+  **Ticket 01's `Done when` named only `listLessons` and `listReferences`**, and has
+  been widened to include this, because the table split fixes all three at once while a
+  kinds-narrowing fix would miss a quarter of the I/O.
+- **`certificates.myCertificate` is the chattiest function in the deployment**, 1.1K
+  prod calls plus 298 dev, well above `listLessons`'s 441. Cheap per call (7 KB), so it
+  is a function-calls question rather than an I/O one, and function calls were 15% and
+  $0.66 of the baseline bill. The cause is structural: `CertificateChip` mounts its own
+  `useQuery(api.certificates.myCertificate)` per course card
+  (`src/app/_components/CourseCardParts.tsx:97`), so one dashboard load fans out one
+  subscription per card. Recorded as fog on the map, not ticketed.
+
+#### What it does NOT settle
+
+- **The unattributed share.** This read is one project, `my-course (hindi-learning)`,
+  and the account reportedly has 9 deployments. Within this project, **non-prod is
+  negligible**: Dev is 660.7 KB of 166.97 MB, about 0.4%. That **weakens the leading
+  hypothesis** for the missing 60%, which was that the non-prod deployments explain it.
+  Other projects were not visible in the screenshots.
+- **The invoice is still unread.** These are dashboard cycle-to-date figures, not a
+  closed bill, so the actual Aug 8 to Sep 8 charge is still unknown.
+- **EU versus US hosting**, which remains the largest single lever and is untouched by
+  any of this.
+
 ### Roughly 60% of the I/O has never been attributed to a function
 
 Stated plainly because it is easy to miss in the baseline table above, and it is

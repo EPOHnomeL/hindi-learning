@@ -247,3 +247,47 @@ should be priced against each other rather than both built.
   exposure on paid content, for a product with around ten lifetime sales. 04 already
   has its prod evidence gathered (2026-09-04) and is on the frontier. It needs a
   human to pick, not more research.
+
+---
+
+## 9. The dashboard read arrived, same day
+
+The operator supplied the by-function screenshots that section 0 said this session
+could not get. **Step 2 of section 7 is substantially done and step 1 is not** (these
+are cycle-to-date figures, not the closed invoice). Full table and derivation in
+[the baseline](../maps/technical-foundation/assets/convex-cost-baseline.md).
+
+**The window is about a day and a half**, derived rather than given: the screenshots
+carry no date range, but they show 9.3K function calls, and the Aug 8 to Sep 8 cycle
+had already logged 204K by 2026-08-27. So this is the cycle that opened 2026-09-08.
+Composition is reliable; monthly projections from it are not.
+
+**Two of this handoff's numbers are dead, and one of its conclusions with them.**
+Section 2 rested on three functions being 95% of the I/O and all reading a table of
+contents. The table-of-contents point stands. The three functions do not:
+`capture.myQuestions` has fallen from **1.15 GB/month to 530 KB** and
+`content/reader.listReferences` from **1.13 GB/month to 4.25 MB**, both fixed by
+`784eb70` with no caching involved. `listLessons` is untouched and now dominant at
+40.7%. So **one of the three motivating numbers for the ToC cache evaporated between
+this handoff being written and being worked**, which is recorded on ticket 38.
+
+**A line this handoff never mentioned is now the #2 cost.** `public.publicCourse`, at
+24.2% of the project's I/O and **257 KB per call**, the worst per-call amplification in
+the deployment, up from an unremarkable 59.65 MB/month. It is the same defect ticket 01
+is about, on the Guest path: it declares the full four-kind Edition mirror, so
+`784eb70` could not help it. **Ticket 01's `Done when` has been widened to include it**,
+because the sibling-table split fixes all three reads at once whereas a
+kinds-narrowing fix would leave a quarter of the I/O in place while appearing to
+succeed. No new ticket: it is one fix and one migration.
+
+**Section 4's hypothesis got weaker.** The likeliest explanation for the unattributed
+~60% was the non-prod deployments. Inside the `my-course` project non-prod is **0.4%**
+(Dev 660.7 KB of 166.97 MB). The other projects on the account were not visible.
+
+**Two bill lines have stopped mattering.** Data Egress is **6 bytes** against a 2 GB /
+$0.34 baseline line, and Compute is 0.00309 GB-hours against 1 GB-hour / $0.43. The
+bill is shrinking without any of the work in section 5.
+
+**Still outstanding, and unchanged in priority:** the closed Aug 8 to Sep 8 invoice
+(step 1), and **EU versus US hosting** (step 3), which remains the largest single lever
+and which none of this touches.

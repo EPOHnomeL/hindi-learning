@@ -48,6 +48,11 @@ rather than any body: `content/reader.listLessons` (1.16 GB),
 `capture.myQuestions` (1.15 GB), `content/reader.listReferences` (1.13 GB), with
 `courseHeader` at 28.05 MB behind them.
 
+**Re-ranked 2026-09-09** by the operator's dashboard read, and the conclusion above
+survives while its numbers do not: `myQuestions` and `listReferences` have both been
+fixed by `784eb70`, and the metadata cost is now concentrated in `listLessons` (40.7%)
+and `public.publicCourse` (24.2%). Still all table-of-contents reads, still no bodies.
+
 So the thing worth caching on the device is **the table of contents, the header and
 progress**, not the lesson HTML, which is already cached harder than anything we would
 build.
@@ -61,11 +66,15 @@ build.
 | [05](05-offline-lesson-content-under-a-lease.md) | open grilling, blocked by [04](04-content-route-is-an-open-bearer-url.md) | offline lesson **bodies** under a lease. |
 | [01](01-slim-the-row-listlessons-collects.md) | open, on the frontier | make the collected row thin **server-side**. The other way to attack the same 1.16 GB. |
 
-**The per-course metadata, which is where 95% of the I/O is, is unowned.** That gap is
-this ticket. Note that [01](01-slim-the-row-listlessons-collects.md) and the
-reads-saved option here are two routes to one number and may substitute for each
-other: 01 makes each read cheap, this makes the read not happen. Price them against
-each other rather than doing both blindly.
+**The per-course metadata, which is where the I/O is, is unowned.** That gap is this
+ticket. But note carefully, and this got stronger with the 2026-09-09 read:
+[01](01-slim-the-row-listlessons-collects.md) and the reads-saved option here are two
+routes to one number and **substitute for each other**. 01 makes each read cheap, this
+makes the read not happen. 01 now covers `listLessons`, `listReferences` **and**
+`public.publicCourse`, which together are 65% of the project's Database I/O, and it
+fixes them server-side for every client with no staleness and no device storage. **If
+01 ships, the cost case for the reads-saved option here is largely spent**, and what
+remains of this ticket is the faster-open question, which was always the better one.
 
 ## What a grilling has to settle
 
@@ -96,10 +105,22 @@ they gate the *reads-saved* half only:
   configuration change worth more than every optimisation on this map combined. If that
   is chosen, the cost argument for the reads-saved option evaporates and only the
   faster-open argument remains.
-- **The unattributed ~60% of Database I/O.** The baseline invoice was 9 GB; the
-  by-function breakdown accounts for 3.62 GB, filtered to prod, and there are 9
-  deployments. Until that is drilled, we do not know the reader path is even the
-  majority of the I/O.
+- **The unattributed ~60% of Database I/O. Substantially moved 2026-09-09**, by the
+  operator's by-function dashboard read (table in
+  [the baseline](../assets/convex-cost-baseline.md)). The reader path is now clearly the
+  majority: `listLessons` at 40.7% plus `public.publicCourse` at 24.2% is **65% of the
+  project's Database I/O**, and non-prod inside this project is 0.4%. So this premise no
+  longer blocks the reads-saved half. Two caveats keep it from being closed: the window
+  is about a day and a half, and other projects on the account were not visible.
+
+  That read also **sharpened what a ToC cache would actually be worth**, and the number
+  is not flattering. `listLessons` costs **154 KB per call** and `courseHeader` **11 KB**
+  across 441 and 414 calls. A cache that skipped a repeat course open saves that per
+  avoided open, against a total bill of $3 to $4 a month. Meanwhile `myQuestions`, one
+  of the three functions the handoff named as the reason to cache, **fell from 1.15
+  GB/month to 530 KB** on its own, without any caching, because `784eb70` narrowed it.
+  **One of the ticket's three motivating numbers evaporated between the handoff being
+  written and this ticket being read.** Check the others before designing anything.
 
 Both are dashboard reads and **neither can be done from a checkout** (verified
 2026-09-09: the Convex CLI has no usage or billing command, and this checkout has no

@@ -44,9 +44,51 @@ Open sub-questions the resolving session must actually answer, not assume:
   *narrow* step, when `html` actually leaves the row — widen and migrate alone save
   nothing. The narrow step is therefore not optional, and it is the risky one.
 
+## The 2026-09-09 measurement, and the one thing it adds to this ticket
+
+The operator supplied the by-function dashboard read this ticket asked for ("read the
+current bill first"). Full table and derivation in
+[the baseline](../assets/convex-cost-baseline.md); the window is about one and a half
+days, so **composition is reliable and monthly projections are weak.** Three things
+matter here:
+
+1. **This ticket's premise is confirmed, and sharpened.** `listLessons` is now **40.7%
+   of the deployment's Database I/O** at 154 KB per call, while its two former peers
+   collapsed: `capture.myQuestions` went from 1.15 GB/month to **530 KB**, and
+   `listReferences` from 1.13 GB/month to **4.25 MB**. `784eb70` fixed those two and,
+   exactly as this ticket predicted, could not make the lesson rows thin. Straight-lined
+   `listLessons` is about 1.7 GB/month against a 1.16 GB baseline, so it is **not
+   improving on its own**.
+
+2. **`public.publicCourse` belongs to this ticket, and the `Done when` above is widened
+   to say so.** It is the **new #2 line at 24.2% of the I/O and 257 KB per call, the
+   worst per-call amplification in the deployment**, up from an unremarkable 59.65
+   MB/month at baseline. It is the same defect: `convex/public.ts` calls
+   `ed.map(["title", "lesson", "reference", "question"])`, the full four-kind Guest
+   mirror, so it collects the fat `translations` rows and gained nothing from
+   `784eb70` because it genuinely needs those kinds.
+
+   **This is why the shape of the fix matters more than the ticket first said.** The
+   sibling-table split proposed above fixes `listLessons`, `listReferences` and
+   `publicCourse` together, because none of them wants the body. Any fix that works by
+   narrowing declared kinds instead **cannot touch `publicCourse` at all**, and would
+   therefore leave a quarter of the I/O in place while looking like a success on the
+   other two. No separate ticket was filed: it is one fix, and splitting it would mean
+   two migrations of one table.
+
+3. **"Is this worth doing at all?" is still open, and the honest answer moved both
+   ways.** Against: the whole bill is $3 to $4 a month, and Compute and Data Egress have
+   now collapsed to nothing (6 bytes of egress against a 2 GB baseline line), so the
+   bill is shrinking without this. For: `listLessons` plus `publicCourse` are now **65%
+   of the deployment's Database I/O between them**, which is a much more concentrated
+   target than the baseline's three-way split, and this read is per (Topic, language) so
+   Editions multiply it. **The decision still needs the EU-versus-US call and the closed
+   invoice**, neither of which this read provides.
+
 ## Done when
 
-- A title-only query (`listLessons`, `listReferences`) reads rows that do **not**
+- A title-only query (`listLessons`, `listReferences`) **and `public.publicCourse`**
+  read rows that do **not**
   contain a translated body, verified by reading the code path — no fat field on the
   table it collects.
 - Every write path lands both rows, or neither. Named above; none missed.

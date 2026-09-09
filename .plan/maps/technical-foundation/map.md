@@ -53,7 +53,18 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
   Anything reasoning about the cost of touching every lesson should reason about 441.
   The read route is in `docs/agents/project-context.md` and it is the only one an agent in
   this checkout has — there is still no prod deploy key here.
-- **Three cost questions on this map are OPERATOR-GATED, not un-worked (2026-09-09).**
+- **The by-function dashboard read LANDED 2026-09-09**, supplied by the operator as
+  screenshots, and it re-ranks this map's cost thread. Full table, period derivation and
+  caveats in [the baseline](assets/convex-cost-baseline.md). The short version:
+  `capture.myQuestions` is **fixed** (1.15 GB/month to 530 KB) and `listReferences`
+  largely so (1.13 GB/month to 4.25 MB), both by `784eb70`; `listLessons` is **not**,
+  and is now 40.7% of the deployment's I/O; **`public.publicCourse` is a new #2 at
+  24.2% and 257 KB per call**, which nothing owned and
+  [01](tickets/01-slim-the-row-listlessons-collects.md) has been widened to cover,
+  because the sibling-table split fixes all three and a kinds-narrowing fix would miss
+  it entirely. Compute and Data Egress have collapsed to nothing. The window is about a
+  day and a half, so **composition is reliable and monthly projections are not.**
+- **Two cost questions remain OPERATOR-GATED, not un-worked (2026-09-09).**
   Written here so no further session re-opens them, re-plans them, or quietly builds
   around them. Each needs a Convex **dashboard** read, and a session in this checkout
   cannot do any of them: verified 2026-09-09 that the Convex CLI exposes no usage or
@@ -63,14 +74,16 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
     first real test of that change, and it may move several numbers in
     [the baseline](assets/convex-cost-baseline.md).
   - **Drill Database I/O per deployment** to find the unattributed ~60% (the fog patch
-    below). Ten minutes of dashboard work, and it gates whether
-    [01](tickets/01-slim-the-row-listlessons-collects.md) is even aimed at the
-    majority of the I/O.
+    below). **Partly answered 2026-09-09 and the leading hypothesis got weaker:** within
+    the `my-course` project non-prod is negligible (Dev 660.7 KB of 166.97 MB, 0.4%), so
+    "it is the non-prod deployments" no longer looks likely. What is still unseen is the
+    other projects on the account.
   - **Decide EU versus US hosting** (the fog patch below). This one may end the cost
     thread outright.
 
   Until they are answered, **do not start a session on cost-motivated code.** The whole
-  bill is $3 to $4 a month and 01 is worth about $0.60 of it, so the user-experience
+  bill is $3 to $4 a month, Compute and Egress have collapsed to nothing, and 01 is
+  worth about $0.60 of it, so the user-experience
   argument is the only one that survives contact with the number. That is the framing
   [38](tickets/38-cache-a-course-toc-on-the-device.md) is filed under.
 - **`pnpm typecheck` is the cheap check** and needs no server. Never stop the dev server.
@@ -511,6 +524,17 @@ sit in this block was stale within days of being written.
   Whichever it is, the two tables disagree and nothing in the tree says which is intended.
   Recorded rather than ticketed because the question is *which shape is correct*, and that
   is a decision, not a defect. No `clears-with:` — no ticket here sharpens it.
+- **`certificates.myCertificate` is the chattiest function in the deployment** (measured
+  2026-09-09): 1.1K prod calls plus 298 dev, well above `listLessons`'s 441 and above
+  every other line. Cheap per call at 7 KB, so this is a **function-calls** question,
+  not an I/O one, and function calls were 15% and $0.66 of the baseline bill. The cause
+  is structural rather than a defect: `CertificateChip` mounts its own
+  `useQuery(api.certificates.myCertificate)` per course card
+  (`src/app/_components/CourseCardParts.tsx:97`), so one dashboard load fans out one
+  live subscription per card. Recorded rather than ticketed because the fix is the same
+  denormalise-onto-the-card shape as the dashboard N+1 that the baseline already ruled
+  **out of scope by measurement**, and at this traffic it is worth cents. Fold it in if
+  a session is already in `CourseCardParts` or the dashboard queries. No `clears-with:`.
 - **Whether the residual read scales with Editions or with readers.** The hot read is per
   (Topic, language), so each new Edition multiplies it, and
   [translation-and-locales](../translation-and-locales/map.md) is actively adding Editions.
