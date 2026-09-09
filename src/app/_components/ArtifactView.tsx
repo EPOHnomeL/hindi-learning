@@ -577,8 +577,16 @@ function LessonView({
             author who asked for editing never found it: it was invisible until
             the mouse was already inside the lesson, and invisible on the
             keyboard until focus landed. No hover state gates it now, at any
-            breakpoint. */}
-        <div className="relative flex min-h-0 flex-1 flex-col">
+            breakpoint.
+
+            The wrapper is `shrink-0`, not `flex-1`: it only exists to position
+            that button over the frame. As a flex item it shrank to the desktop
+            column's leftover height while the content-sized iframe inside kept
+            its own, so the iframe overflowed its box and painted straight over
+            the end-of-lesson card laid out after it. "Mark complete" was
+            invisible on desktop and present on mobile (fixed 2026-09-09), and a
+            long reference could not be scrolled to its end either. */}
+        <div className="relative shrink-0">
           <Frame
             html={html}
             withBridge
@@ -1024,7 +1032,7 @@ function ReferenceView({
           palette (ADR 0011) — the theme then flips them with the rest of the app.
           The Edit button rides over the body, always visible for whoever may edit
           the Edition being read, source or translated (unit 1, as on Lessons). */}
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="relative shrink-0">
         <Frame html={html} withBridge={false} theme={theme} themeCss dir={dir} lang={contentLang} resources={resources} reference cardTarget={cardTarget} share={share} />
         {canEdit && (
           <button
