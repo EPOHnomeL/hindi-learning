@@ -305,7 +305,7 @@ test("a stale translating job (dead run, no heartbeat) can be re-fired, resuming
   // A prior run published the title, then was killed infra-side: the job sits
   // "translating" forever because nothing ever reported (the prod 28/59 incident).
   await t.run((ctx) => ctx.db.insert("translationJobs", { topicId, lang: "es", status: "translating", total: 3, done: 0, failed: 0 }));
-  await t.mutation(api.translate.publishTranslation, {
+  await t.mutation(internal.translate.publishTranslation, {
     secret: "test-secret",
     ownerEmail: "alice@example.com",
     topicSlug: "greek",
@@ -339,8 +339,8 @@ test("a resumed run translates only the stale items — fresh rows are kept, not
   // A prior (killed) run already published the title and the first lesson.
   await t.run((ctx) => ctx.db.insert("translationJobs", { topicId, lang: "es", status: "translating", total: 4, done: 0, failed: 0 }));
   const publish = { secret: "test-secret", ownerEmail: "alice@example.com", topicSlug: "greek", lang: "es" };
-  await t.mutation(api.translate.publishTranslation, { ...publish, kind: "title", key: "", text: "Griego Koiné" });
-  await t.mutation(api.translate.publishTranslation, { ...publish, kind: "lesson", key: "0001-alpha", title: "Alfa", html: "<p>ya</p>" });
+  await t.mutation(internal.translate.publishTranslation, { ...publish, kind: "title", key: "", text: "Griego Koiné" });
+  await t.mutation(internal.translate.publishTranslation, { ...publish, kind: "lesson", key: "0001-alpha", title: "Alfa", html: "<p>ya</p>" });
   const gemini = stubEcho();
 
   await t.action(internal.translate.translateTopic, { topicSlug: "greek", lang: "es" });
@@ -402,7 +402,7 @@ test("each published item bumps the job heartbeat, so a live run keeps its lock"
   await t.run((ctx) =>
     ctx.db.insert("translationJobs", { topicId, lang: "es", status: "translating", total: 3, done: 0, failed: 0, claimedAt: Date.now() - 11 * 60 * 1000 }),
   );
-  await t.mutation(api.translate.publishTranslation, {
+  await t.mutation(internal.translate.publishTranslation, {
     secret: "test-secret",
     ownerEmail: "alice@example.com",
     topicSlug: "greek",

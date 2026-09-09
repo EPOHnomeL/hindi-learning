@@ -260,8 +260,8 @@ test("a forced engine switch DELETES the old engine's rows — `done: 0` alone l
   // A completed gemini run: both items translated and fresh.
   await a.mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "gemini" });
   const secret = "test-secret";
-  await t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "title", key: "", text: "Hindi (gemini)" });
-  await t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "lesson", key: "0001", title: "L", html: "<p>gemini</p>" });
+  await t.mutation(internal.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "title", key: "", text: "Hindi (gemini)" });
+  await t.mutation(internal.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "lesson", key: "0001", title: "L", html: "<p>gemini</p>" });
   await t.mutation(api.translate.reportTranslation, { secret, topicSlug: "hindi", lang: "es", outcome: "ready" });
   expect(await rows()).toHaveLength(2);
 
@@ -350,10 +350,10 @@ test("claim → publish → report round-trips one Edition, and the reader serve
 
   // The run publishes the translated title + lesson.
   expect(
-    await t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "title", key: "", text: "Hindi (es)" }),
+    await t.mutation(internal.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "title", key: "", text: "Hindi (es)" }),
   ).toEqual({ status: "saved" });
   expect(
-    await t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "lesson", key: "0001", title: "Lección", html: "<p>es</p>" }),
+    await t.mutation(internal.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "lesson", key: "0001", title: "Lección", html: "<p>es</p>" }),
   ).toEqual({ status: "saved" });
 
   // The run reports ready → the job is usable, done ticked, nothing failed.
@@ -369,40 +369,52 @@ test("claim → publish → report round-trips one Edition, and the reader serve
   });
 });
 
-// Documents the hole, so it can't quietly widen again: the bare mutation still
-// does not guard a blob-backed source. That is why every caller outside
-// `translateTopic` must publish through `publishTranslationChecked` (below).
-test("publishTranslation still does NOT quiz-guard a blob-backed source — the guarded door is publishTranslationChecked", async () => {
+// The hole is closed, and this is what pins it shut. `publishTranslation` was a
+// PUBLIC mutation whose own quiz guard was dead for a blob-backed Lesson, so any
+// direct caller wrote an unchecked row; 59 rows had already shipped that way.
+// Ticket 26 made it an `internalMutation`, so `publishTranslationChecked` and
+// `translateTopic` are the only doors.
+//
+// This test replaced one that asserted the bypass as correct behaviour. That test
+// pinned the hole open: closing the door made it fail by construction.
+test("publishTranslation is not reachable from outside the deployment", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedUser(t, "alice@example.com");
   const topicId = await seedTopic(t, alice, "hindi", "Hindi", "completed");
-  // The source body lives in a content blob, so the quiz-structure guard can't
-  // read the source markup in a mutation (see translate.ts) — the check is skipped
-  // for the trusted, secret-guarded run and the translated row is written as-is.
   const sid = await t.run((ctx) => ctx.storage.store(new Blob(['<div data-correct="a"></div>'], { type: "text/html" })));
   await t.run((ctx) => ctx.db.insert("lessons", { topicId, key: "0001", seq: 1, title: "L1", htmlStorageId: sid }));
   await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es" });
 
-  // Even a translation that dropped the quiz marker is saved — the guard is bypassed.
-  expect(
-    await t.mutation(api.translate.publishTranslation, {
-      secret: "test-secret",
-      ownerEmail: "alice@example.com",
-      topicSlug: "hindi",
-      lang: "es",
-      kind: "lesson",
-      key: "0001",
-      title: "L1",
-      html: "<div></div>",
-    }),
-  ).toEqual({ status: "saved" });
+  const publish = {
+    secret: "test-secret",
+    ownerEmail: "alice@example.com",
+    topicSlug: "hindi",
+    lang: "es",
+    kind: "lesson" as const,
+    key: "0001",
+    title: "L1",
+    // Dropped the quiz marker: exactly the row that used to be accepted here.
+    html: "<div></div>",
+  };
+
+  // Declared internal, asserted on the source rather than on `api`/`internal`,
+  // which are lazy proxies that answer `in` for any name at all. A future edit
+  // back to `mutation({` reopens the door and fails here.
+  const src = (
+    import.meta.glob("./translate.ts", { query: "?raw", import: "default", eager: true }) as Record<string, string>
+  )["./translate.ts"]!;
+  expect(src).toContain("export const publishTranslation = internalMutation({");
+
+  // And through the door that IS public, the same body is refused rather than
+  // written, because the action can read the source blob the mutation could not.
+  expect(await t.action(api.translate.publishTranslationChecked, publish)).toEqual({ status: "skipped" });
   const row = await t.run((ctx) =>
     ctx.db
       .query("translations")
       .withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "es").eq("kind", "lesson").eq("key", "0001"))
       .unique(),
   );
-  expect(row).toMatchObject({ kind: "lesson", key: "0001", html: "<div></div>" });
+  expect(row).toBeNull();
 });
 
 test("re-publishing an identical item is `unchanged` — a cumulative wave re-publish must not inflate `done` or mask a missing item", async () => {
@@ -413,7 +425,7 @@ test("re-publishing an identical item is `unchanged` — a cumulative wave re-pu
   await addLesson(t, topicId, "0002", 2); // items = title + 2 lessons = 3
   const secret = "test-secret";
   const pub = (kind: "title" | "lesson", key: string, fields: { title?: string; html?: string; text?: string }) =>
-    t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind, key, ...fields });
+    t.mutation(internal.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind, key, ...fields });
   const jobRow = () =>
     t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
 
@@ -448,7 +460,7 @@ test("a re-published item whose content CHANGED still saves and ticks (the uncha
   await addLesson(t, topicId, "0001", 1); // items = title + lesson = 2
   const secret = "test-secret";
   const pub = (html: string) =>
-    t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "lesson", key: "0001", title: "Lección", html });
+    t.mutation(internal.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "lesson", key: "0001", title: "Lección", html });
   const jobRow = () =>
     t.run((ctx) => ctx.db.query("translationJobs").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId).eq("lang", "es")).unique());
 
@@ -474,8 +486,8 @@ test("reportTranslation heals a `done` already poisoned by a pre-fix run", async
   await addLesson(t, topicId, "0001", 1); // items = title + lesson = 2
   const secret = "test-secret";
   await asUser(t, alice).mutation(internal.translate.tryAcquireTranslation, { topicSlug: "hindi", lang: "es", engine: "free" });
-  await t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "title", key: "", text: "Hindi (es)" });
-  await t.mutation(api.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "lesson", key: "0001", title: "Lección", html: "<p>es</p>" });
+  await t.mutation(internal.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "title", key: "", text: "Hindi (es)" });
+  await t.mutation(internal.translate.publishTranslation, { secret, ownerEmail: "alice@example.com", topicSlug: "hindi", lang: "es", kind: "lesson", key: "0001", title: "Lección", html: "<p>es</p>" });
   // Stand in for an Edition whose counter was inflated by cumulative re-publishing
   // before the fix (the live Slovak run reached 102/59).
   await t.run(async (ctx) => {

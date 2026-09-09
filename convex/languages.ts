@@ -8,6 +8,11 @@
 // for a code not listed here. Extend `LANGUAGES` to grow the menu — no other
 // change is needed.
 
+// `sourceLang.ts` is a root constant with no imports of its own, so this edge
+// stays one-way (the same reason `edition.ts` and `shareGrants.ts` both take it
+// from there rather than from each other).
+import { SOURCE_LANG } from "./sourceLang";
+
 export type LanguageInfo = {
   code: string; // BCP-47 primary subtag, e.g. "es", "ur", "pt-BR"
   name: string; // English name, used in the translate prompt
@@ -234,4 +239,52 @@ export function langInfo(code: string): LanguageInfo {
 // The text direction for a language's content/chrome.
 export function langDir(code: string): "ltr" | "rtl" {
   return isRtl(code) ? "rtl" : "ltr";
+}
+
+// ---- Edition presentation ------------------------------------------------------
+
+// The three projections of a language that Edition-facing code actually wants,
+// named once (candidate of the 2026-09-08 architecture walk). `langInfo` is the
+// registry lookup and it is shallow: fifteen call sites across nine server
+// modules and four client components each turned it into one of exactly these
+// three shapes by hand, and the client copies compared a literal `"en"` where
+// the server copies compared `SOURCE_LANG`.
+
+// A **chip**: how one Edition of a Topic is labelled wherever Editions are
+// offered as a set (the reader's switcher, the dashboard cards, the Catalogue,
+// the purchases and shares lists).
+//
+// The source-language override that three of those sites wrote out is stated
+// here and nowhere else. It is currently a no-op, because the registry already
+// carries `en` as English/English, and it is kept rather than deleted so that
+// changing `SOURCE_LANG` to a code outside the picker cannot silently start
+// labelling the source Edition with its bare code.
+export type EditionChip = { lang: string; name: string; native: string; rtl: boolean };
+export function editionChip(lang: string): EditionChip {
+  const i = langInfo(lang);
+  const source = lang === SOURCE_LANG;
+  return {
+    lang,
+    name: source ? "English" : i.name,
+    native: source ? "English" : i.native,
+    rtl: source ? false : !!i.rtl,
+  };
+}
+
+// A **label**: one Edition named in prose, for an email, an invoice line or a
+// heading. The name half of `editionChip`, and four sites wrote it out.
+export function editionLabel(lang: string): string {
+  return editionChip(lang).name;
+}
+
+// The native name to badge a **non-source** Edition with, and `undefined` for
+// the source Edition, which needs no badge because it is what an unlabelled
+// course already is.
+//
+// Three client components wrote this out, and all three compared the literal
+// `"en"` where every server copy compared `SOURCE_LANG`. The literal is the
+// thing worth deleting: it is correct today and silently wrong the day the
+// source language is anything else.
+export function nonSourceEditionName(lang: string): string | undefined {
+  return lang === SOURCE_LANG ? undefined : langInfo(lang).native;
 }

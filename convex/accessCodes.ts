@@ -5,7 +5,10 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import { ACCESS_CODE_PROVIDER_ID, mintAccessCodeString, seatAccountId } from "./accessCodeFormat";
 import { CONSENT_VERSION } from "./joinConsent";
-import { platformFeeBps, splitNet } from "./payfast";
+import { grantEdition } from "./grants";
+import { assertOrganisation, freshDealCode, logDealPayment, ownDeal, unsettledDeals } from "./bulkDeal";
+import { platformFeeBps } from "./payfast";
+import { offGateway, recordMoneyEvent } from "./moneyEvent";
 import { sellableTopic } from "./vouchers";
 import { isCallerAdmin } from "./whitelist";
 
@@ -138,16 +141,9 @@ export const mintAccessCode = mutation({
     if (!Number.isInteger(pricePerSeat) || pricePerSeat <= 0) {
       throw new Error("an access code needs the per-seat price you agreed");
     }
-    const org = orgName.trim();
-    const contact = orgContact.trim();
-    // These two are how the Seller and the sysadmin tell one deal from another
-    // months later, and the contact becomes the Ledger row's `buyerEmail` when the
-    // code stops. A blank one would put an anonymous money event on the queue.
-    if (!org || !contact) {
-      throw new Error("the buying organisation's name and billing contact are both required");
-    }
+    const { org, contact } = assertOrganisation(orgName, orgContact);
 
-    const code = await freshCode(ctx);
+    const code = await freshDealCode(ctx, "accessCodes", mintAccessCodeString);
     const accessCodeId = await ctx.db.insert("accessCodes", {
       topicId: topic._id,
       lang,
@@ -163,22 +159,6 @@ export const mintAccessCode = mutation({
     return { accessCodeId, code };
   },
 });
-
-// A code no Access Code already holds. Convex has no uniqueness constraint, so
-// this is enforced on read exactly as the voucher rail and the EFT rail enforce
-// theirs: retry rather than throw. Bounded, because at 32^9 five clashes in a row
-// is not bad luck, it is a broken RNG, and looping on that would hang the mutation.
-async function freshCode(ctx: MutationCtx): Promise<string> {
-  for (let i = 0; i < 5; i++) {
-    const code = mintAccessCodeString();
-    const clash = await ctx.db
-      .query("accessCodes")
-      .withIndex("by_code", (q) => q.eq("code", code))
-      .first();
-    if (!clash) return code;
-  }
-  throw new Error("could not mint a unique code");
-}
 
 // How many seats an Access Code has consumed. **Derived, always** - there is no
 // counter field on the row and there must never be one (see `schema.ts`).
@@ -270,13 +250,14 @@ export const myAccessCodes = query({
 // The caller's own Access Code, or a throw. Every Seller-facing write goes through
 // this rather than trusting which codes a page happened to list: a cap raise and a
 // stop are both things one Seller could do to another's deal.
-export async function ownCode(ctx: QueryCtx, accessCodeId: Id<"accessCodes">): Promise<Doc<"accessCodes">> {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) throw new Error("sign in to manage your access codes");
-  const code = await ctx.db.get(accessCodeId);
-  if (!code || code.sellerId !== userId) throw new Error("that access code isn't yours");
-  return code;
-}
+// The check itself is `ownDeal`, shared with the voucher rail (ticket 30); the
+// wording stays here because a refusal that says "batch" about an access code
+// reads like a bug.
+export const ownCode = (ctx: QueryCtx, accessCodeId: Id<"accessCodes">) =>
+  ownDeal(ctx, "accessCodes", accessCodeId, {
+    signIn: "sign in to manage your access codes",
+    notYours: "that access code isn't yours",
+  });
 
 // ---- Joining (ticket 03) -------------------------------------------------------
 
@@ -381,7 +362,29 @@ export const claimSeat = internalMutation({
       consentedAt: Date.now(),
       consentVersion,
     });
-    await ctx.db.insert("entitlements", { userId, topicId: code.topicId, lang: code.lang });
+    // **The seat is taken, the grant is granted once.** This rail ran no hold
+    // check at all before 2026-09-08, and it goes through the one Entitlement
+    // writer now so that "one row per (user, Edition)" is structural here as it is
+    // on the other four rails.
+    //
+    // **Not a live defect, and the review's claim that it was is corrected here.**
+    // The 2026-09-04 architecture review and ticket 28 both said a member who had
+    // already bought this Edition would get a duplicate row through this path.
+    // Checked in the tree on 2026-09-08: they cannot. `accessCodeAuth.ts` mints a
+    // fresh account per (code, nickname) through `createAccount`, and a returning
+    // nickname is short-circuited by `forJoin`'s `seatUserId` before it ever
+    // reaches here, so the `userId` arriving at this line has never held anything.
+    // The guard is worth its one index read anyway: the invariant currently rests
+    // on an account-minting scheme two files away, and this is what makes it rest
+    // on this line instead.
+    //
+    // If a caller ever does arrive already entitled, the operator decided on
+    // 2026-09-08 what happens: the seat is still consumed and no second row is
+    // written. The `seats` row is the organisation's cohort record and the
+    // Entitlement is the access, so an already-entitled member still belongs in
+    // the cohort, which also matches ADR 0031 decision 6 (a seat that has been
+    // taken is taken). ADR 0031's row shape is untouched; only the row count.
+    await grantEdition(ctx, { userId, topicId: code.topicId, lang: code.lang });
     // Where the member has just been let in, so `/join` can send them straight into
     // the Edition instead of leaving them on a success message with nowhere to go.
     return { topicSlug: topic.slug, lang: code.lang, courseTitle: topic.title };
@@ -471,19 +474,15 @@ export const stopCode = mutation({
     }
 
     const total = taken * code.pricePerSeat;
-    const { sellerShare, platformShare } = splitNet(total, platformFeeBps());
-    const ledgerId = await ctx.db.insert("ledger", {
-      topicId: code.topicId,
-      lang: code.lang,
-      sellerId: code.sellerId,
-      buyerEmail: code.orgContact,
-      gross: total,
-      fee: 0,
-      net: total,
-      sellerShare,
-      platformShare,
+    const ledgerId = await recordMoneyEvent(ctx, {
       kind: "batch",
       status: "unpaid",
+      topicId: code.topicId,
+      lang: code.lang,
+      payeeId: code.sellerId,
+      buyerEmail: code.orgContact,
+      amounts: offGateway(total),
+      platformBps: platformFeeBps(),
     });
     // One patch, one row, one transaction: `stoppedAt` and `ledgerId` land together
     // or not at all.
@@ -542,15 +541,11 @@ export const pendingAccessCodes = query({
   ),
   handler: async (ctx) => {
     if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
-    // An ABSENT `paymentRef` is the queue, indexed rather than filtered, exactly as
-    // on the voucher rail. Then filtered to STOPPED codes in memory: a live code has
-    // no bill yet, so it is not work waiting on the operator. Capped anyway, because
-    // a hand-reconciled queue is small by definition and one that is not is a signal
-    // rather than a page to paginate.
-    const rows = await ctx.db
-      .query("accessCodes")
-      .withIndex("by_payment_ref", (q) => q.eq("paymentRef", undefined))
-      .take(500);
+    // An ABSENT `paymentRef` is the queue, indexed rather than filtered. That
+    // discipline and the cap are `unsettledDeals`', shared with the voucher rail
+    // (ticket 30). The STOPPED filter below is this rail's own: a live code has no
+    // bill yet, so it is not work waiting on the operator.
+    const rows = await unsettledDeals(ctx, "accessCodes");
     const lines = await Promise.all(
       rows.map(async (c) => {
         const [seller, topic, seats] = await Promise.all([
@@ -600,24 +595,21 @@ export const logAccessCodePayment = mutation({
   args: { accessCodeId: v.id("accessCodes"), reference: v.string() },
   returns: v.null(),
   handler: async (ctx, { accessCodeId, reference }) => {
+    // The admin gate, the blank-reference refusal, the idempotency and the
+    // unpaid-to-owed flip are `logDealPayment`'s, shared with the voucher rail
+    // (ticket 30). The not-yet-stopped refusal below is this rail's own, because a
+    // live code has no bill: a Batch is billed at mint, a code at stop.
+    //
+    // Gated here as well as inside the writer, deliberately: authorising before the
+    // lookup is what stops a non-admin distinguishing an id that exists from one
+    // that does not. See the same note on `vouchers.logBatchPayment`.
     if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
-    const ref = reference.trim();
-    // The whole point is being able to point at the bank statement line later.
-    if (!ref) throw new Error("the bank reference or transaction id is required");
     const code = await ctx.db.get(accessCodeId);
     if (!code) throw new Error("that access code does not exist");
     if (code.stoppedAt === undefined) throw new Error("that access code has not been stopped, so nothing is due yet");
-    if (code.paymentRef !== undefined) return null;
-
-    await ctx.db.patch(accessCodeId, { paymentRef: ref });
-    // Only an `unpaid` row moves. A row somehow already `owed` or `paid` keeps its
-    // state rather than being re-owed, the same posture `markPaid` takes from the
-    // other end of the lifecycle. A zero-seat code has no row at all, which is why
-    // this is a conditional read rather than an assertion.
-    if (code.ledgerId) {
-      const row = await ctx.db.get(code.ledgerId);
-      if (row?.status === "unpaid") await ctx.db.patch(code.ledgerId, { status: "owed" });
-    }
+    // `ledgerId` is optional here and not on the voucher rail: a code stopped with
+    // zero seats settles to nothing and has no row.
+    await logDealPayment(ctx, { id: accessCodeId, paymentRef: code.paymentRef, ledgerId: code.ledgerId }, reference);
     return null;
   },
 });

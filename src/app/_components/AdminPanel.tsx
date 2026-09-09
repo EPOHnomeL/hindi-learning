@@ -8,24 +8,18 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import type { SellerStatus } from "../../../convex/sellerStatus";
 import type { TenantFlag } from "../../../convex/tenantFlags";
+import { formatMoney } from "~/lib/money";
+import { coerceImportedTheme, tenantRemovalBlockers, timeAgo, type Palette } from "./adminDerive";
+import { DayStackChart, VizLegend, type DayColumn } from "./dayStackChart";
 import { TENANT_THEME_TOKENS, type Token } from "../../design/tokens";
 import { salesRange, type SalesPreset } from "./salesRange";
 import { colorVar, rankLanguages, VIZ_SLOTS } from "./salesChart";
-import { axisTicks, labelIndices, niceMax } from "./dayChart";
-import { ConvexError } from "convex/values";
+import { refusalMessage, useMutationRun } from "./mutationRun";
 
-// The message to show the operator when a mutation refuses.
-//
-// **A production Convex deployment redacts a plain `Error`'s message** before it
-// reaches the client — `e.message` is then the useless "[CONVEX M(...)] Server
-// Error" string, which is exactly what the donation-flag precondition looked
-// like the first time it fired in prod. Only `ConvexError`'s `data` survives the
-// trip, so that is what we read first; a server that threw a plain Error gets
-// the caller's own fallback rather than Convex's internal one.
-function mutationError(e: unknown, fallback: string): string {
-  if (e instanceof ConvexError && typeof e.data === "string") return e.data;
-  return fallback;
-}
+// `mutationError` lived here and recorded the first of the production incidents
+// that taught this codebase how a Convex refusal reaches the client. It is
+// `refusalMessage` in `./mutationRun` since 2026-09-08 (ticket 32), along with
+// the three other copies of it.
 
 // The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
 // dashboard is now scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
@@ -132,133 +126,10 @@ function GenerationManager() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// The shared day-bucketed stacked column chart (dataviz skill) behind both admin
-// graphs: the Generation activity chart and the Sales-by-day chart. One column
-// per day on a single count axis, stacked by series, with hairline gridlines at
-// round tick values, a capped-width mark, 2px surface gaps between the stacked
-// fills, and a hover tooltip per day. The tooltip is CSS-only (it lives inside
-// the column it describes, revealed by group-hover), so the chart holds no
-// state and re-renders only when its data does.
-// ---------------------------------------------------------------------------
+// The shared day-bucketed stacked column chart and its legend moved to
+// `dayStackChart.tsx` on 2026-09-08 (ticket 34): it named itself "the shared
+// chart" and already had two adapters, which is a seam rather than reuse.
 
-// One series' contribution to one day. `segments` are given bottom-to-top and
-// carry their own colour, so the caller owns the palette mapping (language rank
-// for Sales, fixed slots for Generation).
-type DaySegment = { key: string; label: string; value: number; color: string };
-type DayColumn = { dayMs: number; segments: DaySegment[] };
-
-const dayLabel = (ms: number) => new Date(ms).toLocaleDateString("en-ZA", { day: "numeric", month: "short", timeZone: "UTC" });
-
-function DayStackChart({ columns, empty, zero }: { columns: DayColumn[]; empty: string; zero: string }) {
-  const H = 160; // px plot height
-  const totals = columns.map((c) => c.segments.reduce((sum, s) => sum + s.value, 0));
-  const peak = Math.max(...totals, 0);
-  if (columns.length === 0 || peak === 0) return <p className="py-12 text-center text-sm text-soft">{empty}</p>;
-
-  const top = niceMax(peak);
-  const ticks = axisTicks(top);
-  const labelled = new Set(labelIndices(columns.length));
-  // A nonzero count always draws at least 3px, so a single sale on a busy axis
-  // stays visible instead of rounding away to nothing.
-  const px = (n: number) => (n > 0 ? Math.max((n / top) * H, 3) : 0);
-
-  return (
-    <div className="flex">
-      <div className="relative w-7 shrink-0" style={{ height: H }} aria-hidden>
-        {ticks.map((t) => (
-          <span
-            key={t}
-            className="absolute right-1.5 translate-y-1/2 text-[10px] tabular-nums text-soft"
-            style={{ bottom: `${(t / top) * 100}%` }}
-          >
-            {t}
-          </span>
-        ))}
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="relative" style={{ height: H }}>
-          {ticks.map((t) => (
-            <div
-              key={t}
-              className="pointer-events-none absolute inset-x-0 border-t border-line"
-              style={{ bottom: `${(t / top) * 100}%` }}
-              aria-hidden
-            />
-          ))}
-          <div className="relative flex h-full items-end gap-[2px]">
-            {columns.map((c, i) => (
-              <div key={c.dayMs} className="group relative flex h-full min-w-0 flex-1 justify-center">
-                <div className="pointer-events-none absolute inset-x-0 inset-y-0 hidden rounded-[3px] bg-hi/50 group-hover:block" />
-                <div className="relative flex h-full w-full max-w-6 flex-col justify-end gap-[2px]">
-                  {[...c.segments].reverse().map((s, j, all) => {
-                    const h = px(s.value);
-                    if (h === 0) return null;
-                    const topMost = all.slice(0, j).every((o) => o.value === 0);
-                    return (
-                      <div
-                        key={s.key}
-                        className={`w-full ${topMost ? "rounded-t-[4px]" : ""}`}
-                        style={{ height: `${h}px`, background: s.color }}
-                      />
-                    );
-                  })}
-                </div>
-                <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden -translate-x-1/2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-left whitespace-nowrap shadow-lg group-hover:block">
-                  <div className="text-[11px] font-semibold text-ink">{dayLabel(c.dayMs)}</div>
-                  {totals[i] === 0 ? (
-                    <div className="mt-0.5 text-[11px] text-soft">{zero}</div>
-                  ) : (
-                    c.segments
-                      .filter((s) => s.value > 0)
-                      .map((s) => (
-                        <div key={s.key} className="mt-0.5 flex items-center gap-1.5 text-[11px] text-soft">
-                          <span className="inline-block h-2 w-2 rounded-[2px]" style={{ background: s.color }} aria-hidden />
-                          <span>{s.label}</span>
-                          <span className="ml-auto pl-2 font-medium tabular-nums text-ink">{s.value}</span>
-                        </div>
-                      ))
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="mt-2 flex gap-[2px]">
-          {columns.map((c, i) => (
-            <div key={c.dayMs} className="min-w-0 flex-1">
-              {labelled.has(i) && (
-                <span
-                  className={`block text-[10px] tabular-nums whitespace-nowrap text-soft ${
-                    i === 0 ? "text-left" : i === columns.length - 1 ? "text-right" : "text-center"
-                  }`}
-                >
-                  {dayLabel(c.dayMs)}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// A chart legend row — one swatch + name per series. Two or more series always
-// carry one; a single series doesn't (the caption already names it).
-function VizLegend({ series }: { series: { key: string; label: string; color: string }[] }) {
-  if (series.length < 2) return null;
-  return (
-    <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
-      {series.map((s) => (
-        <li key={s.key} className="flex items-center gap-1.5 text-xs text-soft">
-          <span className="inline-block h-2.5 w-2.5 rounded-[3px]" style={{ background: s.color }} aria-hidden />
-          {s.label}
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 // The Generation-tab activity graph: daily generation + translation usage over
 // the last 30 days as stacked columns (generation on the bottom, translation on
@@ -303,18 +174,6 @@ function GenerationUsageChart() {
       )}
     </figure>
   );
-}
-
-// A short "time ago" for a past timestamp (ms). Coarse buckets — this is a
-// monitoring glance, not a precise clock.
-function timeAgo(ms: number): string {
-  const s = Math.max(0, Math.round((Date.now() - ms) / 1000));
-  if (s < 60) return `${s}s ago`;
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.round(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.round(h / 24)}d ago`;
 }
 
 // The live "what's busy now" section — reads the generation lock via generatingNow.
@@ -925,7 +784,7 @@ function BatchQueueRow({ batch }: { batch: FunctionReturnType<typeof api.voucher
           try {
             await log({ batchId: batch.batchId, reference });
           } catch (err) {
-            setError(mutationError(err, "Failed - retry"));
+            setError(refusalMessage(err, "Failed - retry"));
             setBusy(false);
           }
         }}
@@ -1048,7 +907,7 @@ function AccessCodeQueueRow({ code }: { code: FunctionReturnType<typeof api.acce
           try {
             await log({ accessCodeId: code.accessCodeId, reference });
           } catch (err) {
-            setError(mutationError(err, "Failed - retry"));
+            setError(refusalMessage(err, "Failed - retry"));
             setBusy(false);
           }
         }}
@@ -1182,9 +1041,13 @@ function OperatorBankForm() {
   );
 }
 
-// Rand formatting for ledger amounts (cents → "R 1 234.56").
+// Ledger amounts, in the shared spelling. The hardcoded `R ` prefix is gone:
+// every row in this panel is Rand today, but the currency beats a prefix that is
+// right by coincidence. `en-ZA` stays explicit, because a cash log the operator
+// reconciles against a bank statement must not change shape with the browser's
+// locale.
 function formatRand(cents: number): string {
-  return `R ${(cents / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatMoney(cents, "ZAR", { locale: "en-ZA" });
 }
 
 function PayoutRow({ owed }: { owed: FunctionReturnType<typeof api.ledger.owedPayouts>[number] }) {
@@ -1733,10 +1596,7 @@ function TenantRemoval({ slug, displayName, onRemoved }: { slug: string; display
     return <div className="h-10 animate-pulse rounded-lg border border-line bg-card" aria-busy />;
   }
 
-  const blockers: string[] = [];
-  if (counts.courses > 0) blockers.push(`${counts.courses} course${counts.courses === 1 ? "" : "s"}`);
-  if (counts.members > 0) blockers.push(`${counts.members} member${counts.members === 1 ? "" : "s"}`);
-  if (counts.users > 0) blockers.push(`${counts.users} user account${counts.users === 1 ? "" : "s"}`);
+  const blockers = tenantRemovalBlockers(counts);
   const removable = blockers.length === 0;
 
   return (
@@ -1943,22 +1803,18 @@ function DonationPayee({ slug }: { slug: string }) {
   // become unreachable by construction instead of something the operator
   // discovers by typing an email and being told no.
   const candidates = useQuery(api.sellers.readySellerEmails);
-  const setPayee = useMutation(api.tenantDonations.setDonationPayee);
   const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // This and `FlagToggles` below are siblings that each carried their own copy of
+  // the dance, which is ticket 32's pattern in miniature. One hook now.
+  const { run, busy, error } = useMutationRun(
+    useMutation(api.tenantDonations.setDonationPayee),
+    "Couldn't set that payee.",
+  );
 
   async function save(next: string | undefined) {
-    setError(null);
-    setBusy(true);
-    try {
-      await setPayee({ tenantSlug: slug, email: next });
-      setEmail("");
-    } catch (e) {
-      setError(mutationError(e, "Couldn't set that payee."));
-    } finally {
-      setBusy(false);
-    }
+    // The field clears only on success, so a refused save leaves the operator's
+    // typing where they can see what was rejected.
+    if ((await run({ tenantSlug: slug, email: next })) !== undefined) setEmail("");
   }
 
   return (
@@ -2041,20 +1897,20 @@ const FLAG_META: { key: TenantFlag; label: string; hint: string }[] = [
 // against a double-click mid-write. Keyed by slug at the call site so switching
 // tenants remounts with fresh state.
 function FlagToggles({ slug, flags }: { slug: string; flags: Partial<Record<TenantFlag, boolean>> }) {
-  const setFlags = useMutation(api.tenantFlags.setTenantFlags);
-  const [busy, setBusy] = useState<TenantFlag | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { run, busy: writing, error } = useMutationRun(
+    useMutation(api.tenantFlags.setTenantFlags),
+    "Couldn't update that flag.",
+  );
+  // Which flag is mid-write, not merely that one is: the per-key busy flag is
+  // what stops a double-click on ONE switch, and the shared hook cannot know
+  // which row asked. So this keeps the key and takes the rest from the hook.
+  const [pending, setPending] = useState<TenantFlag | null>(null);
+  const busy = writing ? pending : null;
 
   async function toggle(key: TenantFlag, next: boolean) {
-    setError(null);
-    setBusy(key);
-    try {
-      await setFlags({ tenantSlug: slug, flags: { [key]: next } });
-    } catch (e) {
-      setError(mutationError(e, "Couldn't update that flag."));
-    } finally {
-      setBusy(null);
-    }
+    setPending(key);
+    await run({ tenantSlug: slug, flags: { [key]: next } });
+    setPending(null);
   }
 
   return (
@@ -2090,7 +1946,7 @@ function FlagToggles({ slug, flags }: { slug: string; flags: Partial<Record<Tena
 // The tenant view getTheme resolves (issue 11) — a non-null tenant's resolved
 // palette + brand asset urls, which the editor seeds from.
 type TenantThemeView = NonNullable<FunctionReturnType<typeof api.tenantTheme.getTheme>>;
-type Palette = Record<string, string>;
+// `Palette` comes from `adminDerive` with the validators that produce one.
 
 // Short human labels for the structured token fields — the semantic role of each
 // token (mirrors the contract in src/design/tokens.ts). The token name is shown
@@ -2112,44 +1968,10 @@ const TOKEN_LABELS: Record<Token, string> = {
   "bad-b": "Wrong-answer accent",
 };
 
-// Validate a pasted palette into a { light?, dark? } update (ticket 20's import
-// mode). Accepts either the `{ light, dark }` envelope a Claude/Figma handoff
-// arrives in, or a bare 14-token map (treated as a complete light palette). Light,
-// when present, must be complete and use only known tokens; dark may be a partial
-// subset. Throws a human-readable message the UI surfaces. Mirrors the server's
-// assertThemeTokens so a bad paste fails before the round-trip — the server is
-// still the boundary.
-function coerceImportedTheme(parsed: unknown): { light?: Palette; dark?: Palette } {
-  if (!parsed || typeof parsed !== "object") throw new Error("Expected a JSON object.");
-  const obj = parsed as Record<string, unknown>;
-  const hasEnvelope = "light" in obj || "dark" in obj;
-  const result: { light?: Palette; dark?: Palette } = {};
-  const rawLight = hasEnvelope ? obj.light : obj;
-  if (rawLight !== undefined) result.light = validatePalette(rawLight, "light", true);
-  if (hasEnvelope && obj.dark !== undefined) result.dark = validatePalette(obj.dark, "dark", false);
-  if (result.light === undefined && result.dark === undefined) {
-    throw new Error('Expected "light" and/or "dark" token maps.');
-  }
-  return result;
-}
-
-function validatePalette(raw: unknown, name: string, complete: boolean): Palette {
-  if (!raw || typeof raw !== "object") throw new Error(`${name} must be an object of token → colour.`);
-  const known = new Set<string>(TENANT_THEME_TOKENS);
-  const entries = Object.entries(raw as Record<string, unknown>);
-  const unknown = entries.map(([k]) => k).filter((k) => !known.has(k));
-  if (unknown.length) throw new Error(`${name} has unknown token(s): ${unknown.join(", ")}`);
-  const palette: Palette = {};
-  for (const [k, val] of entries) {
-    if (typeof val !== "string") throw new Error(`${name} token "${k}" must be a colour string.`);
-    palette[k] = val;
-  }
-  if (complete) {
-    const missing = TENANT_THEME_TOKENS.filter((tok) => !(tok in palette));
-    if (missing.length) throw new Error(`${name} is missing required token(s): ${missing.join(", ")}`);
-  }
-  return palette;
-}
+// The palette import moved to `adminDerive.ts` on 2026-09-08 (ticket 34). It had
+// six distinct throws and no tests, and was reachable only by typing into a
+// textarea. It mirrors the server's `assertThemeTokens`; the two were checked
+// against each other before the move and have not drifted.
 
 // The Theme section's editor (ticket 20): JSON import + structured per-token
 // fields (light/dark tabs) + a live preview, over the identity-guarded

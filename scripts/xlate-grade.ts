@@ -3,7 +3,8 @@
 // quiz-structure guard so a sonnet/opus output is scored exactly as prod would.
 //   pnpm tsx scripts/xlate-grade.ts
 import { readFileSync, existsSync, writeFileSync } from "node:fs";
-import { swapBackStatic, quizStructureMatches } from "../convex/translate";
+import { swapBackStatic } from "../convex/translate";
+import { quizStructureMatches } from "../convex/quizGate";
 
 const SLUG = "prophetic-school";
 const OUT = `topics/${SLUG}/eval`;

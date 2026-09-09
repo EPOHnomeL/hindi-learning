@@ -7,7 +7,7 @@ import { useState } from "react";
 import posthog from "posthog-js";
 import { api } from "../../../convex/_generated/api";
 import { isPostHogInitialized } from "../PostHogClient";
-import { langInfo } from "../../../convex/languages";
+import { nonSourceEditionName } from "../../../convex/languages";
 import { eftAllowed, regionForCountry } from "../../../convex/regions";
 import { checkoutStep } from "./checkoutDerive";
 import { useCountry } from "./CountryContext";
@@ -93,7 +93,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
   // under them. That is step 4 arriving live, which is the whole argument for a
   // page over a dialog.
   const entitled = header.role !== "preview";
-  const editionName = header.lang !== "en" ? langInfo(header.lang).native : undefined;
+  const editionName = nonSourceEditionName(header.lang);
   const courseHref = withLang(`/courses/${topicSlug}`, header.lang);
 
   return (

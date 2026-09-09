@@ -21,20 +21,21 @@ import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { useResourceUpload } from "./useResourceUpload";
-import { completedKeys, frontierKey, nextLessonKey, resumeLessonKey, seenAfterOpening } from "./readerDerive";
+import { completedKeys, frontierKey, nextLessonKey, resumeLessonKey } from "./readerDerive";
 import { Welcome, useWelcomeDismissed } from "./Welcome";
 import { latchFirstOpen, welcomeVariant } from "./welcomeDerive";
 
-// localStorage key for answered-question ids the learner has already seen.
-const SEEN_KEY = "hindi:answers-seen";
-
 // Course-scoped state shared from the course layout down to the Lesson page
-// (ADR 0012). The sidebar (rendered here) reads the per-course queries directly;
-// the page reaches back for `markSeen` (mark a lesson's replies seen on open) and
-// `frontierKey` (is this the Frontier?).
+// (ADR 0012, narrowed by ADR 0036). The sidebar (rendered here) reads the
+// per-course queries directly; the page reaches back for `frontierKey` (is this
+// the Frontier?) and the access flags.
+//
+// **The seen set is gone** (2026-09-08, ticket 33). ADR 0012 gave this context a
+// notification-dot seen set as its reason for existing; the dots were never
+// built, and the set was loaded, composed and persisted for a renderer that does
+// not exist. ADR 0036 supersedes that half; URL-addressability is untouched.
 type CourseCtx = {
   frontierKey: string | null;
-  markSeen: (lessonKey: string) => void;
   // False for a read-only Viewer (a Topic shared with them): the reader then
   // hides every write control. Defaults false while access is still loading, so
   // a Viewer never sees a control flash before it's hidden.
@@ -103,20 +104,9 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const lessons = useQuery(api.content.reader.listLessons, { topicSlug: slug, lang: lang ?? undefined });
   const references = useQuery(api.content.reader.listReferences, { topicSlug: slug, lang: lang ?? undefined });
   const progress = useQuery(api.capture.myProgress, { topicSlug: slug });
-  const questions = useQuery(api.capture.myQuestions, { topicSlug: slug, lang: lang ?? undefined });
-
-  // Answered-question ids already seen (client-only, per device). A lesson with a
-  // reply not in this set gets a notification dot; opening that lesson marks its
-  // answers seen and clears the dot.
-  const [seen, setSeen] = useState<Set<string>>(new Set());
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SEEN_KEY);
-      if (raw) setSeen(new Set(JSON.parse(raw) as string[]));
-    } catch {
-      /* unavailable or corrupt storage — start empty */
-    }
-  }, []);
+  // `myQuestions` was subscribed here for the seen set alone, so deleting the
+  // dead dot machinery takes a whole live subscription out of the shell with it
+  // (ticket 33). The question box subscribes it where it is actually rendered.
 
   // Paid marketplace (ADR 0016): WHICH items are locked is the server's call —
   // `listLessons`/`listReferences` carry a per-item `locked` from the same rule
@@ -148,25 +138,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const frontier = frontierKey(lessons ?? []);
   const nextKey = useCallback((lessonKey: string) => nextLessonKey(lessons ?? [], lessonKey), [lessons]);
 
-  // Opening a lesson counts as seeing its replies — persist the new set so the dot
-  // stays cleared across reloads. No-ops (same reference) when nothing is new.
-  // Stable per `questions` so the Lesson page's open-effect fires on lesson change
-  // or a newly-arrived reply, not on every render.
-  const markSeen = useCallback(
-    (lessonKey: string) => {
-      setSeen((prev) => {
-        const next = seenAfterOpening(questions ?? [], lessonKey, prev);
-        if (next === prev) return prev;
-        try {
-          localStorage.setItem(SEEN_KEY, JSON.stringify([...next]));
-        } catch {
-          /* ignore */
-        }
-        return next;
-      });
-    },
-    [questions],
-  );
+
 
   // The welcome panel's "start here" lesson: the caller's resume point, or — on a
   // paid Edition, where everything past the free Preview is locked — the first
@@ -195,7 +167,6 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
     <Ctx.Provider
       value={{
         frontierKey: frontier,
-        markSeen,
         canWrite,
         canEdit,
         completed: courseCompleted,

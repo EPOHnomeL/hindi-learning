@@ -20,70 +20,50 @@ const ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 export const authorModel = (): string => process.env.OPENROUTER_AUTHOR_MODEL ?? "z-ai/glm-5.3-flash";
 export const translateModel = (): string => process.env.OPENROUTER_TRANSLATE_MODEL ?? "google/gemini-3.5-flash";
 
-export type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
+// The shared policy (key, post-once-retry-once, errors, usage) lives in
+// `convex/modelCall.ts` since 2026-09-08 (ticket 31). What is left here is the
+// OpenRouter wire format: this endpoint, this auth header, `reasoning.effort` as
+// the thinking control, and where OpenRouter puts content and token counts.
+import { complete, usageFrom, type ChatMessage, type ModelAdapter, type ModelReply, type ModelRequest } from "./modelCall";
 
-export type ChatOptions = {
-  model: string;
-  messages: ChatMessage[];
-  // Enable OpenRouter's `web` plugin for this call (web-grounded generation).
-  webSearch?: boolean;
-  // "none" disables the model's reasoning/thinking entirely (OpenRouter's
-  // unified `reasoning.effort`). Thinking is billed as output tokens, so calls
-  // that don't benefit from it (translation) should always turn it off.
-  reasoning?: "none";
+export type { ChatMessage, ModelUsage as ChatUsage } from "./modelCall";
+export type ChatOptions = ModelRequest;
+
+const openrouter: ModelAdapter = {
+  vendor: "openrouter",
+  keyEnv: "OPENROUTER_API_KEY",
+  request(key, req, dropReasoning) {
+    const body: Record<string, unknown> = { model: req.model, messages: req.messages };
+    if (req.webSearch) body.plugins = [{ id: "web" }];
+    // OpenRouter's unified reasoning control. NOTE it is silently ignored for
+    // Gemini endpoints, which is why `geminiClient.ts` exists at all.
+    if (req.reasoning && !dropReasoning) body.reasoning = { effort: req.reasoning };
+    return {
+      url: ENDPOINT,
+      init: {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
+        body: JSON.stringify(body),
+      },
+    };
+  },
+  sendsReasoningControl: (req) => req.reasoning !== undefined,
+  isReasoningComplaint: (body) => /reasoning/i.test(body),
+  parse(json): ModelReply {
+    const j = json as {
+      choices?: { message?: { content?: unknown } }[];
+      usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
+    };
+    const content = j.choices?.[0]?.message?.content;
+    // A non-string content is not an empty completion, it is a shape this client
+    // does not understand, and it gets its own error rather than the shared one.
+    if (typeof content !== "string") throw new Error("openrouter: no message content in response");
+    return { content, usage: usageFrom(j.usage?.prompt_tokens, j.usage?.completion_tokens) };
+  },
 };
-
-// What the provider says the call cost, in tokens (cost instrumentation,
-// technical-foundation/12). `undefined` when the response carried no usable
-// `usage` object: that is UNKNOWN, never zero, and the caller must keep the
-// distinction when it records the run. Counts only, no price: pricing is out of
-// scope here and lives nowhere in this repo.
-export type ChatUsage = { inputTokens: number; outputTokens: number };
 
 // One round-trip: send the messages, return the assistant's text content plus
 // whatever usage the provider reported alongside it.
-// Throws on a missing key or a non-OK response so the caller can report `failed`.
-export async function chatComplete({
-  model,
-  messages,
-  webSearch,
-  reasoning,
-}: ChatOptions): Promise<{ content: string; usage: ChatUsage | undefined }> {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key) throw new Error("OPENROUTER_API_KEY not set");
-
-  const body: Record<string, unknown> = { model, messages };
-  if (webSearch) body.plugins = [{ id: "web" }];
-  if (reasoning) body.reasoning = { effort: reasoning };
-
-  const post = () =>
-    fetch(ENDPOINT, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-      body: JSON.stringify(body),
-    });
-
-  let res = await post();
-  // Some endpoints mandate reasoning and 400 the "none" opt-out ("Reasoning is
-  // mandatory for this endpoint and cannot be disabled") — retry once with the
-  // model's default reasoning rather than fail every call of the run.
-  if (res.status === 400 && reasoning) {
-    const text = await res.text();
-    if (!/reasoning/i.test(text)) throw new Error(`openrouter 400: ${text}`);
-    delete body.reasoning;
-    res = await post();
-  }
-  if (!res.ok) throw new Error(`openrouter ${res.status}: ${await res.text()}`);
-
-  const json = (await res.json()) as {
-    choices?: { message?: { content?: unknown } }[];
-    usage?: { prompt_tokens?: unknown; completion_tokens?: unknown };
-  };
-  const content = json.choices?.[0]?.message?.content;
-  if (typeof content !== "string") throw new Error("openrouter: no message content in response");
-  const inputTokens = json.usage?.prompt_tokens;
-  const outputTokens = json.usage?.completion_tokens;
-  const usage =
-    typeof inputTokens === "number" && typeof outputTokens === "number" ? { inputTokens, outputTokens } : undefined;
-  return { content, usage };
+export async function chatComplete(options: ChatOptions): Promise<ModelReply> {
+  return await complete(openrouter, options);
 }

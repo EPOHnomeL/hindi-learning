@@ -51,3 +51,31 @@ of what was decided and when.
 **Note on test seeding:** `grant-resolver.test.ts:33,36` seeds by raw `db.insert`, so it
 will not catch a caller that skips the new predicate. Consider whether the predicate
 needs its own tests rather than relying on that file.
+
+## Answer
+
+2026-09-08, built. `convex/grants.ts` owns `shares`, `entitlements`, `enrollments` and
+`seats`. The three table reads are named once and every predicate is composed from them,
+**each staying as cheap as the copy it replaced**: `hasEntitlement` is still one index
+read, `heldPersonally` still short-circuits per Catalogue card. `survivesTheOwner` gives
+the voucher rail's wider question a name and says in one place why a Share does not count.
+`grantEdition` and `revokeEdition` are the only writers, pinned by a boundary test scoped
+to the two signatures that were actually duplicated.
+
+`edition.ts` gave up the grant tables and `holdsSeat`. The Catalogue listing trio moved to
+`convex/publishedEditions.ts`, below the grant walk, because `grantsFor` needs the
+free-published set and leaving it in `edition.ts` would have made the two modules import
+each other. That trap has bitten this repo twice, in 16 and 18.
+
+**One claim in this ticket is wrong, and is corrected rather than carried.** It said
+`claimSeat` handed an already-entitled member a duplicate `entitlements` row. It cannot:
+`accessCodeAuth.ts` mints a fresh account per (code, nickname) and a returning nickname
+short-circuits in `forJoin`, so the `userId` reaching `claimSeat` has never held anything.
+The guard went in anyway, because the invariant was resting on an account-minting scheme
+two files away, and a test drives the internal mutation directly to pin it here. **This was
+not a live defect.**
+
+`CONTEXT.md` records the dated correction this ticket asked for: nothing writes an
+`enrollments` row any more. ADR 0023 stands as written; no ADR was rewritten.
+
+Verified by test. `pnpm typecheck` and the full suite green.

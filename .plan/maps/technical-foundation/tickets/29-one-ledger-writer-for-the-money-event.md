@@ -43,3 +43,26 @@ hand-written copies happening to agree.
 **`docs/ponytail-debt.md` has an entry to close here.** The `eft.ts:59-61` marker was
 accepted, not deferred, on the grounds that a second caller was not yet a pattern. Update
 the ledger in the same session rather than leaving it asserting a world this ticket ends.
+
+## Answer
+
+2026-09-08, built. `convex/moneyEvent.ts` owns the money event: `recordMoneyEvent` does
+the split, the cents validation and the insert; `oncePerPayment` is the ITN idempotency
+both PayFast rails needed; `purchasableEdition` is the four-check sale gate that `market.ts`
+and `eft.ts` each wrote out.  A rail still decides its own kind, status, fee rate, payee and
+provenance, because those genuinely differ.
+
+`splitNet` moved out of `payfast.ts`, which is the gateway wire format and never was the
+right home: the donation, Voucher Batch and Access Code rails all split a net and none of
+them touches a gateway. It is exported for its own test only, and a boundary assertion
+fails if a rail imports it again.
+
+The EFT rail's regained cents check has a test that was **proved to fail without it**.
+
+**One claim in this ticket is wrong.** It said the `eft.ts:59` `ponytail:` marker
+anticipated this writer and asked for the ledger entry to be closed. That marker is about
+bank-details validation shared with `sellers.savePayoutDetails`, and its trigger (a third
+bank-details form) has not fired. `docs/ponytail-debt.md` records the correction, and its
+drifted line numbers were re-measured while there.
+
+Verified by test. `pnpm typecheck` and the full suite green.

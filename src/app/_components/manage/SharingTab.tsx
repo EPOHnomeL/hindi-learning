@@ -7,6 +7,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { LANGUAGES } from "../../../../convex/languages";
 import { Icon } from "../icons";
+import { toMajor } from "~/lib/money";
+import { useMutationRun } from "../mutationRun";
 import { formatPrice } from "../Paygate";
 import { ConfirmDialog, MenuItem } from "../ui";
 import { EmptyPanel, Sheet, type Edition, type Engine } from "./shared";
@@ -129,8 +131,10 @@ function PublishToggle({
   notify: (message: string) => void;
 }) {
   const t = useTranslations("Editions");
-  const setPublished = useMutation(api.catalogue.setEditionPublished);
-  const [busy, setBusy] = useState(false);
+  // Was a `finally` with no `catch`, so a refused publish (the tenant's
+  // catalogue flag off, not the owner, the course not completed) left the toggle
+  // snapping back with nothing said. Ticket 32.
+  const { run, busy, error } = useMutationRun(useMutation(api.catalogue.setEditionPublished), t("updateError"));
 
   return (
     <div
@@ -149,6 +153,7 @@ function PublishToggle({
         <div className="min-w-0">
           <b className="block text-[13.5px] font-semibold text-ink">{t("publish")}</b>
           <span className="text-[11.5px] text-soft">{published ? t("publishOn") : t("publishOff")}</span>
+          {error && <span className="block text-[11.5px] text-danger">{error}</span>}
         </div>
       </div>
       <label className="relative inline-flex shrink-0 cursor-pointer items-center">
@@ -158,10 +163,11 @@ function PublishToggle({
           disabled={busy}
           onChange={(e) => {
             const next = e.target.checked;
-            setBusy(true);
-            void setPublished({ topicSlug, lang, published: next })
-              .then(() => notify(next ? t("toastPublishOn") : t("toastPublishOff")))
-              .finally(() => setBusy(false));
+            void run({ topicSlug, lang, published: next }).then(
+              // Only on success: a toast saying it published, after a refusal, is
+              // worse than saying nothing.
+              (ok) => ok !== undefined && notify(next ? t("toastPublishOn") : t("toastPublishOff")),
+            );
           }}
           className="peer sr-only"
         />
@@ -191,8 +197,10 @@ function PublicLinkToggle({
   notify: (message: string) => void;
 }) {
   const t = useTranslations("Editions");
-  const setPublic = useMutation(api.shares.setEditionPublic);
-  const [busy, setBusy] = useState(false);
+  // Was a `finally` with no `catch`: a refused public link (the tenant's
+  // publicLinks flag off, not the owner) said nothing at all. Ticket 32.
+  const publish = useMutationRun(useMutation(api.shares.setEditionPublic), t("updateError"));
+  const busy = publish.busy;
   const [copied, setCopied] = useState(false);
   const [qrBusy, setQrBusy] = useState(false);
   const on = publicToken != null;
@@ -222,10 +230,11 @@ function PublicLinkToggle({
   };
 
   const run = (isPublic: boolean) => {
-    setBusy(true);
-    void setPublic({ topicSlug, lang, isPublic })
-      .then(() => notify(isPublic ? t("toastLinkOn") : t("toastLinkOff")))
-      .finally(() => setBusy(false));
+    // The refusal surfaces as a toast here, because this control sits in a row
+    // that has no room for a message and the owner is already watching for one.
+    void publish
+      .run({ topicSlug, lang, isPublic })
+      .then((ok) => notify(ok === undefined ? (publish.error ?? t("updateError")) : isPublic ? t("toastLinkOn") : t("toastLinkOff")));
   };
 
   return (
@@ -536,10 +545,10 @@ function PriceEditor({
   const t = useTranslations("Editions");
   const setPrice = useMutation(api.market.setEditionPrice);
   const clearPrice = useMutation(api.market.clearEditionPrice);
-  const major = (minor: number | undefined) => (minor === undefined ? "" : (minor / 100).toFixed(2));
+  const major = (minor: number | undefined) => (minor === undefined ? "" : toMajor(minor).toFixed(2));
   // Seeded from what was last saved: a save writes all three fields, so a form
   // that opened blank would silently withdraw the regional prices on every edit.
-  const [amount, setAmount] = useState(current ? (current.amount / 100).toFixed(2) : "");
+  const [amount, setAmount] = useState(current ? toMajor(current.amount).toFixed(2) : "");
   const [usd, setUsd] = useState(major(current?.usdAmount));
   const [eur, setEur] = useState(major(current?.eurAmount));
   const [busy, setBusy] = useState(false);
@@ -706,20 +715,22 @@ function PayoutDetailsForm() {
 // the items that changed or failed.
 function RetryTranslation({ topicSlug, lang }: { topicSlug: string; lang: string }) {
   const t = useTranslations("Editions");
-  const retry = useAction(api.translate.startTranslation);
-  const [busy, setBusy] = useState(false);
+  // Was a `finally` with no `catch`, so a refused retry (translations flag off,
+  // no model key provisioned, another run holding the lock) looked identical to a
+  // retry that started. Ticket 32.
+  const { run, busy, error } = useMutationRun(useAction(api.translate.startTranslation), t("updateError"));
   return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={() => {
-        setBusy(true);
-        void retry({ topicSlug, lang }).finally(() => setBusy(false));
-      }}
-      className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-    >
-      <Icon name="refresh" className="h-4 w-4" /> {busy ? t("retrying") : t("retry")}
-    </button>
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => void run({ topicSlug, lang })}
+        className="inline-flex items-center gap-2 self-start rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+      >
+        <Icon name="refresh" className="h-4 w-4" /> {busy ? t("retrying") : t("retry")}
+      </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </div>
   );
 }
 
@@ -727,20 +738,22 @@ function RetryTranslation({ topicSlug, lang }: { topicSlug: string; lang: string
 // failed/translating panels pass a shorter label.
 function RemoveEdition({ topicSlug, lang, label }: { topicSlug: string; lang: string; label?: string }) {
   const t = useTranslations("Editions");
-  const remove = useMutation(api.translate.removeEdition);
-  const [busy, setBusy] = useState(false);
+  // Was a `finally` with no `catch`: a refused removal (not the owner, the
+  // Edition priced or published) left the row in place with no explanation.
+  // Ticket 32.
+  const { run, busy, error } = useMutationRun(useMutation(api.translate.removeEdition), t("updateError"));
   return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={() => {
-        setBusy(true);
-        void remove({ topicSlug, lang }).finally(() => setBusy(false));
-      }}
-      className="inline-flex items-center gap-1.5 self-start text-[12.5px] text-soft transition-colors hover:text-danger disabled:opacity-60"
-    >
-      <Icon name="trash" className="h-3.75 w-3.75" /> {label ?? t("remove")}
-    </button>
+    <div className="flex flex-col gap-1">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => void run({ topicSlug, lang })}
+        className="inline-flex items-center gap-1.5 self-start text-[12.5px] text-soft transition-colors hover:text-danger disabled:opacity-60"
+      >
+        <Icon name="trash" className="h-3.75 w-3.75" /> {label ?? t("remove")}
+      </button>
+      {error && <p className="text-xs text-danger">{error}</p>}
+    </div>
   );
 }
 
@@ -918,51 +931,32 @@ function RemoveEditionConfirm({
 // "Are you sure?" for re-translating a ready edition: carries the engine picker
 // inside the confirm, seeded from the engine that last produced this edition.
 // Switching engines forces a full redo server-side; the same engine is a cheap
-// resume/repair. Its own <dialog> shell (not ConfirmDialog) so the engine
-// toggle can sit above the buttons.
+// resume/repair.
+//
+// **It had its own <dialog> shell purely because `ConfirmDialog` took a `body:
+// string` and had no slot for the engine toggle.** Ticket 39 widened
+// `ConfirmDialog` (a ReactNode body and an `extra` slot), which is what let this
+// twin go: the whole reason it forked was an interface too narrow to say what it
+// needed.
 function RetranslateConfirm({ topicSlug, edition, onClose }: { topicSlug: string; edition: Edition; onClose: () => void }) {
-  const t = useTranslations("Common");
   const te = useTranslations("Editions");
-  const start = useAction(api.translate.startTranslation);
   const [engine, setEngine] = useState<Engine>(edition.engine);
-  const [busy, setBusy] = useState(false);
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => ref.current?.showModal(), []);
+  const { run, busy, error } = useMutationRun(useAction(api.translate.startTranslation), te("updateError"));
   return (
-    <dialog
-      ref={ref}
+    <ConfirmDialog
+      title={te("confirmRetranslateTitle")}
+      body={
+        <>
+          {te("confirmRetranslateBody", { native: edition.name })}
+          {error && <span className="mt-2 block text-danger">{error}</span>}
+        </>
+      }
+      extra={<EngineToggle value={engine} onChange={setEngine} disabled={busy} />}
+      confirmLabel={busy ? te("retranslating") : te("confirmRetranslate")}
+      confirmDisabled={busy}
+      onConfirm={() => void run({ topicSlug, lang: edition.lang, engine }).then((ok) => ok !== undefined && onClose())}
       onClose={onClose}
-      onClick={(e) => {
-        if (e.target === ref.current) ref.current?.close();
-      }}
-      className="m-auto w-[92vw] max-w-md rounded-2xl border border-line bg-card p-0 text-ink shadow-xl backdrop:bg-black/50"
-    >
-      <div className="px-6 py-5">
-        <h2 className="text-base font-semibold text-accent">{te("confirmRetranslateTitle")}</h2>
-        <p className="mt-2 text-sm leading-relaxed text-soft">{te("confirmRetranslateBody", { native: edition.name })}</p>
-        <div className="mt-4">
-          <EngineToggle value={engine} onChange={setEngine} disabled={busy} />
-        </div>
-        <div className="mt-5 flex justify-end gap-2">
-          <button
-            onClick={() => ref.current?.close()}
-            className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi"
-          >
-            {t("cancel")}
-          </button>
-          <button
-            onClick={() => {
-              setBusy(true);
-              void start({ topicSlug, lang: edition.lang, engine }).then(onClose, () => setBusy(false));
-            }}
-            disabled={busy}
-            className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
-          >
-            {busy ? te("retranslating") : te("confirmRetranslate")}
-          </button>
-        </div>
-      </div>
-    </dialog>
+    />
   );
 }
 
@@ -982,9 +976,11 @@ export function AddLanguagePanel({
   onAdded: (code: string) => void;
 }) {
   const t = useTranslations("Editions");
-  const start = useAction(api.translate.startTranslation);
+  // Was a `finally` with no `catch`, and this one is the worst of the nine: it
+  // called `onAdded(code)` unconditionally, so a refused translation optimistically
+  // showed the new Edition in the list and said nothing. Ticket 32.
+  const { run, busy, error } = useMutationRun(useAction(api.translate.startTranslation), t("updateError"));
   const [q, setQ] = useState("");
-  const [busy, setBusy] = useState(false);
   // Defaults to Free (translate for free first; upgrade to Gemini later per edition).
   const [engine, setEngine] = useState<Engine>("free");
 
@@ -1005,15 +1001,17 @@ export function AddLanguagePanel({
     : LANGUAGES.filter((l) => !present.has(l.code) && l.code !== "en").slice(0, 8);
 
   const add = (code: string) => {
-    setBusy(true);
     setQ("");
-    void start({ topicSlug, lang: code, engine }).finally(() => setBusy(false));
-    onAdded(code);
+    // `onAdded` only once the run actually started: it is what puts the Edition
+    // in the owner's list, and doing it before the answer showed an Edition that
+    // was never created.
+    void run({ topicSlug, lang: code, engine }).then((ok) => ok !== undefined && onAdded(code));
   };
 
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-sm text-soft">{t("addLanguageIntro")}</p>
+      {error && <p className="text-xs text-danger">{error}</p>}
       <EngineToggle value={engine} onChange={setEngine} disabled={busy} />
       <input
         value={q}

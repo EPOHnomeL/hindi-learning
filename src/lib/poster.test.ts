@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { formatMoney } from "./money";
 import { posterModel, priceLabel, titleLen, type PosterCourse, type PosterEdits, type PosterTenant } from "./poster";
 
 // The poster model (course-poster spec, Testing Decisions): drive the seam with
@@ -42,7 +43,10 @@ describe("posterModel", () => {
     const m = model();
     expect(m.eyebrow).toBe("eyebrowPaid");
     expect(m.price).toEqual({ label: priceLabel(10000, "ZAR", "en"), suffix: "priceSuffix" });
-    expect(m.price!.label).toBe("R100");
+    // Two decimal places, the operator's 2026-09-08 call. This asserted `R100`
+    // until then: the poster had its own compact spelling and the rest of the
+    // product did not, so one R100 Edition printed three ways.
+    expect(m.price!.label).toBe(formatMoney(10000, "ZAR", { locale: "en" }));
   });
 
   it("a free Edition gets the free eyebrow and no price block", () => {
@@ -158,14 +162,19 @@ describe("posterModel", () => {
 });
 
 describe("priceLabel", () => {
-  it("prints whole units when there are no cents and two decimals otherwise", () => {
-    expect(priceLabel(10000, "zar", "en")).toBe("R100");
+  // `priceLabel` is the shared `formatMoney` since 2026-09-08, so what is left to
+  // assert here is that the poster is not special: it prints what every other
+  // surface prints, in the locale it was handed.
+  it("prints two decimal places, whether or not the amount has cents", () => {
+    // Was `R100` and `$12.50` before the operator chose one spelling over two.
+    expect(priceLabel(10000, "zar", "en")).toBe(formatMoney(10000, "zar", { locale: "en" }));
+    expect(priceLabel(10000, "zar", "en")).toMatch(/100\.00$/);
     expect(priceLabel(1250, "USD", "en")).toBe("$12.50");
-    // A trailing symbol keeps its locale spacing.
-    expect(priceLabel(10000, "zar", "fr")).toMatch(/^100\s+R$/);
+    // A trailing symbol still keeps its locale's own spacing and separators.
+    expect(priceLabel(10000, "zar", "fr")).toMatch(/^100,00\s+R$/);
   });
 
   it("falls back to a plain amount for a currency Intl refuses", () => {
-    expect(priceLabel(10000, "NOTREAL", "en")).toBe("100 NOTREAL");
+    expect(priceLabel(10000, "NOTREAL", "en")).toBe("100.00 NOTREAL");
   });
 });

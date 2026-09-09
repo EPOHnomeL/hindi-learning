@@ -27,61 +27,74 @@ const endpoint = (model: string) =>
 // model that rejects `thinkingLevel`, the retry below drops the control.
 export const geminiTranslateModel = (): string => process.env.GEMINI_TRANSLATE_MODEL ?? "gemini-3.5-flash";
 
-// Structurally identical to openrouterClient's ChatMessage, so a caller can pass
-// the same message array to either client; kept local so this module has no
-// dependency on the OpenRouter client.
-export type GeminiMessage = { role: "system" | "user" | "assistant"; content: string };
+// The shared policy (key, post-once-retry-once, errors, usage) lives in
+// `convex/modelCall.ts` since 2026-09-08 (ticket 31). What is left here is the
+// Gemini wire format: this endpoint, this key header, `systemInstruction` split
+// out of the turn list, `thinkingLevel` as the thinking control, and where
+// Gemini puts content and token counts.
+//
+// The usage is no longer logged and dropped. `complete` normalises it and both
+// rails log it the same way, so the translate rail can now SEE its token spend.
+// **Persisting it is deliberately still not done here.** Ticket 12 instruments
+// Routine RUNS in `generationRuns`, per Topic; a translation job is a different
+// unit with its own `translationJobs` row and no usage columns, so recording it
+// is schema work on that table and belongs to its own ticket rather than to this
+// refactor.
+import { complete, usageFrom, type ChatMessage, type ModelAdapter, type ModelReply } from "./modelCall";
 
-// One round-trip: map our [system?, user] messages onto Gemini's
-// systemInstruction + contents, disable thinking, and return the assistant text.
-// Throws on a missing key or a non-OK response so the caller can report `failed`.
-export async function geminiComplete({ model, messages }: { model: string; messages: GeminiMessage[] }): Promise<string> {
-  const key = process.env.GOOGLE_AI_API_KEY;
-  if (!key) throw new Error("GOOGLE_AI_API_KEY not set");
+// Kept as an alias so the two clients' message types stay interchangeable by
+// construction rather than by both happening to be spelled the same way.
+export type GeminiMessage = ChatMessage;
 
-  // Gemini splits the system prompt out of the turn list into `systemInstruction`.
-  const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
-  const contents = messages
-    .filter((m) => m.role !== "system")
-    .map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+const gemini: ModelAdapter = {
+  vendor: "gemini",
+  keyEnv: "GOOGLE_AI_API_KEY",
+  request(key, req, dropReasoning) {
+    // Gemini splits the system prompt out of the turn list into `systemInstruction`.
+    const system = req.messages.filter((m) => m.role === "system").map((m) => m.content).join("\n\n");
+    const contents = req.messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] }));
+    const body: Record<string, unknown> = { contents };
+    // Gemini 3.x has no "off": the 2.5-era `thinkingBudget: 0` is deprecated and
+    // does not disable thinking, so `minimal` is the floor. Thinking is
+    // minimised, not zero, and some thought tokens are still billed.
+    if (!dropReasoning) body.generationConfig = { thinkingConfig: { thinkingLevel: "minimal" } };
+    if (system) body.systemInstruction = { parts: [{ text: system }] };
+    return {
+      url: endpoint(req.model),
+      init: {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify(body),
+      },
+    };
+  },
+  // Always sent, unlike OpenRouter's, because this client exists precisely to
+  // pin the thinking control and has nothing to do without it.
+  sendsReasoningControl: () => true,
+  isReasoningComplaint: (body) => /think/i.test(body),
+  parse(json): ModelReply {
+    const j = json as {
+      candidates?: { content?: { parts?: { text?: unknown }[] } }[];
+      usageMetadata?: { thoughtsTokenCount?: unknown; candidatesTokenCount?: unknown; promptTokenCount?: unknown };
+    };
+    const parts = j.candidates?.[0]?.content?.parts ?? [];
+    const content = parts.map((p) => (typeof p.text === "string" ? p.text : "")).join("");
+    // Thought tokens are billed as output, so they are counted as output rather
+    // than discarded: that is the ground truth for whether `minimal` minimised
+    // anything, and dropping it would understate the spend.
+    const thoughts = typeof j.usageMetadata?.thoughtsTokenCount === "number" ? j.usageMetadata.thoughtsTokenCount : 0;
+    const out = j.usageMetadata?.candidatesTokenCount;
+    return {
+      content,
+      usage: usageFrom(j.usageMetadata?.promptTokenCount, typeof out === "number" ? out + thoughts : out),
+    };
+  },
+};
 
-  const body: Record<string, unknown> = {
-    contents,
-    generationConfig: { thinkingConfig: { thinkingLevel: "minimal" } },
-  };
-  if (system) body.systemInstruction = { parts: [{ text: system }] };
-
-  const post = () =>
-    fetch(endpoint(model), {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify(body),
-    });
-
-  let res = await post();
-  // A model that doesn't accept our thinking control (e.g. a 2.5 tier rejecting
-  // `thinkingLevel`, or a tier clamping a minimum) 400s the opt-out; retry once
-  // with the model's default thinking rather than fail every call of the run
-  // (mirrors openrouterClient's reasoning-mandatory retry).
-  if (res.status === 400) {
-    const text = await res.text();
-    if (!/think/i.test(text)) throw new Error(`gemini 400: ${text}`);
-    delete (body.generationConfig as Record<string, unknown>).thinkingConfig;
-    res = await post();
-  }
-  if (!res.ok) throw new Error(`gemini ${res.status}: ${await res.text()}`);
-
-  const json = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: unknown }[] } }[];
-    usageMetadata?: { thoughtsTokenCount?: number; candidatesTokenCount?: number; promptTokenCount?: number };
-  };
-  // The ground truth for "did minimal actually minimise reasoning": thought
-  // tokens are billed as output, so a non-zero count here is real spend. Logged
-  // (not thrown on) so `npx convex logs` answers the cost question per call.
-  const u = json.usageMetadata;
-  if (u) console.log(`gemini usage: thoughts=${u.thoughtsTokenCount ?? 0} out=${u.candidatesTokenCount ?? 0} in=${u.promptTokenCount ?? 0}`);
-  const parts = json.candidates?.[0]?.content?.parts ?? [];
-  const text = parts.map((p) => (typeof p.text === "string" ? p.text : "")).join("");
-  if (text === "") throw new Error("gemini: no text content in response");
-  return text;
+// One round-trip. Returns content plus usage, the same shape `chatComplete`
+// returns, which is the whole point of ticket 31.
+export async function geminiComplete({ model, messages }: { model: string; messages: GeminiMessage[] }): Promise<ModelReply> {
+  return await complete(gemini, { model, messages, reasoning: "none" });
 }

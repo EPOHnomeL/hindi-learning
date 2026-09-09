@@ -1,8 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "convex/react";
+import { useMutationRun } from "../mutationRun";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { Icon } from "../icons";
 import { type Edition } from "./shared";
@@ -62,14 +62,18 @@ function AccessRow({
   entry: { email: string; role: "viewer" | "editor"; status: "accepted" | "pending" };
 }) {
   const t = useTranslations("Editions");
-  const setShareRole = useMutation(api.shares.setShareRole);
-  const revokeShare = useMutation(api.shares.revokeShare);
-  const [busy, setBusy] = useState(false);
+  // Both of these had a `finally` and no `catch` until 2026-09-08, so every
+  // refusal `setShareRole` and `revokeShare` wrote (not your course, not an
+  // Edition you hold) reached the browser and was dropped on the floor.
+  // `useMutationRun` cannot be written without the catch (ticket 32).
+  const roleRun = useMutationRun(useMutation(api.shares.setShareRole), t("updateError"));
+  const revokeRun = useMutationRun(useMutation(api.shares.revokeShare), t("updateError"));
+  const busy = roleRun.busy || revokeRun.busy;
+  const error = roleRun.error ?? revokeRun.error;
 
-  const setRole = (role: "viewer" | "editor") => {
-    if (role === entry.role) return;
-    setBusy(true);
-    void setShareRole({ topicSlug, email: entry.email, lang, role }).finally(() => setBusy(false));
+  const setRole = (next: "viewer" | "editor") => {
+    if (next === entry.role) return;
+    void roleRun.run({ topicSlug, email: entry.email, lang, role: next });
   };
 
   return (
@@ -79,6 +83,8 @@ function AccessRow({
           {entry.email}
         </span>
         {entry.status === "pending" && <span className="text-[11px] text-soft">{t("pendingJoins")}</span>}
+        {/* The refusal, which this row used to discard. */}
+        {error && <span className="block text-[11px] text-danger">{error}</span>}
       </div>
       <div className="inline-flex shrink-0 overflow-hidden rounded-lg border border-line text-[12px]">
         {(["viewer", "editor"] as const).map((role) => (
@@ -101,10 +107,7 @@ function AccessRow({
         disabled={busy}
         aria-label={t("revokeAccessFor", { email: entry.email })}
         title={t("revokeAccess")}
-        onClick={() => {
-          setBusy(true);
-          void revokeShare({ topicSlug, email: entry.email, lang }).finally(() => setBusy(false));
-        }}
+        onClick={() => void revokeRun.run({ topicSlug, email: entry.email, lang })}
         className="shrink-0 rounded-lg p-1.5 text-soft transition-colors hover:bg-hi hover:text-danger disabled:opacity-60"
       >
         <Icon name="trash" className="h-3.75 w-3.75" />

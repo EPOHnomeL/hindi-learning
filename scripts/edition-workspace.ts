@@ -4,7 +4,7 @@
 // two one-off round-trips this framework generalises (the st-ZA orthography rewrite
 // and the hi-Latn to hi Devanagari conversion) each shipped content past a guard
 // that turned out to be dead code.
-import { quizStructureMatches } from "../convex/translate";
+import { quizStructureMatches } from "../convex/quizGate";
 
 export type Kind = "lesson" | "reference" | "mission" | "title" | "question";
 

@@ -18,7 +18,8 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
 import { convexUrl, ownerEmail, publishSecret, topicArg } from "./_env";
-import { swapOutStatic, swapBackStatic, quizStructureMatches } from "../convex/translate";
+import { swapOutStatic, swapBackStatic } from "../convex/translate";
+import { quizStructureMatches } from "../convex/quizGate";
 
 const FROM = "st";
 const TO = "st-ZA";

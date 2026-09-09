@@ -53,3 +53,34 @@ either decision.
 `translate.ts`, this is a behaviour change inside it. They are independent, but whichever
 runs second rebases on the other; 24's discipline (moves never share a commit with
 behaviour changes) means this ticket's change should be its own commit either way.
+
+## Answer
+
+2026-09-08, built. `convex/quizGate.ts` holds `quizStructureMatches` (the pure core) and
+`quizVerdict` (the policy: ok / mismatch / unreadable), and all six call sites ask it.
+The dead branch in `publishTranslation` is **deleted, not commented**, and the mutation is
+an `internalMutation`, so `publishTranslationChecked` and `translateTopic` are the only
+doors. The boundary is asserted on the source text rather than on `api`/`internal`, which
+are lazy proxies that answer `in` for any name at all.
+
+The test that pinned the bypass open was rewritten, as this ticket said it must be: it now
+asserts the public door refuses the same body.
+
+**Not done, and the reason first given here was wrong.** This Answer said on 2026-09-08
+that `topics/_devanagari/publish.ts` "does not exist in this checkout", which was true of
+the worktree the work was done in and false of the repo. Re-checked on 2026-09-09 before
+merging: it exists at `topics/_devanagari/publish.ts:89` in the main checkout and calls
+`client.mutation(api.translate.publishTranslation, ...)`, exactly as this ticket's Question
+said. `topics/` is gitignored, so the file cannot be carried by the branch, but it is real
+and it breaks the moment the mutation goes internal.
+
+The repoint is two tokens on that one line: `client.mutation` to `client.action`, and
+`publishTranslation` to `publishTranslationChecked`. The argument object and the
+`{ status }` return are identical, so the `skipped` handling below it is unchanged, and
+routing through the checked action gives that script the quiz guard it was bypassing, which
+is the same hole that let 59 unchecked rows ship.
+
+Every COMMITTED caller already used the checked action; this was the only exception, and it
+lives outside version control.
+
+Verified by test. `pnpm typecheck` and the full suite green.

@@ -55,3 +55,32 @@ fog patch on this map by doing it.
 `assertThemeTokens`; if the two have already drifted, that is a finding to record, and 23
 is the precedent for holding a hand-mirror to its canonical source with one assertion
 rather than a refactor.
+
+## Answer
+
+2026-09-08, built. `adminDerive.ts` takes `coerceImportedTheme`, `validatePalette`,
+`timeAgo` and `tenantRemovalBlockers`; `dayStackChart.tsx` takes the chart, which called
+itself "the shared chart" in its own comment and already had two real adapters. 2660 lines
+to 2489.
+
+`validatePalette`'s six refusals each have their own test, which is the whole reason it
+moved: they are the only feedback an operator gets on a bad paste, and nothing checked that
+any of them said what it meant.
+
+**Checked against the server before trusting it, as this ticket required. The two have NOT
+drifted:** same token set (both read `TENANT_THEME_TOKENS`), same unknown-token refusal,
+same light-complete rule, same deliberately-partial dark. Two differences, both
+intentional. The client also refuses a non-string colour, where the server gets that from
+its Convex validator rather than lacking it; and the client accepts a bare token map with
+no envelope, which is an input convenience for a paste rather than a different rule about
+what a valid theme is. The mirror is pinned to its canonical source by one assertion, which
+is 23's precedent.
+
+One behaviour change, and the only one: `timeAgo` takes `now` as a parameter with a
+`Date.now()` default, because a function that reads the clock itself cannot be tested
+without faking global time.
+
+**The five-way tab split is not done, deliberately.** It waits on 03, and this map's
+`AdminPanel.tsx` fog patch stays open for it.
+
+Verified by test. `pnpm typecheck` and the full suite green.

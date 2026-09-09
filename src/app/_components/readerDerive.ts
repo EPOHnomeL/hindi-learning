@@ -68,16 +68,14 @@ export function completedKeys(progress: readonly ProgressLite[]): Set<string> {
   return new Set(progress.filter((p) => p.status === "completed").map((p) => p.lessonKey));
 }
 
-// Lessons carrying a teacher Reply the learner hasn't seen yet → a sidebar dot.
-// `seen` is the set of answered-Question ids already viewed (per-device).
-export function unseenReplyKeys(
-  questions: readonly QuestionLite[],
-  seen: ReadonlySet<string>,
-): Set<string> {
-  const keys = new Set<string>();
-  for (const q of questions) if (q.reply && !seen.has(q.id)) keys.add(q.lessonKey);
-  return keys;
-}
+
+// Resolve an internal link clicked inside an artifact to the path the app should
+// route to. Lessons author cross-links as the owner's `/courses/<slug>/…` routes
+// (AUTHORING.md §5). A signed-in owner/viewer routes there directly; but a Guest
+// on the public reader (`/share/<token>/…`) can't open `/courses/…`, so rewrite
+// a `/courses/<slug>/(lessons|references)/<key>` target into the share context,
+// preserving the artifact kind + key. Non-artifact or already-share paths pass
+// through unchanged.
 
 // Resolve an internal link clicked inside an artifact to the path the app should
 // route to. Lessons author cross-links as the owner's `/courses/<slug>/…` routes
@@ -166,20 +164,24 @@ export function composeCardShare(input: {
   return `${head}\n\nLearn ${input.courseTitle.trim()} on ${input.brand.trim()} →\n${input.url}`;
 }
 
-// Opening a lesson counts as seeing its teacher Replies. Returns the next `seen`
-// set with that lesson's replied-Question ids added — or the *same* reference
-// when there's nothing new, so a React state setter can skip a re-render.
-export function seenAfterOpening(
-  questions: readonly QuestionLite[],
-  lessonKey: string,
-  seen: ReadonlySet<string>,
-): Set<string> {
-  const ids = questions.filter((q) => q.lessonKey === lessonKey && q.reply).map((q) => q.id);
-  if (ids.every((id) => seen.has(id))) return seen as Set<string>;
-  const next = new Set(seen);
-  for (const id of ids) next.add(id);
-  return next;
-}
+
+// The Edition an in-place edit must be aimed at: the one the server actually
+// SERVED (`courseHeader.lang`), never the URL's `?lang`.
+//
+// They differ whenever the served Edition came from the resolver's fallback
+// rather than the URL, and that is the normal first visit for exactly the person
+// per-Edition editing exists for. A Dutch Editor holds only `nl`: `nl` is not an
+// app locale, so the course-index redirect cannot pre-fill `?lang=nl` from the
+// UI language, and on a first visit nothing is in localStorage either. So she
+// lands on a lang-less URL, the resolver serves her the one Edition she holds,
+// and the server sets `canEdit` true against `nl`. A client keying off the URL
+// would read that as the English source, aim `editReference` / `editLesson` at
+// it, and get a bare save failure from the upload guard (she holds no `en`
+// share). Keying off the header makes the client agree with the server by
+// construction, since `canEdit` is computed against this very language.
+//
+// `headerLang` is undefined only while that query is in flight; the URL is the
+// stopgap for that beat, and English the last resort.
 
 // The Edition an in-place edit must be aimed at: the one the server actually
 // SERVED (`courseHeader.lang`), never the URL's `?lang`.

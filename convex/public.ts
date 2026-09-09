@@ -1,11 +1,12 @@
 import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
-import { buildPaywall, editionAccessLevel, editionPrice, lessonsToc, livePublishedLangs, paywallValidator, loadEdition, publishedLangs, readLesson, readReference, referencesToc, type EditionAccess } from "./edition";
+import { buildPaywall, editionAccessLevel, editionPrice, lessonsToc, paywallValidator, loadEdition, readLesson, readReference, referencesToc, type EditionAccess } from "./edition";
+import { livePublishedLangs, publishedLangs } from "./publishedEditions";
 import { topicBySlug } from "./topicAccess";
 import { SOURCE_LANG } from "./sourceLang";
 import { teacherQaOn } from "./capture";
-import { langInfo } from "./languages";
+import { editionChip, langDir } from "./languages";
 
 // The Guest read seam (issue 07 / ADR 0013). Every function here authorizes by
 // the Public link token, NOT by getAuthUserId — these serve anonymous Guests.
@@ -136,7 +137,7 @@ async function liveLanguages(ctx: QueryCtx, topic: Doc<"topics">): Promise<{ lan
   return [...ready]
     .filter((lang) => reachable.has(lang))
     .sort((a, b) => a.localeCompare(b))
-    .map((lang) => ({ lang, native: langInfo(lang).native }));
+    .map((lang) => ({ lang, native: editionChip(lang).native }));
 }
 
 // The twin of `publicEditionLang` for the slug entrance: the language of the
@@ -296,7 +297,7 @@ export const publicCourse = query({
       title,
       slug: topic.slug,
       lang,
-      dir: langInfo(lang).rtl ? ("rtl" as const) : ("ltr" as const),
+      dir: langDir(lang),
       // The welcome panel's orientation (welcome/01) — see the validator above for
       // why both are served even on a paid Edition.
       mission: await ed.mission(),

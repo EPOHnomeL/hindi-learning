@@ -24,6 +24,25 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
   a build queued behind them; the decision is usually trivial and the work is the whole
   point. Tickets 01, 03, 06, 10, 12, 15, 16, 17, 18, 20 and 26 to 37 are execution. The
   grillings (02, 04, 05, 07, 08, 09, 11, 13, 14, 19) are genuine open decisions.
+- **Two tickets are PART built and stay open (2026-09-08).** They are named here rather
+  than in `## Decisions so far`, which may only index tickets with an `## Answer`. Each
+  ticket's own body records what landed and what is left, so neither is re-done from
+  scratch:
+  - [33](tickets/33-one-reader-course-module.md): the dead notification-dot machinery is
+    gone (`unseenReplyKeys` had zero callers, `NavItem.notify` was never passed, the seen
+    set fed no renderer), which took `myQuestions` out of `CourseShell` with it, and
+    `docs/adr/0036` supersedes ADR 0012's seen-set half. The `useReaderCourse()` collapse
+    itself is untouched: it is the highest-traffic surface with zero component tests, so it
+    wants its own session and a browser walk.
+  - [37](tickets/37-what-crosses-the-lesson-boundary.md): the one breakpoint is built, two
+    rules deep so it actually moves on the 441 stored lessons. The light-mode token bridge
+    is not, and the reason is recorded: it repaints reading material and wants a human
+    looking at a real lesson. The ticket's "only the 14 contract vars" claim was already
+    stale and is corrected at the seam.
+- **Delivery mode, 2026-09-08:** tickets 26 to 36 landed on a branch and a PR
+  (`t3code/improve-codebase-architecture`) rather than as trunk commits, because the
+  operator asked for one PR carrying a whole `/improve-codebase-architecture` run. That is
+  a deviation from this repo's trunk-based convention, scoped to that request.
 - **Verify before reasoning.** Every size and count on this map was measured on 2026-09-01
   and is written with that date. Re-measure before acting: `lib.ts` grew from ~25 import
   sites to 32 while sitting un-ticketed.
@@ -238,7 +257,7 @@ sit in this block was stale within days of being written.
   permanent boundary. One breakpoint, **768px**, matching Tailwind `md`. The design system
   reaches a lesson **only as CSS custom properties**, across the bridge
   `injectTenantPaletteCss` already provides. This **narrows**
-  [03](tickets/03-shadcn-foundation.md) — no quiz primitives, lesson interior out of scope —
+  ticket 03 — no quiz primitives, lesson interior out of scope —
   and the narrowing is written into 03's own body. Three build tickets were filed rather
   than folded in, because a resolved decision ticket on this map renders as *shipped*; they
   are named in 02's own Answer. **Not done, deliberately:** the `e.source` guard stays with
@@ -324,6 +343,73 @@ sit in this block was stale within days of being written.
   covered as well, being a second hand-mirror of `globals.css` with the same blast radius.
   The lazy fix worked because a test can import across the Convex runtime boundary that a
   Convex function cannot, and the test was **proved able to fail** before being trusted.
+- [`pnpm bundle:authoring` has been broken](tickets/36-repair-bundle-authoring.md)
+  2026-09-08: the authoring contract moved to `lessons/AUTHORING.md`, out of the
+  skills-CLI-managed directory that deleted it. The other five teach docs stay pointed at
+  the skill on purpose, because copying them here would manufacture the drift the bundler
+  prevents. The real fix is that the bundle is one function, `bundleAuthoringAssets`, so
+  the suite runs the bundler instead of only its renderer: the old test stayed green for
+  eleven days while `pnpm bundle:authoring` could not start. Regenerating folded in twelve
+  days of frozen skill drift. **Unblocked 37.**
+- [One publish door for the quiz-structure guard](tickets/26-one-publish-door-for-the-quiz-guard.md)
+  2026-09-08: `convex/quizGate.ts`, with `quizVerdict` returning ok/mismatch/unreadable so
+  the unreadable case is named rather than left to six callers to remember. The dead branch
+  in `publishTranslation` is **deleted, not commented**, and the mutation is
+  `internalMutation`, so `publishTranslationChecked` and `translateTopic` are the only
+  doors. The test that pinned the bypass open was rewritten. `topics/_devanagari/publish.ts`
+  could not be repointed: `topics/` is gitignored and absent from this checkout.
+- [A publish-time validator for an answer key that names no option](tickets/35-publish-time-quiz-answer-key-validator.md)
+  2026-09-08: `unresolvableAnswerKeys` in the same gate, refusing at BOTH publish paths
+  before the row exists, because a Lesson is immutable (ADR 0003) and the only repair is a
+  republish. A referential check on the markup, not scoring, so ADR 0035 stands. The tests
+  read the contract off `lessons/AUTHORING.md` and the script off `foot.html`, and one pins
+  that ADR 0019's shuffle can never invalidate a key.
+- [One Ledger writer for the money event](tickets/29-one-ledger-writer-for-the-money-event.md)
+  2026-09-08: `convex/moneyEvent.ts` owns the split, the cents check, the insert, the ITN
+  idempotency and the shared purchasable-Edition gate. The EFT rail's regained cents check
+  has a test **proved to fail without it**. `splitNet` left `payfast.ts`, which is the
+  gateway wire format and never was its home, and a boundary assertion fails if a rail
+  imports it again. **Correction:** the ticket's claim that the `eft.ts:59` `ponytail:`
+  marker anticipated this writer is wrong. That marker is bank-details validation and its
+  trigger has not fired; `docs/ponytail-debt.md` records it.
+- [Collapse the two bulk-seat rails](tickets/30-collapse-the-two-bulk-seat-rails.md)
+  2026-09-08: `convex/bulkDeal.ts` takes the five shared mechanisms; each rail keeps only
+  what ADR 0031 says differs, each difference named at the seam. **No superseding ADR**, and
+  the Answer says why: 0031 named this cost rather than deciding it, and every substantive
+  constraint of it still stands. No behaviour change, evidenced by 43 existing tests passing
+  unmodified.
+- [One predicate for holding an Edition](tickets/28-one-predicate-for-holding-an-edition.md)
+  2026-09-08: `convex/grants.ts` owns the four grant tables with `grantEdition` and
+  `revokeEdition` as the only writers, and each predicate stays as cheap as the copy it
+  replaced. The Catalogue listing trio moved to `publishedEditions.ts` to keep the edge
+  one-way, which is 16's and 18's circular-import trap avoided rather than re-met.
+  **Correction:** the ticket's claim that `claimSeat` wrote a duplicate Entitlement row is
+  wrong. It cannot, because the seat account is minted per (code, nickname). The guard went
+  in anyway; **it was not a live defect.** `CONTEXT.md` records that nothing writes an
+  `enrollments` row any more.
+- [One model-call interface, two adapters](tickets/31-one-model-call-interface-two-adapters.md)
+  2026-09-08: `convex/modelCall.ts`. The question the ticket refused to let us assume is
+  answered: the policy **is** genuinely identical, and every difference is wire format, now
+  named per adapter. One real behavioural difference was kept and made explicit rather than
+  flattened (`sendsReasoningControl`). `geminiComplete` returns usage like its sibling, and
+  Gemini's thought tokens count as output because that is how they are billed. Translation
+  usage is deliberately **not persisted**: that is schema work on `translationJobs` and its
+  own ticket. ADR 0014 honoured, not reopened; 19 not touched.
+- [One mutation-run module behind the busy/error triples](tickets/32-one-mutation-run-module.md)
+  2026-09-08: `mutationRun.ts` with `refusalTag`, `refusalMessage` and `useMutationRun`. All
+  four copies of the unwrap gone. **Ten silent call sites, not the seven the review counted**
+  (it missed `SharingTab`'s two toggles and `ManageShell`'s generation control), and two of
+  them were worse than silent, reporting success for a refused write. Writing the tests
+  found **two latent defects** in the copy being made shared: object `ConvexError` data
+  printed as raw JSON, and an empty message rendering as nothing at all. Only the pure half
+  is tested, and the ticket's own instruction to check first is why: there is no
+  `.test.tsx` in the repo and no React testing environment.
+- [AdminPanel's pure cores, lifted out](tickets/34-adminpanel-pure-cores-lifted-out.md)
+  2026-09-08: `adminDerive.ts` and `dayStackChart.tsx`, 2660 lines to 2489.
+  `validatePalette`'s six refusals each have a test, which was the whole point. Checked
+  against the server as the ticket required: the mirror has **not** drifted, and the two
+  differences are intentional. The five-way tab split stays out of scope, so the
+  `AdminPanel.tsx` fog patch stays open on 03.
 
 ## Not yet specified
 

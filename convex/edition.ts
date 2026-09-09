@@ -4,6 +4,8 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { SOURCE_LANG } from "./sourceLang";
 import { shareLang } from "./shareGrants";
 import { decodeEntities, pickContentBody, type ContentBody } from "./contentBlobs";
+import { type Grant, grantsFor } from "./grants";
+import { freePublishedLangs, livePublishedLangs, publishedLangs } from "./publishedEditions";
 
 // `convex/edition.ts`: the Edition reader, the grant resolver and the paywall.
 // Who holds which Edition of a Topic, which one to serve them, how its rows read,
@@ -15,148 +17,21 @@ import { decodeEntities, pickContentBody, type ContentBody } from "./contentBlob
 
 // ---- Editions (course-translation) -----------------------------------------
 
-// A caller's provenance on one Edition — which grant kind admits them. All three
-// read ≡ a Viewer (full access); the kind only labels the badge ("Shared with me"
-// / "Purchases" / "Joined"). `owner` is NOT a Grant: an owner holds the source +
-// every ready translation from `translationJobs`, not a table-row grant, so it is
-// resolved by the callers (`heldLangs`/`editionAccessLevel`), never here.
-export type Grant = "viewer" | "entitled" | "enrolled";
+// The grant tables (`shares`/`entitlements`/`enrollments`/`seats`) moved to
+// `convex/grants.ts` on 2026-09-08 (ticket 28), along with `Grant`, `grantsFor`,
+// `hasEntitlement` and `holdsSeat`. This file keeps the Edition reader, the
+// paygate and Edition selection, and no longer reads another rail's tables.
 
-// THE grant walk (edition-deepening/02): the one place shares/entitlements/
-// enrollments are read for a caller, each held lang mapped to its provenance.
-// Precedence is viewer > entitled > enrolled — encoded in walk order (Shares set
-// unconditionally; the paid/self-serve twins fill only langs still unclaimed) so
-// a lang held by more than one grant keeps the same badge `editionAccessLevel`
-// showed before the collapse. Adding a grant type is one more block here plus one
-// member on `Grant` — nothing else across the file moves.
-export async function grantsFor(
-  ctx: QueryCtx,
-  topicId: Id<"topics">,
-  userId: Id<"users">,
-): Promise<Map<string, Grant>> {
-  const grants = new Map<string, Grant>();
-  // Viewer (Shares) — highest precedence. Legacy rows carry no `lang`; `shareLang`
-  // reads them as the English edition, consistent with `getEditableTopic`.
-  const shares = await ctx.db
-    .query("shares")
-    .withIndex("by_topic_viewer", (q) => q.eq("topicId", topicId).eq("viewerId", userId))
-    .collect();
-  for (const s of shares) grants.set(shareLang(s), "viewer");
-  // Entitled (paid, ADR 0016) — an entitled buyer reads ≡ a Viewer. Fills only
-  // langs a Share has not already claimed.
-  const entitlements = await ctx.db
-    .query("entitlements")
-    .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
-    .collect();
-  for (const e of entitlements) if (!grants.has(e.lang)) grants.set(e.lang, "entitled");
-  // Enrolled (self-serve, ADR 0023) — lowest precedence twin of the two above.
-  const enrollments = await ctx.db
-    .query("enrollments")
-    .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
-    .collect();
-  for (const e of enrollments) if (!grants.has(e.lang)) grants.set(e.lang, "enrolled");
-  // Published & free (course-publishing) — the only grant that is not a row about
-  // THIS caller: an Edition the owner listed in the catalogue and left free reads
-  // ≡ a Viewer for every signed-in account, with no join click and nothing stored.
-  // Lowest precedence, so a real grant above keeps its own badge. Being live
-  // rather than stored, it also ends when the owner unpublishes or prices the
-  // Edition — grandfathering an already-joined learner is what an `enrollments`
-  // row is for (still honoured above; unused by the catalogue path).
-  for (const lang of await freePublishedLangs(ctx, topicId)) if (!grants.has(lang)) grants.set(lang, "viewer");
-  return grants;
-}
-
-// Does this account already hold a paid grant on ONE Edition? The narrow question
-// `grantsFor` above does not answer: it walks every grant kind and returns a
-// badge per lang, and four callers only ever needed "is there an `entitlements`
-// row for this lang". They each wrote the same index read plus the same
-// `.some(e => e.lang === lang)`, and one of them is the PayFast fulfilment path,
-// so the shape had to stay identical rather than drift a fifth way.
-//
-// **It reads `entitlements` and nothing else, deliberately.** A Share, a free
-// published Edition or a grandfathered Enrollment are all access without an
-// Entitlement, and every caller here is about to WRITE an Entitlement (or refuse
-// to spend a seat that would write one) - so widening this to "has any access"
-// would suppress grants that the buyer has paid for. `vouchers.redeem` asks the
-// wider question by checking enrollments and ownership beside this call, where
-// the wider question stays visible.
-export async function hasEntitlement(
-  ctx: QueryCtx,
-  topicId: Id<"topics">,
-  userId: Id<"users">,
-  lang: string,
-): Promise<boolean> {
-  const held = await ctx.db
-    .query("entitlements")
-    .withIndex("by_topic_user", (q) => q.eq("topicId", topicId).eq("userId", userId))
-    .collect();
-  return held.some((e) => e.lang === lang);
-}
-
-// The Editions a course has listed in its tenant's catalogue
-// (`publishedEditions`, course-publishing): `published: true` rows only — an
-// absent row and `published: false` both read as unlisted.
-export async function publishedLangs(ctx: QueryCtx, topicId: Id<"topics">): Promise<Set<string>> {
-  const rows = await ctx.db
-    .query("publishedEditions")
-    .withIndex("by_topic", (q) => q.eq("topicId", topicId))
-    .collect();
-  return new Set(rows.filter((r) => r.published).map((r) => r.lang));
-}
-
-// The listed Editions that actually exist — what the catalogue may advertise. A
-// listed language whose translation has since been removed (or never finished) is
-// not an Edition at all, so serving it would mean English text under a
-// foreign-language label; publishing enforces that create-side, and this
-// re-checks it because an Edition can go away after being listed.
-export async function livePublishedLangs(ctx: QueryCtx, topicId: Id<"topics">): Promise<Set<string>> {
-  const langs = await publishedLangs(ctx, topicId);
-  if (![...langs].some((l) => l !== SOURCE_LANG)) return langs;
-  const jobs = await ctx.db
-    .query("translationJobs")
-    .withIndex("by_topic", (q) => q.eq("topicId", topicId))
-    .collect();
-  const ready = new Set(jobs.filter((j) => j.status === "ready").map((j) => j.lang));
-  for (const l of langs) if (l !== SOURCE_LANG && !ready.has(l)) langs.delete(l);
-  return langs;
-}
-
-// The listed Editions that are free to read — the ones publishing actually opens
-// up, i.e. `livePublishedLangs` minus the PRICED ones (a paid Edition is bought,
-// never read for free; only its Preview shows).
-export async function freePublishedLangs(ctx: QueryCtx, topicId: Id<"topics">): Promise<Set<string>> {
-  const langs = await livePublishedLangs(ctx, topicId);
-  if (langs.size === 0) return langs;
-  const priced = await ctx.db
-    .query("listings")
-    .withIndex("by_topic", (q) => q.eq("topicId", topicId))
-    .collect();
-  for (const l of priced) langs.delete(l.lang);
-  return langs;
-}
+// The Catalogue listing trio (`publishedLangs`, `livePublishedLangs`,
+// `freePublishedLangs`) moved to `convex/publishedEditions.ts` on 2026-09-08
+// (ticket 28): they answer nothing about a caller, and `grants.ts` needs the
+// free-published set, so they had to sit below the grant walk.
 
 // The set of Editions the caller may read on a Topic. The owner holds the source
 // English edition plus every language with a READY translation job (a generated
 // Edition); a non-owner holds the languages their Shares grant PLUS the languages
 // they have an Entitlement for (an entitled buyer reads their Edition exactly like
 // a Viewer, ADR 0016); anyone else nothing.
-// Does this account hold a **Seat** on an Organisation Voucher? (ADR 0031.)
-//
-// The `seats` table belongs to `convex/accessCodes.ts`; this predicate lives here
-// because it is a cross-cutting question that modules with no other business in that
-// rail have to ask, and a one-line read is a smaller thing to share than a new import
-// edge into a module full of mutations.
-//
-// A row stripped of its `userId` by a withdrawal cannot match, which is correct: that
-// member no longer holds a Seat.
-export async function holdsSeat(ctx: QueryCtx, userId: Id<"users">): Promise<boolean> {
-  const seat = await ctx.db
-    .query("seats")
-    .withIndex("by_user", (q) => q.eq("userId", userId))
-    .first();
-  return seat !== null;
-}
-
 export async function heldLangs(
   ctx: QueryCtx,
   topic: Doc<"topics">,

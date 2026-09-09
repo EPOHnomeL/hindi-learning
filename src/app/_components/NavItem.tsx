@@ -46,13 +46,6 @@ export function NavItem({
             {t("free")}
           </span>
         )}
-        {notify && (
-          <span
-            aria-label={t("newReply")}
-            title={t("answeredHere")}
-            className={`h-2 w-2 rounded-full ${active ? "bg-white" : "bg-gold"}`}
-          />
-        )}
         {done && (
           <span aria-label={t("completedLabel")} title={t("completed")} className={`text-xs ${active ? "text-white" : "text-accent2"}`}>
             ✓

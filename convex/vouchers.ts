@@ -3,9 +3,12 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query } from "./_generated/server";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { hasEntitlement, publishedLangs } from "./edition";
+import { grantEdition, survivesTheOwner } from "./grants";
+import { publishedLangs } from "./publishedEditions";
 import { topicBySlug } from "./topicAccess";
-import { platformFeeBps, splitNet } from "./payfast";
+import { platformFeeBps } from "./payfast";
+import { assertOrganisation, freshDealCode, logDealPayment, ownDeal, unsettledDeals } from "./bulkDeal";
+import { offGateway, recordMoneyEvent } from "./moneyEvent";
 import { getSeller, sellerStatusOf } from "./sellerStatus";
 import { mintCode, normaliseCode } from "./voucherCode";
 import { isCallerAdmin } from "./whitelist";
@@ -107,29 +110,20 @@ export const mintBatch = mutation({
       throw new Error(`a batch is between 1 and ${MAX_SEATS} seats`);
     }
     if (!Number.isInteger(total) || total <= 0) throw new Error("a batch needs the total you agreed");
-    const org = orgName.trim();
-    const contact = orgContact.trim();
-    // These two are how the Seller and the sysadmin tell one batch from another
-    // months later, and the contact is the Ledger row's `buyerEmail` - a blank one
-    // would put an anonymous money event in the payouts view.
-    if (!org || !contact) throw new Error("the buying organisation's name and billing contact are both required");
+    const { org, contact } = assertOrganisation(orgName, orgContact);
 
-    const { sellerShare, platformShare } = splitNet(total, platformFeeBps());
-    const ledgerId = await ctx.db.insert("ledger", {
-      topicId: topic._id,
-      lang,
-      sellerId: userId,
-      buyerEmail: contact,
-      gross: total,
-      fee: 0,
-      net: total,
-      sellerShare,
-      platformShare,
+    const ledgerId = await recordMoneyEvent(ctx, {
       kind: "batch",
       // The guard, and the reason ticket 01 landed first: `owedPayouts` reads the
       // `by_status` index for `owed`, so this row is invisible to payouts with no
       // filter anybody could later forget to apply.
       status: "unpaid",
+      topicId: topic._id,
+      lang,
+      payeeId: userId,
+      buyerEmail: contact,
+      amounts: offGateway(total),
+      platformBps: platformFeeBps(),
     });
 
     const batchId = await ctx.db.insert("voucherBatches", {
@@ -145,27 +139,11 @@ export const mintBatch = mutation({
     });
 
     for (let i = 0; i < seats; i++) {
-      await ctx.db.insert("vouchers", { batchId, code: await freshCode(ctx) });
+      await ctx.db.insert("vouchers", { batchId, code: await freshDealCode(ctx, "vouchers", mintCode) });
     }
     return batchId;
   },
 });
-
-// A code no voucher already holds. Convex has no uniqueness constraint, so this is
-// enforced on read exactly as the EFT rail enforces its reference: retry rather
-// than throw. Bounded, because at 32^8 five clashes in a row is not bad luck, it
-// is a broken RNG, and looping on that would hang the mutation instead.
-async function freshCode(ctx: MutationCtx): Promise<string> {
-  for (let i = 0; i < 5; i++) {
-    const code = mintCode();
-    const clash = await ctx.db
-      .query("vouchers")
-      .withIndex("by_code", (q) => q.eq("code", code))
-      .first();
-    if (!clash) return code;
-  }
-  throw new Error("could not mint a unique code");
-}
 
 // ---- Redemption (ticket 03) ---------------------------------------------------
 
@@ -244,12 +222,7 @@ export const redeem = mutation({
     // one of those really would buy the member nothing.
     const alreadyHas = new ConvexError("voucher/already-have-access");
     if (topic.ownerId === userId) throw alreadyHas;
-    if (await hasEntitlement(ctx, batch.topicId, userId, batch.lang)) throw alreadyHas;
-    const enrolled = await ctx.db
-      .query("enrollments")
-      .withIndex("by_topic_user", (q) => q.eq("topicId", batch.topicId).eq("userId", userId))
-      .collect();
-    if (enrolled.some((e) => e.lang === batch.lang)) throw alreadyHas;
+    if (await survivesTheOwner(ctx, batch.topicId, userId, batch.lang)) throw alreadyHas;
 
     // The seat. **No provenance of any kind** - no batch id, no voucher id, no
     // `pfPaymentId`, no `eftRef` - so this row is byte-identical to an Admin comp
@@ -257,7 +230,7 @@ export const redeem = mutation({
     // operator could list the redeemers by elimination, and the promise the
     // organisation bought would be theatre. `vouchers.test.ts` asserts these
     // absences positively; do not delete that assertion as redundant.
-    await ctx.db.insert("entitlements", { userId, topicId: batch.topicId, lang: batch.lang });
+    await grantEdition(ctx, { userId, topicId: batch.topicId, lang: batch.lang });
     // The whole state machine: the code is spent, and the row says nothing else.
     await ctx.db.patch(voucher._id, { redeemedAt: Date.now() });
 
@@ -308,14 +281,12 @@ export const pendingBatches = query({
   ),
   handler: async (ctx) => {
     if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
-    // An ABSENT `paymentRef` is the queue - the same shape the Ledger row's
-    // `unpaid` status has, read from the side that the sysadmin acts on. Indexed
-    // rather than filtered, and capped anyway: a hand-reconciled queue is small by
-    // definition, and one that is not is a signal rather than a page to paginate.
-    const rows = await ctx.db
-      .query("voucherBatches")
-      .withIndex("by_payment_ref", (q) => q.eq("paymentRef", undefined))
-      .take(500);
+    // An ABSENT `paymentRef` is the queue, the same shape the Ledger row's
+    // `unpaid` status has, read from the side the sysadmin acts on. The
+    // index-not-filter discipline and the cap are `unsettledDeals`', shared with
+    // the Access Code rail (ticket 30); what each line SAYS is per-rail and stays
+    // below.
+    const rows = await unsettledDeals(ctx, "voucherBatches");
     return await Promise.all(
       rows.map(async (b) => {
         const [seller, topic, codes] = await Promise.all([
@@ -361,20 +332,21 @@ export const logBatchPayment = mutation({
   args: { batchId: v.id("voucherBatches"), reference: v.string() },
   returns: v.null(),
   handler: async (ctx, { batchId, reference }) => {
+    // **Authorise before reading.** `logDealPayment` gates too, but it cannot gate
+    // before this lookup, and collapsing the two rails onto it briefly put the
+    // existence check first here: a non-admin caller of this public mutation could
+    // then tell an id that exists from one that does not, before being refused.
+    // Convex ids are opaque so the leak was small, but the order is the point, and
+    // the Access Code rail already gated first. The double check costs one index
+    // read on an admin-only path and means the shared writer can never be reached
+    // ungated from a future rail.
     if (!(await isCallerAdmin(ctx))) throw new Error("forbidden");
-    const ref = reference.trim();
-    // The whole point is being able to point at the bank statement line later.
-    if (!ref) throw new Error("the bank reference or transaction id is required");
     const batch = await ctx.db.get(batchId);
     if (!batch) throw new Error("that batch does not exist");
-    if (batch.paymentRef !== undefined) return null;
-
-    await ctx.db.patch(batchId, { paymentRef: ref });
-    // Only an `unpaid` row moves. A batch whose row was somehow already `owed` or
-    // `paid` keeps its state rather than being re-owed, which is the same posture
-    // `markPaid` takes from the other end of the same lifecycle.
-    const row = await ctx.db.get(batch.ledgerId);
-    if (row?.status === "unpaid") await ctx.db.patch(batch.ledgerId, { status: "owed" });
+    // The blank-reference refusal, the idempotency and the unpaid-to-owed flip are
+    // `logDealPayment`'s, shared with the Access Code rail (ticket 30). A batch
+    // always has a Ledger row, unlike a zero-seat code.
+    await logDealPayment(ctx, { id: batchId, paymentRef: batch.paymentRef, ledgerId: batch.ledgerId }, reference);
     return null;
   },
 });
@@ -485,16 +457,14 @@ export const batchCodes = query({
   },
 });
 
-// The caller's own batch, or a throw. Codes are the one thing in this rail that a
-// Seller could use against another Seller, so ownership is checked server-side on
-// every read of them rather than by which batches a page happens to list.
-async function ownBatch(ctx: QueryCtx, batchId: Id<"voucherBatches">): Promise<Doc<"voucherBatches">> {
-  const userId = await getAuthUserId(ctx);
-  if (!userId) throw new Error("sign in to see your batches");
-  const batch = await ctx.db.get(batchId);
-  if (!batch || batch.sellerId !== userId) throw new Error("that batch isn't yours");
-  return batch;
-}
+// The caller's own batch, or a throw. The check itself is `ownDeal`, shared with
+// the Access Code rail (ticket 30); the wording stays here because a refusal that
+// says "access code" about a batch reads like a bug.
+const ownBatch = (ctx: QueryCtx, batchId: Id<"voucherBatches">) =>
+  ownDeal(ctx, "voucherBatches", batchId, {
+    signIn: "sign in to see your batches",
+    notYours: "that batch isn't yours",
+  });
 
 // ---- Voiding (ticket 07) --------------------------------------------------------
 

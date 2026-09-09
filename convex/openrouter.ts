@@ -17,6 +17,7 @@ import {
   type MaterialisedContext,
 } from "./authoring";
 import { authorModel, chatComplete } from "./openrouterClient";
+import { unresolvableAnswerKeys } from "./quizGate";
 import { hashString } from "./tokens";
 
 // The OpenRouter teaching runtime (ADR 0014). A course with `provider:
@@ -92,6 +93,19 @@ async function publishAuthoredLesson(
   // rides through the mutation. In-deployment we can store the blob directly,
   // skipping the CLI's generateContentUploadUrl → PUT dance. publishLesson takes
   // ownership of the blob (drops it if the Lesson already exists).
+  // **The answer key must name an option that exists** (ticket 35). Nothing
+  // downstream ever evaluates it: the server never scores (ADR 0035), so a
+  // `data-correct="d"` whose options are only a, b and c would publish cleanly
+  // and stay wrong forever, marking every option wrong and telling the teaching
+  // loop the learner failed a question that could not be passed. Lessons are
+  // immutable (ADR 0003), so the only repair is a republish, which is why this
+  // refuses BEFORE the row exists rather than reporting afterwards.
+  const unresolvable = unresolvableAnswerKeys(html);
+  if (unresolvable.length > 0) {
+    throw new Error(
+      `authoring: lesson ${key} has an answer key naming no option (${unresolvable.join(", ")}); not published`,
+    );
+  }
   const storageId = await ctx.storage.store(new Blob([html], { type: "text/html" }));
   await ctx.runMutation(api.content.publish.publishLesson, {
     secret,

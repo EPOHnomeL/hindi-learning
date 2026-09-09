@@ -7,6 +7,7 @@ import { api } from "../../../../convex/_generated/api";
 import { CourseSettingsBody } from "../CourseSettings";
 import { DashboardTab } from "./DashboardTab";
 import { Icon, type IconName } from "../icons";
+import { useMutationRun } from "../mutationRun";
 import { IconButton } from "../ui";
 import { EditionBadges, EmptyPanel, Sheet, type Edition } from "./shared";
 import { AddLanguagePanel, SharingTab } from "./SharingTab";
@@ -209,9 +210,11 @@ function AdminGenerationSection({ topicSlug, courseCompleted }: { topicSlug: str
   const t = useTranslations("Dashboard");
   const amAdmin = useQuery(api.whitelist.amIAdmin);
   const status = useQuery(api.routine.generationStatus, { topicSlug });
-  const finish = useAction(api.routine.finishGenerating);
   const cancel = useAction(api.routine.cancelFinishGenerating);
-  const [busy, setBusy] = useState(false);
+  // A tenth silent site, found by ticket 32's boundary test rather than by the
+  // review that counted seven. `finishGenerating` refuses on a locked run, a
+  // completed course and a missing model key, and all three said nothing.
+  const { run: finish, busy, error } = useMutationRun(useAction(api.routine.finishGenerating), t("setupError"));
   if (!amAdmin || courseCompleted) return null;
 
   const generating = busy || status?.status === "generating";
@@ -231,8 +234,7 @@ function AdminGenerationSection({ topicSlug, courseCompleted }: { topicSlug: str
             if (!cancelling) void cancel({ topicSlug });
             return;
           }
-          setBusy(true);
-          void finish({ topicSlug }).finally(() => setBusy(false));
+          void finish({ topicSlug });
         }}
         className="flex w-full items-center gap-2 rounded-xl border border-line bg-card px-3 py-2.5 text-start text-sm text-ink transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
       >
@@ -245,6 +247,7 @@ function AdminGenerationSection({ topicSlug, courseCompleted }: { topicSlug: str
             ? t("finishGeneratingRetry")
             : t("finishGenerating")}
       </button>
+      {error && <p className="mt-2 text-xs text-danger">{error}</p>}
     </div>
   );
 }

@@ -5,7 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import { topicBySlug } from "./topicAccess";
 import { assertAdmin } from "./adminSecret";
 import { shuffleQuizOptions } from "./quizShuffle";
-import { quizStructureMatches } from "./translate";
+import { quizVerdict } from "./quizGate";
 
 // One-shot, secret-gated backfill: reshuffle the option order of every stored
 // quiz so the correct answer is no longer clustered at the first position (the
@@ -276,7 +276,7 @@ export const sweepLessonText = action({
       const hits = html.split(from).length - 1;
       if (hits === 0) continue;
       const next = html.split(from).join(to);
-      if (!quizStructureMatches(html, next)) {
+      if (quizVerdict(html, next) !== "ok") {
         refused.push(r.key);
         continue;
       }

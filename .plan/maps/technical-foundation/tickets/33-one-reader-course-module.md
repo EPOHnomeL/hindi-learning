@@ -67,3 +67,35 @@ shape 27 then re-cuts.
 layout hosts a small course-scoped context owning the seen set for notification dots. The
 dots no longer exist. The URL-addressability decision itself is untouched by this ticket,
 so the superseding ADR should be narrow and say so.
+
+**Part of this landed on 2026-09-08, and the ticket stays open.** No `## Answer`,
+because the `## Done when` above is not met.
+
+What landed (commit `refactor(reader): delete the notification-dot machinery nothing
+rendered`), which is this ticket's "the dead seen-set machinery and the callerless derive
+exports go with it, or a reason to keep them is recorded":
+
+- `unseenReplyKeys` deleted, with its three tests. It had **zero production callers**.
+- `NavItem`'s `notify` prop and the dot it rendered deleted. It was **never passed by
+  either reader**.
+- The `hindi:answers-seen` set, `markSeen`, `seenAfterOpening` and `LessonPane`'s
+  mark-on-open effect deleted. The only thing that ever read the key back was the
+  sign-out sweep's own test.
+- **`myQuestions` came out of `CourseShell` with it**, because the seen set was its only
+  consumer. So the shell is down one of the six live subscriptions this ticket counts, and
+  the context is down one member.
+- `docs/adr/0036` supersedes ADR 0012 in part, which is the superseding ADR this ticket
+  asked for rather than an edit. It is narrow and says so: URL-addressability, the
+  layout/page split and the live-`useQuery` posture are untouched. It also records what is
+  NOT decided, namely whether the product wants reply dots at all.
+
+**What remains, and why it was not attempted in the same session:** the one
+`useReaderCourse()` with an authed and a Guest adapter, `ArtifactView` re-subscribing
+nothing, `CourseShell`/`PublicCourseShell` reduced to chrome, and the three duplicated
+compositions (resume-else-first, the next-row lookup, the paygate wiring) folded into
+`readerNav`. That is the highest-traffic surface in the product with **zero component
+tests**, so a regression there is invisible to the suite and lands on every learner. It
+wants its own session and a browser walk, not the tail of a long one.
+
+Note the line numbers in the Question above have drifted: they were measured 2026-09-07
+and this file changed on 2026-09-08. Re-measure before acting on them.

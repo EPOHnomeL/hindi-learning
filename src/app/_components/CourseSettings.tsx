@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { EmblemSection } from "./Certificate";
 import { Icon } from "./icons";
+import { useMutationRun } from "./mutationRun";
 import { ConfirmDialog, IconButton } from "./ui";
 
 // "Course settings" (UI redesign): Details, the certificate emblem, and the
@@ -99,8 +100,9 @@ export function CourseSettingsBody({
 function TeacherQaSection({ topicSlug }: { topicSlug: string }) {
   const t = useTranslations("CourseSettings");
   const header = useQuery(api.content.reader.courseHeader, { topicSlug });
-  const setTeacherQa = useMutation(api.capture.setTeacherQa);
-  const [busy, setBusy] = useState(false);
+  // Was a `finally` with no `catch`: a refused toggle (the tenant's `qa` flag
+  // off, not the owner) snapped back with nothing said. Ticket 32.
+  const { run, busy, error } = useMutationRun(useMutation(api.capture.setTeacherQa), t("updateError"));
   // Absence means ON, and so does a header still loading: the toggle must never
   // flash "off" on a course whose Q&A is open.
   const on = header?.teacherQa ?? true;
@@ -117,17 +119,17 @@ function TeacherQaSection({ topicSlug }: { topicSlug: string }) {
           >
             <Icon name="chat" className="h-4.5 w-4.5" />
           </span>
-          <span className="text-[11.5px] text-soft">{on ? t("teacherQaOn") : t("teacherQaOff")}</span>
+          <span className="text-[11.5px] text-soft">
+            {on ? t("teacherQaOn") : t("teacherQaOff")}
+            {error && <span className="block text-danger">{error}</span>}
+          </span>
         </div>
         <label className="relative inline-flex shrink-0 cursor-pointer items-center">
           <input
             type="checkbox"
             checked={on}
             disabled={busy || header === undefined}
-            onChange={(e) => {
-              setBusy(true);
-              void setTeacherQa({ topicSlug, enabled: e.target.checked }).finally(() => setBusy(false));
-            }}
+            onChange={(e) => void run({ topicSlug, enabled: e.target.checked })}
             className="peer sr-only"
           />
           <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
@@ -370,9 +372,10 @@ function LessonsSection({ topicSlug }: { topicSlug: string }) {
 function CompletionSection({ topicSlug, status }: { topicSlug: string; status: "seeded" | "active" | "completed" }) {
   const t = useTranslations("CourseSettings");
   const endCourse = useMutation(api.content.authoring.endCourse);
-  const reopenCourse = useMutation(api.content.authoring.reopenCourse);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Reopening was a `finally` with no `catch`. Ticket 32.
+  const reopen = useMutationRun(useMutation(api.content.authoring.reopenCourse), t("updateError"));
 
   if (status === "completed") {
     return (
@@ -381,15 +384,13 @@ function CompletionSection({ topicSlug, status }: { topicSlug: string; status: "
         <p className="mt-1 text-[12.5px] text-soft">{t("completionDoneBody")}</p>
         <button
           type="button"
-          disabled={busy}
-          onClick={() => {
-            setBusy(true);
-            void reopenCourse({ topicSlug }).finally(() => setBusy(false));
-          }}
+          disabled={reopen.busy}
+          onClick={() => void reopen.run({ topicSlug })}
           className="mt-4 inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm text-soft transition-colors hover:border-transparent hover:bg-hi hover:text-accent disabled:opacity-60"
         >
-          <Icon name="refresh" className="h-4 w-4" /> {busy ? t("reopening") : t("reopen")}
+          <Icon name="refresh" className="h-4 w-4" /> {reopen.busy ? t("reopening") : t("reopen")}
         </button>
+        {reopen.error && <p className="mt-2 text-xs text-danger">{reopen.error}</p>}
       </div>
     );
   }

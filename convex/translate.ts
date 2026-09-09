@@ -3,7 +3,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { api, internal } from "./_generated/api";
 import { action, internalAction, internalMutation, internalQuery, mutation, query, type QueryCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import { publishedLangs } from "./edition";
+import { publishedLangs } from "./publishedEditions";
 import { getEditableTopic, getOwnedTopic, topicBySlug } from "./topicAccess";
 import { assertAdmin } from "./adminSecret";
 import { hashString } from "./tokens";
@@ -13,6 +13,7 @@ import { assertTenantFlag } from "./tenantFlags";
 import { isKnownLang, langInfo } from "./languages";
 import { chatComplete, translateModel, type ChatMessage } from "./openrouterClient";
 import { geminiComplete, geminiTranslateModel } from "./geminiClient";
+import { quizVerdict } from "./quizGate";
 
 // Course translation (Editions), driven by the cloud **translate Routine** — the
 // sibling of the next-lesson Routine (routine.ts), reusing its lock → claim →
@@ -582,13 +583,13 @@ export const publishTranslationChecked = action({
       if (sid) {
         const blob = await ctx.storage.get(sid);
         const body = blob ? await blob.text() : null;
-        // An unreadable source blob is not a licence to skip the check — refuse,
-        // the same way a marker mismatch does. Silently publishing here is how
-        // the guard stopped protecting the first time.
-        if (body === null || !quizStructureMatches(body, html)) return { status: "skipped" };
+        // An unreadable source blob is not a licence to skip the check: refuse it
+        // the same way a marker mismatch is refused. `quizVerdict` is where that
+        // rule lives now, so it cannot be forgotten at a seventh call site.
+        if (quizVerdict(body, html) !== "ok") return { status: "skipped" };
       }
     }
-    return await ctx.runMutation(api.translate.publishTranslation, a);
+    return await ctx.runMutation(internal.translate.publishTranslation, a);
   },
 });
 
@@ -691,7 +692,7 @@ export const claimTranslation = mutation({
 // translation whose quiz-marker counts changed (positional scoring must survive)
 // — a rejected/vanished item is skipped, leaving the English fallback. A missing
 // job means the Edition was removed mid-run: skip, so no orphan row is inserted.
-export const publishTranslation = mutation({
+export const publishTranslation = internalMutation({
   args: {
     secret: v.string(),
     ownerEmail: v.string(),
@@ -722,18 +723,18 @@ export const publishTranslation = mutation({
     if (!src) return { status: "skipped" }; // source vanished — leave the English fallback.
 
     const html = a.html !== undefined ? stripFence(a.html) : undefined;
-    // A structural drift in a Lesson's quiz markers would break positional scoring
-    // — skip it (English fallback) rather than ship a broken quiz.
+    // **The quiz guard is not here, and no longer pretends to be.** It was dead
+    // code for a Lesson: source bodies are content blobs, so `readSource` returns
+    // no `html` and a mutation cannot fetch one, which made `src.html !==
+    // undefined` permanently false. Deleted on 2026-09-08 rather than left
+    // commented (ticket 26), because a guard that cannot fire is worse than no
+    // guard: it reads like protection.
     //
-    // NOTE this branch is unreachable for a Lesson today: source bodies are content
-    // blobs, so `readSource` returns no `html` and a mutation cannot fetch one. It
-    // is kept for non-blob sources and as the last line of defence. The live guard
-    // for blob-backed sources is in the two callers that CAN read the blob —
-    // `translateTopic` (holds the body already) and `publishTranslationChecked`
-    // (re-reads it). Publish through one of those, never this mutation directly.
-    if (a.kind === "lesson" && html !== undefined && src.html !== undefined && !quizStructureMatches(src.html, html)) {
-      return { status: "skipped" };
-    }
+    // The real gate is `quizVerdict`, run by the two callers that CAN read a blob:
+    // `translateTopic`, which holds the body already, and
+    // `publishTranslationChecked`, which re-reads it. This is an
+    // `internalMutation` now, so those two are the only doors, which is what stops
+    // the rule resting on this comment.
 
     const row = {
       topicId: topic._id,
@@ -913,13 +914,18 @@ function translationBackend(): TranslationBackend {
 async function translateField(content: string, langName: string, mode: "html" | "text"): Promise<string> {
   if (content.trim() === "") return content;
   const messages = buildTranslateMessages(content, langName, mode);
-  if (translationBackend() === "openrouter") {
-    // Usage is reported by the client but not recorded here: the cost seam
-    // (technical-foundation/12) instruments Routine RUNS, per Topic, and a
-    // translation job is a different unit with its own job rows.
-    return (await chatComplete({ model: translateModel(), messages, reasoning: "none" })).content;
-  }
-  return await geminiComplete({ model: geminiTranslateModel(), messages });
+  // A dispatch, and nothing more. Both clients return `{ content, usage }` since
+  // ticket 31, so the two arms differ only in which vendor they name.
+  const reply =
+    translationBackend() === "openrouter"
+      ? await chatComplete({ model: translateModel(), messages, reasoning: "none" })
+      : await geminiComplete({ model: geminiTranslateModel(), messages });
+  // Usage is now visible on BOTH rails (`complete` logs it), and still not
+  // persisted on either. Ticket 12 instruments Routine RUNS in `generationRuns`,
+  // per Topic; a translation job is a different unit with its own
+  // `translationJobs` row and no usage columns, so recording it is schema work on
+  // that table and its own ticket. Deliberately not smuggled in here.
+  return reply.content;
 }
 
 // Items translated per action invocation. A big course can't finish inside one
@@ -970,8 +976,8 @@ export const translateTopic = internalAction({
           // A mangled placeholder or a dropped quiz marker means a corrupt body:
           // skip the item (English fallback; counted `failed` at report). The
           // mutation-side quiz guard can't read blobs, so this is THE check.
-          if (html === null || !quizStructureMatches(body, html)) continue;
-          await ctx.runMutation(api.translate.publishTranslation, {
+          if (html === null || quizVerdict(body, html) !== "ok") continue;
+          await ctx.runMutation(internal.translate.publishTranslation, {
             secret,
             ownerEmail,
             topicSlug,
@@ -983,7 +989,7 @@ export const translateTopic = internalAction({
           });
         } else {
           // title / mission — a single text field.
-          await ctx.runMutation(api.translate.publishTranslation, {
+          await ctx.runMutation(internal.translate.publishTranslation, {
             secret,
             ownerEmail,
             topicSlug,
@@ -1053,16 +1059,11 @@ function stripFence(s: string): string {
   return m ? m[1]!.trim() : s.trim();
 }
 
-// True when the quiz-scoring markers survived translation unchanged. The reader
-// derives quiz identity positionally and reads data-correct/data-answer/data-k
-// (lessonSrcDoc), so a changed count means a broken quiz. Reused by the owner
-// prose-edit path (content.editLesson) to reject a structural change to a Lesson.
-export function quizStructureMatches(source: string, out: string): boolean {
-  for (const re of [/data-correct=/g, /data-answer=/g, /data-k=/g]) {
-    if ((source.match(re) ?? []).length !== (out.match(re) ?? []).length) return false;
-  }
-  return true;
-}
+// The quiz-structure gate moved to `convex/quizGate.ts` on 2026-09-08 (ticket 26),
+// with the read-both-bodies-then-decide POLICY that six call sites each wrote out
+// by hand. `quizStructureMatches` is still the pure core; `quizVerdict` is the
+// policy, and it names the unreadable case instead of leaving each caller to
+// remember that an unreadable source is not permission.
 
 // ---- Owner: the Editions panel data ----------------------------------------
 

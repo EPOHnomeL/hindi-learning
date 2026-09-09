@@ -13,8 +13,6 @@ import {
   resourceOpenMode,
   resourceTarget,
   resumeLessonKey,
-  seenAfterOpening,
-  unseenReplyKeys,
 } from "./readerDerive";
 
 describe("courseIndexRedirect", () => {
@@ -280,31 +278,6 @@ describe("resumeLessonKey", () => {
   });
 });
 
-describe("unseenReplyKeys", () => {
-  const questions = [
-    { id: "q1", lessonKey: "0001-alpha", reply: "Here's the answer." },
-    { id: "q2", lessonKey: "0002-beta", reply: null }, // open, no reply yet
-    { id: "q3", lessonKey: "0003-gamma", reply: "Another answer." },
-  ];
-
-  it("flags lessons whose reply the learner has not yet seen", () => {
-    const dots = unseenReplyKeys(questions, new Set());
-    expect(dots.has("0001-alpha")).toBe(true);
-    expect(dots.has("0003-gamma")).toBe(true);
-  });
-
-  it("ignores questions with no reply", () => {
-    const dots = unseenReplyKeys(questions, new Set());
-    expect(dots.has("0002-beta")).toBe(false);
-  });
-
-  it("drops a lesson once its replied question has been seen", () => {
-    const dots = unseenReplyKeys(questions, new Set(["q1"]));
-    expect(dots.has("0001-alpha")).toBe(false);
-    expect(dots.has("0003-gamma")).toBe(true);
-  });
-});
-
 describe("cardIdFromHash", () => {
   it("returns the card id from a hash, stripping the leading #", () => {
     expect(cardIdFromHash("#dhanya")).toBe("dhanya");
@@ -359,37 +332,6 @@ describe("resolveArtifactClick — card deep-link hash preservation (reference-c
     expect(internalNavTarget("/courses/hindi/references/glossary", "/share/tok1/lessons/0003")).toBe(
       "/share/tok1/references/glossary",
     );
-  });
-});
-
-describe("seenAfterOpening", () => {
-  const questions = [
-    { id: "q1", lessonKey: "0001-alpha", reply: "answer" },
-    { id: "q2", lessonKey: "0001-alpha", reply: null }, // open, no reply
-    { id: "q3", lessonKey: "0002-beta", reply: "answer" },
-  ];
-
-  it("marks the opened lesson's replied questions as seen", () => {
-    const next = seenAfterOpening(questions, "0001-alpha", new Set());
-    expect(next.has("q1")).toBe(true);
-  });
-
-  it("does not mark questions from other lessons, or unanswered ones", () => {
-    const next = seenAfterOpening(questions, "0001-alpha", new Set());
-    expect(next.has("q2")).toBe(false); // same lesson, no reply
-    expect(next.has("q3")).toBe(false); // other lesson
-  });
-
-  it("returns the same set reference when there is nothing new to mark", () => {
-    const seen = new Set(["q1"]);
-    expect(seenAfterOpening(questions, "0001-alpha", seen)).toBe(seen);
-  });
-
-  it("returns the same set reference when the lesson has no replied questions", () => {
-    const seen = new Set<string>();
-    expect(seenAfterOpening(questions, "0002-beta", new Set(["q3"]))).not.toBe(seen);
-    // a lesson with no replies at all leaves seen untouched
-    expect(seenAfterOpening(questions, "no-such-lesson", seen)).toBe(seen);
   });
 });
 

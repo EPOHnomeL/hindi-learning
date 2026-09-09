@@ -1,4 +1,5 @@
 import { isDevanagari, isRtl } from "../../convex/languages";
+import { formatMoney } from "./money";
 import { DEFAULT_LOCALE, offeredLocale, type Locale } from "../i18n/config";
 
 // The course poster's model (course-poster spec): the pure seam between the three
@@ -90,27 +91,19 @@ export function posterScript(lang: string): PosterScript {
   return isDevanagari(lang) ? "deva" : isRtl(lang) ? "arab" : "latn";
 }
 
-// The price as the poster prints it: the Edition's own currency, its narrow
-// symbol, whole units unless the amount has cents (R100, not R100,00), in the
-// poster's locale. A leading symbol is set tight against the figure, as a price
-// tag does ("R100", "$12.50"); a trailing one keeps the locale's space ("100 R").
-// Falls back to a plain "100 ZAR" for a currency Intl rejects.
+// The price as the poster prints it, which is now how the rest of the product
+// prints it: the Edition's own currency, its narrow symbol, the poster's locale,
+// and always two decimal places.
+//
+// **This changed on 2026-09-08 and the change is visible.** It used to drop the
+// cents on a round amount and set a leading symbol tight against the figure, as a
+// price tag does, so a R100 Edition printed `R100` here and `R 100,00` in the
+// admin cash log. The operator chose one spelling over two, knowing it alters a
+// poster that had already been signed off. Kept as a named function because a
+// poster's price is a distinct thing to reach for, and the locale stays explicit
+// because a rendered poster must not read differently depending on who opened it.
 export function priceLabel(amount: number, currency: string, locale: string): string {
-  const major = amount / 100;
-  const fraction = amount % 100 === 0 ? 0 : 2;
-  try {
-    return new Intl.NumberFormat(locale, {
-      style: "currency",
-      currency: currency.toUpperCase(),
-      currencyDisplay: "narrowSymbol",
-      minimumFractionDigits: fraction,
-      maximumFractionDigits: fraction,
-    })
-      .format(major)
-      .replace(/^(\D+?)\s+(?=\d)/u, "$1");
-  } catch {
-    return `${major.toFixed(fraction)} ${currency.toUpperCase()}`;
-  }
+  return formatMoney(amount, currency, { locale });
 }
 
 // The mission as a tagline, or null. A course's mission can be a whole brief

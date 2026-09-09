@@ -56,3 +56,23 @@ intended (Guests record no Responses) or a second gap, and say which in the Answ
 **Note for whoever also takes [33](33-one-reader-course-module.md):** 33 restructures
 `ArtifactView` around a frame component that owns no queries. That component is this
 ticket's product, which is why 33 is `blocked_by` this one.
+
+## Answer
+
+2026-09-08, built. `lessonMessage(e, frame)` is the inbound half of the bridge, beside the
+builders that are the outbound half, and all four listeners go through it. The frame
+argument is required and not defaulted: a caller cannot install a listener without saying
+which frame it trusts, and `null` trusts nothing, so a listener bound before the iframe
+mounts drops messages instead of accepting them from anywhere.
+
+**A second missing `e.source` check, which this ticket did not list.** The review named the
+height listener. The quiz-response listener had no check either, so any frame on the page
+could record a quiz answer against the reader's Progress. It **could not** have checked:
+it sat in `LessonView`, which renders `Frame` and holds no ref to the iframe. So it moved
+into `Frame`, and `LessonView` hands down what to do with an answer. A read-only Viewer is
+now the callback being absent rather than an early return inside a listener.
+
+The parser is tested without a DOM: every malformed payload, both wrong-frame cases, the
+no-frame case, and a boundary test that fails if a listener casts `e.data` again.
+
+Verified by test. `pnpm typecheck` and the full suite green.

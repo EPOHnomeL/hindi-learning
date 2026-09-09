@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { Icon } from "../icons";
+import { refusalMessage } from "../mutationRun";
 import { formatPrice } from "../Paygate";
 import { ConfirmDialog } from "../ui";
 
@@ -173,10 +174,14 @@ function MintAccessCodeForm({ topicSlug, lang, onMinted }: { topicSlug: string; 
         try {
           await mint({ topicSlug, lang, capacity: seats, pricePerSeat: cents, orgName, orgContact });
           onMinted();
-        } catch {
-          // The server's own refusals are plain Errors, which a production
-          // deployment redacts, so this says what a Seller can actually check.
-          setError(t("accessError"));
+        } catch (e) {
+          // This used to discard `e` on the grounds that the server's refusals
+          // are plain Errors a production deployment redacts. Some of them are
+          // tagged `ConvexError`s and did survive the trip, so giving up threw
+          // away the messages that worked along with the ones that did not.
+          // `refusalMessage` keeps the Seller-facing fallback for the redacted
+          // case and shows the real refusal when there is one (ticket 32).
+          setError(refusalMessage(e, t("accessError")));
         } finally {
           setBusy(false);
         }

@@ -10,7 +10,8 @@ import posthog from "posthog-js";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { isPostHogInitialized } from "../PostHogClient";
-import { langInfo } from "../../../convex/languages";
+import { editionChip } from "../../../convex/languages";
+import { preferEdition } from "../../../convex/editionPreference";
 import { tenantPill } from "~/design/tenantPill";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { catalogueCacheKey, DASHBOARD_CACHE_KEY, TENANT_NAME_CACHE_KEY, writeCache } from "./offlineCache";
@@ -327,10 +328,7 @@ function CourseCard({ course }: { course: Course }) {
   const pricing = useQuery(api.market.editionPricing, complete ? { topicSlug: course.slug } : "skip");
   const priced = pricing && pricing.length > 0 ? pricing : null;
 
-  const editions = course.editions.map((code) => {
-    const i = langInfo(code);
-    return { lang: i.code, native: i.native, rtl: !!i.rtl };
-  });
+  const editions = course.editions.map(editionChip);
 
   return (
     // A seeded course has no lesson to open, so it is NOT a click-through card:
@@ -458,15 +456,12 @@ function SharedSection() {
 function SharedCourseCard({ course }: { course: SharedCourse }) {
   const t = useTranslations("Dashboard");
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
-  // Open in the active UI language when the Viewer holds that Edition; else the
-  // Edition the card's title is shown in — English if held, else their first
-  // Edition (mirrors listSharedTopics' `preferred`).
+  // Open in the active UI language when the Viewer holds that Edition, else the
+  // source, else their first. `preferEdition` is that ladder, shared with the two
+  // server queries that title these cards; see its own note on why the server
+  // asks without the locale rung.
   const locale = useLocale();
-  const openLang = course.langs.some((l) => l.lang === locale)
-    ? locale
-    : course.langs.some((l) => l.lang === "en")
-      ? "en"
-      : course.langs[0]?.lang;
+  const openLang = preferEdition(course.langs.map((l) => l.lang), locale);
 
   return (
     <article className="open-card relative flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm hover:border-accent/45 hover:shadow-md">
@@ -602,11 +597,7 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
   const t = useTranslations("Dashboard");
   const pct = course.lessonCount > 0 ? Math.round((course.completedCount / course.lessonCount) * 100) : 0;
   const locale = useLocale();
-  const openLang = course.langs.some((l) => l.lang === locale)
-    ? locale
-    : course.langs.some((l) => l.lang === "en")
-      ? "en"
-      : course.langs[0]?.lang;
+  const openLang = preferEdition(course.langs.map((l) => l.lang), locale);
 
   return (
     <article className="open-card relative flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm hover:border-accent/45 hover:shadow-md">
@@ -704,14 +695,8 @@ function AvailableSection() {
 // moves to their own list once they start it.
 function AvailableCourseCard({ course }: { course: AvailableCourse }) {
   const t = useTranslations("Dashboard");
-  // Open the Edition matching the app language when the course has one, else
-  // English, else its first — the same preference SharedCourseCard uses.
   const locale = useLocale();
-  const openLang = course.langs.some((l) => l.lang === locale)
-    ? locale
-    : course.langs.some((l) => l.lang === "en")
-      ? "en"
-      : course.langs[0]?.lang;
+  const openLang = preferEdition(course.langs.map((l) => l.lang), locale);
 
   return (
     <article className="open-card relative flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm hover:border-accent/45 hover:shadow-md">

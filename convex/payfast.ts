@@ -227,7 +227,7 @@ export function buildCheckoutFields(opts: {
     notify_url: opts.notifyUrl,
     ...(opts.email ? { email_address: opts.email } : {}),
     ...(opts.mPaymentId ? { m_payment_id: opts.mPaymentId } : {}),
-    amount: randFromCents(opts.amountCents),
+    amount: payfastAmountField(opts.amountCents),
     item_name: opts.itemName.slice(0, 100),
     custom_str1: opts.custom1,
     custom_str2: opts.custom2,
@@ -245,23 +245,22 @@ export function platformFeeBps(): number {
   return env().PLATFORM_FEE_BPS;
 }
 
-// Split a sale's net (cents, from the ITN's amount_net) into the Seller's and
-// the platform's shares. The bps is the PLATFORM's cut — its name, and the
-// prior rail's convention (1500 meant a 15% platform take-rate); the PRD's
-// literal formula handed the bps to the seller, which at the decided 5000 is
-// identical but at any other value inverts the economics, so the name wins.
-// The shares always sum back to net and never go negative — rounding neither
-// loses nor mints a cent, even on a fixed-fee-heavy cheap sale.
-export function splitNet(netCents: number, bps: number): { sellerShare: number; platformShare: number } {
-  const platformShare = Math.round((netCents * bps) / 10_000);
-  return { sellerShare: netCents - platformShare, platformShare };
-}
+// The payout split moved to `moneyEvent.ts` on 2026-09-08. It never belonged
+// here: the donation, Voucher Batch and Access Code rails all split a net and
+// none of them touches a gateway. This module is the PayFast wire format.
 
 // ---- ZAR formatting -----------------------------------------------------------------
 
-// Cents → the 2-decimal Rand string PayFast's `amount` fields carry ("1500.00").
-// Integer math — no float rounding at the money boundary.
-export function randFromCents(cents: number): string {
+// Cents to the 2-decimal Rand string PayFast's `amount` fields carry ("1500.00").
+// Integer math, so there is no float rounding at the money boundary.
+//
+// **This is WIRE format, not display**, and the name says so since 2026-09-08.
+// It looked like a fourth money formatter beside `formatMoney`, `formatPrice`
+// and the admin log's, and it is not one: no symbol, no grouping, no locale, a
+// dot decimal separator because that is what the gateway parses, and a value
+// that goes into a signed field where changing the spelling breaks the
+// signature. Display money lives in `src/lib/money.ts`.
+export function payfastAmountField(cents: number): string {
   return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
 }
 

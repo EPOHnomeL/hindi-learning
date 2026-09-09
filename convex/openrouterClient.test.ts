@@ -2,6 +2,10 @@
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { authorModel, chatComplete, translateModel } from "./openrouterClient";
 
+// Only what is vendor-specific about OpenRouter. The shared policy (missing key,
+// post-once-retry-once, non-OK, empty completion, usage normalisation) moved to
+// `modelCall.test.ts` with the policy itself on 2026-09-08 (ticket 31).
+
 // A captured fetch call, so we can assert on URL / headers / body.
 type Captured = { url: string; init: RequestInit };
 function stubFetch(content: string): { calls: Captured[] } {
@@ -68,26 +72,6 @@ test("chatComplete retries once without reasoning when the endpoint mandates it"
   expect(JSON.parse(bodies[1]!).reasoning).toBeUndefined();
 });
 
-test("chatComplete does not retry a reasoning-mandatory 400 when reasoning was never sent", async () => {
-  const fetchMock = vi.fn(
-    async () =>
-      new Response(JSON.stringify({ error: { message: "Reasoning is mandatory for this endpoint and cannot be disabled." } }), {
-        status: 400,
-      }),
-  );
-  vi.stubGlobal("fetch", fetchMock);
-  await expect(chatComplete({ model: "m", messages: [] })).rejects.toThrow(/400/);
-  expect(fetchMock).toHaveBeenCalledTimes(1);
-});
-
-test("chatComplete throws on a non-OK response and when the key is missing", async () => {
-  vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 429 })));
-  await expect(chatComplete({ model: "m", messages: [] })).rejects.toThrow(/429/);
-
-  delete process.env.OPENROUTER_API_KEY;
-  await expect(chatComplete({ model: "m", messages: [] })).rejects.toThrow(/OPENROUTER_API_KEY/);
-});
-
 test("model slugs come from env with GLM/Gemini defaults", () => {
   expect(authorModel()).toBe("z-ai/glm-5.3-flash");
   expect(translateModel()).toBe("google/gemini-3.5-flash");
@@ -95,30 +79,4 @@ test("model slugs come from env with GLM/Gemini defaults", () => {
   process.env.OPENROUTER_TRANSLATE_MODEL = "custom/translate";
   expect(authorModel()).toBe("custom/author");
   expect(translateModel()).toBe("custom/translate");
-});
-
-// Cost instrumentation (technical-foundation/12): the provider answers with a
-// `usage` object, and the client hands it back instead of dropping it. Absent or
-// non-numeric usage is UNKNOWN (undefined), never zero.
-test("chatComplete returns the provider's token usage when it sends one", async () => {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(
-      async () =>
-        new Response(
-          JSON.stringify({
-            choices: [{ message: { content: "hi" } }],
-            usage: { prompt_tokens: 812, completion_tokens: 91 },
-          }),
-          { status: 200 },
-        ),
-    ),
-  );
-  const out = await chatComplete({ model: "m", messages: [] });
-  expect(out).toEqual({ content: "hi", usage: { inputTokens: 812, outputTokens: 91 } });
-});
-
-test("chatComplete reports usage as undefined when the response carries none", async () => {
-  stubFetch("hi");
-  expect((await chatComplete({ model: "m", messages: [] })).usage).toBeUndefined();
 });
