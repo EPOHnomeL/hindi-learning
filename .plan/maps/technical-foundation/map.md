@@ -64,28 +64,30 @@ and deliberate-shortcut debt all pass. A feature that happens to need a migratio
   because the sibling-table split fixes all three and a kinds-narrowing fix would miss
   it entirely. Compute and Data Egress have collapsed to nothing. The window is about a
   day and a half, so **composition is reliable and monthly projections are not.**
-- **Two cost questions remain OPERATOR-GATED, not un-worked (2026-09-09).**
-  Written here so no further session re-opens them, re-plans them, or quietly builds
-  around them. Each needs a Convex **dashboard** read, and a session in this checkout
-  cannot do any of them: verified 2026-09-09 that the Convex CLI exposes no usage or
-  billing command (`npx convex --help`), and there is still no prod deploy key here.
-  - **Read the Aug 8 to Sep 8 2026 invoice.** It closed on 2026-09-08 and nobody has
-    read it. It is the first closed bill that fully contains `784eb70`, so it is the
-    first real test of that change, and it may move several numbers in
-    [the baseline](assets/convex-cost-baseline.md).
-  - **Drill Database I/O per deployment** to find the unattributed ~60% (the fog patch
-    below). **Partly answered 2026-09-09 and the leading hypothesis got weaker:** within
-    the `my-course` project non-prod is negligible (Dev 660.7 KB of 166.97 MB, 0.4%), so
-    "it is the non-prod deployments" no longer looks likely. What is still unseen is the
-    other projects on the account.
-  - **Decide EU versus US hosting** (the fog patch below). This one may end the cost
-    thread outright.
+- **What is LEFT of the cost thread after 2026-09-09, and who can do it.** The
+  by-function read is done and the EU-versus-US arithmetic is costed; both live in
+  [the baseline](assets/convex-cost-baseline.md). What remains is short, and no session
+  in this checkout can do the first two: verified 2026-09-09 that the Convex CLI exposes
+  no usage or billing command (`npx convex --help`), and there is still no prod deploy
+  key here.
+  - **The residency decision, and it is the only real question left.** Not a cost
+    question any more: the cost side is costed (US with 01 is about $0.09/month, versus
+    $2.17 today). It is whether the courses' learners' data may leave the EU, which is a
+    POPIA and duty-of-care call for the operator alone.
+  - **Read the closed Aug 8 to Sep 8 2026 invoice**, to firm up projections that
+    currently rest on a 1.25-day window. Nice to have rather than gating: the
+    composition it would confirm is already visible.
+  - **Finish the attribution, cheaply.** Compare the top-line Database I/O figure for
+    Sep 08 to Oct 08 against the **166.97 MB** the by-function panel totals for the same
+    range. If they match, the baseline's unattributed ~60% was an artefact of its
+    **prod-only filter** and the question closes; the 2026-09-09 panel was already set
+    to *All Projects*, so this is one number, not a drill-down.
 
-  Until they are answered, **do not start a session on cost-motivated code.** The whole
-  bill is $3 to $4 a month, Compute and Egress have collapsed to nothing, and 01 is
-  worth about $0.60 of it, so the user-experience
-  argument is the only one that survives contact with the number. That is the framing
-  [38](tickets/38-cache-a-course-toc-on-the-device.md) is filed under.
+  **The standing instruction has not changed: do not start a session on cost-motivated
+  code before the residency call.** It is the only input that changes whether 01 is
+  worth $0.75/month or worth the last dollar of the bill. On user-experience grounds,
+  which is the framing [38](tickets/38-cache-a-course-toc-on-the-device.md) is filed
+  under, work may proceed at any time.
 - **`pnpm typecheck` is the cheap check** and needs no server. Never stop the dev server.
 - **The RTL flip has a one-line hold, and one landmine if you remove it wrongly**
   (2026-09-03, while the operator checks whether the reorder is wanted at all).
@@ -507,13 +509,23 @@ sit in this block was stale within days of being written.
   [convex-cost baseline](assets/convex-cost-baseline.md). Drill Database I/O per deployment
   before spending a session on [01](tickets/01-slim-the-row-listlessons-collects.md), or
   this map optimises the smaller half.
-- **Whether moving deployments to a US region beats every optimisation on this map.** All
-  deployments are EU-hosted, and EU usage cannot draw on the plan's included allowances, so
-  every unit prices from the first one plus a 30% regional surcharge. US usage would draw on
-  them: at this traffic that is a $0 bill, versus the cents 01 is worth. It is a
-  configuration change, not a code change. Not free, since it moves data residency, which is
-  a question about the courses' learners rather than about cost. Deliberately floating with
-  no anchor: no ticket here sharpens it.
+- **Whether to move deployments to a US region. COSTED 2026-09-09, and it does NOT compete
+  with this map, it complements it.** All deployments are EU-hosted, and EU usage cannot draw
+  on the plan's included allowances, so every unit prices from the first one plus a 30%
+  regional surcharge. The dashboard states this itself: *"Included plan limits only apply to
+  US-hosted deployments."* **The "$0 bill" this patch used to claim was too optimistic** and
+  is corrected in [the baseline](assets/convex-cost-baseline.md) with the arithmetic:
+  projected I/O is 4.03 GB/month against a 1 GB allowance, so US hosting **alone** lands at
+  about **$0.67/month**, not nothing. Estimated four ways: EU today ~$2.17, US alone ~$0.67,
+  EU with 01 ~$1.42, **US with 01 ~$0.09**.
+
+  So [01](tickets/01-slim-the-row-listlessons-collects.md) is what pulls I/O near the
+  allowance the move unlocks, and **only the pair reaches ~$0**. That is a straight reversal
+  of this patch's old framing. It remains a configuration change rather than a code change,
+  and it remains not free: it moves data residency, which is a question about the courses'
+  learners and POPIA rather than about cost. Still floating with no anchor, since no ticket
+  here sharpens the residency question. Note the dollar figures rest on a 1.25-day window
+  and on rates derived from one invoice.
 - **1194 `translations` rows carry inline `html` with no blob**, measured on prod
   2026-09-07 by the same walk that produced the row counts above (`stranded` in
   `backfill:verifyHtmlBlobs`). Against 272 blob-only and 10 matched, that is most of the

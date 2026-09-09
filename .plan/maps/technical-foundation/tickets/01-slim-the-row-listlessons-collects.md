@@ -76,14 +76,33 @@ matter here:
    other two. No separate ticket was filed: it is one fix, and splitting it would mean
    two migrations of one table.
 
-3. **"Is this worth doing at all?" is still open, and the honest answer moved both
-   ways.** Against: the whole bill is $3 to $4 a month, and Compute and Data Egress have
-   now collapsed to nothing (6 bytes of egress against a 2 GB baseline line), so the
-   bill is shrinking without this. For: `listLessons` plus `publicCourse` are now **65%
-   of the deployment's Database I/O between them**, which is a much more concentrated
-   target than the baseline's three-way split, and this read is per (Topic, language) so
-   Editions multiply it. **The decision still needs the EU-versus-US call and the closed
-   invoice**, neither of which this read provides.
+3. **"Is this worth doing at all?" now has a real answer, and it depends on one
+   decision that is not this ticket's.** Against, honestly: the whole bill is $3 to $4 a
+   month, and Compute and Data Egress have collapsed to nothing (6 bytes of egress
+   against a 2 GB baseline line), so the bill shrinks without this. For: `listLessons`
+   plus `publicCourse` are **64.9% of the project's Database I/O between them**, far more
+   concentrated than the baseline's three-way split, and the read is per (Topic,
+   language) so Editions multiply it.
+
+   **The thing that actually decides it, costed 2026-09-09 in
+   [the baseline](../assets/convex-cost-baseline.md): this ticket and the EU-to-US move
+   are complementary, not competing, and only the pair reaches a $0 bill.** Estimates:
+
+   | Scenario | Estimated bill |
+   |---|---|
+   | EU today | ~$2.17/month |
+   | US alone | ~$0.67/month |
+   | EU + this ticket | ~$1.42/month |
+   | **US + this ticket** | **~$0.09/month** |
+
+   US hosting alone leaves I/O about 4x over the 1 GB included allowance, so it does not
+   reach $0 on its own. This ticket is what pulls I/O down to where that allowance
+   absorbs it. **So if the residency question goes the way of US hosting, this ticket
+   stops being worth $0.60 and starts being worth the last dollar of the bill; if it
+   stays EU, this is worth about $0.75/month and the honest answer may still be to close
+   it out of scope.** That reverses the map's old framing that the US move competed with
+   this work. The dollar figures rest on a 1.25-day window and rates derived from one
+   invoice, so re-check them before acting.
 
 ## Done when
 

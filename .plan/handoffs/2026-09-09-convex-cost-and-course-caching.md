@@ -291,3 +291,46 @@ bill is shrinking without any of the work in section 5.
 **Still outstanding, and unchanged in priority:** the closed Aug 8 to Sep 8 invoice
 (step 1), and **EU versus US hosting** (step 3), which remains the largest single lever
 and which none of this touches.
+
+---
+
+## 10. Step 3 is costed, and the answer inverts section 3
+
+The operator supplied the Usage page header: range **Sep 08, 2026 to Oct 08, 2026**,
+project selector **All Projects**, and the EU banner verbatim. Two consequences.
+
+**The section 9 window is confirmed, not inferred.** 1.25 days, cross-checked two ways
+that agree to 0.4% (function calls give a factor of 24.7, elapsed days give 24.8). The
+agreement is also evidence the traffic is representative rather than a spike. And the
+panel was **All Projects**, not prod-filtered, which is what lets it speak to section 4
+at all: the baseline's unattributed 60% came from a **prod-only** filter.
+
+**Section 3's central claim is wrong, and the correction reverses its conclusion.**
+Section 3 says US hosting is "a $0 bill" and "a configuration change, not a code
+change, worth more than every ticket in the read-amplification thread combined". At the
+I/O this cycle projects, it is not. Projected Database I/O is **4.03 GB/month against a
+1 GB included allowance**, so US hosting **alone** lands at about **$0.67/month**.
+
+| Scenario | Estimated bill |
+|---|---|
+| EU today | ~$2.17/month |
+| US alone | ~$0.67/month |
+| EU + ticket 01 | ~$1.42/month |
+| **US + ticket 01** | **~$0.09/month** |
+
+**So the US move and ticket 01 are complementary, not competing, and only the pair
+reaches ~$0.** Ticket 01 is what pulls I/O down to where the allowance absorbs it.
+Section 3 told the next session that if the answer is "move to US", *"the cost argument
+for everything in section 5 evaporates"*. **The opposite is true:** choosing US is what
+makes ticket 01 worth the last dollar of the bill rather than $0.60 of it. Recorded on
+01, on the map's fog patch, and in the baseline with the arithmetic.
+
+Rates are derived from invoice RJDCQK-00001 rather than a live pricing page, and the
+projection rests on 1.25 days. Also worth knowing before anyone moves: **US storage
+headroom is tight**, 475 MB of database plus file storage against a 512 MB allowance.
+
+**What is actually left.** The residency question itself, which was never a cost
+question and is now visibly not one: whether the courses' learners' data may leave the
+EU is a POPIA and duty-of-care call for the operator. Plus two cheap reads: the closed
+invoice, and one number (top-line Database I/O for Sep 08 to Oct 08 against the 166.97
+MB the by-function panel totals) which would close section 4 outright if they match.
