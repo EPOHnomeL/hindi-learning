@@ -17,7 +17,7 @@ import { Icon } from "./icons";
 import { LessonFootCard } from "./LessonFoot";
 import { Markdown } from "./MarkdownView";
 import { MarkdownResourceDialog } from "./ResourceItem";
-import { cardIdFromHash, composeCardShare, editionToEdit, resolveArtifactClick, resourceTarget } from "./readerDerive";
+import { applyProgress, cardIdFromHash, composeCardShare, editionToEdit, resolveArtifactClick, resourceTarget } from "./readerDerive";
 import { Modal, ReaderSkeleton } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useTenant } from "./TenantContext";
@@ -462,7 +462,39 @@ function LessonView({
   const html = useContentHtml(lesson);
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
-  const setProgress = useMutation(api.capture.setProgress);
+  // **The one optimistic mutation in the app** (perceived-performance ticket 04),
+  // and it is optimistic because completing a lesson is the most repeated
+  // interaction in the product and the only one whose result is read somewhere
+  // else the same instant.
+  //
+  // `completeLesson` below ticks the lesson and navigates in the same gesture, so
+  // without this the learner arrives on the next lesson while the sidebar row,
+  // the course progress indicator and `nextKey` are all still showing the old
+  // state, and they catch up a round trip later. The write was never slow; it was
+  // simply unacknowledged, which made finishing a lesson feel like something that
+  // happened TO the app rather than something the learner did.
+  //
+  // `applyProgress` is the merge rule, pure and tested in `readerDerive`, and it
+  // mirrors the server's own two rules (see its comment). Patching
+  // `capture.myProgress` reaches every reader of it at once, because CourseShell's
+  // sidebar and `CourseIndex` subscribe with these exact args and Convex dedupes
+  // on query + args. The dashboard card reads a DIFFERENT query
+  // (`content.reader.dashboard`) and is not patched here: it is a route away, so
+  // it re-queries on arrival and is correct by the time it is seen.
+  //
+  // The other 67 mutation call sites stay pessimistic on purpose. A purchase, a
+  // redemption or an invite should show a busy control and a real refusal, which
+  // is what `useMutationRun` already gives them; only a write whose result is
+  // read instantly, elsewhere, earns this.
+  const setProgress = useMutation(api.capture.setProgress).withOptimisticUpdate(
+    (localStore, { topicSlug: slug, lessonKey: key, status }) => {
+      const current = localStore.getQuery(api.capture.myProgress, { topicSlug: slug });
+      // Undefined means the query has not landed yet, so there is no list to
+      // patch and nothing on screen to correct. The server write still happens.
+      if (current === undefined) return;
+      localStore.setQuery(api.capture.myProgress, { topicSlug: slug }, applyProgress(current, key, status));
+    },
+  );
   const editLesson = useAction(api.content.authoring.editLesson);
   const editTranslatedLesson = useAction(api.content.authoring.editTranslatedLesson);
   const [editing, setEditing] = useState(false);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyProgress,
   cardIdFromHash,
   composeCardShare,
   completedKeys,
@@ -354,5 +355,45 @@ describe("editionToEdit", () => {
 
   it("falls back to English when neither is known", () => {
     expect(editionToEdit(undefined, null)).toBe("en");
+  });
+});
+
+describe("applyProgress", () => {
+  it("adds a row for a lesson with no progress yet", () => {
+    expect(applyProgress([], "0001", "opened")).toEqual([{ lessonKey: "0001", status: "opened" }]);
+  });
+
+  it("promotes opened to completed", () => {
+    expect(applyProgress([{ lessonKey: "0001", status: "opened" }], "0001", "completed")).toEqual([
+      { lessonKey: "0001", status: "completed" },
+    ]);
+  });
+
+  // The rule this whole function exists for. The reader writes "opened" on every
+  // mount, so without it, re-opening a finished lesson would un-tick it in the
+  // sidebar on the click and re-tick it a round trip later.
+  it("never downgrades completed back to opened, mirroring the server", () => {
+    expect(applyProgress([{ lessonKey: "0001", status: "completed" }], "0001", "opened")).toEqual([
+      { lessonKey: "0001", status: "completed" },
+    ]);
+  });
+
+  it("leaves every other lesson untouched", () => {
+    const current = [
+      { lessonKey: "0001", status: "completed" as const },
+      { lessonKey: "0002", status: "opened" as const },
+      { lessonKey: "0003", status: "opened" as const },
+    ];
+    expect(applyProgress(current, "0002", "completed")).toEqual([
+      { lessonKey: "0001", status: "completed" },
+      { lessonKey: "0002", status: "completed" },
+      { lessonKey: "0003", status: "opened" },
+    ]);
+  });
+
+  it("does not mutate the list it was given", () => {
+    const current = [{ lessonKey: "0001", status: "opened" as const }];
+    applyProgress(current, "0001", "completed");
+    expect(current).toEqual([{ lessonKey: "0001", status: "opened" }]);
   });
 });

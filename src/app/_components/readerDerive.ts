@@ -203,3 +203,32 @@ export function composeCardShare(input: {
 export function editionToEdit(headerLang: string | undefined, urlLang: string | null): string {
   return headerLang ?? urlLang ?? "en";
 }
+
+// The caller's Progress list after a `setProgress` write, applied locally
+// (perceived-performance ticket 04). This is the optimistic update's whole
+// brain, kept pure and tested here rather than inline in the reader.
+//
+// **It is a MIRROR of `convex/capture.ts` setProgress, and the mirroring is the
+// point.** An optimistic update that disagrees with the server paints one thing
+// on the click and something else a round trip later, which is a worse
+// experience than the delay it set out to remove. Two rules, both the server's:
+//
+//   - **Never downgrade `completed` to `opened`.** The reader writes `opened` on
+//     every mount, including when re-opening a lesson already finished, and the
+//     server explicitly refuses to walk that back. Without this line, revisiting
+//     a completed lesson would visibly un-tick it in the sidebar and then re-tick
+//     it when the server answered.
+//   - **A lesson with no row yet gets one**, rather than the write being lost
+//     until the server replies.
+//
+// If the server's rule changes, this changes in the same commit.
+export function applyProgress(
+  current: readonly ProgressLite[],
+  lessonKey: string,
+  status: "opened" | "completed",
+): ProgressLite[] {
+  const existing = current.find((p) => p.lessonKey === lessonKey);
+  if (!existing) return [...current, { lessonKey, status }];
+  if (existing.status === "completed") return [...current];
+  return current.map((p) => (p.lessonKey === lessonKey ? { lessonKey, status } : p));
+}
