@@ -25,6 +25,11 @@ export const tenantThemeValidator = v.object({
   dark: v.optional(v.record(v.string(), v.string())),
   logo: v.optional(v.id("_storage")),
   favicon: v.optional(v.id("_storage")),
+  // The home-page banner (2026-09-11): a wide hero raster a tenant chooses,
+  // rendered full-width above the course grid on the signed-in dashboard.
+  // Optional like the other assets. Absent means the dashboard opens straight
+  // on the header and the courses, exactly as it did before.
+  banner: v.optional(v.id("_storage")),
 });
 
 // A tenant's feature flags (ticket 04): five flat required booleans, each

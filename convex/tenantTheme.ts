@@ -43,6 +43,19 @@ export const DEFAULT_TENANT_THEME = {
   },
 };
 
+// A home-page banner is a full-bleed hero raster, not a 48px mark, so the emblem's
+// 256 KB cap would refuse every usable one. 1 MB is the banner's own ceiling: wide
+// enough for a 1600px WebP or a decent JPEG, still small enough that the dashboard
+// stays cheap on a phone. Everything else about the upload rail is unchanged,
+// notably raster-only (an SVG banner would be the same XSS vector as an SVG logo).
+export const TENANT_BANNER_MAX_BYTES = 1024 * 1024;
+
+// The byte cap an asset slot is held to: the banner gets its own, the logo and
+// favicon keep the shared emblem cap (assertEmblemImage's default).
+export function assetMaxBytes(asset: "logo" | "favicon" | "banner"): number | undefined {
+  return asset === "banner" ? TENANT_BANNER_MAX_BYTES : undefined;
+}
+
 export function assertThemeTokens(theme: { light: Record<string, string>; dark?: Record<string, string> }) {
   const known = new Set<string>(TENANT_THEME_TOKENS);
 
@@ -72,6 +85,7 @@ function themeWithAssetsPreserved(
   if (theme.dark) next.dark = theme.dark;
   if (existing.logo) next.logo = existing.logo;
   if (existing.favicon) next.favicon = existing.favicon;
+  if (existing.banner) next.banner = existing.banner;
   return next;
 }
 
@@ -157,6 +171,7 @@ export const getTheme = query({
       }),
       logoUrl: v.union(v.string(), v.null()),
       faviconUrl: v.union(v.string(), v.null()),
+      bannerUrl: v.union(v.string(), v.null()),
       flags: tenantFlagsValidator,
     }),
   ),
@@ -167,13 +182,14 @@ export const getTheme = query({
       .unique();
     if (!tenant) return null;
 
-    const { light, dark, logo, favicon } = tenant.theme;
+    const { light, dark, logo, favicon, banner } = tenant.theme;
     return {
       displayName: tenant.displayName,
       motto: tenant.motto ?? null,
       theme: dark ? { light, dark } : { light },
       logoUrl: logo ? await ctx.storage.getUrl(logo) : null,
       faviconUrl: favicon ? await ctx.storage.getUrl(favicon) : null,
+      bannerUrl: banner ? await ctx.storage.getUrl(banner) : null,
       flags: tenant.flags,
     };
   },
@@ -220,7 +236,7 @@ export const updateTenantMotto = mutation({
 export const setTenantAsset = mutation({
   args: {
     tenantSlug: v.string(),
-    asset: v.union(v.literal("logo"), v.literal("favicon")),
+    asset: v.union(v.literal("logo"), v.literal("favicon"), v.literal("banner")),
     storageId: v.id("_storage"),
     contentType: v.string(),
   },
@@ -232,7 +248,7 @@ export const setTenantAsset = mutation({
       .withIndex("by_slug", (q) => q.eq("slug", tenantSlug))
       .unique();
     if (!tenant) throw new Error("tenant not found");
-    await assertEmblemImage(ctx, storageId, contentType);
+    await assertEmblemImage(ctx, storageId, contentType, assetMaxBytes(asset));
     await ctx.db.patch(tenant._id, { theme: { ...tenant.theme, [asset]: storageId } });
     return null;
   },
@@ -246,7 +262,7 @@ export const seedTenantAsset = mutation({
   args: {
     secret: v.string(),
     tenantSlug: v.string(),
-    asset: v.union(v.literal("logo"), v.literal("favicon")),
+    asset: v.union(v.literal("logo"), v.literal("favicon"), v.literal("banner")),
     storageId: v.id("_storage"),
     contentType: v.string(),
   },
@@ -258,7 +274,7 @@ export const seedTenantAsset = mutation({
       .withIndex("by_slug", (q) => q.eq("slug", tenantSlug))
       .unique();
     if (!tenant) throw new Error("tenant not found");
-    await assertEmblemImage(ctx, storageId, contentType);
+    await assertEmblemImage(ctx, storageId, contentType, assetMaxBytes(asset));
     await ctx.db.patch(tenant._id, { theme: { ...tenant.theme, [asset]: storageId } });
     return null;
   },

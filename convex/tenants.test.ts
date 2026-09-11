@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { beforeAll, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
-import { TENANT_THEME_TOKENS } from "./tenantTheme";
+import { TENANT_BANNER_MAX_BYTES, TENANT_THEME_TOKENS } from "./tenantTheme";
 import type { Id } from "./_generated/dataModel";
 
 const modules = import.meta.glob("./**/*.ts");
@@ -495,6 +495,130 @@ test("setTenantAsset: an unknown tenant slug is rejected", async () => {
       tenantSlug: "ghost", asset: "logo", storageId: logo, contentType: "image/png",
     }),
   ).rejects.toThrow(/not found/i);
+});
+
+// The home banner (2026-09-11) is a third asset slot on the same rail: same
+// identity gate, same raster-only validation, its own byte cap, and a `bannerUrl`
+// on the read seam the dashboard renders above the course grid.
+
+test("setTenantAsset: a sys admin sets a tenant home banner", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+
+  const banner = await storeImage(t, "image/webp");
+  await asUser(t, sys).mutation(api.tenantTheme.setTenantAsset, {
+    tenantSlug: "upf", asset: "banner", storageId: banner, contentType: "image/webp",
+  });
+
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
+  );
+  expect(row?.theme.banner).toBe(banner);
+  expect(row?.theme.light).toEqual(LIGHT);
+});
+
+test("setTenantAsset: an SVG banner is refused, like an SVG logo", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+
+  const svg = await storeImage(t, "image/svg+xml");
+  await expect(
+    asUser(t, sys).mutation(api.tenantTheme.setTenantAsset, {
+      tenantSlug: "upf", asset: "banner", storageId: svg, contentType: "image/svg+xml",
+    }),
+  ).rejects.toThrow(/PNG|JPEG|WebP/i);
+});
+
+test("setTenantAsset: a tenant admin cannot set another tenant's banner", async () => {
+  const t = convexTest(schema, modules);
+  const upfAdmin = await seedAdmin(t, "upfadmin@example.com", "upf");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "ywampotch", displayName: "YW", theme: THEME, flags: FLAGS });
+
+  const banner = await storeImage(t);
+  await asUser(t, upfAdmin).mutation(api.tenantTheme.setTenantAsset, {
+    tenantSlug: "upf", asset: "banner", storageId: banner, contentType: "image/png",
+  });
+  await expect(
+    asUser(t, upfAdmin).mutation(api.tenantTheme.setTenantAsset, {
+      tenantSlug: "ywampotch", asset: "banner", storageId: banner, contentType: "image/png",
+    }),
+  ).rejects.toThrow(/forbidden/i);
+});
+
+test("setTenantAsset: a banner over its own 1 MB cap is refused", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+
+  const tooBig = await t.run((ctx) =>
+    ctx.storage.store(new Blob([new Uint8Array(TENANT_BANNER_MAX_BYTES + 1)], { type: "image/png" })),
+  );
+  await expect(
+    asUser(t, sys).mutation(api.tenantTheme.setTenantAsset, {
+      tenantSlug: "upf", asset: "banner", storageId: tooBig, contentType: "image/png",
+    }),
+  ).rejects.toThrow(/too large/i);
+});
+
+test("setTenantAsset: a banner between the emblem cap and the banner cap is accepted", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+
+  // 512 KB: too big for a logo, fine for a full-bleed hero.
+  const big = await t.run((ctx) =>
+    ctx.storage.store(new Blob([new Uint8Array(512 * 1024)], { type: "image/png" })),
+  );
+  await asUser(t, sys).mutation(api.tenantTheme.setTenantAsset, {
+    tenantSlug: "upf", asset: "banner", storageId: big, contentType: "image/png",
+  });
+  await expect(
+    asUser(t, sys).mutation(api.tenantTheme.setTenantAsset, {
+      tenantSlug: "upf", asset: "logo", storageId: big, contentType: "image/png",
+    }),
+  ).rejects.toThrow(/too large/i);
+});
+
+test("getTheme resolves the banner storage id to a url", async () => {
+  const t = convexTest(schema, modules);
+  const banner = await storeImage(t);
+  await t.run((ctx) =>
+    ctx.db.insert("tenants", { slug: "upf", displayName: "UPF", theme: { light: LIGHT, banner }, flags: FLAGS }),
+  );
+
+  const view = await t.query(api.tenantTheme.getTheme, { slug: "upf" });
+  expect(typeof view?.bannerUrl).toBe("string");
+  // The palette-only theme is returned without the storage id.
+  expect(view?.theme).not.toHaveProperty("banner");
+});
+
+test("getTheme returns a null bannerUrl when no banner is set", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  expect((await t.query(api.tenantTheme.getTheme, { slug: "upf" }))?.bannerUrl).toBeNull();
+});
+
+test("updateTenantTheme: a repaint carries the banner across untouched", async () => {
+  const t = convexTest(schema, modules);
+  const sys = await seedAdmin(t, "sys@example.com");
+  await t.mutation(api.tenants.seedTenant, { secret, slug: "upf", displayName: "UPF", theme: THEME, flags: FLAGS });
+  const banner = await storeImage(t);
+  await asUser(t, sys).mutation(api.tenantTheme.setTenantAsset, {
+    tenantSlug: "upf", asset: "banner", storageId: banner, contentType: "image/png",
+  });
+
+  await asUser(t, sys).mutation(api.tenantTheme.updateTenantTheme, {
+    tenantSlug: "upf", theme: { light: { ...LIGHT, accent: "#123456" } },
+  });
+
+  const row = await t.run((ctx) =>
+    ctx.db.query("tenants").withIndex("by_slug", (q) => q.eq("slug", "upf")).unique(),
+  );
+  expect(row?.theme.banner).toBe(banner);
+  expect(row?.theme.light.accent).toBe("#123456");
 });
 
 // seedTenantAsset — the secret-guarded operator twin used by the branding scripts.

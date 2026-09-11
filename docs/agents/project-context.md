@@ -431,9 +431,16 @@ disk as history only). The follow-on effort that grows the flag set is
   `isAdmin` and no `tenantSlug` is a **sys admin** (global); with a `tenantSlug`
   it's a **tenant admin** (that tenant only). `isCallerAdmin(ctx, tenantSlug?)`
   is scope-aware — no arg = "is sys admin"; `amITenantAdmin` is the client seam.
-- **Producing a tenant's branding** (palette JSON + logo/favicon from a Claude
-  design system): see [tenant-branding.md](tenant-branding.md) —
-  `pnpm tenant-branding validate|logo|favicon`, then seed + `setTenantAsset`.
+- **Producing a tenant's branding** (palette JSON + logo/favicon/home banner from
+  a Claude design system): see [tenant-branding.md](tenant-branding.md) —
+  `pnpm tenant-branding validate|logo|favicon|banner`, then seed + `setTenantAsset`.
+- **The home banner** (2026-09-11) is the third uploaded tenant asset, stored as
+  `theme.banner` and surfaced by `getTheme` as `bannerUrl`. The dashboard renders
+  it full-width above the course grid when set, and renders nothing when not, so
+  the default site and un-bannered tenants are unchanged. Its cap is 1 MB, not the
+  256 KB the logo and favicon share. This does not contradict ADR 0030 — that
+  rejected an uploaded *App Icon*, which is derivable from the logo and needed by
+  every tenant; a banner is bespoke content and entirely optional.
 
 ## Product rules
 

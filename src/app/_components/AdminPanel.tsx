@@ -1397,7 +1397,7 @@ function TenantDetail({ slug, role, onRemoved }: { slug: string; role: "sys" | "
         <p className="mt-0.5 text-sm text-soft">{slug}.my-course.app</p>
       </div>
 
-      <TenantSection title="Theme" hint="Brand palette, logo, favicon, and motto.">
+      <TenantSection title="Theme" hint="Brand palette, logo, favicon, home banner, and motto.">
         {view === undefined ? (
           <span>Loading…</span>
         ) : view === null ? (
@@ -2158,7 +2158,7 @@ function ThemeEditor({ slug, view }: { slug: string; view: TenantThemeView }) {
         {error && <span className="text-xs text-danger">{error}</span>}
       </div>
 
-      <AssetUploads slug={slug} logoUrl={view.logoUrl} faviconUrl={view.faviconUrl} />
+      <AssetUploads slug={slug} logoUrl={view.logoUrl} faviconUrl={view.faviconUrl} bannerUrl={view.bannerUrl} />
       <MottoEditor slug={slug} motto={view.motto} />
     </div>
   );
@@ -2300,14 +2300,28 @@ function MottoEditor({ slug, motto }: { slug: string; motto: string | null }) {
 // uploads as-is (raster only; the server refuses SVG and caps size at 256 KB) so a
 // logo keeps its aspect ratio. The live getTheme query re-resolves the new url, so
 // the slot's thumbnail and the header logo update on their own after a save.
-function AssetUploads({ slug, logoUrl, faviconUrl }: { slug: string; logoUrl: string | null; faviconUrl: string | null }) {
+function AssetUploads({
+  slug,
+  logoUrl,
+  faviconUrl,
+  bannerUrl,
+}: {
+  slug: string;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+  bannerUrl: string | null;
+}) {
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-wide text-accent2">Brand assets</p>
-      <p className="mt-0.5 text-xs text-soft">PNG, JPEG, or WebP up to 256&nbsp;KB. Uploads are live immediately.</p>
+      <p className="mt-0.5 text-xs text-soft">
+        PNG, JPEG, or WebP. Up to 256&nbsp;KB for the logo and favicon, 1&nbsp;MB for the home banner (it is
+        full-width, so it needs the room). Uploads are live immediately.
+      </p>
       <div className="mt-3 grid gap-4 sm:grid-cols-2">
         <AssetSlot slug={slug} asset="logo" label="Logo" currentUrl={logoUrl} />
         <AssetSlot slug={slug} asset="favicon" label="Favicon" currentUrl={faviconUrl} />
+        <AssetSlot slug={slug} asset="banner" label="Home banner" currentUrl={bannerUrl} />
       </div>
     </div>
   );
@@ -2320,7 +2334,7 @@ function AssetSlot({
   currentUrl,
 }: {
   slug: string;
-  asset: "logo" | "favicon";
+  asset: "logo" | "favicon" | "banner";
   label: string;
   currentUrl: string | null;
 }) {
@@ -2334,6 +2348,13 @@ function AssetSlot({
     setError(null);
     if (file.type === "image/svg+xml") {
       setError("SVG isn't allowed — use a PNG, JPEG, or WebP.");
+      return;
+    }
+    // Checked here as well as on the server so the admin reads their own limit
+    // rather than the shared upload rail and its "emblem image is too large".
+    const maxBytes = asset === "banner" ? 1024 * 1024 : 256 * 1024;
+    if (file.size > maxBytes) {
+      setError(`That file is ${Math.round(file.size / 1024)} KB. The limit here is ${maxBytes / 1024} KB.`);
       return;
     }
     setBusy(true);
@@ -2358,7 +2379,11 @@ function AssetSlot({
   return (
     <div className="rounded-xl border border-line bg-card p-3">
       <div className="flex items-center gap-3">
-        <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-lg border border-line bg-paper">
+        <div
+          className={`grid h-12 shrink-0 place-items-center overflow-hidden rounded-lg border border-line bg-paper ${
+            asset === "banner" ? "w-28" : "w-12"
+          }`}
+        >
           {currentUrl ? (
             <img src={currentUrl} alt="" className="h-full w-full object-contain" />
           ) : (

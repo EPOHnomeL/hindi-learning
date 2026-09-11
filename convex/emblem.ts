@@ -90,15 +90,18 @@ export function normaliseGlyph(glyph: string): string {
 //     type closes the XSS vector even if the declared type was spoofed. Absent in
 //     the test harness (skipped there); present and authoritative in production.
 // Size is checked from cheap metadata, so an over-cap upload is rejected without
-// materialising its bytes.
+// materialising its bytes. `maxBytes` defaults to the emblem cap; a caller whose
+// surface genuinely needs a bigger raster passes its own (the tenant home banner
+// is full-bleed, so it gets TENANT_BANNER_MAX_BYTES).
 export async function assertEmblemImage(
   ctx: MutationCtx,
   storageId: Id<"_storage">,
   contentType: string,
+  maxBytes: number = EMBLEM_IMAGE_MAX_BYTES,
 ): Promise<void> {
   const meta = await ctx.db.system.get(storageId);
   if (!meta) throw new Error("emblem upload not found");
-  if (meta.size > EMBLEM_IMAGE_MAX_BYTES) throw new Error("emblem image is too large");
+  if (meta.size > maxBytes) throw new Error("emblem image is too large");
   if (!ALLOWED_EMBLEM_IMAGE_TYPES.has(contentType)) {
     throw new Error("emblem must be a PNG, JPEG, or WebP image");
   }

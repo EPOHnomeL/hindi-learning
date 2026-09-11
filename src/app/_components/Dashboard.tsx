@@ -196,6 +196,8 @@ export function Dashboard() {
           </div>
         </header>
 
+        <HomeBanner />
+
         {courses === undefined ? (
           // Sized from the last-known-good list, and matching what page.tsx drew
           // during AuthLoading a moment earlier (perceived-performance ticket
@@ -247,6 +249,30 @@ export function Dashboard() {
       <SiteFooter localePicker={false} />
       {prefsOpen && <SettingsDialog onClose={() => setPrefsOpen(false)} />}
     </>
+  );
+}
+
+// The tenant's home banner (2026-09-11): a wide image the tenant chooses, shown
+// between the header and the courses. Renders nothing at all when there is no
+// tenant, while the tenant query is still loading, or when the tenant simply has
+// no banner set, so the default site and every un-bannered tenant keep today's
+// layout with no reserved gap and no placeholder.
+//
+// Fixed aspect + object-cover rather than the natural height: tenants upload
+// whatever shape they have, and an unconstrained image would either dwarf the
+// course grid (a square photo) or letterbox into a sliver (a 7:1 lockup). A
+// banner is decoration beside the brand lockup already in the header, so its alt
+// is empty: a screen reader should reach the courses, not hear the name twice.
+function HomeBanner() {
+  const tenant = useTenant();
+  if (!tenant?.bannerUrl) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- Convex storage URL, not a static asset.
+    <img
+      src={tenant.bannerUrl}
+      alt=""
+      className="mb-8 aspect-[16/5] w-full rounded-2xl border border-line object-cover"
+    />
   );
 }
 

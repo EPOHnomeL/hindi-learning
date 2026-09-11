@@ -10,6 +10,7 @@
 //     pnpm tenant-branding validate <theme.json>
 //     pnpm tenant-branding logo    <src-image> <out.webp|png>
 //     pnpm tenant-branding favicon <src-image> <out.png>
+//     pnpm tenant-branding banner  <src-image> <out.webp|png>
 //
 // Image conversion shells out to `ffmpeg` (native, already on PATH — no new npm
 // dependency; note NOT ImageMagick, whose `convert` collides with a Windows disk
@@ -30,6 +31,11 @@ import { TENANT_THEME_TOKENS, type Token } from "../src/design/tokens";
 // (via assertEmblemImage) enforces on the uploaded blob. Kept in sync by hand;
 // a script can't import the convex server module cleanly.
 export const ASSET_MAX_BYTES = 256 * 1024;
+
+// Mirror of convex/tenantTheme.ts TENANT_BANNER_MAX_BYTES (2026-09-11): the home
+// banner is full-width, so it gets its own, larger cap. Kept in sync by hand for
+// the same reason as ASSET_MAX_BYTES.
+export const BANNER_MAX_BYTES = 1024 * 1024;
 
 type Palette = Partial<Record<Token, string>>;
 type MaybeTheme = { light?: unknown; dark?: unknown };
@@ -85,13 +91,13 @@ export function validateTheme(theme: MaybeTheme): string[] {
 // and the output codec follows the file extension (.webp / .png). The size check
 // enforces the upload cap. `maxDim` picks the shape: a small favicon vs a larger
 // logo. Output format for a logo is best as .webp (smaller under the cap).
-function convertImage(src: string, out: string, maxDim: number): void {
+function convertImage(src: string, out: string, maxDim: number, maxBytes: number = ASSET_MAX_BYTES): void {
   const scale = `scale='min(${maxDim},iw)':'min(${maxDim},ih)':force_original_aspect_ratio=decrease`;
   execFileSync("ffmpeg", ["-y", "-loglevel", "error", "-i", src, "-vf", scale, out], { stdio: "inherit" });
   const bytes = statSync(out).size;
-  if (bytes > ASSET_MAX_BYTES) {
+  if (bytes > maxBytes) {
     throw new Error(
-      `${out} is ${(bytes / 1024).toFixed(0)} KB — over the ${ASSET_MAX_BYTES / 1024} KB cap. ` +
+      `${out} is ${(bytes / 1024).toFixed(0)} KB — over the ${maxBytes / 1024} KB cap. ` +
         `Re-run with a .webp output, or start from smaller/flatter source art.`,
     );
   }
@@ -122,7 +128,14 @@ function main(argv: string[]): void {
     convertImage(a, b, 64);
     return;
   }
-  throw new Error("usage: pnpm tenant-branding <validate|logo|favicon> …");
+  if (cmd === "banner") {
+    if (!a || !b) throw new Error("usage: pnpm tenant-branding banner <src-image> <out.webp|png>");
+    // 1600px wide is enough for the dashboard hero on a retina laptop, and the
+    // 1 MB cap is comfortable at that size as .webp.
+    convertImage(a, b, 1600, BANNER_MAX_BYTES);
+    return;
+  }
+  throw new Error("usage: pnpm tenant-branding <validate|logo|favicon|banner> …");
 }
 
 // Run the CLI only when invoked directly, so the test can import the pure helpers.

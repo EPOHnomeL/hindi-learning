@@ -89,12 +89,14 @@ uses ffmpeg, not ImageMagick — its `convert` collides with a Windows utility).
 ```
 pnpm tenant-branding logo    upf-src.png  upf-logo.webp     # ≤512 px, WebP (smallest under the cap)
 pnpm tenant-branding favicon upf-src.png  upf-favicon.png   # ≤64 px  PNG
+pnpm tenant-branding banner  upf-src.jpg  upf-banner.webp    # ≤1600 px, WebP (home banner)
 ```
 
-Both preserve aspect (never upscale), strip to a raster the upload accepts, and
-**fail if the output exceeds the 256 KB cap** (the same limit
-`setTenantAsset`/`assertEmblemImage` enforce). If a logo exceeds it, prefer
-`.webp` output or start from flatter source art.
+All three preserve aspect (never upscale), strip to a raster the upload accepts,
+and **fail if the output exceeds its cap** (the same limits
+`setTenantAsset`/`assertEmblemImage` enforce): 256 KB for the logo and favicon,
+1 MB for the home banner, which is full-width and needs the room. If a logo
+exceeds it, prefer `.webp` output or start from flatter source art.
 
 ## Step 4 — Apply
 
@@ -105,8 +107,8 @@ Both preserve aspect (never upscale), strip to a raster the upload accepts, and
   (`--prod` for live — snapshot first). Seeding is idempotent and never
   overwrites an existing slug, so to *update* a live tenant's palette use the
   dashboard (ticket 20) or a one-off `seedTenant`-style edit, not a re-seed.
-- **Logo / favicon** — upload the converted files through the dashboard's asset
-  widget (ticket 20), which calls `resources.generateUploadUrl` then
+- **Logo / favicon / home banner** — upload the converted files through the
+  dashboard's asset widget (ticket 20), which calls `resources.generateUploadUrl` then
   `tenants.setTenantAsset({ tenantSlug, asset, storageId, contentType })`.
   Authorisation: a **sys admin** (any tenant) or that **tenant's admin** (issue
   08). Mint-new-never-overwrite — a new upload swaps the id and leaves the old
