@@ -1,7 +1,7 @@
 "use client";
 
 import { useAction, useMutation, useQuery } from "convex/react";
-import { refusalMessage } from "./mutationRun";
+import { refusalMessage, useMutationRun } from "./mutationRun";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -528,7 +528,15 @@ function LessonView({
   const teacherQa = header?.teacherQa !== false;
   const html = useContentHtml(lesson);
   const progress = useQuery(api.capture.myProgress, { topicSlug });
-  const recordResponse = useMutation(api.capture.recordResponse);
+  // The reader fires this as the learner answers a quiz. A floating promise here
+  // used to reach the global handler as an uncaught rejection whenever the write
+  // refused (session expired, or client and server disagreed on ownership), losing
+  // the answer with no feedback. `useMutationRun` catches the refusal, holds the
+  // message, and lets the toast below offer a retry of the same answer.
+  const { run: recordResponse, error: recordError } = useMutationRun(
+    useMutation(api.capture.recordResponse),
+    t("quizSaveError"),
+  );
   // **The one optimistic mutation in the app** (perceived-performance ticket 04),
   // and it is optimistic because completing a lesson is the most repeated
   // interaction in the product and the only one whose result is read somewhere
@@ -613,12 +621,21 @@ function LessonView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lesson?.key, header?.role]);
 
+  // The last answer the learner sent, held so the refusal toast can re-send exactly
+  // that one on retry rather than whatever is on screen when the button is pressed.
+  const lastAnswer = useRef<{ quizId: string; answer: string; correct: boolean } | null>(null);
+
   // What to do with a quiz answer, handed to the `Frame` that owns the iframe
   // rather than listened for here (ticket 27). `undefined` for a read-only
   // Viewer, whose attempts are not recorded against the owner, and the absence
   // is what switches it off rather than an early `return` inside a listener.
   const onResponse = useCallback(
     (r: { quizId: string; answer: string; correct: boolean }) => {
+      // Keep the exact answer so the refusal toast can re-send it, not a stale one.
+      lastAnswer.current = r;
+      // `recordResponse` is `useMutationRun`'s `run`: it catches the refusal itself,
+      // so this floating call can never reach the global unhandled-rejection handler.
+      // A refusal lands in `recordError` and the toast below offers a retry.
       void recordResponse({ topicSlug, lessonKey, ...r });
       if (isPostHogInitialized()) posthog.capture("quiz_answered", { correct: r.correct });
     },
@@ -806,6 +823,28 @@ function LessonView({
         <aside className="hidden shrink-0 md:block md:w-80 md:overflow-y-auto">
           <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} readOnly={readOnly} />
         </aside>
+      )}
+      {/* A refused quiz answer (session expired, or the course is no longer the
+          caller's to write to). This used to fail silently and lose the attempt;
+          now the learner sees the refusal and can retry the same answer.
+          `role="alert"` so a screen reader announces it. */}
+      {recordError && (
+        <div
+          role="alert"
+          className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border border-line bg-card px-4 py-2 text-sm text-ink shadow-lg"
+        >
+          <span>{recordError}</span>
+          <button
+            type="button"
+            onClick={() => {
+              const r = lastAnswer.current;
+              if (r) void recordResponse({ topicSlug, lessonKey, ...r });
+            }}
+            className="font-medium text-accent hover:underline"
+          >
+            {t("retry")}
+          </button>
+        </div>
       )}
     </div>
   );
