@@ -212,6 +212,38 @@ export default defineSchema({
     .index("by_topic_seq", ["topicId", "seq"])
     .index("by_topic_key", ["topicId", "key"]),
 
+  // A rendered narration of one Lesson, in one Edition language: the ElevenLabs
+  // mp3 in Convex File Storage, plus the inputs that produced it. Written lazily
+  // on first play by `convex/lessonAudio.ts` and never regenerated, which is what
+  // makes the second press of the play button instant and free.
+  //
+  // **`voiceId` and `modelId` are part of the cache identity, not decoration.**
+  // Both are env-overridable so the pilot can audition a different voice without a
+  // deploy; if they were not keyed on, flipping `ELEVENLABS_VOICE_ID` would hand
+  // back the old voice forever and the audition would silently be a no-op.
+  //
+  // The Lesson body is immutable in normal operation, but the owner's in-place
+  // prose editor (ADR 0020) can repoint `lessons.htmlStorageId`, which would leave
+  // this row narrating superseded text. `sourceStorageId` records which body was
+  // read, so a stale row is DETECTABLE rather than silently wrong; the pilot
+  // treats a mismatch as a cache miss and re-renders.
+  //
+  // Pilot scope (2026-09-14): only the first Lesson of `prophetic-school`, in
+  // English, for that course's owner. The table is shaped for the general case so
+  // widening the gate is a one-line change rather than a migration.
+  lessonAudio: defineTable({
+    topicId: v.id("topics"),
+    lessonKey: v.string(),
+    lang: v.string(),
+    voiceId: v.string(),
+    modelId: v.string(),
+    sourceStorageId: v.optional(v.id("_storage")),
+    storageId: v.id("_storage"),
+    // What the render cost, in ElevenLabs billing terms (characters sent). The
+    // only spend signal this pilot has; no usage table is invented for it.
+    chars: v.number(),
+  }).index("by_lesson", ["topicId", "lessonKey", "lang", "voiceId", "modelId"]),
+
   // A learner's Resource: either an uploaded blob (`kind: "file"`, bytes in
   // `rawStorageId`) or an external link (`kind: "url"`, in `url`). `processed`
   // (a manifest of rendered/extracted artifacts) is filled lazily by the Routine

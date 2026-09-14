@@ -75,6 +75,21 @@ Validated with `@t3-oss/env` (see [env-validation](#env-validation-t3-oss-env)
 below). PayFast rail vars live in `convex/env.ts`; the Next client var in
 `env.js`.
 
+### `ELEVENLABS_API_KEY` (AI lesson narration, added 2026-09-14)
+
+- **Without it the play button refuses in words**, it does not hide: the pilot's
+  gate and its configuration are separate questions, so an owner who is inside the
+  gate is told the deployment is unconfigured rather than seeing nothing at all.
+  Set it with `npx convex env set ELEVENLABS_API_KEY <key>`; never in `.env`.
+- Optional siblings, both read at call time so a voice can be auditioned without a
+  deploy: `ELEVENLABS_VOICE_ID` (default `21m00Tcm4TlvDq8ikWAM`, the stock
+  "Rachel") and `ELEVENLABS_MODEL_ID` (default `eleven_multilingual_v2`, the
+  expressive model, 10,000 characters per request; `eleven_flash_v2_5` is half the
+  price and takes 40,000 at a lower quality bar).
+- **Both are part of the `lessonAudio` cache key**, so flipping either really does
+  re-render. That is deliberate and it is also the cost trap: auditioning four
+  voices on one lesson bills four renders.
+
 ### Per-tenant sessions: cookies are host-only (no `NEXT_PUBLIC_COOKIE_DOMAIN`)
 
 - **Each tenant subdomain has its own session, app language and theme.** Signing in

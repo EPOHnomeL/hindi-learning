@@ -664,6 +664,10 @@ function LessonView({
         >
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
           <div className="flex shrink-0 items-center gap-2">
+            {/* AI narration (pilot). First in the row because it is the control
+                you reach for BEFORE reading, unlike everything beside it, which
+                is about leaving the lesson. It hides itself outside the pilot. */}
+            <LessonAudioButton topicSlug={topicSlug} lessonKey={lessonKey} />
             {/* Authoring is owner-only and stops once the course is completed
                 (ADR 0015): no "Generate next lesson" on a finished course. */}
             {!readOnly && !courseCompleted && isFrontier && completed && (
@@ -992,6 +996,112 @@ function ContentEditor({
 }
 
 // Fires the next-lesson Routine on demand (ADR 0008). Only rendered on the
+// **The AI narration play button (pilot, 2026-09-14).** Reads the lesson aloud in
+// an ElevenLabs voice. Whether it appears at all is `convex/lessonAudio.ts`'s
+// call, not this component's: `status.eligible` is the server's verdict on the
+// whole gate (the `prophetic-school` course, English, the first lesson, the
+// owner), so widening the pilot never means remembering to widen a second rule
+// hidden in the UI. An ineligible caller renders nothing and pays one cheap
+// query for the privilege.
+//
+// The render is lazy and cached, so the button has two lives. Before anything is
+// rendered it is a "Listen" button that spends real money on press. Afterwards
+// `status.url` is populated by the live query, and it is an ordinary transport
+// control over a plain `<audio>` element.
+//
+// ponytail: the labels here are hardcoded English rather than message-catalogue
+// keys. The pilot is visible to one person, on one English lesson, and
+// `messages/parity.test.ts` requires every new key in all six catalogues. Add
+// keys when the gate widens past the owner; not before.
+function LessonAudioButton({ topicSlug, lessonKey }: { topicSlug: string; lessonKey: string }) {
+  const lang = useEditionLang();
+  const status = useQuery(api.lessonAudio.status, { topicSlug, key: lessonKey, lang: lang ?? undefined });
+  const speak = useAction(api.lessonAudio.speak);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const [rendering, setRendering] = useState(false);
+  const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Whether the caller has asked to hear it, so a render that finishes can start
+  // playback itself rather than making them press a second time.
+  const wantPlay = useRef(false);
+
+  const url = status?.url ?? null;
+
+  // Autoplay once the freshly rendered file lands. A render takes long enough
+  // that the browser may have forgotten the click that started it, so a blocked
+  // `play()` is EXPECTED, not an error: swallow it and leave the control sitting
+  // on Play for a second press that is unambiguously a gesture.
+  useEffect(() => {
+    if (!url || !wantPlay.current) return;
+    wantPlay.current = false;
+    audioRef.current?.play().catch(() => {});
+  }, [url]);
+
+  // A lesson switch remounts nothing (the key is a prop), so reset by hand.
+  useEffect(() => {
+    setError(null);
+    setPlaying(false);
+    wantPlay.current = false;
+  }, [lessonKey]);
+
+  if (!status?.eligible) return null;
+
+  const toggle = () => {
+    setError(null);
+    const el = audioRef.current;
+    if (url && el) {
+      if (el.paused) void el.play().catch(() => setError("This browser would not start playback."));
+      else el.pause();
+      return;
+    }
+    // Nothing rendered yet: this press is the one that spends money.
+    wantPlay.current = true;
+    setRendering(true);
+    void speak({ topicSlug, key: lessonKey, lang: lang ?? undefined })
+      .catch((e: unknown) => {
+        wantPlay.current = false;
+        // `refusalMessage` is the shared reader of a ConvexError's `data`, which
+        // is the only part of a refusal that survives a production deployment's
+        // redaction (see `saveError` above).
+        setError(refusalMessage(e, "The narration could not be made."));
+      })
+      .finally(() => setRendering(false));
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={rendering}
+        aria-label={playing ? "Pause narration" : "Play narration"}
+        title={url ? "Listen to this lesson" : "Make an audio narration of this lesson"}
+        className="flex items-center gap-1.5 rounded-lg bg-gold/20 px-2.5 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-gold/30 disabled:opacity-70"
+      >
+        <svg viewBox="0 0 16 16" aria-hidden className="h-3.5 w-3.5 fill-current">
+          {playing ? <path d="M4 2h3v12H4zm5 0h3v12H9z" /> : <path d="M4 2l10 6-10 6z" />}
+        </svg>
+        {rendering ? "Making audio…" : playing ? "Pause" : "Listen"}
+      </button>
+      {/* The refusal sits beside the control rather than in a toast: the two
+          that will actually happen (no API key on the deployment, a lesson past
+          the single-render character limit) are operator problems, and an
+          operator needs to be able to read them twice. */}
+      {error && <span className="max-w-[16rem] truncate text-xs text-soft" title={error}>{error}</span>}
+      {url && (
+        <audio
+          ref={audioRef}
+          src={url}
+          preload="none"
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 // completed Frontier. It reflects the lock so a press can't double-fire and a
 // crashed run eventually offers a retry; the new lesson arrives live (Convex
 // subscription), at which point this lesson is no longer the Frontier and the
