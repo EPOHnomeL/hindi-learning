@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
+import { ConvexError } from "convex/values";
 import { beforeAll, expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import schema from "./schema";
@@ -74,6 +75,40 @@ test("reviewState is scoped to one owner+topic; recordResponse is first-answer-w
   expect(state.responses).toEqual([{ lessonKey: "0001", quizId: "q1", answer: "A", correct: true }]); // first answer only
   expect(state.progress).toEqual([{ lessonKey: "0001", status: "opened" }]);
   expect(state.openQuestions).toMatchObject([{ lessonKey: "0001", text: "hi?" }]);
+});
+
+test("recordResponse tolerates a duplicate row — first-answer-wins does not throw on a dup", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const hindi = await seedTopic(t, alice, "hindi");
+  // Two rows for the same topic+user+lesson+quiz — the state `.unique()` threw on.
+  await t.run(async (ctx) => {
+    await ctx.db.insert("responses", { userId: alice, topicId: hindi, lessonKey: "0001", quizId: "q1", answer: "A", correct: true });
+    await ctx.db.insert("responses", { userId: alice, topicId: hindi, lessonKey: "0001", quizId: "q1", answer: "B", correct: false });
+  });
+  // The learner answers again: recorded-once means it is ignored, and it must not
+  // throw an internal error just because a duplicate already exists.
+  await expect(
+    asUser(t, alice).mutation(api.capture.recordResponse, { topicSlug: "hindi", lessonKey: "0001", quizId: "q1", answer: "C", correct: false }),
+  ).resolves.toBeNull();
+  const rows = await t.run((ctx) => ctx.db.query("responses").collect());
+  expect(rows).toHaveLength(2); // nothing added, nothing thrown
+});
+
+test("recordResponse refuses deliberately — a ConvexError for a non-owner and for signed-out", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedUser(t, "alice@example.com");
+  const stranger = await seedUser(t, "stranger@example.com");
+  await seedTopic(t, alice, "hindi");
+  const args = { topicSlug: "hindi", lessonKey: "0001", quizId: "q1", answer: "A", correct: true } as const;
+
+  // A raw `Error` is redacted to "Server Error" in production and reaches the
+  // reader as an uncaught rejection; only a `ConvexError` is a refusal the reader
+  // can catch and surface. Both the non-owner and the signed-out paths must send one.
+  const strangerErr = await asUser(t, stranger).mutation(api.capture.recordResponse, args).then(() => null, (e) => e);
+  expect(strangerErr).toBeInstanceOf(ConvexError);
+  const anonErr = await t.mutation(api.capture.recordResponse, args).then(() => null, (e) => e);
+  expect(anonErr).toBeInstanceOf(ConvexError);
 });
 
 test("setProgress stamps lastReadAt on insert, patch, and re-open of a completed lesson", async () => {

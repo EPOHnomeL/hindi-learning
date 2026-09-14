@@ -313,6 +313,7 @@
     "copied": "Copied — paste it anywhere ✓",
     "lessonNotFound": "Lesson not found.",
     "lessonLoadError": "Couldn’t load this lesson. Try refreshing.",
+    "quizSaveError": "Couldn’t save your answer. Try again.",
     "completed": "✓ Completed",
     "markComplete": "Mark complete",
     "nextLesson": "Next lesson →",
