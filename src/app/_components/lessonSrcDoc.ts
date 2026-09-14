@@ -178,6 +178,110 @@ function injectReferenceCardCss(html: string): string {
 
 // The message the parent posts to a reference iframe's REFERENCE_BRIDGE to scroll
 // to and flash a card. `id` is the card's anchor id (the `#<cardId>` fragment).
+// NARRATE_BRIDGE (lessons in the AI-narration pilot only): the play control that
+// lives INSIDE the lesson, under its heading, rather than up in the reader's
+// chrome. It is injected here for one reason: the lesson is a sandboxed iframe,
+// so the app physically cannot reach into `header.lesson` to place a button
+// beside the authored subtitle. Only a script running inside the document can.
+//
+// It owns no audio. Pressing it posts `narrate` to the parent, which holds the
+// `<audio>` element, the Convex action and the ElevenLabs bill; the parent posts
+// state back and this re-skins. Keeping playback in the parent means the sound
+// survives a theme flip and the control never has to know a URL.
+//
+// The authored `.sub` (the italic subtitle) is MOVED into the row rather than
+// copied, so there is one subtitle on the page, not two.
+const NARRATE_BRIDGE = `<script>(function(){
+  function post(m){ try{ parent.postMessage(Object.assign({__lesson:true}, m), '*'); }catch(e){} }
+  var head = document.querySelector('header.lesson') || document.querySelector('header');
+  if(!head) return;
+  var h1 = head.querySelector('h1');
+  var sub = head.querySelector('.sub');
+  var row = document.createElement('div');
+  row.className = 'narrate';
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'narrate-btn';
+  btn.setAttribute('aria-label', 'Listen to this lesson');
+  var label = document.createElement('span');
+  label.className = 'narrate-label';
+  row.appendChild(btn);
+  // The authored subtitle sits to the right of the circle; when the lesson has
+  // none, the row still reads as a control rather than a naked button.
+  if(sub){ row.appendChild(sub); } else { label.textContent = 'Listen to this lesson'; row.appendChild(label); }
+  // Under the heading: after the h1 when there is one, else at the head's end.
+  if(h1 && h1.parentNode === head){ head.insertBefore(row, h1.nextSibling); } else { head.appendChild(row); }
+
+  var PLAY = '<svg viewBox="0 0 24 24" aria-hidden><path d="M8 5l12 7-12 7z"/></svg>';
+  var PAUSE = '<svg viewBox="0 0 24 24" aria-hidden><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
+  var state = 'idle';
+  function render(msg){
+    btn.className = 'narrate-btn' + (state === 'loading' ? ' is-loading' : '') + (state === 'playing' ? ' is-playing' : '');
+    btn.innerHTML = state === 'playing' ? PAUSE : PLAY;
+    btn.disabled = state === 'loading';
+    btn.setAttribute('aria-label', state === 'playing' ? 'Pause narration' : 'Listen to this lesson');
+    var note = head.querySelector('.narrate-note');
+    if(msg){
+      if(!note){ note = document.createElement('p'); note.className='narrate-note'; row.parentNode.insertBefore(note, row.nextSibling); }
+      note.textContent = msg;
+    } else if(note){ note.remove(); }
+  }
+  btn.addEventListener('click', function(){ if(state !== 'loading') post({type:'narrate'}); });
+  window.addEventListener('message', function(e){
+    var d = e.data;
+    if(!d || !d.__lessonNarrate) return;
+    state = d.state;
+    render(typeof d.message === 'string' && d.message ? d.message : '');
+  });
+  render('');
+}());<\/script>`;
+
+// The control's skin, in the LESSON's own palette variables so it inherits the
+// paper aesthetic in light mode and the authored dark palette in dark, with no
+// second set of colours to keep in sync.
+const NARRATE_CSS = `<style>
+  .narrate{display:flex; align-items:center; gap:16px; margin:.55em 0 .1em}
+  .narrate .sub{margin:0}
+  .narrate-label{color:var(--soft); font-style:italic; font-size:18px}
+  .narrate-btn{flex:0 0 auto; width:58px; height:58px; border-radius:50%; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; padding:0;
+    border:1px solid var(--gold); background:var(--card); color:var(--accent);
+    box-shadow:0 2px 14px #b88a2e20; transition:transform .12s, box-shadow .12s, background .12s}
+  .narrate-btn svg{width:24px; height:24px; fill:currentColor; margin-left:2px}
+  .narrate-btn.is-playing svg{margin-left:0}
+  .narrate-btn:hover:not(:disabled){background:var(--hi); transform:scale(1.04); box-shadow:0 4px 18px #b88a2e33}
+  .narrate-btn:active:not(:disabled){transform:scale(.97)}
+  .narrate-btn:focus-visible{outline:2px solid var(--accent2); outline-offset:3px}
+  .narrate-btn:disabled{cursor:default}
+  /* Loading is a ring that spins around the circle, so the button keeps its size
+     and the row never reflows between states. */
+  .narrate-btn.is-loading{border-color:var(--line); border-top-color:var(--gold); animation:narrate-spin .8s linear infinite}
+  .narrate-btn.is-loading svg{opacity:.35}
+  @keyframes narrate-spin{to{transform:rotate(360deg)}}
+  .narrate-note{margin:.1em 0 0; font-size:14px; color:var(--soft)}
+  @media (prefers-reduced-motion: reduce){
+    .narrate-btn{transition:none}
+    .narrate-btn.is-loading{animation:none}
+  }
+</style>`;
+
+// Inject the control's CSS into <head> (or ahead of the document when a lesson
+// somehow has no head), same shape as the other injectors here.
+function injectNarrateCss(doc: string): string {
+  const i = doc.indexOf("</head>");
+  return i === -1 ? NARRATE_CSS + doc : doc.slice(0, i) + NARRATE_CSS + doc.slice(i);
+}
+
+// The message the parent posts to an iframe's NARRATE_BRIDGE to re-skin the
+// control. `message` is the one line shown under the row: a refusal, or empty.
+export type NarrateState = "idle" | "loading" | "playing";
+export function narrateMessage(
+  state: NarrateState,
+  message = "",
+): { __lessonNarrate: true; state: NarrateState; message: string } {
+  return { __lessonNarrate: true, state, message };
+}
+
 export function scrollToCardMessage(id: string): { __lesson: true; type: "scrollToCard"; id: string } {
   return { __lesson: true, type: "scrollToCard", id };
 }
@@ -204,7 +308,8 @@ export type LessonMessage =
   | { type: "shareCard"; term: string; definition: string }
   | { type: "height"; height: number }
   | { type: "navigate"; href: string; newTab: boolean }
-  | { type: "response"; quizId: string; answer: string; correct: boolean };
+  | { type: "response"; quizId: string; answer: string; correct: boolean }
+  | { type: "narrate" };
 
 // Parse one raw `MessageEvent` as a message from THIS frame, or `null` for
 // anything else: another frame, a message that is not a lesson's, an unknown
@@ -229,6 +334,11 @@ export function lessonMessage(e: MessageEvent, frame: Window | null | undefined)
       return typeof raw.height === "number" ? { type: "height", height: raw.height } : null;
     case "navigate":
       return typeof raw.href === "string" ? { type: "navigate", href: raw.href, newTab: Boolean(raw.newTab) } : null;
+    case "narrate":
+      // A bare press. It carries no payload at all, deliberately: the frame says
+      // "the reader pressed the control" and the parent decides what that means
+      // given the state it alone holds (nothing rendered yet, playing, paused).
+      return { type: "narrate" };
     case "response":
       // A response with no quizId cannot be recorded against anything.
       return typeof raw.quizId === "string" && raw.quizId !== ""
@@ -513,6 +623,11 @@ export function buildSrcDoc(
     // References only (reference-cards/03): also inject the per-card share button.
     // Implies `reference`. Set only when the course has a public link to share.
     refShare?: boolean;
+    // Lessons in the AI-narration pilot only: inject the in-lesson play control
+    // under the heading. Driven by the server's own eligibility verdict
+    // (`lessonAudio.status`), so a reader outside the pilot gets a document with
+    // no trace of the feature rather than a hidden button.
+    narrate?: boolean;
   },
 ): string {
   let doc = ensureDocument(html);
@@ -530,6 +645,7 @@ export function buildSrcDoc(
     doc = injectLessonJustify(doc);
   }
   if (opts.teacherQa === false) doc = injectAskHidden(doc);
+  if (opts.narrate) doc = injectNarrateCss(doc);
   doc = setRootDirLang(doc, opts.dir, opts.lang);
   if (opts.lang && isDevanagari(opts.lang)) doc = injectDevanagariCss(doc);
   if (opts.tenantPalette) doc = injectTenantPaletteCss(doc, opts.tenantPalette);
@@ -538,6 +654,7 @@ export function buildSrcDoc(
     NAV_BRIDGE +
     (opts.quiz ? QUIZ_BRIDGE : "") +
     (opts.theme ? THEME_BRIDGE : "") +
+    (opts.narrate ? NARRATE_BRIDGE : "") +
     (reference ? referenceBridge(!!opts.refShare) : "");
   // Inject before the LAST </body>. A first-match replace is unsafe: an assembled
   // lesson can carry an authoring comment (or a code sample) that contains a

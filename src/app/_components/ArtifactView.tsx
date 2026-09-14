@@ -12,7 +12,7 @@ import { isPostHogInitialized } from "../PostHogClient";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { LockedPane, Paygate } from "./Paygate";
 import { checkoutLink, publicCourseUrl, useEditionLang, withLang } from "./editionUrl";
-import { buildEditDoc, buildSrcDoc, lessonMessage, replaceBodyInner, replaceTitleDisplay, scrollToCardMessage, themeMessage, type Theme } from "./lessonSrcDoc";
+import { buildEditDoc, buildSrcDoc, lessonMessage, narrateMessage, replaceBodyInner, replaceTitleDisplay, scrollToCardMessage, themeMessage, type NarrateState, type Theme } from "./lessonSrcDoc";
 import { Icon } from "./icons";
 import { LessonFootCard } from "./LessonFoot";
 import { Markdown } from "./MarkdownView";
@@ -218,6 +218,7 @@ export function Frame({
   cardTarget,
   share,
   teacherQa,
+  narrate,
   onResponse,
 }: {
   html: string;
@@ -247,6 +248,12 @@ export function Frame({
   // caller already holds. `false` hides the lesson's green ask block; `true` and
   // absence build the document exactly as authored.
   teacherQa?: boolean;
+  // The in-lesson narration control (AI voice pilot). Absent means the document
+  // is built without the control at all, which is what a reader outside the pilot
+  // gets. Present means: inject it, paint it in `state`, and call `onToggle` when
+  // it is pressed. The audio itself stays in the PARENT (see `LessonView`) so a
+  // theme flip, which re-skins the frame, never interrupts playback.
+  narrate?: { state: NarrateState; message: string; onToggle: () => void };
   // A quiz answered inside the frame (ticket 27). The listener lives HERE, in the
   // component that owns the iframe, because only this component can say which
   // frame a message must have come from. It used to sit in `LessonView`, which
@@ -287,8 +294,13 @@ export function Frame({
   const [copied, setCopied] = useState(false);
   const srcDoc = useMemo(
     () =>
-      buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss, dir, lang, tenantPalette, reference, refShare: shareable, teacherQa }),
-    [html, withBridge, themeCss, dir, lang, tenantPalette, reference, shareable, teacherQa],
+      buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss, dir, lang, tenantPalette, reference, refShare: shareable, teacherQa, narrate: !!narrate }),
+    // `!!narrate`, not `narrate`: the object identity changes on every state
+    // change, and depending on it would rebuild srcDoc (reloading the iframe,
+    // losing scroll and answered quizzes) every time the button changed colour.
+    // Only whether the control EXISTS belongs in the document.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [html, withBridge, themeCss, dir, lang, tenantPalette, reference, shareable, teacherQa, !!narrate],
   );
 
   // Deep-link to a glossary card (reference-cards/02). Read the target via a ref so
@@ -363,6 +375,28 @@ export function Frame({
     window.addEventListener("message", onQuiz);
     return () => window.removeEventListener("message", onQuiz);
   }, []);
+
+  // The control was pressed inside the frame. Read the handler through a ref so a
+  // changing callback never re-binds the listener, exactly like `onResponse`, and
+  // only THIS frame's messages count.
+  const narrateRef = useRef(narrate);
+  narrateRef.current = narrate;
+  useEffect(() => {
+    function onNarrate(e: MessageEvent) {
+      const m = lessonMessage(e, iframeRef.current?.contentWindow);
+      if (m?.type === "narrate") narrateRef.current?.onToggle();
+    }
+    window.addEventListener("message", onNarrate);
+    return () => window.removeEventListener("message", onNarrate);
+  }, []);
+
+  // Push the control's state in. Depends on srcDoc too, so a freshly loaded frame
+  // (lesson switch, theme-css rebuild) is repainted rather than stranded showing
+  // the previous document's state.
+  useEffect(() => {
+    if (!narrate) return;
+    iframeRef.current?.contentWindow?.postMessage(narrateMessage(narrate.state, narrate.message), "*");
+  }, [narrate, srcDoc]);
 
   // Push theme changes into the already-loaded iframe (no reload). Also fires
   // when srcDoc changes (lesson switch) so a freshly loaded frame is in sync.
@@ -527,6 +561,12 @@ function LessonView({
   // with an open channel never flashes shut.
   const teacherQa = header?.teacherQa !== false;
   const html = useContentHtml(lesson);
+  // AI narration (pilot). `undefined` outside the pilot, which builds the lesson
+  // document with no trace of the control. It moved OUT of this title bar and
+  // into the lesson itself on 2026-09-14: a play button is the thing you reach
+  // for before reading, so it belongs beside the lesson's own subtitle, not in
+  // the row of controls that are all about leaving the lesson.
+  const narrate = useLessonNarration(topicSlug, lessonKey);
   const progress = useQuery(api.capture.myProgress, { topicSlug });
   const recordResponse = useMutation(api.capture.recordResponse);
   // **The one optimistic mutation in the app** (perceived-performance ticket 04),
@@ -664,10 +704,6 @@ function LessonView({
         >
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
           <div className="flex shrink-0 items-center gap-2">
-            {/* AI narration (pilot). First in the row because it is the control
-                you reach for BEFORE reading, unlike everything beside it, which
-                is about leaving the lesson. It hides itself outside the pilot. */}
-            <LessonAudioButton topicSlug={topicSlug} lessonKey={lessonKey} />
             {/* Authoring is owner-only and stops once the course is completed
                 (ADR 0015): no "Generate next lesson" on a finished course. */}
             {!readOnly && !courseCompleted && isFrontier && completed && (
@@ -721,6 +757,7 @@ function LessonView({
             lang={contentLang}
             resources={resources}
             teacherQa={header?.teacherQa}
+            narrate={narrate}
             // Absent for a read-only Viewer, whose quiz attempts are not
             // recorded against the owner. The absence is the switch.
             onResponse={readOnly ? undefined : onResponse}
@@ -996,110 +1033,110 @@ function ContentEditor({
 }
 
 // Fires the next-lesson Routine on demand (ADR 0008). Only rendered on the
-// **The AI narration play button (pilot, 2026-09-14).** Reads the lesson aloud in
-// an ElevenLabs voice. Whether it appears at all is `convex/lessonAudio.ts`'s
-// call, not this component's: `status.eligible` is the server's verdict on the
-// whole gate (the `prophetic-school` course, English, the first lesson, and a
-// caller who administers it), so widening the pilot never means remembering to
-// widen a second rule hidden in the UI. A learner renders nothing and pays one
-// cheap query for the privilege.
+// **The AI narration control (pilot, 2026-09-14).** Everything behind the play
+// button that now lives INSIDE the lesson, under its heading (see NARRATE_BRIDGE
+// in `lessonSrcDoc.ts` for the control itself).
 //
-// The render is lazy and cached, so the button has two lives. Before anything is
-// rendered it is a "Listen" button that spends real money on press. Afterwards
-// `status.url` is populated by the live query, and it is an ordinary transport
-// control over a plain `<audio>` element.
+// The split is deliberate. The button has to be in the iframe, because only a
+// script inside the sandboxed document can place it beside the authored subtitle.
+// The AUDIO has to be out here, because the frame is rebuilt whenever the
+// document changes and an `<audio>` inside it would stop mid-sentence every time
+// the reader flipped the theme. So the frame owns the pixels and this owns the
+// sound, joined by two postMessages.
 //
-// ponytail: the labels here are hardcoded English rather than message-catalogue
-// keys. The pilot is visible to one person, on one English lesson, and
-// `messages/parity.test.ts` requires every new key in all six catalogues. Add
-// keys when the gate widens past the owner; not before.
-function LessonAudioButton({ topicSlug, lessonKey }: { topicSlug: string; lessonKey: string }) {
+// Whether the control exists at all is `lessonAudio.status`, the server's verdict
+// on the whole pilot gate. `undefined` here means the document is built with no
+// trace of the feature, which is what every learner gets.
+//
+// ponytail: the strings are hardcoded English. The pilot is admin-only on one
+// English lesson, and `messages/parity.test.ts` demands every new key in all six
+// catalogues. Add keys when the gate widens past administrators.
+function useLessonNarration(
+  topicSlug: string,
+  lessonKey: string,
+): { state: NarrateState; message: string; onToggle: () => void } | undefined {
   const lang = useEditionLang();
   const status = useQuery(api.lessonAudio.status, { topicSlug, key: lessonKey, lang: lang ?? undefined });
   const speak = useAction(api.lessonAudio.speak);
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const [rendering, setRendering] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // Whether the caller has asked to hear it, so a render that finishes can start
-  // playback itself rather than making them press a second time.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [state, setState] = useState<NarrateState>("idle");
+  const [message, setMessage] = useState("");
+  // Whether the reader has asked to hear it, so a render that finishes can start
+  // playback itself instead of making them press a second time.
   const wantPlay = useRef(false);
-
   const url = status?.url ?? null;
 
-  // Autoplay once the freshly rendered file lands. A render takes long enough
-  // that the browser may have forgotten the click that started it, so a blocked
-  // `play()` is EXPECTED, not an error: swallow it and leave the control sitting
-  // on Play for a second press that is unambiguously a gesture.
+  // One `Audio` for the life of the pane. Built imperatively rather than rendered,
+  // because nothing about it is visible: the only UI is in the iframe.
   useEffect(() => {
-    if (!url || !wantPlay.current) return;
-    wantPlay.current = false;
-    audioRef.current?.play().catch(() => {});
-  }, [url]);
+    const a = new Audio();
+    a.preload = "none";
+    const playing = () => setState("playing");
+    const stopped = () => setState("idle");
+    a.addEventListener("play", playing);
+    a.addEventListener("pause", stopped);
+    a.addEventListener("ended", stopped);
+    audioRef.current = a;
+    return () => {
+      a.pause();
+      a.removeEventListener("play", playing);
+      a.removeEventListener("pause", stopped);
+      a.removeEventListener("ended", stopped);
+      audioRef.current = null;
+    };
+  }, []);
 
-  // A lesson switch remounts nothing (the key is a prop), so reset by hand.
+  // A lesson switch keeps the same pane, so stop the previous lesson's audio and
+  // reset by hand rather than relying on a remount that does not happen.
   useEffect(() => {
-    setError(null);
-    setPlaying(false);
+    audioRef.current?.pause();
+    setState("idle");
+    setMessage("");
     wantPlay.current = false;
   }, [lessonKey]);
 
-  if (!status?.eligible) return null;
+  // Point the element at whatever the live query says is rendered, and start it if
+  // this URL arrived because the reader asked for it. A render takes long enough
+  // that the browser may have forgotten the click, so a blocked `play()` is
+  // EXPECTED rather than an error: fall back to a control sitting on Play.
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a || !url) return;
+    if (a.src !== url) a.src = url;
+    if (!wantPlay.current) return;
+    wantPlay.current = false;
+    a.play().catch(() => {
+      setState("idle");
+      setMessage("Ready. Press play to listen.");
+    });
+  }, [url]);
 
-  const toggle = () => {
-    setError(null);
-    const el = audioRef.current;
-    if (url && el) {
-      if (el.paused) void el.play().catch(() => setError("This browser would not start playback."));
-      else el.pause();
+  const onToggle = useCallback(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    setMessage("");
+    if (!a.paused) {
+      a.pause();
+      return;
+    }
+    if (url) {
+      a.play().catch(() => setMessage("This browser would not start playback."));
       return;
     }
     // Nothing rendered yet: this press is the one that spends money.
     wantPlay.current = true;
-    setRendering(true);
-    void speak({ topicSlug, key: lessonKey, lang: lang ?? undefined })
-      .catch((e: unknown) => {
-        wantPlay.current = false;
-        // `refusalMessage` is the shared reader of a ConvexError's `data`, which
-        // is the only part of a refusal that survives a production deployment's
-        // redaction (see `saveError` above).
-        setError(refusalMessage(e, "The narration could not be made."));
-      })
-      .finally(() => setRendering(false));
-  };
+    setState("loading");
+    void speak({ topicSlug, key: lessonKey, lang: lang ?? undefined }).catch((e: unknown) => {
+      wantPlay.current = false;
+      setState("idle");
+      // `refusalMessage` reads a ConvexError's `data`, the only part of a refusal
+      // that survives a production deployment's redaction (see `saveError`).
+      setMessage(refusalMessage(e, "The narration could not be made."));
+    });
+  }, [url, speak, topicSlug, lessonKey, lang]);
 
-  return (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        onClick={toggle}
-        disabled={rendering}
-        aria-label={playing ? "Pause narration" : "Play narration"}
-        title={url ? "Listen to this lesson" : "Make an audio narration of this lesson"}
-        className="flex items-center gap-1.5 rounded-lg bg-gold/20 px-2.5 py-1.5 text-sm font-medium text-accent transition-colors hover:bg-gold/30 disabled:opacity-70"
-      >
-        <svg viewBox="0 0 16 16" aria-hidden className="h-3.5 w-3.5 fill-current">
-          {playing ? <path d="M4 2h3v12H4zm5 0h3v12H9z" /> : <path d="M4 2l10 6-10 6z" />}
-        </svg>
-        {rendering ? "Making audio…" : playing ? "Pause" : "Listen"}
-      </button>
-      {/* The refusal sits beside the control rather than in a toast: the two
-          that will actually happen (no API key on the deployment, a lesson past
-          the single-render character limit) are operator problems, and an
-          operator needs to be able to read them twice. */}
-      {error && <span className="max-w-[16rem] truncate text-xs text-soft" title={error}>{error}</span>}
-      {url && (
-        <audio
-          ref={audioRef}
-          src={url}
-          preload="none"
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onEnded={() => setPlaying(false)}
-        />
-      )}
-    </div>
-  );
+  if (!status?.eligible) return undefined;
+  return { state, message, onToggle };
 }
 
 // completed Frontier. It reflects the lock so a press can't double-fire and a
