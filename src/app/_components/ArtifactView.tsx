@@ -999,10 +999,10 @@ function ContentEditor({
 // **The AI narration play button (pilot, 2026-09-14).** Reads the lesson aloud in
 // an ElevenLabs voice. Whether it appears at all is `convex/lessonAudio.ts`'s
 // call, not this component's: `status.eligible` is the server's verdict on the
-// whole gate (the `prophetic-school` course, English, the first lesson, the
-// owner), so widening the pilot never means remembering to widen a second rule
-// hidden in the UI. An ineligible caller renders nothing and pays one cheap
-// query for the privilege.
+// whole gate (the `prophetic-school` course, English, the first lesson, and a
+// caller who administers it), so widening the pilot never means remembering to
+// widen a second rule hidden in the UI. A learner renders nothing and pays one
+// cheap query for the privilege.
 //
 // The render is lazy and cached, so the button has two lives. Before anything is
 // rendered it is a "Listen" button that spends real money on press. Afterwards

@@ -12,9 +12,11 @@
 //  - **Lazy, cached forever.** Rendered on the first press of the button and
 //    stored; every later press is a storage URL. Nothing is rendered at publish,
 //    so the pilot cannot quietly start billing for lessons nobody listens to.
-//  - **Gated to one lesson.** `prophetic-school`, English, first lesson, owner
-//    only (see `pilotLesson`). The gate is SERVER-side and the UI reads the same
-//    verdict back, so there is exactly one place the pilot can be widened.
+//  - **Gated to one lesson, for administrators of it.** `prophetic-school`,
+//    English, first lesson, and a caller who is a sys admin, a `ywampotch`
+//    tenant admin, or the course's owner (see `pilotLesson`). The gate is
+//    SERVER-side and the UI reads the same verdict back, so there is exactly one
+//    place the pilot can be widened.
 //
 // Provider choice: ElevenLabs, chosen 2026-09-14 over Gemini TTS (which would
 // have reused the already-provisioned `GOOGLE_AI_API_KEY`) because voice quality
@@ -36,6 +38,7 @@ import { action, internalMutation, internalQuery, query, type QueryCtx } from ".
 import { narrationFromHtml } from "./narrationText";
 import { SOURCE_LANG } from "./sourceLang";
 import { topicBySlug } from "./topicAccess";
+import { isCallerAdmin } from "./whitelist";
 
 // The pilot gate, as two constants rather than a config table: widening this is
 // a decision, and a decision should show up in a diff.
@@ -82,9 +85,24 @@ async function pilotLesson(
   const userId = await getAuthUserId(ctx);
   if (!userId) return null;
   const topic = await topicBySlug(ctx, topicSlug);
-  // Owner only. Not `canWrite`, not an Editor, not a Viewer holding a grant:
-  // the narrowest possible audience for an unproven voice and an unproven bill.
-  if (!topic || topic.ownerId !== userId) return null;
+  if (!topic) return null;
+  // **Administrators of this course, and nobody else** (2026-09-14). Not
+  // `canWrite`, not an Editor, not a Viewer holding a grant, and emphatically not
+  // a learner: an unproven voice and an unproven bill get the smallest audience
+  // that can still judge them.
+  //
+  // Three principals qualify, and `isCallerAdmin` supplies two of them: a sys
+  // admin (an allowlist row with `isAdmin` and no slug) passes every scoped
+  // check, and a tenant admin passes only their OWN tenant's. Passing
+  // `topic.tenantSlug` is what makes that second clause tenant-local, so
+  // another brand's admin is refused here. A course with no tenant (the apex)
+  // degrades to the unscoped check, which is sys-admin-only: the safe direction.
+  //
+  // The owner is kept alongside them rather than folded in, because course
+  // ownership and the Allowlist are genuinely different tables and an owner who
+  // was never made an admin would otherwise lose the button on their own course.
+  const admin = (await isCallerAdmin(ctx, topic.tenantSlug)) || topic.ownerId === userId;
+  if (!admin) return null;
   const first = await ctx.db
     .query("lessons")
     .withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id))
@@ -199,8 +217,8 @@ export const speak = action({
   handler: async (ctx, { topicSlug, key, lang }): Promise<string> => {
     const pilot = await ctx.runQuery(internal.lessonAudio.pilotBody, { topicSlug, key, lang });
     // Not in the pilot. Deliberately the same refusal for "wrong course", "wrong
-    // lesson" and "not the owner": a caller outside the gate learns nothing about
-    // what is behind it.
+    // lesson" and "not an administrator of it": a caller outside the gate learns
+    // nothing about what is behind it.
     if (!pilot) throw new ConvexError({ message: "Narration is not available for this lesson." });
 
     if (pilot.cachedStorageId) {

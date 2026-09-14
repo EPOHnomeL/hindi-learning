@@ -229,7 +229,8 @@ export default defineSchema({
   // treats a mismatch as a cache miss and re-renders.
   //
   // Pilot scope (2026-09-14): only the first Lesson of `prophetic-school`, in
-  // English, for that course's owner. The table is shaped for the general case so
+  // English, read by an administrator of that course (a sys admin, a `ywampotch`
+  // tenant admin, or its owner). The table is shaped for the general case so
   // widening the gate is a one-line change rather than a migration.
   lessonAudio: defineTable({
     topicId: v.id("topics"),
