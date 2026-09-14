@@ -25,9 +25,16 @@ Dates are absolute. `[[links]]` in older notes have been resolved to sections he
   - Convex validates data on push, so a **field removal needs the data stripped
     of that field first** (patch `{field: undefined}`) on the target deployment
     before the narrowing schema deploys — sequence it as its own earlier merge.
-- **`npx convex codegen` here pushes to the shared dev deployment** — it doesn't
-  just generate types locally; it uploads functions/schema to
-  `dev:judicious-marmot-580`. A worktree has no `.env.local`, so codegen there
+- **CORRECTED 2026-09-14: `npx convex codegen` here pushes to PROD, not to dev.**
+  `.env.local` now pins a **prod** deploy key (`CONVEX_DEPLOY_KEY=prod:capable-barracuda-769`),
+  and a deploy key BEATS `CONVEX_DEPLOYMENT=dev:judicious-marmot-580` set in the
+  same file, so every bare `npx convex <cmd>` in this checkout targets production.
+  `npx convex dashboard` prints the target and is the cheap way to check before
+  running anything. Found the hard way: a `codegen` run on 2026-09-14 created an
+  empty `lessonAudio` table on prod while its author believed they were on dev.
+  Codegen pushes the SCHEMA but does NOT register functions, so the blast radius
+  of that mistake is an empty table, never live code.
+  A worktree has no `.env.local`, so codegen there
   needs `CONVEX_DEPLOYMENT="dev:judicious-marmot-580" npx convex codegen --typecheck disable`.
   Pushing `main` reconciles the shared dev schema to `main`'s and **drops
   indexes/tables that exist only on a concurrent branch** — non-destructive to
@@ -37,10 +44,11 @@ Dates are absolute. `[[links]]` in older notes have been resolved to sections he
 - **CLI auth is a per-repo deploy key, not the global login.** This machine runs
   two Convex accounts (company Y-Knot/FuelSwitch + the personal course app), and
   the CLI stores ONE token at `~/.convex/config.json` — so `npx convex login` is a
-  machine-wide toggle. To skip the logout/login churn, this repo pins a **dev
-  deploy key** in `.env.local` (`CONVEX_DEPLOY_KEY=dev:...|ey...`); the env var
-  wins over the global login, so `npx convex dev`/`deploy` always run against this
-  project's deployment. A **"You don't have access to the selected project"** error
+  machine-wide toggle. To skip the logout/login churn, this repo pins a deploy key
+  in `.env.local`; the env var wins over the global login, so `npx convex
+  dev`/`deploy` always run against this project's deployment. **As of 2026-09-14
+  that key is a PROD key** (`CONVEX_DEPLOY_KEY=prod:...`), not the dev key this
+  note originally described, which is why bare CLI commands reach production. A **"You don't have access to the selected project"** error
   means the key is missing/stale (regenerate: personal account → dev deployment →
   Settings → Deploy keys), not a code problem. A plain dev key can lack perms for
   `convex logs`/env reads — grant those role actions when generating if needed.
@@ -77,10 +85,15 @@ below). PayFast rail vars live in `convex/env.ts`; the Next client var in
 
 ### `ELEVENLABS_API_KEY` (AI lesson narration, added 2026-09-14)
 
-- **Without it the play button refuses in words**, it does not hide: the pilot's
-  gate and its configuration are separate questions, so an owner who is inside the
-  gate is told the deployment is unconfigured rather than seeing nothing at all.
-  Set it with `npx convex env set ELEVENLABS_API_KEY <key>`; never in `.env`.
+- **Who sees the play button at all** is `pilotLesson` in `convex/lessonAudio.ts`:
+  the `prophetic-school` course, English, its first lesson, and a caller who
+  administers it (a sys admin, a `ywampotch` tenant admin, or the course's owner).
+  A learner never sees it and cannot call the action. `convex/lessonAudio.test.ts`
+  is that boundary's regression suite.
+- **Without the key the play button refuses in words**, it does not hide: the
+  pilot's gate and its configuration are separate questions, so an administrator
+  inside the gate is told the deployment is unconfigured rather than seeing nothing
+  at all. Set it with `npx convex env set ELEVENLABS_API_KEY <key>`; never in `.env`.
 - Optional siblings, both read at call time so a voice can be auditioned without a
   deploy: `ELEVENLABS_VOICE_ID` (default `21m00Tcm4TlvDq8ikWAM`, the stock
   "Rachel") and `ELEVENLABS_MODEL_ID` (default `eleven_multilingual_v2`, the
