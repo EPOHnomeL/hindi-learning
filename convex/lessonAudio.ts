@@ -1,5 +1,7 @@
-// **AI narration of a Lesson, pilot scope.** A play button at the top of the
-// reader that reads the lesson aloud in an ElevenLabs voice.
+// **AI narration of a Lesson, pilot scope.** The play control inside the lesson,
+// under its heading, that reads the lesson aloud in an ElevenLabs voice. The
+// control itself is NARRATE_BRIDGE in `src/app/_components/lessonSrcDoc.ts`; this
+// is the rail behind it.
 //
 // This is a deliberately tiny slice of the deferred course-audio design
 // (`.plan/maps/authoring/assets/deferred/course-audio.md`), which leaves format,
@@ -248,6 +250,15 @@ export const speak = action({
       });
     }
 
+    // **The bill, before it is incurred.** ElevenLabs charges per character, so
+    // this line IS the cost of the render, visible in `npx convex logs` whether
+    // the call then succeeds or fails. It exists because on 2026-09-14 the first
+    // real press was refused by the provider and there was no way to answer "what
+    // would that lesson have cost?" without it. USD is at the published
+    // multilingual-v2 rate; flash models are half.
+    const usd = ((text.length / 1000) * 0.1).toFixed(3);
+    console.log(`lessonAudio: ${pilot.lessonKey} narration is ${text.length} chars, about $${usd} on ${modelId()}`);
+
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId()}`, {
       method: "POST",
       headers: { "content-type": "application/json", "xi-api-key": apiKey },
@@ -258,6 +269,17 @@ export const speak = action({
       // are the two that will actually happen, and both are unguessable from a
       // generic failure message.
       const detail = (await res.text().catch(() => "")).slice(0, 300);
+      // 402 is its own case because it is the one refusal that is not a bug and
+      // not a typo: the account cannot use this voice on its current plan. Saying
+      // so plainly, and naming the two ways out, saves reading a raw provider
+      // payload in a lesson header.
+      if (res.status === 402) {
+        throw new ConvexError({
+          message:
+            `This ElevenLabs plan cannot use voice ${voiceId()}. Upgrade the plan, or point ` +
+            `ELEVENLABS_VOICE_ID at a voice the account owns. Provider said: ${detail}`,
+        });
+      }
       throw new ConvexError({ message: `ElevenLabs refused the render (${res.status}). ${detail}`.trim() });
     }
 
