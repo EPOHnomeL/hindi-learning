@@ -49,6 +49,14 @@ import { SOURCE_LANG } from "./sourceLang";
 import { topicBySlug } from "./topicAccess";
 import { isCallerAdmin } from "./whitelist";
 
+// **Every refusal in this file throws `new ConvexError("<string>")`, never an
+// object.** The client's `refusalMessage` (src/app/_components/mutationRun.ts)
+// only surfaces a ConvexError whose `data` is a STRING; anything else falls
+// through to the caller's generic fallback. This file threw `{ message }` until
+// 2026-09-15, so the operator saw "The narration could not be made." in the
+// lesson while the real reason (an ElevenLabs per-key credit quota) was only
+// readable in `npx convex logs`. `lessonAudio.test.ts` pins the shape.
+
 // The pilot gate, as two constants rather than a config table: widening this is
 // a decision, and a decision should show up in a diff.
 const PILOT_SLUG = "prophetic-school";
@@ -249,13 +257,13 @@ export const voices = action({
   handler: async (_ctx, { secret }): Promise<{ voiceId: string; name: string; category: string }[]> => {
     assertAdmin(secret);
     const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (!apiKey) throw new ConvexError({ message: "ELEVENLABS_API_KEY is not set on this deployment." });
+    if (!apiKey) throw new ConvexError("ELEVENLABS_API_KEY is not set on this deployment.");
     const res = await fetch("https://api.elevenlabs.io/v2/voices?page_size=100", {
       headers: { "xi-api-key": apiKey },
     });
     if (!res.ok) {
       const detail = (await res.text().catch(() => "")).slice(0, 300);
-      throw new ConvexError({ message: `ElevenLabs refused the voice list (${res.status}). ${detail}`.trim() });
+      throw new ConvexError(`ElevenLabs refused the voice list (${res.status}). ${detail}`.trim());
     }
     const json = (await res.json()) as { voices?: { voice_id?: unknown; name?: unknown; category?: unknown }[] };
     return (json.voices ?? []).map((v2) => ({
@@ -281,7 +289,7 @@ export const speak = action({
     // Not in the pilot. Deliberately the same refusal for "wrong course", "wrong
     // lesson" and "not an administrator of it": a caller outside the gate learns
     // nothing about what is behind it.
-    if (!pilot) throw new ConvexError({ message: "Narration is not available for this lesson." });
+    if (!pilot) throw new ConvexError("Narration is not available for this lesson.");
 
     if (pilot.cachedStorageId) {
       const url = await ctx.storage.getUrl(pilot.cachedStorageId);
@@ -292,16 +300,14 @@ export const speak = action({
 
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) {
-      throw new ConvexError({
-        message: "Narration is not configured yet: ELEVENLABS_API_KEY is not set on this deployment.",
-      });
+      throw new ConvexError("Narration is not configured yet: ELEVENLABS_API_KEY is not set on this deployment.");
     }
 
-    if (!pilot.sourceStorageId) throw new ConvexError({ message: "This lesson has no body to read." });
+    if (!pilot.sourceStorageId) throw new ConvexError("This lesson has no body to read.");
     const body = await ctx.storage.get(pilot.sourceStorageId);
-    if (!body) throw new ConvexError({ message: "This lesson's body could not be loaded." });
+    if (!body) throw new ConvexError("This lesson's body could not be loaded.");
     const full = narrationFromHtml(await body.text());
-    if (!full) throw new ConvexError({ message: "This lesson has no prose to read aloud." });
+    if (!full) throw new ConvexError("This lesson has no prose to read aloud.");
     // Sampling happens BEFORE the length guard, so an audition of a lesson that
     // is too long to narrate in full still works: the point of a sample is to
     // judge a voice, and that does not need the whole lesson.
@@ -309,9 +315,9 @@ export const speak = action({
     if (text.length > MAX_CHARS) {
       // Named numbers, because the operator reading this needs to know how far
       // over it is before deciding whether chunking is worth building.
-      throw new ConvexError({
-        message: `This lesson is ${text.length} characters, past the ${MAX_CHARS} a single render takes. Splitting long lessons is not built yet.`,
-      });
+      throw new ConvexError(
+        `This lesson is ${text.length} characters, past the ${MAX_CHARS} a single render takes. Splitting long lessons is not built yet.`,
+      );
     }
 
     // **The bill, before it is incurred.** ElevenLabs charges per character, so
@@ -341,13 +347,12 @@ export const speak = action({
       // so plainly, and naming the two ways out, saves reading a raw provider
       // payload in a lesson header.
       if (res.status === 402) {
-        throw new ConvexError({
-          message:
-            `This ElevenLabs plan cannot use voice ${voiceId()}. Upgrade the plan, or point ` +
+        throw new ConvexError(
+          `This ElevenLabs plan cannot use voice ${voiceId()}. Upgrade the plan, or point ` +
             `ELEVENLABS_VOICE_ID at a voice the account owns. Provider said: ${detail}`,
-        });
+        );
       }
-      throw new ConvexError({ message: `ElevenLabs refused the render (${res.status}). ${detail}`.trim() });
+      throw new ConvexError(`ElevenLabs refused the render (${res.status}). ${detail}`.trim());
     }
 
     // `res.blob()` carries the provider's content type; restate it so the stored
@@ -363,7 +368,7 @@ export const speak = action({
       chars: text.length,
     });
     const url = await ctx.storage.getUrl(storageId);
-    if (!url) throw new ConvexError({ message: "The narration was rendered but could not be served." });
+    if (!url) throw new ConvexError("The narration was rendered but could not be served.");
     return url;
   },
 });

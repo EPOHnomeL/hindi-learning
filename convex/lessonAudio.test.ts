@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
+import { ConvexError } from "convex/values";
 import { expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -232,4 +233,24 @@ test("a malformed sample budget reads as off rather than breaking the button", a
 test("the voices diagnostic refuses without the operator secret", async () => {
   const t = convexTest(schema, modules);
   await expect(t.action(api.lessonAudio.voices, { secret: "wrong" })).rejects.toThrow(/unauthorized/i);
+});
+
+test("a refusal reaches the reader instead of being swallowed", async () => {
+  // **The client only surfaces a `ConvexError` whose `data` is a STRING.**
+  // `refusalMessage` in `src/app/_components/mutationRun.ts` returns the caller's
+  // generic fallback for anything else, so throwing `new ConvexError({ message })`
+  // meant every carefully worded refusal in this file reached the lesson as
+  // "The narration could not be made." and the operator saw nothing useful.
+  // Found on 2026-09-15 when an ElevenLabs per-key quota refusal was invisible in
+  // the UI and only readable in `npx convex logs`.
+  const t = convexTest(schema, modules);
+  await seedCourse(t, await user(t, "owner@example.com"));
+  const learner = await user(t, "learner@example.com");
+  const err = await asUser(t, learner)
+    .action(api.lessonAudio.speak, { topicSlug: SLUG, key: "l1" })
+    .then(() => null)
+    .catch((e: unknown) => e);
+  expect(err).toBeInstanceOf(ConvexError);
+  expect(typeof (err as ConvexError<string>).data).toBe("string");
+  expect((err as ConvexError<string>).data).toMatch(/not available/i);
 });
