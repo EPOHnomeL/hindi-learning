@@ -114,9 +114,20 @@ below). PayFast rail vars live in `convex/env.ts`; the Next client var in
   `premade` one; ElevenLabs' own docs say Default voices exist only for accounts
   created before March 2026 and expire 2026-12-31, so this is a property of the
   account on the day, not a fixed list.
+- **An ElevenLabs API KEY carries its own credit quota, separate from the plan**
+  (2026-09-15). The key named "My Course" was created with a quota of 10 credits,
+  so a 553-character sample was refused with a **401 `quota_exceeded`** ("exceeds
+  your API key (My Course) quota of 10") while the account's own free allowance was
+  untouched. Raise or remove the limit on the key itself in the ElevenLabs
+  dashboard; upgrading the plan would not have helped. Note the status is 401, not
+  402, so it reads like an auth failure and is not one.
+- **Refusals must be `new ConvexError("<string>")`, never an object.** The client's
+  `refusalMessage` only surfaces string `data`; an object falls through to a
+  generic fallback, which is why the quota refusal above showed in the lesson as
+  "The narration could not be made." Fixed 2026-09-15 and pinned by a test.
 - **Measured cost** (2026-09-14, from the repo's pristine prophetic-school lesson 1
   run through `narrationFromHtml`): Spanish 8,573 chars, Sesotho 8,421, English
-  estimated ~7,300, so about $0.73 a lesson on `eleven_multilingual_v2` at
+  MEASURED at 7,214 on 2026-09-15 (the estimate was ~7,300), so about $0.72 a lesson on `eleven_multilingual_v2` at
   $0.10/1,000 chars, half that on `eleven_flash_v2_5`. The whole 56-lesson course
   in English is roughly 498,000 chars, about $50 or $25. **The median lesson
   exceeds the 10,000-char single-request cap** (33 of 56 in Spanish, an estimated
