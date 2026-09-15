@@ -240,10 +240,16 @@ export default defineSchema({
     modelId: v.string(),
     sourceStorageId: v.optional(v.id("_storage")),
     storageId: v.id("_storage"),
+    // The sample budget this row was rendered under (`ELEVENLABS_SAMPLE_CHARS`),
+    // or 0 for the whole lesson. In the KEY for the same reason `voiceId` is: a
+    // 600-character audition and the full narration are different recordings, and
+    // caching one as the other would either replay a snippet forever or bill a
+    // full lesson to hear a sample.
+    sampleChars: v.number(),
     // What the render cost, in ElevenLabs billing terms (characters sent). The
     // only spend signal this pilot has; no usage table is invented for it.
     chars: v.number(),
-  }).index("by_lesson", ["topicId", "lessonKey", "lang", "voiceId", "modelId"]),
+  }).index("by_lesson", ["topicId", "lessonKey", "lang", "voiceId", "modelId", "sampleChars"]),
 
   // A learner's Resource: either an uploaded blob (`kind: "file"`, bytes in
   // `rawStorageId`) or an external link (`kind: "url"`, in `url`). `processed`

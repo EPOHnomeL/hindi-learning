@@ -110,3 +110,35 @@ export function narrationFromHtml(html: string): string {
     .filter((line) => line.length > 0)
     .join("\n");
 }
+
+/**
+ * The first `limit` characters of a narration script, cut where a reader would
+ * stop rather than mid-word.
+ *
+ * This exists for the free-tier audition. ElevenLabs' free plan allows 10,000
+ * characters a MONTH, and one prophetic-school lesson is around 7,300, so
+ * rendering a whole lesson just to find out whether you like a voice spends most
+ * of the month on the first try and makes comparing two voices impossible. A
+ * 600-character sample costs 6% of it instead.
+ *
+ * The cut walks backwards from the limit: the end of the last complete sentence,
+ * failing that a paragraph break, failing that the last space. Each fallback is
+ * only taken if it leaves a reasonable amount of text, so a stray early full stop
+ * cannot collapse a 600-character sample into eight words. A hard slice is the
+ * last resort, because a clipped word beats returning nothing.
+ *
+ * `limit <= 0` means no sampling at all: the whole script, which is the default.
+ */
+export function sampleOf(text: string, limit: number): string {
+  if (limit <= 0 || text.length <= limit) return text;
+  const head = text.slice(0, limit);
+  // Enough of the budget used that the cut is a sample rather than a fragment.
+  const enough = limit * 0.4;
+  // Greedy, so this matches up to the LAST sentence-ending mark in `head`.
+  const sentence = head.match(/[\s\S]*[.!?](?=\s|$)/);
+  if (sentence && sentence[0].length > enough) return sentence[0].trim();
+  const para = head.lastIndexOf("\n");
+  if (para > enough) return head.slice(0, para).trim();
+  const space = head.lastIndexOf(" ");
+  return (space > 0 ? head.slice(0, space) : head).trim();
+}

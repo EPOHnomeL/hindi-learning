@@ -27,17 +27,24 @@
 //
 // Operator setup (one line, on the deployment, NOT in `.env`):
 //   npx convex env set ELEVENLABS_API_KEY <key>
-// Optional, both env-overridable so a voice can be auditioned without a deploy
-// (and both keyed into the cache, so flipping one really does re-render):
-//   ELEVENLABS_VOICE_ID   default below
-//   ELEVENLABS_MODEL_ID   default eleven_multilingual_v2
+// Optional, all env-overridable so a voice can be auditioned without a deploy,
+// and all three keyed into the cache, so flipping one really does re-render:
+//   ELEVENLABS_VOICE_ID       default below
+//   ELEVENLABS_MODEL_ID       default eleven_multilingual_v2
+//   ELEVENLABS_SAMPLE_CHARS   unset/0 = the whole lesson; 600 = a short audition
+//
+// `pnpm voices:prod` lists the voices the key can actually use. Reach for it the
+// moment a render is refused with a 402: the free plan cannot drive Voice Library
+// voices through the API, only Default/premade ones, and which ids are which is a
+// property of the account rather than of a documentation page.
 
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { action, internalMutation, internalQuery, query, type QueryCtx } from "./_generated/server";
-import { narrationFromHtml } from "./narrationText";
+import { narrationFromHtml, sampleOf } from "./narrationText";
+import { assertAdmin } from "./adminSecret";
 import { SOURCE_LANG } from "./sourceLang";
 import { topicBySlug } from "./topicAccess";
 import { isCallerAdmin } from "./whitelist";
@@ -63,6 +70,20 @@ const MAX_CHARS = 10_000;
 
 const voiceId = () => process.env.ELEVENLABS_VOICE_ID ?? DEFAULT_VOICE_ID;
 const modelId = () => process.env.ELEVENLABS_MODEL_ID ?? DEFAULT_MODEL_ID;
+
+// **The audition budget.** `ELEVENLABS_SAMPLE_CHARS=600` renders only the first
+// 600 characters of a lesson instead of all of it. Unset or 0 is the whole
+// lesson, which is the default and the real product.
+//
+// It exists because ElevenLabs' FREE plan allows 10,000 characters a month and
+// one prophetic-school lesson is around 7,300, so the free tier buys exactly one
+// full render and no way to compare two voices. At 600 it buys sixteen.
+// Deliberately an env var and not a UI control: it is an operator's testing
+// setting, and a second button in the lesson would be a worse lesson.
+const sampleChars = () => {
+  const n = Number(process.env.ELEVENLABS_SAMPLE_CHARS ?? 0);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+};
 
 type Pilot = { topic: Doc<"topics">; lesson: Doc<"lessons"> };
 
@@ -125,7 +146,8 @@ async function cached(ctx: QueryCtx, pilot: Pilot): Promise<Doc<"lessonAudio"> |
         .eq("lessonKey", pilot.lesson.key)
         .eq("lang", SOURCE_LANG)
         .eq("voiceId", voiceId())
-        .eq("modelId", modelId()),
+        .eq("modelId", modelId())
+        .eq("sampleChars", sampleChars()),
     )
     .unique();
   if (!row) return null;
@@ -183,7 +205,7 @@ export const saveAudio = internalMutation({
     chars: v.number(),
   },
   handler: async (ctx, { topicId, lessonKey, sourceStorageId, storageId, chars }) => {
-    const key = { lang: SOURCE_LANG, voiceId: voiceId(), modelId: modelId() };
+    const key = { lang: SOURCE_LANG, voiceId: voiceId(), modelId: modelId(), sampleChars: sampleChars() };
     const existing = await ctx.db
       .query("lessonAudio")
       .withIndex("by_lesson", (q) =>
@@ -192,7 +214,8 @@ export const saveAudio = internalMutation({
           .eq("lessonKey", lessonKey)
           .eq("lang", key.lang)
           .eq("voiceId", key.voiceId)
-          .eq("modelId", key.modelId),
+          .eq("modelId", key.modelId)
+          .eq("sampleChars", key.sampleChars),
       )
       .unique();
     if (existing) {
@@ -203,6 +226,43 @@ export const saveAudio = internalMutation({
       await ctx.db.delete(existing._id);
     }
     await ctx.db.insert("lessonAudio", { topicId, lessonKey, ...key, sourceStorageId, storageId, chars });
+  },
+});
+
+/**
+ * **Which voices can this API key actually use?** Operator diagnostic, guarded by
+ * PUBLISH_SECRET like the rest of the CLI rail (`scripts/voices.ts` calls it).
+ *
+ * It exists because guessing a voice id is unreliable and the guess is expensive
+ * to test. On 2026-09-14 the pilot's default, "Rachel", was refused with a 402:
+ * she is a VOICE LIBRARY voice, and ElevenLabs' free plan cannot drive those
+ * through the API. Default voices can be, but ElevenLabs' own docs say Default
+ * voices exist only for accounts created before March 2026 and expire at the end
+ * of 2026, so which ids are usable is a property of THIS account on THIS day, not
+ * something a doc page can settle.
+ *
+ * So ask the account. `category` is the answer: anything other than `premade` is
+ * a candidate for the 402 on a free plan.
+ */
+export const voices = action({
+  args: { secret: v.string() },
+  handler: async (_ctx, { secret }): Promise<{ voiceId: string; name: string; category: string }[]> => {
+    assertAdmin(secret);
+    const apiKey = process.env.ELEVENLABS_API_KEY;
+    if (!apiKey) throw new ConvexError({ message: "ELEVENLABS_API_KEY is not set on this deployment." });
+    const res = await fetch("https://api.elevenlabs.io/v2/voices?page_size=100", {
+      headers: { "xi-api-key": apiKey },
+    });
+    if (!res.ok) {
+      const detail = (await res.text().catch(() => "")).slice(0, 300);
+      throw new ConvexError({ message: `ElevenLabs refused the voice list (${res.status}). ${detail}`.trim() });
+    }
+    const json = (await res.json()) as { voices?: { voice_id?: unknown; name?: unknown; category?: unknown }[] };
+    return (json.voices ?? []).map((v2) => ({
+      voiceId: String(v2.voice_id ?? ""),
+      name: String(v2.name ?? ""),
+      category: String(v2.category ?? "unknown"),
+    }));
   },
 });
 
@@ -240,8 +300,12 @@ export const speak = action({
     if (!pilot.sourceStorageId) throw new ConvexError({ message: "This lesson has no body to read." });
     const body = await ctx.storage.get(pilot.sourceStorageId);
     if (!body) throw new ConvexError({ message: "This lesson's body could not be loaded." });
-    const text = narrationFromHtml(await body.text());
-    if (!text) throw new ConvexError({ message: "This lesson has no prose to read aloud." });
+    const full = narrationFromHtml(await body.text());
+    if (!full) throw new ConvexError({ message: "This lesson has no prose to read aloud." });
+    // Sampling happens BEFORE the length guard, so an audition of a lesson that
+    // is too long to narrate in full still works: the point of a sample is to
+    // judge a voice, and that does not need the whole lesson.
+    const text = sampleOf(full, sampleChars());
     if (text.length > MAX_CHARS) {
       // Named numbers, because the operator reading this needs to know how far
       // over it is before deciding whether chunking is worth building.
@@ -257,7 +321,10 @@ export const speak = action({
     // would that lesson have cost?" without it. USD is at the published
     // multilingual-v2 rate; flash models are half.
     const usd = ((text.length / 1000) * 0.1).toFixed(3);
-    console.log(`lessonAudio: ${pilot.lessonKey} narration is ${text.length} chars, about $${usd} on ${modelId()}`);
+    const scope = sampleChars() ? `sample of ${full.length}` : "full lesson";
+    console.log(
+      `lessonAudio: ${pilot.lessonKey} narration is ${text.length} chars (${scope}), about $${usd} on ${modelId()}`,
+    );
 
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId()}`, {
       method: "POST",

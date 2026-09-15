@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { narrationFromHtml } from "./narrationText";
+import { narrationFromHtml, sampleOf } from "./narrationText";
 
 // A lesson body shaped like a real one: the authored `<head>` with its stylesheet,
 // prose, and an MCQ quiz card matching the authoring contract (see
@@ -67,5 +67,47 @@ describe("narrationFromHtml", () => {
 
   it("is empty, not a crash, for an empty body", () => {
     expect(narrationFromHtml("")).toBe("");
+  });
+});
+
+// ---- sampleOf: the free-tier audition -------------------------------------
+
+describe("sampleOf", () => {
+  const long = "One two three. Four five six. Seven eight nine. Ten eleven twelve.";
+
+  it("returns the whole script when no limit is set", () => {
+    expect(sampleOf(long, 0)).toBe(long);
+    expect(sampleOf(long, -1)).toBe(long);
+  });
+
+  it("returns the whole script when it already fits", () => {
+    expect(sampleOf(long, 1000)).toBe(long);
+  });
+
+  it("cuts at the end of the last complete sentence", () => {
+    expect(sampleOf(long, 40)).toBe("One two three. Four five six.");
+  });
+
+  it("never exceeds the limit", () => {
+    for (const n of [10, 20, 33, 47, 60]) expect(sampleOf(long, n).length).toBeLessThanOrEqual(n);
+  });
+
+  it("falls back to a paragraph break when there is no sentence end", () => {
+    expect(sampleOf("first line here\nsecond line here\nthird", 34)).toBe("first line here\nsecond line here");
+  });
+
+  it("falls back to a word boundary when there is neither", () => {
+    expect(sampleOf("alpha bravo charlie delta echo", 20)).toBe("alpha bravo charlie");
+  });
+
+  it("does not collapse into a fragment on a stray early full stop", () => {
+    // The trap: "Dr." ends a "sentence" eight characters in. Honouring it would
+    // turn a 60-character sample into two words.
+    const out = sampleOf("Dr. " + "word ".repeat(40), 60);
+    expect(out.length).toBeGreaterThan(24);
+  });
+
+  it("clips a single unbroken word rather than returning nothing", () => {
+    expect(sampleOf("x".repeat(100), 10)).toBe("x".repeat(10));
   });
 });

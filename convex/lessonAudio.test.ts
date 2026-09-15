@@ -174,3 +174,62 @@ test("an admin past the gate still stops at an unconfigured deployment", async (
     if (had !== undefined) process.env.ELEVENLABS_API_KEY = had;
   }
 });
+
+// ---- the audition budget ----------------------------------------------------
+
+test("a sample and a full render are different cache entries", async () => {
+  // The trap this pins: if `sampleChars` were not in the key, turning sampling on
+  // would replay the full lesson (so the audition never happens), and turning it
+  // off would replay the 600-character snippet forever.
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const sys = await admin(t, "sys@example.com");
+  await t.run(async (ctx) => {
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_seq", (q) => q.eq("topicId", topicId))
+      .first();
+    const storageId = await ctx.storage.store(new Blob(["mp3"], { type: "audio/mpeg" }));
+    await ctx.db.insert("lessonAudio", {
+      topicId,
+      lessonKey: "l1",
+      lang: "en",
+      voiceId: "21m00Tcm4TlvDq8ikWAM",
+      modelId: "eleven_multilingual_v2",
+      sampleChars: 0,
+      sourceStorageId: lesson!.htmlStorageId,
+      storageId,
+      chars: 20,
+    });
+  });
+
+  // Sampling off: the cached full render is a hit.
+  expect((await ask(asUser(t, sys))).url).not.toBeNull();
+
+  // Sampling on: a miss, because what is cached is not what was asked for.
+  process.env.ELEVENLABS_SAMPLE_CHARS = "600";
+  try {
+    expect((await ask(asUser(t, sys))).url).toBeNull();
+  } finally {
+    delete process.env.ELEVENLABS_SAMPLE_CHARS;
+  }
+});
+
+test("a malformed sample budget reads as off rather than breaking the button", async () => {
+  const t = convexTest(schema, modules);
+  await seedCourse(t, await user(t, "owner@example.com"));
+  const sys = await admin(t, "sys@example.com");
+  for (const bad of ["", "abc", "-5", "0"]) {
+    process.env.ELEVENLABS_SAMPLE_CHARS = bad;
+    try {
+      expect(await ask(asUser(t, sys))).toEqual({ eligible: true, url: null });
+    } finally {
+      delete process.env.ELEVENLABS_SAMPLE_CHARS;
+    }
+  }
+});
+
+test("the voices diagnostic refuses without the operator secret", async () => {
+  const t = convexTest(schema, modules);
+  await expect(t.action(api.lessonAudio.voices, { secret: "wrong" })).rejects.toThrow(/unauthorized/i);
+});
