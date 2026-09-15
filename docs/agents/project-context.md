@@ -99,9 +99,29 @@ below). PayFast rail vars live in `convex/env.ts`; the Next client var in
   "Rachel") and `ELEVENLABS_MODEL_ID` (default `eleven_multilingual_v2`, the
   expressive model, 10,000 characters per request; `eleven_flash_v2_5` is half the
   price and takes 40,000 at a lower quality bar).
-- **Both are part of the `lessonAudio` cache key**, so flipping either really does
-  re-render. That is deliberate and it is also the cost trap: auditioning four
-  voices on one lesson bills four renders.
+- `ELEVENLABS_SAMPLE_CHARS` renders only the first N characters (cut at a sentence
+  end) instead of the whole lesson. Unset/0 is the whole lesson, the real product.
+  Set it to ~600 to audition voices: the FREE plan allows 10,000 characters a
+  MONTH and one prophetic-school lesson is about 7,300, so full renders buy one
+  try a month and no way to compare two voices.
+- **All three are part of the `lessonAudio` cache key**, so flipping any of them
+  really does re-render. That is deliberate and it is also the cost trap:
+  auditioning four voices on one full lesson bills four full renders.
+- **A 402 on render means the voice, not the key** (2026-09-14). The free plan can
+  drive Default/premade voices through the API but NOT Voice Library voices, and
+  the pilot's original default ("Rachel", `21m00Tcm4TlvDq8ikWAM`) is a library
+  voice. Run `pnpm voices:prod` to list what the key can actually use and pick a
+  `premade` one; ElevenLabs' own docs say Default voices exist only for accounts
+  created before March 2026 and expire 2026-12-31, so this is a property of the
+  account on the day, not a fixed list.
+- **Measured cost** (2026-09-14, from the repo's pristine prophetic-school lesson 1
+  run through `narrationFromHtml`): Spanish 8,573 chars, Sesotho 8,421, English
+  estimated ~7,300, so about $0.73 a lesson on `eleven_multilingual_v2` at
+  $0.10/1,000 chars, half that on `eleven_flash_v2_5`. The whole 56-lesson course
+  in English is roughly 498,000 chars, about $50 or $25. **The median lesson
+  exceeds the 10,000-char single-request cap** (33 of 56 in Spanish, an estimated
+  8 of 56 in English), so narrating the whole course needs chunk-and-stitch built,
+  or `eleven_flash_v2_5`, whose limit is 40,000.
 
 ### Per-tenant sessions: cookies are host-only (no `NEXT_PUBLIC_COOKIE_DOMAIN`)
 
