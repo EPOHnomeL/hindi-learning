@@ -111,11 +111,20 @@ test("a signed-out visitor does not", async () => {
 
 // ---- the rest of the pilot's scope ----------------------------------------
 
-test("not the second lesson, even for a sys admin", async () => {
+test("any lesson of the course, not just the first", async () => {
+  // Widened 2026-09-15 so a precomputed course can be heard end to end. The
+  // course is still the gate; the lesson is not.
   const t = convexTest(schema, modules);
   await seedCourse(t, await user(t, "owner@example.com"));
   const sys = await admin(t, "sys@example.com");
-  expect(await ask(asUser(t, sys), "l2")).toEqual({ eligible: false, url: null });
+  expect(await ask(asUser(t, sys), "l2")).toEqual({ eligible: true, url: null });
+});
+
+test("a lesson that does not exist is still nothing", async () => {
+  const t = convexTest(schema, modules);
+  await seedCourse(t, await user(t, "owner@example.com"));
+  const sys = await admin(t, "sys@example.com");
+  expect(await ask(asUser(t, sys), "no-such-lesson")).toEqual({ eligible: false, url: null });
 });
 
 test("not a translated Edition, even for a sys admin", async () => {
@@ -148,14 +157,14 @@ test("speak refuses a learner rather than trusting the caller", async () => {
   ).rejects.toThrow(/not available/i);
 });
 
-test("speak refuses an admin on the wrong lesson with the same words", async () => {
-  // The refusal is deliberately identical for "wrong lesson" and "not an
-  // administrator", so probing it leaks nothing about the gate's shape.
+test("speak refuses a lesson that does not exist, with the same words", async () => {
+  // The refusal is deliberately identical for "no such lesson" and "not allowed
+  // to render", so probing it leaks nothing about the gate's shape.
   const t = convexTest(schema, modules);
   await seedCourse(t, await user(t, "owner@example.com"));
   const sys = await admin(t, "sys@example.com");
   await expect(
-    asUser(t, sys).action(api.lessonAudio.speak, { topicSlug: SLUG, key: "l2" }),
+    asUser(t, sys).action(api.lessonAudio.speak, { topicSlug: SLUG, key: "no-such-lesson" }),
   ).rejects.toThrow(/not available/i);
 });
 
@@ -185,6 +194,9 @@ test("a sample and a full render are different cache entries", async () => {
   const t = convexTest(schema, modules);
   const topicId = await seedCourse(t, await user(t, "owner@example.com"));
   const sys = await admin(t, "sys@example.com");
+  // Pin the voice rather than inheriting DEFAULT_VOICE_ID, so re-casting the
+  // narrator (as 2026-09-15 did, Rachel to George) never breaks this test.
+  process.env.ELEVENLABS_VOICE_ID = "test-voice";
   await t.run(async (ctx) => {
     const lesson = await ctx.db
       .query("lessons")
@@ -195,7 +207,7 @@ test("a sample and a full render are different cache entries", async () => {
       topicId,
       lessonKey: "l1",
       lang: "en",
-      voiceId: "21m00Tcm4TlvDq8ikWAM",
+      voiceId: "test-voice",
       modelId: "eleven_multilingual_v2",
       sampleChars: 0,
       sourceStorageId: lesson!.htmlStorageId,
@@ -213,6 +225,7 @@ test("a sample and a full render are different cache entries", async () => {
     expect((await ask(asUser(t, sys))).url).toBeNull();
   } finally {
     delete process.env.ELEVENLABS_SAMPLE_CHARS;
+    delete process.env.ELEVENLABS_VOICE_ID;
   }
 });
 
@@ -253,4 +266,75 @@ test("a refusal reaches the reader instead of being swallowed", async () => {
   expect(err).toBeInstanceOf(ConvexError);
   expect(typeof (err as ConvexError<string>).data).toBe("string");
   expect((err as ConvexError<string>).data).toMatch(/not available/i);
+});
+
+// ---- playing is free and shared; rendering spends money --------------------
+
+// A rendered narration already sitting in storage for this lesson.
+async function seedRender(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, lessonKey: string) {
+  await t.run(async (ctx) => {
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", lessonKey))
+      .unique();
+    const storageId = await ctx.storage.store(new Blob(["mp3"], { type: "audio/mpeg" }));
+    await ctx.db.insert("lessonAudio", {
+      topicId,
+      lessonKey,
+      lang: "en",
+      voiceId: "JBFqnCBsd6RMkjVDRZzb",
+      modelId: "eleven_multilingual_v2",
+      sampleChars: 0,
+      sourceStorageId: lesson!.htmlStorageId,
+      storageId,
+      chars: 7214,
+    });
+  });
+}
+
+test("a learner with a grant hears a lesson that has already been rendered", async () => {
+  // The point of precomputing: the bytes are bought once and everyone plays them.
+  const t = convexTest(schema, modules);
+  const owner = await user(t, "owner@example.com");
+  const topicId = await seedCourse(t, owner);
+  await seedRender(t, topicId, "l1");
+  const learner = await user(t, "learner@example.com");
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: learner }));
+  const res = await ask(asUser(t, learner));
+  expect(res.eligible).toBe(true);
+  expect(res.url).not.toBeNull();
+});
+
+test("a learner sees no control on a lesson nobody has rendered", async () => {
+  // A play button that can only ever fail is worse than no play button.
+  const t = convexTest(schema, modules);
+  const owner = await user(t, "owner@example.com");
+  const topicId = await seedCourse(t, owner);
+  const learner = await user(t, "learner@example.com");
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: learner }));
+  expect(await ask(asUser(t, learner))).toEqual({ eligible: false, url: null });
+});
+
+test("a learner who CAN see the control still cannot commission a render", async () => {
+  // The spend boundary, and the reason `canRender` is threaded into the action
+  // rather than left to `status` having hidden the button.
+  const t = convexTest(schema, modules);
+  const owner = await user(t, "owner@example.com");
+  const topicId = await seedCourse(t, owner);
+  await seedRender(t, topicId, "l1");
+  const learner = await user(t, "learner@example.com");
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: learner }));
+  // They can see and play l1 (previous test), but l2 is unrendered and theirs to
+  // ask for only if they were allowed to spend. They are not.
+  await expect(
+    asUser(t, learner).action(api.lessonAudio.speak, { topicSlug: SLUG, key: "l2" }),
+  ).rejects.toThrow(/not available/i);
+});
+
+test("a stranger with no grant at all hears nothing, rendered or not", async () => {
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  await seedRender(t, topicId, "l1");
+  const stranger = await user(t, "stranger@example.com");
+  expect(await ask(asUser(t, stranger))).toEqual({ eligible: false, url: null });
 });

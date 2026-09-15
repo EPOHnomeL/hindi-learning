@@ -42,11 +42,11 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { action, internalMutation, internalQuery, query, type QueryCtx } from "./_generated/server";
+import { action, internalMutation, internalQuery, query, type ActionCtx, type QueryCtx } from "./_generated/server";
 import { narrationFromHtml, sampleOf } from "./narrationText";
 import { assertAdmin } from "./adminSecret";
 import { SOURCE_LANG } from "./sourceLang";
-import { topicBySlug } from "./topicAccess";
+import { getViewableTopic, topicBySlug } from "./topicAccess";
 import { isCallerAdmin } from "./whitelist";
 
 // **Every refusal in this file throws `new ConvexError("<string>")`, never an
@@ -61,9 +61,15 @@ import { isCallerAdmin } from "./whitelist";
 // a decision, and a decision should show up in a diff.
 const PILOT_SLUG = "prophetic-school";
 
-// "Rachel", a stock ElevenLabs voice. Not a considered casting call, just a
-// starting point for the audition; `ELEVENLABS_VOICE_ID` swaps it.
-const DEFAULT_VOICE_ID = "21m00Tcm4TlvDq8ikWAM";
+// **George**, "Warm, Captivating Storyteller". Chosen by the repo owner on
+// 2026-09-15 after auditioning against Bella on this course's own lesson 1, so
+// this is a real casting decision rather than a placeholder. `ELEVENLABS_VOICE_ID`
+// still overrides it.
+//
+// The previous default was "Rachel" (`21m00Tcm4TlvDq8ikWAM`), which this account
+// cannot use at all: she is a Voice Library voice and the API refuses those on a
+// free plan. `pnpm voices:prod` lists what a key can actually drive.
+const DEFAULT_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
 
 // `eleven_multilingual_v2` is the expressive model (10k characters per request).
 // `eleven_flash_v2_5` is half the price and takes 40k, at a lower quality bar.
@@ -93,7 +99,10 @@ const sampleChars = () => {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
 };
 
-type Pilot = { topic: Doc<"topics">; lesson: Doc<"lessons"> };
+// What a caller may do with this lesson's narration. The split is the whole
+// point: PLAYING a rendered file is free and shared, RENDERING one spends money
+// at a provider, so they are different permissions rather than one.
+type Pilot = { topic: Doc<"topics">; lesson: Doc<"lessons">; canRender: boolean };
 
 /**
  * The one gate. Returns the Topic and Lesson when this caller, on this lesson,
@@ -132,15 +141,24 @@ async function pilotLesson(
   // The owner is kept alongside them rather than folded in, because course
   // ownership and the Allowlist are genuinely different tables and an owner who
   // was never made an admin would otherwise lose the button on their own course.
-  const admin = (await isCallerAdmin(ctx, topic.tenantSlug)) || topic.ownerId === userId;
-  if (!admin) return null;
-  const first = await ctx.db
+  const canRender = (await isCallerAdmin(ctx, topic.tenantSlug)) || topic.ownerId === userId;
+  // **Anyone who may READ the lesson may hear it** (2026-09-15). A rendered file
+  // is cached per lesson, not per person, so a learner pressing play costs
+  // nothing at all: the bytes are already bought and sitting in storage. Refusing
+  // them was only ever a proxy for "do not let anyone run up a bill", and
+  // `canRender` is that control, stated directly.
+  //
+  // `getViewableTopic` is the reader's own rule (owner, or any non-empty grant
+  // walk), so narration is readable by exactly the people the lesson is.
+  if (!canRender && !(await getViewableTopic(ctx, userId, topicSlug))) return null;
+  // Any lesson of the course, not just the first: the pilot widened on 2026-09-15
+  // so a precomputed course can be listened to end to end.
+  const lesson = await ctx.db
     .query("lessons")
-    .withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id))
-    .order("asc")
-    .first();
-  if (!first || first.key !== lessonKey) return null;
-  return { topic, lesson: first };
+    .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", lessonKey))
+    .unique();
+  if (!lesson) return null;
+  return { topic, lesson, canRender };
 }
 
 // The cached render for this lesson under the CURRENT voice and model. Keyed on
@@ -179,9 +197,14 @@ export const status = query({
   args: { topicSlug: v.string(), key: v.string(), lang: v.optional(v.string()) },
   handler: async (ctx, { topicSlug, key, lang }) => {
     const pilot = await pilotLesson(ctx, topicSlug, key, lang);
-    if (!pilot) return { eligible: false as const, url: null };
+    if (!pilot) return { eligible: false, url: null };
     const row = await cached(ctx, pilot);
-    return { eligible: true as const, url: row ? await ctx.storage.getUrl(row.storageId) : null };
+    const url = row ? await ctx.storage.getUrl(row.storageId) : null;
+    // A learner sees the control only when there is something to play, because a
+    // play button that can only ever fail is worse than no play button. An
+    // administrator sees it always: for them an empty lesson is an invitation to
+    // render one.
+    return { eligible: pilot.canRender || url !== null, url };
   },
 });
 
@@ -196,6 +219,9 @@ export const pilotBody = internalQuery({
     return {
       topicId: pilot.topic._id,
       lessonKey: pilot.lesson.key,
+      // Carried through so the action can enforce the spend boundary itself
+      // rather than trusting that `status` already hid the control.
+      canRender: pilot.canRender,
       sourceStorageId: pilot.lesson.htmlStorageId ?? null,
       cachedStorageId: row?.storageId ?? null,
     };
@@ -290,6 +316,9 @@ export const speak = action({
     // lesson" and "not an administrator of it": a caller outside the gate learns
     // nothing about what is behind it.
     if (!pilot) throw new ConvexError("Narration is not available for this lesson.");
+    // The spend boundary. A learner can reach this action (they can see the
+    // control when a render exists) and must not be able to commission a new one.
+    if (!pilot.canRender) throw new ConvexError("Narration is not available for this lesson.");
 
     if (pilot.cachedStorageId) {
       const url = await ctx.storage.getUrl(pilot.cachedStorageId);
@@ -298,13 +327,124 @@ export const speak = action({
       // hand back a URL that 404s.
     }
 
+    if (!pilot.sourceStorageId) throw new ConvexError("This lesson has no body to read.");
+    const { url } = await renderNarration(ctx, {
+      topicId: pilot.topicId,
+      lessonKey: pilot.lessonKey,
+      sourceStorageId: pilot.sourceStorageId,
+    });
+    return url;
+  },
+});
+
+// ---- precompute -------------------------------------------------------------
+
+/** Every lesson of a course, with what it would take to narrate each. */
+export const courseLessons = internalQuery({
+  args: { topicSlug: v.string() },
+  handler: async (ctx, { topicSlug }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return null;
+    const lessons = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id))
+      .collect();
+    const out = [];
+    for (const lesson of lessons) {
+      const row = await cached(ctx, { topic, lesson, canRender: true });
+      out.push({
+        key: lesson.key,
+        seq: lesson.seq,
+        title: lesson.title,
+        sourceStorageId: lesson.htmlStorageId ?? null,
+        rendered: !!row,
+        renderedChars: row?.chars ?? null,
+      });
+    }
+    return { topicId: topic._id, lessons: out };
+  },
+});
+
+/**
+ * **Narrate a whole course ahead of time**, so a learner never waits for a render
+ * and the bill is spent deliberately rather than by whoever presses play first.
+ *
+ * DRY RUN unless `apply` is true, matching the other operator CLIs here
+ * (`sweep-lesson-text`). A dry run makes no provider call at all: it reads each
+ * lesson's blob, extracts the narration, and reports the character count, so the
+ * cost of the whole course is knowable for free before a cent is spent.
+ *
+ * Already-rendered lessons are skipped, so this is resumable: run it, hit a
+ * quota, top up, run it again.
+ */
+export const precompute = action({
+  args: { secret: v.string(), topicSlug: v.string(), apply: v.optional(v.boolean()) },
+  handler: async (
+    ctx,
+    { secret, topicSlug, apply },
+  ): Promise<{
+    lessons: { key: string; seq: number; chars: number; rendered: boolean; skipped: string | null }[];
+  }> => {
+    assertAdmin(secret);
+    const course = await ctx.runQuery(internal.lessonAudio.courseLessons, { topicSlug });
+    if (!course) throw new ConvexError(`No course "${topicSlug}".`);
+    const report: { key: string; seq: number; chars: number; rendered: boolean; skipped: string | null }[] = [];
+    for (const lesson of course.lessons) {
+      if (lesson.rendered) {
+        report.push({ key: lesson.key, seq: lesson.seq, chars: lesson.renderedChars ?? 0, rendered: true, skipped: "already rendered" });
+        continue;
+      }
+      if (!lesson.sourceStorageId) {
+        report.push({ key: lesson.key, seq: lesson.seq, chars: 0, rendered: false, skipped: "no body" });
+        continue;
+      }
+      const body = await ctx.storage.get(lesson.sourceStorageId);
+      if (!body) {
+        report.push({ key: lesson.key, seq: lesson.seq, chars: 0, rendered: false, skipped: "body missing" });
+        continue;
+      }
+      const text = sampleOf(narrationFromHtml(await body.text()), sampleChars());
+      if (text.length > MAX_CHARS) {
+        // Reported rather than thrown: one over-long lesson must not stop the
+        // other fifty-five, and the operator needs the full list to decide
+        // whether chunking is worth building.
+        report.push({ key: lesson.key, seq: lesson.seq, chars: text.length, rendered: false, skipped: `over the ${MAX_CHARS} cap` });
+        continue;
+      }
+      if (!apply) {
+        report.push({ key: lesson.key, seq: lesson.seq, chars: text.length, rendered: false, skipped: null });
+        continue;
+      }
+      await renderNarration(ctx, {
+        topicId: course.topicId,
+        lessonKey: lesson.key,
+        sourceStorageId: lesson.sourceStorageId,
+      });
+      report.push({ key: lesson.key, seq: lesson.seq, chars: text.length, rendered: true, skipped: null });
+    }
+    return { lessons: report };
+  },
+});
+
+// ---- the render itself ------------------------------------------------------
+
+/**
+ * One lesson, from stored HTML to a stored mp3 and a `lessonAudio` row. Shared by
+ * the reader's play button and the precompute CLI, which differ only in who is
+ * allowed to call them and how many lessons they do at once. Authorization is the
+ * CALLER's job: this function spends money and asks no questions.
+ */
+async function renderNarration(
+  ctx: ActionCtx,
+  p: { topicId: Id<"topics">; lessonKey: string; sourceStorageId: Id<"_storage"> },
+): Promise<{ url: string; chars: number }> {
     const apiKey = process.env.ELEVENLABS_API_KEY;
     if (!apiKey) {
       throw new ConvexError("Narration is not configured yet: ELEVENLABS_API_KEY is not set on this deployment.");
     }
 
-    if (!pilot.sourceStorageId) throw new ConvexError("This lesson has no body to read.");
-    const body = await ctx.storage.get(pilot.sourceStorageId);
+    if (!p.sourceStorageId) throw new ConvexError("This lesson has no body to read.");
+    const body = await ctx.storage.get(p.sourceStorageId);
     if (!body) throw new ConvexError("This lesson's body could not be loaded.");
     const full = narrationFromHtml(await body.text());
     if (!full) throw new ConvexError("This lesson has no prose to read aloud.");
@@ -329,7 +469,7 @@ export const speak = action({
     const usd = ((text.length / 1000) * 0.1).toFixed(3);
     const scope = sampleChars() ? `sample of ${full.length}` : "full lesson";
     console.log(
-      `lessonAudio: ${pilot.lessonKey} narration is ${text.length} chars (${scope}), about $${usd} on ${modelId()}`,
+      `lessonAudio: ${p.lessonKey} narration is ${text.length} chars (${scope}), about $${usd} on ${modelId()}`,
     );
 
     const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId()}`, {
@@ -361,14 +501,13 @@ export const speak = action({
       new Blob([await res.arrayBuffer()], { type: "audio/mpeg" }),
     );
     await ctx.runMutation(internal.lessonAudio.saveAudio, {
-      topicId: pilot.topicId,
-      lessonKey: pilot.lessonKey,
-      sourceStorageId: pilot.sourceStorageId,
+      topicId: p.topicId,
+      lessonKey: p.lessonKey,
+      sourceStorageId: p.sourceStorageId,
       storageId,
       chars: text.length,
     });
     const url = await ctx.storage.getUrl(storageId);
     if (!url) throw new ConvexError("The narration was rendered but could not be served.");
-    return url;
-  },
-});
+    return { url, chars: text.length };
+}
