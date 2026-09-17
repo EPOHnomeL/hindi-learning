@@ -127,6 +127,29 @@ body {
   }
 }
 
+/* Poster / hero-action button entrance (SharingTab): a gentle fade + scale so
+   the Poster button doesn't snap in when the public link is toggled on.
+   Lighter than pop-in (no Y offset, smaller scale) — it's a sibling appearing
+   inside an already-settled row, not a new layer arriving over the page. */
+@keyframes fade-in-item {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fade-in-item {
+  animation: fade-in-item 1s ease-in;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-item {
+    animation: none;
+  }
+}
+
 /* Course setup pane (CoursePanes.CourseSetupPane). The owner waits around ten
    minutes here for Lesson 1, so this is the one place in the app where motion is
    load-bearing rather than decorative: a static pane over that long reads as a

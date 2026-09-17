@@ -62,6 +62,7 @@ import type * as resetEmail from "../resetEmail.js";
 import type * as resources from "../resources.js";
 import type * as routine from "../routine.js";
 import type * as sales from "../sales.js";
+import type * as seedDev from "../seedDev.js";
 import type * as sellerStatus from "../sellerStatus.js";
 import type * as sellers from "../sellers.js";
 import type * as shareGrants from "../shareGrants.js";
@@ -143,6 +144,7 @@ declare const fullApi: ApiFromModules<{
   resources: typeof resources;
   routine: typeof routine;
   sales: typeof sales;
+  seedDev: typeof seedDev;
   sellerStatus: typeof sellerStatus;
   sellers: typeof sellers;
   shareGrants: typeof shareGrants;

@@ -3,21 +3,112 @@
 import { useAction, useMutation, useQuery } from "convex/react";
 import { type FunctionReturnType } from "convex/server";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { LANGUAGES } from "../../../../convex/languages";
-import { Icon } from "../icons";
+import { Icon, type IconName } from "../icons";
 import { toMajor } from "~/lib/money";
 import { useMutationRun } from "../mutationRun";
 import { formatPrice } from "../Paygate";
-import { ConfirmDialog, MenuItem } from "../ui";
+import { ConfirmDialog } from "../ui";
 import { EmptyPanel, Sheet, type Edition, type Engine } from "./shared";
 import { VoucherCard } from "./VoucherCard";
 
-// The Sharing peer of the manage route: ticket 15's three groups in order, as
-// plain scrolling sections with small-caps labels. Per Edition; the shell's
-// edition button picks which. Every query and mutation is unchanged from the
-// dialog this replaces.
+// ── WhatsApp Row & Switch Components ────────────────────────────────────────
+
+function WhatsAppToggle({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <label className="relative inline-flex shrink-0 cursor-pointer items-center">
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer sr-only"
+      />
+      <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
+    </label>
+  );
+}
+
+function WhatsAppRow({
+  icon,
+  iconColor = "text-soft",
+  title,
+  subtitle,
+  right,
+  onClick,
+  danger = false,
+  className = "",
+}: {
+  icon: IconName;
+  iconColor?: string;
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  right?: React.ReactNode;
+  onClick?: () => void;
+  danger?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className={`flex min-h-[54px] items-center gap-4 py-3 transition-colors ${
+        onClick ? "cursor-pointer hover:bg-hi/30 active:bg-hi/50 -mx-2 px-2 rounded-xl" : ""
+      } ${className}`}
+    >
+      <span
+        className={`flex h-6 w-6 shrink-0 items-center justify-center ${
+          danger ? "text-danger" : iconColor
+        }`}
+      >
+        <Icon name={icon} className="h-5 w-5" />
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <div
+          className={`text-[15px] leading-snug ${
+            danger ? "font-medium text-danger" : "font-normal text-ink"
+          }`}
+        >
+          {title}
+        </div>
+        {subtitle && (
+          <div className="mt-0.5 text-[13px] leading-tight text-soft">
+            {subtitle}
+          </div>
+        )}
+      </div>
+
+      {right && <div className="shrink-0 flex items-center">{right}</div>}
+    </div>
+  );
+}
+
+async function triggerDownloadQr(url: string, topicSlug: string, lang: string, notify: (msg: string) => void) {
+  try {
+    const QRCode = (await import("qrcode")).default;
+    const png = await QRCode.toDataURL(url, { width: 512, margin: 2 });
+    const a = document.createElement("a");
+    a.href = png;
+    a.download = `${topicSlug}-${lang}-qr.png`;
+    a.click();
+    notify("QR code downloaded");
+  } catch {
+    notify("Could not generate QR code");
+  }
+}
+
+// ── The Production SharingTab (Exact 3C Matching Image 1) ───────────────────
+
 export function SharingTab({
   topicSlug,
   edition,
@@ -29,12 +120,58 @@ export function SharingTab({
   edition: Edition;
   completed: boolean;
   notify: (message: string) => void;
-  // Set only on a one-edition course, whose shell shows no edition button; the
-  // quiet row at the foot is then the door to adding a language.
   onAddLanguage: (() => void) | null;
 }) {
   const t = useTranslations("Editions");
+  const publish = useMutationRun(useMutation(api.shares.setEditionPublic), "Couldn't update link");
+  const catalogue = useMutationRun(useMutation(api.catalogue.setEditionPublished), "Couldn't update catalog");
+  const retranslate = useMutationRun(useAction(api.translate.startTranslation), t("updateError"));
+  const shareTopic = useMutation(api.shares.shareTopic);
+  const removeEdition = useMutation(api.translate.removeEdition);
 
+  const pricing = useQuery(api.market.editionPricing, { topicSlug });
+  const sellerStatus = useQuery(api.sellers.sellerStatus);
+  const currentPricing = pricing?.find((p) => p.lang === edition.lang) ?? null;
+
+  const [copied, setCopied] = useState(false);
+  const [inviteSheetOpen, setInviteSheetOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [busyInvite, setBusyInvite] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState<string | null>(null);
+
+  const [pricingSheetOpen, setPricingSheetOpen] = useState(false);
+  const [sellerSetupOpen, setSellerSetupOpen] = useState(false);
+  const [vouchersSheetOpen, setVouchersSheetOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [confirmRetranslate, setConfirmRetranslate] = useState(false);
+  const [retranslateEngine, setRetranslateEngine] = useState<Engine>(edition.engine);
+
+  // Optimistic toggle states for responsive UX without layout snap or lag
+  const [localPublic, setLocalPublic] = useState<boolean | null>(null);
+  const [localPublished, setLocalPublished] = useState<boolean | null>(null);
+
+  const on = localPublic ?? (edition.publicToken != null);
+  const isPublished = localPublished ?? edition.published;
+
+  useEffect(() => {
+    if (localPublic !== null && (edition.publicToken != null) === localPublic) {
+      setLocalPublic(null);
+    }
+  }, [edition.publicToken, localPublic]);
+
+  useEffect(() => {
+    if (localPublished !== null && edition.published === localPublished) {
+      setLocalPublished(null);
+    }
+  }, [edition.published, localPublished]);
+
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const effectiveToken = localPublic === false ? null : (edition.publicToken ?? null);
+  const url = effectiveToken ? `${origin}/share/${effectiveToken}` : null;
+
+  // Translating state
   if (edition.status === "translating") {
     const pct = edition.total > 0 ? Math.round((edition.done / edition.total) * 100) : 0;
     return (
@@ -55,6 +192,7 @@ export function SharingTab({
     );
   }
 
+  // Failed state
   if (edition.status === "failed") {
     return (
       <div className="flex flex-col items-start gap-3.5 rounded-xl border border-dashed border-line p-4 text-sm leading-relaxed text-soft">
@@ -72,465 +210,392 @@ export function SharingTab({
     );
   }
 
-  // Ready.
-  return (
-    <div className="flex flex-col gap-6">
-      <Group label={t("groupFind")}>
-        <PublishToggle topicSlug={topicSlug} lang={edition.lang} published={edition.published} notify={notify} />
-      </Group>
-      <Group label={t("groupHandTo")}>
-        <PublicLinkToggle topicSlug={topicSlug} lang={edition.lang} publicToken={edition.publicToken} completed={completed} notify={notify} />
-        <InviteByEmail topicSlug={topicSlug} lang={edition.lang} />
-      </Group>
-      <Group label={t("groupCosts")}>
-        <SellEdition topicSlug={topicSlug} lang={edition.lang} name={edition.name} completed={completed} />
-        {completed && (
-          <VoucherCard topicSlug={topicSlug} lang={edition.lang} name={edition.name} published={edition.published} />
-        )}
-      </Group>
-      <div className="flex flex-col items-start gap-3 border-t border-line pt-4">
-        <EditionDangerMenu topicSlug={topicSlug} edition={edition} />
-        {onAddLanguage && (
-          <button
-            type="button"
-            onClick={onAddLanguage}
-            className="inline-flex items-center gap-2 rounded-lg border border-dashed border-line px-3 py-2 text-[13px] font-medium text-soft transition-colors hover:bg-hi hover:text-accent"
-          >
-            <Icon name="plus" className="h-4 w-4" /> {t("addLanguage")}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// One of ticket 15's groups: a small-caps question as the label, controls under it.
-function Group({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3">
-      <h3 className="text-[11px] font-bold uppercase tracking-wider text-soft">{label}</h3>
-      {children}
-    </section>
-  );
-}
-
-// Whether this edition is listed in the site's course catalogue, as an on/off
-// toggle. Deliberately separate from the public link: publishing lists the
-// edition for signed-in members, a public link hands anonymous access to anyone
-// holding the token. Publishing is orthogonal to price (CONTEXT.md): a priced
-// published Edition is listed AND paygated.
-function PublishToggle({
-  topicSlug,
-  lang,
-  published,
-  notify,
-}: {
-  topicSlug: string;
-  lang: string;
-  published: boolean;
-  notify: (message: string) => void;
-}) {
-  const t = useTranslations("Editions");
-  // Was a `finally` with no `catch`, so a refused publish (the tenant's
-  // catalogue flag off, not the owner, the course not completed) left the toggle
-  // snapping back with nothing said. Ticket 32.
-  const { run, busy, error } = useMutationRun(useMutation(api.catalogue.setEditionPublished), t("updateError"));
-
-  return (
-    <div
-      className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
-        published ? "border-accent2/40" : "border-line"
-      } bg-card`}
-    >
-      <div className="flex min-w-0 items-center gap-3">
-        <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] transition-colors ${
-            published ? "bg-accent2/15 text-accent2" : "bg-hi text-soft"
-          }`}
-        >
-          <Icon name="book" className="h-4.5 w-4.5" />
-        </span>
-        <div className="min-w-0">
-          <b className="block text-[13.5px] font-semibold text-ink">{t("publish")}</b>
-          <span className="text-[11.5px] text-soft">{published ? t("publishOn") : t("publishOff")}</span>
-          {error && <span className="block text-[11.5px] text-danger">{error}</span>}
-        </div>
-      </div>
-      <label className="relative inline-flex shrink-0 cursor-pointer items-center">
-        <input
-          type="checkbox"
-          checked={published}
-          disabled={busy}
-          onChange={(e) => {
-            const next = e.target.checked;
-            void run({ topicSlug, lang, published: next }).then(
-              // Only on success: a toast saying it published, after a refusal, is
-              // worse than saying nothing.
-              (ok) => ok !== undefined && notify(next ? t("toastPublishOn") : t("toastPublishOff")),
-            );
-          }}
-          className="peer sr-only"
-        />
-        <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
-      </label>
-    </div>
-  );
-}
-
-// The anonymous public link for one edition, as an on/off toggle. Turning it on
-// mints a fresh token; off revokes it. Regenerating lives in the danger menu.
-// The link row always renders (greyed out while off) so toggling doesn't resize
-// the column.
-function PublicLinkToggle({
-  topicSlug,
-  lang,
-  publicToken,
-  completed,
-  notify,
-}: {
-  topicSlug: string;
-  lang: string;
-  publicToken: string | null;
-  // Whether the course has finished generating: the poster prints the lesson
-  // count as a fact, so it waits for the count to stop moving.
-  completed: boolean;
-  notify: (message: string) => void;
-}) {
-  const t = useTranslations("Editions");
-  // Was a `finally` with no `catch`: a refused public link (the tenant's
-  // publicLinks flag off, not the owner) said nothing at all. Ticket 32.
-  const publish = useMutationRun(useMutation(api.shares.setEditionPublic), t("updateError"));
-  const busy = publish.busy;
-  const [copied, setCopied] = useState(false);
-  const [qrBusy, setQrBusy] = useState(false);
-  const on = publicToken != null;
-  const posterOn = on && completed;
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const url = publicToken ? `${origin}/share/${publicToken}` : null;
-
-  // ponytail: the QR code is a PNG data URL and the download is an anchor click,
-  // same shape as the voucher CSV. `qrcode` is imported on the click so the
-  // encoder never rides in the manage-page bundle for the owners who never
-  // press it. 512px with a wide-ish margin is what a printed flyer needs.
-  const downloadQr = async () => {
-    if (!url) return;
-    setQrBusy(true);
-    try {
-      const QRCode = (await import("qrcode")).default;
-      const png = await QRCode.toDataURL(url, { width: 512, margin: 2 });
-      const a = document.createElement("a");
-      a.href = png;
-      a.download = `${topicSlug}-${lang}-qr.png`;
-      a.click();
-    } catch {
-      notify(t("qrError"));
-    } finally {
-      setQrBusy(false);
+  const handleCopyLink = async () => {
+    let linkUrl = url;
+    if (!linkUrl) {
+      setLocalPublic(true);
+      const token = await publish.run({ topicSlug, lang: edition.lang, isPublic: true });
+      if (token) {
+        linkUrl = `${origin}/share/${token}`;
+      } else {
+        setLocalPublic(null);
+        notify("Could not activate link");
+        return;
+      }
+    }
+    if (linkUrl) {
+      void navigator.clipboard?.writeText(linkUrl).then(() => {
+        setCopied(true);
+        notify("Share link copied to clipboard");
+        setTimeout(() => setCopied(false), 2000);
+      });
     }
   };
 
-  const run = (isPublic: boolean) => {
-    // The refusal surfaces as a toast here, because this control sits in a row
-    // that has no room for a message and the owner is already watching for one.
-    void publish
-      .run({ topicSlug, lang, isPublic })
-      .then((ok) => notify(ok === undefined ? (publish.error ?? t("updateError")) : isPublic ? t("toastLinkOn") : t("toastLinkOff")));
+  const handleQrClick = () => {
+    if (!url) {
+      notify("Turn on public link sharing first");
+      return;
+    }
+    void triggerDownloadQr(url, topicSlug, edition.lang, notify);
+  };
+
+  const handleInviteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const addr = email.trim();
+    if (!addr) return;
+    setBusyInvite(true);
+    setInviteMsg(null);
+    try {
+      const res = await shareTopic({ topicSlug, email: addr, lang: edition.lang });
+      setInviteMsg(res === "shared" ? `Access granted to ${addr}` : `Invite sent to ${addr}`);
+      setEmail("");
+    } catch {
+      setInviteMsg("Failed to send invite");
+    } finally {
+      setBusyInvite(false);
+    }
   };
 
   return (
-    <div>
-      <div
-        className={`flex items-center justify-between gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
-          on ? "border-accent2/40" : "border-line"
-        } bg-card`}
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <span
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] transition-colors ${
-              on ? "bg-accent2/15 text-accent2" : "bg-hi text-soft"
-            }`}
-          >
-            <Icon name={on ? "globe" : "lock"} className="h-4.5 w-4.5" />
+    <div className="flex flex-col pb-24 text-ink">
+      {/* ── Top Hero Quick Actions Card (Exactly as in Image 1) ── */}
+      <div className="my-2 flex items-center justify-center gap-4 rounded-3xl bg-card border border-line/70 p-5 shadow-xs">
+        <button
+          type="button"
+          onClick={handleCopyLink}
+          className="flex w-20 flex-col items-center gap-2 text-xs font-normal text-ink transition-opacity hover:opacity-80"
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-accent2/15 text-accent2">
+            <Icon name="link" className="h-5 w-5" />
           </span>
-          <div className="min-w-0">
-            <b className="block text-[13.5px] font-semibold text-ink">{t("publicLink")}</b>
-            <span className="text-[11.5px] text-soft">{on ? t("publicOn") : t("publicOff")}</span>
-          </div>
-        </div>
-        <label className="relative inline-flex shrink-0 cursor-pointer items-center">
-          <input type="checkbox" checked={on} disabled={busy} onChange={(e) => run(e.target.checked)} className="peer sr-only" />
-          <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
-        </label>
+          <span className="w-full text-center" aria-live="polite">
+            <span className="inline-block w-full text-center">{copied ? "Copied!" : "Copy link"}</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleQrClick}
+          className="flex w-20 flex-col items-center gap-2 text-xs font-normal text-ink transition-opacity hover:opacity-80"
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gold/15 text-gold">
+            <Icon name="qr" className="h-5 w-5" />
+          </span>
+          <span className="w-full truncate text-center">QR code</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setInviteSheetOpen(true)}
+          className="flex w-20 flex-col items-center gap-2 text-xs font-normal text-ink transition-opacity hover:opacity-80"
+        >
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gold/15 text-gold">
+            <Icon name="users" className="h-5 w-5" />
+          </span>
+          <span className="w-full truncate text-center">Email invite</span>
+        </button>
+
+        {/* Printable poster: only when completed & active */}
+        {completed && on && url && (
+          <a
+            href={`/poster/${edition.publicToken}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="fade-in-item flex w-20 flex-col items-center gap-2 text-xs font-normal text-ink transition-opacity hover:opacity-80"
+          >
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gold/15 text-gold">
+              <Icon name="poster" className="h-5 w-5" />
+            </span>
+            <span className="w-full truncate text-center">Poster</span>
+          </a>
+        )}
       </div>
 
-      <div className="mt-2.5 flex gap-1.5">
-        <input
-          readOnly
-          disabled={!on}
-          value={on && url ? url : t("publicLinkDisabled")}
-          onFocus={(e) => on && e.currentTarget.select()}
-          className={`min-w-0 flex-1 rounded-lg border px-2.5 py-2 text-xs transition-colors focus:outline-none ${
-            on ? "border-line bg-hi text-ink" : "border-line/60 bg-line/20 text-soft/60"
-          }`}
-        />
-        <button
-          type="button"
-          disabled={!on || busy}
-          onClick={() => {
-            if (!url) return;
-            navigator.clipboard?.writeText(url).then(
-              () => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 1500);
-              },
-              () => {
-                /* clipboard blocked; the field is selectable to copy by hand */
-              },
-            );
+      {/* ── Section 1: Sharing settings (Exactly as in Image 1) ── */}
+      <h3 className="px-1 pt-4 pb-1 text-[13px] font-normal text-soft">
+        Sharing settings
+      </h3>
+
+      <WhatsAppRow
+        icon="link"
+        title="Public link sharing"
+        subtitle={on ? "Anyone with this link can view this course" : "Public link is disabled"}
+        right={
+          <WhatsAppToggle
+            checked={on}
+            disabled={publish.busy}
+            onChange={(next) => {
+              setLocalPublic(next);
+              void publish.run({ topicSlug, lang: edition.lang, isPublic: next }).then((res) => {
+                if (res === undefined) {
+                  setLocalPublic(null);
+                }
+              });
+            }}
+          />
+        }
+      />
+
+      <WhatsAppRow
+        icon="globe"
+        title="Show in Site Catalog"
+        subtitle={isPublished ? "Listed in site catalog" : "Hidden from site catalog"}
+        right={
+          <WhatsAppToggle
+            checked={isPublished}
+            disabled={catalogue.busy}
+            onChange={(next) => {
+              setLocalPublished(next);
+              void catalogue.run({ topicSlug, lang: edition.lang, published: next }).then((res) => {
+                if (res === undefined) {
+                  setLocalPublished(null);
+                }
+              });
+            }}
+          />
+        }
+      />
+
+      {/* Regenerate link: only surfaced when the public link is active — it
+          invalidates every existing share URL, so it's a deliberate secondary
+          action, not something to stumble onto. */}
+      {on && (
+        <div className="fade-in-item mb-1 flex justify-end px-1">
+          <button
+            type="button"
+            onClick={() => setConfirmRegenerate(true)}
+            className="text-[12px] text-soft transition-colors hover:text-accent"
+          >
+            Regenerate link
+          </button>
+        </div>
+      )}
+
+      {/* ── Section 2: Monetization and licensing (Exactly as in Image 1) ── */}
+      <h3 className="px-1 pt-6 pb-1 text-[13px] font-normal text-soft">
+        Monetization and licensing
+      </h3>
+
+      <WhatsAppRow
+        icon="tag"
+        title="Course Pricing"
+        subtitle={
+          !completed
+            ? "Paid enrollment unlocks once curriculum authoring is marked complete."
+            : sellerStatus !== "ready"
+              ? "Set up payout details to charge for this course"
+              : currentPricing
+                ? `Priced at ${formatPrice(currentPricing.amount, currentPricing.currency)}`
+                : "Free to access"
+        }
+        onClick={
+          completed
+            ? sellerStatus !== "ready"
+              ? () => setSellerSetupOpen(true)
+              : () => setPricingSheetOpen(true)
+            : undefined
+        }
+        right={
+          <span className="rounded-full bg-gold/15 px-3 py-0.5 text-xs font-medium text-gold">
+            {currentPricing ? formatPrice(currentPricing.amount, currentPricing.currency) : "Free"}
+          </span>
+        }
+      />
+
+      <WhatsAppRow
+        icon="award"
+        title="Group & Organisation Vouchers"
+        subtitle={
+          !completed
+            ? "Voucher issuance unlocks once curriculum authoring is marked complete."
+            : sellerStatus !== "ready"
+              ? "Set up payout details to issue vouchers"
+              : "Manage shared organisation codes or individual batch vouchers."
+        }
+        onClick={
+          completed
+            ? sellerStatus !== "ready"
+              ? () => setSellerSetupOpen(true)
+              : () => setVouchersSheetOpen(true)
+            : undefined
+        }
+        right={completed ? <Icon name="chevron" className="h-4 w-4 text-soft" /> : null}
+      />
+
+      {/* ── Section 3: Danger Zone (if not source language) ── */}
+      {!edition.source && (
+        <div className="mt-6 border-t border-line/40 pt-2">
+          <WhatsAppRow
+            icon="refresh"
+            title="Re-translate this edition"
+            subtitle={`Re-run the ${edition.name} translation from scratch`}
+            onClick={() => {
+              setRetranslateEngine(edition.engine);
+              setConfirmRetranslate(true);
+            }}
+          />
+          <WhatsAppRow
+            icon="trash"
+            danger
+            title="Delete Language Edition"
+            subtitle={`Remove ${edition.name} translation and revoke share link`}
+            onClick={() => setConfirmDelete(true)}
+          />
+        </div>
+      )}
+
+      {/* Add language button on single edition */}
+      {onAddLanguage && (
+        <div className="mt-4 px-1">
+          <button
+            type="button"
+            onClick={onAddLanguage}
+            className="inline-flex items-center gap-2 rounded-xl border border-dashed border-line px-3 py-2 text-[13px] font-medium text-soft transition-colors hover:bg-hi hover:text-accent"
+          >
+            <Icon name="plus" className="h-4 w-4" /> {t("addLanguage")}
+          </button>
+        </div>
+      )}
+
+      {/* ── Focused Modal Sheets for Email Invite, Pricing, and Vouchers ── */}
+      {inviteSheetOpen && (
+        <Sheet title="Invite to Course by Email" onClose={() => setInviteSheetOpen(false)}>
+          <div className="flex flex-col gap-3 text-ink">
+            <p className="text-xs text-soft">Send an invite link through email.</p>
+            <form onSubmit={handleInviteSubmit} className="flex flex-col gap-2.5">
+              <input
+                type="email"
+                autoFocus
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setInviteMsg(null);
+                }}
+                placeholder="colleague@example.com"
+                className="rounded-xl border border-line bg-card px-3 py-2 text-sm text-ink placeholder:text-soft/60 focus:border-accent2 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={busyInvite || !email.trim()}
+                className="rounded-xl bg-accent py-2 text-xs font-semibold text-white hover:bg-accent/90 disabled:opacity-40"
+              >
+                {busyInvite ? "Sending…" : "Send invite"}
+              </button>
+            </form>
+            {inviteMsg && <p className="text-xs text-accent2 font-medium">{inviteMsg}</p>}
+          </div>
+        </Sheet>
+      )}
+
+      {pricingSheetOpen && (
+        <Sheet title="Course Pricing" onClose={() => setPricingSheetOpen(false)}>
+          <div className="p-1">
+            <PriceEditor
+              topicSlug={topicSlug}
+              lang={edition.lang}
+              current={currentPricing}
+              onSaved={() => setPricingSheetOpen(false)}
+            />
+          </div>
+        </Sheet>
+      )}
+
+      {sellerSetupOpen && (
+        <Sheet title={t("turnOnSellingTitle")} onClose={() => setSellerSetupOpen(false)}>
+          <p className="text-[13px] leading-relaxed text-soft">
+            <b className="font-semibold text-ink">{t("addPayoutTitle")}</b> {t("addPayoutBody")}
+          </p>
+          <PayoutDetailsForm />
+        </Sheet>
+      )}
+
+      {vouchersSheetOpen && (
+        <Sheet title="Group & Organisation Vouchers" onClose={() => setVouchersSheetOpen(false)}>
+          <div className="pt-2">
+            {sellerStatus !== "ready" ? (
+              <div className="flex flex-col gap-3 p-1">
+                <p className="text-[13px] leading-relaxed text-soft">
+                  <b className="font-semibold text-ink">Payout details required.</b> Set up payout details before issuing vouchers.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVouchersSheetOpen(false);
+                    setSellerSetupOpen(true);
+                  }}
+                  className="rounded-xl bg-accent py-2 text-xs font-semibold text-white hover:bg-accent/90"
+                >
+                  Set up payout details
+                </button>
+              </div>
+            ) : (
+              <VoucherCard
+                topicSlug={topicSlug}
+                lang={edition.lang}
+                name={edition.name}
+                published={edition.published}
+              />
+            )}
+          </div>
+        </Sheet>
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title={`Remove ${edition.name} Edition?`}
+          body="All translated lessons and its public share link will be deleted permanently."
+          confirmLabel={deleting ? "Deleting…" : "Delete Edition"}
+          confirmDisabled={deleting}
+          onConfirm={() => {
+            setDeleting(true);
+            void removeEdition({ topicSlug, lang: edition.lang }).finally(() => {
+              setDeleting(false);
+              setConfirmDelete(false);
+            });
           }}
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors ${
-            on ? "bg-accent2 text-white hover:bg-accent2/90" : "cursor-not-allowed bg-soft/10 text-soft/50"
-          }`}
-        >
-          <Icon name="link" className="h-3.5 w-3.5" /> {copied ? t("copied") : t("copy")}
-        </button>
-        <button
-          type="button"
-          disabled={!on || busy || qrBusy}
-          onClick={() => void downloadQr()}
-          title={t("qrDownload")}
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
-            on ? "border-line bg-hi text-ink hover:bg-line/40" : "cursor-not-allowed border-line/60 bg-soft/10 text-soft/50"
-          }`}
-        >
-          <Icon name="qr" className="h-3.5 w-3.5" /> {t("qrCode")}
-        </button>
-        {/* The course poster (course-poster spec): a new tab on the anonymous
-            poster route, keyed by this Edition's token, so it exists only while
-            the link is on and its QR always opens something, and only once the
-            course has finished generating (2026-09-07), so the lesson count it
-            prints is final. A real anchor, not window.open, so the new tab is
-            never popup-blocked; inert while off. */}
-        <a
-          href={posterOn && publicToken ? `/poster/${publicToken}` : undefined}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-disabled={!posterOn}
-          title={on && !completed ? t("posterNeedsCompleted") : t("posterOpen")}
-          className={`inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
-            posterOn ? "border-line bg-hi text-ink hover:bg-line/40" : "pointer-events-none cursor-not-allowed border-line/60 bg-soft/10 text-soft/50"
-          }`}
-        >
-          <Icon name="poster" className="h-3.5 w-3.5" /> {t("poster")}
-        </a>
-      </div>
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
+
+      {confirmRegenerate && (
+        <ConfirmDialog
+          title="Regenerate share link?"
+          body="The current link will stop working immediately. Anyone who saved it will need the new one."
+          confirmLabel={publish.busy ? "Regenerating…" : "Regenerate"}
+          confirmDisabled={publish.busy}
+          onConfirm={() => {
+            void publish
+              .run({ topicSlug, lang: edition.lang, isPublic: true })
+              .then((ok) => ok !== undefined && setConfirmRegenerate(false));
+          }}
+          onClose={() => setConfirmRegenerate(false)}
+        />
+      )}
+
+      {confirmRetranslate && (
+        <ConfirmDialog
+          title={`Re-translate ${edition.name}?`}
+          body={`All existing translated lessons will be replaced. This cannot be undone.`}
+          extra={<EngineToggle value={retranslateEngine} onChange={setRetranslateEngine} disabled={retranslate.busy} />}
+          confirmLabel={retranslate.busy ? "Starting…" : "Re-translate"}
+          confirmDisabled={retranslate.busy}
+          onConfirm={() => {
+            void retranslate
+              .run({ topicSlug, lang: edition.lang, engine: retranslateEngine })
+              .then((ok) => ok !== undefined && setConfirmRetranslate(false));
+          }}
+          onClose={() => setConfirmRetranslate(false)}
+        />
+      )}
     </div>
   );
 }
 
-// Invite one person to this edition by email (read-only Viewer access). Scoped
-// to `lang`: a Viewer gets exactly the Edition(s) shared with them. The roster
-// the invites land in lives on the Users tab (ui-overhaul 17).
-function InviteByEmail({ topicSlug, lang }: { topicSlug: string; lang: string }) {
-  const t = useTranslations("Editions");
-  const shareTopic = useMutation(api.shares.shareTopic);
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ email: string; status: "shared" | "pending" } | null>(null);
-
-  return (
-    <form
-      className="flex flex-col gap-2"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        const addr = email.trim();
-        if (!addr) return;
-        setBusy(true);
-        setError(null);
-        try {
-          const status = await shareTopic({ topicSlug, email: addr, lang });
-          setDone({ email: addr, status });
-          setEmail("");
-        } catch {
-          setError(t("inviteError"));
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <div className="flex gap-2">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            setError(null);
-            setDone(null);
-          }}
-          placeholder={t("invitePlaceholder")}
-          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
-        />
-        <button
-          type="submit"
-          disabled={busy}
-          className="shrink-0 rounded-lg bg-accent px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-        >
-          {busy ? t("inviting") : t("invite")}
-        </button>
-      </div>
-      <p className="text-xs text-soft">{t("inviteHelp")}</p>
-      {error && <p className="text-xs text-danger">{error}</p>}
-      {done?.status === "shared" && <p className="text-xs text-accent2">{t("shared", { email: done.email })}</p>}
-      {done?.status === "pending" && <p className="text-xs text-accent2">{t("invited", { email: done.email })}</p>}
-    </form>
-  );
-}
+// ── Price Editor ────────────────────────────────────────────────────────────
 
 type Pricing = FunctionReturnType<typeof api.market.editionPricing>[number];
 
-// The "What it costs" row (ADR 0016; ui-overhaul 15/17). A ready Seller gets the
-// price card. Anyone else gets ONE collapsed "Selling is off" row: the seller
-// grant and payout details live inside it rather than on /settings, because an
-// owner setting a price for the first time should discover why they cannot in
-// the same place they are trying to. Turn on opens the two-step sheet the
-// operator approved: payout details, then price. `payments-unconfigured` and
-// `not-granted` stay read-only text; the owner can act on neither.
-function SellEdition({
-  topicSlug,
-  lang,
-  name,
-  completed,
-}: {
-  topicSlug: string;
-  lang: string;
-  name: string;
-  completed: boolean;
-}) {
-  const t = useTranslations("Editions");
-  const status = useQuery(api.sellers.sellerStatus);
-  const pricing = useQuery(api.market.editionPricing, { topicSlug });
-  const current = pricing?.find((p) => p.lang === lang) ?? null;
-  const [open, setOpen] = useState(false);
-  const [setupOpen, setSetupOpen] = useState(false);
-
-  // Only a completed course is sellable (its content is frozen).
-  if (!completed) {
-    return (
-      <div className="flex items-center gap-2.5 rounded-xl border border-dashed border-line px-3 py-2.5 text-[12.5px] text-soft">
-        <Icon name="tag" className="h-4 w-4 shrink-0" />
-        <span>{t("sellIncomplete")}</span>
-      </div>
-    );
-  }
-
-  if (status !== "ready") {
-    const line =
-      status === undefined
-        ? t("checkingSellerStatus")
-        : status === "payments-unconfigured"
-          ? t("paymentsUnconfiguredBody")
-          : status === "not-granted"
-            ? t("notGrantedBody")
-            : t("addPayoutBody");
-    // The one step the owner can clear themselves is their own payout details.
-    const canTurnOn = status !== undefined && status !== "payments-unconfigured" && status !== "not-granted";
-    return (
-      <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-3 py-2.5">
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-hi text-soft">
-            <Icon name="tag" className="h-4.5 w-4.5" />
-          </span>
-          <div className="min-w-0">
-            <b className="block text-[13.5px] font-semibold text-ink">{t("sellingOff")}</b>
-            <span className="text-[11.5px] text-soft">{line}</span>
-          </div>
-        </div>
-        {canTurnOn && (
-          <button
-            type="button"
-            onClick={() => setSetupOpen(true)}
-            className="shrink-0 rounded-lg bg-gold/20 px-3 py-1.5 text-[12.5px] font-medium text-accent transition-colors hover:bg-gold/30"
-          >
-            {t("turnOnSelling")}
-          </button>
-        )}
-        {setupOpen && (
-          <Sheet title={t("turnOnSellingTitle")} onClose={() => setSetupOpen(false)}>
-            {/* Step 1: payout details. Saving flips sellerStatus reactively, and
-                this same sheet becomes step 2, the price. */}
-            <p className="text-[13px] leading-relaxed text-soft">
-              <b className="font-semibold text-ink">{t("addPayoutTitle")}</b> {t("addPayoutBody")}
-            </p>
-            <PayoutDetailsForm />
-          </Sheet>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className={`rounded-xl border bg-card p-3.5 ${current ? "border-gold/40" : "border-line"}`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <span
-              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] ${
-                current ? "bg-gold/15 text-gold" : "bg-hi text-soft"
-              }`}
-            >
-              <Icon name="tag" className="h-4.5 w-4.5" />
-            </span>
-            <div className="min-w-0">
-              <b className="block text-[13.5px] font-semibold text-ink">{t("sellThisEdition")}</b>
-              <span className="text-[11.5px] text-soft">
-                {current ? (
-                  t.rich("paidState", {
-                    price: () => (
-                      <span className="font-semibold text-gold">{formatPrice(current.amount, current.currency)}</span>
-                    ),
-                  })
-                ) : (
-                  t.rich("freeState", {
-                    native: () => <span>{name}</span>,
-                  })
-                )}
-              </span>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            className={`shrink-0 rounded-lg px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
-              current
-                ? "border border-line text-soft hover:bg-hi hover:text-accent"
-                : "bg-gold/20 text-accent hover:bg-gold/30"
-            }`}
-          >
-            {current ? t("editPrice") : t("setAPrice")}
-          </button>
-        </div>
-        {open && (
-          <div className="mt-3 border-t border-line pt-3">
-            <PriceEditor topicSlug={topicSlug} lang={lang} current={current} onSaved={() => setOpen(false)} />
-          </div>
-        )}
-      </div>
-      {/* The turn-on sheet's step 2: the owner who just saved payout details
-          lands here with the price fields, completing the approved two-step. */}
-      {setupOpen && (
-        <Sheet title={t("setAPrice")} onClose={() => setSetupOpen(false)}>
-          <PriceEditor topicSlug={topicSlug} lang={lang} current={current} onSaved={() => setSetupOpen(false)} />
-        </Sheet>
-      )}
-    </>
-  );
-}
-
-// The price fields (base ZAR plus the two regional prices), shared by the ready
-// card's inline editor and the turn-on sheet's second step. Regional prices are
-// typed in the foreign currency; blank means that region pays the Rand price.
-// The BASE price is ZAR-only (PayFast settles in Rand); the server enforces it.
 function PriceEditor({
   topicSlug,
   lang,
@@ -546,8 +611,6 @@ function PriceEditor({
   const setPrice = useMutation(api.market.setEditionPrice);
   const clearPrice = useMutation(api.market.clearEditionPrice);
   const major = (minor: number | undefined) => (minor === undefined ? "" : toMajor(minor).toFixed(2));
-  // Seeded from what was last saved: a save writes all three fields, so a form
-  // that opened blank would silently withdraw the regional prices on every edit.
   const [amount, setAmount] = useState(current ? toMajor(current.amount).toFixed(2) : "");
   const [usd, setUsd] = useState(major(current?.usdAmount));
   const [eur, setEur] = useState(major(current?.eurAmount));
@@ -560,9 +623,6 @@ function PriceEditor({
       setError(t("priceGreaterThanZero"));
       return;
     }
-    // Blank means that region falls back to the Rand price. Anything typed must
-    // be a real price: silently dropping a fat-fingered "1o.00" would sell at
-    // R100 in New York.
     const regional = (raw: string): number | undefined | "bad" => {
       if (!raw.trim()) return undefined;
       const cents = Math.round(parseFloat(raw) * 100);
@@ -585,6 +645,7 @@ function PriceEditor({
       setBusy(false);
     }
   };
+
   const stopSelling = async () => {
     setBusy(true);
     setError(null);
@@ -631,11 +692,9 @@ function PriceEditor({
           {busy ? t("saving") : t("save")}
         </button>
       </div>
-      {/* Blank is a real answer here, and an unexplained blank field on a money
-          form reads as one you forgot to fill in. */}
       <p className="text-xs text-soft">{t("regionalPriceHint")}</p>
       {error && <p className="text-xs text-danger">{error}</p>}
-      {current ? (
+      {current && (
         <button
           type="button"
           disabled={busy}
@@ -644,17 +703,13 @@ function PriceEditor({
         >
           <Icon name="x" className="h-3.75 w-3.75" /> {t("stopSelling")}
         </button>
-      ) : (
-        <p className="text-xs text-soft">{t("eachLanguagePriced")}</p>
       )}
     </div>
   );
 }
 
-// The payout bank-details form (PayFast rail): a granted Seller saves the SA
-// bank account their earnings are EFT'd to, the step that makes them a ready
-// Seller. Write-only by design: details are never read back into any non-admin
-// UI, so the form always starts blank (re-submitting overwrites).
+// ── Payout Details Form ─────────────────────────────────────────────────────
+
 function PayoutDetailsForm() {
   const t = useTranslations("Editions");
   const save = useMutation(api.sellers.savePayoutDetails);
@@ -711,13 +766,10 @@ function PayoutDetailsForm() {
   );
 }
 
-// Retry a failed translation. Re-runs startTranslation, which only reschedules
-// the items that changed or failed.
+// ── Retry and Remove ────────────────────────────────────────────────────────
+
 function RetryTranslation({ topicSlug, lang }: { topicSlug: string; lang: string }) {
   const t = useTranslations("Editions");
-  // Was a `finally` with no `catch`, so a refused retry (translations flag off,
-  // no model key provisioned, another run holding the lock) looked identical to a
-  // retry that started. Ticket 32.
   const { run, busy, error } = useMutationRun(useAction(api.translate.startTranslation), t("updateError"));
   return (
     <div className="flex flex-col gap-1">
@@ -734,13 +786,8 @@ function RetryTranslation({ topicSlug, lang }: { topicSlug: string; lang: string
   );
 }
 
-// Remove a translation edition. A quiet danger text link by default; the
-// failed/translating panels pass a shorter label.
 function RemoveEdition({ topicSlug, lang, label }: { topicSlug: string; lang: string; label?: string }) {
   const t = useTranslations("Editions");
-  // Was a `finally` with no `catch`: a refused removal (not the owner, the
-  // Edition priced or published) left the row in place with no explanation.
-  // Ticket 32.
   const { run, busy, error } = useMutationRun(useMutation(api.translate.removeEdition), t("updateError"));
   return (
     <div className="flex flex-col gap-1">
@@ -757,9 +804,6 @@ function RemoveEdition({ topicSlug, lang, label }: { topicSlug: string; lang: st
   );
 }
 
-// The Free / Gemini engine picker: a segmented toggle with a per-engine hint.
-// Gemini's hint warns it uses tokens; the label IS the warning (no blocking
-// confirm). Shared by the add-language panel and the re-translate confirm.
 export function EngineToggle({ value, onChange, disabled }: { value: Engine; onChange: (e: Engine) => void; disabled?: boolean }) {
   const t = useTranslations("Editions");
   return (
@@ -786,184 +830,8 @@ export function EngineToggle({ value, onChange, disabled }: { value: Engine; onC
   );
 }
 
-// The ready edition's destructive-action menu, at the foot of the tab. Every
-// action here either invalidates a shared link or throws work away, so each is
-// two clicks deep and then gated by a confirm. A translation gets all three
-// (regenerate the public link, re-translate, remove); the English source can
-// only regenerate its link, and only while the link is on.
-function EditionDangerMenu({ topicSlug, edition }: { topicSlug: string; edition: Edition }) {
-  const t = useTranslations("Editions");
-  const [open, setOpen] = useState(false);
-  const [confirm, setConfirm] = useState<null | "regenerate" | "retranslate" | "remove">(null);
-  const ref = useRef<HTMLDivElement>(null);
+// ── AddLanguagePanel (Used by ManageShell) ──────────────────────────────────
 
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const canRegenerate = edition.publicToken != null;
-  if (edition.source && !canRegenerate) return null;
-
-  const pick = (which: NonNullable<typeof confirm>) => {
-    setOpen(false);
-    setConfirm(which);
-  };
-
-  return (
-    <div ref={ref} className="relative self-start">
-      <button
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-[13px] font-medium text-soft transition-colors hover:bg-hi hover:text-accent"
-      >
-        <Icon name="settings" className="h-4 w-4" />
-        {t("manageEdition")}
-        <Icon name="chevron" className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div
-          role="menu"
-          className="pop-in absolute bottom-[calc(100%+6px)] start-0 z-50 min-w-56 rounded-xl border border-line bg-card p-1.5 shadow-xl"
-        >
-          {canRegenerate && (
-            <MenuItem icon="refresh" onClick={() => pick("regenerate")}>
-              {t("regenerateLink")}
-            </MenuItem>
-          )}
-          {!edition.source && (
-            <MenuItem icon="refresh" onClick={() => pick("retranslate")}>
-              {t("retranslate")}
-            </MenuItem>
-          )}
-          {!edition.source && (
-            <MenuItem icon="trash" onClick={() => pick("remove")}>
-              {t("removeThisEdition")}
-            </MenuItem>
-          )}
-        </div>
-      )}
-
-      {confirm === "regenerate" && (
-        <RegenerateLinkConfirm topicSlug={topicSlug} lang={edition.lang} onClose={() => setConfirm(null)} />
-      )}
-      {confirm === "retranslate" && (
-        <RetranslateConfirm topicSlug={topicSlug} edition={edition} onClose={() => setConfirm(null)} />
-      )}
-      {confirm === "remove" && (
-        <RemoveEditionConfirm
-          topicSlug={topicSlug}
-          lang={edition.lang}
-          native={edition.name}
-          onClose={() => setConfirm(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-// "Are you sure?" for regenerating the public link: minting a fresh token kills
-// the link everyone already has. Reuses setEditionPublic (isPublic: true swaps
-// the token in place).
-function RegenerateLinkConfirm({ topicSlug, lang, onClose }: { topicSlug: string; lang: string; onClose: () => void }) {
-  const t = useTranslations("Editions");
-  const setPublic = useMutation(api.shares.setEditionPublic);
-  const [busy, setBusy] = useState(false);
-  return (
-    <ConfirmDialog
-      title={t("confirmRegenerateTitle")}
-      body={t("confirmRegenerateBody")}
-      confirmLabel={busy ? t("regenerating") : t("regenerateLink")}
-      confirmDisabled={busy}
-      onConfirm={() => {
-        setBusy(true);
-        void setPublic({ topicSlug, lang, isPublic: true }).then(onClose, () => setBusy(false));
-      }}
-      onClose={onClose}
-    />
-  );
-}
-
-// "Are you sure?" for removing a translation edition: it and everyone's access
-// to it go for good. Reuses removeEdition.
-function RemoveEditionConfirm({
-  topicSlug,
-  lang,
-  native,
-  onClose,
-}: {
-  topicSlug: string;
-  lang: string;
-  native: string;
-  onClose: () => void;
-}) {
-  const t = useTranslations("Editions");
-  const remove = useMutation(api.translate.removeEdition);
-  const [busy, setBusy] = useState(false);
-  return (
-    <ConfirmDialog
-      title={t("confirmRemoveTitle")}
-      body={t("confirmRemoveBody", { native })}
-      confirmLabel={busy ? t("removing") : t("removeThisEdition")}
-      confirmDisabled={busy}
-      onConfirm={() => {
-        setBusy(true);
-        void remove({ topicSlug, lang }).then(onClose, () => setBusy(false));
-      }}
-      onClose={onClose}
-    />
-  );
-}
-
-// "Are you sure?" for re-translating a ready edition: carries the engine picker
-// inside the confirm, seeded from the engine that last produced this edition.
-// Switching engines forces a full redo server-side; the same engine is a cheap
-// resume/repair.
-//
-// **It had its own <dialog> shell purely because `ConfirmDialog` took a `body:
-// string` and had no slot for the engine toggle.** Ticket 39 widened
-// `ConfirmDialog` (a ReactNode body and an `extra` slot), which is what let this
-// twin go: the whole reason it forked was an interface too narrow to say what it
-// needed.
-function RetranslateConfirm({ topicSlug, edition, onClose }: { topicSlug: string; edition: Edition; onClose: () => void }) {
-  const te = useTranslations("Editions");
-  const [engine, setEngine] = useState<Engine>(edition.engine);
-  const { run, busy, error } = useMutationRun(useAction(api.translate.startTranslation), te("updateError"));
-  return (
-    <ConfirmDialog
-      title={te("confirmRetranslateTitle")}
-      body={
-        <>
-          {te("confirmRetranslateBody", { native: edition.name })}
-          {error && <span className="mt-2 block text-danger">{error}</span>}
-        </>
-      }
-      extra={<EngineToggle value={engine} onChange={setEngine} disabled={busy} />}
-      confirmLabel={busy ? te("retranslating") : te("confirmRetranslate")}
-      confirmDisabled={busy}
-      onConfirm={() => void run({ topicSlug, lang: edition.lang, engine }).then((ok) => ok !== undefined && onClose())}
-      onClose={onClose}
-    />
-  );
-}
-
-// Add a translation edition: a searchable pick from LANGUAGES (excluding
-// editions already present) that kicks off a bulk translation. Only a completed
-// course is translatable (content frozen), so otherwise it shows the unlock
-// hint. Lives in the shell's edition sheet.
 export function AddLanguagePanel({
   topicSlug,
   editions,
@@ -976,12 +844,8 @@ export function AddLanguagePanel({
   onAdded: (code: string) => void;
 }) {
   const t = useTranslations("Editions");
-  // Was a `finally` with no `catch`, and this one is the worst of the nine: it
-  // called `onAdded(code)` unconditionally, so a refused translation optimistically
-  // showed the new Edition in the list and said nothing. Ticket 32.
   const { run, busy, error } = useMutationRun(useAction(api.translate.startTranslation), t("updateError"));
   const [q, setQ] = useState("");
-  // Defaults to Free (translate for free first; upgrade to Gemini later per edition).
   const [engine, setEngine] = useState<Engine>("free");
 
   if (!completed) {
@@ -1002,9 +866,6 @@ export function AddLanguagePanel({
 
   const add = (code: string) => {
     setQ("");
-    // `onAdded` only once the run actually started: it is what puts the Edition
-    // in the owner's list, and doing it before the answer showed an Edition that
-    // was never created.
     void run({ topicSlug, lang: code, engine }).then((ok) => ok !== undefined && onAdded(code));
   };
 
@@ -1020,8 +881,6 @@ export function AddLanguagePanel({
         placeholder={t("searchLanguages")}
         className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none disabled:opacity-60"
       />
-      {/* Fixed-height, scrollable list: the panel keeps its height whether the
-          query matches 8 languages, one, or none. Empty query pre-fills. */}
       <div className="h-[290px] overflow-y-auto pe-0.5">
         {matches.length > 0 ? (
           <ul className="flex flex-col gap-1.5">
@@ -1033,7 +892,6 @@ export function AddLanguagePanel({
                   onClick={() => add(l.code)}
                   className="flex w-full items-center justify-between gap-2 rounded-lg border border-line px-3 py-2 text-start text-sm text-ink transition-colors hover:bg-hi"
                 >
-                  {/* English name only; see the endonym note in ManageShell. */}
                   <span className="min-w-0 truncate">{l.name}</span>
                   <span className="shrink-0 text-xs uppercase text-soft">
                     {l.code}
