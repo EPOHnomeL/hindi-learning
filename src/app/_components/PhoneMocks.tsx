@@ -90,13 +90,13 @@ function Phone({
   return (
     <div
       aria-hidden={interactive ? undefined : true}
-      className="mx-auto flex h-92 w-full max-w-[15rem] flex-col overflow-hidden rounded-xl border border-line bg-paper shadow-sm"
+      className="mx-auto flex h-[26rem] w-full max-w-[17rem] flex-col overflow-hidden rounded-xl border border-line bg-paper shadow-sm"
     >
       {/* Status bar. The 9:41 is the convention every device mockup uses; a real
           clock here would be a hydration mismatch for no gain. No fake notch —
           the first attempt rendered as a stray bar floating above the frame's
           rounded edge, and a notch was never carrying any of the meaning. */}
-      <div className="flex items-center justify-between border-b border-line px-3 py-1.5 text-[9px] text-soft">
+      <div className="flex items-center justify-between border-b border-line px-3 py-1.5 text-[11px] text-soft">
         <span className="font-medium">9:41</span>
         <span className="flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-soft/50" />
@@ -119,7 +119,7 @@ function Phone({
           <line x1="19" y1="12" x2="5" y2="12" />
           <polyline points="12 19 5 12 12 5" />
         </svg>
-        <span className="min-w-0 truncate text-[10px] font-semibold tracking-tight text-accent">
+        <span className="min-w-0 truncate text-[12px] font-semibold tracking-tight text-accent">
           {copy.courseTitle}
         </span>
         <svg
@@ -147,7 +147,7 @@ function Prose({ widths }: { widths: number[] }) {
   return (
     <span className="mt-2 block space-y-1.5">
       {widths.map((w, i) => (
-        <span key={i} className="block h-1.5 rounded-sm bg-line" style={{ width: `${w}%` }} />
+        <span key={i} className="block h-2 rounded-sm bg-line" style={{ width: `${w}%` }} />
       ))}
     </span>
   );
@@ -158,11 +158,11 @@ function Prose({ widths }: { widths: number[] }) {
 function LessonHead({ copy }: { copy: PhoneMockCopy }) {
   return (
     <div className="flex items-center justify-between gap-2 border-b border-line pb-1.5">
-      <span className="min-w-0 truncate text-[10px] font-semibold text-ink">
+      <span className="min-w-0 truncate text-[12px] font-semibold text-ink">
         {copy.lessonTitle ?? copy.lessonProgress}
       </span>
       {copy.nextLesson && (
-        <span className="shrink-0 rounded-md bg-accent px-1.5 py-[3px] text-[7px] font-medium text-white">
+        <span className="shrink-0 rounded-md bg-accent px-1.5 py-[3px] text-[8px] font-medium text-white">
           {copy.nextLesson} →
         </span>
       )}
@@ -177,21 +177,21 @@ export function LessonMock({ copy }: { copy: PhoneMockCopy }) {
       <LessonHead copy={copy} />
       <div className="mt-2">
         {copy.lessonSection && (
-          <div className="text-[7px] font-semibold uppercase tracking-[0.16em] text-accent2">
+          <div className="text-[8px] font-semibold uppercase tracking-[0.16em] text-accent2">
             {copy.lessonSection}
           </div>
         )}
         {copy.lessonBody ? (
           <div className="mt-1.5 space-y-1.5">
             {copy.lessonBody.map((p) => (
-              <p key={p} className="text-[8px] leading-[1.55] text-ink">
+              <p key={p} className="text-[10px] leading-[1.55] text-ink">
                 {p}
               </p>
             ))}
           </div>
         ) : (
           <>
-            <span className="mt-1.5 block h-2 w-2/3 rounded-sm bg-soft/40" />
+            <span className="mt-1.5 block h-2.5 w-2/3 rounded-sm bg-soft/40" />
             <Prose widths={[100, 96, 88, 100, 94, 82, 68]} />
           </>
         )}
@@ -199,13 +199,13 @@ export function LessonMock({ copy }: { copy: PhoneMockCopy }) {
             authored lesson: a card ruled gold down its left edge. */}
         <div className="mt-2 rounded-md border border-line border-s-[3px] border-s-gold bg-card px-2 py-1.5">
           {copy.verse ? (
-            <p className="text-[8px] leading-[1.55] text-ink">{copy.verse}</p>
+            <p className="text-[10px] leading-[1.55] text-ink">{copy.verse}</p>
           ) : (
             <Prose widths={[80, 92, 58]} />
           )}
         </div>
         {copy.askCta && (
-          <span className="mt-2 flex items-center gap-1.5 rounded-md border border-line px-2 py-1.5 text-[9px] text-soft">
+          <span className="mt-2 flex items-center gap-1.5 rounded-md border border-line px-2 py-1.5 text-[11px] text-soft">
             <Icon name="chat" className="h-2.5 w-2.5 text-accent" />
             {copy.askCta}
           </span>
@@ -236,7 +236,7 @@ export function QuizMock({ copy }: { copy: PhoneMockCopy }) {
       <LessonHead copy={copy} />
       <div className="mt-2">
         <div className="rounded-lg border border-line bg-card p-2 shadow-sm">
-          <div className="text-[9px] font-semibold leading-snug text-ink">{copy.quizQuestion}</div>
+          <div className="text-[11px] font-semibold leading-snug text-ink">{copy.quizQuestion}</div>
           <div className="mt-2 space-y-1">
             {copy.quizOptions.map((opt, i) => (
               <button
@@ -244,7 +244,7 @@ export function QuizMock({ copy }: { copy: PhoneMockCopy }) {
                 type="button"
                 aria-pressed={selected === i}
                 onClick={() => setSelected(i)}
-                className={`flex min-h-9 w-full items-center justify-between gap-1 rounded-md border px-2 py-1 text-start text-[9px] leading-snug transition-colors motion-reduce:transition-none ${optionClass[options[i]!]}`}
+                className={`flex min-h-9 w-full items-center justify-between gap-1 rounded-md border px-2 py-1 text-start text-[11px] leading-snug transition-colors motion-reduce:transition-none ${optionClass[options[i]!]}`}
               >
                 {opt}
                 {options[i] === "correct" && <Icon name="check" className="h-2.5 w-2.5 shrink-0 text-good-b" />}
@@ -257,7 +257,7 @@ export function QuizMock({ copy }: { copy: PhoneMockCopy }) {
           {note && (
             <p
               role="status"
-              className={`mt-1.5 text-[8px] leading-snug ${
+              className={`mt-1.5 text-[10px] leading-snug ${
                 feedback === "correct" ? "text-good-b" : feedback === "retry" ? "text-bad-b" : "text-soft"
               }`}
             >
@@ -266,7 +266,7 @@ export function QuizMock({ copy }: { copy: PhoneMockCopy }) {
           )}
         </div>
         {copy.lessonBody ? (
-          <p className="mt-2 text-[8px] leading-[1.55] text-ink">{copy.lessonBody[0]}</p>
+          <p className="mt-2 text-[10px] leading-[1.55] text-ink">{copy.lessonBody[0]}</p>
         ) : (
           <Prose widths={[96, 88, 74]} />
         )}
@@ -282,7 +282,7 @@ export function AskMock({ copy }: { copy: PhoneMockCopy }) {
       <LessonHead copy={copy} />
       <div className="mt-2 space-y-2">
         {/* The learner's question — right-aligned, the universal "mine". */}
-        <div className="ms-6 rounded-md rounded-ee-sm bg-hi px-2 py-1.5 text-[9px] leading-snug text-ink">
+        <div className="ms-6 rounded-md rounded-ee-sm bg-hi px-2 py-1.5 text-[11px] leading-snug text-ink">
           {copy.askedQuestion}
         </div>
         {/* The reply, inline and attributed with the same avatar treatment the
@@ -292,13 +292,13 @@ export function AskMock({ copy }: { copy: PhoneMockCopy }) {
             <Icon name="book" className="h-2 w-2" />
           </span>
           <span className="rounded-md rounded-es-sm border border-line bg-card px-2 py-1.5">
-            <span className="block text-[9px] leading-snug text-soft">{copy.askedReply}</span>
+            <span className="block text-[11px] leading-snug text-soft">{copy.askedReply}</span>
             <Prose widths={[92, 100, 88, 96, 70]} />
           </span>
         </div>
         {/* The follow-up, so the frame shows a conversation rather than a single
             answered question. */}
-        <div className="ms-6 rounded-md rounded-ee-sm bg-hi px-2 py-1.5 text-[9px] leading-snug text-ink">
+        <div className="ms-6 rounded-md rounded-ee-sm bg-hi px-2 py-1.5 text-[11px] leading-snug text-ink">
           {copy.askedFollowUp}
         </div>
       </div>
