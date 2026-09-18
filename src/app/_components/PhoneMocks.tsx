@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { Icon } from "./icons";
+import { quizMockState } from "./phoneQuiz";
 
 // Phone mockups of the product, **built in CSS** rather than screenshotted
 // (spoorpet.com brief, 2026-08-07). The reason is maintenance, not novelty: a
@@ -24,9 +26,11 @@ import { Icon } from "./icons";
 // fallback for the translated landing, where inventing lesson prose in five
 // languages would cost more than it says.
 //
-// Everything here is `aria-hidden` decoration: the caption underneath each frame
-// carries the actual claim, so a screen reader gets the point without wading
-// through fake prose.
+// The lesson and ask frames are `aria-hidden` decoration: the caption underneath
+// each frame carries the actual claim, so a screen reader gets the point without
+// wading through fake prose. The quiz frame is the exception (landing-page spec,
+// 2026-09-18): its options are real buttons a visitor can tap to feel active
+// recall before signing in, so that frame stays in the accessibility tree.
 
 // The visible micro-copy inside the frames. Passed in rather than hardcoded so the
 // default landing can translate it and YwamPotch.tsx can hand over its own — a
@@ -55,6 +59,11 @@ export type PhoneMockCopy = {
   quizOptions: [string, string, string];
   /** What the lesson says back once the right option is chosen. */
   quizFeedback?: string;
+  /** What it says after a wrong tap. Omit and the wrong option just turns red. */
+  quizRetry?: string;
+  /** The invitation to tap, shown until something is chosen. Omit and the
+   *  question stands alone. */
+  quizNudge?: string;
   /** What the learner asked. */
   askedQuestion: string;
   /** What came back, inline. */
@@ -68,10 +77,19 @@ export type PhoneMockCopy = {
 // height so the frames line up in a row regardless of content — which means each
 // screen's content has to roughly FILL it. A half-empty frame reads as a cropped
 // screenshot, so the runs are tuned per screen.
-function Phone({ copy, children }: { copy: PhoneMockCopy; children: React.ReactNode }) {
+function Phone({
+  copy,
+  interactive = false,
+  children,
+}: {
+  copy: PhoneMockCopy;
+  /** Keep the frame in the accessibility tree because it holds real controls. */
+  interactive?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <div
-      aria-hidden
+      aria-hidden={interactive ? undefined : true}
       className="mx-auto flex h-92 w-full max-w-[15rem] flex-col overflow-hidden rounded-xl border border-line bg-paper shadow-sm"
     >
       {/* Status bar. The 9:41 is the convention every device mockup uses; a real
@@ -197,34 +215,60 @@ export function LessonMock({ copy }: { copy: PhoneMockCopy }) {
   );
 }
 
-// 2 — a quiz inside the lesson, as `.quiz`/`.opt` render it: a card, one option
-// chosen and gone green. A mockup of an unanswered quiz shows nothing about what
-// the product does.
+// 2 — a quiz inside the lesson, as `.quiz`/`.opt` render it, and the one frame a
+// visitor can actually use (landing-page spec, 2026-09-18). Nothing is chosen
+// until they tap: the first option goes green with the lesson's feedback, any
+// other goes red with a retry line, and tapping again moves the mark. The state
+// model is `quizMockState` so it can be tested without a DOM. Options are real
+// buttons, tall enough to hit with a thumb on the phone the frame is imitating.
 export function QuizMock({ copy }: { copy: PhoneMockCopy }) {
+  const [selected, setSelected] = useState<number | null>(null);
+  const { options, feedback } = quizMockState(selected, copy.quizOptions.length);
+  const optionClass = {
+    idle: "border-line text-ink hover:border-gold",
+    correct: "border-good-b bg-good text-ink",
+    wrong: "border-bad-b bg-bad text-ink",
+  } as const;
+  const note =
+    feedback === "correct" ? copy.quizFeedback : feedback === "retry" ? copy.quizRetry : copy.quizNudge;
   return (
-    <Phone copy={copy}>
+    <Phone copy={copy} interactive>
       <LessonHead copy={copy} />
       <div className="mt-2">
         <div className="rounded-lg border border-line bg-card p-2 shadow-sm">
           <div className="text-[9px] font-semibold leading-snug text-ink">{copy.quizQuestion}</div>
           <div className="mt-2 space-y-1">
             {copy.quizOptions.map((opt, i) => (
-              <div
+              <button
                 key={opt}
-                className={`rounded-md border px-2 py-1 text-[8px] leading-snug ${
-                  i === 0 ? "border-good-b bg-good text-ink" : "border-line text-ink"
-                }`}
+                type="button"
+                aria-pressed={selected === i}
+                onClick={() => setSelected(i)}
+                className={`flex min-h-9 w-full items-center justify-between gap-1 rounded-md border px-2 py-1 text-start text-[9px] leading-snug transition-colors motion-reduce:transition-none ${optionClass[options[i]!]}`}
               >
                 {opt}
-              </div>
+                {options[i] === "correct" && <Icon name="check" className="h-2.5 w-2.5 shrink-0 text-good-b" />}
+                {options[i] === "wrong" && <Icon name="x" className="h-2.5 w-2.5 shrink-0 text-bad-b" />}
+              </button>
             ))}
           </div>
-          {copy.quizFeedback && <p className="mt-1.5 text-[8px] leading-snug text-good-b">{copy.quizFeedback}</p>}
+          {/* One slot, three messages: the nudge, the lesson's feedback, or the
+              retry line. `role=status` so a screen reader hears the mark land. */}
+          {note && (
+            <p
+              role="status"
+              className={`mt-1.5 text-[8px] leading-snug ${
+                feedback === "correct" ? "text-good-b" : feedback === "retry" ? "text-bad-b" : "text-soft"
+              }`}
+            >
+              {note}
+            </p>
+          )}
         </div>
         {copy.lessonBody ? (
           <p className="mt-2 text-[8px] leading-[1.55] text-ink">{copy.lessonBody[0]}</p>
         ) : (
-          <Prose widths={[96, 88, 92, 74]} />
+          <Prose widths={[96, 88, 74]} />
         )}
       </div>
     </Phone>
