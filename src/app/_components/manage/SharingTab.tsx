@@ -880,17 +880,20 @@ function EditionDangerMenu({ topicSlug, edition }: { topicSlug: string; edition:
 // the token in place).
 function RegenerateLinkConfirm({ topicSlug, lang, onClose }: { topicSlug: string; lang: string; onClose: () => void }) {
   const t = useTranslations("Editions");
-  const setPublic = useMutation(api.shares.setEditionPublic);
-  const [busy, setBusy] = useState(false);
+  // Kept the confirm open on refusal but said nothing about why; the refusal
+  // now renders under the body.
+  const { run, busy, error } = useMutationRun(useMutation(api.shares.setEditionPublic), t("updateError"));
   return (
     <ConfirmDialog
       title={t("confirmRegenerateTitle")}
       body={t("confirmRegenerateBody")}
+      extra={error ? <p className="text-xs text-danger">{error}</p> : undefined}
       confirmLabel={busy ? t("regenerating") : t("regenerateLink")}
       confirmDisabled={busy}
       onConfirm={() => {
-        setBusy(true);
-        void setPublic({ topicSlug, lang, isPublic: true }).then(onClose, () => setBusy(false));
+        void run({ topicSlug, lang, isPublic: true }).then((r) => {
+          if (r !== undefined) onClose();
+        });
       }}
       onClose={onClose}
     />
@@ -911,17 +914,20 @@ function RemoveEditionConfirm({
   onClose: () => void;
 }) {
   const t = useTranslations("Editions");
-  const remove = useMutation(api.translate.removeEdition);
-  const [busy, setBusy] = useState(false);
+  // Kept the confirm open on refusal but said nothing about why; the refusal
+  // now renders under the body.
+  const { run, busy, error } = useMutationRun(useMutation(api.translate.removeEdition), t("updateError"));
   return (
     <ConfirmDialog
       title={t("confirmRemoveTitle")}
       body={t("confirmRemoveBody", { native })}
+      extra={error ? <p className="text-xs text-danger">{error}</p> : undefined}
       confirmLabel={busy ? t("removing") : t("removeThisEdition")}
       confirmDisabled={busy}
       onConfirm={() => {
-        setBusy(true);
-        void remove({ topicSlug, lang }).then(onClose, () => setBusy(false));
+        void run({ topicSlug, lang }).then((r) => {
+          if (r !== undefined) onClose();
+        });
       }}
       onClose={onClose}
     />

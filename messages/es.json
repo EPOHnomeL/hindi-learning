@@ -269,6 +269,7 @@
     "emailAddEmail": "Tu correo electrónico",
     "emailAddPassword": "Una contraseña (al menos 8 caracteres)",
     "emailAddFailed": "No ha funcionado. Puede que esa dirección ya se use en otra cuenta.",
+    "updateError": "No ha funcionado. Inténtalo de nuevo.",
     "seatDelete": "Borrar lo que guardáis sobre mí",
     "seatDeleteConfirmTitle": "¿Borrar tu nombre?",
     "seatDeleteConfirmBody": "Borraremos tu nombre, de modo que nada aquí te vincule con la organización que pagó tu plaza. Lee primero esta parte: tu nombre es la única forma de volver a entrar, así que una vez borrado no podrás iniciar sesión en otro teléfono. Conservas el curso en este teléfono, en este navegador, hasta que cierres la sesión. Tu progreso se mantiene hasta entonces. Esto no se puede deshacer."

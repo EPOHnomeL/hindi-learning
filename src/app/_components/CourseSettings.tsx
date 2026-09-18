@@ -314,9 +314,10 @@ function DetailsSection({ topicSlug }: { topicSlug: string }) {
 function LessonsSection({ topicSlug }: { topicSlug: string }) {
   const t = useTranslations("CourseSettings");
   const lessons = useQuery(api.content.reader.listLessons, { topicSlug });
-  const deleteLesson = useMutation(api.content.authoring.deleteLesson);
+  // Was a `finally` with no `catch`: a refused delete closed the confirm as if
+  // the lesson had gone. The confirm now stays up and says why.
+  const del = useMutationRun(useMutation(api.content.authoring.deleteLesson), t("updateError"));
   const [pending, setPending] = useState<{ key: string; title: string } | null>(null);
-  const [busy, setBusy] = useState(false);
   const pendingName = pending ? pending.title.split("—")[0]!.trim() : "";
 
   return (
@@ -351,16 +352,18 @@ function LessonsSection({ topicSlug }: { topicSlug: string }) {
         <ConfirmDialog
           title={t("deleteConfirmTitle")}
           body={t("deleteConfirmBody", { title: pendingName })}
-          confirmLabel={busy ? t("deleting") : t("deleteLessonTitle")}
-          confirmDisabled={busy}
+          confirmLabel={del.busy ? t("deleting") : t("deleteLessonTitle")}
+          confirmDisabled={del.busy}
+          extra={del.error ? <p className="text-xs text-danger">{del.error}</p> : undefined}
           onConfirm={() => {
-            setBusy(true);
-            void deleteLesson({ topicSlug, key: pending.key }).finally(() => {
-              setBusy(false);
-              setPending(null);
+            void del.run({ topicSlug, key: pending.key }).then((r) => {
+              if (r !== undefined) setPending(null);
             });
           }}
-          onClose={() => setPending(null)}
+          onClose={() => {
+            del.reset();
+            setPending(null);
+          }}
         />
       )}
     </div>
@@ -371,9 +374,10 @@ function LessonsSection({ topicSlug }: { topicSlug: string }) {
 // (it stops the Routine); "Reopen" returns a completed course to active.
 function CompletionSection({ topicSlug, status }: { topicSlug: string; status: "seeded" | "active" | "completed" }) {
   const t = useTranslations("CourseSettings");
-  const endCourse = useMutation(api.content.authoring.endCourse);
+  // Ending was a `finally` with no `catch` too: a refused "mark complete" closed
+  // the confirm as if the course had ended. The confirm now stays up and says why.
+  const end = useMutationRun(useMutation(api.content.authoring.endCourse), t("updateError"));
   const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState(false);
   // Reopening was a `finally` with no `catch`. Ticket 32.
   const reopen = useMutationRun(useMutation(api.content.authoring.reopenCourse), t("updateError"));
 
@@ -413,16 +417,18 @@ function CompletionSection({ topicSlug, status }: { topicSlug: string; status: "
         <ConfirmDialog
           title={t("markCompleteConfirmTitle")}
           body={t("markCompleteConfirmBody")}
-          confirmLabel={busy ? t("ending") : t("markComplete")}
-          confirmDisabled={busy}
+          confirmLabel={end.busy ? t("ending") : t("markComplete")}
+          confirmDisabled={end.busy}
+          extra={end.error ? <p className="text-xs text-danger">{end.error}</p> : undefined}
           onConfirm={() => {
-            setBusy(true);
-            void endCourse({ topicSlug }).finally(() => {
-              setBusy(false);
-              setConfirming(false);
+            void end.run({ topicSlug }).then((r) => {
+              if (r !== undefined) setConfirming(false);
             });
           }}
-          onClose={() => setConfirming(false)}
+          onClose={() => {
+            end.reset();
+            setConfirming(false);
+          }}
         />
       )}
     </div>

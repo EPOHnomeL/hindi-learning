@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { Icon } from "../icons";
-import { refusalMessage } from "../mutationRun";
+import { refusalMessage, useMutationRun } from "../mutationRun";
 import { formatPrice } from "../Paygate";
 import { ConfirmDialog } from "../ui";
 
@@ -309,7 +309,9 @@ function BatchRow({
 }) {
   const t = useTranslations("Editions");
   const convex = useConvex();
-  const voidBatch = useMutation(api.vouchers.voidBatch);
+  // Was a `finally` with no `catch`: a refused void closed the confirm as if
+  // the codes had been stopped. The confirm now stays up and says why.
+  const voidRun = useMutationRun(useMutation(api.vouchers.voidBatch), t("updateError"));
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
   // Collapsed by default: the summary line (who, how many, how much) is the
@@ -415,15 +417,17 @@ function BatchRow({
           title={t("batchVoidConfirmTitle")}
           body={t("batchVoidConfirmBody")}
           confirmLabel={t("batchVoid")}
-          confirmDisabled={busy}
+          confirmDisabled={voidRun.busy}
+          extra={voidRun.error ? <p className="text-xs text-danger">{voidRun.error}</p> : undefined}
           onConfirm={() => {
-            setBusy(true);
-            void voidBatch({ batchId: batch.batchId }).finally(() => {
-              setBusy(false);
-              setConfirming(false);
+            void voidRun.run({ batchId: batch.batchId }).then((r) => {
+              if (r !== undefined) setConfirming(false);
             });
           }}
-          onClose={() => setConfirming(false)}
+          onClose={() => {
+            voidRun.reset();
+            setConfirming(false);
+          }}
         />
       )}
     </li>

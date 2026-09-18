@@ -5,6 +5,7 @@ import { useMutation, useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
+import { useMutationRun } from "./mutationRun";
 import { ConfirmDialog } from "./ui";
 
 // What a member holding a **Seat** on a shared Access Code sees in Settings (ADR
@@ -181,9 +182,10 @@ function AddEmail({ hasEmail }: { hasEmail: boolean }) {
 // believe they can come back.
 function DeleteSeat() {
   const t = useTranslations("Settings");
-  const deleteSeat = useMutation(api.accessCodes.deleteMySeat);
+  // Was a `finally` with no `catch`: a refused withdrawal closed the confirm as
+  // if it had worked. The confirm now stays up and says why.
+  const del = useMutationRun(useMutation(api.accessCodes.deleteMySeat), t("updateError"));
   const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState(false);
 
   return (
     <>
@@ -198,15 +200,17 @@ function DeleteSeat() {
           title={t("seatDeleteConfirmTitle")}
           body={t("seatDeleteConfirmBody")}
           confirmLabel={t("seatDelete")}
-          confirmDisabled={busy}
+          confirmDisabled={del.busy}
+          extra={del.error ? <p className="text-xs text-danger">{del.error}</p> : undefined}
           onConfirm={() => {
-            setBusy(true);
-            void deleteSeat({}).finally(() => {
-              setBusy(false);
-              setConfirming(false);
+            void del.run({}).then((r) => {
+              if (r !== undefined) setConfirming(false);
             });
           }}
-          onClose={() => setConfirming(false)}
+          onClose={() => {
+            del.reset();
+            setConfirming(false);
+          }}
         />
       )}
     </>

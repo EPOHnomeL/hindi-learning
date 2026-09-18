@@ -21,6 +21,7 @@ import { Icon } from "./icons";
 import { formatPrice } from "./Paygate";
 import { Logo } from "./Logo";
 import { missionPreview } from "./markdown";
+import { refusalMessage } from "./mutationRun";
 import { SettingsDialog } from "./SettingsDialog";
 import { CardFoot, CardTitleLink } from "./CourseCardParts";
 import { SiteFooter } from "./SiteFooter";
@@ -883,10 +884,12 @@ function NewCourseCard() {
           setFiles([]);
           setOpen(false);
           router.push(`/courses/${slug}`);
-        } catch {
-          // The server caps new courses to one per day; surface that (the most
-          // likely reason a valid title fails) rather than leaving the form stuck.
-          setError(t("oneCoursePerDay"));
+        } catch (e) {
+          // Show the server's refusal when it sends a readable one. `seedTopic`
+          // throws plain `Error`s as of 2026-09-18 (the daily cap, the allowlist),
+          // and production redacts those, so the daily cap stays as the fallback:
+          // it is the most likely reason a valid title fails.
+          setError(refusalMessage(e, t("oneCoursePerDay")));
         } finally {
           setBusy(false);
         }
