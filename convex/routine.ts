@@ -927,11 +927,19 @@ export const dailyFire = internalAction({
 // ---- Materialise (PUBLISH_SECRET-guarded) ----------------------------------
 
 // The whole context a claimed run needs, pulled in one round-trip: prior
-// Lessons + References (with HTML), Resources (raw download URL + any cached
-// `processed`), and Topic-scoped capture. The `materialise` CLI writes these to
-// `topics/<slug>/` and the teach skill runs there (ADR 0009: the Routine pulls
-// from Convex, never the repo). ponytail: returns all Lesson HTML in one query —
-// fine for a curriculum's worth; paginate if a Topic ever grows huge.
+// Lessons + References (each as a signed `htmlUrl`, never the body bytes),
+// Resources (raw download URL + any cached `processed`), and Topic-scoped
+// capture. The `materialise` CLI writes these to `topics/<slug>/` and the teach
+// skill runs there (ADR 0009: the Routine pulls from Convex, never the repo).
+// ponytail: corrected 2026-09-09. This does NOT "return all Lesson HTML in one
+// query", and has not since the content-blob migration: `lessons` rows carry
+// `htmlStorageId` and no `html` (`convex/schema.ts`), so a body costs one
+// `storage.getUrl` and zero row bytes. What this query DOES collect whole is
+// `learningRecords.markdown` for every record, plus unpaginated `questions` and
+// `responses`. Those run once per materialise run rather than per page view, so
+// this is a different cost profile from the reader-path read amplification that
+// ticket 01 owns. Unmeasured: ticket 22 owns the numbers, and may well conclude
+// it is fine exactly as it stands.
 // The whole materialised context for one Topic + owner, in one round-trip. Shared
 // by the secret-guarded `materialiseTopic` (the Claude CLI seam) and the internal
 // `materialiseForProvider` (the OpenRouter action seam), so both see identical

@@ -44,9 +44,70 @@ Open sub-questions the resolving session must actually answer, not assume:
   *narrow* step, when `html` actually leaves the row — widen and migrate alone save
   nothing. The narrow step is therefore not optional, and it is the risky one.
 
+## The 2026-09-09 measurement, and the one thing it adds to this ticket
+
+The operator supplied the by-function dashboard read this ticket asked for ("read the
+current bill first"). Full table and derivation in
+[the baseline](../assets/convex-cost-baseline.md); the window is about one and a half
+days, so **composition is reliable and monthly projections are weak.** Three things
+matter here:
+
+1. **This ticket's premise is confirmed, and sharpened.** `listLessons` is now **40.7%
+   of the deployment's Database I/O** at 154 KB per call, while its two former peers
+   collapsed: `capture.myQuestions` went from 1.15 GB/month to **530 KB**, and
+   `listReferences` from 1.13 GB/month to **4.25 MB**. `784eb70` fixed those two and,
+   exactly as this ticket predicted, could not make the lesson rows thin. Straight-lined
+   `listLessons` is about 1.7 GB/month against a 1.16 GB baseline, so it is **not
+   improving on its own**.
+
+2. **`public.publicCourse` belongs to this ticket, and the `Done when` above is widened
+   to say so.** It is the **new #2 line at 24.2% of the I/O and 257 KB per call, the
+   worst per-call amplification in the deployment**, up from an unremarkable 59.65
+   MB/month at baseline. It is the same defect: `convex/public.ts` calls
+   `ed.map(["title", "lesson", "reference", "question"])`, the full four-kind Guest
+   mirror, so it collects the fat `translations` rows and gained nothing from
+   `784eb70` because it genuinely needs those kinds.
+
+   **This is why the shape of the fix matters more than the ticket first said.** The
+   sibling-table split proposed above fixes `listLessons`, `listReferences` and
+   `publicCourse` together, because none of them wants the body. Any fix that works by
+   narrowing declared kinds instead **cannot touch `publicCourse` at all**, and would
+   therefore leave a quarter of the I/O in place while looking like a success on the
+   other two. No separate ticket was filed: it is one fix, and splitting it would mean
+   two migrations of one table.
+
+3. **"Is this worth doing at all?" now has a real answer, and it depends on one
+   decision that is not this ticket's.** Against, honestly: the whole bill is $3 to $4 a
+   month, and Compute and Data Egress have collapsed to nothing (6 bytes of egress
+   against a 2 GB baseline line), so the bill shrinks without this. For: `listLessons`
+   plus `publicCourse` are **64.9% of the project's Database I/O between them**, far more
+   concentrated than the baseline's three-way split, and the read is per (Topic,
+   language) so Editions multiply it.
+
+   **The thing that actually decides it, costed 2026-09-09 in
+   [the baseline](../assets/convex-cost-baseline.md): this ticket and the EU-to-US move
+   are complementary, not competing, and only the pair reaches a $0 bill.** Estimates:
+
+   | Scenario | Estimated bill |
+   |---|---|
+   | EU today | ~$2.17/month |
+   | US alone | ~$0.67/month |
+   | EU + this ticket | ~$1.42/month |
+   | **US + this ticket** | **~$0.09/month** |
+
+   US hosting alone leaves I/O about 4x over the 1 GB included allowance, so it does not
+   reach $0 on its own. This ticket is what pulls I/O down to where that allowance
+   absorbs it. **So if the residency question goes the way of US hosting, this ticket
+   stops being worth $0.60 and starts being worth the last dollar of the bill; if it
+   stays EU, this is worth about $0.75/month and the honest answer may still be to close
+   it out of scope.** That reverses the map's old framing that the US move competed with
+   this work. The dollar figures rest on a 1.25-day window and rates derived from one
+   invoice, so re-check them before acting.
+
 ## Done when
 
-- A title-only query (`listLessons`, `listReferences`) reads rows that do **not**
+- A title-only query (`listLessons`, `listReferences`) **and `public.publicCourse`**
+  read rows that do **not**
   contain a translated body, verified by reading the code path — no fat field on the
   table it collects.
 - Every write path lands both rows, or neither. Named above; none missed.

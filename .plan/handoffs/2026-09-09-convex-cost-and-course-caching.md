@@ -172,3 +172,165 @@ today.
 
 Steps 1 to 3 are a single short session and are mostly dashboard reading, not
 code. Do not let a session start at step 4.
+
+---
+
+## 8. What was executed against this handoff, 2026-09-09
+
+Same day it was written, in one session. **Steps 1 to 3 of section 7 were NOT done,
+and cannot be done from a checkout.** Everything that was not gated on them was.
+
+### Blocked, and now recorded as blocked rather than un-worked
+
+Steps 1, 2 and 3 all need a Convex **dashboard** read. Verified rather than assumed:
+`npx convex --help` on 1.45.0 exposes no usage or billing command (`dev`, `deploy`,
+`run`, `data`, `insights`, `env`, ... and nothing for the invoice), and this checkout
+has no prod deploy key. So they need the **operator**, not another session.
+
+They are now written into the technical-foundation map's `## Notes` as
+operator-gated, with the standing instruction not to start a cost-motivated code
+session before them, so the next session does not re-plan them or quietly build
+around them.
+
+### Step 1's cheap half was closed anyway
+
+The invoice is unread, but the baseline's **candidate explanation 1** for why the
+mid-cycle read came in 17% down instead of the estimated 58%, namely *"`784eb70` may
+not be live in prod"*, is answerable from git and is now **ruled out**. It is live:
+`784eb70` is an ancestor of `origin/main` with 331 commits after it, and every one of
+those pushes ran `npx convex deploy --cmd 'pnpm run build'` (recorded in `README.md`,
+`docs/routine.md` and `docs/agents/project-context.md`, and confirmed against a real
+Vercel build log on 2026-07-29). Prod has been running the narrowed `map()` for
+essentially the whole Aug 8 to Sep 8 cycle.
+
+That leaves **candidate 2 as the standing explanation**, and it was re-verified in the
+code on 2026-09-09: `listLessons` still calls `loadEdition(...).map(["lesson"])` at
+`convex/content/reader.ts:226`. Recorded in the baseline.
+
+### Ticket 22's unconditional half is done
+
+Its first `Done when` was explicitly *"true regardless of what is decided below"*, so
+it needed nothing from steps 1 to 3. The stale `ponytail:` marker above
+`collectTopicContext` is corrected in the tree with an absolute date. **Two things
+were stale, not one:** the claim itself (no Lesson HTML crosses that query, and the
+header sentence "Lessons + References (with HTML)" was wrong the same way), and
+**this handoff's and the ticket's own line number**, which said `convex/routine.ts:838`
+when the marker is at **933**.
+
+Ticket 22 stays **open**: its second `Done when` is the measured call, and nothing
+here measured anything.
+
+### Section 6's ticket was filed after all, as
+[technical-foundation/38](../maps/technical-foundation/tickets/38-cache-a-course-toc-on-the-device.md)
+
+This reverses section 6's "no ticket was filed, deliberately", and the reason is that
+section 6 and section 7 step 5 disagree. Section 6 withholds the ticket until sections
+3 and 4 are answered; step 5 says to charter it *"separately, on user-experience
+grounds and not cost"*. Both of section 6's open premises are **cost** premises, so
+under step 5's framing they gate the reads-saved half of the question only, not the
+question. Step 5 is the more specific instruction and it is the one followed.
+
+38 carries the section 6 question verbatim as its `## Question`, plus the section 2
+correction (bodies are already cached, the metadata is the cost), the section 5 table
+of what exists, and both premises written down as operator-gated so nobody re-derives
+them. It also names something section 6 did not: 38's reads-saved option and ticket
+**01 are two routes to the same 1.16 GB** and may substitute for each other, so they
+should be priced against each other rather than both built.
+
+### Not done, and why
+
+- **Step 4** (is 01 worth doing) is gated on steps 1 to 3 by this handoff's own
+  instruction: *"do not let a session start at step 4."* Untouched.
+- **Step 5's other half, resolving [04](../maps/technical-foundation/tickets/04-content-route-is-an-open-bearer-url.md)**,
+  is a genuine decision for the operator, not an agent: it trades a year-long
+  `immutable` cache and permanent shareable lesson URLs against POPIA-adjacent
+  exposure on paid content, for a product with around ten lifetime sales. 04 already
+  has its prod evidence gathered (2026-09-04) and is on the frontier. It needs a
+  human to pick, not more research.
+
+---
+
+## 9. The dashboard read arrived, same day
+
+The operator supplied the by-function screenshots that section 0 said this session
+could not get. **Step 2 of section 7 is substantially done and step 1 is not** (these
+are cycle-to-date figures, not the closed invoice). Full table and derivation in
+[the baseline](../maps/technical-foundation/assets/convex-cost-baseline.md).
+
+**The window is about a day and a half**, derived rather than given: the screenshots
+carry no date range, but they show 9.3K function calls, and the Aug 8 to Sep 8 cycle
+had already logged 204K by 2026-08-27. So this is the cycle that opened 2026-09-08.
+Composition is reliable; monthly projections from it are not.
+
+**Two of this handoff's numbers are dead, and one of its conclusions with them.**
+Section 2 rested on three functions being 95% of the I/O and all reading a table of
+contents. The table-of-contents point stands. The three functions do not:
+`capture.myQuestions` has fallen from **1.15 GB/month to 530 KB** and
+`content/reader.listReferences` from **1.13 GB/month to 4.25 MB**, both fixed by
+`784eb70` with no caching involved. `listLessons` is untouched and now dominant at
+40.7%. So **one of the three motivating numbers for the ToC cache evaporated between
+this handoff being written and being worked**, which is recorded on ticket 38.
+
+**A line this handoff never mentioned is now the #2 cost.** `public.publicCourse`, at
+24.2% of the project's I/O and **257 KB per call**, the worst per-call amplification in
+the deployment, up from an unremarkable 59.65 MB/month. It is the same defect ticket 01
+is about, on the Guest path: it declares the full four-kind Edition mirror, so
+`784eb70` could not help it. **Ticket 01's `Done when` has been widened to include it**,
+because the sibling-table split fixes all three reads at once whereas a
+kinds-narrowing fix would leave a quarter of the I/O in place while appearing to
+succeed. No new ticket: it is one fix and one migration.
+
+**Section 4's hypothesis got weaker.** The likeliest explanation for the unattributed
+~60% was the non-prod deployments. Inside the `my-course` project non-prod is **0.4%**
+(Dev 660.7 KB of 166.97 MB). The other projects on the account were not visible.
+
+**Two bill lines have stopped mattering.** Data Egress is **6 bytes** against a 2 GB /
+$0.34 baseline line, and Compute is 0.00309 GB-hours against 1 GB-hour / $0.43. The
+bill is shrinking without any of the work in section 5.
+
+**Still outstanding, and unchanged in priority:** the closed Aug 8 to Sep 8 invoice
+(step 1), and **EU versus US hosting** (step 3), which remains the largest single lever
+and which none of this touches.
+
+---
+
+## 10. Step 3 is costed, and the answer inverts section 3
+
+The operator supplied the Usage page header: range **Sep 08, 2026 to Oct 08, 2026**,
+project selector **All Projects**, and the EU banner verbatim. Two consequences.
+
+**The section 9 window is confirmed, not inferred.** 1.25 days, cross-checked two ways
+that agree to 0.4% (function calls give a factor of 24.7, elapsed days give 24.8). The
+agreement is also evidence the traffic is representative rather than a spike. And the
+panel was **All Projects**, not prod-filtered, which is what lets it speak to section 4
+at all: the baseline's unattributed 60% came from a **prod-only** filter.
+
+**Section 3's central claim is wrong, and the correction reverses its conclusion.**
+Section 3 says US hosting is "a $0 bill" and "a configuration change, not a code
+change, worth more than every ticket in the read-amplification thread combined". At the
+I/O this cycle projects, it is not. Projected Database I/O is **4.03 GB/month against a
+1 GB included allowance**, so US hosting **alone** lands at about **$0.67/month**.
+
+| Scenario | Estimated bill |
+|---|---|
+| EU today | ~$2.17/month |
+| US alone | ~$0.67/month |
+| EU + ticket 01 | ~$1.42/month |
+| **US + ticket 01** | **~$0.09/month** |
+
+**So the US move and ticket 01 are complementary, not competing, and only the pair
+reaches ~$0.** Ticket 01 is what pulls I/O down to where the allowance absorbs it.
+Section 3 told the next session that if the answer is "move to US", *"the cost argument
+for everything in section 5 evaporates"*. **The opposite is true:** choosing US is what
+makes ticket 01 worth the last dollar of the bill rather than $0.60 of it. Recorded on
+01, on the map's fog patch, and in the baseline with the arithmetic.
+
+Rates are derived from invoice RJDCQK-00001 rather than a live pricing page, and the
+projection rests on 1.25 days. Also worth knowing before anyone moves: **US storage
+headroom is tight**, 475 MB of database plus file storage against a 512 MB allowance.
+
+**What is actually left.** The residency question itself, which was never a cost
+question and is now visibly not one: whether the courses' learners' data may leave the
+EU is a POPIA and duty-of-care call for the operator. Plus two cheap reads: the closed
+invoice, and one number (top-line Database I/O for Sep 08 to Oct 08 against the 166.97
+MB the by-function panel totals) which would close section 4 outright if they match.
