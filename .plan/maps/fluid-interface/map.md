@@ -85,6 +85,14 @@ the existing layouts stay.
   on every floating bar, a scroll-edge fade under the sticky titles, bars that
   move by transform, shadows graded by surface size. Solid under reduced
   transparency, inked under more contrast.
+- [Type is tracked and leaded for its size and script](tickets/07-type-for-its-size-and-script.md):
+  a display/heading/label tracking and leading scale in `@theme`, chrome type
+  in rem, a 1.7 leading for Devanagari and Naskh, `font-sans` still Spectral
+  by stated choice.
+- [A phone always shows where you are and how to get out](tickets/08-wayfinding-on-a-phone.md):
+  a back arrow in the authed reader's phone header, a disabled Course tab when
+  there is nothing to resume, the narration refusal in the dock, the generation
+  failure reason as text.
 
 ## Not yet specified
 
@@ -94,8 +102,8 @@ the existing layouts stay.
   question for after the drawer is seen moving. clears-with: 03
 - **Is the tab bar hide-on-scroll worth keeping?** It costs the learner their
   sense of place on a phone. With the bar translucent and cheaper to look at,
-  the reason to hide it weakens. The material landed in ticket 06; the
-  wayfinding ticket is where the hide gets judged. clears-with: 08
+  the reason to hide it weakens. The material landed in ticket 06 and the
+  back arrow in 08; whether the bar should still hide needs a phone in hand.
 
 ## Out of scope
 

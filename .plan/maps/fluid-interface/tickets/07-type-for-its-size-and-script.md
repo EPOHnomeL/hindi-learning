@@ -1,8 +1,6 @@
 ---
 type: task
 blocked_by: [06]
-claimed_by: fable-t3code-e63c30e8
-claimed_at: 2026-09-18T10:55:58+02:00
 ---
 # Type is tracked and leaded for its size and script
 
@@ -31,3 +29,30 @@ comment (a sans is out of scope).
 No `text-[NNpx]` remains in `AppTabs`, `CourseSettings`, `ManageShell` or the
 legal layout; display, heading and body use the scale; tall scripts have their
 own leading; typecheck passes.
+
+## Answer
+
+Built 2026-09-18, commit for ticket 07 (the `AppTabs` label conversion rode in
+ticket 08's commit, which owned that file). Verified by typecheck and the `src`
+suite; not walked in a browser, and the Devanagari leading in particular has
+only been reasoned about, never seen on a Hindi load.
+
+- `@theme` gains `--tracking-display -0.02em`, `--tracking-heading -0.01em`,
+  `--tracking-label 0.04em`, `--leading-display 1.05`, `--leading-heading 1.2`.
+  `text-2xl` and up counts as display; `text-lg` to `text-xl` as heading; body
+  sets no tracking. Applied across the dashboard, settings, checkout, setup
+  panes, legal column and the landing heroes. `tracking-wide` eyebrows became
+  `tracking-label`; the wider hand-tuned eyebrows stayed.
+- Fixed px type in `AppTabs`, `CourseSettings`, `ManageShell`, `Dashboard`,
+  `CheckoutPage`, `CoursePanes`, `SettingsPage`, `LessonFoot` and the legal
+  layout is now rem at the same rendered size. The card subtitle box is
+  `min-h-[2.375rem]`.
+- `.font-deva, .font-naskh { line-height: 1.7 }`, which the body class turns
+  into the document default for those locales; per-element leading utilities
+  still win.
+- `--font-sans` still aliases Spectral, now with a comment saying a sans is out
+  of scope for this map.
+
+Not changed: the two dashboard card titles keep `leading-snug` because the
+sibling `CardTitleLink` hard-codes it and two same-property utilities would
+resolve by stylesheet order.

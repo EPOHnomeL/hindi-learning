@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: [02, 03, 04, 06]
+claimed_by: fable-t3code-e63c30e8
+claimed_at: 2026-09-18T11:44:20+02:00
 ---
 # The chrome honours reduced motion, reduced transparency and more contrast
 
