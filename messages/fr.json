@@ -269,6 +269,7 @@
     "emailAddEmail": "Votre adresse e-mail",
     "emailAddPassword": "Un mot de passe (au moins 8 caractères)",
     "emailAddFailed": "Cela n'a pas marché. Cette adresse est peut-être déjà utilisée sur un autre compte.",
+    "updateError": "Cela n'a pas marché. Veuillez réessayer.",
     "seatDelete": "Supprimer ce que vous gardez sur moi",
     "seatDeleteConfirmTitle": "Supprimer votre nom ?",
     "seatDeleteConfirmBody": "Nous supprimerons votre nom, de sorte que rien ici ne vous relie à l'organisation qui a payé votre place. Lisez d'abord ceci : votre nom est le seul moyen de revenir, donc une fois supprimé vous ne pourrez plus vous connecter sur un autre téléphone. Vous gardez le cours sur ce téléphone, dans ce navigateur, jusqu'à ce que vous vous déconnectiez. Votre progression reste jusque-là. C'est irréversible."
@@ -351,7 +352,12 @@
     "close": "Fermer",
     "completeAndContinue": "Terminer et continuer",
     "next": "Suivant",
-    "finishCourse": "Terminer le cours"
+    "finishCourse": "Terminer le cours",
+    "narrationRendering": "Génération de la narration…",
+    "narrationPause": "Mettre la narration en pause",
+    "narrationResume": "Reprendre la narration",
+    "narrationFailed": "La narration n'a pas pu être créée.",
+    "narrationReady": "Prêt. Appuyez sur lecture pour écouter."
   },
   "Editions": {
     "loading": "Chargement…",

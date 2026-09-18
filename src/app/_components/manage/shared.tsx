@@ -44,10 +44,12 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
   const t = useTranslations("Common");
   // The bottom-sheet layout is the only thing this adds to `Modal`: the shell
   // classes. The mechanics and the backdrop are shared (ticket 39's candidate).
+  // `sheet-shell` is what globals.css keys off to make it rise from the bottom on
+  // a phone instead of scaling in like the centred dialogs (fluid-interface 04).
   return (
     <Modal
       onClose={onClose}
-      shell="m-0 mt-auto w-full max-w-none rounded-t-2xl bg-paper sm:m-auto sm:w-[92vw] sm:max-w-md sm:rounded-2xl"
+      shell="sheet-shell m-0 mt-auto w-full max-w-none rounded-t-2xl bg-paper sm:m-auto sm:w-[92vw] sm:max-w-md sm:rounded-2xl"
     >
       {(close) => (
         <>

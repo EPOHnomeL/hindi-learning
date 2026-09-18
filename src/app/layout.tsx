@@ -186,7 +186,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             Naskh for Urdu and any other Arabic-script locale (hatch B, added
             2026-09-03). Devanagari is tested first because the two sets are
             disjoint and isDevanagari is the narrower question. Latin text inside
-            either falls back within the stack. */}
+            either falls back within the stack. Either class also carries a
+            line-height of 1.7 (globals.css, fluid-interface 07), because these
+            scripts' ascenders and descenders clip at Latin leading; since the
+            class sits here on <body>, that is the document default for those
+            locales and a Tailwind `leading-*` utility still wins per element. */}
         <body className={isDevanagari(locale) ? "font-deva" : isRtl(locale) ? "font-naskh" : undefined}>
           {/* First thing in the body, and outside every provider: the launch
               screen an installed app draws for itself, so a whitelabel PWA opens

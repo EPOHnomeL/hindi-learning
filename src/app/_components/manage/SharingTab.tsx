@@ -34,7 +34,7 @@ function WhatsAppToggle({
         onChange={(e) => onChange(e.target.checked)}
         className="peer sr-only"
       />
-      <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
+      <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] motion-reduce:after:transition-none peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
     </label>
   );
 }
@@ -127,7 +127,9 @@ export function SharingTab({
   const catalogue = useMutationRun(useMutation(api.catalogue.setEditionPublished), "Couldn't update catalog");
   const retranslate = useMutationRun(useAction(api.translate.startTranslation), t("updateError"));
   const shareTopic = useMutation(api.shares.shareTopic);
-  const removeEdition = useMutation(api.translate.removeEdition);
+  // Kept the confirm open on refusal but said nothing about why; the refusal
+  // now renders under the body.
+  const removeEdition = useMutationRun(useMutation(api.translate.removeEdition), t("updateError"));
 
   const pricing = useQuery(api.market.editionPricing, { topicSlug });
   const sellerStatus = useQuery(api.sellers.sellerStatus);
@@ -143,7 +145,6 @@ export function SharingTab({
   const [sellerSetupOpen, setSellerSetupOpen] = useState(false);
   const [vouchersSheetOpen, setVouchersSheetOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [confirmRetranslate, setConfirmRetranslate] = useState(false);
   const [retranslateEngine, setRetranslateEngine] = useState<Engine>(edition.engine);
@@ -185,7 +186,14 @@ export function SharingTab({
           })}
         </p>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
-          <div className="h-full rounded-full bg-accent2 transition-[width] duration-300" style={{ width: `${pct}%` }} />
+          {/* scaleX, not width (fluid-interface 05): a compositor-only property,
+              stepped under reduced motion. The track's `overflow-hidden
+              rounded-full` shapes the fill, so the fill drops its own radius
+              rather than have the scale squash it into an ellipse. */}
+          <div
+            className="h-full w-full origin-left bg-accent2 transition-transform duration-300 motion-reduce:transition-none rtl:origin-right"
+            style={{ transform: `scaleX(${pct / 100})` }}
+          />
         </div>
         <RemoveEdition topicSlug={topicSlug} lang={edition.lang} />
       </div>
@@ -545,13 +553,12 @@ export function SharingTab({
         <ConfirmDialog
           title={`Remove ${edition.name} Edition?`}
           body="All translated lessons and its public share link will be deleted permanently."
-          confirmLabel={deleting ? "Deleting…" : "Delete Edition"}
-          confirmDisabled={deleting}
+          extra={removeEdition.error ? <p className="text-xs text-danger">{removeEdition.error}</p> : undefined}
+          confirmLabel={removeEdition.busy ? "Deleting…" : "Delete Edition"}
+          confirmDisabled={removeEdition.busy}
           onConfirm={() => {
-            setDeleting(true);
-            void removeEdition({ topicSlug, lang: edition.lang }).finally(() => {
-              setDeleting(false);
-              setConfirmDelete(false);
+            void removeEdition.run({ topicSlug, lang: edition.lang }).then((ok) => {
+              if (ok !== undefined) setConfirmDelete(false);
             });
           }}
           onClose={() => setConfirmDelete(false)}

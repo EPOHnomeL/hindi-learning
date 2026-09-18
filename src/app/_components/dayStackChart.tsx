@@ -84,7 +84,7 @@ export function DayStackChart({ columns, empty, zero }: { columns: DayColumn[]; 
                     );
                   })}
                 </div>
-                <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden -translate-x-1/2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-left whitespace-nowrap shadow-lg group-hover:block">
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-1.5 hidden -translate-x-1/2 rounded-lg border border-line bg-paper px-2.5 py-1.5 text-left whitespace-nowrap shadow-sm group-hover:block">
                   <div className="text-[11px] font-semibold text-ink">{dayLabel(c.dayMs)}</div>
                   {totals[i] === 0 ? (
                     <div className="mt-0.5 text-[11px] text-soft">{zero}</div>

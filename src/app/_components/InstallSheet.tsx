@@ -7,6 +7,7 @@ import { useTenant } from "./TenantContext";
 import { INSTALL_DISMISSED_KEY, takeInstallPromptArmed } from "./accountLocalState";
 import { chromeIntentUrl, installDismissed, isIosBrowser, isSamsungInternet } from "./installPromptDerive";
 import { Icon } from "./icons";
+import { useExit } from "./ui";
 
 // Chrome's install event; not in TS's DOM lib because only Chromium ships it.
 type BeforeInstallPromptEvent = Event & { prompt(): Promise<unknown> };
@@ -51,6 +52,8 @@ export function InstallSheet({ armed = false }: { armed?: boolean } = {}) {
   const [samsung, setSamsung] = useState(false);
   const [pastDelay, setPastDelay] = useState(false);
   const [closed, setClosed] = useState(false);
+  // Sinks out on dismiss before unmounting (fluid-interface 04).
+  const exit = useExit(!closed);
 
   useEffect(() => {
     const standalone =
@@ -82,7 +85,7 @@ export function InstallSheet({ armed = false }: { armed?: boolean } = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if ((!promptEvent && !ios && !samsung) || !pastDelay || closed) return null;
+  if ((!promptEvent && !ios && !samsung) || !pastDelay || !exit.mounted) return null;
 
   const install = () => {
     setClosed(true);
@@ -105,7 +108,10 @@ export function InstallSheet({ armed = false }: { armed?: boolean } = {}) {
   return (
     // Above the AppTabs bar (z-50): a sheet is transient and deliberately covers
     // chrome while it is up.
-    <div className="fixed inset-x-0 bottom-0 z-[60] border-t border-line bg-card p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-lg">
+    <div
+      onAnimationEnd={exit.onAnimationEnd}
+      className={`${exit.leaving ? "sheet-out pointer-events-none" : "sheet-in"} chrome chrome--card fixed inset-x-0 bottom-0 z-[60] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-lg`}
+    >
       <div className="mx-auto flex max-w-md flex-col gap-3">
         <Brand />
         <p className="text-sm text-soft">{t("lead", { name: tenant?.displayName ?? "My Course" })}</p>
@@ -133,7 +139,7 @@ export function InstallSheet({ armed = false }: { armed?: boolean } = {}) {
           {samsung ? (
             <button
               onClick={openInChrome}
-              className="flex-1 rounded-lg bg-accent px-4 py-2.5 font-semibold text-paper"
+              className="flex-1 rounded-lg bg-accent px-4 py-2.5 font-semibold text-paper transition duration-100 active:bg-accent/80"
             >
               {t("openInChrome")}
             </button>
@@ -141,13 +147,16 @@ export function InstallSheet({ armed = false }: { armed?: boolean } = {}) {
             promptEvent && (
               <button
                 onClick={install}
-                className="flex-1 rounded-lg bg-accent px-4 py-2.5 font-semibold text-paper"
+                className="flex-1 rounded-lg bg-accent px-4 py-2.5 font-semibold text-paper transition duration-100 active:bg-accent/80"
               >
                 {t("install")}
               </button>
             )
           )}
-          <button onClick={dismiss} className="flex-1 rounded-lg border border-line px-4 py-2.5 text-soft">
+          <button
+            onClick={dismiss}
+            className="flex-1 rounded-lg border border-line px-4 py-2.5 text-soft transition duration-100 active:bg-hi active:text-accent"
+          >
             {t("notNow")}
           </button>
         </div>

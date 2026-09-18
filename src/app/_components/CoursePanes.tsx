@@ -154,7 +154,7 @@ function CourseSetupPane({ slug }: { slug: string }) {
         {view.kind === "failed" ? (
           <>
             <div className="flex flex-col items-center gap-2">
-              <h2 className="text-xl font-semibold tracking-tight text-accent">{t("setupFailedTitle")}</h2>
+              <h2 className="text-xl font-semibold leading-heading tracking-heading text-accent">{t("setupFailedTitle")}</h2>
               <p className="text-sm leading-relaxed text-soft">{t("setupFailedBody")}</p>
               {view.error && (
                 <p className="mt-1 max-w-sm break-words rounded-lg bg-hi/60 px-3 py-2 text-start text-xs text-soft">
@@ -167,7 +167,7 @@ function CourseSetupPane({ slug }: { slug: string }) {
         ) : view.kind === "queued" ? (
           <>
             <div className="flex flex-col items-center gap-2">
-              <h2 className="text-xl font-semibold tracking-tight text-accent">{t("setupQueuedTitle")}</h2>
+              <h2 className="text-xl font-semibold leading-heading tracking-heading text-accent">{t("setupQueuedTitle")}</h2>
               <p className="max-w-sm text-sm leading-relaxed text-soft">{t("setupQueuedBody")}</p>
             </div>
             <RestartButton onClick={restart} busy={restarting} label={t("setupStartNow")} />
@@ -175,7 +175,7 @@ function CourseSetupPane({ slug }: { slug: string }) {
         ) : (
           <>
             <div className="flex flex-col items-center gap-2">
-              <h2 className="text-xl font-semibold tracking-tight text-accent">{t("preparingFirstLessonTitle")}</h2>
+              <h2 className="text-xl font-semibold leading-heading tracking-heading text-accent">{t("preparingFirstLessonTitle")}</h2>
               <p className="max-w-sm text-sm leading-relaxed text-soft">{t("preparingFirstLessonBody")}</p>
             </div>
 
@@ -183,12 +183,18 @@ function CourseSetupPane({ slug }: { slug: string }) {
                 read out every second is noise, the stage changing is the news. */}
             <div className="w-full">
               <div className="relative h-2 overflow-hidden rounded-full bg-line">
+                {/* scaleX, not width (fluid-interface 05). The `.setup-bar::after`
+                    sheen rides the fill's own box, so it scales with it and stays
+                    the same proportion of the fill it was at `width: n%`; the
+                    globals.css reduced-motion block already removes it outright.
+                    The fill drops its `rounded-full` (the scale would squash that
+                    radius); the track's `overflow-hidden rounded-full` shapes it. */}
                 <div
-                  className="setup-bar h-full rounded-full bg-gradient-to-r from-accent2 to-gold transition-[width] duration-1000 ease-linear"
-                  style={{ width: `${view.percent}%` }}
+                  className="setup-bar h-full w-full origin-left bg-gradient-to-r from-accent2 to-gold transition-transform duration-1000 ease-linear motion-reduce:transition-none rtl:origin-right"
+                  style={{ transform: `scaleX(${view.percent / 100})` }}
                 />
               </div>
-              <div className="mt-2 flex items-baseline justify-between text-[11.5px] text-soft">
+              <div className="mt-2 flex items-baseline justify-between text-[0.72rem] text-soft">
                 <span className="tabular-nums">{formatElapsed(view.elapsedMs)}</span>
                 <span>{view.kind === "slow" ? t("setupTakingLonger") : t("setupUsuallyTenMinutes")}</span>
               </div>
@@ -204,13 +210,13 @@ function CourseSetupPane({ slug }: { slug: string }) {
                 return (
                   <li
                     key={stage.key}
-                    className={`flex items-center gap-2.5 text-[13px] leading-snug transition-colors ${
+                    className={`flex items-center gap-2.5 text-[0.8125rem] leading-snug transition-colors ${
                       live ? "font-semibold text-ink" : done ? "text-soft" : "text-soft/55"
                     }`}
                   >
                     <span
                       aria-hidden
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.625rem] font-bold ${
                         done
                           ? "bg-accent2/20 text-accent2"
                           : live

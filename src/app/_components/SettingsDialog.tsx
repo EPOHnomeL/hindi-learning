@@ -8,6 +8,7 @@ import { langDir, langInfo } from "../../../convex/languages";
 import { LOCALES } from "~/i18n/config";
 import { useSetLocale } from "~/i18n/locale-client";
 import { Icon } from "./icons";
+import { refusalMessage } from "./mutationRun";
 import { SeatSettings } from "./SeatSettings";
 import { useTheme } from "./ThemeContext";
 import { Dialog } from "./ui";
@@ -34,6 +35,8 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const [name, setNameInput] = useState("");
   const [seeded, setSeeded] = useState(false);
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  // Had no `catch`: a refused rename parked the button on "Saving…" for good.
+  const [error, setError] = useState<string | null>(null);
 
   // Seed the field from the account once it first loads — never clobber typing.
   useEffect(() => {
@@ -47,8 +50,14 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
 
   async function save() {
     setStatus("saving");
-    await setName({ name });
-    setStatus("saved");
+    setError(null);
+    try {
+      await setName({ name });
+      setStatus("saved");
+    } catch (e) {
+      setStatus("idle");
+      setError(refusalMessage(e, t("updateError")));
+    }
   }
 
   return (
@@ -72,6 +81,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                   onChange={(e) => {
                     setNameInput(e.target.value);
                     if (status !== "idle") setStatus("idle");
+                    setError(null);
                   }}
                   className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink focus:border-gold focus:outline-none"
                 />
@@ -85,6 +95,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
                 </button>
               </div>
               <p className="text-xs text-soft">{t("displayNameHint")}</p>
+              {error && <p className="text-xs text-danger">{error}</p>}
             </section>
           </>
         )}

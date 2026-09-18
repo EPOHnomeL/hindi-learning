@@ -16,9 +16,10 @@ import { buildEditDoc, buildSrcDoc, lessonMessage, narrateMessage, replaceBodyIn
 import { Icon } from "./icons";
 import { LessonFootCard } from "./LessonFoot";
 import { Markdown } from "./MarkdownView";
+import { clock, progress } from "./narrationDock";
 import { MarkdownResourceDialog } from "./ResourceItem";
 import { applyProgress, cardIdFromHash, composeCardShare, editionToEdit, resolveArtifactClick, resourceTarget } from "./readerDerive";
-import { Modal, ReaderSkeleton } from "./ui";
+import { Modal, ReaderSkeleton, useExit } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useTenant } from "./TenantContext";
 import { useHideOnScroll } from "./useHideOnScroll";
@@ -292,6 +293,8 @@ export function Frame({
   const shareRef = useRef(share);
   shareRef.current = share;
   const [copied, setCopied] = useState(false);
+  // The "Copied" toast stays mounted through its sink-out (fluid-interface 04).
+  const copiedExit = useExit(copied);
   const srcDoc = useMemo(
     () =>
       buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss, dir, lang, tenantPalette, reference, refShare: shareable, teacherQa, narrate: !!narrate }),
@@ -488,10 +491,11 @@ export function Frame({
       )}
       {/* Share-card confirmation (reference-cards/03), shown when we fell back to a
           clipboard copy (desktop, no native share sheet). */}
-      {copied && (
+      {copiedExit.mounted && (
         <div
           role="status"
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-card px-4 py-2 text-sm text-ink shadow-lg"
+          onAnimationEnd={copiedExit.onAnimationEnd}
+          className={`${copiedExit.leaving ? "toast-out" : "toast-in"} fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-card px-4 py-2 text-sm text-ink shadow-lg`}
         >
           {t("copied")}
         </div>
@@ -698,8 +702,11 @@ function LessonView({
         {/* Title + actions: a sticky bar under the mobile header; inline on desktop.
             Rises to the top edge in step with the header as it hides on scroll. */}
         <div
-          className={`sticky z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
-            navHidden ? "top-0" : "top-12"
+          // `motion-reduce:transition-none` (fluid-interface 05): this bar never
+          // hides, it only shifts 3rem to take the header's place, so the reduced
+          // motion fallback is a jump. A cross-fade would blink a bar that stays.
+          className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 flex items-center justify-between gap-3 px-3 py-2 transition-transform duration-300 motion-reduce:transition-none md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
+            navHidden ? "translate-y-0" : "translate-y-12"
           }`}
         >
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
@@ -834,6 +841,19 @@ function LessonView({
           <div className="p-3 md:hidden">
             <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} variant="inline" readOnly={readOnly} />
           </div>
+        )}
+        {/* The persistent playback surface. Last in the column so it sticks to
+            the foot of it on desktop; `fixed` on mobile, where the window is the
+            scroller. Absent outside the narration pilot, like the control in the
+            lesson, because `narrate` itself is. */}
+        {narrate && (
+          <NarrationDock
+            audio={narrate.audio}
+            state={narrate.state}
+            message={narrate.message}
+            title={headTitle(lesson.title)}
+            onToggle={narrate.onToggle}
+          />
         )}
       </div>
       {/* Desktop: persistent ask column on the right (past the paygate for preview). */}
@@ -1051,16 +1071,164 @@ function ContentEditor({
 // ponytail: the strings are hardcoded English. The pilot is admin-only on one
 // English lesson, and `messages/parity.test.ts` demands every new key in all six
 // catalogues. Add keys when the gate widens past administrators.
+// **The docked narration player** (course-narration ticket 01, variant B of the
+// 2026-09-18 prototype). The circular control inside the lesson starts playback
+// and then scrolls away with the heading, which left a nine-minute narration
+// with no way to pause and no way to tell where you were. This is the surface
+// that persists: play/pause, which lesson is speaking, elapsed over total, and
+// a hairline along its top edge for the position.
+//
+// **It appears only once playback has been asked for**, which is the one change
+// from the prototype's variant B. Drawn as always-present it cost 58px on top of
+// `AppTabs`'s 76px, about 18% of a phone screen spent on chrome while somebody
+// is reading; tying it to playback keeps the reader untouched for every learner
+// who never presses play. To make it permanent, drop the `started` guard below.
+//
+// **Mobile: `fixed`, riding with the nav.** `AppTabs` tucks away on scroll in
+// the reader (`useHideOnScroll`), so a bar pinned above it would strand a gap.
+// This takes the same signal and slides down into the space the nav vacates,
+// the mirror of what the lesson title bar does. Both move by transform now
+// (fluid-interface 06): the dock is pinned `bottom-0` and rides up 4.75rem
+// while the nav is showing, rather than animating `bottom` itself. `z-20`, under the lesson drawer (z-40) and its
+// scrim (z-30): opening the lesson list dims the dock with the rest of the page.
+//
+// **Desktop: `sticky` inside the lesson column**, because the column is its own
+// scroller there. A fixed full-width bar would run under the sidebar and the
+// Teacher Q&A aside, and stop reading as part of the lesson.
+//
+// ponytail: no scrubber, no skip, no speed. The ticket asked to see where you
+// are and to pause from anywhere; those are the parts nobody asked for, and the
+// track is a display, not an input.
+function NarrationDock({
+  audio,
+  state,
+  message,
+  title,
+  onToggle,
+}: {
+  audio: HTMLAudioElement | null;
+  state: NarrateState;
+  // The refusal or fallback line from `useLessonNarration`. It is also posted
+  // into the iframe beside the inline play button, but that button may be
+  // scrolled far away by the time the answer arrives (fluid-interface 08), so
+  // the dock, which is always on screen, says it too.
+  message: string;
+  title: string;
+  onToggle: () => void;
+}) {
+  const t = useTranslations("Artifact");
+  const navHidden = useHideOnScroll();
+  const [at, setAt] = useState(0);
+  const [total, setTotal] = useState(0);
+
+  // The clock lives HERE rather than in `useLessonNarration`, so `timeupdate`
+  // (roughly four times a second) re-renders this bar alone instead of the whole
+  // lesson pane around it.
+  useEffect(() => {
+    if (!audio) return;
+    const sync = () => {
+      setAt(audio.currentTime);
+      setTotal(audio.duration);
+    };
+    sync();
+    const events = ["timeupdate", "loadedmetadata", "durationchange", "seeked", "emptied"] as const;
+    for (const e of events) audio.addEventListener(e, sync);
+    return () => {
+      for (const e of events) audio.removeEventListener(e, sync);
+    };
+  }, [audio]);
+
+  // Rendering, playing, or paused partway through: all three are "in progress"
+  // and want the bar. A lesson nobody has pressed play on does not.
+  const started = state !== "idle" || at > 0;
+  if (!started) return null;
+
+  const playing = state === "playing";
+  return (
+    <>
+      {/* Keeps the last line of the lesson (and the inline Q&A below it) clear of
+          the fixed bar, the same spacer trick `AppTabs` uses. Mobile only: on
+          desktop the bar is in the flow of the column it sticks to. */}
+      <div aria-hidden className="h-14 md:hidden" />
+      <div
+        // `motion-reduce:transition-none` (fluid-interface 05): the dock never
+        // hides, it only rides above or below the tab bar's 4.75rem, so reduced
+        // motion gets a jump rather than a cross-fade that would blink it away.
+        className={`chrome chrome--card fixed inset-x-0 bottom-0 z-20 shadow-lg transition-transform duration-300 motion-reduce:transition-none md:sticky md:z-auto md:mt-2 md:translate-y-0 md:rounded-t-xl md:border-x md:border-line ${
+          navHidden ? "translate-y-0" : "-translate-y-[4.75rem]"
+        }`}
+      >
+        {/* The played hairline fills by `scaleX`, not `width` (fluid-interface 05):
+            a compositor-only property, and `motion-reduce:transition-none` makes it
+            step instead of glide. `progress()` is already 0 to 1. */}
+        <div className="h-[3px] w-full bg-line">
+          <div
+            className="h-full w-full origin-left bg-accent transition-transform duration-300 motion-reduce:transition-none rtl:origin-right"
+            style={{ transform: `scaleX(${progress(at, total)})` }}
+          />
+        </div>
+        <div className="flex items-center gap-3 px-3 py-2">
+          <button
+            type="button"
+            onClick={onToggle}
+            disabled={state === "loading"}
+            aria-label={playing ? t("narrationPause") : t("narrationResume")}
+            // `no-press`: this scales itself (fluid-interface 02), so the base press
+            // rule in globals.css must not compound a second transform onto it.
+            className="no-press flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold bg-paper text-accent transition duration-100 hover:bg-hi active:bg-hi motion-safe:hover:scale-105 motion-safe:active:scale-95 disabled:cursor-default disabled:opacity-60"
+          >
+            <Icon name={playing ? "pause" : "play"} className="h-4 w-4" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">{title}</p>
+            <p className="text-xs tabular-nums text-soft">
+              {state === "loading" ? t("narrationRendering") : `${clock(at)} / ${clock(total)}`}
+            </p>
+            {message && !playing && <p className="text-xs text-danger">{message}</p>}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// **Resume, for the length of one visit** (ticket 01, 2026-09-18). Where each
+// lesson's narration was left, keyed by topic + lesson + Edition.
+//
+// A module-level Map, deliberately, and NOT `myProgress`: position-in-audio is
+// not Progress (a learner who paused at 2:14 has not completed anything), and
+// writing it to the server would put a mutation behind every pause. It dies on
+// reload, which is the right size for the thing it fixes: opening the lesson
+// list mid-narration and coming back should not restart nine minutes of audio.
+// Cross-device resume is a server decision nobody has asked for yet.
+const resumeAt = new Map<string, number>();
+
+// Bank a position, ignoring the two that mean "nothing to come back to": the
+// very start, and a track played to its end.
+function remember(key: string, a: HTMLAudioElement) {
+  if (a.currentTime > 0 && !a.ended) resumeAt.set(key, a.currentTime);
+  else resumeAt.delete(key);
+}
+
 function useLessonNarration(
   topicSlug: string,
   lessonKey: string,
-): { state: NarrateState; message: string; onToggle: () => void } | undefined {
+): { state: NarrateState; message: string; onToggle: () => void; audio: HTMLAudioElement | null } | undefined {
+  const t = useTranslations("Artifact");
   const lang = useEditionLang();
   const status = useQuery(api.lessonAudio.status, { topicSlug, key: lessonKey, lang: lang ?? undefined });
   const speak = useAction(api.lessonAudio.speak);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // The same element as `audioRef`, held in state as well so the dock re-renders
+  // once it exists. The ref is what the callbacks below read (they must not
+  // re-create when the element arrives); this is what the dock subscribes to.
+  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
   const [state, setState] = useState<NarrateState>("idle");
   const [message, setMessage] = useState("");
+  // Where this lesson's narration was left, for the resume rule below.
+  const resumeKey = `${topicSlug}:${lessonKey}:${lang ?? "en"}`;
+  const resumeKeyRef = useRef(resumeKey);
+  resumeKeyRef.current = resumeKey;
   // Whether the reader has asked to hear it, so a render that finishes can start
   // playback itself instead of making them press a second time.
   const wantPlay = useRef(false);
@@ -1077,23 +1245,35 @@ function useLessonNarration(
     a.addEventListener("pause", stopped);
     a.addEventListener("ended", stopped);
     audioRef.current = a;
+    setAudio(a);
     return () => {
+      // Leaving the reader entirely: bank the position first, so coming back to
+      // this lesson in the same visit resumes rather than restarts.
+      remember(resumeKeyRef.current, a);
       a.pause();
       a.removeEventListener("play", playing);
       a.removeEventListener("pause", stopped);
       a.removeEventListener("ended", stopped);
       audioRef.current = null;
+      setAudio(null);
     };
   }, []);
 
   // A lesson switch keeps the same pane, so stop the previous lesson's audio and
-  // reset by hand rather than relying on a remount that does not happen.
+  // reset by hand rather than relying on a remount that does not happen. The
+  // position goes into `resumeAt` on the way out, keyed by the lesson being
+  // LEFT, which is why the previous key is carried in a ref: by the time this
+  // runs, `resumeKey` is already the lesson being arrived at.
+  const leavingRef = useRef(resumeKey);
   useEffect(() => {
+    const leaving = leavingRef.current;
+    leavingRef.current = resumeKey;
+    if (audioRef.current && leaving !== resumeKey) remember(leaving, audioRef.current);
     audioRef.current?.pause();
     setState("idle");
     setMessage("");
     wantPlay.current = false;
-  }, [lessonKey]);
+  }, [resumeKey]);
 
   // Point the element at whatever the live query says is rendered, and start it if
   // this URL arrived because the reader asked for it. A render takes long enough
@@ -1102,14 +1282,21 @@ function useLessonNarration(
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !url) return;
-    if (a.src !== url) a.src = url;
+    if (a.src !== url) {
+      a.src = url;
+      // Resume where this lesson was left. `currentTime` is ignored until the
+      // element knows how long the track is, so it waits for the metadata
+      // rather than being set alongside the `src` above.
+      const at = resumeAt.get(resumeKey);
+      if (at) a.addEventListener("loadedmetadata", () => (a.currentTime = at), { once: true });
+    }
     if (!wantPlay.current) return;
     wantPlay.current = false;
     a.play().catch(() => {
       setState("idle");
-      setMessage("Ready. Press play to listen.");
+      setMessage(t("narrationReady"));
     });
-  }, [url]);
+  }, [url, resumeKey, t]);
 
   const onToggle = useCallback(() => {
     const a = audioRef.current;
@@ -1131,12 +1318,12 @@ function useLessonNarration(
       setState("idle");
       // `refusalMessage` reads a ConvexError's `data`, the only part of a refusal
       // that survives a production deployment's redaction (see `saveError`).
-      setMessage(refusalMessage(e, "The narration could not be made."));
+      setMessage(refusalMessage(e, t("narrationFailed")));
     });
-  }, [url, speak, topicSlug, lessonKey, lang]);
+  }, [url, speak, topicSlug, lessonKey, lang, t]);
 
   if (!status?.eligible) return undefined;
-  return { state, message, onToggle };
+  return { state, message, onToggle, audio };
 }
 
 // completed Frontier. It reflects the lock so a press can't double-fire and a
@@ -1206,10 +1393,11 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
   const label = status === "failed" ? t("retry") : stale ? t("stillWorkingRetry") : t("generateNext");
   return (
     <div className="flex items-center gap-2">
+      {/* The reason reads as text, not a `title` tooltip: a phone has no hover
+          (fluid-interface 08, 2026-09-18). The guard above already means there
+          is a reason, so it is appended flat rather than conditionally. */}
       {status === "failed" && gen?.error && (
-        <span title={gen.error} className="text-xs text-soft">
-          {t("generationFailed")}
-        </span>
+        <span className="text-xs text-soft">{`${t("generationFailed")}: ${gen.error}`}</span>
       )}
       <button
         onClick={() => void fire()}
@@ -1290,12 +1478,14 @@ function ReferenceView({
   }
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3 md:overflow-y-auto">
+      {/* `truncate` sits on the inner span, not the h2: the h2 owns the
+          scroll-edge fade, and `overflow: hidden` would clip the ::after away. */}
       <h2
-        className={`sticky z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
-          navHidden ? "top-0" : "top-12"
+        className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 px-3 py-2 text-lg font-semibold transition-transform duration-300 motion-reduce:transition-none md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
+          navHidden ? "translate-y-0" : "translate-y-12"
         }`}
       >
-        {ref.title}
+        <span className="block truncate">{ref.title}</span>
       </h2>
       {/* References carry no dark CSS of their own, so themeCss injects the dark
           palette (ADR 0011) — the theme then flips them with the rest of the app.
@@ -1358,6 +1548,7 @@ function QuestionBox({
   const questions = useQuery(api.capture.myQuestions, { topicSlug, lang: lang ?? undefined });
   const askQuestion = useMutation(api.capture.askQuestion);
   const [text, setText] = useState("");
+  const [askError, setAskError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<{ text: string; reply: string } | null>(null);
   const mine = questions?.filter((q) => q.lessonKey === lessonKey) ?? [];
 
@@ -1379,14 +1570,22 @@ function QuestionBox({
             e.preventDefault();
             const trimmed = text.trim();
             if (!trimmed) return;
-            setText("");
-            await askQuestion({ topicSlug, lessonKey, text: trimmed });
+            // The field clears only once the server has the question (fluid-interface
+            // 01): clearing first lost the typed text on a refusal, and said nothing.
+            try {
+              await askQuestion({ topicSlug, lessonKey, text: trimmed });
+              setText("");
+              setAskError(null);
+            } catch (e) {
+              setAskError(refusalMessage(e, t("saveFailed")));
+            }
           }}
         >
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t("questionPlaceholder")} className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none" />
+          <input value={text} onChange={(e) => { setText(e.target.value); setAskError(null); }} placeholder={t("questionPlaceholder")} className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none" />
           <button type="submit" className="rounded-lg bg-accent2 px-3 py-2 text-sm text-white hover:bg-accent2/90">{t("ask")}</button>
         </form>
       )}
+      {askError && <p className="mt-2 text-xs text-danger">{askError}</p>}
       {readOnly && mine.length === 0 && <p className="text-sm text-soft">{t("noQuestions")}</p>}
       <ul className={`mt-3 flex flex-col gap-3 ${variant === "inline" ? "" : "min-h-0 flex-1 overflow-y-auto"}`}>
         {mine.map((q) => (

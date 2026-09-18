@@ -21,6 +21,7 @@ import { Icon } from "./icons";
 import { formatPrice } from "./Paygate";
 import { Logo } from "./Logo";
 import { missionPreview } from "./markdown";
+import { refusalMessage } from "./mutationRun";
 import { SettingsDialog } from "./SettingsDialog";
 import { CardFoot, CardTitleLink } from "./CourseCardParts";
 import { SiteFooter } from "./SiteFooter";
@@ -155,7 +156,7 @@ export function Dashboard() {
               <Logo className="h-9 w-9 shrink-0 text-accent md:h-10 md:w-10" />
             )}
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">
+              <h1 className="text-2xl font-semibold leading-display tracking-display text-accent md:text-3xl">
                 {tenant?.displayName ?? "My Course"}
               </h1>
               {(tenant ? tenant.motto : tc("tagline")) && (
@@ -290,12 +291,12 @@ function LangChips({ langs }: { langs: { lang: string; native: string; rtl: bool
         <span
           key={l.lang}
           dir={l.rtl ? "rtl" : undefined}
-          className="rounded-full bg-hi px-2 py-0.5 text-[11px] font-medium text-accent2"
+          className="rounded-full bg-hi px-2 py-0.5 text-[0.6875rem] font-medium text-accent2"
         >
           {l.native}
         </span>
       ))}
-      {extra > 0 && <span className="rounded-full px-2 py-0.5 text-[11px] font-medium text-soft">+{extra}</span>}
+      {extra > 0 && <span className="rounded-full px-2 py-0.5 text-[0.6875rem] font-medium text-soft">+{extra}</span>}
     </div>
   );
 }
@@ -306,7 +307,7 @@ function StatusPill({ course }: { course: Course }) {
   const t = useTranslations("Dashboard");
   if (course.status === "completed") {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-label text-gold">
         <Icon name="award" className="h-3 w-3" /> {t("complete")}
       </span>
     );
@@ -315,7 +316,7 @@ function StatusPill({ course }: { course: Course }) {
     return (
       <span
         title={t("publicLinkLive")}
-        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent2/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-accent2"
+        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent2/15 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-label text-accent2"
       >
         <Icon name="globe" className="h-3 w-3" /> {t("public")}
       </span>
@@ -323,7 +324,7 @@ function StatusPill({ course }: { course: Course }) {
   }
   if (course.status === "seeded") {
     return (
-      <span className="shrink-0 rounded-full bg-hi px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-accent">
+      <span className="shrink-0 rounded-full bg-hi px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-label text-accent">
         {t("settingUp")}
       </span>
     );
@@ -339,7 +340,7 @@ function PaidPill({ pricing }: { pricing: { amount: number; currency: string }[]
   const t = useTranslations("Dashboard");
   const min = pricing.reduce((a, b) => (b.amount < a.amount ? b : a));
   return (
-    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
+    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-label text-gold">
       <Icon name="tag" className="h-3 w-3" />
       {pricing.length > 1 ? t("from") : ""}
       {formatPrice(min.amount, min.currency)}
@@ -358,7 +359,7 @@ function TenantPill({ tenantSlug }: { tenantSlug: string | null }) {
   if (!pill) return null;
   return (
     <span
-      className="shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide"
+      className="shrink-0 rounded-full px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-label"
       style={{
         color: pill.colour,
         backgroundColor: `color-mix(in oklab, ${pill.colour} 16%, transparent)`,
@@ -392,9 +393,9 @@ function CourseCard({ course }: { course: Course }) {
     >
       <div className="mb-2.5 flex items-start justify-between gap-2.5">
         {seeded ? (
-          <h2 className="min-w-0 text-lg font-semibold leading-snug tracking-tight text-ink">{course.title}</h2>
+          <h2 className="min-w-0 text-lg font-semibold leading-snug tracking-heading text-ink">{course.title}</h2>
         ) : (
-          <CardTitleLink href={`/courses/${course.slug}`} className="tracking-tight">
+          <CardTitleLink href={`/courses/${course.slug}`} className="tracking-heading">
             {course.title}
           </CardTitleLink>
         )}
@@ -407,11 +408,11 @@ function CourseCard({ course }: { course: Course }) {
       </div>
 
       {course.mission ? (
-        <p className="line-clamp-2 min-h-[38px] text-[13.5px] leading-snug text-soft">
+        <p className="line-clamp-2 min-h-[2.375rem] text-[0.85rem] leading-snug text-soft">
           {missionPreview(course.mission)}
         </p>
       ) : (
-        <p className="min-h-[38px] text-[13.5px] text-soft">
+        <p className="min-h-[2.375rem] text-[0.85rem] text-soft">
           {seeded ? t("preparingMission") : t("noMission")}
         </p>
       )}
@@ -442,8 +443,12 @@ function CourseCard({ course }: { course: Course }) {
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-line">
           <div
-            className={`h-full rounded-full transition-[width] duration-300 ${complete ? "bg-gradient-to-r from-accent2 to-gold" : "bg-accent2"}`}
-            style={{ width: `${pct}%` }}
+            // Fills by `scaleX`, not `width` (fluid-interface 05): a compositor-only
+            // property, stepped under reduced motion. The fill drops its own
+            // `rounded-full`, since scaling would squash that radius into an
+            // ellipse; the track's `overflow-hidden rounded-full` shapes it instead.
+            className={`h-full w-full origin-left transition-transform duration-300 motion-reduce:transition-none rtl:origin-right ${complete ? "bg-gradient-to-r from-accent2 to-gold" : "bg-accent2"}`}
+            style={{ transform: `scaleX(${pct / 100})` }}
           />
         </div>
       </div>
@@ -487,7 +492,7 @@ function SharedSection() {
   if (!shared || shared.length === 0) return null;
   return (
     <section className="mt-12">
-      <h2 className="mb-1 text-lg font-semibold tracking-tight text-accent">{t("sharedWithMe")}</h2>
+      <h2 className="mb-1 text-lg font-semibold leading-heading tracking-heading text-accent">{t("sharedWithMe")}</h2>
       <p className="mb-4 text-sm text-soft">{t("sharedSubtitle")}</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {shared.map((c) => (
@@ -518,13 +523,13 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
     <article className="open-card relative flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm hover:border-accent/45 hover:shadow-md">
       <div className="mb-2 flex items-start justify-between gap-2">
         <CardTitleLink href={withLang(`/courses/${course.slug}`, openLang)}>{course.title}</CardTitleLink>
-        <span className="shrink-0 rounded-full bg-hi px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-accent">
+        <span className="shrink-0 rounded-full bg-hi px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-label text-accent">
           {t("sharedBadge")}
         </span>
       </div>
 
       {course.mission && (
-        <p className="line-clamp-2 min-h-[38px] text-[13.5px] leading-snug text-soft">
+        <p className="line-clamp-2 min-h-[2.375rem] text-[0.85rem] leading-snug text-soft">
           {missionPreview(course.mission)}
         </p>
       )}
@@ -552,7 +557,11 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
           {course.lessonCount > 0 && <span>{pct}%</span>}
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-line">
-          <div className="h-full rounded-full bg-accent2 transition-[width] duration-300" style={{ width: `${pct}%` }} />
+          {/* scaleX fill, see the note on the course card's bar above. */}
+          <div
+            className="h-full w-full origin-left bg-accent2 transition-transform duration-300 motion-reduce:transition-none rtl:origin-right"
+            style={{ transform: `scaleX(${pct / 100})` }}
+          />
         </div>
       </div>
 
@@ -579,7 +588,7 @@ function AwaitingPaymentSection() {
   if (!pending || pending.length === 0) return null;
   return (
     <section className="mt-12">
-      <h2 className="mb-1 text-lg font-semibold tracking-tight text-accent">{t("awaitingPayment")}</h2>
+      <h2 className="mb-1 text-lg font-semibold leading-heading tracking-heading text-accent">{t("awaitingPayment")}</h2>
       <p className="mb-4 text-sm text-soft">{t("awaitingPaymentSubtitle")}</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {pending.map((c) => (
@@ -589,18 +598,18 @@ function AwaitingPaymentSection() {
           >
             <div className="mb-2 flex items-start justify-between gap-2">
               <h2 className="min-w-0 text-lg font-semibold leading-snug text-ink">{c.title}</h2>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-label text-gold">
                 <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-gold" />
                 {t("awaitingBadge")}
               </span>
             </div>
-            <p className="text-[13.5px] leading-snug text-soft">
+            <p className="text-[0.85rem] leading-snug text-soft">
               {t("awaitingBody", { price: formatPrice(c.amount, "zar"), edition: c.langName })}
             </p>
             {/* The reference restated, because it is the one thing the buyer may
                 need again — to check it against what they typed into their bank. */}
             <div className="mt-3.5 rounded-lg border border-gold/50 bg-gold/10 px-3 py-2">
-              <span className="text-[10.5px] font-semibold uppercase tracking-wide text-accent2">
+              <span className="text-[0.65rem] font-semibold uppercase tracking-label text-accent2">
                 {t("awaitingRef")}
               </span>
               <b className="mt-0.5 block select-all text-lg font-bold tracking-[0.1em] text-ink">{c.ref}</b>
@@ -627,7 +636,7 @@ function PurchasedSection() {
   if (!purchased || purchased.length === 0) return null;
   return (
     <section className="mt-12">
-      <h2 className="mb-1 text-lg font-semibold tracking-tight text-accent">{t("purchased")}</h2>
+      <h2 className="mb-1 text-lg font-semibold leading-heading tracking-heading text-accent">{t("purchased")}</h2>
       <p className="mb-4 text-sm text-soft">{t("purchasedSubtitle")}</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {purchased.map((c) => (
@@ -654,13 +663,13 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
     <article className="open-card relative flex flex-col rounded-2xl border border-line bg-card p-5 shadow-sm hover:border-accent/45 hover:shadow-md">
       <div className="mb-2 flex items-start justify-between gap-2">
         <CardTitleLink href={withLang(`/courses/${course.slug}`, openLang)}>{course.title}</CardTitleLink>
-        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
+        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-label text-gold">
           <Icon name="check" className="h-3 w-3" /> {t("purchased")}
         </span>
       </div>
 
       {course.mission && (
-        <p className="line-clamp-2 min-h-[38px] text-[13.5px] leading-snug text-soft">
+        <p className="line-clamp-2 min-h-[2.375rem] text-[0.85rem] leading-snug text-soft">
           {missionPreview(course.mission)}
         </p>
       )}
@@ -684,7 +693,11 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
           {course.lessonCount > 0 && <span>{pct}%</span>}
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-line">
-          <div className="h-full rounded-full bg-accent2 transition-[width] duration-300" style={{ width: `${pct}%` }} />
+          {/* scaleX fill, see the note on the course card's bar above. */}
+          <div
+            className="h-full w-full origin-left bg-accent2 transition-transform duration-300 motion-reduce:transition-none rtl:origin-right"
+            style={{ transform: `scaleX(${pct / 100})` }}
+          />
         </div>
       </div>
 
@@ -730,7 +743,7 @@ function AvailableSection() {
   if (!available || available.length === 0) return null;
   return (
     <section className="mt-12">
-      <h2 className="mb-1 text-lg font-semibold tracking-tight text-accent">{t("availableCourses")}</h2>
+      <h2 className="mb-1 text-lg font-semibold leading-heading tracking-heading text-accent">{t("availableCourses")}</h2>
       <p className="mb-4 text-sm text-soft">{t("availableSubtitle")}</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {available.map((c) => (
@@ -754,19 +767,19 @@ function AvailableCourseCard({ course }: { course: AvailableCourse }) {
       <div className="mb-2 flex items-start justify-between gap-2">
         <CardTitleLink href={withLang(`/courses/${course.slug}`, openLang)}>{course.title}</CardTitleLink>
         {course.price ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-gold">
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-label text-gold">
             <Icon name="tag" className="h-3 w-3" />
             {formatPrice(course.price.amount, course.price.currency)}
           </span>
         ) : (
-          <span className="shrink-0 rounded-full bg-accent2/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wide text-accent2">
+          <span className="shrink-0 rounded-full bg-accent2/15 px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-label text-accent2">
             {t("free")}
           </span>
         )}
       </div>
 
       {course.mission && (
-        <p className="line-clamp-2 min-h-[38px] text-[13.5px] leading-snug text-soft">
+        <p className="line-clamp-2 min-h-[2.375rem] text-[0.85rem] leading-snug text-soft">
           {missionPreview(course.mission)}
         </p>
       )}
@@ -793,7 +806,7 @@ function EmptyLibrary() {
       <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-hi text-accent">
         <Icon name="book" className="h-6 w-6" />
       </span>
-      <h2 className="text-lg font-semibold tracking-tight text-ink">{t("noCoursesYet")}</h2>
+      <h2 className="text-lg font-semibold leading-heading tracking-heading text-ink">{t("noCoursesYet")}</h2>
       <p className="mt-2 max-w-md text-sm leading-relaxed text-soft">{t("emptyLibraryBody")}</p>
     </div>
   );
@@ -883,16 +896,18 @@ function NewCourseCard() {
           setFiles([]);
           setOpen(false);
           router.push(`/courses/${slug}`);
-        } catch {
-          // The server caps new courses to one per day; surface that (the most
-          // likely reason a valid title fails) rather than leaving the form stuck.
-          setError(t("oneCoursePerDay"));
+        } catch (e) {
+          // Show the server's refusal when it sends a readable one. `seedTopic`
+          // throws plain `Error`s as of 2026-09-18 (the daily cap, the allowlist),
+          // and production redacts those, so the daily cap stays as the fallback:
+          // it is the most likely reason a valid title fails.
+          setError(refusalMessage(e, t("oneCoursePerDay")));
         } finally {
           setBusy(false);
         }
       }}
     >
-      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">{t("newCourse")}</label>
+      <label className="text-xs font-semibold uppercase tracking-label text-accent2">{t("newCourse")}</label>
       <input
         autoFocus
         value={title}
@@ -908,7 +923,7 @@ function NewCourseCard() {
         className="resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
       />
 
-      <label className="mt-1 text-xs font-semibold uppercase tracking-wide text-accent2">{t("teacher")}</label>
+      <label className="mt-1 text-xs font-semibold uppercase tracking-label text-accent2">{t("teacher")}</label>
       <select
         value={provider}
         onChange={(e) => setProvider(e.target.value as "claude" | "openrouter")}
@@ -921,7 +936,7 @@ function NewCourseCard() {
         <p className="text-xs text-soft">{t("providerExperimental")}</p>
       )}
 
-      <label className="mt-1 text-xs font-semibold uppercase tracking-wide text-accent2">{t("resourcesOptional")}</label>
+      <label className="mt-1 text-xs font-semibold uppercase tracking-label text-accent2">{t("resourcesOptional")}</label>
       {(links.length > 0 || files.length > 0) && (
         <ul className="flex flex-col gap-1">
           {links.map((l, i) => (

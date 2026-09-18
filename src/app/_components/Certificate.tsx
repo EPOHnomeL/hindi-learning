@@ -471,7 +471,7 @@ export function CompletionCelebration({ topicSlug }: { topicSlug: string }) {
 
   if (!blockedToken) return null;
   return (
-    <div className="fixed inset-x-0 bottom-4 z-50 mx-auto flex w-[92vw] max-w-sm items-center justify-between gap-3 rounded-2xl border border-gold/50 bg-card px-4 py-3 text-sm shadow-xl">
+    <div className="chrome chrome--card fixed inset-x-0 bottom-4 z-50 mx-auto flex w-[92vw] max-w-sm items-center justify-between gap-3 rounded-2xl border border-gold/50 px-4 py-3 text-sm shadow-lg">
       <span className="flex items-center gap-2 text-accent">
         <span aria-hidden>🎉</span> {t("ready")}
       </span>

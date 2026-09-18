@@ -12,6 +12,7 @@ import { isPostHogInitialized } from "../PostHogClient";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { Icon } from "./icons";
 import { LocalePicker } from "./LocalePicker";
+import { useMutationRun } from "./mutationRun";
 import { SeatSettings } from "./SeatSettings";
 import { useTheme } from "./ThemeContext";
 
@@ -42,7 +43,7 @@ export function SettingsPage() {
   return (
     <div className="mx-auto w-full max-w-2xl px-3 pb-8">
       <header className="flex h-16 items-center">
-        <h1 className="text-2xl font-semibold tracking-tight text-accent">{t("title")}</h1>
+        <h1 className="text-2xl font-semibold leading-display tracking-display text-accent">{t("title")}</h1>
       </header>
       <div>
         {/* An ordinary account has an email and a display name. A **Seat** on a
@@ -125,10 +126,12 @@ function SupportLink({ href, children }: { href: string; children: React.ReactNo
 function DisplayNameRow() {
   const t = useTranslations("Settings");
   const me = useQuery(api.users.me);
-  const setName = useMutation(api.users.setName);
+  // Was a `finally` with no `catch` and no confirmation: a rename neither said
+  // "Saved" nor reported a refusal. Same "Saved" idiom as SettingsDialog.
+  const save = useMutationRun(useMutation(api.users.setName), t("updateError"));
   const [name, setNameInput] = useState("");
   const [seeded, setSeeded] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   // Seed from the account once it lands, and never clobber typing.
   useEffect(() => {
@@ -148,23 +151,29 @@ function DisplayNameRow() {
         </label>
         <button
           onClick={() => {
-            setSaving(true);
-            void setName({ name }).finally(() => setSaving(false));
+            void save.run({ name }).then((r) => {
+              if (r !== undefined) setSaved(true);
+            });
           }}
-          disabled={!dirty || saving}
+          disabled={!dirty || save.busy}
           className="shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs text-ink disabled:opacity-40"
         >
-          {saving ? t("saving") : t("save")}
+          {save.busy ? t("saving") : !dirty && saved ? t("saved") : t("save")}
         </button>
       </div>
       <input
         id="settings-display-name"
         value={name}
-        onChange={(e) => setNameInput(e.target.value)}
+        onChange={(e) => {
+          setNameInput(e.target.value);
+          setSaved(false);
+          save.reset();
+        }}
         placeholder={t("notSet")}
         className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-gold focus:outline-none"
       />
       <p className="text-xs text-soft">{t("displayNameHint")}</p>
+      {save.error && <p className="text-xs text-danger">{save.error}</p>}
     </div>
   );
 }

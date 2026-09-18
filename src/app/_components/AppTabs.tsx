@@ -54,7 +54,12 @@ function Tabs() {
   const onAdmin = pathname.startsWith("/admin");
   const onSettings = pathname.startsWith("/settings");
   const onHome = pathname === "/";
-  const continueHref = last ? `/courses/${last.topicSlug}/lessons/${last.lessonKey}` : "/";
+  // `undefined` while `myLastRead` is still loading OR when there is no resume
+  // point at all; either way there is nowhere for Course to go, and the tab is
+  // rendered inert rather than as a dimmed link to Home (fluid-interface 08,
+  // 2026-09-18: a link to "/" lit Home and Course at once, with opacity as the
+  // only thing telling them apart).
+  const continueHref = last ? `/courses/${last.topicSlug}/lessons/${last.lessonKey}` : undefined;
 
   return (
     <>
@@ -68,14 +73,14 @@ function Tabs() {
           are already reading, so Course is just an active tab there. */}
       {onHome && last && (
         <Link
-          href={continueHref}
-          className="fixed inset-x-3 bottom-[4.75rem] z-40 flex items-center gap-3 rounded-2xl border border-line bg-card px-3 py-2.5 shadow-lg md:hidden"
+          href={`/courses/${last.topicSlug}/lessons/${last.lessonKey}`}
+          className="chrome chrome--card fixed inset-x-3 bottom-[4.75rem] z-40 flex items-center gap-3 rounded-2xl px-3 py-2.5 shadow-lg md:hidden"
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-hi text-sm font-bold text-accent">
             {lesson?.seq ?? "?"}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[10px] font-semibold uppercase tracking-wider text-accent2">
+            <span className="block text-[0.625rem] font-semibold uppercase tracking-wider text-accent2">
               {t("pickUp")}
             </span>
             <span className="block truncate text-sm font-semibold text-ink">
@@ -87,9 +92,13 @@ function Tabs() {
       )}
 
       <nav
-        className={`fixed inset-x-0 bottom-0 z-50 grid h-[4.75rem] border-t border-line bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur transition-transform duration-300 md:hidden ${
+        // Reduced motion (fluid-interface 05): the bar cross-fades instead of
+        // sliding. `motion-reduce:transition-opacity` retargets the transition,
+        // `motion-reduce:translate-y-0` cancels the slide and the hidden branch
+        // fades out, with pointer events off so an invisible bar eats no taps.
+        className={`chrome fixed inset-x-0 bottom-0 z-50 grid h-[4.75rem] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 motion-reduce:translate-y-0 motion-reduce:transition-opacity md:hidden ${
           isAdmin ? "grid-cols-4" : "grid-cols-3"
-        } ${navHidden && onCourse ? "translate-y-full" : "translate-y-0"}`}
+        } ${navHidden && onCourse ? "translate-y-full motion-reduce:pointer-events-none motion-reduce:opacity-0" : "translate-y-0"}`}
       >
         <Tab href="/" active={onHome} label={t("home")} icon={<HomeIcon />} />
         {/* "Course", not "Continue": the other tabs are places, so a verb here
@@ -97,7 +106,7 @@ function Tabs() {
             spells that out in the words a 10px tab label has no room for.
             Icon: a document. The folded corner makes it read as a page, and two
             interior lines are the whole interior: three go to mush at 20px. */}
-        <Tab href={continueHref} active={onCourse} label={t("course")} icon={<DocIcon />} muted={!last} />
+        <Tab href={continueHref} active={onCourse} label={t("course")} icon={<DocIcon />} />
         <Tab
           href="/settings"
           active={onSettings}
@@ -112,26 +121,33 @@ function Tabs() {
   );
 }
 
+// No `href` means there is nowhere to go: the tab renders as a `span` that is
+// `aria-disabled`, out of the tab order and inert to pointers, keeping its label
+// and icon so the bar still reads as three places rather than shifting about.
 function Tab({
   href,
   active,
   label,
   icon,
-  muted = false,
 }: {
-  href: string;
+  href?: string;
   active: boolean;
   label: string;
   icon: React.ReactNode;
-  muted?: boolean;
 }) {
+  // `press`: the base press rule in globals.css (fluid-interface 02), since a
+  // Link is not a button; the tab also recolours on press, not only by route.
+  const shared = "flex flex-col items-center justify-center gap-1 text-[0.625rem] font-medium transition duration-100";
+  if (!href) {
+    return (
+      <span aria-disabled="true" tabIndex={-1} className={`${shared} pointer-events-none text-soft/50`}>
+        {icon}
+        {label}
+      </span>
+    );
+  }
   return (
-    <Link
-      href={href}
-      className={`flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors ${
-        active ? "text-accent" : muted ? "text-soft/50" : "text-soft"
-      }`}
-    >
+    <Link href={href} className={`press ${shared} active:text-accent ${active ? "text-accent" : "text-soft"}`}>
       {icon}
       {label}
     </Link>

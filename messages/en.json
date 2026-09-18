@@ -305,6 +305,7 @@
     "emailAddEmail": "Your email address",
     "emailAddPassword": "A password (at least 8 characters)",
     "emailAddFailed": "That did not work. The address may already be in use on another account.",
+    "updateError": "That did not work. Please try again.",
     "seatDelete": "Delete what you hold about me",
     "seatDeleteConfirmTitle": "Delete your name?",
     "seatDeleteConfirmBody": "We will delete your name, so nothing here links you to the organisation that paid for your place. Read this part first: your name is the only way back in, so once it is gone you cannot sign in again on another phone. You keep the course on this phone, in this browser, until you sign out. Your progress stays until then. This cannot be undone."
@@ -351,7 +352,12 @@
     "close": "Close",
     "completeAndContinue": "Complete and continue",
     "next": "Next",
-    "finishCourse": "Finish course"
+    "finishCourse": "Finish course",
+    "narrationRendering": "Rendering the narration…",
+    "narrationPause": "Pause narration",
+    "narrationResume": "Resume narration",
+    "narrationFailed": "The narration could not be made.",
+    "narrationReady": "Ready. Press play to listen."
   },
   "Editions": {
     "loading": "Loading…",
