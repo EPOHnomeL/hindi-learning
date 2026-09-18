@@ -183,9 +183,15 @@ function CourseSetupPane({ slug }: { slug: string }) {
                 read out every second is noise, the stage changing is the news. */}
             <div className="w-full">
               <div className="relative h-2 overflow-hidden rounded-full bg-line">
+                {/* scaleX, not width (fluid-interface 05). The `.setup-bar::after`
+                    sheen rides the fill's own box, so it scales with it and stays
+                    the same proportion of the fill it was at `width: n%`; the
+                    globals.css reduced-motion block already removes it outright.
+                    The fill drops its `rounded-full` (the scale would squash that
+                    radius); the track's `overflow-hidden rounded-full` shapes it. */}
                 <div
-                  className="setup-bar h-full rounded-full bg-gradient-to-r from-accent2 to-gold transition-[width] duration-1000 ease-linear"
-                  style={{ width: `${view.percent}%` }}
+                  className="setup-bar h-full w-full origin-left bg-gradient-to-r from-accent2 to-gold transition-transform duration-1000 ease-linear motion-reduce:transition-none rtl:origin-right"
+                  style={{ transform: `scaleX(${view.percent / 100})` }}
                 />
               </div>
               <div className="mt-2 flex items-baseline justify-between text-[0.72rem] text-soft">

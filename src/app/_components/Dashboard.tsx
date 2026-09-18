@@ -443,8 +443,12 @@ function CourseCard({ course }: { course: Course }) {
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-line">
           <div
-            className={`h-full rounded-full transition-[width] duration-300 ${complete ? "bg-gradient-to-r from-accent2 to-gold" : "bg-accent2"}`}
-            style={{ width: `${pct}%` }}
+            // Fills by `scaleX`, not `width` (fluid-interface 05): a compositor-only
+            // property, stepped under reduced motion. The fill drops its own
+            // `rounded-full`, since scaling would squash that radius into an
+            // ellipse; the track's `overflow-hidden rounded-full` shapes it instead.
+            className={`h-full w-full origin-left transition-transform duration-300 motion-reduce:transition-none rtl:origin-right ${complete ? "bg-gradient-to-r from-accent2 to-gold" : "bg-accent2"}`}
+            style={{ transform: `scaleX(${pct / 100})` }}
           />
         </div>
       </div>
@@ -553,7 +557,11 @@ function SharedCourseCard({ course }: { course: SharedCourse }) {
           {course.lessonCount > 0 && <span>{pct}%</span>}
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-line">
-          <div className="h-full rounded-full bg-accent2 transition-[width] duration-300" style={{ width: `${pct}%` }} />
+          {/* scaleX fill, see the note on the course card's bar above. */}
+          <div
+            className="h-full w-full origin-left bg-accent2 transition-transform duration-300 motion-reduce:transition-none rtl:origin-right"
+            style={{ transform: `scaleX(${pct / 100})` }}
+          />
         </div>
       </div>
 
@@ -685,7 +693,11 @@ function PurchasedCourseCard({ course }: { course: PurchasedCourse }) {
           {course.lessonCount > 0 && <span>{pct}%</span>}
         </div>
         <div className="h-1.5 overflow-hidden rounded-full bg-line">
-          <div className="h-full rounded-full bg-accent2 transition-[width] duration-300" style={{ width: `${pct}%` }} />
+          {/* scaleX fill, see the note on the course card's bar above. */}
+          <div
+            className="h-full w-full origin-left bg-accent2 transition-transform duration-300 motion-reduce:transition-none rtl:origin-right"
+            style={{ transform: `scaleX(${pct / 100})` }}
+          />
         </div>
       </div>
 

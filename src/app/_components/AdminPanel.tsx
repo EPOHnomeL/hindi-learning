@@ -537,7 +537,7 @@ function SalesCourseRow({ course }: { course: FunctionReturnType<typeof api.sale
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
       >
         <span className="flex min-w-0 items-center gap-2">
-          <span className={`shrink-0 text-soft transition-transform ${open ? "rotate-90" : ""}`} aria-hidden>
+          <span className={`shrink-0 text-soft transition-transform motion-reduce:transition-none ${open ? "rotate-90" : ""}`} aria-hidden>
             ▸
           </span>
           <span className="truncate text-sm font-medium text-ink">{course.courseTitle}</span>
@@ -1933,7 +1933,7 @@ function FlagToggles({ slug, flags }: { slug: string; flags: Partial<Record<Tena
                 onChange={(e) => toggle(key, e.target.checked)}
                 className="peer sr-only"
               />
-              <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 peer-checked:after:translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-disabled:opacity-60" />
+              <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] motion-reduce:after:transition-none peer-checked:bg-accent2 peer-checked:after:translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-disabled:opacity-60" />
             </label>
           </div>
         );

@@ -702,7 +702,10 @@ function LessonView({
         {/* Title + actions: a sticky bar under the mobile header; inline on desktop.
             Rises to the top edge in step with the header as it hides on scroll. */}
         <div
-          className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 flex items-center justify-between gap-3 px-3 py-2 transition-transform duration-300 md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
+          // `motion-reduce:transition-none` (fluid-interface 05): this bar never
+          // hides, it only shifts 3rem to take the header's place, so the reduced
+          // motion fallback is a jump. A cross-fade would blink a bar that stays.
+          className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 flex items-center justify-between gap-3 px-3 py-2 transition-transform duration-300 motion-reduce:transition-none md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
             navHidden ? "translate-y-0" : "translate-y-12"
           }`}
         >
@@ -1148,12 +1151,21 @@ function NarrationDock({
           desktop the bar is in the flow of the column it sticks to. */}
       <div aria-hidden className="h-14 md:hidden" />
       <div
-        className={`chrome chrome--card fixed inset-x-0 bottom-0 z-20 shadow-lg transition-transform duration-300 md:sticky md:z-auto md:mt-2 md:translate-y-0 md:rounded-t-xl md:border-x md:border-line ${
+        // `motion-reduce:transition-none` (fluid-interface 05): the dock never
+        // hides, it only rides above or below the tab bar's 4.75rem, so reduced
+        // motion gets a jump rather than a cross-fade that would blink it away.
+        className={`chrome chrome--card fixed inset-x-0 bottom-0 z-20 shadow-lg transition-transform duration-300 motion-reduce:transition-none md:sticky md:z-auto md:mt-2 md:translate-y-0 md:rounded-t-xl md:border-x md:border-line ${
           navHidden ? "translate-y-0" : "-translate-y-[4.75rem]"
         }`}
       >
+        {/* The played hairline fills by `scaleX`, not `width` (fluid-interface 05):
+            a compositor-only property, and `motion-reduce:transition-none` makes it
+            step instead of glide. `progress()` is already 0 to 1. */}
         <div className="h-[3px] w-full bg-line">
-          <div className="h-full bg-accent transition-[width] duration-300" style={{ width: `${progress(at, total) * 100}%` }} />
+          <div
+            className="h-full w-full origin-left bg-accent transition-transform duration-300 motion-reduce:transition-none rtl:origin-right"
+            style={{ transform: `scaleX(${progress(at, total)})` }}
+          />
         </div>
         <div className="flex items-center gap-3 px-3 py-2">
           <button
@@ -1469,7 +1481,7 @@ function ReferenceView({
       {/* `truncate` sits on the inner span, not the h2: the h2 owns the
           scroll-edge fade, and `overflow: hidden` would clip the ::after away. */}
       <h2
-        className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 px-3 py-2 text-lg font-semibold transition-transform duration-300 md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
+        className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 px-3 py-2 text-lg font-semibold transition-transform duration-300 motion-reduce:transition-none md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
           navHidden ? "translate-y-0" : "translate-y-12"
         }`}
       >

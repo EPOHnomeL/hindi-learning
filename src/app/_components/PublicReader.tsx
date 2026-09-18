@@ -140,8 +140,9 @@ export function PublicCourseShell({ src, children }: { src: GuestSource; childre
     <Ctx.Provider value={{ src, course, completed, markComplete }}>
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
         <header
-          className={`chrome chrome--top sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 px-3 transition-transform duration-300 md:hidden ${
-            navHidden ? "-translate-y-full" : "translate-y-0"
+          // Reduced motion (fluid-interface 05): a cross-fade rather than a slide.
+          className={`chrome chrome--top sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 px-3 transition-transform duration-300 motion-reduce:translate-y-0 motion-reduce:transition-opacity md:hidden ${
+            navHidden ? "-translate-y-full motion-reduce:pointer-events-none motion-reduce:opacity-0" : "translate-y-0"
           }`}
         >
           <Link
@@ -169,7 +170,7 @@ export function PublicCourseShell({ src, children }: { src: GuestSource; childre
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className={`transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`}
+              className={`transition-transform duration-200 motion-reduce:transition-none ${menuOpen ? "rotate-180" : ""}`}
             >
               <polyline points="6 9 12 15 18 9" />
             </svg>
@@ -248,7 +249,7 @@ export function PublicCourseShell({ src, children }: { src: GuestSource; childre
                   {t("resources")}
                   <svg
                     aria-hidden
-                    className="me-1 transition-transform duration-200 group-open:rotate-180"
+                    className="me-1 transition-transform duration-200 motion-reduce:transition-none group-open:rotate-180"
                     width="14"
                     height="14"
                     viewBox="0 0 24 24"
@@ -367,7 +368,10 @@ export function PublicLessonPane({ src, lessonKey }: { src: GuestSource; lessonK
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
       <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3 md:overflow-y-auto">
         <div
-          className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 flex items-center justify-between gap-3 px-3 py-2 transition-transform duration-300 md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
+          // `motion-reduce:transition-none` (fluid-interface 05): this bar never
+          // hides, it only shifts 3rem to take the header's place, so the reduced
+          // motion fallback is a jump. A cross-fade would blink a bar that stays.
+          className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 flex items-center justify-between gap-3 px-3 py-2 transition-transform duration-300 motion-reduce:transition-none md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
             navHidden ? "translate-y-0" : "translate-y-12"
           }`}
         >
@@ -515,7 +519,7 @@ export function PublicReferencePane({ src, refKey }: { src: GuestSource; refKey:
       {/* `truncate` sits on the inner span, not the h2: the h2 owns the
           scroll-edge fade, and `overflow: hidden` would clip the ::after away. */}
       <h2
-        className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 px-3 py-2 text-lg font-semibold transition-transform duration-300 md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
+        className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 px-3 py-2 text-lg font-semibold transition-transform duration-300 motion-reduce:transition-none md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
           navHidden ? "translate-y-0" : "translate-y-12"
         }`}
       >

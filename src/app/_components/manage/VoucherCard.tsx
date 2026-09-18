@@ -372,7 +372,7 @@ function BatchRow({
               {t("batchVoidedBadge")}
             </span>
           )}
-          <Icon name="chevron" className={`h-4 w-4 shrink-0 text-soft transition-transform ${open ? "rotate-180" : ""}`} />
+          <Icon name="chevron" className={`h-4 w-4 shrink-0 text-soft transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`} />
         </div>
       </button>
       {open && (
@@ -492,7 +492,7 @@ function AccessCodeRow({ code }: { code: FunctionReturnType<typeof api.accessCod
               {t("accessStoppedBadge")}
             </span>
           )}
-          <Icon name="chevron" className={`h-4 w-4 shrink-0 text-soft transition-transform ${open ? "rotate-180" : ""}`} />
+          <Icon name="chevron" className={`h-4 w-4 shrink-0 text-soft transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`} />
         </div>
       </button>
 

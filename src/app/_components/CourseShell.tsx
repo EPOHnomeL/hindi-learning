@@ -184,8 +184,9 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             hamburger and the course title open the lesson drawer. All three fit
             one row at 360px (two 34px icon buttons, a 200px-capped title). */}
         <header
-          className={`chrome chrome--top sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 px-3 transition-transform duration-300 md:hidden ${
-            navHidden ? "-translate-y-full" : "translate-y-0"
+          // Reduced motion (fluid-interface 05): a cross-fade rather than a slide.
+          className={`chrome chrome--top sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 px-3 transition-transform duration-300 motion-reduce:translate-y-0 motion-reduce:transition-opacity md:hidden ${
+            navHidden ? "-translate-y-full motion-reduce:pointer-events-none motion-reduce:opacity-0" : "translate-y-0"
           }`}
         >
           <Link
@@ -225,7 +226,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className={`transition-transform duration-200 ${menuOpen ? "rotate-180" : ""}`}
+              className={`transition-transform duration-200 motion-reduce:transition-none ${menuOpen ? "rotate-180" : ""}`}
             >
               <polyline points="6 9 12 15 18 9" />
             </svg>
@@ -451,7 +452,7 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
         {t("resources")}
         <svg
           aria-hidden
-          className="me-1 transition-transform duration-200 group-open:rotate-180"
+          className="me-1 transition-transform duration-200 motion-reduce:transition-none group-open:rotate-180"
           width="14"
           height="14"
           viewBox="0 0 24 24"

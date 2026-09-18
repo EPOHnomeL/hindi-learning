@@ -48,7 +48,14 @@ export function SharingTab({
           })}
         </p>
         <div className="h-1.5 w-full overflow-hidden rounded-full bg-line">
-          <div className="h-full rounded-full bg-accent2 transition-[width] duration-300" style={{ width: `${pct}%` }} />
+          {/* scaleX, not width (fluid-interface 05): a compositor-only property,
+              stepped under reduced motion. The track's `overflow-hidden
+              rounded-full` shapes the fill, so the fill drops its own radius
+              rather than have the scale squash it into an ellipse. */}
+          <div
+            className="h-full w-full origin-left bg-accent2 transition-transform duration-300 motion-reduce:transition-none rtl:origin-right"
+            style={{ transform: `scaleX(${pct / 100})` }}
+          />
         </div>
         <RemoveEdition topicSlug={topicSlug} lang={edition.lang} />
       </div>
@@ -171,7 +178,7 @@ function PublishToggle({
           }}
           className="peer sr-only"
         />
-        <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
+        <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] motion-reduce:after:transition-none peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
       </label>
     </div>
   );
@@ -259,7 +266,7 @@ function PublicLinkToggle({
         </div>
         <label className="relative inline-flex shrink-0 cursor-pointer items-center">
           <input type="checkbox" checked={on} disabled={busy} onChange={(e) => run(e.target.checked)} className="peer sr-only" />
-          <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
+          <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] motion-reduce:after:transition-none peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
         </label>
       </div>
 
@@ -832,7 +839,7 @@ function EditionDangerMenu({ topicSlug, edition }: { topicSlug: string; edition:
       >
         <Icon name="settings" className="h-4 w-4" />
         {t("manageEdition")}
-        <Icon name="chevron" className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        <Icon name="chevron" className={`h-4 w-4 transition-transform motion-reduce:transition-none ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div

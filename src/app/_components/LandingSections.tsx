@@ -41,7 +41,7 @@ export function Faq({ items }: { items: FaqItem[] }) {
                   a second icon to say the same thing. */}
               <Icon
                 name="chevron"
-                className={`h-4 w-4 shrink-0 text-soft transition-transform ${isOpen ? "rotate-180" : ""}`}
+                className={`h-4 w-4 shrink-0 text-soft transition-transform motion-reduce:transition-none ${isOpen ? "rotate-180" : ""}`}
               />
             </button>
             {isOpen && <p className="-mt-1 pb-5 pe-8 text-sm leading-relaxed text-soft">{item.a}</p>}
