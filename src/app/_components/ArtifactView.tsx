@@ -847,6 +847,7 @@ function LessonView({
           <NarrationDock
             audio={narrate.audio}
             state={narrate.state}
+            message={narrate.message}
             title={headTitle(lesson.title)}
             onToggle={narrate.onToggle}
           />
@@ -1098,14 +1099,21 @@ function ContentEditor({
 function NarrationDock({
   audio,
   state,
+  message,
   title,
   onToggle,
 }: {
   audio: HTMLAudioElement | null;
   state: NarrateState;
+  // The refusal or fallback line from `useLessonNarration`. It is also posted
+  // into the iframe beside the inline play button, but that button may be
+  // scrolled far away by the time the answer arrives (fluid-interface 08), so
+  // the dock, which is always on screen, says it too.
+  message: string;
   title: string;
   onToggle: () => void;
 }) {
+  const t = useTranslations("Artifact");
   const navHidden = useHideOnScroll();
   const [at, setAt] = useState(0);
   const [total, setTotal] = useState(0);
@@ -1152,7 +1160,7 @@ function NarrationDock({
             type="button"
             onClick={onToggle}
             disabled={state === "loading"}
-            aria-label={playing ? "Pause narration" : "Resume narration"}
+            aria-label={playing ? t("narrationPause") : t("narrationResume")}
             // `no-press`: this scales itself (fluid-interface 02), so the base press
             // rule in globals.css must not compound a second transform onto it.
             className="no-press flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold bg-paper text-accent transition duration-100 hover:bg-hi active:bg-hi motion-safe:hover:scale-105 motion-safe:active:scale-95 disabled:cursor-default disabled:opacity-60"
@@ -1162,8 +1170,9 @@ function NarrationDock({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{title}</p>
             <p className="text-xs tabular-nums text-soft">
-              {state === "loading" ? "Rendering the narration..." : `${clock(at)} / ${clock(total)}`}
+              {state === "loading" ? t("narrationRendering") : `${clock(at)} / ${clock(total)}`}
             </p>
+            {message && !playing && <p className="text-xs text-danger">{message}</p>}
           </div>
         </div>
       </div>
@@ -1193,6 +1202,7 @@ function useLessonNarration(
   topicSlug: string,
   lessonKey: string,
 ): { state: NarrateState; message: string; onToggle: () => void; audio: HTMLAudioElement | null } | undefined {
+  const t = useTranslations("Artifact");
   const lang = useEditionLang();
   const status = useQuery(api.lessonAudio.status, { topicSlug, key: lessonKey, lang: lang ?? undefined });
   const speak = useAction(api.lessonAudio.speak);
@@ -1272,9 +1282,9 @@ function useLessonNarration(
     wantPlay.current = false;
     a.play().catch(() => {
       setState("idle");
-      setMessage("Ready. Press play to listen.");
+      setMessage(t("narrationReady"));
     });
-  }, [url, resumeKey]);
+  }, [url, resumeKey, t]);
 
   const onToggle = useCallback(() => {
     const a = audioRef.current;
@@ -1296,9 +1306,9 @@ function useLessonNarration(
       setState("idle");
       // `refusalMessage` reads a ConvexError's `data`, the only part of a refusal
       // that survives a production deployment's redaction (see `saveError`).
-      setMessage(refusalMessage(e, "The narration could not be made."));
+      setMessage(refusalMessage(e, t("narrationFailed")));
     });
-  }, [url, speak, topicSlug, lessonKey, lang]);
+  }, [url, speak, topicSlug, lessonKey, lang, t]);
 
   if (!status?.eligible) return undefined;
   return { state, message, onToggle, audio };
@@ -1371,10 +1381,11 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
   const label = status === "failed" ? t("retry") : stale ? t("stillWorkingRetry") : t("generateNext");
   return (
     <div className="flex items-center gap-2">
+      {/* The reason reads as text, not a `title` tooltip: a phone has no hover
+          (fluid-interface 08, 2026-09-18). The guard above already means there
+          is a reason, so it is appended flat rather than conditionally. */}
       {status === "failed" && gen?.error && (
-        <span title={gen.error} className="text-xs text-soft">
-          {t("generationFailed")}
-        </span>
+        <span className="text-xs text-soft">{`${t("generationFailed")}: ${gen.error}`}</span>
       )}
       <button
         onClick={() => void fire()}

@@ -352,7 +352,12 @@
     "close": "بند کریں",
     "completeAndContinue": "مکمل کریں اور آگے بڑھیں",
     "next": "اگلا",
-    "finishCourse": "کورس ختم کریں"
+    "finishCourse": "کورس ختم کریں",
+    "narrationRendering": "بیانیہ تیار کیا جا رہا ہے…",
+    "narrationPause": "بیانیہ روکیں",
+    "narrationResume": "بیانیہ جاری رکھیں",
+    "narrationFailed": "بیانیہ تیار نہیں کیا جا سکا۔",
+    "narrationReady": "تیار ہے۔ سننے کے لیے پلے دبائیں۔"
   },
   "Editions": {
     "loading": "لوڈ ہو رہا ہے…",

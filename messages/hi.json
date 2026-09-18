@@ -352,7 +352,12 @@
     "close": "बंद करें",
     "completeAndContinue": "पूरा करें और आगे बढ़ें",
     "next": "अगला",
-    "finishCourse": "कोर्स पूरा करें"
+    "finishCourse": "कोर्स पूरा करें",
+    "narrationRendering": "वर्णन तैयार किया जा रहा है…",
+    "narrationPause": "वर्णन रोकें",
+    "narrationResume": "वर्णन जारी रखें",
+    "narrationFailed": "वर्णन नहीं बनाया जा सका।",
+    "narrationReady": "तैयार। सुनने के लिए प्ले दबाएँ।"
   },
   "Editions": {
     "loading": "लोड हो रहा है…",

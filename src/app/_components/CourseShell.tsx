@@ -175,16 +175,30 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
       }}
     >
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
-        {/* Mobile top bar: hamburger opens the lesson selector. Slides away on
-            scroll-down for a fuller-screen read (useHideOnScroll). The app tab
-            bar's Home tab owns "back to the library" (mobile bottom nav,
-            2026-08-23), so the old back arrow is a hamburger: both it and the
-            course title open the lesson drawer. */}
+        {/* Mobile top bar: a back arrow out to the library, then the hamburger
+            that opens the lesson selector. Slides away on scroll-down for a
+            fuller-screen read (useHideOnScroll). The arrow came back on
+            2026-09-18 (fluid-interface 08): the Home tab is a long way from the
+            top of the screen and reads as "app home", not "out of this course",
+            and the Guest reader has carried this arrow all along. Both the
+            hamburger and the course title open the lesson drawer. All three fit
+            one row at 360px (two 34px icon buttons, a 200px-capped title). */}
         <header
           className={`chrome chrome--top sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 px-3 transition-transform duration-300 md:hidden ${
             navHidden ? "-translate-y-full" : "translate-y-0"
           }`}
         >
+          <Link
+            href="/"
+            aria-label={t("backToCoursesLabel")}
+            title={t("backToCoursesLabel")}
+            className="press rounded-lg p-1.5 text-soft hover:bg-hi hover:text-accent"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="19" y1="12" x2="5" y2="12" />
+              <polyline points="12 19 5 12 12 5" />
+            </svg>
+          </Link>
           <button
             onClick={() => setMenuOpen((prev) => !prev)}
             aria-label={t("lessons")}

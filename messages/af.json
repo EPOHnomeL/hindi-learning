@@ -352,7 +352,12 @@
     "close": "Maak toe",
     "completeAndContinue": "Voltooi en gaan voort",
     "next": "Volgende",
-    "finishCourse": "Voltooi kursus"
+    "finishCourse": "Voltooi kursus",
+    "narrationRendering": "Besig om die vertelling te maak…",
+    "narrationPause": "Laat wag vertelling",
+    "narrationResume": "Hervat vertelling",
+    "narrationFailed": "Die vertelling kon nie gemaak word nie.",
+    "narrationReady": "Gereed. Druk speel om te luister."
   },
   "Editions": {
     "loading": "Laai tans…",

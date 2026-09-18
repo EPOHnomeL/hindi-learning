@@ -352,7 +352,12 @@
     "close": "Fermer",
     "completeAndContinue": "Terminer et continuer",
     "next": "Suivant",
-    "finishCourse": "Terminer le cours"
+    "finishCourse": "Terminer le cours",
+    "narrationRendering": "Génération de la narration…",
+    "narrationPause": "Mettre la narration en pause",
+    "narrationResume": "Reprendre la narration",
+    "narrationFailed": "La narration n'a pas pu être créée.",
+    "narrationReady": "Prêt. Appuyez sur lecture pour écouter."
   },
   "Editions": {
     "loading": "Chargement…",

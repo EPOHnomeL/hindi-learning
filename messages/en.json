@@ -352,7 +352,12 @@
     "close": "Close",
     "completeAndContinue": "Complete and continue",
     "next": "Next",
-    "finishCourse": "Finish course"
+    "finishCourse": "Finish course",
+    "narrationRendering": "Rendering the narration…",
+    "narrationPause": "Pause narration",
+    "narrationResume": "Resume narration",
+    "narrationFailed": "The narration could not be made.",
+    "narrationReady": "Ready. Press play to listen."
   },
   "Editions": {
     "loading": "Loading…",
