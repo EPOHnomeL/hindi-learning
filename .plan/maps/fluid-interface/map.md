@@ -62,6 +62,25 @@ the existing layouts stay.
 
 <!-- one line per resolved ticket -->
 
+- [Every mutation reports its refusal](tickets/01-feedback-on-every-mutation.md):
+  six confirms stay open and show the server's message, the rename dialog and
+  settings page recover and confirm, upload and Q&A keep the learner's work.
+  Course creation still cannot show a real refusal until `seedTopic` throws
+  tagged errors, a `convex/` change left for its owner.
+- [Controls answer on press](tickets/02-press-feedback.md): one base rule
+  scales every button and menu item on pointer-down with a 100ms release, plus
+  explicit fills on the shared primitives, tabs and nav rows. `.no-press` opts
+  out.
+- [The drawer moves on a spring](tickets/03-the-drawer-on-a-spring.md): a
+  dependency-free critically damped spring and one shared hook for both
+  readers; velocity decides above 300 px/s, position below, rubber-band above
+  rest, the scrim follows the sheet. Constants unwalked; see the ticket's edge
+  note.
+- [Dialogs, sheets, menus and toasts arrive and leave along one path](tickets/04-enter-and-exit.md):
+  the native dialog materialises via `@starting-style` and `allow-discrete`,
+  the sheet rises, the menu scales from its trigger and reverses, toasts and
+  the install sheet share a `useExit` hook. Reduced motion gets a 150ms fade.
+
 ## Not yet specified
 
 - **Does the drawer become a shared sheet?** Once the reader drawer moves on a

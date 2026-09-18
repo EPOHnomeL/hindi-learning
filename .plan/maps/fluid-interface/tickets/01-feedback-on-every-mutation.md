@@ -30,3 +30,32 @@ control, keep the dialog open on refusal, and keep the learner's typed text.
 Each listed site keeps its dialog or field on refusal and renders the refusal
 text beside the control; `SettingsPage` says "Saved" like the dialog does;
 typecheck and the test suite pass.
+
+## Answer
+
+Built 2026-09-18, commit `5a1db3c` (the upload and Q&A sites rode in `15f454b`
+and `b0a2533`, which share their files). Verified by typecheck, the component
+test suite and code reading; not walked in a browser.
+
+- The six confirms (delete account, delete lesson, mark complete, void batch,
+  regenerate link, remove edition) run through `useMutationRun`. The confirm
+  stays open on refusal and renders the server's message in `ConfirmDialog`'s
+  `extra` slot; it closes only when the run resolves. Cancel resets the error
+  so it does not reappear next time.
+- The rename dialog catches, returns to idle and shows the message under the
+  hint. The settings page does the same and reads "Saved" on success, the
+  dialog's idiom. Typing clears the message in both.
+- Resource upload shows the upload's own localised failure text under the
+  buttons. The Q&A field clears only after the server has the question and
+  shows the refusal below the form otherwise.
+- Course creation calls `refusalMessage` with "one course per day" as the
+  fallback. **It still shows the fallback for every refusal in production**,
+  because `seedTopic` in `convex/content/authoring.ts` throws plain `Error`s
+  (unauthenticated, allowlist, daily cap) that Convex redacts. Making it throw
+  tagged `ConvexError`s is a `convex/` change outside this map; the code
+  comment records the 2026-09-18 state.
+- One new key, `Settings.updateError`, in all six locale files.
+
+Full-suite note: `scripts/bundle-authoring-assets.test.ts` fails on this
+Windows worktree before and after this work, on CRLF drift in files nobody
+touched. Three independent agents traced it to the same cause.

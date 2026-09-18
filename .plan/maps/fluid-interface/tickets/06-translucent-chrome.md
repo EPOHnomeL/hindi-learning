@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: [03, 04]
+claimed_by: fable-t3code-e63c30e8
+claimed_at: 2026-09-18T10:48:11+02:00
 ---
 # Chrome becomes a translucent layer the content scrolls under
 
