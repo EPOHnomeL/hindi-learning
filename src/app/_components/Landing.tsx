@@ -291,11 +291,16 @@ export function Landing() {
              numbers). ── */}
       <section className="mx-auto w-full max-w-5xl px-6 pb-20">
         <h2 className="text-center text-xs font-semibold uppercase tracking-[0.25em] text-accent2">{t("features.heading")}</h2>
-        <ul className="land-reveal mt-6 grid overflow-hidden rounded-xl border border-line bg-card sm:grid-cols-2 lg:grid-cols-3">
+        {/* The dividers are the grid's own 1px gaps showing the panel's
+            background through them, NOT per-tile borders: an nth-child chain
+            has to be rewritten for every column count and drew lines in the
+            wrong places at two columns (2026-09-18). Six tiles fill one, two
+            and three columns exactly, so no gap is ever left hanging. */}
+        <ul className="land-reveal mt-6 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
           {features.map((f) => (
             <li
               key={f.key}
-              className="flex gap-4 border-line p-6 transition-colors hover:bg-hi/40 [&:not(:first-child)]:border-t sm:[&:nth-child(2)]:border-t-0 sm:[&:nth-child(even)]:border-s lg:[&:nth-child(3)]:border-t-0 lg:[&:nth-child(even)]:border-s-0 lg:[&:not(:nth-child(3n+1))]:border-s"
+              className="flex gap-4 bg-card p-6 transition-colors hover:bg-hi/40"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold/15 text-accent">
                 <Icon name={f.icon} className="h-5 w-5" />
