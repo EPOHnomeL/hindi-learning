@@ -8,7 +8,7 @@ import { CourseSettingsBody } from "../CourseSettings";
 import { DashboardTab } from "./DashboardTab";
 import { Icon, type IconName } from "../icons";
 import { useMutationRun } from "../mutationRun";
-import { IconButton } from "../ui";
+import { IconButton, useExit } from "../ui";
 import { EditionBadges, EmptyPanel, Sheet, type Edition } from "./shared";
 import { AddLanguagePanel, SharingTab } from "./SharingTab";
 import { UsersTab } from "./UsersTab";
@@ -37,12 +37,17 @@ export function ManageShell({ slug }: { slug: string }) {
   const [pending, setPending] = useState<string | null>(null);
   // One transient toast; publish and link toggles confirm through it (the flow
   // the operator accepted with the prototype).
+  // The message outlives `toastShown` by one exit animation (useExit), so the
+  // toast sinks out still reading its text rather than emptying first.
   const [toast, setToast] = useState<string | null>(null);
+  const [toastShown, setToastShown] = useState(false);
+  const toastExit = useExit(toastShown);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notify = (message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast(message);
-    toastTimer.current = setTimeout(() => setToast(null), 2200);
+    setToastShown(true);
+    toastTimer.current = setTimeout(() => setToastShown(false), 2200);
   };
 
   const editions = data?.editions ?? [];
@@ -89,7 +94,7 @@ export function ManageShell({ slug }: { slug: string }) {
               type="button"
               aria-haspopup="dialog"
               onClick={() => setSheet("editions")}
-              className="flex min-w-0 max-w-[45%] shrink items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 py-1.5 text-[12.5px] font-medium text-ink transition-colors hover:bg-hi"
+              className="flex min-w-0 max-w-[45%] shrink items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 py-1.5 text-[0.78rem] font-medium text-ink transition-colors hover:bg-hi"
             >
               <span className="min-w-0 truncate">{active.name}</span>
               <EditionBadges edition={active} />
@@ -105,7 +110,7 @@ export function ManageShell({ slug }: { slug: string }) {
               role="tab"
               aria-selected={tab === key}
               onClick={() => setTab(key)}
-              className={`-mb-px inline-flex min-w-0 flex-auto items-center justify-center gap-1.5 border-b-2 px-1 py-2.5 text-[12.5px] font-semibold transition-colors sm:flex-none sm:px-4 ${
+              className={`-mb-px inline-flex min-w-0 flex-auto items-center justify-center gap-1.5 border-b-2 px-1 py-2.5 text-[0.78rem] font-semibold transition-colors sm:flex-none sm:px-4 ${
                 tab === key ? "border-accent text-accent" : "border-transparent text-soft hover:text-ink"
               }`}
             >
@@ -170,10 +175,11 @@ export function ManageShell({ slug }: { slug: string }) {
         </Sheet>
       )}
 
-      {toast && (
+      {toast && toastExit.mounted && (
         <div
           role="status"
-          className="fixed bottom-20 left-1/2 z-[70] -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-[12.5px] font-medium text-paper shadow-lg"
+          onAnimationEnd={toastExit.onAnimationEnd}
+          className={`${toastExit.leaving ? "toast-out" : "toast-in"} fixed bottom-20 left-1/2 z-[70] -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-[0.78rem] font-medium text-paper shadow-lg`}
         >
           {toast}
         </div>
@@ -191,7 +197,7 @@ function SettingsTab({ topicSlug, lang }: { topicSlug: string; lang: string }) {
   const t = useTranslations("CourseSettings");
   const topics = useQuery(api.content.reader.listTopics);
   const topic = topics?.find((x) => x.slug === topicSlug) ?? null;
-  if (topics === undefined) return <p className="text-[12.5px] text-soft">{t("loading")}</p>;
+  if (topics === undefined) return <p className="text-[0.78rem] text-soft">{t("loading")}</p>;
   if (!topic) return null;
   return (
     <>

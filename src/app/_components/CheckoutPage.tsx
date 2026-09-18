@@ -104,7 +104,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
         redirectingToCard: busy && method === "card",
       })}
     >
-      <h1 className="text-xl font-semibold tracking-tight text-ink">
+      <h1 className="text-xl font-semibold leading-heading tracking-heading text-ink">
         {entitled ? t("ownedTitle") : t("unlockThisCourse")}
       </h1>
 
@@ -114,7 +114,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
           nothing but the four one-word steps. */}
       <div className="mt-3 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <b className="block text-[15px] text-ink">{header.title}</b>
+          <b className="block text-[0.9375rem] text-ink">{header.title}</b>
           <span className="text-xs text-soft">
             {t("editionLifetime", {
               edition: editionName ? t("editionName", { name: editionName }) : t("thisEditionTitle"),
@@ -130,7 +130,7 @@ export function CheckoutPage({ topicSlug, lang }: { topicSlug: string; lang: str
                 the buyer commits: a $10 quote that lands on the statement as
                 Rand is the dispute this string exists to prevent. */}
             {price.charged && (
-              <span className="mt-1 block text-[11px] leading-tight text-soft">
+              <span className="mt-1 block text-[0.6875rem] leading-tight text-soft">
                 {t("chargedAs", { price: price.charged })}
               </span>
             )}
@@ -340,10 +340,10 @@ function EftInstructions({
           banking app — often on a phone, sometimes retyped by hand — so they are set
           at reading size and left selectable, and nothing competes with them. */}
       <div className="mt-3.5 rounded-lg border border-gold/50 bg-card px-4 py-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-accent2">{t("eftReference")}</span>
-        <b className="mt-0.5 block select-all text-2xl font-bold tracking-[0.12em] text-ink">{ref_}</b>
+        <span className="text-xs font-semibold uppercase tracking-label text-accent2">{t("eftReference")}</span>
+        <b className="mt-0.5 block select-all text-2xl font-bold tracking-[0.1em] text-ink">{ref_}</b>
       </div>
-      <dl className="mt-3.5 flex flex-col gap-2 rounded-lg border border-gold/50 bg-card px-4 py-3 text-[15px]">
+      <dl className="mt-3.5 flex flex-col gap-2 rounded-lg border border-gold/50 bg-card px-4 py-3 text-[0.9375rem]">
         {(
           [
             [t("eftAccountName"), bank.accountHolder, false],

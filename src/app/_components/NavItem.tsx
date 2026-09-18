@@ -31,8 +31,13 @@ export function NavItem({
   return (
     <Link
       href={href}
-      className={`flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-start text-sm transition-colors md:py-1.5 ${
-        active ? "bg-accent text-white" : locked ? "text-soft hover:bg-hi" : "text-ink hover:bg-hi"
+      // `press`: the base press rule in globals.css (fluid-interface 02).
+      className={`press flex items-center justify-between gap-2 rounded-lg px-2.5 py-2.5 text-start text-sm transition duration-100 md:py-1.5 ${
+        active
+          ? "bg-accent text-white active:bg-accent/80"
+          : locked
+            ? "text-soft hover:bg-hi active:bg-hi"
+            : "text-ink hover:bg-hi active:bg-hi"
       }`}
     >
       <span className="min-w-0">{children}</span>

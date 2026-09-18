@@ -48,7 +48,9 @@ export function IconButton({
   target?: string;
   rel?: string;
 }) {
-  const cls = `relative inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] border text-soft transition-colors after:absolute after:-inset-[3px] after:content-[''] hover:border-transparent hover:bg-hi hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-soft ${
+  // `press` opts the Link form into the base press rule (globals.css); `transition`
+  // rather than `transition-colors` so the release eases the transform back too.
+  const cls = `press relative inline-flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px] border text-soft transition duration-100 after:absolute after:-inset-[3px] after:content-[''] hover:border-transparent hover:bg-hi hover:text-accent active:border-transparent active:bg-hi active:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:bg-transparent disabled:hover:text-soft ${
     variant === "ghost" ? "border-transparent" : "border-line"
   } ${className ?? ""}`;
   const body = (
@@ -157,9 +159,35 @@ export function Dialog({
   );
 }
 
+// Keeps a surface mounted through its exit animation (fluid-interface 04), so a
+// menu or toast can leave along the path it arrived by instead of vanishing.
+// `shown` is the caller's intent; `mounted` lags it by one exit, during which
+// `leaving` is true and the caller swaps its `*-in` class for `*-out`. The node
+// unmounts on `animationend` (wire `onAnimationEnd` to the animated element), or
+// after `ms` if no animation fires at all (a browser extension forcing
+// `animation: none`, a test), so nothing can stay stuck on screen. Under reduced
+// motion globals.css swaps the moves for a 150ms fade, so the end still fires.
+export function useExit(shown: boolean, ms = 300) {
+  const [mounted, setMounted] = useState(shown);
+  useEffect(() => {
+    if (shown) {
+      setMounted(true);
+      return;
+    }
+    const t = setTimeout(() => setMounted(false), ms);
+    return () => clearTimeout(t);
+  }, [shown, ms]);
+  const onAnimationEnd = () => {
+    if (!shown) setMounted(false);
+  };
+  return { mounted, leaving: mounted && !shown, onAnimationEnd };
+}
+
 // A popover menu anchored to an icon-only trigger. Closes on click-outside and
 // Esc. `children` is a render-prop given a `close` callback so items can dismiss
 // the menu after acting. Used for the course card's ⋯ overflow (certificate).
+// It pops from its trigger's corner (`origin-top-right`, mirrored in RTL) and
+// reverses along the same path on close, staying mounted through `.pop-out`.
 export function Menu({
   triggerIcon = "kebab",
   triggerLabel,
@@ -173,6 +201,7 @@ export function Menu({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const exit = useExit(open);
 
   useEffect(() => {
     if (!open) return;
@@ -200,10 +229,11 @@ export function Menu({
         ariaExpanded={open}
         onClick={() => setOpen((v) => !v)}
       />
-      {open && (
+      {exit.mounted && (
         <div
           role="menu"
-          className="pop-in absolute end-0 top-[calc(100%+6px)] z-50 min-w-[216px] rounded-xl border border-line bg-card p-1.5 shadow-xl"
+          onAnimationEnd={exit.onAnimationEnd}
+          className={`${exit.leaving ? "pop-out pointer-events-none" : "pop-in"} absolute end-0 top-[calc(100%+6px)] z-50 min-w-[216px] origin-top-right rounded-xl border border-line bg-card p-1.5 shadow-md rtl:origin-top-left`}
         >
           {children(() => setOpen(false))}
         </div>
@@ -236,7 +266,7 @@ export function MenuItem({
   rel?: string;
 }) {
   const cls =
-    "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-start text-sm text-ink transition-colors hover:bg-hi hover:text-accent";
+    "group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-start text-sm text-ink transition duration-100 hover:bg-hi hover:text-accent active:bg-hi active:text-accent";
   const body = (
     <>
       {icon && (
@@ -397,13 +427,16 @@ export function ConfirmDialog({
           <div className="mt-2 text-sm leading-relaxed text-soft">{body}</div>
           {extra !== undefined && <div className="mt-4">{extra}</div>}
           <div className="mt-5 flex justify-end gap-2">
-            <button onClick={close} className="rounded-lg border border-line px-3 py-2 text-sm text-soft hover:bg-hi">
+            <button
+              onClick={close}
+              className="rounded-lg border border-line px-3 py-2 text-sm text-soft transition duration-100 hover:bg-hi active:bg-hi active:text-accent"
+            >
               {t("cancel")}
             </button>
             <button
               onClick={onConfirm}
               disabled={confirmDisabled}
-              className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white hover:bg-accent/90 disabled:opacity-60"
+              className="rounded-lg bg-accent px-3 py-2 text-sm font-medium text-white transition duration-100 hover:bg-accent/90 active:bg-accent/80 disabled:opacity-60"
             >
               {confirmLabel}
             </button>

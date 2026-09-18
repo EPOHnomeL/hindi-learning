@@ -62,7 +62,7 @@ export function CourseSettingsBody({
           edition ? (
             <EditionDetailsSection topicSlug={topicSlug} edition={edition} />
           ) : (
-            <p className="text-[12.5px] text-soft">{t("loading")}</p>
+            <p className="text-[0.78rem] text-soft">{t("loading")}</p>
           )
         ) : (
           <DetailsSection topicSlug={topicSlug} />
@@ -109,7 +109,7 @@ function TeacherQaSection({ topicSlug }: { topicSlug: string }) {
 
   return (
     <div>
-      <h4 className="text-[13px] font-bold text-ink">{t("teacherQa")}</h4>
+      <h4 className="text-[0.8125rem] font-bold text-ink">{t("teacherQa")}</h4>
       <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-3">
           <span
@@ -119,7 +119,7 @@ function TeacherQaSection({ topicSlug }: { topicSlug: string }) {
           >
             <Icon name="chat" className="h-4.5 w-4.5" />
           </span>
-          <span className="text-[11.5px] text-soft">
+          <span className="text-[0.72rem] text-soft">
             {on ? t("teacherQaOn") : t("teacherQaOff")}
             {error && <span className="block text-danger">{error}</span>}
           </span>
@@ -132,7 +132,7 @@ function TeacherQaSection({ topicSlug }: { topicSlug: string }) {
             onChange={(e) => void run({ topicSlug, enabled: e.target.checked })}
             className="peer sr-only"
           />
-          <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
+          <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:start-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] motion-reduce:after:transition-none peer-checked:bg-accent2 ltr:peer-checked:after:translate-x-4.5 rtl:peer-checked:after:-translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent" />
         </label>
       </div>
     </div>
@@ -161,8 +161,8 @@ function EditionDetailsSection({
 
   return (
     <div>
-      <h4 className="text-[13px] font-bold text-ink">{t("editionDetailsHeading", { native })}</h4>
-      <p className="mt-1 text-[12.5px] text-soft">{t("editionDetailsBody")}</p>
+      <h4 className="text-[0.8125rem] font-bold text-ink">{t("editionDetailsHeading", { native })}</h4>
+      <p className="mt-1 text-[0.78rem] text-soft">{t("editionDetailsBody")}</p>
       <form
         className="mt-4 flex flex-col gap-4"
         onSubmit={async (e) => {
@@ -180,7 +180,7 @@ function EditionDetailsSection({
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wide text-accent2">{t("titleLabel")}</label>
+          <label className="text-[0.6875rem] font-bold uppercase tracking-label text-accent2">{t("titleLabel")}</label>
           <input
             value={title}
             onChange={(e) => {
@@ -192,7 +192,7 @@ function EditionDetailsSection({
         </div>
         {servedMission !== null && (
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wide text-accent2">{t("missionLabel")}</label>
+            <label className="text-[0.6875rem] font-bold uppercase tracking-label text-accent2">{t("missionLabel")}</label>
             <textarea
               value={mission}
               onChange={(e) => {
@@ -247,8 +247,8 @@ function DetailsSection({ topicSlug }: { topicSlug: string }) {
 
   return (
     <div>
-      <h4 className="text-[13px] font-bold text-ink">{t("detailsHeading")}</h4>
-      <p className="mt-1 text-[12.5px] text-soft">{t("detailsBody")}</p>
+      <h4 className="text-[0.8125rem] font-bold text-ink">{t("detailsHeading")}</h4>
+      <p className="mt-1 text-[0.78rem] text-soft">{t("detailsBody")}</p>
       <form
         className="mt-4 flex flex-col gap-4"
         onSubmit={async (e) => {
@@ -267,7 +267,7 @@ function DetailsSection({ topicSlug }: { topicSlug: string }) {
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wide text-accent2">{t("titleLabel")}</label>
+          <label className="text-[0.6875rem] font-bold uppercase tracking-label text-accent2">{t("titleLabel")}</label>
           <input
             value={title ?? ""}
             disabled={loading}
@@ -279,7 +279,7 @@ function DetailsSection({ topicSlug }: { topicSlug: string }) {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wide text-accent2">{t("missionLabel")}</label>
+          <label className="text-[0.6875rem] font-bold uppercase tracking-label text-accent2">{t("missionLabel")}</label>
           <textarea
             value={mission}
             disabled={loading}
@@ -314,20 +314,21 @@ function DetailsSection({ topicSlug }: { topicSlug: string }) {
 function LessonsSection({ topicSlug }: { topicSlug: string }) {
   const t = useTranslations("CourseSettings");
   const lessons = useQuery(api.content.reader.listLessons, { topicSlug });
-  const deleteLesson = useMutation(api.content.authoring.deleteLesson);
+  // Was a `finally` with no `catch`: a refused delete closed the confirm as if
+  // the lesson had gone. The confirm now stays up and says why.
+  const del = useMutationRun(useMutation(api.content.authoring.deleteLesson), t("updateError"));
   const [pending, setPending] = useState<{ key: string; title: string } | null>(null);
-  const [busy, setBusy] = useState(false);
   const pendingName = pending ? pending.title.split("—")[0]!.trim() : "";
 
   return (
     <div>
-      <h4 className="text-[13px] font-bold text-ink">{t("lessonsHeading")}</h4>
-      <p className="mt-1 text-[12.5px] text-soft">{t("lessonsBody")}</p>
+      <h4 className="text-[0.8125rem] font-bold text-ink">{t("lessonsHeading")}</h4>
+      <p className="mt-1 text-[0.78rem] text-soft">{t("lessonsBody")}</p>
 
       {lessons === undefined ? (
-        <p className="mt-4 text-[12.5px] text-soft">{t("loading")}</p>
+        <p className="mt-4 text-[0.78rem] text-soft">{t("loading")}</p>
       ) : lessons.length === 0 ? (
-        <p className="mt-4 text-[12.5px] text-soft">{t("noLessons")}</p>
+        <p className="mt-4 text-[0.78rem] text-soft">{t("noLessons")}</p>
       ) : (
         <ul className="mt-4 flex flex-col divide-y divide-line overflow-hidden rounded-xl border border-line">
           {lessons.map((l) => (
@@ -351,16 +352,18 @@ function LessonsSection({ topicSlug }: { topicSlug: string }) {
         <ConfirmDialog
           title={t("deleteConfirmTitle")}
           body={t("deleteConfirmBody", { title: pendingName })}
-          confirmLabel={busy ? t("deleting") : t("deleteLessonTitle")}
-          confirmDisabled={busy}
+          confirmLabel={del.busy ? t("deleting") : t("deleteLessonTitle")}
+          confirmDisabled={del.busy}
+          extra={del.error ? <p className="text-xs text-danger">{del.error}</p> : undefined}
           onConfirm={() => {
-            setBusy(true);
-            void deleteLesson({ topicSlug, key: pending.key }).finally(() => {
-              setBusy(false);
-              setPending(null);
+            void del.run({ topicSlug, key: pending.key }).then((r) => {
+              if (r !== undefined) setPending(null);
             });
           }}
-          onClose={() => setPending(null)}
+          onClose={() => {
+            del.reset();
+            setPending(null);
+          }}
         />
       )}
     </div>
@@ -371,17 +374,18 @@ function LessonsSection({ topicSlug }: { topicSlug: string }) {
 // (it stops the Routine); "Reopen" returns a completed course to active.
 function CompletionSection({ topicSlug, status }: { topicSlug: string; status: "seeded" | "active" | "completed" }) {
   const t = useTranslations("CourseSettings");
-  const endCourse = useMutation(api.content.authoring.endCourse);
+  // Ending was a `finally` with no `catch` too: a refused "mark complete" closed
+  // the confirm as if the course had ended. The confirm now stays up and says why.
+  const end = useMutationRun(useMutation(api.content.authoring.endCourse), t("updateError"));
   const [confirming, setConfirming] = useState(false);
-  const [busy, setBusy] = useState(false);
   // Reopening was a `finally` with no `catch`. Ticket 32.
   const reopen = useMutationRun(useMutation(api.content.authoring.reopenCourse), t("updateError"));
 
   if (status === "completed") {
     return (
       <div>
-        <h4 className="text-[13px] font-bold text-ink">{t("completionHeading")}</h4>
-        <p className="mt-1 text-[12.5px] text-soft">{t("completionDoneBody")}</p>
+        <h4 className="text-[0.8125rem] font-bold text-ink">{t("completionHeading")}</h4>
+        <p className="mt-1 text-[0.78rem] text-soft">{t("completionDoneBody")}</p>
         <button
           type="button"
           disabled={reopen.busy}
@@ -397,8 +401,8 @@ function CompletionSection({ topicSlug, status }: { topicSlug: string; status: "
 
   return (
     <div>
-      <h4 className="text-[13px] font-bold text-ink">{t("completionHeading")}</h4>
-      <p className="mt-1 text-[12.5px] text-soft">{t("completionActiveBody")}</p>
+      <h4 className="text-[0.8125rem] font-bold text-ink">{t("completionHeading")}</h4>
+      <p className="mt-1 text-[0.78rem] text-soft">{t("completionActiveBody")}</p>
       <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3">
         <span className="text-sm text-ink">{t("markCompleteRow")}</span>
         <button
@@ -413,16 +417,18 @@ function CompletionSection({ topicSlug, status }: { topicSlug: string; status: "
         <ConfirmDialog
           title={t("markCompleteConfirmTitle")}
           body={t("markCompleteConfirmBody")}
-          confirmLabel={busy ? t("ending") : t("markComplete")}
-          confirmDisabled={busy}
+          confirmLabel={end.busy ? t("ending") : t("markComplete")}
+          confirmDisabled={end.busy}
+          extra={end.error ? <p className="text-xs text-danger">{end.error}</p> : undefined}
           onConfirm={() => {
-            setBusy(true);
-            void endCourse({ topicSlug }).finally(() => {
-              setBusy(false);
-              setConfirming(false);
+            void end.run({ topicSlug }).then((r) => {
+              if (r !== undefined) setConfirming(false);
             });
           }}
-          onClose={() => setConfirming(false)}
+          onClose={() => {
+            end.reset();
+            setConfirming(false);
+          }}
         />
       )}
     </div>

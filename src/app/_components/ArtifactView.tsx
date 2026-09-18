@@ -19,7 +19,7 @@ import { Markdown } from "./MarkdownView";
 import { clock, progress } from "./narrationDock";
 import { MarkdownResourceDialog } from "./ResourceItem";
 import { applyProgress, cardIdFromHash, composeCardShare, editionToEdit, resolveArtifactClick, resourceTarget } from "./readerDerive";
-import { Modal, ReaderSkeleton } from "./ui";
+import { Modal, ReaderSkeleton, useExit } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useTenant } from "./TenantContext";
 import { useHideOnScroll } from "./useHideOnScroll";
@@ -293,6 +293,8 @@ export function Frame({
   const shareRef = useRef(share);
   shareRef.current = share;
   const [copied, setCopied] = useState(false);
+  // The "Copied" toast stays mounted through its sink-out (fluid-interface 04).
+  const copiedExit = useExit(copied);
   const srcDoc = useMemo(
     () =>
       buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss, dir, lang, tenantPalette, reference, refShare: shareable, teacherQa, narrate: !!narrate }),
@@ -489,10 +491,11 @@ export function Frame({
       )}
       {/* Share-card confirmation (reference-cards/03), shown when we fell back to a
           clipboard copy (desktop, no native share sheet). */}
-      {copied && (
+      {copiedExit.mounted && (
         <div
           role="status"
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-card px-4 py-2 text-sm text-ink shadow-lg"
+          onAnimationEnd={copiedExit.onAnimationEnd}
+          className={`${copiedExit.leaving ? "toast-out" : "toast-in"} fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-card px-4 py-2 text-sm text-ink shadow-lg`}
         >
           {t("copied")}
         </div>
@@ -699,8 +702,11 @@ function LessonView({
         {/* Title + actions: a sticky bar under the mobile header; inline on desktop.
             Rises to the top edge in step with the header as it hides on scroll. */}
         <div
-          className={`sticky z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
-            navHidden ? "top-0" : "top-12"
+          // `motion-reduce:transition-none` (fluid-interface 05): this bar never
+          // hides, it only shifts 3rem to take the header's place, so the reduced
+          // motion fallback is a jump. A cross-fade would blink a bar that stays.
+          className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 flex items-center justify-between gap-3 px-3 py-2 transition-transform duration-300 motion-reduce:transition-none md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
+            navHidden ? "translate-y-0" : "translate-y-12"
           }`}
         >
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
@@ -844,6 +850,7 @@ function LessonView({
           <NarrationDock
             audio={narrate.audio}
             state={narrate.state}
+            message={narrate.message}
             title={headTitle(lesson.title)}
             onToggle={narrate.onToggle}
           />
@@ -1080,8 +1087,9 @@ function ContentEditor({
 // **Mobile: `fixed`, riding with the nav.** `AppTabs` tucks away on scroll in
 // the reader (`useHideOnScroll`), so a bar pinned above it would strand a gap.
 // This takes the same signal and slides down into the space the nav vacates,
-// the mirror of what the lesson title bar does with `top-12`/`top-0`, so the
-// control is never off-screen. `z-20`, under the lesson drawer (z-40) and its
+// the mirror of what the lesson title bar does. Both move by transform now
+// (fluid-interface 06): the dock is pinned `bottom-0` and rides up 4.75rem
+// while the nav is showing, rather than animating `bottom` itself. `z-20`, under the lesson drawer (z-40) and its
 // scrim (z-30): opening the lesson list dims the dock with the rest of the page.
 //
 // **Desktop: `sticky` inside the lesson column**, because the column is its own
@@ -1094,14 +1102,21 @@ function ContentEditor({
 function NarrationDock({
   audio,
   state,
+  message,
   title,
   onToggle,
 }: {
   audio: HTMLAudioElement | null;
   state: NarrateState;
+  // The refusal or fallback line from `useLessonNarration`. It is also posted
+  // into the iframe beside the inline play button, but that button may be
+  // scrolled far away by the time the answer arrives (fluid-interface 08), so
+  // the dock, which is always on screen, says it too.
+  message: string;
   title: string;
   onToggle: () => void;
 }) {
+  const t = useTranslations("Artifact");
   const navHidden = useHideOnScroll();
   const [at, setAt] = useState(0);
   const [total, setTotal] = useState(0);
@@ -1136,28 +1151,40 @@ function NarrationDock({
           desktop the bar is in the flow of the column it sticks to. */}
       <div aria-hidden className="h-14 md:hidden" />
       <div
-        className={`fixed inset-x-0 z-20 border-t border-line bg-card transition-[bottom] duration-300 md:sticky md:bottom-0 md:z-auto md:mt-2 md:rounded-t-xl md:border-x ${
-          navHidden ? "bottom-0" : "bottom-[4.75rem]"
+        // `motion-reduce:transition-none` (fluid-interface 05): the dock never
+        // hides, it only rides above or below the tab bar's 4.75rem, so reduced
+        // motion gets a jump rather than a cross-fade that would blink it away.
+        className={`chrome chrome--card fixed inset-x-0 bottom-0 z-20 shadow-lg transition-transform duration-300 motion-reduce:transition-none md:sticky md:z-auto md:mt-2 md:translate-y-0 md:rounded-t-xl md:border-x md:border-line ${
+          navHidden ? "translate-y-0" : "-translate-y-[4.75rem]"
         }`}
       >
+        {/* The played hairline fills by `scaleX`, not `width` (fluid-interface 05):
+            a compositor-only property, and `motion-reduce:transition-none` makes it
+            step instead of glide. `progress()` is already 0 to 1. */}
         <div className="h-[3px] w-full bg-line">
-          <div className="h-full bg-accent transition-[width] duration-300" style={{ width: `${progress(at, total) * 100}%` }} />
+          <div
+            className="h-full w-full origin-left bg-accent transition-transform duration-300 motion-reduce:transition-none rtl:origin-right"
+            style={{ transform: `scaleX(${progress(at, total)})` }}
+          />
         </div>
         <div className="flex items-center gap-3 px-3 py-2">
           <button
             type="button"
             onClick={onToggle}
             disabled={state === "loading"}
-            aria-label={playing ? "Pause narration" : "Resume narration"}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold bg-paper text-accent transition-transform hover:scale-105 disabled:cursor-default disabled:opacity-60"
+            aria-label={playing ? t("narrationPause") : t("narrationResume")}
+            // `no-press`: this scales itself (fluid-interface 02), so the base press
+            // rule in globals.css must not compound a second transform onto it.
+            className="no-press flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold bg-paper text-accent transition duration-100 hover:bg-hi active:bg-hi motion-safe:hover:scale-105 motion-safe:active:scale-95 disabled:cursor-default disabled:opacity-60"
           >
             <Icon name={playing ? "pause" : "play"} className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{title}</p>
             <p className="text-xs tabular-nums text-soft">
-              {state === "loading" ? "Rendering the narration..." : `${clock(at)} / ${clock(total)}`}
+              {state === "loading" ? t("narrationRendering") : `${clock(at)} / ${clock(total)}`}
             </p>
+            {message && !playing && <p className="text-xs text-danger">{message}</p>}
           </div>
         </div>
       </div>
@@ -1187,6 +1214,7 @@ function useLessonNarration(
   topicSlug: string,
   lessonKey: string,
 ): { state: NarrateState; message: string; onToggle: () => void; audio: HTMLAudioElement | null } | undefined {
+  const t = useTranslations("Artifact");
   const lang = useEditionLang();
   const status = useQuery(api.lessonAudio.status, { topicSlug, key: lessonKey, lang: lang ?? undefined });
   const speak = useAction(api.lessonAudio.speak);
@@ -1266,9 +1294,9 @@ function useLessonNarration(
     wantPlay.current = false;
     a.play().catch(() => {
       setState("idle");
-      setMessage("Ready. Press play to listen.");
+      setMessage(t("narrationReady"));
     });
-  }, [url, resumeKey]);
+  }, [url, resumeKey, t]);
 
   const onToggle = useCallback(() => {
     const a = audioRef.current;
@@ -1290,9 +1318,9 @@ function useLessonNarration(
       setState("idle");
       // `refusalMessage` reads a ConvexError's `data`, the only part of a refusal
       // that survives a production deployment's redaction (see `saveError`).
-      setMessage(refusalMessage(e, "The narration could not be made."));
+      setMessage(refusalMessage(e, t("narrationFailed")));
     });
-  }, [url, speak, topicSlug, lessonKey, lang]);
+  }, [url, speak, topicSlug, lessonKey, lang, t]);
 
   if (!status?.eligible) return undefined;
   return { state, message, onToggle, audio };
@@ -1365,10 +1393,11 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
   const label = status === "failed" ? t("retry") : stale ? t("stillWorkingRetry") : t("generateNext");
   return (
     <div className="flex items-center gap-2">
+      {/* The reason reads as text, not a `title` tooltip: a phone has no hover
+          (fluid-interface 08, 2026-09-18). The guard above already means there
+          is a reason, so it is appended flat rather than conditionally. */}
       {status === "failed" && gen?.error && (
-        <span title={gen.error} className="text-xs text-soft">
-          {t("generationFailed")}
-        </span>
+        <span className="text-xs text-soft">{`${t("generationFailed")}: ${gen.error}`}</span>
       )}
       <button
         onClick={() => void fire()}
@@ -1449,12 +1478,14 @@ function ReferenceView({
   }
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3 md:overflow-y-auto">
+      {/* `truncate` sits on the inner span, not the h2: the h2 owns the
+          scroll-edge fade, and `overflow: hidden` would clip the ::after away. */}
       <h2
-        className={`sticky z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
-          navHidden ? "top-0" : "top-12"
+        className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 px-3 py-2 text-lg font-semibold transition-transform duration-300 motion-reduce:transition-none md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
+          navHidden ? "translate-y-0" : "translate-y-12"
         }`}
       >
-        {ref.title}
+        <span className="block truncate">{ref.title}</span>
       </h2>
       {/* References carry no dark CSS of their own, so themeCss injects the dark
           palette (ADR 0011) — the theme then flips them with the rest of the app.
@@ -1517,6 +1548,7 @@ function QuestionBox({
   const questions = useQuery(api.capture.myQuestions, { topicSlug, lang: lang ?? undefined });
   const askQuestion = useMutation(api.capture.askQuestion);
   const [text, setText] = useState("");
+  const [askError, setAskError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<{ text: string; reply: string } | null>(null);
   const mine = questions?.filter((q) => q.lessonKey === lessonKey) ?? [];
 
@@ -1538,14 +1570,22 @@ function QuestionBox({
             e.preventDefault();
             const trimmed = text.trim();
             if (!trimmed) return;
-            setText("");
-            await askQuestion({ topicSlug, lessonKey, text: trimmed });
+            // The field clears only once the server has the question (fluid-interface
+            // 01): clearing first lost the typed text on a refusal, and said nothing.
+            try {
+              await askQuestion({ topicSlug, lessonKey, text: trimmed });
+              setText("");
+              setAskError(null);
+            } catch (e) {
+              setAskError(refusalMessage(e, t("saveFailed")));
+            }
           }}
         >
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t("questionPlaceholder")} className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none" />
+          <input value={text} onChange={(e) => { setText(e.target.value); setAskError(null); }} placeholder={t("questionPlaceholder")} className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none" />
           <button type="submit" className="rounded-lg bg-accent2 px-3 py-2 text-sm text-white hover:bg-accent2/90">{t("ask")}</button>
         </form>
       )}
+      {askError && <p className="mt-2 text-xs text-danger">{askError}</p>}
       {readOnly && mine.length === 0 && <p className="text-sm text-soft">{t("noQuestions")}</p>}
       <ul className={`mt-3 flex flex-col gap-3 ${variant === "inline" ? "" : "min-h-0 flex-1 overflow-y-auto"}`}>
         {mine.map((q) => (

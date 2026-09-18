@@ -169,6 +169,16 @@ const REFERENCE_CARD_CSS = `<style>
 .term:hover .card-share, .word:hover .card-share, .card-share:focus-visible{opacity:1}
 .card-share:hover{background:var(--hi); color:var(--accent)}
 @media (hover:none){.card-share{opacity:.55}}
+/* Reduced motion (fluid-interface 05). The flash is not decoration: it is the
+   only thing that says "this is the card you followed a link to", so it becomes a
+   static highlight rather than nothing. It holds the keyframe's own first frame
+   for the same 1.7s the class is on the element (the script removes it), so the
+   card is just as findable without anything fading. The block lives here, not in
+   NARRATE_CSS's reduced-motion block, because these are two separately injected
+   <style> blocks and only this one is injected for references. */
+@media (prefers-reduced-motion: reduce){
+  .card-flash{animation:none; box-shadow:0 0 0 3px var(--gold); background:var(--hi)}
+}
 </style>`;
 
 function injectReferenceCardCss(html: string): string {
