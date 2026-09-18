@@ -192,10 +192,16 @@ body {
 /* ---------------------------------------------------------------------------
    `.chrome`: the ONE translucent material (fluid-interface 06). Every floating
    surface the content scrolls under wears this class and nothing else: the two
-   mobile reader headers, the four sticky lesson/reference title bars, the
-   narration dock, the tab bar, the Home resume card, InstallSheet and the
-   certificate's completion bar. Per-surface `bg-paper` + `border-t border-line`
-   stacks are what it replaces, so the app has one recipe for "chrome", not nine.
+   mobile reader headers, the narration dock, the tab bar, the Home resume card,
+   InstallSheet and the certificate's completion bar. Per-surface `bg-paper` +
+   `border-t border-line` stacks are what it replaces, so the app has one recipe
+   for "chrome", not nine.
+
+   The four sticky lesson/reference title bars were on this list until
+   2026-09-18, when they went desktop-only: on a phone they stacked a second
+   title bar under the course header and repeated the `<h1>` the lesson body
+   already opens with, and the content scrolled under both. `.chrome--mobile`
+   and `.chrome-fade` went with them, having had no other users.
 
    The parts:
    - **Tint.** `--chrome-tint` is the token the surface used to paint solid, so
@@ -210,11 +216,11 @@ body {
      silently eat the drop shadow off the dock, the resume card, InstallSheet and
      the completion bar. Re-including Tailwind v4's `--tw-shadow` (what every
      `shadow-*` utility actually sets) keeps both.
-   - **`.chrome--mobile`** switches the material OFF from `md` up, for the four
-     title bars that are sticky chrome on a phone and plain static headings on a
-     desktop. It is last in this section on purpose: it has to out-order the two
-     accessibility overrides below, which would otherwise repaint a desktop
-     heading solid.
+   - **`.chrome--solid`** opts a surface out of the translucency and keeps only
+     the hairline. The tab bar wears it (2026-09-18): it is the one surface that
+     is up on every screen at the bottom of the phone, and reading the lesson
+     through it was noise rather than depth. It is last in this section on
+     purpose, so it out-orders the `@supports` block above.
    - **Fallbacks.** Without `backdrop-filter` the tint goes to ~95%, near-solid,
      since 80% with nothing behind it is just a washed-out bar. Under
      `prefers-reduced-transparency` it is fully solid with no blur, and under
@@ -248,19 +254,11 @@ html[data-theme="dark"] .chrome {
   }
 }
 
-/* The scroll-edge fade that replaces the sticky title bar's bottom rule: 12px of
-   paper dissolving into the lesson, so text slides under the bar instead of
-   hitting a line. Mobile only, since from `md` the bar is static and
-   transparent. The host must not be `overflow: hidden`, which is why the two
-   reference title bars moved their `truncate` onto an inner span. */
-.chrome-fade::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  top: 100%;
-  height: 12px;
-  background: linear-gradient(to bottom, var(--color-paper), transparent);
-  pointer-events: none;
+/* Opaque chrome: hairline, no see-through, no blur. */
+.chrome--solid {
+  background: var(--chrome-tint);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -273,18 +271,6 @@ html[data-theme="dark"] .chrome {
 @media (prefers-contrast: more) {
   .chrome {
     --chrome-hairline: var(--color-ink);
-  }
-}
-
-@media (width >= 48rem) {
-  .chrome--mobile {
-    background: transparent;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-    box-shadow: var(--tw-shadow, 0 0 #0000);
-  }
-  .chrome-fade::after {
-    display: none;
   }
 }
 

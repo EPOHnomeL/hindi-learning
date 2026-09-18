@@ -543,7 +543,6 @@ function LessonView({
   const t = useTranslations("Artifact");
   const { theme } = useTheme();
   const lang = useEditionLang();
-  const navHidden = useHideOnScroll();
   const lesson = useQuery(api.content.reader.getLesson, { topicSlug, key: lessonKey, lang: lang ?? undefined });
   // The same subscription CourseShell already holds (deduped by Convex), for the
   // end-of-lesson card's next-lesson number and title.
@@ -622,6 +621,11 @@ function LessonView({
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
   // The next lesson's row (for the end-of-lesson card's number and title).
   const nextLesson = nextLessonKey ? (lessons?.find((l) => l.key === nextLessonKey) ?? null) : null;
+  // The title row is desktop chrome. On a phone it renders only when the owner's
+  // "Generate next lesson" control is in it, which is the one action with no
+  // other home; everything else in that row is desktop-only or duplicated by the
+  // end-of-lesson card. Keep this in step with the row's contents below.
+  const hasTitleActions = !readOnly && !courseCompleted && isFrontier && completed;
 
   // **Warm the next lesson** (perceived-performance ticket 05). Forward is how
   // the reader is actually used: finish this one, go to the next. Holding a
@@ -716,17 +720,22 @@ function LessonView({
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
       {/* Lesson column — fills the available height on desktop; grows with content on mobile. */}
       <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3 md:overflow-y-auto">
-        {/* Title + actions: a sticky bar under the mobile header; inline on desktop.
-            Rises to the top edge in step with the header as it hides on scroll. */}
+        {/* Title + actions: a plain heading row on desktop, actions only on mobile.
+            Until 2026-09-18 this was a translucent sticky bar pinned under the
+            mobile header, so the lesson scrolled underneath its own title: two
+            title bars stacked on a phone, eating 5.5rem of a screen the reader is
+            trying to read on. The lesson body carries its own `<h1>` (verified in
+            the published fragments), so the bar repeated what the first line of
+            the page already said. Dropped on mobile; the row survives there only
+            to carry the owner's "Generate next lesson" control, which has nowhere
+            else to live. Forward navigation is LessonFootCard's job at every
+            breakpoint, so the Viewer's next-lesson link is desktop-only now. */}
         <div
-          // `motion-reduce:transition-none` (fluid-interface 05): this bar never
-          // hides, it only shifts 3rem to take the header's place, so the reduced
-          // motion fallback is a jump. A cross-fade would blink a bar that stays.
-          className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 flex items-center justify-between gap-3 px-3 py-2 transition-transform duration-300 motion-reduce:transition-none md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
-            navHidden ? "translate-y-0" : "translate-y-12"
+          className={`items-center justify-between gap-3 px-3 pt-2 md:flex md:px-0 md:pt-0 ${
+            hasTitleActions ? "flex" : "hidden"
           }`}
         >
-          <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
+          <h2 className="hidden min-w-0 truncate text-lg font-semibold md:block">{lesson.title}</h2>
           <div className="flex shrink-0 items-center gap-2">
             {/* Authoring is owner-only and stops once the course is completed
                 (ADR 0015): no "Generate next lesson" on a finished course. */}
@@ -734,8 +743,8 @@ function LessonView({
               <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />
             )}
             {/* No certificate pill here: Home carries the certificate on every
-                card kind (mobile-reader-todos 01), and on a phone this bar has
-                no room for anything beside the title. */}
+                card kind (mobile-reader-todos 01), and on a phone this row is
+                gone entirely. */}
             {/* No standing "Mark complete" button at any breakpoint (2026-09-01).
                 Advancing IS completing: the end-of-lesson card below now renders
                 on desktop too and ticks the lesson it leaves, so a second control
@@ -743,14 +752,16 @@ function LessonView({
                 last lesson, where there is nothing to advance to, is that same
                 end-of-lesson card's `finish` button. */}
             {/* A Viewer also gets plain navigation to the next lesson, which
-                ticks this one like every other way forward does. */}
+                ticks this one like every other way forward does. Desktop only
+                since 2026-09-18: on a phone LessonFootCard sits at the foot of
+                the very lesson they just read and does the same two things. */}
             {readOnly && nextLessonKey && (
               <Link
                 href={withLang(`/courses/${topicSlug}/lessons/${nextLessonKey}`, lang)}
                 onClick={() => {
                   if (!preview && !completed) completeLesson("advance");
                 }}
-                className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90"
+                className="hidden rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90 md:block"
               >
                 {t("nextLesson")}
               </Link>
@@ -1467,7 +1478,6 @@ function ReferenceView({
   const t = useTranslations("Artifact");
   const { theme } = useTheme();
   const lang = useEditionLang();
-  const navHidden = useHideOnScroll();
   const ref = useQuery(api.content.reader.getReference, { topicSlug, key: refKey, lang: lang ?? undefined });
   const header = useQuery(api.content.reader.courseHeader, { topicSlug, lang: lang ?? undefined });
   const html = useContentHtml(ref);
@@ -1517,15 +1527,10 @@ function ReferenceView({
   }
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3 md:overflow-y-auto">
-      {/* `truncate` sits on the inner span, not the h2: the h2 owns the
-          scroll-edge fade, and `overflow: hidden` would clip the ::after away. */}
-      <h2
-        className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 px-3 py-2 text-lg font-semibold transition-transform duration-300 motion-reduce:transition-none md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
-          navHidden ? "translate-y-0" : "translate-y-12"
-        }`}
-      >
-        <span className="block truncate">{ref.title}</span>
-      </h2>
+      {/* Desktop only since 2026-09-18, with the lesson title bar it matched: on
+          a phone this was a translucent sticky bar the reference scrolled under,
+          repeating the `<h1>` the reference body opens with. */}
+      <h2 className="hidden truncate text-lg font-semibold md:block">{ref.title}</h2>
       {/* References carry no dark CSS of their own, so themeCss injects the dark
           palette (ADR 0011) — the theme then flips them with the rest of the app.
           The Edit button rides over the body, always visible for whoever may edit

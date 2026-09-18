@@ -331,7 +331,6 @@ export function PublicCourseIndex({ src }: { src: GuestSource }) {
 export function PublicLessonPane({ src, lessonKey }: { src: GuestSource; lessonKey: string }) {
   const t = useTranslations("Reader");
   const { theme } = useTheme();
-  const navHidden = useHideOnScroll();
   const { course, completed, markComplete } = useGuestCourse();
   const lesson = useQuery(api.public.publicLesson, { ...guestArgs(src), key: lessonKey });
   const html = useContentHtml(lesson);
@@ -367,14 +366,12 @@ export function PublicLessonPane({ src, lessonKey }: { src: GuestSource; lessonK
   return (
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
       <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3 md:overflow-y-auto">
-        <div
-          // `motion-reduce:transition-none` (fluid-interface 05): this bar never
-          // hides, it only shifts 3rem to take the header's place, so the reduced
-          // motion fallback is a jump. A cross-fade would blink a bar that stays.
-          className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 flex items-center justify-between gap-3 px-3 py-2 transition-transform duration-300 motion-reduce:transition-none md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
-            navHidden ? "translate-y-0" : "translate-y-12"
-          }`}
-        >
+        {/* Desktop only since 2026-09-18, mirroring the authed reader: on a phone
+            this was a translucent sticky bar the lesson scrolled under, stacked
+            below the course header and repeating the `<h1>` the lesson body opens
+            with. LessonFootCard carries the Guest forward at the foot of the page
+            like it does everywhere else. */}
+        <div className="hidden items-center justify-between gap-3 md:flex">
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
           {next && (
             <Link
@@ -489,7 +486,6 @@ export function PublicReferencePane({ src, refKey }: { src: GuestSource; refKey:
   const t = useTranslations("Reader");
   const { theme } = useTheme();
   const { course } = useGuestCourse();
-  const navHidden = useHideOnScroll();
   const ref = useQuery(api.public.publicReference, { ...guestArgs(src), key: refKey });
   const html = useContentHtml(ref);
   const cardTarget = useCardTarget(refKey);
@@ -516,15 +512,8 @@ export function PublicReferencePane({ src, refKey }: { src: GuestSource; refKey:
   }
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3 md:overflow-y-auto">
-      {/* `truncate` sits on the inner span, not the h2: the h2 owns the
-          scroll-edge fade, and `overflow: hidden` would clip the ::after away. */}
-      <h2
-        className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 px-3 py-2 text-lg font-semibold transition-transform duration-300 motion-reduce:transition-none md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
-          navHidden ? "translate-y-0" : "translate-y-12"
-        }`}
-      >
-        <span className="block truncate">{ref.title}</span>
-      </h2>
+      {/* Desktop only since 2026-09-18, with the other three title bars. */}
+      <h2 className="hidden truncate text-lg font-semibold md:block">{ref.title}</h2>
       <Frame html={html} withBridge={false} theme={theme} themeCss dir={course.dir} lang={course.lang} resources={course.resources} reference cardTarget={cardTarget} share={share} />
     </div>
   );
