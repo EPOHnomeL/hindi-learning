@@ -240,6 +240,28 @@ this section is the current state.
   at those boundaries.
 - **Error tracking:** `capture_exceptions: true` on init, plus the App Router
   boundary `src/app/global-error.tsx` calling `captureException`.
+  - **"TypeError: Failed to fetch" with only minified frames was the Convex Auth
+    token refresh, not the service worker** (established 2026-09-18 by reading the
+    deployed chunks at the frame columns, since no source map covered them). The
+    Next.js auth client POSTs `/api/auth` to refresh a signed-in learner's JWT, and
+    the Convex client (1.41.0) schedules that with a bare `void`, so a network blip
+    at refresh time escaped as an unhandled rejection. `src/lib/authTokenRetry.ts`
+    wraps the fetcher via a `ConvexReactClient` subclass in
+    `ConvexClientProvider.tsx`: three retries, then a clean `null`, reported as a
+    handled exception tagged `auth_token_refresh_failed`. The service-worker fetch
+    guard (`c2049dd`) and the frameless `before_send` filter (PR #122) were both
+    correct fixes for *other* shapes and stay.
+  - **Source maps on PostHog do not cover every deploy.** The frames above reported
+    "Could not find sourcemap" for chunks live on 2026-09-15, so when a stack is
+    unreadable, `curl` the chunk and read the column before assuming a library.
+- **A retention or conversion drop in a weekly cohort is usually a share-link
+  broadcast, not a regression.** Twice in September 2026 (interaction conversion,
+  2026-09-16; Week 1 pageview retention, 2026-09-18) the scout flagged a drop and
+  the cause was one `/share/<token>` link on the ywampotch tenant spreading through
+  messaging (`$direct` referrer, dozens of first visits in a day, one-lesson reads).
+  The 2026-09-06 cohort was 79 entrants, 52 of them from share links; without them
+  Week 1 retention was 6 of 27, in line with the prior cohort. Check the entry path
+  and host mix of the cohort before reading a rate as product behaviour.
 - **Session Replay is on and recording** (enabled PostHog-side, not in code).
   Learner sessions are being recorded; if `/privacy` doesn't say so, it should.
 - **Self-driving was switched on 2026-09-03**: four scouts, error/health/support
