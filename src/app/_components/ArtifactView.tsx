@@ -19,7 +19,7 @@ import { Markdown } from "./MarkdownView";
 import { clock, progress } from "./narrationDock";
 import { MarkdownResourceDialog } from "./ResourceItem";
 import { applyProgress, cardIdFromHash, composeCardShare, editionToEdit, resolveArtifactClick, resourceTarget } from "./readerDerive";
-import { Modal, ReaderSkeleton } from "./ui";
+import { Modal, ReaderSkeleton, useExit } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useTenant } from "./TenantContext";
 import { useHideOnScroll } from "./useHideOnScroll";
@@ -293,6 +293,8 @@ export function Frame({
   const shareRef = useRef(share);
   shareRef.current = share;
   const [copied, setCopied] = useState(false);
+  // The "Copied" toast stays mounted through its sink-out (fluid-interface 04).
+  const copiedExit = useExit(copied);
   const srcDoc = useMemo(
     () =>
       buildSrcDoc(html, { quiz: withBridge, theme: themeRef.current, themeCss, dir, lang, tenantPalette, reference, refShare: shareable, teacherQa, narrate: !!narrate }),
@@ -489,10 +491,11 @@ export function Frame({
       )}
       {/* Share-card confirmation (reference-cards/03), shown when we fell back to a
           clipboard copy (desktop, no native share sheet). */}
-      {copied && (
+      {copiedExit.mounted && (
         <div
           role="status"
-          className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-card px-4 py-2 text-sm text-ink shadow-lg"
+          onAnimationEnd={copiedExit.onAnimationEnd}
+          className={`${copiedExit.leaving ? "toast-out" : "toast-in"} fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-full border border-line bg-card px-4 py-2 text-sm text-ink shadow-lg`}
         >
           {t("copied")}
         </div>
@@ -1149,7 +1152,9 @@ function NarrationDock({
             onClick={onToggle}
             disabled={state === "loading"}
             aria-label={playing ? "Pause narration" : "Resume narration"}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold bg-paper text-accent transition-transform hover:scale-105 disabled:cursor-default disabled:opacity-60"
+            // `no-press`: this scales itself (fluid-interface 02), so the base press
+            // rule in globals.css must not compound a second transform onto it.
+            className="no-press flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold bg-paper text-accent transition duration-100 hover:bg-hi active:bg-hi motion-safe:hover:scale-105 motion-safe:active:scale-95 disabled:cursor-default disabled:opacity-60"
           >
             <Icon name={playing ? "pause" : "play"} className="h-4 w-4" />
           </button>
@@ -1517,6 +1522,7 @@ function QuestionBox({
   const questions = useQuery(api.capture.myQuestions, { topicSlug, lang: lang ?? undefined });
   const askQuestion = useMutation(api.capture.askQuestion);
   const [text, setText] = useState("");
+  const [askError, setAskError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<{ text: string; reply: string } | null>(null);
   const mine = questions?.filter((q) => q.lessonKey === lessonKey) ?? [];
 
@@ -1538,14 +1544,22 @@ function QuestionBox({
             e.preventDefault();
             const trimmed = text.trim();
             if (!trimmed) return;
-            setText("");
-            await askQuestion({ topicSlug, lessonKey, text: trimmed });
+            // The field clears only once the server has the question (fluid-interface
+            // 01): clearing first lost the typed text on a refusal, and said nothing.
+            try {
+              await askQuestion({ topicSlug, lessonKey, text: trimmed });
+              setText("");
+              setAskError(null);
+            } catch (e) {
+              setAskError(refusalMessage(e, t("saveFailed")));
+            }
           }}
         >
-          <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t("questionPlaceholder")} className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none" />
+          <input value={text} onChange={(e) => { setText(e.target.value); setAskError(null); }} placeholder={t("questionPlaceholder")} className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none" />
           <button type="submit" className="rounded-lg bg-accent2 px-3 py-2 text-sm text-white hover:bg-accent2/90">{t("ask")}</button>
         </form>
       )}
+      {askError && <p className="mt-2 text-xs text-danger">{askError}</p>}
       {readOnly && mine.length === 0 && <p className="text-sm text-soft">{t("noQuestions")}</p>}
       <ul className={`mt-3 flex flex-col gap-3 ${variant === "inline" ? "" : "min-h-0 flex-1 overflow-y-auto"}`}>
         {mine.map((q) => (

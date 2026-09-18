@@ -106,8 +106,53 @@ body {
   font-family: var(--font-naskh);
 }
 
-/* Popover menu entrance (UI redesign): a small fade + rise so the card's ⋯
-   overflow doesn't snap in. Suppressed under prefers-reduced-motion. */
+/* Press feedback (fluid-interface 02). On a phone the press is the only feedback
+   the device can give, so every control answers on pointer-down: a 3% shrink that
+   lands instantly (`transition-duration: 0ms` while :active) and eases back over
+   100ms on release.
+
+   The scheme, so nothing gets two transforms:
+   - Plain `button`s, `[role="button"]`, `[role="menuitem"]` and anything opting
+     in with `.press` (links styled as controls: NavItem, the tab bar, IconButton's
+     Link form) get the rule. `:disabled` is excluded.
+   - `.no-press` opts a control OUT because it scales itself (the narration dock's
+     play button, which uses `active:scale-95`); a `scale-*` utility composes with
+     `transform`, so both at once would compound.
+   - The transform is set on `transform`, never `scale`, so a `-translate-x-1/2`
+     or `rotate-*` utility on the same element still composes correctly.
+   - The `:active` rules sit OUTSIDE any layer so they beat a `transition-colors`
+     utility's duration; the release transition lives in `@layer base` so a
+     control that sets its own `transition-*` utility keeps it. On those controls
+     the release only eases if that utility covers `transform` (`transition`
+     does, `transition-colors` does not, and the shared primitives use the former). */
+@layer base {
+  :is(button, [role="button"], [role="menuitem"], .press):not(:disabled, .no-press) {
+    transition: transform 100ms ease-out;
+  }
+}
+:is(button, [role="button"], [role="menuitem"], .press):not(:disabled):active {
+  transition-duration: 0ms;
+}
+:is(button, [role="button"], [role="menuitem"], .press):not(:disabled, .no-press):active {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  /* The press still answers, as a fill rather than a move. An inset shadow rather
+     than `background-color` so an accent-filled button keeps its fill (and its
+     legible white label) instead of flashing to pale yellow. */
+  :is(button, [role="button"], [role="menuitem"], .press):not(:disabled, .no-press):active {
+    transform: none;
+    box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--color-ink) 10%, transparent);
+  }
+}
+
+/* Popover menu enter and exit (UI redesign; exit added by fluid-interface 04): a
+   small fade + rise so the card's ⋯ overflow doesn't snap in, and the same path
+   in reverse on close. `Menu` keeps the node mounted through `.pop-out` and
+   unmounts on `animationend` (useExit in ui.tsx). The origin is set per menu with
+   `origin-*` utilities, since one pops down from its trigger's corner and another
+   (SharingTab) pops up. Under prefers-reduced-motion both become a 150ms opacity
+   cross-fade with no movement, never a hard cut, so `animationend` still fires. */
 @keyframes pop-in {
   from {
     opacity: 0;
@@ -118,12 +163,159 @@ body {
     transform: none;
   }
 }
+@keyframes pop-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
 .pop-in {
   animation: pop-in 0.12s ease-out;
 }
+.pop-out {
+  animation: pop-out 0.1s ease-in forwards;
+}
+
+/* Toasts (fluid-interface 04): rise 8px + fade in, sink + fade out. Shared by the
+   ManageShell toast and ArtifactView's "Copied" toast, both of which stay mounted
+   through `.toast-out` via useExit. Keyframes move `transform`, so the toasts'
+   `-translate-x-1/2` centring (the `translate` property) composes untouched. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.toast-in {
+  animation: toast-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.toast-out {
+  animation: toast-out 160ms ease-in forwards;
+}
+
+/* A non-dialog bottom sheet (InstallSheet) rising in and sinking out. The native
+   `<dialog>` sheet in manage/shared.tsx is handled by `.sheet-shell` below. */
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes sheet-out {
+  from {
+    transform: none;
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+.sheet-in {
+  animation: sheet-in 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sheet-out {
+  animation: sheet-out 220ms ease-in forwards;
+}
+
+/* Cross-fade for a 150ms opacity-only enter/exit under reduced motion. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .pop-in {
-    animation: none;
+  .pop-in,
+  .toast-in,
+  .sheet-in {
+    animation: fade-in 150ms ease-out;
+  }
+  .pop-out,
+  .toast-out,
+  .sheet-out {
+    animation: fade-out 150ms ease-out forwards;
+  }
+}
+
+/* The native <dialog> materialises (fluid-interface 04). `Modal` in ui.tsx is
+   the one dialog (ui.test.ts), so this keys off the element. Enter: opacity 0 to 1
+   and scale 0.96 to 1 over 200ms, the backdrop fading with it, from
+   `@starting-style`. Exit: the same in reverse on `close()`, which works because
+   `display` and `overlay` are transitioned with `allow-discrete`, so the element
+   stays rendered (and in the top layer) until the transition ends.
+   `--dialog-from` is the closed-state transform: a centred dialog scales from its
+   centre; a `.sheet-shell` (manage/shared.tsx) rises from `translateY(100%)` on a
+   phone and scales like the others from `sm` up. Only transform and opacity move. */
+dialog {
+  --dialog-from: scale(0.96);
+  opacity: 0;
+  transform: var(--dialog-from);
+  transform-origin: center;
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out,
+    overlay 200ms allow-discrete,
+    display 200ms allow-discrete;
+}
+dialog[open] {
+  opacity: 1;
+  transform: none;
+}
+dialog::backdrop {
+  opacity: 0;
+  transition:
+    opacity 200ms ease-out,
+    overlay 200ms allow-discrete,
+    display 200ms allow-discrete;
+}
+dialog[open]::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  dialog[open] {
+    opacity: 0;
+    transform: var(--dialog-from);
+  }
+  dialog[open]::backdrop {
+    opacity: 0;
+  }
+}
+@media (width < 40rem) {
+  dialog.sheet-shell {
+    --dialog-from: translateY(100%);
+    transform-origin: bottom center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog {
+    --dialog-from: none;
+    transition-duration: 150ms;
+  }
+  dialog::backdrop {
+    transition-duration: 150ms;
   }
 }
 

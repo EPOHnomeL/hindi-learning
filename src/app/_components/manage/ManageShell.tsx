@@ -8,7 +8,7 @@ import { CourseSettingsBody } from "../CourseSettings";
 import { DashboardTab } from "./DashboardTab";
 import { Icon, type IconName } from "../icons";
 import { useMutationRun } from "../mutationRun";
-import { IconButton } from "../ui";
+import { IconButton, useExit } from "../ui";
 import { EditionBadges, EmptyPanel, Sheet, type Edition } from "./shared";
 import { AddLanguagePanel, SharingTab } from "./SharingTab";
 import { UsersTab } from "./UsersTab";
@@ -37,12 +37,17 @@ export function ManageShell({ slug }: { slug: string }) {
   const [pending, setPending] = useState<string | null>(null);
   // One transient toast; publish and link toggles confirm through it (the flow
   // the operator accepted with the prototype).
+  // The message outlives `toastShown` by one exit animation (useExit), so the
+  // toast sinks out still reading its text rather than emptying first.
   const [toast, setToast] = useState<string | null>(null);
+  const [toastShown, setToastShown] = useState(false);
+  const toastExit = useExit(toastShown);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notify = (message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast(message);
-    toastTimer.current = setTimeout(() => setToast(null), 2200);
+    setToastShown(true);
+    toastTimer.current = setTimeout(() => setToastShown(false), 2200);
   };
 
   const editions = data?.editions ?? [];
@@ -170,10 +175,11 @@ export function ManageShell({ slug }: { slug: string }) {
         </Sheet>
       )}
 
-      {toast && (
+      {toast && toastExit.mounted && (
         <div
           role="status"
-          className="fixed bottom-20 left-1/2 z-[70] -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-[12.5px] font-medium text-paper shadow-lg"
+          onAnimationEnd={toastExit.onAnimationEnd}
+          className={`${toastExit.leaving ? "toast-out" : "toast-in"} fixed bottom-20 left-1/2 z-[70] -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-[12.5px] font-medium text-paper shadow-lg`}
         >
           {toast}
         </div>

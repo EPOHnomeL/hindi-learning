@@ -128,7 +128,9 @@ function Tab({
   return (
     <Link
       href={href}
-      className={`flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-colors ${
+      // `press`: the base press rule in globals.css (fluid-interface 02), since a
+      // Link is not a button; the tab also recolours on press, not only by route.
+      className={`press flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition duration-100 active:text-accent ${
         active ? "text-accent" : muted ? "text-soft/50" : "text-soft"
       }`}
     >
