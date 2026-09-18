@@ -106,6 +106,47 @@ test("seedTopic persists the chosen provider; absent defaults to claude", async 
   expect(rows.find((x) => x.slug === def)?.provider).toBeUndefined();
 });
 
+test("seedTopic stamps the tenant of the site it was created on", async () => {
+  const t = convexTest(schema, modules);
+  await t.mutation(api.tenants.seedTenant, {
+    secret: "test-secret",
+    slug: "upf",
+    displayName: "UPF",
+    theme: {
+      light: {
+        paper: "#fff", card: "#fff", ink: "#000", soft: "#111", line: "#222",
+        accent: "#333", accent2: "#444", gold: "#555", hi: "#666",
+        danger: "#777", good: "#888", "good-b": "#999", bad: "#aaa", "bad-b": "#bbb",
+      },
+    },
+    flags: { certificates: true, translations: true, publicLinks: true, qa: true, seeding: true },
+  });
+  const alice = await seedMember(t, "alice@example.com");
+  const bob = await seedMember(t, "bob@example.com");
+
+  // Created on upf.my-course.app: the course belongs to that tenant, so it lists
+  // in the tenant's catalogue and its canonical host stays the subdomain.
+  const { slug } = await asUser(t, alice).mutation(api.content.authoring.seedTopic, {
+    title: "Tenant Course",
+    why: "y",
+    tenantSlug: "upf",
+  });
+  // Created on the default site: no tenant, exactly as before.
+  const { slug: dflt } = await asUser(t, bob).mutation(api.content.authoring.seedTopic, { title: "Apex Course", why: "y" });
+
+  const rows = await t.run((ctx) => ctx.db.query("topics").collect());
+  expect(rows.find((x) => x.slug === slug)?.tenantSlug).toBe("upf");
+  expect(rows.find((x) => x.slug === dflt)?.tenantSlug).toBeUndefined();
+});
+
+test("seedTopic refuses a tenant slug with no tenant row", async () => {
+  const t = convexTest(schema, modules);
+  const alice = await seedMember(t, "alice@example.com");
+  await expect(
+    asUser(t, alice).mutation(api.content.authoring.seedTopic, { title: "Nowhere", why: "y", tenantSlug: "ghost" }),
+  ).rejects.toThrow();
+});
+
 test("seedTopic caps a non-Admin to one new course per day; the Admin is exempt", async () => {
   const t = convexTest(schema, modules);
   const alice = await seedMember(t, "alice@example.com");

@@ -232,24 +232,24 @@ test("tryAcquireTranslation acquires when translations is on (and on the default
   ).resolves.toMatchObject({ acquired: true });
 });
 
-// ---- seeding flag → seedTopic (gated by the CALLER's own tenantSlug) ---------
+// ---- seeding flag: seedTopic, gated by the tenant of the site it is created on
 
-test("seedTopic throws when the caller's own tenant seeding flag is off", async () => {
+test("seedTopic throws when the seeding flag of the site it is created on is off", async () => {
   const t = convexTest(schema, modules);
   await seedTenant(t, "upf", { seeding: false });
   const alice = await seedUser(t, "alice@example.com", "upf");
   await expect(
-    asUser(t, alice).mutation(api.content.authoring.seedTopic, { title: "New Course", why: "because" }),
+    asUser(t, alice).mutation(api.content.authoring.seedTopic, { title: "New Course", why: "because", tenantSlug: "upf" }),
   ).rejects.toThrow();
 });
 
-test("seedTopic succeeds when the caller's tenant seeding is on, and for a default-site user", async () => {
+test("seedTopic succeeds when the site's seeding is on, and on the default site", async () => {
   const t = convexTest(schema, modules);
   await seedTenant(t, "upf");
   const scoped = await seedUser(t, "scoped@example.com", "upf");
   const dflt = await seedUser(t, "default@example.com");
   await expect(
-    asUser(t, scoped).mutation(api.content.authoring.seedTopic, { title: "Scoped Course", why: "y" }),
+    asUser(t, scoped).mutation(api.content.authoring.seedTopic, { title: "Scoped Course", why: "y", tenantSlug: "upf" }),
   ).resolves.toMatchObject({ slug: expect.any(String) });
   await expect(
     asUser(t, dflt).mutation(api.content.authoring.seedTopic, { title: "Default Course", why: "y" }),

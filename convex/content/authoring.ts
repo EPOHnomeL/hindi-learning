@@ -21,12 +21,19 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const seedTopic = mutation({
   // `provider` (ADR 0014) is chosen at creation; omit for the Claude default so
   // an absent value on the row reads as `claude` (schema + fire branch agree).
+  // `tenantSlug` is the SITE THE COURSE IS CREATED ON, resolved server-side from
+  // the Host and passed down by the client (`useTenantSlug()`), exactly as the
+  // catalogue read is scoped. It is NOT read off the account: `users.tenantSlug`
+  // is never written (see catalogue.ts), so a tenant member's new course used to
+  // land untenanted, missing from their subdomain's catalogue and bounced off the
+  // subdomain to the apex by the course layout's canonical redirect (2026-09-18).
   args: {
     title: v.string(),
     why: v.string(),
     provider: v.optional(v.union(v.literal("claude"), v.literal("openrouter"))),
+    tenantSlug: v.optional(v.string()),
   },
-  handler: async (ctx, { title, why, provider }): Promise<{ slug: string }> => {
+  handler: async (ctx, { title, why, provider, tenantSlug }): Promise<{ slug: string }> => {
     const userId = await getAuthUserId(ctx);
     if (!userId) throw new Error("unauthenticated");
     // Course creation is Allowlist-gated (ADR 0021): sign-up is open, so the
@@ -36,10 +43,12 @@ export const seedTopic = mutation({
     if (!user?.email || !(await isEmailAdmitted(ctx, user.email))) {
       throw new Error("Course creation is limited to Allowlisted emails.");
     }
-    // Whitelabel: seeding a course is create-side — gated by the CALLER's own
-    // tenant `seeding` flag (there's no Topic yet at creation, so the tenant comes
-    // from the user, not a Topic). No-op for a default-site user (issue 17).
-    await assertTenantFlag(ctx, user.tenantSlug, "seeding");
+    // Whitelabel: seeding a course is create-side, gated by the `seeding` flag of
+    // the tenant whose site it is being created on (there is no Topic yet at
+    // creation). A no-op on the default site (issue 17). `assertTenantFlag` fails
+    // closed on a slug with no `tenants` row, which is also what validates the
+    // client-supplied slug before it is stamped below.
+    await assertTenantFlag(ctx, tenantSlug, "seeding");
     // One new course per user per day (issue 08, bounds Claude usage). Exempt: an
     // Admin (they drive the app and aren't the runaway-usage risk this guards
     // against, mirroring the routine's on-demand bypass) and any member whose
@@ -68,6 +77,7 @@ export const seedTopic = mutation({
       seed: why,
       status: "seeded",
       ...(provider === "openrouter" ? { provider } : {}),
+      ...(tenantSlug ? { tenantSlug } : {}),
     });
     return { slug };
   },

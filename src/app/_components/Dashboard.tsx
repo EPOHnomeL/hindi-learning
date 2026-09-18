@@ -817,6 +817,10 @@ function EmptyLibrary() {
 function NewCourseCard() {
   const t = useTranslations("Dashboard");
   const seedTopic = useMutation(api.content.authoring.seedTopic);
+  // The site being browsed, resolved server-side from the Host. The new course is
+  // stamped with it so it lists in this tenant's catalogue and its canonical host
+  // stays this subdomain, instead of bouncing to the apex (2026-09-18).
+  const tenantSlug = useTenantSlug();
   const requestSetup = useAction(api.routine.requestSetup);
   const { uploadFile, addLink } = useResourceUpload();
   const router = useRouter();
@@ -864,7 +868,7 @@ function NewCourseCard() {
         const chosenLinks = links;
         const chosenFiles = files;
         try {
-          const { slug } = await seedTopic({ title: trimmed, why: why.trim(), provider });
+          const { slug } = await seedTopic({ title: trimmed, why: why.trim(), provider, ...(tenantSlug ? { tenantSlug } : {}) });
           // Land on the new course immediately so the learner sees its "setting up"
           // page right away — instead of watching this form sit in "Creating…"
           // (next to the card the reactive dashboard has already rendered) for the
