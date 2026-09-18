@@ -628,7 +628,7 @@
     "hero": {
       "eyebrow": "Un studio de cours par IA",
       "headline": "Transformez des livres denses et des notes en <em>cours interactifs</em> que vous terminerez vraiment.",
-      "subhead": "Importez un manuel, un livre ou vos notes. My Course en fait de courtes leçons avec des quiz intégrés et un tuteur à qui poser vos questions en pleine leçon. À partir de vos sources et de rien d’autre.",
+      "subhead": "Importez un manuel, un livre ou vos notes. My Course en fait de courtes leçons avec des quiz intégrés, et vos questions façonnent la suivante. À partir de vos sources et de rien d’autre.",
       "getStarted": "Commencer",
       "sampleLesson": "Voir une leçon d’exemple",
       "materialsPill": "Fonctionne avec les livres, les Écritures, les procédures d’entreprise et les notes de cours"
@@ -663,6 +663,18 @@
       "share": {
         "title": "Partagez-le",
         "body": "Par e-mail, en lecture seule ou modifiable, ou par un lien public ouvert à tous."
+      },
+      "audio": {
+        "title": "Écoutez plutôt",
+        "body": "Appuyez sur lecture et la leçon vous est lue à voix haute."
+      },
+      "certificate": {
+        "title": "Un certificat à la fin",
+        "body": "Terminez le cours et téléchargez-en un à votre nom."
+      },
+      "install": {
+        "title": "Installez-le comme une app",
+        "body": "Ajoutez-le à votre écran d’accueil et ouvrez-le comme n’importe quelle app."
       }
     },
     "mocks": {
@@ -676,8 +688,8 @@
         "body": "De courtes questions dans la leçon, corrigées sur place. Touchez-en une."
       },
       "ask": {
-        "title": "Demandez là où vous bloquez",
-        "body": "La réponse arrive sous le paragraphe concerné, dans votre prochaine leçon."
+        "title": "Demandez, un enseignant répond",
+        "body": "Laissez une question sous une leçon. Elle y trouve sa réponse, et la leçon suivante s’écrit en sachant que vous l’avez posée."
       },
       "phone": {
         "courseTitle": "Le ciel nocturne, d'après votre guide de terrain",
@@ -688,18 +700,19 @@
         "quizOptionB": "Mercure",
         "quizOptionC": "Mars",
         "askedQuestion": "Pourquoi Mercure n'est-elle pas une géante gazeuse ?",
-        "askedReply": "Bonne question — tout se joue sur la masse.",
-        "askedFollowUp": "Donc tout se résume à la masse ?",
         "quizFeedback": "Exact. Jupiter est surtout faite d’hydrogène et d’hélium, sans surface solide.",
         "quizRetry": "Pas tout à fait. Essayez une autre réponse.",
-        "quizNudge": "Touchez une réponse pour essayer."
+        "quizNudge": "Touchez une réponse pour essayer.",
+        "askHeading": "Questions et retours",
+        "askTeacher": "Enseignant",
+        "askPlaceholder": "Votre question ou remarque…"
       }
     },
     "capabilities": {
       "heading": "Conçu en Afrique du Sud, pour partout où vous lisez",
       "body": "Un petit studio, un vrai support, et un cours qui tient dans un téléphone.",
-      "t1v": "1:1",
-      "t1l": "Demandez en pleine leçon, réponse à la suivante",
+      "t1v": "1",
+      "t1l": "Source suffit pour lancer un cours",
       "t2v": "100+",
       "t2l": "Langues dans lesquelles un cours peut être réécrit",
       "t3v": "6",
@@ -709,7 +722,7 @@
     },
     "founder": {
       "quote": "« J’en avais assez d’enregistrer de longs livres et des PDF denses que je ne retiendrais jamais, et assez des chats IA génériques qui déversent cinq paragraphes oubliés dans l’heure. J’ai construit My Course parce qu’apprendre vraiment demande du rappel actif : lire un court passage, répondre à un quiz pour se vérifier, et obtenir d’un tuteur patient la réponse à votre question précise, là où vous avez bloqué. Fondé uniquement sur les sources auxquelles vous faites vraiment confiance. »",
-      "byline": "Jonathan Vorster, créateur de My Course"
+      "byline": "Jonathan Vorster, fondateur de My Course"
     },
     "faq": {
       "heading": "Vos questions, nos réponses.",
@@ -724,7 +737,7 @@
       "q5": "Puis-je partager un cours avec quelqu'un ?",
       "a5": "De trois façons : par e-mail en lecture seule, par e-mail avec droits de modification, ou via un lien public anonyme que n'importe qui peut ouvrir sans compte.",
       "chatgptQ": "Pourquoi ne pas simplement coller mon PDF dans ChatGPT ?",
-      "chatgptA": "ChatGPT vous rend un mur de texte que vous parcourez et oubliez avant le déjeuner. My Course découpe votre lecture en courtes leçons avec des quiz, des fiches qui suivent, et des questions qui restent attachées à la phrase qui les a suscitées."
+      "chatgptA": "ChatGPT vous rend un mur de texte que vous parcourez et oubliez avant le déjeuner. My Course découpe votre lecture en courtes leçons avec des quiz, des fiches qui suivent, et un espace sous chaque leçon pour interroger un enseignant."
     },
     "interest": {
       "heading": "Pas encore prêt à en lancer un ?",

@@ -628,7 +628,7 @@
     "hero": {
       "eyebrow": "An AI course studio",
       "headline": "Turn dense books and notes into <em>interactive courses</em> you’ll actually finish.",
-      "subhead": "Upload a handbook, a textbook or your notes. My Course turns it into short lessons with quizzes built in and a tutor you can ask mid-lesson. From your sources and nothing else.",
+      "subhead": "Upload a handbook, a textbook or your notes. My Course turns it into short lessons with quizzes built in, and your questions shape the next one. From your sources and nothing else.",
       "getStarted": "Get started",
       "sampleLesson": "Preview a sample lesson",
       "materialsPill": "Works with books, scripture, company SOPs, and lecture notes"
@@ -663,6 +663,18 @@
       "share": {
         "title": "Share it",
         "body": "By email, read-only or editable, or as a public link anyone can open."
+      },
+      "audio": {
+        "title": "Listen instead",
+        "body": "Press play and the lesson is read aloud to you."
+      },
+      "certificate": {
+        "title": "A certificate at the end",
+        "body": "Finish the course and download one with your name on it."
+      },
+      "install": {
+        "title": "Install it like an app",
+        "body": "Add it to your home screen and open it like anything else on your phone."
       }
     },
     "mocks": {
@@ -676,8 +688,8 @@
         "body": "Short questions inside the lesson, marked on the spot. Tap one."
       },
       "ask": {
-        "title": "Ask where you're stuck",
-        "body": "The answer lands under the paragraph you asked about, in your next lesson."
+        "title": "Ask, and a teacher answers",
+        "body": "Leave a question under a lesson. It is answered there, and the next lesson is written knowing you asked."
       },
       "phone": {
         "courseTitle": "The Night Sky, from Your Field Guide",
@@ -688,18 +700,19 @@
         "quizOptionB": "Mercury",
         "quizOptionC": "Mars",
         "askedQuestion": "Why isn't Mercury a gas giant?",
-        "askedReply": "Good question — it comes down to mass.",
-        "askedFollowUp": "So mass is the whole story?",
         "quizFeedback": "Right. Jupiter is mostly hydrogen and helium, with no solid surface.",
         "quizRetry": "Not quite. Try another.",
-        "quizNudge": "Tap an answer to try it."
+        "quizNudge": "Tap an answer to try it.",
+        "askHeading": "Questions & feedback",
+        "askTeacher": "Teacher",
+        "askPlaceholder": "Your question or feedback…"
       }
     },
     "capabilities": {
       "heading": "Built in South Africa, for wherever you're reading",
       "body": "A small studio, real support, and a course that fits on a phone.",
-      "t1v": "1:1",
-      "t1l": "Ask mid-lesson, answered next lesson",
+      "t1v": "1",
+      "t1l": "Source is enough to start a course",
       "t2v": "100+",
       "t2l": "Languages a course can be re-authored in",
       "t3v": "6",
@@ -709,7 +722,7 @@
     },
     "founder": {
       "quote": "“I got tired of saving long books and dense PDFs that I’d never actually retain, and tired of generic AI chat that dumps five paragraphs you forget within the hour. I built My Course because real learning needs active recall: read a bite-sized piece, answer a quiz to check yourself, and have a patient tutor answer your exact question right where you got stuck. Grounded only in the sources you actually trust.”",
-      "byline": "Jonathan Vorster, builder of My Course"
+      "byline": "Jonathan Vorster, founder of My Course"
     },
     "faq": {
       "heading": "Questions, answered.",
@@ -724,7 +737,7 @@
       "q5": "Can I share a course with someone else?",
       "a5": "Three ways: by email as a read-only viewer, by email with editing rights, or as an anonymous public link anyone can open without an account.",
       "chatgptQ": "Why not just paste my PDF into ChatGPT?",
-      "chatgptA": "ChatGPT hands you a wall of text you skim and forget by lunch. My Course splits your reading into short lessons with quizzes, cheat-sheets that stay current, and questions that stay pinned to the sentence that prompted them."
+      "chatgptA": "ChatGPT hands you a wall of text you skim and forget by lunch. My Course splits your reading into short lessons with quizzes, cheat-sheets that stay current, and a place under each lesson to ask a teacher."
     },
     "interest": {
       "heading": "Not ready to start one yet?",

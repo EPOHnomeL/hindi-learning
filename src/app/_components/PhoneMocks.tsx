@@ -64,13 +64,15 @@ export type PhoneMockCopy = {
   /** The invitation to tap, shown until something is chosen. Omit and the
    *  question stands alone. */
   quizNudge?: string;
+  /** The heading of the lesson's Q&A card, as the reader labels it
+   *  ("Questions & feedback"). */
+  askHeading?: string;
   /** What the learner asked. */
   askedQuestion: string;
-  /** What came back, inline. */
-  askedReply: string;
-  /** The follow-up. A thread with one exchange in it isn't a conversation, and it
-   *  left a third of the frame empty. */
-  askedFollowUp: string;
+  /** The label over the reply ("Teacher"). */
+  askTeacher?: string;
+  /** The ask box's placeholder ("Your question or feedback…"). */
+  askPlaceholder?: string;
 };
 
 // The shared phone shell: status bar, the reader's own top bar, content. Fixed
@@ -275,32 +277,38 @@ export function QuizMock({ copy }: { copy: PhoneMockCopy }) {
   );
 }
 
-// 3 — asking mid-lesson and getting an answer in the lesson where you asked it.
+// 3 — the lesson's Questions & feedback card, as the reader actually draws it
+// (`GuestQuestions` in PublicReader, the ask box in ArtifactView): the learner's
+// question, the teacher's reply in a gold-tinted block ruled on its start edge,
+// and the ask box beneath. Redrawn 2026-09-18: the previous frame showed a chat
+// thread with a follow-up bubble, which is a conversation the product does not
+// have. A question is answered under the lesson, once, by the teacher.
 export function AskMock({ copy }: { copy: PhoneMockCopy }) {
   return (
     <Phone copy={copy}>
       <LessonHead copy={copy} />
-      <div className="mt-2 space-y-2">
-        {/* The learner's question — right-aligned, the universal "mine". */}
-        <div className="ms-6 rounded-md rounded-ee-sm bg-hi px-2 py-1.5 text-[11px] leading-snug text-ink">
-          {copy.askedQuestion}
+      <Prose widths={[100, 92, 64]} />
+      <div className="mt-3 rounded-lg border border-line bg-card p-2 shadow-sm">
+        {copy.askHeading && (
+          <div className="text-[8px] font-semibold uppercase tracking-[0.16em] text-accent2">{copy.askHeading}</div>
+        )}
+        <p className="mt-1.5 text-[11px] font-medium leading-snug text-ink">{copy.askedQuestion}</p>
+        <div className="mt-1.5 rounded-md border-s-2 border-accent2 bg-hi px-2 py-1.5">
+          {copy.askTeacher && (
+            <div className="text-[8px] font-semibold uppercase tracking-[0.16em] text-accent2">{copy.askTeacher}</div>
+          )}
+          <Prose widths={[100, 94, 88, 60]} />
         </div>
-        {/* The reply, inline and attributed with the same avatar treatment the
-            reader uses. */}
-        <div className="me-4 flex items-start gap-1.5">
-          <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-accent/15 text-accent">
-            <Icon name="book" className="h-2 w-2" />
-          </span>
-          <span className="rounded-md rounded-es-sm border border-line bg-card px-2 py-1.5">
-            <span className="block text-[11px] leading-snug text-soft">{copy.askedReply}</span>
-            <Prose widths={[92, 100, 88, 96, 70]} />
-          </span>
-        </div>
-        {/* The follow-up, so the frame shows a conversation rather than a single
-            answered question. */}
-        <div className="ms-6 rounded-md rounded-ee-sm bg-hi px-2 py-1.5 text-[11px] leading-snug text-ink">
-          {copy.askedFollowUp}
-        </div>
+        {copy.askPlaceholder && (
+          <div className="mt-2 flex items-center gap-1.5">
+            <span className="min-w-0 flex-1 truncate rounded-md border border-line bg-card px-2 py-1.5 text-[10px] text-soft">
+              {copy.askPlaceholder}
+            </span>
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-accent text-white">
+              <Icon name="arrow" className="h-3 w-3" />
+            </span>
+          </div>
+        )}
       </div>
     </Phone>
   );

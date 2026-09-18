@@ -628,7 +628,7 @@
     "hero": {
       "eyebrow": "’n KI-kursusstudio",
       "headline": "Verander digte boeke en notas in <em>interaktiewe kursusse</em> wat jy werklik sal voltooi.",
-      "subhead": "Laai ’n handleiding, ’n handboek of jou notas op. My Course maak daarvan kort lesse met ingeboude vasvrae en ’n tutor wat jy tydens die les kan vra. Uit jou bronne en niks anders nie.",
+      "subhead": "Laai ’n handleiding, ’n handboek of jou notas op. My Course maak daarvan kort lesse met ingeboude vasvrae, en jou vrae vorm die volgende een. Uit jou bronne en niks anders nie.",
       "getStarted": "Kom aan die gang",
       "sampleLesson": "Bekyk ’n voorbeeldles",
       "materialsPill": "Werk met boeke, die Skrif, maatskappyprosedures en lesingnotas"
@@ -663,6 +663,18 @@
       "share": {
         "title": "Deel dit",
         "body": "Per e-pos, leesalleen of redigeerbaar, of as ’n openbare skakel wat enigiemand kan oopmaak."
+      },
+      "audio": {
+        "title": "Luister eerder",
+        "body": "Druk speel en die les word vir jou voorgelees."
+      },
+      "certificate": {
+        "title": "’n Sertifikaat aan die einde",
+        "body": "Voltooi die kursus en laai een af met jou naam op."
+      },
+      "install": {
+        "title": "Installeer dit soos ’n app",
+        "body": "Voeg dit by jou tuisskerm en maak dit oop soos enigiets anders op jou foon."
       }
     },
     "mocks": {
@@ -676,8 +688,8 @@
         "body": "Kort vrae binne die les, dadelik gemerk. Tik een."
       },
       "ask": {
-        "title": "Vra waar jy vashaak",
-        "body": "Die antwoord land onder die paragraaf waaroor jy gevra het, in jou volgende les."
+        "title": "Vra, en ’n onderwyser antwoord",
+        "body": "Laat ’n vraag onder ’n les. Dit word daar beantwoord, en die volgende les word geskryf met jou vraag in gedagte."
       },
       "phone": {
         "courseTitle": "Die Naghemel, uit Jou Veldgids",
@@ -688,18 +700,19 @@
         "quizOptionB": "Mercurius",
         "quizOptionC": "Mars",
         "askedQuestion": "Waarom is Mercurius nie ’n gasreus nie?",
-        "askedReply": "Goeie vraag — dit kom neer op massa.",
-        "askedFollowUp": "So massa is die hele storie?",
         "quizFeedback": "Reg. Jupiter bestaan meestal uit waterstof en helium, sonder ’n vaste oppervlak.",
         "quizRetry": "Nie heeltemal. Probeer ’n ander een.",
-        "quizNudge": "Tik ’n antwoord om dit te probeer."
+        "quizNudge": "Tik ’n antwoord om dit te probeer.",
+        "askHeading": "Vrae & terugvoer",
+        "askTeacher": "Onderwyser",
+        "askPlaceholder": "Jou vraag of terugvoer…"
       }
     },
     "capabilities": {
       "heading": "In Suid-Afrika gebou, vir waar jy ook al lees",
       "body": "’n Klein ateljee, egte ondersteuning, en ’n kursus wat op ’n foon pas.",
-      "t1v": "1:1",
-      "t1l": "Vra tydens ’n les, in die volgende les geantwoord",
+      "t1v": "1",
+      "t1l": "Bron is genoeg om ’n kursus te begin",
       "t2v": "100+",
       "t2l": "Tale waarin ’n kursus herskryf kan word",
       "t3v": "6",
@@ -709,7 +722,7 @@
     },
     "founder": {
       "quote": "“Ek was moeg daarvoor om lang boeke en digte PDF’s te bewaar wat ek nooit werklik sou onthou, en moeg vir generiese KI-geselsies wat vyf paragrawe uitstort wat jy binne ’n uur vergeet. Ek het My Course gebou omdat regte leer aktiewe herroeping nodig het: lees ’n kort stukkie, beantwoord ’n vasvra om jouself te toets, en laat ’n geduldige tutor jou presiese vraag beantwoord net daar waar jy vasgehaak het. Slegs gegrond op die bronne wat jy werklik vertrou.”",
-      "byline": "Jonathan Vorster, bouer van My Course"
+      "byline": "Jonathan Vorster, stigter van My Course"
     },
     "faq": {
       "heading": "Vrae, geantwoord.",
@@ -724,7 +737,7 @@
       "q5": "Kan ek ’n kursus met iemand anders deel?",
       "a5": "Op drie maniere: per e-pos as ’n leesalleen-kyker, per e-pos met redigeerregte, of as ’n anonieme openbare skakel wat enigiemand sonder ’n rekening kan oopmaak.",
       "chatgptQ": "Hoekom plak ek nie net my PDF in ChatGPT?",
-      "chatgptA": "ChatGPT gee jou ’n muur van teks wat jy vlugtig lees en teen middagete vergeet. My Course verdeel jou leeswerk in kort lesse met vasvrae, opsommings wat bybly, en vrae wat vas bly aan die sin wat hulle laat ontstaan het."
+      "chatgptA": "ChatGPT gee jou ’n muur van teks wat jy vlugtig lees en teen middagete vergeet. My Course verdeel jou leeswerk in kort lesse met vasvrae, opsommings wat bybly, en ’n plek onder elke les om ’n onderwyser te vra."
     },
     "interest": {
       "heading": "Nog nie gereed om een te begin nie?",

@@ -628,7 +628,7 @@
     "hero": {
       "eyebrow": "Un estudio de cursos con IA",
       "headline": "Convierte libros densos y apuntes en <em>cursos interactivos</em> que de verdad terminarás.",
-      "subhead": "Sube un manual, un libro de texto o tus apuntes. My Course lo convierte en lecciones cortas con cuestionarios integrados y un tutor al que preguntar durante la lección. Desde tus fuentes y nada más.",
+      "subhead": "Sube un manual, un libro de texto o tus apuntes. My Course lo convierte en lecciones cortas con cuestionarios integrados, y tus preguntas dan forma a la siguiente. Desde tus fuentes y nada más.",
       "getStarted": "Empezar",
       "sampleLesson": "Ver una lección de muestra",
       "materialsPill": "Funciona con libros, Escrituras, procedimientos de empresa y apuntes de clase"
@@ -663,6 +663,18 @@
       "share": {
         "title": "Compártelo",
         "body": "Por correo, solo lectura o editable, o como enlace público que cualquiera puede abrir."
+      },
+      "audio": {
+        "title": "Escúchala",
+        "body": "Pulsa play y la lección se lee en voz alta."
+      },
+      "certificate": {
+        "title": "Un certificado al final",
+        "body": "Termina el curso y descarga uno con tu nombre."
+      },
+      "install": {
+        "title": "Instálalo como una app",
+        "body": "Añádelo a tu pantalla de inicio y ábrelo como cualquier otra app del teléfono."
       }
     },
     "mocks": {
@@ -676,8 +688,8 @@
         "body": "Preguntas cortas dentro de la lección, corregidas al instante. Toca una."
       },
       "ask": {
-        "title": "Pregunta donde te atascas",
-        "body": "La respuesta aparece bajo el párrafo por el que preguntaste, en tu siguiente lección."
+        "title": "Pregunta, y un profesor responde",
+        "body": "Deja una pregunta bajo una lección. Se responde ahí, y la siguiente lección se escribe sabiendo que preguntaste."
       },
       "phone": {
         "courseTitle": "El cielo nocturno, desde tu guía de campo",
@@ -688,18 +700,19 @@
         "quizOptionB": "Mercurio",
         "quizOptionC": "Marte",
         "askedQuestion": "¿Por qué Mercurio no es un gigante gaseoso?",
-        "askedReply": "Buena pregunta: todo se reduce a la masa.",
-        "askedFollowUp": "¿Entonces todo es cuestión de masa?",
         "quizFeedback": "Correcto. Júpiter es sobre todo hidrógeno y helio, sin superficie sólida.",
         "quizRetry": "No exactamente. Prueba otra.",
-        "quizNudge": "Toca una respuesta para probarlo."
+        "quizNudge": "Toca una respuesta para probarlo.",
+        "askHeading": "Preguntas y comentarios",
+        "askTeacher": "Profesor",
+        "askPlaceholder": "Tu pregunta o comentario…"
       }
     },
     "capabilities": {
       "heading": "Hecho en Sudáfrica, para donde sea que estés leyendo",
       "body": "Un estudio pequeño, soporte real y un curso que cabe en un teléfono.",
-      "t1v": "1:1",
-      "t1l": "Pregunta en plena lección, respondida en la siguiente",
+      "t1v": "1",
+      "t1l": "Fuente basta para empezar un curso",
       "t2v": "100+",
       "t2l": "Idiomas en los que se puede reescribir un curso",
       "t3v": "6",
@@ -709,7 +722,7 @@
     },
     "founder": {
       "quote": "“Me cansé de guardar libros largos y PDF densos que nunca llegaría a retener, y de los chats de IA genéricos que sueltan cinco párrafos que olvidas en una hora. Construí My Course porque aprender de verdad exige recuerdo activo: leer un fragmento breve, responder un cuestionario para comprobarlo y que un tutor paciente responda tu pregunta exacta justo donde te atascaste. Basado solo en las fuentes en las que realmente confías.”",
-      "byline": "Jonathan Vorster, creador de My Course"
+      "byline": "Jonathan Vorster, fundador de My Course"
     },
     "faq": {
       "heading": "Preguntas, respondidas.",
@@ -724,7 +737,7 @@
       "q5": "¿Puedo compartir un curso con alguien?",
       "a5": "De tres formas: por correo como lector de solo lectura, por correo con permiso de edición, o como enlace público anónimo que cualquiera puede abrir sin cuenta.",
       "chatgptQ": "¿Por qué no pegar mi PDF en ChatGPT sin más?",
-      "chatgptA": "ChatGPT te entrega un muro de texto que lees por encima y olvidas antes de comer. My Course divide tu lectura en lecciones cortas con cuestionarios, chuletas que se mantienen al día y preguntas que quedan ancladas a la frase que las provocó."
+      "chatgptA": "ChatGPT te entrega un muro de texto que lees por encima y olvidas antes de comer. My Course divide tu lectura en lecciones cortas con cuestionarios, chuletas que se mantienen al día y un lugar bajo cada lección para preguntar a un profesor."
     },
     "interest": {
       "heading": "¿Aún no quieres empezar uno?",

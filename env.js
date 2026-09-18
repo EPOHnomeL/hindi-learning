@@ -13,10 +13,11 @@ export const env = createEnv({
     NEXT_PUBLIC_CONVEX_URL: z.string().url(),
     NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: z.string().min(1).optional(),
     NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
-    // Where the landing page's "Preview a sample lesson" button goes: a public
-    // share link (`/share/<token>`, absolute or relative). Unset, the button
+    // Where the landing page's "Preview a sample lesson" button goes: the FULL
+    // URL of a public share link, so it can point at another tenant's host
+    // (e.g. https://ywampotch.my-course.app/share/<token>). Unset, the button
     // scrolls to the tappable phone mocks instead (landing-page spec, 2026-09-18).
-    NEXT_PUBLIC_SAMPLE_LESSON_URL: z.string().min(1).optional(),
+    NEXT_PUBLIC_SAMPLE_LESSON_URL: z.string().url().optional(),
     // NEXT_PUBLIC_COOKIE_DOMAIN is gone: cookies are host-only so each tenant
     // subdomain has its own session, language and theme (ADR 0025). Don't add it
     // back — a parent `Domain` is exactly what shared one account across brands.

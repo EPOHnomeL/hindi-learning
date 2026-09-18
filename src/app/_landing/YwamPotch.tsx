@@ -58,7 +58,7 @@ const FOCUS_AREAS: { icon: IconName; title: string; body: string }[] = [
 // already written the questions arrive rarely, and a landing page that leads with
 // an answer service promises a conversation the Guest mostly won't have. The
 // `askCta`/`asked*` fields are what the shared row would need for it, and are
-// deliberately left off — bar the `asked*` trio the type still requires.
+// deliberately left off — bar `askedQuestion`, which the type still requires.
 const PHONE_COPY: PhoneMockCopy = {
   courseTitle: "Prophetic School",
   lessonProgress: "Lesson 4 of 12",
@@ -78,8 +78,6 @@ const PHONE_COPY: PhoneMockCopy = {
   ],
   quizFeedback: "That's it — Scripture is the measure a word is held against, never the other way round.",
   askedQuestion: "How do I know it's God's voice and not my own?",
-  askedReply: "A fair question, and the honest answer starts with Scripture.",
-  askedFollowUp: "And if I get it wrong?",
 };
 
 // Capabilities, not traction numbers — the same discipline as the shared landing,

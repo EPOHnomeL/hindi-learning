@@ -30,8 +30,9 @@ import { useTheme } from "./ThemeContext";
 //   - an **objection-first FAQ**, hardest question at the top;
 //   - **one** email-capture form, and its success state replaces it.
 // What was deliberately NOT taken: its form sits above the fold because it has
-// nothing to sell. Ours is below sign-in, because sign-in is the conversion here
-// and the address is the fallback (see InterestForm).
+// nothing to sell. Ours sat below sign-in until 2026-09-18 and now sits mid-page,
+// after the product and the steps; sign-in stays the conversion and the address
+// the fallback (see InterestForm).
 //
 // **The certificate is no longer a section.** It used to have half a page and a
 // live demo card; it is a PNG with no compliance weight behind it, so leading on
@@ -54,11 +55,18 @@ const STEP_KEYS = ["seed", "author", "advance"] as const;
 
 // Only the features the phone mocks do NOT already show. Grounded, interactive
 // and ask used to be cards here too, which said the same thing twice on one
-// page; the three frames under the hero now carry them (2026-09-18).
+// page; the three frames under the hero now carry them (2026-09-18). Every
+// entry here is built and live: narration is the ElevenLabs pilot
+// (convex/lessonAudio.ts), the certificate is /certificate/[token], install is
+// the web manifest plus InstallSheet. Offline READING is not built (ADR 0030),
+// so the install line promises the app, not offline lessons.
 const FEATURE_KEYS: { icon: IconName; key: string }[] = [
   { icon: "refresh", key: "references" },
   { icon: "globe", key: "language" },
+  { icon: "play", key: "audio" },
   { icon: "link", key: "share" },
+  { icon: "certificate", key: "certificate" },
+  { icon: "phone", key: "install" },
 ];
 
 // Icon-only light/dark toggle for the landing nav (ADR 0011) — the same compact
@@ -102,9 +110,10 @@ export function Landing() {
     quizFeedback: t("mocks.phone.quizFeedback"),
     quizRetry: t("mocks.phone.quizRetry"),
     quizNudge: t("mocks.phone.quizNudge"),
+    askHeading: t("mocks.phone.askHeading"),
     askedQuestion: t("mocks.phone.askedQuestion"),
-    askedReply: t("mocks.phone.askedReply"),
-    askedFollowUp: t("mocks.phone.askedFollowUp"),
+    askTeacher: t("mocks.phone.askTeacher"),
+    askPlaceholder: t("mocks.phone.askPlaceholder"),
   };
 
   const tiles: CapabilityTile[] = [1, 2, 3, 4].map((n) => ({
@@ -275,22 +284,38 @@ export function Landing() {
         </ol>
       </section>
 
-      {/* ── The rest of the features, as one quiet strip rather than a second
-             grid of cards. Three items, icon and a line each. ── */}
+      {/* ── The rest of the features: six tiles in one bordered panel, divided
+             by hairlines rather than boxed one by one, each with a gold icon
+             disc, a title and one line. Distinct from the phones above (those
+             show the lesson) and from the capability tiles below (those are
+             numbers). ── */}
       <section className="mx-auto w-full max-w-5xl px-6 pb-20">
-        <div className="land-reveal rounded-xl border border-line bg-card/60 px-6 py-8 sm:px-10">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-accent2">{t("features.heading")}</h2>
-          <ul className="mt-6 grid gap-8 sm:grid-cols-3">
-            {features.map((f) => (
-              <li key={f.key} className="flex gap-3">
-                <Icon name={f.icon} className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
-                <div>
-                  <h3 className="font-semibold text-ink">{f.title}</h3>
-                  <p className="mt-1 text-sm leading-relaxed text-soft">{f.body}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+        <h2 className="text-center text-xs font-semibold uppercase tracking-[0.25em] text-accent2">{t("features.heading")}</h2>
+        <ul className="land-reveal mt-6 grid overflow-hidden rounded-xl border border-line bg-card sm:grid-cols-2 lg:grid-cols-3">
+          {features.map((f) => (
+            <li
+              key={f.key}
+              className="flex gap-4 border-line p-6 transition-colors hover:bg-hi/40 [&:not(:first-child)]:border-t sm:[&:nth-child(2)]:border-t-0 sm:[&:nth-child(even)]:border-s lg:[&:nth-child(3)]:border-t-0 lg:[&:nth-child(even)]:border-s-0 lg:[&:not(:nth-child(3n+1))]:border-s"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold/15 text-accent">
+                <Icon name={f.icon} className="h-5 w-5" />
+              </span>
+              <div>
+                <h3 className="font-semibold text-ink">{f.title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-soft">{f.body}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* ── The softer ask (ADR 0028), mid-page since 2026-09-18 rather than
+             under sign-in: a visitor who has just seen the product and how it
+             works is the one most likely to leave an address, and the ones who
+             scroll on still meet sign-in below. ── */}
+      <section className="border-y border-line bg-card/60">
+        <div className="mx-auto w-full max-w-xl px-6 py-16">
+          <InterestForm source="landing-footer" copy={interestCopy} />
         </div>
       </section>
 
@@ -340,13 +365,6 @@ export function Landing() {
       <section id="get-started" className="cert-stage border-t border-line">
         <div className="relative z-10">
           <SignIn />
-        </div>
-      </section>
-
-      {/* ── The softer ask, for whoever scrolled past sign-in (ADR 0028) ── */}
-      <section className="border-t border-line bg-card/60">
-        <div className="mx-auto w-full max-w-xl px-6 py-16">
-          <InterestForm source="landing-footer" copy={interestCopy} />
         </div>
       </section>
 
