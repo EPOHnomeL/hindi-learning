@@ -837,7 +837,7 @@ function EditionDangerMenu({ topicSlug, edition }: { topicSlug: string; edition:
       {open && (
         <div
           role="menu"
-          className="pop-in absolute bottom-[calc(100%+6px)] start-0 z-50 min-w-56 rounded-xl border border-line bg-card p-1.5 shadow-xl"
+          className="pop-in absolute bottom-[calc(100%+6px)] start-0 z-50 min-w-56 rounded-xl border border-line bg-card p-1.5 shadow-md"
         >
           {canRegenerate && (
             <MenuItem icon="refresh" onClick={() => pick("regenerate")}>

@@ -233,7 +233,7 @@ export function Menu({
         <div
           role="menu"
           onAnimationEnd={exit.onAnimationEnd}
-          className={`${exit.leaving ? "pop-out pointer-events-none" : "pop-in"} absolute end-0 top-[calc(100%+6px)] z-50 min-w-[216px] origin-top-right rounded-xl border border-line bg-card p-1.5 shadow-xl rtl:origin-top-left`}
+          className={`${exit.leaving ? "pop-out pointer-events-none" : "pop-in"} absolute end-0 top-[calc(100%+6px)] z-50 min-w-[216px] origin-top-right rounded-xl border border-line bg-card p-1.5 shadow-md rtl:origin-top-left`}
         >
           {children(() => setOpen(false))}
         </div>

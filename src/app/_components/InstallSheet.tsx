@@ -110,7 +110,7 @@ export function InstallSheet({ armed = false }: { armed?: boolean } = {}) {
     // chrome while it is up.
     <div
       onAnimationEnd={exit.onAnimationEnd}
-      className={`${exit.leaving ? "sheet-out pointer-events-none" : "sheet-in"} fixed inset-x-0 bottom-0 z-[60] border-t border-line bg-card p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-lg`}
+      className={`${exit.leaving ? "sheet-out pointer-events-none" : "sheet-in"} chrome chrome--card fixed inset-x-0 bottom-0 z-[60] p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-lg`}
     >
       <div className="mx-auto flex max-w-md flex-col gap-3">
         <Brand />

@@ -702,8 +702,8 @@ function LessonView({
         {/* Title + actions: a sticky bar under the mobile header; inline on desktop.
             Rises to the top edge in step with the header as it hides on scroll. */}
         <div
-          className={`sticky z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
-            navHidden ? "top-0" : "top-12"
+          className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 flex items-center justify-between gap-3 px-3 py-2 transition-transform duration-300 md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
+            navHidden ? "translate-y-0" : "translate-y-12"
           }`}
         >
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
@@ -1083,8 +1083,9 @@ function ContentEditor({
 // **Mobile: `fixed`, riding with the nav.** `AppTabs` tucks away on scroll in
 // the reader (`useHideOnScroll`), so a bar pinned above it would strand a gap.
 // This takes the same signal and slides down into the space the nav vacates,
-// the mirror of what the lesson title bar does with `top-12`/`top-0`, so the
-// control is never off-screen. `z-20`, under the lesson drawer (z-40) and its
+// the mirror of what the lesson title bar does. Both move by transform now
+// (fluid-interface 06): the dock is pinned `bottom-0` and rides up 4.75rem
+// while the nav is showing, rather than animating `bottom` itself. `z-20`, under the lesson drawer (z-40) and its
 // scrim (z-30): opening the lesson list dims the dock with the rest of the page.
 //
 // **Desktop: `sticky` inside the lesson column**, because the column is its own
@@ -1139,8 +1140,8 @@ function NarrationDock({
           desktop the bar is in the flow of the column it sticks to. */}
       <div aria-hidden className="h-14 md:hidden" />
       <div
-        className={`fixed inset-x-0 z-20 border-t border-line bg-card transition-[bottom] duration-300 md:sticky md:bottom-0 md:z-auto md:mt-2 md:rounded-t-xl md:border-x ${
-          navHidden ? "bottom-0" : "bottom-[4.75rem]"
+        className={`chrome chrome--card fixed inset-x-0 bottom-0 z-20 shadow-lg transition-transform duration-300 md:sticky md:z-auto md:mt-2 md:translate-y-0 md:rounded-t-xl md:border-x md:border-line ${
+          navHidden ? "translate-y-0" : "-translate-y-[4.75rem]"
         }`}
       >
         <div className="h-[3px] w-full bg-line">
@@ -1454,12 +1455,14 @@ function ReferenceView({
   }
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3 md:overflow-y-auto">
+      {/* `truncate` sits on the inner span, not the h2: the h2 owns the
+          scroll-edge fade, and `overflow: hidden` would clip the ::after away. */}
       <h2
-        className={`sticky z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
-          navHidden ? "top-0" : "top-12"
+        className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 px-3 py-2 text-lg font-semibold transition-transform duration-300 md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
+          navHidden ? "translate-y-0" : "translate-y-12"
         }`}
       >
-        {ref.title}
+        <span className="block truncate">{ref.title}</span>
       </h2>
       {/* References carry no dark CSS of their own, so themeCss injects the dark
           palette (ADR 0011) — the theme then flips them with the rest of the app.

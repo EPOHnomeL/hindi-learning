@@ -140,7 +140,7 @@ export function PublicCourseShell({ src, children }: { src: GuestSource; childre
     <Ctx.Provider value={{ src, course, completed, markComplete }}>
       <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
         <header
-          className={`sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 transition-transform duration-300 md:hidden ${
+          className={`chrome chrome--top sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 px-3 transition-transform duration-300 md:hidden ${
             navHidden ? "-translate-y-full" : "translate-y-0"
           }`}
         >
@@ -367,8 +367,8 @@ export function PublicLessonPane({ src, lessonKey }: { src: GuestSource; lessonK
     <div className="flex flex-col gap-4 md:h-full md:flex-row">
       <div className="flex min-h-0 flex-1 flex-col gap-0 md:gap-3 md:overflow-y-auto">
         <div
-          className={`sticky z-20 flex items-center justify-between gap-3 border-b border-line bg-paper px-3 py-2 transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
-            navHidden ? "top-0" : "top-12"
+          className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 flex items-center justify-between gap-3 px-3 py-2 transition-transform duration-300 md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
+            navHidden ? "translate-y-0" : "translate-y-12"
           }`}
         >
           <h2 className="min-w-0 truncate text-lg font-semibold">{lesson.title}</h2>
@@ -512,12 +512,14 @@ export function PublicReferencePane({ src, refKey }: { src: GuestSource; refKey:
   }
   return (
     <div className="flex flex-col gap-0 md:h-full md:gap-3 md:overflow-y-auto">
+      {/* `truncate` sits on the inner span, not the h2: the h2 owns the
+          scroll-edge fade, and `overflow: hidden` would clip the ::after away. */}
       <h2
-        className={`sticky z-20 truncate border-b border-line bg-paper px-3 py-2 text-lg font-semibold transition-[top] duration-300 md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:py-0 ${
-          navHidden ? "top-0" : "top-12"
+        className={`chrome chrome--top chrome--mobile chrome-fade sticky top-0 z-20 px-3 py-2 text-lg font-semibold transition-transform duration-300 md:static md:z-auto md:translate-y-0 md:px-0 md:py-0 ${
+          navHidden ? "translate-y-0" : "translate-y-12"
         }`}
       >
-        {ref.title}
+        <span className="block truncate">{ref.title}</span>
       </h2>
       <Frame html={html} withBridge={false} theme={theme} themeCss dir={course.dir} lang={course.lang} resources={course.resources} reference cardTarget={cardTarget} share={share} />
     </div>

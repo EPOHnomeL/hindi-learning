@@ -181,7 +181,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             2026-08-23), so the old back arrow is a hamburger: both it and the
             course title open the lesson drawer. */}
         <header
-          className={`sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 border-b border-line bg-paper px-3 transition-transform duration-300 md:hidden ${
+          className={`chrome chrome--top sticky top-0 z-30 flex h-12 shrink-0 items-center gap-3 px-3 transition-transform duration-300 md:hidden ${
             navHidden ? "-translate-y-full" : "translate-y-0"
           }`}
         >

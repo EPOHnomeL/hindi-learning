@@ -69,7 +69,7 @@ function Tabs() {
       {onHome && last && (
         <Link
           href={continueHref}
-          className="fixed inset-x-3 bottom-[4.75rem] z-40 flex items-center gap-3 rounded-2xl border border-line bg-card px-3 py-2.5 shadow-lg md:hidden"
+          className="chrome chrome--card fixed inset-x-3 bottom-[4.75rem] z-40 flex items-center gap-3 rounded-2xl px-3 py-2.5 shadow-lg md:hidden"
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-hi text-sm font-bold text-accent">
             {lesson?.seq ?? "?"}
@@ -87,7 +87,7 @@ function Tabs() {
       )}
 
       <nav
-        className={`fixed inset-x-0 bottom-0 z-50 grid h-[4.75rem] border-t border-line bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur transition-transform duration-300 md:hidden ${
+        className={`chrome fixed inset-x-0 bottom-0 z-50 grid h-[4.75rem] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 md:hidden ${
           isAdmin ? "grid-cols-4" : "grid-cols-3"
         } ${navHidden && onCourse ? "translate-y-full" : "translate-y-0"}`}
       >
