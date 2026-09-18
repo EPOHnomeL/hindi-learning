@@ -155,6 +155,15 @@ export const setTopicPublic = mutation({
     if (isPublic) await assertTenantFlag(ctx, topic.tenantSlug, "publicLinks");
     const publicToken = isPublic ? mintToken() : undefined;
     await ctx.db.patch(topic._id, { publicToken });
+    const existing = await ctx.db
+      .query("publicLinks")
+      .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", SOURCE_LANG))
+      .unique();
+    if (!isPublic) {
+      if (existing) await ctx.db.delete(existing._id);
+    } else if (existing && publicToken) {
+      await ctx.db.patch(existing._id, { token: publicToken });
+    }
     return publicToken ?? null;
   },
 });
@@ -178,6 +187,15 @@ export const setEditionPublic = mutation({
     if (lang === SOURCE_LANG) {
       const publicToken = isPublic ? mintToken() : undefined;
       await ctx.db.patch(topic._id, { publicToken });
+      const existing = await ctx.db
+        .query("publicLinks")
+        .withIndex("by_topic_lang", (q) => q.eq("topicId", topic._id).eq("lang", lang))
+        .unique();
+      if (!isPublic) {
+        if (existing) await ctx.db.delete(existing._id);
+        return null;
+      }
+      if (existing && publicToken) await ctx.db.patch(existing._id, { token: publicToken });
       return publicToken ?? null;
     }
     const existing = await ctx.db

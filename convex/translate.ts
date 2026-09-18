@@ -1115,10 +1115,9 @@ export const editions = query({
 
     const shareCount = (lang: string) => shares.filter((s) => shareLang(s) === lang).length;
     const tokenFor = (lang: string) => {
+      if (lang === SOURCE_LANG) return topic.publicToken ?? null;
       const link = links.find((l) => l.lang === lang);
       if (link) return link.token;
-      // Legacy: the pre-translation single per-Topic token is the English link.
-      if (lang === SOURCE_LANG && topic.publicToken) return topic.publicToken;
       return null;
     };
 

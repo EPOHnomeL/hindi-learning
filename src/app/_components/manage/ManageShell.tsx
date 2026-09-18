@@ -6,12 +6,12 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../../../convex/_generated/api";
 import { CourseSettingsBody } from "../CourseSettings";
 import { DashboardTab } from "./DashboardTab";
+import { UsersTab } from "./UsersTab";
 import { Icon, type IconName } from "../icons";
 import { useMutationRun } from "../mutationRun";
 import { IconButton, useExit } from "../ui";
 import { EditionBadges, EmptyPanel, Sheet, type Edition } from "./shared";
 import { AddLanguagePanel, SharingTab } from "./SharingTab";
-import { UsersTab } from "./UsersTab";
 
 type Tab = "sharing" | "users" | "settings" | "dashboard";
 
@@ -167,7 +167,7 @@ export function ManageShell({ slug }: { slug: string }) {
             topicSlug={slug}
             editions={editions}
             completed={data.completed}
-            onAdded={(code) => {
+            onAdded={(code: string) => {
               setPending(code);
               setSheet(null);
             }}
@@ -206,6 +206,8 @@ function SettingsTab({ topicSlug, lang }: { topicSlug: string; lang: string }) {
     </>
   );
 }
+
+
 
 // The admin's "fire and pray": generate the remaining curriculum in one go, and
 // cancel a run in flight. Self-gated on `amIAdmin`, and rendered for nobody else.

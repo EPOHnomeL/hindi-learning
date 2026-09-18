@@ -158,3 +158,46 @@ test("shareTopic is owner-only: a non-owner cannot share someone else's Topic", 
     asUser(t, stranger).mutation(api.shares.shareTopic, { topicSlug: "hindi", email: "target@example.com" }),
   ).rejects.toThrow();
 });
+
+test("setEditionPublic turns English public link on and off correctly", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi");
+
+  // Turn ON
+  const token = await asUser(t, owner).mutation(api.shares.setEditionPublic, {
+    topicSlug: "hindi",
+    lang: "en",
+    isPublic: true,
+  });
+  expect(typeof token).toBe("string");
+
+  let editionsData = await asUser(t, owner).query(api.translate.editions, { topicSlug: "hindi" });
+  let enEdition = editionsData?.editions.find((e) => e.lang === "en");
+  expect(enEdition?.publicToken).toBe(token);
+
+  // Turn OFF
+  const off = await asUser(t, owner).mutation(api.shares.setEditionPublic, {
+    topicSlug: "hindi",
+    lang: "en",
+    isPublic: false,
+  });
+  expect(off).toBeNull();
+
+  editionsData = await asUser(t, owner).query(api.translate.editions, { topicSlug: "hindi" });
+  enEdition = editionsData?.editions.find((e) => e.lang === "en");
+  expect(enEdition?.publicToken).toBeNull();
+
+  // Test case where a publicLinks row exists for English (e.g. from seedDev)
+  await t.run((ctx) => ctx.db.insert("publicLinks", { topicId, lang: "en", token: "legacy-link" }));
+  const offWithLegacy = await asUser(t, owner).mutation(api.shares.setEditionPublic, {
+    topicSlug: "hindi",
+    lang: "en",
+    isPublic: false,
+  });
+  expect(offWithLegacy).toBeNull();
+  editionsData = await asUser(t, owner).query(api.translate.editions, { topicSlug: "hindi" });
+  enEdition = editionsData?.editions.find((e) => e.lang === "en");
+  expect(enEdition?.publicToken).toBeNull();
+});
+
