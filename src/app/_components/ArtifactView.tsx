@@ -16,6 +16,7 @@ import { buildEditDoc, buildSrcDoc, lessonMessage, narrateMessage, replaceBodyIn
 import { Icon } from "./icons";
 import { LessonFootCard } from "./LessonFoot";
 import { Markdown } from "./MarkdownView";
+import { clock, progress } from "./narrationDock";
 import { MarkdownResourceDialog } from "./ResourceItem";
 import { applyProgress, cardIdFromHash, composeCardShare, editionToEdit, resolveArtifactClick, resourceTarget } from "./readerDerive";
 import { Modal, ReaderSkeleton } from "./ui";
@@ -835,6 +836,18 @@ function LessonView({
             <QuestionBox topicSlug={topicSlug} lessonKey={lessonKey} variant="inline" readOnly={readOnly} />
           </div>
         )}
+        {/* The persistent playback surface. Last in the column so it sticks to
+            the foot of it on desktop; `fixed` on mobile, where the window is the
+            scroller. Absent outside the narration pilot, like the control in the
+            lesson, because `narrate` itself is. */}
+        {narrate && (
+          <NarrationDock
+            audio={narrate.audio}
+            state={narrate.state}
+            title={headTitle(lesson.title)}
+            onToggle={narrate.onToggle}
+          />
+        )}
       </div>
       {/* Desktop: persistent ask column on the right (past the paygate for preview). */}
       {/* Teacher Q&A off takes the whole column away, so the lesson reads at the
@@ -1051,16 +1064,143 @@ function ContentEditor({
 // ponytail: the strings are hardcoded English. The pilot is admin-only on one
 // English lesson, and `messages/parity.test.ts` demands every new key in all six
 // catalogues. Add keys when the gate widens past administrators.
+// **The docked narration player** (course-narration ticket 01, variant B of the
+// 2026-09-18 prototype). The circular control inside the lesson starts playback
+// and then scrolls away with the heading, which left a nine-minute narration
+// with no way to pause and no way to tell where you were. This is the surface
+// that persists: play/pause, which lesson is speaking, elapsed over total, and
+// a hairline along its top edge for the position.
+//
+// **It appears only once playback has been asked for**, which is the one change
+// from the prototype's variant B. Drawn as always-present it cost 58px on top of
+// `AppTabs`'s 76px, about 18% of a phone screen spent on chrome while somebody
+// is reading; tying it to playback keeps the reader untouched for every learner
+// who never presses play. To make it permanent, drop the `started` guard below.
+//
+// **Mobile: `fixed`, riding with the nav.** `AppTabs` tucks away on scroll in
+// the reader (`useHideOnScroll`), so a bar pinned above it would strand a gap.
+// This takes the same signal and slides down into the space the nav vacates,
+// the mirror of what the lesson title bar does with `top-12`/`top-0`, so the
+// control is never off-screen. `z-20`, under the lesson drawer (z-40) and its
+// scrim (z-30): opening the lesson list dims the dock with the rest of the page.
+//
+// **Desktop: `sticky` inside the lesson column**, because the column is its own
+// scroller there. A fixed full-width bar would run under the sidebar and the
+// Teacher Q&A aside, and stop reading as part of the lesson.
+//
+// ponytail: no scrubber, no skip, no speed. The ticket asked to see where you
+// are and to pause from anywhere; those are the parts nobody asked for, and the
+// track is a display, not an input.
+function NarrationDock({
+  audio,
+  state,
+  title,
+  onToggle,
+}: {
+  audio: HTMLAudioElement | null;
+  state: NarrateState;
+  title: string;
+  onToggle: () => void;
+}) {
+  const navHidden = useHideOnScroll();
+  const [at, setAt] = useState(0);
+  const [total, setTotal] = useState(0);
+
+  // The clock lives HERE rather than in `useLessonNarration`, so `timeupdate`
+  // (roughly four times a second) re-renders this bar alone instead of the whole
+  // lesson pane around it.
+  useEffect(() => {
+    if (!audio) return;
+    const sync = () => {
+      setAt(audio.currentTime);
+      setTotal(audio.duration);
+    };
+    sync();
+    const events = ["timeupdate", "loadedmetadata", "durationchange", "seeked", "emptied"] as const;
+    for (const e of events) audio.addEventListener(e, sync);
+    return () => {
+      for (const e of events) audio.removeEventListener(e, sync);
+    };
+  }, [audio]);
+
+  // Rendering, playing, or paused partway through: all three are "in progress"
+  // and want the bar. A lesson nobody has pressed play on does not.
+  const started = state !== "idle" || at > 0;
+  if (!started) return null;
+
+  const playing = state === "playing";
+  return (
+    <>
+      {/* Keeps the last line of the lesson (and the inline Q&A below it) clear of
+          the fixed bar, the same spacer trick `AppTabs` uses. Mobile only: on
+          desktop the bar is in the flow of the column it sticks to. */}
+      <div aria-hidden className="h-14 md:hidden" />
+      <div
+        className={`fixed inset-x-0 z-20 border-t border-line bg-card transition-[bottom] duration-300 md:sticky md:bottom-0 md:z-auto md:mt-2 md:rounded-t-xl md:border-x ${
+          navHidden ? "bottom-0" : "bottom-[4.75rem]"
+        }`}
+      >
+        <div className="h-[3px] w-full bg-line">
+          <div className="h-full bg-accent transition-[width] duration-300" style={{ width: `${progress(at, total) * 100}%` }} />
+        </div>
+        <div className="flex items-center gap-3 px-3 py-2">
+          <button
+            type="button"
+            onClick={onToggle}
+            disabled={state === "loading"}
+            aria-label={playing ? "Pause narration" : "Resume narration"}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold bg-paper text-accent transition-transform hover:scale-105 disabled:cursor-default disabled:opacity-60"
+          >
+            <Icon name={playing ? "pause" : "play"} className="h-4 w-4" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">{title}</p>
+            <p className="text-xs tabular-nums text-soft">
+              {state === "loading" ? "Rendering the narration..." : `${clock(at)} / ${clock(total)}`}
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// **Resume, for the length of one visit** (ticket 01, 2026-09-18). Where each
+// lesson's narration was left, keyed by topic + lesson + Edition.
+//
+// A module-level Map, deliberately, and NOT `myProgress`: position-in-audio is
+// not Progress (a learner who paused at 2:14 has not completed anything), and
+// writing it to the server would put a mutation behind every pause. It dies on
+// reload, which is the right size for the thing it fixes: opening the lesson
+// list mid-narration and coming back should not restart nine minutes of audio.
+// Cross-device resume is a server decision nobody has asked for yet.
+const resumeAt = new Map<string, number>();
+
+// Bank a position, ignoring the two that mean "nothing to come back to": the
+// very start, and a track played to its end.
+function remember(key: string, a: HTMLAudioElement) {
+  if (a.currentTime > 0 && !a.ended) resumeAt.set(key, a.currentTime);
+  else resumeAt.delete(key);
+}
+
 function useLessonNarration(
   topicSlug: string,
   lessonKey: string,
-): { state: NarrateState; message: string; onToggle: () => void } | undefined {
+): { state: NarrateState; message: string; onToggle: () => void; audio: HTMLAudioElement | null } | undefined {
   const lang = useEditionLang();
   const status = useQuery(api.lessonAudio.status, { topicSlug, key: lessonKey, lang: lang ?? undefined });
   const speak = useAction(api.lessonAudio.speak);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  // The same element as `audioRef`, held in state as well so the dock re-renders
+  // once it exists. The ref is what the callbacks below read (they must not
+  // re-create when the element arrives); this is what the dock subscribes to.
+  const [audio, setAudio] = useState<HTMLAudioElement | null>(null);
   const [state, setState] = useState<NarrateState>("idle");
   const [message, setMessage] = useState("");
+  // Where this lesson's narration was left, for the resume rule below.
+  const resumeKey = `${topicSlug}:${lessonKey}:${lang ?? "en"}`;
+  const resumeKeyRef = useRef(resumeKey);
+  resumeKeyRef.current = resumeKey;
   // Whether the reader has asked to hear it, so a render that finishes can start
   // playback itself instead of making them press a second time.
   const wantPlay = useRef(false);
@@ -1077,23 +1217,35 @@ function useLessonNarration(
     a.addEventListener("pause", stopped);
     a.addEventListener("ended", stopped);
     audioRef.current = a;
+    setAudio(a);
     return () => {
+      // Leaving the reader entirely: bank the position first, so coming back to
+      // this lesson in the same visit resumes rather than restarts.
+      remember(resumeKeyRef.current, a);
       a.pause();
       a.removeEventListener("play", playing);
       a.removeEventListener("pause", stopped);
       a.removeEventListener("ended", stopped);
       audioRef.current = null;
+      setAudio(null);
     };
   }, []);
 
   // A lesson switch keeps the same pane, so stop the previous lesson's audio and
-  // reset by hand rather than relying on a remount that does not happen.
+  // reset by hand rather than relying on a remount that does not happen. The
+  // position goes into `resumeAt` on the way out, keyed by the lesson being
+  // LEFT, which is why the previous key is carried in a ref: by the time this
+  // runs, `resumeKey` is already the lesson being arrived at.
+  const leavingRef = useRef(resumeKey);
   useEffect(() => {
+    const leaving = leavingRef.current;
+    leavingRef.current = resumeKey;
+    if (audioRef.current && leaving !== resumeKey) remember(leaving, audioRef.current);
     audioRef.current?.pause();
     setState("idle");
     setMessage("");
     wantPlay.current = false;
-  }, [lessonKey]);
+  }, [resumeKey]);
 
   // Point the element at whatever the live query says is rendered, and start it if
   // this URL arrived because the reader asked for it. A render takes long enough
@@ -1102,14 +1254,21 @@ function useLessonNarration(
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !url) return;
-    if (a.src !== url) a.src = url;
+    if (a.src !== url) {
+      a.src = url;
+      // Resume where this lesson was left. `currentTime` is ignored until the
+      // element knows how long the track is, so it waits for the metadata
+      // rather than being set alongside the `src` above.
+      const at = resumeAt.get(resumeKey);
+      if (at) a.addEventListener("loadedmetadata", () => (a.currentTime = at), { once: true });
+    }
     if (!wantPlay.current) return;
     wantPlay.current = false;
     a.play().catch(() => {
       setState("idle");
       setMessage("Ready. Press play to listen.");
     });
-  }, [url]);
+  }, [url, resumeKey]);
 
   const onToggle = useCallback(() => {
     const a = audioRef.current;
@@ -1136,7 +1295,7 @@ function useLessonNarration(
   }, [url, speak, topicSlug, lessonKey, lang]);
 
   if (!status?.eligible) return undefined;
-  return { state, message, onToggle };
+  return { state, message, onToggle, audio };
 }
 
 // completed Frontier. It reflects the lock so a press can't double-fire and a

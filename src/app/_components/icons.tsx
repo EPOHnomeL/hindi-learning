@@ -36,7 +36,9 @@ export type IconName =
   | "poster"
   | "sliders"
   | "certificate"
-  | "arrow";
+  | "arrow"
+  | "play"
+  | "pause";
 
 const PATHS: Record<IconName, ReactNode> = {
   edit: (
@@ -74,6 +76,10 @@ const PATHS: Record<IconName, ReactNode> = {
     </>
   ),
   check: <path d="M20 6 9 17l-5-5" />,
+  // The narration dock's transport (ticket 01). Stroked like every other glyph
+  // here, not filled like the in-lesson circle: this one sits in the app chrome.
+  play: <path d="M8 5l12 7-12 7z" />,
+  pause: <path d="M9 4v16M15 4v16" />,
   refresh: (
     <>
       <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
