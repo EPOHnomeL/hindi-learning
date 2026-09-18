@@ -96,7 +96,10 @@ function Tabs() {
         // sliding. `motion-reduce:transition-opacity` retargets the transition,
         // `motion-reduce:translate-y-0` cancels the slide and the hidden branch
         // fades out, with pointer events off so an invisible bar eats no taps.
-        className={`chrome fixed inset-x-0 bottom-0 z-50 grid h-[4.75rem] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 motion-reduce:translate-y-0 motion-reduce:transition-opacity md:hidden ${
+        // `chrome--solid` (2026-09-18): the tab bar is the one surface that is up
+        // on every screen, so lesson text sliding about behind it read as noise
+        // rather than depth. It keeps the hairline and loses the see-through.
+        className={`chrome chrome--solid fixed inset-x-0 bottom-0 z-50 grid h-[4.75rem] pb-[env(safe-area-inset-bottom)] transition-transform duration-300 motion-reduce:translate-y-0 motion-reduce:transition-opacity md:hidden ${
           isAdmin ? "grid-cols-4" : "grid-cols-3"
         } ${navHidden && onCourse ? "translate-y-full motion-reduce:pointer-events-none motion-reduce:opacity-0" : "translate-y-0"}`}
       >
