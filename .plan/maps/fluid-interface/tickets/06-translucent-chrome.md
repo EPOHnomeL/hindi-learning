@@ -60,3 +60,21 @@ This resolves the fog patch about hide-on-scroll only partly: the bar is now
 cheaper to look at, but whether it should still hide inside a course is a
 question for the owner's walk, so it stays in Not yet specified re-anchored to
 ticket 08.
+
+## Partly superseded 2026-09-18
+
+The operator walked the reader on a phone and rejected two parts of the above.
+The rest stands.
+
+- **The four sticky title bars are gone on mobile.** They stacked a second bar
+  under the course header, the lesson scrolled under it, and they repeated the
+  `<h1>` every published lesson and reference body already opens with. They are
+  plain static headings from `md` up, as before. `.chrome--mobile` and
+  `.chrome-fade` had no other users and were deleted with them. The authed
+  reader's title row survives on mobile only when it carries the owner's
+  "Generate next lesson" control; the Viewer/Guest next-lesson links in those
+  rows went desktop-only, since `LessonFootCard` does the same two things at the
+  foot of the lesson at every breakpoint.
+- **The tab bar wears the new `.chrome--solid`**: hairline kept, translucency
+  and blur dropped. It is the one surface up on every screen, so content moving
+  behind it read as noise rather than depth.
