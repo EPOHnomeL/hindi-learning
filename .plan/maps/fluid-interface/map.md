@@ -80,6 +80,11 @@ the existing layouts stay.
   the native dialog materialises via `@starting-style` and `allow-discrete`,
   the sheet rises, the menu scales from its trigger and reverses, toasts and
   the install sheet share a `useExit` hook. Reduced motion gets a 150ms fade.
+- [Chrome becomes a translucent layer](tickets/06-translucent-chrome.md): one
+  `.chrome` material (80% tint, 16px blur, a bright hairline facing content)
+  on every floating bar, a scroll-edge fade under the sticky titles, bars that
+  move by transform, shadows graded by surface size. Solid under reduced
+  transparency, inked under more contrast.
 
 ## Not yet specified
 
@@ -89,7 +94,8 @@ the existing layouts stay.
   question for after the drawer is seen moving. clears-with: 03
 - **Is the tab bar hide-on-scroll worth keeping?** It costs the learner their
   sense of place on a phone. With the bar translucent and cheaper to look at,
-  the reason to hide it weakens. Decide after the materials land. clears-with: 06
+  the reason to hide it weakens. The material landed in ticket 06; the
+  wayfinding ticket is where the hide gets judged. clears-with: 08
 
 ## Out of scope
 

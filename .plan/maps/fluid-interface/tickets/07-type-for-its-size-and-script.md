@@ -1,6 +1,8 @@
 ---
 type: task
 blocked_by: [06]
+claimed_by: fable-t3code-e63c30e8
+claimed_at: 2026-09-18T10:55:58+02:00
 ---
 # Type is tracked and leaded for its size and script
 
