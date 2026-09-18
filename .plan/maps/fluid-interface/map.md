@@ -57,6 +57,18 @@ the existing layouts stay.
   resolves to Spectral; `tracking-tight` is the same value at 16px and 60px.
 - Skills: `/apple-design` for the values, `/ponytail` for the size of the fix,
   `/tdd` where a pure helper is added.
+- **All eight tickets resolved 2026-09-18** in commits `15f454b` through
+  `bb66b7d`, nine feature commits on `main`. What is left is the owner's walk:
+  open a course on a phone, pull the drawer and flick it, open a dialog and
+  the sharing sheet, toggle reduced motion and reduced transparency once, and
+  load a Hindi edition to see the 1.7 leading. Anything that reads wrong is a
+  constant in one place: `useSheetDrag.ts` for the drawer, the `.chrome` block
+  for the material, the `@theme` scale for type.
+- **Left for owners outside this map:** `seedTopic` in
+  `convex/content/authoring.ts` throws plain errors, so course-creation
+  refusals still show the fallback text in production (ticket 01). The
+  `scripts/bundle-authoring-assets.test.ts` failure on Windows worktrees is
+  CRLF drift in untouched files, present before this map and after it.
 
 ## Decisions so far
 
@@ -93,6 +105,11 @@ the existing layouts stay.
   a back arrow in the authed reader's phone header, a disabled Course tab when
   there is nothing to resume, the narration refusal in the dock, the generation
   failure reason as text.
+- [The chrome honours reduced motion, reduced transparency and more contrast](tickets/05-reduced-motion-transparency-contrast.md):
+  every transform transition has a `motion-reduce` fallback (cross-fade for
+  bars that leave the screen, a jump otherwise), all progress fills move by
+  `scaleX`, skeleton pulses stop, the dialog border inks under more contrast,
+  the iframe deep-link flash becomes a held highlight.
 
 ## Not yet specified
 
