@@ -1882,7 +1882,7 @@ const FLAG_META: { key: TenantFlag; label: string; hint: string }[] = [
   { key: "certificates", label: "Certificates", hint: "Learners can claim a completion certificate." },
   { key: "translations", label: "Translations", hint: "Owners can translate a completed course into other languages." },
   { key: "publicLinks", label: "Public links", hint: "Owners can publish a shareable public link to a course." },
-  { key: "qa", label: "Questions", hint: "Learners can ask questions on a lesson." },
+  { key: "qa", label: "Questions & feedback", hint: "Learners can ask or leave feedback on a lesson; the next lesson answers it and builds on it." },
   { key: "seeding", label: "Course creation", hint: "Members can seed new courses on this tenant." },
   // The one flag with a precondition (ADR 0027): the server refuses to switch it
   // on until a donation payee is set and is a ready seller, and says so.

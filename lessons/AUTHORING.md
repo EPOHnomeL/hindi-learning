@@ -97,6 +97,9 @@ publish); use them instead of inventing markup: `.verse`, `.book` (+`.book .ex`)
 `.deva`, `.cite`. Standard structure: `header.lesson` → `.recap` → `.lead` →
 numbered `<h2><span class="num">N</span>…` sections → quizzes → `.win` → `.ask` →
 `<footer>`. A dark theme is driven by the app; author light and it just works.
+`.ask` invites a question or a piece of feedback, and what it promises is that
+the **next** lesson answers it and builds on it. Never word it as a live chat
+or an instant reply.
 
 ## 5. Cross-links between artifacts
 
