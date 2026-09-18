@@ -42,17 +42,33 @@ as Progress.
 - The deferred scoping note this pilot cut a slice out of is
   `../authoring/assets/deferred/course-audio.md`. It still holds the questions this
   map has not reached: Editions, and whether listening ticks Progress.
-- Skills: `/prototype` before any player UI is written (see ticket 01), `/ponytail`,
-  `/tdd`.
+- **The player is built** (2026-09-18, commit `769c34d`): a bar docked to the foot
+  of the lesson, appearing once playback starts. See ticket 01 for every call it
+  locked and `assets/01-floating-player-prototype.html` for the four surfaces it
+  was chosen from (open it in a browser, it needs no server).
+- Skills: `/ponytail`, `/tdd`. `/prototype` before any further player UI: the
+  four-variant lab in `assets/` is the shape that worked, and the HITL rule in
+  CLAUDE.md means a written description of a player is not a player.
 
 ## Decisions so far
 
 <!-- one line per resolved ticket -->
 
-_None yet._
+- [Scope the floating player](tickets/01-the-floating-player.md): a bar docked to
+  the foot of the lesson, appearing once playback is asked for, carrying
+  play/pause, the lesson title, elapsed over total and a progress hairline.
+  In-lesson only (leaving still stops playback), resume for the length of one
+  visit in memory rather than in Progress, text highlighting ruled out. Decided
+  against a prototype the owner opened, and built the same day.
 
 ## Not yet specified
 
+- **Does listening travel across lessons?**
+  Ticket 01 kept the `<audio>` in `LessonView`, so navigating away stops it, and
+  named this the map's biggest remaining question rather than a detail. A player
+  that keeps reading while the learner moves through the course is a different
+  component in the root layout with its own queue, and it needs a reason to exist
+  before it gets one: nobody has asked to listen across lessons yet.
 - **Editions.** Narration is English-only today and the cache is keyed by `lang`,
   so the shape is ready, but nobody has decided whether audio multiplies per
   language or whether that is a per-tenant opt-in. Cost at Edition scale is the

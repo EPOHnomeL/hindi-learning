@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The floating player, four ways (throwaway prototype)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* ============================================================================
+   THROWAWAY PROTOTYPE, course-narration ticket 01 "Scope the floating player".
+   Not production code, not in the repo. It exists to be looked at and reacted to.
+
+   The lab chrome is cool slate ON PURPOSE, so the warm paper screens read as the
+   product and this reads as the bench. Same convention as
+   .plan/maps/ui-overhaul/assets/manage-shell-prototype.html.
+   ========================================================================== */
+:root{
+  --lab-bg:#e6e9ee; --lab-panel:#f7f8fa; --lab-ink:#1b1f26; --lab-soft:#5c6470;
+  --lab-line:#d1d7e0; --lab-accent:#2f5fa8; --lab-on:#fff; --lab-warn:#a34a34;
+  --lab-yes:#2f7d54;
+  --lab-shadow:0 1px 2px rgba(20,28,40,.08),0 12px 32px rgba(20,28,40,.10);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--lab-bg);color:var(--lab-ink);
+  font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:14px}
+h1{font-size:19px;margin:0 0 2px}
+.lab-head{padding:14px 18px 12px;border-bottom:1px solid var(--lab-line);background:var(--lab-panel);
+  position:sticky;top:0;z-index:100;box-shadow:0 1px 0 rgba(20,28,40,.04)}
+.lab-sub{color:var(--lab-soft);font-size:12.5px;margin:0 0 10px;max-width:86ch;line-height:1.5}
+.rows{display:flex;flex-wrap:wrap;gap:8px 22px;align-items:center}
+.grp{display:flex;align-items:center;gap:6px}
+.grp>label{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--lab-soft);margin-right:2px}
+button.tab{font:inherit;font-size:12.5px;padding:5px 11px;border:1px solid var(--lab-line);
+  background:#fff;color:var(--lab-ink);border-radius:7px;cursor:pointer}
+button.tab:hover{border-color:var(--lab-accent)}
+button.tab[aria-pressed="true"]{background:var(--lab-accent);border-color:var(--lab-accent);color:var(--lab-on)}
+.stage{display:flex;gap:22px;align-items:flex-start;padding:20px 18px 60px;flex-wrap:wrap}
+.notes{flex:1 1 320px;min-width:300px;max-width:520px;background:var(--lab-panel);
+  border:1px solid var(--lab-line);border-radius:12px;padding:14px 16px;box-shadow:var(--lab-shadow)}
+.notes h2{font-size:14px;margin:0 0 8px}
+.notes h3{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--lab-soft);margin:14px 0 5px}
+.notes ul{margin:0;padding-left:17px;line-height:1.55;font-size:13px}
+.notes li{margin-bottom:5px}
+.notes .no::marker{color:var(--lab-warn)}
+.notes .yes::marker{color:var(--lab-yes)}
+.pill{display:inline-block;font-size:11px;padding:2px 7px;border-radius:99px;
+  background:#fff;border:1px solid var(--lab-line);color:var(--lab-soft);margin-right:5px}
+
+/* ---------------- the product frames ---------------- */
+.device{background:var(--lab-panel);border:1px solid var(--lab-line);border-radius:14px;
+  padding:12px;box-shadow:var(--lab-shadow)}
+.device>.cap{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--lab-soft);margin-bottom:8px}
+.screen{position:relative;overflow:hidden;background:var(--paper);color:var(--ink);
+  font-family:Spectral,Georgia,serif;border:1px solid var(--line);border-radius:10px}
+.screen.phone{width:390px;height:750px}
+.screen.desk{width:1080px;height:690px}
+
+/* the 14 token product palette, lifted from src/styles/globals.css */
+.screen{
+  --paper:#fbf7f0; --card:#fffdf9; --ink:#2b2622; --soft:#6b6258; --line:#e7ddd4;
+  --accent:#9c5b34; --accent2:#3f6f5e; --gold:#b88a2e; --hi:#fbeecb;
+}
+.screen[data-theme="dark"]{
+  --paper:#1b1815; --card:#241f1a; --ink:#e9e1d4; --soft:#a99d8a; --line:#3a322a;
+  --accent:#dd9863; --accent2:#79b39b; --gold:#d8ab57; --hi:#4a3c1f;
+}
+
+/* mobile chrome, mirroring CourseShell + ArtifactView + AppTabs */
+.mtop{position:absolute;inset-inline:0;top:0;height:48px;z-index:30;display:flex;align-items:center;
+  gap:10px;padding:0 12px;background:var(--paper);border-bottom:1px solid var(--line);font-size:14px}
+.mtitlebar{position:absolute;inset-inline:0;top:48px;z-index:20;display:flex;align-items:center;
+  justify-content:space-between;gap:10px;padding:8px 12px;background:var(--paper);
+  border-bottom:1px solid var(--line)}
+.mtitlebar h2{font-size:16px;margin:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.scroller{position:absolute;inset:0;padding-top:96px;padding-bottom:92px;overflow-y:auto}
+.desk .scroller{padding:0;display:flex;inset:0}
+.tabs{position:absolute;inset-inline:0;bottom:0;height:76px;z-index:40;display:flex;
+  background:var(--paper);border-top:1px solid var(--line);font-family:"IBM Plex Sans",sans-serif}
+.tabs div{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;font-size:10.5px;color:var(--soft)}
+.tabs div.on{color:var(--accent)}
+.tabs i{width:20px;height:20px;border-radius:5px;border:1.6px solid currentColor;display:block}
+
+/* desktop chrome */
+.sidebar{width:230px;flex:0 0 230px;border-inline-end:1px solid var(--line);padding:14px 12px;overflow:hidden;
+  font-family:"IBM Plex Sans",sans-serif;font-size:12.5px;color:var(--soft)}
+.sidebar b{display:block;font-family:Spectral,serif;font-size:14px;color:var(--ink);margin-bottom:10px}
+.sidebar .row{padding:6px 8px;border-radius:7px;margin-bottom:2px}
+.sidebar .row.on{background:var(--hi);color:var(--accent)}
+.col{flex:1;min-width:0;position:relative;overflow-y:auto;padding:14px 18px 14px}
+.aside{width:280px;flex:0 0 280px;border-inline-start:1px solid var(--line);padding:14px;
+  font-family:"IBM Plex Sans",sans-serif;font-size:12.5px;color:var(--soft)}
+.aside .box{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:10px;margin-bottom:10px}
+.dtitle{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.dtitle h2{font-size:18px;margin:0}
+
+/* the lesson itself */
+.lesson{padding:0 16px 16px;line-height:1.62;font-size:15.5px}
+.desk .lesson{padding:0}
+.lesson h1{font-family:Spectral,serif;font-size:26px;margin:14px 0 4px;font-weight:600}
+.narrate{display:flex;align-items:center;gap:14px;margin:10px 0 2px}
+.narrate .sub{margin:0;font-style:italic;color:var(--soft);font-size:15px}
+.nbtn{flex:0 0 auto;width:52px;height:52px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;border:1px solid var(--gold);background:var(--card);color:var(--accent);
+  box-shadow:0 2px 14px #b88a2e20;cursor:pointer;padding:0}
+.nbtn svg{width:21px;height:21px;fill:currentColor}
+.lesson p{margin:.85em 0}
+.sent{border-radius:4px;padding:1px 0;transition:background .25s}
+.sent.spoken{background:var(--hi);box-shadow:0 0 0 3px var(--hi)}
+.foot{margin:22px 16px 10px;border:1px solid var(--line);background:var(--card);border-radius:12px;
+  padding:12px 14px;font-family:"IBM Plex Sans",sans-serif;font-size:13px;color:var(--soft)}
+.desk .foot{margin:22px 0 10px}
+.foot b{display:block;color:var(--ink);font-size:14px;margin-top:2px}
+
+/* ---------------- shared player parts ---------------- */
+.pbtn{flex:0 0 auto;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--gold);background:var(--card);color:var(--accent);cursor:pointer;padding:0}
+.pbtn svg{fill:currentColor}
+.meta{font-family:"IBM Plex Sans",sans-serif;min-width:0}
+.meta .l1{font-size:12.5px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta .l2{font-size:11px;color:var(--soft);font-variant-numeric:tabular-nums}
+.track{position:relative;height:3px;border-radius:99px;background:var(--line);overflow:hidden}
+.track i{position:absolute;inset-block:0;inset-inline-start:0;background:var(--accent);display:block}
+.ghost{background:none;border:0;color:var(--soft);cursor:pointer;font:inherit;font-family:"IBM Plex Sans",sans-serif;
+  font-size:11px;padding:4px 6px;border-radius:6px}
+.ghost:hover{background:var(--hi);color:var(--accent)}
+
+/* A, island */
+.island{position:absolute;z-index:45;background:var(--card);border:1px solid var(--line);
+  border-radius:99px;box-shadow:0 6px 28px rgba(43,38,34,.18);padding:7px 14px 7px 7px;
+  display:flex;align-items:center;gap:11px;overflow:hidden;transition:border-radius .18s}
+.phone .island{inset-inline:14px;bottom:88px}
+.desk .island{inset-inline-start:50%;transform:translateX(-50%);bottom:18px;min-width:380px}
+.island .pbtn{width:40px;height:40px}
+.island .pbtn svg{width:16px;height:16px}
+.island .meta{flex:1}
+.island .track{position:absolute;inset-inline:0;bottom:0;height:2.5px;border-radius:0}
+.island.open{border-radius:20px;flex-direction:column;align-items:stretch;padding:12px 14px 14px;gap:9px}
+.island .scrub{display:none}
+.island.open .scrub{display:block}
+.island.open .track{position:static;height:5px;border-radius:99px}
+.island .xtra{display:none}
+.island.open .xtra{display:flex;justify-content:space-between;align-items:center}
+
+/* B, docked bar */
+.dock{position:absolute;z-index:45;background:var(--card);border-top:1px solid var(--line);
+  box-shadow:0 -4px 22px rgba(43,38,34,.10);padding:10px 14px;display:flex;align-items:center;gap:12px}
+.phone .dock{inset-inline:0;bottom:76px}
+.desk .dock{inset-inline:0;bottom:0}
+.dock .pbtn{width:38px;height:38px}
+.dock .pbtn svg{width:15px;height:15px}
+.dock .meta{flex:1}
+.dock>.track{position:absolute;inset-inline:0;top:0;height:2.5px}
+
+/* C, inside the sticky title bar */
+.tb-play{width:32px;height:32px}
+.tb-play svg{width:13px;height:13px}
+.tbprog{position:absolute;inset-inline:0;bottom:-1px;height:2.5px}
+.tbrow{position:absolute;inset-inline:0;top:100%;background:var(--card);border-bottom:1px solid var(--line);
+  padding:8px 12px 10px;display:flex;align-items:center;gap:10px;font-family:"IBM Plex Sans",sans-serif;
+  font-size:11px;color:var(--soft)}
+.tbrow .track{flex:1;height:5px;border-radius:99px}
+
+/* D, hairline + FAB */
+.hair{position:absolute;inset-inline:0;z-index:25;height:3px}
+.fab{position:absolute;z-index:45;width:52px;height:52px;box-shadow:0 6px 22px rgba(43,38,34,.20)}
+.phone .fab{inset-inline-end:16px;bottom:92px}
+.desk .fab{inset-inline-end:22px;bottom:20px}
+.fab svg{width:19px;height:19px}
+.fabtime{position:absolute;z-index:45;font-family:"IBM Plex Sans",sans-serif;font-size:10.5px;
+  color:var(--soft);background:var(--card);border:1px solid var(--line);border-radius:99px;padding:2px 8px;
+  font-variant-numeric:tabular-nums}
+.phone .fabtime{inset-inline-end:16px;bottom:150px}
+.desk .fabtime{inset-inline-end:22px;bottom:78px}
+
+/* the "left the lesson" screen */
+.home{padding:14px 16px;font-family:"IBM Plex Sans",sans-serif}
+.home h3{font-family:Spectral,serif;font-size:20px;margin:6px 0 12px;color:var(--ink)}
+.home .card{border:1px solid var(--line);background:var(--card);border-radius:12px;padding:12px;
+  margin-bottom:10px;font-size:13px;color:var(--soft)}
+.home .card b{display:block;color:var(--ink);font-size:14.5px;font-family:Spectral,serif}
+.dead{position:absolute;inset-inline:14px;bottom:88px;z-index:45;border:1px dashed var(--line);
+  border-radius:14px;padding:12px 14px;background:var(--card);color:var(--soft);
+  font-family:"IBM Plex Sans",sans-serif;font-size:12px;line-height:1.5}
+.dead b{color:var(--accent);display:block;margin-bottom:3px;font-size:12.5px}
+</style>
+</head>
+<body>
+
+<div class="lab-head">
+  <h1>The floating player, four ways</h1>
+  <p class="lab-sub">
+    Throwaway prototype for <code>.plan/maps/course-narration/tickets/01-the-floating-player.md</code>.
+    Nothing here is in the repo. Playback is simulated: a 9:12 clock over the mock lesson, so
+    "where you are" is something you can watch rather than read about. Every variant is drawn
+    against the surfaces it actually has to coexist with: the 48px mobile top bar, the sticky
+    lesson title bar, the 76px <code>AppTabs</code>, the end of lesson card, and the desktop
+    Teacher&nbsp;Q&amp;A column.
+  </p>
+  <div class="rows">
+    <div class="grp"><label>Surface</label>
+      <button class="tab" data-v="A" aria-pressed="true">A. Island</button>
+      <button class="tab" data-v="B">B. Docked bar</button>
+      <button class="tab" data-v="C">C. In the title bar</button>
+      <button class="tab" data-v="D">D. Hairline + FAB</button>
+    </div>
+    <div class="grp"><label>Viewport</label>
+      <button class="tab" data-p="phone" aria-pressed="true">Phone</button>
+      <button class="tab" data-p="desk">Desktop</button>
+    </div>
+    <div class="grp"><label>Theme</label>
+      <button class="tab" data-t="light" aria-pressed="true">Light</button>
+      <button class="tab" data-t="dark">Dark</button>
+    </div>
+    <div class="grp"><label>State</label>
+      <button class="tab" data-s="idle">Idle</button>
+      <button class="tab" data-s="loading">Rendering</button>
+      <button class="tab" data-s="playing" aria-pressed="true">Playing</button>
+    </div>
+    <div class="grp"><label>Try</label>
+      <button class="tab" id="hl">Sentence highlighting</button>
+      <button class="tab" id="away">Leave the lesson</button>
+    </div>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="device">
+    <div class="cap" id="cap">A. Island, phone</div>
+    <div class="screen phone" id="screen" data-theme="light"></div>
+  </div>
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+/* ------------------------------------------------------------------ state */
+const S = { v:'A', port:'phone', theme:'light', play:'playing', hl:false, away:false, open:false, t:134 };
+const DUR = 552; // 9:12, roughly a real lesson of this course at George's pace
+const SENTS = 7;
+
+const PLAY  = '<svg viewBox="0 0 24 24"><path d="M8 5l12 7-12 7z"/></svg>';
+const PAUSE = '<svg viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z"/></svg>';
+const SPIN  = '<svg viewBox="0 0 24 24" style="opacity:.35"><path d="M8 5l12 7-12 7z"/></svg>';
+
+const mmss = s => Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
+const pct  = () => (S.t/DUR*100).toFixed(2) + '%';
+const icon = () => S.play==='playing' ? PAUSE : S.play==='loading' ? SPIN : PLAY;
+
+/* the mock lesson body, with sentence spans so highlighting has something to move through */
+const PARAS = [
+  ['The call did not arrive as a voice from the sky.','It arrived as a weight that would not lift, and a name he could not stop hearing.'],
+  ['Three times he answered the wrong person.','Only on the fourth did the old priest understand who was speaking, and told the boy what to say back.'],
+  ['What follows in this lesson is the shape of that answer, and why the shape matters more than the words.']
+];
+function body(){
+  let n = 0, out = '';
+  const live = Math.min(SENTS-1, Math.floor(S.t/DUR*SENTS));
+  for (const p of PARAS){
+    out += '<p>' + p.map(s => {
+      const cls = (S.hl && S.play==='playing' && n===live) ? 'sent spoken' : 'sent';
+      n++; return '<span class="'+cls+'">'+s+'</span>';
+    }).join(' ') + '</p>';
+  }
+  return out;
+}
+
+/* -------------------------------------------------------------- the player */
+function meta(two){
+  return '<div class="meta"><div class="l1">Lesson 3 &middot; The Call</div><div class="l2">'+two+'</div></div>';
+}
+function timeLine(){
+  if (S.play==='loading') return 'Rendering the narration...';
+  if (S.play==='idle')    return 'Paused at '+mmss(S.t)+' of '+mmss(DUR);
+  return mmss(S.t)+' / '+mmss(DUR);
+}
+function btn(cls){ return '<button class="pbtn '+cls+'" data-toggle>'+icon()+'</button>'; }
+
+function player(){
+  if (S.play==='idle' && S.v==='A') return ''; // A only exists once you have pressed play
+  if (S.away && (S.v==='C' || S.v==='D')) return '';
+  const p = pct();
+  if (S.v==='A') return ''+
+    '<div class="island'+(S.open?' open':'')+'" data-open>'+
+      '<div class="toprow" style="display:flex;align-items:center;gap:11px;width:100%">'+
+        btn('') + meta(timeLine()) +
+        '<button class="ghost" data-x>'+(S.open?'▾':'▴')+'</button>'+
+      '</div>'+
+      '<div class="scrub"><div class="track"><i style="width:'+p+'"></i></div></div>'+
+      '<div class="xtra"><button class="ghost">back 15s</button><button class="ghost">1.0x</button>'+
+        '<button class="ghost">fwd 15s</button><button class="ghost">Stop</button></div>'+
+      (S.open?'':'<div class="track"><i style="width:'+p+'"></i></div>')+
+    '</div>';
+  if (S.v==='B') return ''+
+    '<div class="dock">'+
+      '<div class="track"><i style="width:'+p+'"></i></div>'+
+      btn('') + meta(timeLine()) +
+      '<button class="ghost">1.0x</button><button class="ghost">Close</button>'+
+    '</div>';
+  if (S.v==='D') return ''+
+    '<div class="hair" style="top:'+(S.port==='phone'?'96px':'0')+'"><div class="track" style="height:3px"><i style="width:'+p+'"></i></div></div>'+
+    '<div class="fabtime">'+mmss(S.t)+' / '+mmss(DUR)+'</div>'+
+    '<button class="pbtn fab" data-toggle>'+icon()+'</button>';
+  return '';
+}
+/* C lives inside the title bar, so it is rendered by the chrome, not here */
+function titlebarExtras(){
+  if (S.v!=='C' || S.away) return {right:'', below:'', prog:''};
+  return {
+    right: '<button class="pbtn tb-play" data-toggle>'+icon()+'</button>',
+    prog : '<div class="tbprog"><div class="track" style="height:2.5px"><i style="width:'+pct()+'"></i></div></div>',
+    below: S.play==='idle' ? '' :
+      '<div class="tbrow"><span>'+mmss(S.t)+'</span><div class="track"><i style="width:'+pct()+'"></i></div>'+
+      '<span>'+mmss(DUR)+'</span><button class="ghost">1.0x</button></div>'
+  };
+}
+
+/* ------------------------------------------------------------- the screens */
+function lessonInner(){
+  return '<div class="lesson">'+
+    '<h1>The Call</h1>'+
+    '<div class="narrate"><button class="nbtn" data-toggle>'+icon()+'</button>'+
+      '<p class="sub">Where a boy learns whose voice he has been hearing</p></div>'+
+    body()+
+  '</div>'+
+  '<div class="foot">Next lesson<b>4 &middot; The Answer He Was Given</b></div>';
+}
+function homeInner(){
+  return '<div class="home"><h3>Prophetic School</h3>'+
+    '<div class="card"><b>Prophetic School</b>12 of 56 lessons, last read Lesson 3</div>'+
+    '<div class="card"><b>Foundations</b>Not started</div>'+
+    '<div class="card"><b>The Psalms, Slowly</b>3 of 40 lessons</div></div>';
+}
+function deadNote(){
+  return '<div class="dead"><b>Playback stopped.</b>Variant '+S.v+' lives in the lesson chrome, so leaving the '+
+    'lesson takes the player with it and the audio stops mid sentence. That is what the reader does today.</div>';
+}
+
+function render(){
+  const sc = document.getElementById('screen');
+  sc.className = 'screen ' + S.port;
+  sc.dataset.theme = S.theme;
+  const tb = titlebarExtras();
+  const inner = S.away ? homeInner() : lessonInner();
+
+  if (S.port === 'phone'){
+    sc.innerHTML =
+      '<div class="mtop"><span style="font-size:18px">&#9776;</span><span>'+(S.away?'Home':'Prophetic School')+'</span></div>'+
+      (S.away ? '' :
+        '<div class="mtitlebar"><h2>3 &middot; The Call</h2><div style="display:flex;gap:8px;align-items:center">'+tb.right+'</div>'+tb.prog+tb.below+'</div>')+
+      '<div class="scroller" style="'+(S.away?'padding-top:48px':'')+'">'+inner+'</div>'+
+      (S.away && (S.v==='C'||S.v==='D') ? deadNote() : player())+
+      '<div class="tabs"><div class="'+(S.away?'on':'')+'"><i></i>Home</div><div class="'+(S.away?'':'on')+'"><i></i>Course</div>'+
+        '<div><i></i>Settings</div></div>';
+  } else {
+    sc.innerHTML =
+      '<div class="scroller">'+
+        '<div class="sidebar"><b>Prophetic School</b>'+
+          '<div class="row">1 &middot; The Silence</div><div class="row">2 &middot; The Lamp</div>'+
+          '<div class="row on">3 &middot; The Call</div><div class="row">4 &middot; The Answer</div>'+
+          '<div class="row">5 &middot; The Second Night</div></div>'+
+        '<div class="col">'+
+          (S.away ? homeInner() :
+            '<div class="dtitle"><h2>3 &middot; The Call</h2><div style="display:flex;gap:8px;align-items:center">'+tb.right+'</div></div>'+inner)+
+        '</div>'+
+        (S.away ? '' : '<div class="aside"><div class="box"><b style="color:var(--ink)">Ask the teacher</b></div>'+
+          '<div class="box">Why four times?<br><span style="color:var(--accent2)">Answered</span></div>'+
+          '<div class="box">Is this the same word as in Lesson 1?</div></div>')+
+      '</div>'+
+      (S.away && (S.v==='C'||S.v==='D') ? deadNote() : player());
+  }
+
+  document.getElementById('cap').textContent =
+    ({A:'A. Island',B:'B. Docked bar',C:'C. In the title bar',D:'D. Hairline + FAB'})[S.v] +
+    ', ' + (S.port==='phone'?'phone':'desktop') + (S.away?', after leaving the lesson':'');
+  document.getElementById('notes').innerHTML = NOTES[S.v];
+
+  sc.querySelectorAll('[data-toggle]').forEach(b => b.onclick = e => {
+    e.stopPropagation();
+    S.play = S.play==='playing' ? 'idle' : 'playing';
+    syncStateTabs(); render();
+  });
+  const isl = sc.querySelector('[data-open]');
+  if (isl) isl.onclick = () => { S.open = !S.open; render(); };
+}
+
+/* -------------------------------------------------------------- lab wiring */
+function press(sel, val, attr){
+  document.querySelectorAll(sel).forEach(b =>
+    b.setAttribute('aria-pressed', String(b.dataset[attr] === val)));
+}
+function syncStateTabs(){ press('[data-s]', S.play, 's'); }
+
+document.querySelectorAll('[data-v]').forEach(b => b.onclick = () => {
+  S.v = b.dataset.v; S.open = false; press('[data-v]', S.v, 'v'); render(); });
+document.querySelectorAll('[data-p]').forEach(b => b.onclick = () => {
+  S.port = b.dataset.p; press('[data-p]', S.port, 'p'); render(); });
+document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => {
+  S.theme = b.dataset.t; press('[data-t]', S.theme, 't'); render(); });
+document.querySelectorAll('[data-s]').forEach(b => b.onclick = () => {
+  S.play = b.dataset.s; syncStateTabs(); render(); });
+document.getElementById('hl').onclick = e => {
+  S.hl = !S.hl; e.currentTarget.setAttribute('aria-pressed', String(S.hl)); render(); };
+document.getElementById('away').onclick = e => {
+  S.away = !S.away; e.currentTarget.setAttribute('aria-pressed', String(S.away)); render(); };
+
+setInterval(() => {
+  if (S.play !== 'playing') return;
+  S.t = (S.t + 1) % DUR;
+  render();
+}, 1000);
+
+/* ----------------------------------------------------------------- the notes */
+const NOTES = {
+A:`<h2>A. Island, a floating pill over the reader</h2>
+<p style="margin:0 0 8px;color:var(--lab-soft);font-size:13px">Appears only once playback has started.
+Tap it to expand into a scrubber; the collapsed pill carries a hairline progress edge.</p>
+<h3>What it costs the page</h3>
+<ul>
+<li class="yes">Sits <b>above</b> <code>AppTabs</code> (bottom 88px vs the bar's 76px), the same shelf the Home
+"pick up where you left off" card already uses at <code>bottom-[4.75rem]</code>, so the precedent and the
+z order are both already in the codebase.</li>
+<li class="no">On a phone it covers roughly 56px of the lesson's last visible lines, permanently, while playing.</li>
+<li class="no">Collides with the mobile <b>lesson drawer</b> (a <code>fixed bottom-0 z-40</code> sheet): the island
+has to hide, or sit under it, when the drawer opens.</li>
+<li class="yes">Desktop: centred over the lesson column, clear of the Q&amp;A aside.</li>
+</ul>
+<h3>Reads as</h3><ul><li>Playback is a thing happening <i>to</i> the course, not a property of this page.</li>
+<li>The only variant whose shape survives leaving the lesson. Press <span class="pill">Leave the lesson</span>.</li></ul>`,
+
+B:`<h2>B. Docked bar, full width, pinned to the foot</h2>
+<p style="margin:0 0 8px;color:var(--lab-soft);font-size:13px">The podcast app shape. Always present when a
+narration exists, not only while playing.</p>
+<h3>What it costs the page</h3>
+<ul>
+<li class="no">Two stacked bars on a phone: 58px of player on top of 76px of <code>AppTabs</code> is <b>134px</b>,
+about 18% of the screen, permanently spent on chrome while somebody reads.</li>
+<li class="no"><code>AppTabs</code> hides on scroll in the reader (<code>useHideOnScroll</code>), so either the dock
+hides with it and you lose the control again, or it stays and the stack jumps as the nav slides away.</li>
+<li class="yes">Most legible of the four: title, elapsed, total and speed all visible without a gesture.</li>
+<li class="no">Desktop: a full width bar crosses <i>under</i> the Q&amp;A aside and the sidebar, so it stops
+reading as part of the lesson column.</li>
+</ul>
+<h3>Reads as</h3><ul><li>A media app that happens to contain a course.</li></ul>`,
+
+C:`<h2>C. In the sticky title bar, no new surface at all</h2>
+<p style="margin:0 0 8px;color:var(--lab-soft);font-size:13px">The lesson title bar is <i>already</i> sticky and
+already survives scrolling. Give it a play/pause and make its bottom border the progress line.</p>
+<h3>What it costs the page</h3>
+<ul>
+<li class="yes"><b>Zero</b> new pixels: the bar exists and is pinned whether or not narration does.</li>
+<li class="yes">"Where you are" is the bar's own bottom edge filling left to right, legible at a glance,
+costs nothing, no number to read.</li>
+<li class="no">The bar is <i>tight</i> on a phone: a truncated title plus (for an owner on the frontier)
+<code>NextLessonButton</code>, plus this. Something has to give.</li>
+<li class="no">Bound to the lesson by construction. The bar is per lesson chrome, so playback
+<b>cannot</b> survive navigation. Press <span class="pill">Leave the lesson</span> to see it die.</li>
+</ul>
+<h3>Reads as</h3><ul><li>Narration is a property of the lesson you are reading, which is exactly what it is today.</li></ul>`,
+
+D:`<h2>D. Hairline + FAB, the minimum that answers the ticket</h2>
+<p style="margin:0 0 8px;color:var(--lab-soft);font-size:13px">A 3px progress line under the title bar, and a
+round pause button bottom right. The question was "see where we are and pause from anywhere", and this is
+literally that and nothing else.</p>
+<h3>What it costs the page</h3>
+<ul>
+<li class="yes">The cheapest by a distance: reuses the existing circular control's skin, adds one line.</li>
+<li class="no">A bare FAB bottom right is the <b>same corner and shape</b> the "last lesson" FAB was deleted from
+on 2026-09-01 for eating screen. Re introducing one is a decision, not a detail.</li>
+<li class="no">No title, no lesson identity. Fine in lesson, useless the moment playback is course wide.</li>
+<li class="yes">Phone: the hairline sits directly under the title bar and is never covered by anything.</li>
+</ul>
+<h3>Reads as</h3><ul><li>A progress indicator with a stop button, not a player.</li></ul>`
+};
+render();
+</script>
+</body>
+</html>

@@ -48,4 +48,92 @@ description of a player is not a player.
 
 ## Answer
 
-<!-- unresolved -->
+**Decided AND built, 2026-09-18** (commit `769c34d`). Unusually for this map,
+the decision and its implementation landed in one session, so this ticket is
+genuinely shipped rather than merely resolved. What is left open is listed under
+"Deliberately out" below, and none of it blocks anything.
+
+Answered against a prototype the repo owner actually opened:
+[assets/01-floating-player-prototype.html](../assets/01-floating-player-prototype.html),
+four surfaces over a mock reader carrying the real chrome. Open it in a browser;
+it needs no server. The verdict was **variant B, the docked bar**.
+
+### The surface
+
+A bar docked to the **foot of the lesson**, full width of the lesson column.
+
+- **It appears only once playback has been asked for** (rendering, playing, or
+  paused partway), not whenever a narration exists. This is the one change from
+  the prototype as drawn, and it is the fix for B's only real weakness: drawn as
+  always-present it stacked 58px of player on `AppTabs`'s 76px, about 18% of a
+  phone screen spent on chrome for every learner who never presses play. To make
+  it permanent, drop the `started` guard in `NarrationDock`.
+- **The in-lesson circular control stays.** It is the invitation, beside the
+  authored subtitle, and it is what is on screen before anyone scrolls. The dock
+  is the persistent surface, not a replacement for the first press.
+- **Mobile: `fixed`, riding the nav.** `AppTabs` tucks away on scroll in the
+  reader (`useHideOnScroll`), so a bar pinned above it strands a gap. The dock
+  reads the same signal and slides into the space the nav vacates, the mirror of
+  the lesson title bar's `top-12`/`top-0`. `z-20`, below the lesson drawer
+  (`z-40`) and its scrim (`z-30`), so opening the lesson list dims it with the
+  rest of the page. A `md:hidden` spacer keeps the last line of the lesson and
+  the inline Q&A clear of it, the same trick `AppTabs` already uses.
+- **Desktop: `sticky bottom-0` inside the lesson column**, because that column
+  is its own scroller. A fixed full-width bar ran under the sidebar and the
+  Teacher Q&A aside and stopped reading as part of the lesson.
+
+### What "where we are" means
+
+**Elapsed over total, plus a 3px progress hairline along the top edge of the
+bar.** Both are display only.
+
+**Text highlighting is OUT.** ElevenLabs can return per-character timings, but
+nothing in `lessonAudio` stores them and every already-cached mp3 carries none,
+so turning it on is a schema change plus a re-render of the whole course, at the
+cost recorded in the map's Notes. Seen in the prototype (the "Sentence
+highlighting" toggle) it also reads as busy against a lesson somebody is reading
+rather than following along with. Revisit only if a learner asks for it.
+
+**No scrubber, no skip, no speed.** The request was to see where you are and
+pause from anywhere; the track is a display, not an input. Marked `ponytail:` in
+the code so `/ponytail-debt` carries it.
+
+### Scope: in-lesson, not course-wide
+
+The `<audio>` stays where it is, in `LessonView`, and **navigating away still
+stops playback**. Course-wide listening is a different component mounted in the
+root layout with its own queue, and the prototype made the size of that visible:
+only a surface shaped like this one could survive the trip at all, which is why
+B and A were the only candidates that answered it. Nobody has asked to listen
+across lessons yet, and it is now the map's biggest remaining question rather
+than a detail inside this one.
+
+### Resume: for the length of one visit
+
+A module-level `Map` keyed by topic + lesson + Edition, banked on leaving a
+lesson and restored on `loadedmetadata`. **Not `myProgress`**, on purpose: a
+learner paused at 2:14 has not completed anything, position-in-audio is not
+Progress, and writing it would put a mutation behind every pause. It dies on
+reload, which is the right size for what it fixes, which is opening the lesson
+list mid-narration and coming back to find nine minutes restarted. Cross-device
+resume is a server decision nobody has asked for.
+
+### Deliberately out
+
+Course-wide playback, text highlighting, scrubbing, playback speed, cross-device
+resume. None is blocked by anything here; each is a fresh ticket if it is ever
+wanted.
+
+### Evidence
+
+`pnpm typecheck` clean, and `narrationDock.ts`'s arithmetic is unit tested (an
+audio element reports `NaN` for `duration` until metadata lands, and a frame
+past the end for `currentTime`; neither may reach the DOM). The **prototype** was
+walked in a browser by the repo owner, which is what chose the variant. The
+**production dock** is verified by types, tests and reading the code, NOT walked
+in a browser: no dev server was running, and the pilot is admin-gated to one
+English lesson of `prophetic-school`. Worth a look there before the gate widens.
+
+<!-- The failing `scripts/bundle-authoring-assets.test.ts` seen in this session
+     is a CRLF mismatch in a generated bundle and predates this work; confirmed
+     failing on a clean tree. Not this ticket's. -->
