@@ -627,10 +627,11 @@
     },
     "hero": {
       "eyebrow": "Un studio de cours par IA",
-      "headline": "Apprenez n’importe quoi, ancré dans <em>vos</em> lectures.",
-      "subhead": "Amorcez un sujet avec les sources auxquelles vous faites confiance, et un auteur IA vous rédige un cours interactif — leçon après leçon, à mesure que vous apprenez.",
+      "headline": "Transformez des livres denses et des notes en <em>cours interactifs</em> que vous terminerez vraiment.",
+      "subhead": "Importez un manuel, un livre ou vos notes. My Course construit un programme court et interactif, avec des quiz intégrés et des questions au professeur en ligne, fondé strictement sur vos sources.",
       "getStarted": "Commencer",
-      "seeHow": "Voir comment ça marche"
+      "sampleLesson": "Voir une leçon d’exemple",
+      "materialsPill": "Fonctionne avec les livres, les Écritures, les procédures d’entreprise et les notes de cours"
     },
     "how": {
       "heading": "Un cours qui s’écrit à mesure que vous l’apprenez"
@@ -701,7 +702,10 @@
         "quizOptionC": "Mars",
         "askedQuestion": "Pourquoi Mercure n'est-elle pas une géante gazeuse ?",
         "askedReply": "Bonne question — tout se joue sur la masse.",
-        "askedFollowUp": "Donc tout se résume à la masse ?"
+        "askedFollowUp": "Donc tout se résume à la masse ?",
+        "quizFeedback": "Exact. Jupiter est surtout faite d’hydrogène et d’hélium, sans surface solide.",
+        "quizRetry": "Pas tout à fait. Essayez une autre réponse.",
+        "quizNudge": "Touchez une réponse pour essayer."
       }
     },
     "capabilities": {
@@ -717,8 +721,8 @@
       "t4l": "Conçu et développé"
     },
     "founder": {
-      "quote": "",
-      "byline": ""
+      "quote": "« J’en avais assez d’enregistrer de longs livres et des PDF denses que je ne retiendrais jamais, et assez des chats IA génériques qui déversent cinq paragraphes oubliés dans l’heure. J’ai construit My Course parce qu’apprendre vraiment demande du rappel actif : lire un court passage, répondre à un quiz pour se vérifier, et obtenir d’un tuteur patient la réponse à votre question précise, là où vous avez bloqué. Fondé uniquement sur les sources auxquelles vous faites vraiment confiance. »",
+      "byline": "Jonathan Vorster, créateur de My Course"
     },
     "faq": {
       "heading": "Vos questions, nos réponses.",
@@ -731,7 +735,9 @@
       "q4": "Puis-je apprendre dans une autre langue que l'anglais ?",
       "a4": "Oui. Un cours peut devenir une édition complète dans une autre langue — les mêmes leçons réécrites, pas traduites à la machine — et vous passez d'une édition à l'autre quand vous voulez.",
       "q5": "Puis-je partager un cours avec quelqu'un ?",
-      "a5": "De trois façons : par e-mail en lecture seule, par e-mail avec droits de modification, ou via un lien public anonyme que n'importe qui peut ouvrir sans compte."
+      "a5": "De trois façons : par e-mail en lecture seule, par e-mail avec droits de modification, ou via un lien public anonyme que n'importe qui peut ouvrir sans compte.",
+      "chatgptQ": "Pourquoi ne pas simplement coller mon PDF dans ChatGPT ?",
+      "chatgptA": "ChatGPT vous rend un mur de texte que vous parcourez et oubliez dans l’heure. My Course découpe votre lecture en un programme structuré, étape par étape, avec des quiz de rappel actif, des fiches de référence persistantes et des questions en ligne qui restent attachées à la phrase exacte qui les a suscitées."
     },
     "interest": {
       "heading": "Pas encore prêt à en lancer un ?",

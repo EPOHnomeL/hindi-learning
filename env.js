@@ -13,6 +13,10 @@ export const env = createEnv({
     NEXT_PUBLIC_CONVEX_URL: z.string().url(),
     NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: z.string().min(1).optional(),
     NEXT_PUBLIC_POSTHOG_HOST: z.string().url().optional(),
+    // Where the landing page's "Preview a sample lesson" button goes: a public
+    // share link (`/share/<token>`, absolute or relative). Unset, the button
+    // scrolls to the tappable phone mocks instead (landing-page spec, 2026-09-18).
+    NEXT_PUBLIC_SAMPLE_LESSON_URL: z.string().min(1).optional(),
     // NEXT_PUBLIC_COOKIE_DOMAIN is gone: cookies are host-only so each tenant
     // subdomain has its own session, language and theme (ADR 0025). Don't add it
     // back — a parent `Domain` is exactly what shared one account across brands.
@@ -21,6 +25,7 @@ export const env = createEnv({
     NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL,
     NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN: process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN,
     NEXT_PUBLIC_POSTHOG_HOST: process.env.NEXT_PUBLIC_POSTHOG_HOST,
+    NEXT_PUBLIC_SAMPLE_LESSON_URL: process.env.NEXT_PUBLIC_SAMPLE_LESSON_URL,
   },
   // Let Docker/CI image builds opt out of validation (create-t3-app convention).
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,

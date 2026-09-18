@@ -627,10 +627,11 @@
     },
     "hero": {
       "eyebrow": "Un estudio de cursos con IA",
-      "headline": "Aprende cualquier cosa, basado en <em>tu</em> lectura.",
-      "subhead": "Siembra un tema con las fuentes en las que confías, y un autor con IA te escribe un curso interactivo — lección a lección, a medida que aprendes.",
+      "headline": "Convierte libros densos y apuntes en <em>cursos interactivos</em> que de verdad terminarás.",
+      "subhead": "Sube un manual, un libro de texto o tus apuntes. My Course crea un plan de estudio breve e interactivo con cuestionarios integrados y preguntas al profesor en línea, basado estrictamente en tus fuentes.",
       "getStarted": "Empezar",
-      "seeHow": "Ver cómo funciona"
+      "sampleLesson": "Ver una lección de muestra",
+      "materialsPill": "Funciona con libros, Escrituras, procedimientos de empresa y apuntes de clase"
     },
     "how": {
       "heading": "Un curso que se escribe a medida que lo aprendes"
@@ -701,7 +702,10 @@
         "quizOptionC": "Marte",
         "askedQuestion": "¿Por qué Mercurio no es un gigante gaseoso?",
         "askedReply": "Buena pregunta: todo se reduce a la masa.",
-        "askedFollowUp": "¿Entonces todo es cuestión de masa?"
+        "askedFollowUp": "¿Entonces todo es cuestión de masa?",
+        "quizFeedback": "Correcto. Júpiter es sobre todo hidrógeno y helio, sin superficie sólida.",
+        "quizRetry": "No exactamente. Prueba otra.",
+        "quizNudge": "Toca una respuesta para probarlo."
       }
     },
     "capabilities": {
@@ -717,8 +721,8 @@
       "t4l": "Diseñado y construido"
     },
     "founder": {
-      "quote": "",
-      "byline": ""
+      "quote": "“Me cansé de guardar libros largos y PDF densos que nunca llegaría a retener, y de los chats de IA genéricos que sueltan cinco párrafos que olvidas en una hora. Construí My Course porque aprender de verdad exige recuerdo activo: leer un fragmento breve, responder un cuestionario para comprobarlo y que un tutor paciente responda tu pregunta exacta justo donde te atascaste. Basado solo en las fuentes en las que realmente confías.”",
+      "byline": "Jonathan Vorster, creador de My Course"
     },
     "faq": {
       "heading": "Preguntas, respondidas.",
@@ -731,7 +735,9 @@
       "q4": "¿Puedo aprender en un idioma que no sea inglés?",
       "a4": "Sí. Un curso puede convertirse en una edición completa en otro idioma — las mismas lecciones reescritas, no traducidas a máquina — y puedes cambiar de edición cuando quieras.",
       "q5": "¿Puedo compartir un curso con alguien?",
-      "a5": "De tres formas: por correo como lector de solo lectura, por correo con permiso de edición, o como enlace público anónimo que cualquiera puede abrir sin cuenta."
+      "a5": "De tres formas: por correo como lector de solo lectura, por correo con permiso de edición, o como enlace público anónimo que cualquiera puede abrir sin cuenta.",
+      "chatgptQ": "¿Por qué no pegar mi PDF en ChatGPT sin más?",
+      "chatgptA": "ChatGPT te devuelve un muro de texto que lees por encima y olvidas en una hora. My Course divide tu lectura en un plan estructurado, paso a paso, con cuestionarios de recuerdo activo, referencias de repaso permanentes y preguntas en línea que quedan unidas a la frase exacta que las provocó."
     },
     "interest": {
       "heading": "¿Aún no quieres empezar uno?",

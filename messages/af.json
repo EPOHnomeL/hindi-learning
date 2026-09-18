@@ -627,10 +627,11 @@
     },
     "hero": {
       "eyebrow": "’n KI-kursusstudio",
-      "headline": "Leer enigiets, gegrond in <em>jou</em> leeswerk.",
-      "subhead": "Saai ’n onderwerp met die bronne wat jy vertrou, en ’n KI-outeur skryf vir jou ’n interaktiewe kursus — les vir les, soos jy leer.",
+      "headline": "Verander digte boeke en notas in <em>interaktiewe kursusse</em> wat jy werklik sal voltooi.",
+      "subhead": "Laai ’n handleiding, handboek of notas op. My Course bou ’n kort, interaktiewe kurrikulum met ingeboude vasvrae en inlyn-vrae aan die onderwyser, streng gegrond op jou bronne.",
       "getStarted": "Kom aan die gang",
-      "seeHow": "Sien hoe dit werk"
+      "sampleLesson": "Bekyk ’n voorbeeldles",
+      "materialsPill": "Werk met boeke, die Skrif, maatskappyprosedures en lesingnotas"
     },
     "how": {
       "heading": "’n Kursus wat geskryf word soos jy dit leer"
@@ -701,7 +702,10 @@
         "quizOptionC": "Mars",
         "askedQuestion": "Waarom is Mercurius nie ’n gasreus nie?",
         "askedReply": "Goeie vraag — dit kom neer op massa.",
-        "askedFollowUp": "So massa is die hele storie?"
+        "askedFollowUp": "So massa is die hele storie?",
+        "quizFeedback": "Reg. Jupiter bestaan meestal uit waterstof en helium, sonder ’n vaste oppervlak.",
+        "quizRetry": "Nie heeltemal. Probeer ’n ander een.",
+        "quizNudge": "Tik ’n antwoord om dit te probeer."
       }
     },
     "capabilities": {
@@ -717,8 +721,8 @@
       "t4l": "Ontwerp en gebou"
     },
     "founder": {
-      "quote": "",
-      "byline": ""
+      "quote": "“Ek was moeg daarvoor om lang boeke en digte PDF’s te bewaar wat ek nooit werklik sou onthou, en moeg vir generiese KI-geselsies wat vyf paragrawe uitstort wat jy binne ’n uur vergeet. Ek het My Course gebou omdat regte leer aktiewe herroeping nodig het: lees ’n kort stukkie, beantwoord ’n vasvra om jouself te toets, en laat ’n geduldige tutor jou presiese vraag beantwoord net daar waar jy vasgehaak het. Slegs gegrond op die bronne wat jy werklik vertrou.”",
+      "byline": "Jonathan Vorster, bouer van My Course"
     },
     "faq": {
       "heading": "Vrae, geantwoord.",
@@ -731,7 +735,9 @@
       "q4": "Kan ek in ’n ander taal as Engels leer?",
       "a4": "Ja. ’n Kursus kan in ’n volledige uitgawe in ’n ander taal omskep word — dieselfde lesse herskryf, nie masjien-vertaal nie — en jy kan enige tyd tussen uitgawes wissel.",
       "q5": "Kan ek ’n kursus met iemand anders deel?",
-      "a5": "Op drie maniere: per e-pos as ’n leesalleen-kyker, per e-pos met redigeerregte, of as ’n anonieme openbare skakel wat enigiemand sonder ’n rekening kan oopmaak."
+      "a5": "Op drie maniere: per e-pos as ’n leesalleen-kyker, per e-pos met redigeerregte, of as ’n anonieme openbare skakel wat enigiemand sonder ’n rekening kan oopmaak.",
+      "chatgptQ": "Hoekom plak ek nie net my PDF in ChatGPT?",
+      "chatgptA": "ChatGPT gee jou ’n muur van teks wat jy vlugtig lees en binne ’n uur vergeet. My Course verdeel jou leeswerk in ’n gestruktureerde, stap-vir-stap kurrikulum met vasvrae vir aktiewe herroeping, blywende opsommingsverwysings en inlyn-vrae waar jou vrae vas bly aan die presiese sin wat hulle laat ontstaan het."
     },
     "interest": {
       "heading": "Nog nie gereed om een te begin nie?",

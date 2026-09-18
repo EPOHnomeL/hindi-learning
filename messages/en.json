@@ -627,10 +627,11 @@
     },
     "hero": {
       "eyebrow": "An AI course studio",
-      "headline": "Learn anything, grounded in <em>your</em> reading.",
-      "subhead": "Seed a topic with the sources you trust, and an AI author writes you an interactive course — lesson by lesson, as you learn.",
+      "headline": "Turn dense books and notes into <em>interactive courses</em> you’ll actually finish.",
+      "subhead": "Upload a handbook, textbook, or notes. My Course builds a bite-sized, interactive curriculum with built-in quizzes and inline teacher Q&A, grounded strictly in your sources.",
       "getStarted": "Get started",
-      "seeHow": "See how it works"
+      "sampleLesson": "Preview a sample lesson",
+      "materialsPill": "Works with books, scripture, company SOPs, and lecture notes"
     },
     "how": {
       "heading": "A course that’s written as you learn it"
@@ -701,7 +702,10 @@
         "quizOptionC": "Mars",
         "askedQuestion": "Why isn't Mercury a gas giant?",
         "askedReply": "Good question — it comes down to mass.",
-        "askedFollowUp": "So mass is the whole story?"
+        "askedFollowUp": "So mass is the whole story?",
+        "quizFeedback": "Right. Jupiter is mostly hydrogen and helium, with no solid surface.",
+        "quizRetry": "Not quite. Try another.",
+        "quizNudge": "Tap an answer to try it."
       }
     },
     "capabilities": {
@@ -717,8 +721,8 @@
       "t4l": "Designed and built"
     },
     "founder": {
-      "quote": "",
-      "byline": ""
+      "quote": "“I got tired of saving long books and dense PDFs that I’d never actually retain, and tired of generic AI chat that dumps five paragraphs you forget within the hour. I built My Course because real learning needs active recall: read a bite-sized piece, answer a quiz to check yourself, and have a patient tutor answer your exact question right where you got stuck. Grounded only in the sources you actually trust.”",
+      "byline": "Jonathan Vorster, builder of My Course"
     },
     "faq": {
       "heading": "Questions, answered.",
@@ -731,7 +735,9 @@
       "q4": "Can I learn in a language other than English?",
       "a4": "Yes. A course can be turned into a full edition in another language — the same lessons re-authored, not machine-glossed — and you can switch between editions whenever you like.",
       "q5": "Can I share a course with someone else?",
-      "a5": "Three ways: by email as a read-only viewer, by email with editing rights, or as an anonymous public link anyone can open without an account."
+      "a5": "Three ways: by email as a read-only viewer, by email with editing rights, or as an anonymous public link anyone can open without an account.",
+      "chatgptQ": "Why not just paste my PDF into ChatGPT?",
+      "chatgptA": "ChatGPT gives you a wall of text that you skim and forget within an hour. My Course breaks your reading into a structured, step-by-step curriculum with active-recall quizzes, persistent cheat-sheet references, and inline Q&A where your questions stay attached to the exact sentence that prompted them."
     },
     "interest": {
       "heading": "Not ready to start one yet?",

@@ -1,7 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { type CSSProperties } from "react";
+import Image from "next/image";
+import { useState, type CSSProperties } from "react";
+import { env } from "../../../env.js";
 import { DonateSection } from "./DonateSection";
 import { Icon, type IconName } from "./icons";
 import { Brand } from "./Brand";
@@ -34,6 +36,16 @@ import { useTheme } from "./ThemeContext";
 // **The certificate is no longer a section.** It used to have half a page and a
 // live demo card; it is a PNG with no compliance weight behind it, so leading on
 // it oversold the product. It still exists, it just isn't the pitch.
+//
+// **Refreshed 2026-09-18** (.plan/maps/landing-page/spec.md), for conversion:
+//   - the headline sells the outcome (courses you finish), not the mechanism;
+//   - a materials line under the CTAs answers "will MY reading work?";
+//   - the secondary CTA previews a sample lesson without an account
+//     (`NEXT_PUBLIC_SAMPLE_LESSON_URL`, else it scrolls to the tappable mocks);
+//   - the phone mocks moved up under the hero so the product peeks above the
+//     fold on desktop, and the quiz frame is tappable (PhoneMocks);
+//   - the founder quote is written and carries a portrait (`/images/founder.png`);
+//   - the FAQ opens on "why not just paste it into ChatGPT?".
 
 // Display copy lives in the "Landing" namespace; the constants hold only the
 // stable per-item keys (step index, feature icon) and copy is resolved with
@@ -87,6 +99,9 @@ export function Landing() {
     askCta: t("mocks.phone.askCta"),
     quizQuestion: t("mocks.phone.quizQuestion"),
     quizOptions: [t("mocks.phone.quizOptionA"), t("mocks.phone.quizOptionB"), t("mocks.phone.quizOptionC")],
+    quizFeedback: t("mocks.phone.quizFeedback"),
+    quizRetry: t("mocks.phone.quizRetry"),
+    quizNudge: t("mocks.phone.quizNudge"),
     askedQuestion: t("mocks.phone.askedQuestion"),
     askedReply: t("mocks.phone.askedReply"),
     askedFollowUp: t("mocks.phone.askedFollowUp"),
@@ -97,7 +112,21 @@ export function Landing() {
     l: t(`capabilities.t${n}l`),
   }));
 
-  const faqItems: FaqItem[] = [1, 2, 3, 4, 5].map((n) => ({ q: t(`faq.q${n}`), a: t(`faq.a${n}`) }));
+  // Hardest objection first: "why not just paste it into ChatGPT?" is the one
+  // every prospect is already asking, so it leads (spec, 2026-09-18).
+  const faqItems: FaqItem[] = [
+    { q: t("faq.chatgptQ"), a: t("faq.chatgptA") },
+    ...[1, 2, 3, 4, 5].map((n) => ({ q: t(`faq.q${n}`), a: t(`faq.a${n}`) })),
+  ];
+
+  // The portrait beside the founder quote. `public/images/founder.png` is the
+  // slot; if it ever fails to load the aside drops away and the quote widens to
+  // fill the row, which beats a broken-image icon beside a personal statement.
+  const [portrait, setPortrait] = useState(true);
+
+  // Where "Preview a sample lesson" goes: a public share link when the operator
+  // has set one, otherwise the tappable phone mocks just under the hero.
+  const sampleLessonHref = env.NEXT_PUBLIC_SAMPLE_LESSON_URL ?? "#see-it";
 
   const interestCopy: InterestFormCopy = {
     heading: t("interest.heading"),
@@ -112,10 +141,10 @@ export function Landing() {
     fieldLabel: t("interest.fieldLabel"),
   };
 
-  // The founder quote is the operator's own words or it is nothing. `founder.quote`
-  // ships EMPTY (messages/*.json) precisely so this section can't render invented
-  // origin-story prose: writing the quote turns the section on, and no code change
-  // is needed to do it.
+  // The founder quote is the operator's own words or it is nothing. It shipped
+  // EMPTY until 2026-09-18 so this section could not render invented origin-story
+  // prose; the operator wrote it that day (messages/*.json), and blanking the key
+  // again switches the section off with no code change.
   const founderQuote = t("founder.quote");
 
   return (
@@ -135,7 +164,9 @@ export function Landing() {
           </span>
         </nav>
 
-        <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center px-6 pb-24 pt-16 text-center sm:pb-32 sm:pt-24">
+        {/* Bottom padding is deliberately short so the mocks section's heading
+            peeks above the fold on a desktop viewport. */}
+        <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center px-6 pb-16 pt-16 text-center sm:pb-20 sm:pt-24">
           <p className="land-rise text-xs font-semibold uppercase tracking-[0.35em] text-accent2">
             {t("hero.eyebrow")}
           </p>
@@ -162,14 +193,44 @@ export function Landing() {
               {t("hero.getStarted")}
             </a>
             <a
-              href="#how"
+              href={sampleLessonHref}
               className="rounded-lg border border-line bg-card px-6 py-3 text-sm font-semibold text-ink transition-colors hover:border-gold hover:text-accent"
             >
-              {t("hero.seeHow")}
+              {t("hero.sampleLesson")}
             </a>
           </div>
+          {/* What goes in: one quiet line, not a row of badges, so it answers the
+              "will my reading work?" question without competing with the CTAs. */}
+          <p
+            className="land-rise mt-6 inline-flex items-center gap-2 rounded-full border border-line bg-card/60 px-4 py-1.5 text-xs text-soft"
+            style={{ "--d": "320ms" } as CSSProperties}
+          >
+            <Icon name="book" className="h-3.5 w-3.5 shrink-0 text-accent" />
+            {t("hero.materialsPill")}
+          </p>
         </div>
       </header>
+
+      {/* ── The product itself, in CSS phone frames, straight under the hero so
+             it peeks above the fold. A lesson, a quiz you can tap, and a question
+             answered where it was asked. Also the fallback target of "Preview a
+             sample lesson" when no public link is configured. ── */}
+      <section id="see-it" className="scroll-mt-8 border-y border-line bg-card/60">
+        <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-14">
+          <div className="land-reveal mx-auto max-w-2xl text-center">
+            <h2 className="text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">{t("mocks.heading")}</h2>
+            <p className="mt-3 leading-relaxed text-soft">{t("mocks.body")}</p>
+          </div>
+          <PhoneMockRow
+            copy={phoneCopy}
+            captions={[
+              { title: t("mocks.lesson.title"), body: t("mocks.lesson.body") },
+              { title: t("mocks.quiz.title"), body: t("mocks.quiz.body") },
+              { title: t("mocks.ask.title"), body: t("mocks.ask.body") },
+            ]}
+          />
+        </div>
+      </section>
 
       {/* ── How it works ── */}
       <section id="how" className="mx-auto w-full max-w-5xl scroll-mt-8 px-6 py-20">
@@ -187,26 +248,6 @@ export function Landing() {
               <p className="mt-2 text-sm leading-relaxed text-soft">{step.body}</p>
             </div>
           ))}
-        </div>
-      </section>
-
-      {/* ── The product itself, in CSS phone frames — the section that replaced
-             the certificate showcase. A lesson, a quiz inside it, and a question
-             answered where it was asked. ── */}
-      <section className="border-y border-line bg-card/60">
-        <div className="mx-auto w-full max-w-5xl px-6 py-20">
-          <div className="land-reveal mx-auto max-w-2xl text-center">
-            <h2 className="text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">{t("mocks.heading")}</h2>
-            <p className="mt-3 leading-relaxed text-soft">{t("mocks.body")}</p>
-          </div>
-          <PhoneMockRow
-            copy={phoneCopy}
-            captions={[
-              { title: t("mocks.lesson.title"), body: t("mocks.lesson.body") },
-              { title: t("mocks.quiz.title"), body: t("mocks.quiz.body") },
-              { title: t("mocks.ask.title"), body: t("mocks.ask.body") },
-            ]}
-          />
         </div>
       </section>
 
@@ -235,7 +276,26 @@ export function Landing() {
       <CapabilityBand heading={t("capabilities.heading")} body={t("capabilities.body")} tiles={tiles} />
 
       {/* ── Founder quote — renders only once the operator has written one ── */}
-      {founderQuote !== "" && <FounderQuote quote={founderQuote} byline={t("founder.byline")} />}
+      {founderQuote !== "" && (
+        <FounderQuote
+          quote={founderQuote}
+          byline={t("founder.byline")}
+          aside={
+            portrait ? (
+              <div className="relative mx-auto aspect-square w-full max-w-[16rem] overflow-hidden rounded-2xl border border-line bg-card shadow-sm">
+                <Image
+                  src="/images/founder.png"
+                  alt={t("founder.byline")}
+                  fill
+                  sizes="(min-width: 1024px) 16rem, 60vw"
+                  className="object-cover"
+                  onError={() => setPortrait(false)}
+                />
+              </div>
+            ) : undefined
+          }
+        />
+      )}
 
       {/* ── FAQ, hardest objection first ── */}
       <section className="mx-auto w-full max-w-3xl px-6 py-20">
