@@ -12,6 +12,13 @@ import { Logo } from "./Logo";
 import { CheckoutSteps } from "./Paygate";
 import { useTenant } from "./TenantContext";
 
+// The Password provider's own default rule (`validateDefaultPasswordRequirements`
+// in @convex-dev/auth), duplicated here because the unified door has to apply it
+// BEFORE it decides what a failure meant. See the submit handler. No account can
+// exist with a shorter password: every path that sets one (`signUp`,
+// `reset-verification`) runs that same validator server-side.
+const MIN_PASSWORD_LENGTH = 8;
+
 // Google's four-colour G. Inline rather than an asset: it must render before any
 // network fetch on the sign-in screen, and Google's brand guidelines require the
 // official mark be used unaltered — so the paths are fixed, not themed.
@@ -59,24 +66,23 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
   // Standing on the checkout URL itself (auth-first, ADR 0021): `AppGate`
   // renders this component *at* `/checkout/<slug>/<lang>` and re-renders into the
   // page after auth, so the path is the buy intent — no marker to carry, and the
-  // trigger says what it means. The common path is a NEW buyer, so the form opens
-  // on "Create account" with purchase-flavoured copy; the toggle still reaches
-  // sign-in. Anywhere else the default stays "Sign in".
+  // trigger says what it means. Used only for the checkout rail and its
+  // copy now: since 2026-09-18 the form has one door, so there is no opening
+  // state to pick.
   const path = usePathname();
   const buyIntent = !!path?.startsWith("/checkout");
-  // A member arriving with a voucher code (`/redeem`, ADR 0029) has almost
-  // certainly never been here - their organisation bought the seats and handed
-  // them a code - so the form opens on "Create account" for them too. NOT
-  // `buyIntent` though: they are not mid-purchase, so the four-step checkout rail
-  // and its copy would be describing something that is not happening.
+  // **One door** (2026-09-18). There is no sign-in/sign-up toggle any more: the
+  // submit button tries `signIn` and, only if that fails, `signUp`, so a visitor
+  // never has to know which of the two they are. A new address is registered, a
+  // known one is signed in, and the opening-state guessing this used to do for
+  // `/checkout`, `/redeem` and `/sign-up` is gone with it.
+  //
   // `reset` and `reset-verification` are the two halves of the forgot-password
   // walk (technical-foundation ticket 21), and they are named for the `flow` param
   // Convex Auth's Password provider expects, because that is exactly what this
   // value is posted as. Neither is ever an opening state: you can only arrive at
-  // them from the sign-in form.
-  const [flow, setFlow] = useState<"signIn" | "signUp" | "reset" | "reset-verification">(
-    buyIntent || path?.startsWith("/redeem") || path === "/sign-up" ? "signUp" : "signIn",
-  );
+  // them from the form.
+  const [flow, setFlow] = useState<"auth" | "reset" | "reset-verification">("auth");
   const isReset = flow === "reset" || flow === "reset-verification";
   // The address the code was sent to, held across the step change: the second step
   // asks only for the code and the new password, but the provider verifies the OTP
@@ -163,7 +169,6 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
             setBusy(true);
             setError(null);
             const formData = new FormData(e.currentTarget);
-            formData.set("flow", flow);
             if (isPostHogInitialized()) posthog.capture("auth_password_submitted", { flow, checkout_intent: buyIntent });
             // **Step one of a reset tells the visitor nothing.** Convex Auth
             // throws `InvalidAccountId` when the address has no account, so
@@ -172,6 +177,7 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
             // swallowed and the code step is shown either way; the copy on it
             // promises only "if that address has an account".
             if (flow === "reset") {
+              formData.set("flow", "reset");
               try {
                 await signIn("password", formData);
               } catch {
@@ -182,27 +188,75 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
               setBusy(false);
               return;
             }
-            if (flow === "reset-verification") formData.set("email", resetEmail);
-            try {
-              await signIn("password", formData);
-              // Only on success, and only after it — a failed attempt shouldn't
-              // rewrite the hint. A sign-*up* counts too: it's how they'll come back.
-              // A completed reset counts as well: the provider signs the user in as
-              // part of verifying the code, and password is how they got back.
-              rememberAuthMethod("password");
-            } catch {
-              setError(
-                flow === "signIn" ? t("signInFailed") : flow === "signUp" ? t("signUpFailed") : t("resetFailed"),
-              );
-              setBusy(false);
+            if (flow === "reset-verification") {
+              formData.set("flow", "reset-verification");
+              formData.set("email", resetEmail);
+              try {
+                await signIn("password", formData);
+                // A completed reset counts as a password sign-in: the provider signs
+                // the user in as part of verifying the code, and password is how
+                // they got back.
+                rememberAuthMethod("password");
+              } catch {
+                setError(t("resetFailed"));
+                setBusy(false);
+              }
+              return;
             }
+
+            // **The one door.** `signIn` first and `signUp` only as a fallback,
+            // never the other way round: sign-up-first would be attempted on every
+            // returning visitor, and a provider change that ever made
+            // `createAccount` link rather than throw would then silently repoint an
+            // existing account. Signing in first can only ever succeed for somebody
+            // who already holds the credential.
+            const email = String(formData.get("email") ?? "");
+            const password = String(formData.get("password") ?? "");
+            // Checked here, before either attempt, because it is what makes the
+            // fallback below readable: with a long-enough password the only
+            // ordinary reason `signUp` ALSO fails is that the address is already
+            // taken, so that pair of failures means "wrong password". Left to the
+            // server, a too-short password would fail both attempts and be reported
+            // as a wrong one.
+            if (password.length < MIN_PASSWORD_LENGTH) {
+              setError(t("passwordTooShort"));
+              setBusy(false);
+              return;
+            }
+            let created = false;
+            try {
+              await signIn("password", { email, password, flow: "signIn" });
+            } catch {
+              try {
+                await signIn("password", { email, password, flow: "signUp" });
+                created = true;
+              } catch {
+                // Both halves refused: the address is registered and the password
+                // does not match it. (`signUp` throws on an address that already has
+                // an account, and the length rule above has ruled out the other
+                // everyday cause.)
+                setError(t("wrongPassword"));
+                setBusy(false);
+                return;
+              }
+            }
+            // Only on success, and only after it. A failed attempt shouldn't
+            // rewrite the hint. A sign-*up* counts too: it's how they'll come back.
+            rememberAuthMethod("password");
+            // Which half of the door they went through is the thing worth counting
+            // now that the visitor no longer declares it: this is the new-versus-
+            // returning split for every funnel that starts here.
+            if (isPostHogInitialized()) posthog.capture("auth_password_succeeded", { created, checkout_intent: buyIntent });
           }}
         >
           <h2 className="text-xl font-semibold text-accent">
-            {isReset ? t("resetTitle") : flow === "signIn" ? t("signIn") : t("createAccount")}
+            {isReset ? t("resetTitle") : t("continueTitle")}
           </h2>
-          {buyIntent && flow === "signUp" && (
-            <p className="-mt-1.5 text-sm text-soft">{t("buyIntent")}</p>
+          {/* The lead is doing the work the toggle used to: it says, in words,
+              that one button covers both arrivals, so nobody hunts for a "create
+              account" link that is no longer there. */}
+          {!isReset && (
+            <p className="-mt-1.5 text-sm text-soft">{buyIntent ? t("buyIntent") : t("continueLead")}</p>
           )}
           {/* On step two this is the only acknowledgement the request was made,
               and it is deliberately conditional ("if that address has an
@@ -211,9 +265,9 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
           {isReset && (
             <p className="-mt-1.5 text-sm text-soft">{flow === "reset" ? t("resetLead") : t("resetSent")}</p>
           )}
-          {/* Shown in both toggle states: with email-linking (#111) a Google click
-              signs in and signs up identically, so there is nothing to choose.
-              Hidden mid-reset: someone who is here because their password does not
+          {/* With email-linking (#111) a Google click signs in and signs up
+              identically, which is the same promise the password button below now
+              makes. Hidden mid-reset: someone who is here because their password does not
               work is not helped by a second way in, and a Google click would
               abandon the code already sitting in their inbox. */}
           {!isReset && (
@@ -263,13 +317,20 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
           <input name="email" type="email" placeholder={t("email")} autoComplete="email" required className="rounded-lg border border-line bg-card px-3 py-2.5 focus:border-gold focus:outline-none" />
           )}
           {!isReset && (
-          <input name="password" type="password" placeholder={t("password")} autoComplete={flow === "signIn" ? "current-password" : "new-password"} required className="rounded-lg border border-line bg-card px-3 py-2.5 focus:border-gold focus:outline-none" />
+          // `current-password`, not `new-password`, even though this same field
+          // creates the account for a first-time visitor: the form cannot know
+          // which of the two it is facing, and `current-password` is the value that
+          // lets a returning visitor's password manager fill it. A browser still
+          // offers to SAVE whatever a new visitor types. `minLength` mirrors the
+          // provider's own rule so the browser can say so without a round-trip.
+          <input name="password" type="password" placeholder={t("password")} autoComplete="current-password" minLength={MIN_PASSWORD_LENGTH} required className="rounded-lg border border-line bg-card px-3 py-2.5 focus:border-gold focus:outline-none" />
           )}
-          {/* The door out of the lockout. Only on sign-in: there is nothing to
-              reset while creating an account, and mid-reset it would point at the
-              step you are standing on. A quiet end-aligned line rather than a
-              button, so it does not compete with the two real ways in. */}
-          {flow === "signIn" && (
+          {/* The door out of the lockout. Shown on the one door, because the form
+              cannot know whether this visitor has a password to have forgotten;
+              hidden mid-reset, where it would point at the step you are standing
+              on. A quiet end-aligned line rather than a button, so it does not
+              compete with the two real ways in. */}
+          {!isReset && (
             <button
               type="button"
               className="-mt-1 self-end text-sm text-soft hover:text-accent"
@@ -303,6 +364,7 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
                 name="newPassword"
                 type="password"
                 autoComplete="new-password"
+                minLength={MIN_PASSWORD_LENGTH}
                 required
                 placeholder={t("newPassword")}
                 className="rounded-lg border border-line bg-card px-3 py-2.5 focus:border-gold focus:outline-none"
@@ -312,31 +374,33 @@ export function SignIn({ embedded = false }: { embedded?: boolean } = {}) {
           <button type="submit" disabled={busy} className="relative rounded-lg bg-accent px-3 py-2.5 font-medium text-white disabled:opacity-50">
             {busy
               ? "…"
-              : flow === "signIn"
-                ? t("signIn")
-                : flow === "signUp"
-                  ? t("signUp")
-                  : flow === "reset"
-                    ? t("sendResetCode")
-                    : t("setNewPassword")}
-            {/* Only while signing in: on the "Create account" toggle a "Last used"
-                banner would be nonsense — you can't have last created this account. */}
-            {!busy && flow === "signIn" && lastUsed === "password" && <LastUsedPill label={t("lastUsed")} />}
+              : flow === "auth"
+                ? t("continueAction")
+                : flow === "reset"
+                  ? t("sendResetCode")
+                  : t("setNewPassword")}
+            {/* Not during the reset walk, where "Last used" would be advising on a
+                button that is neither of the two ways in. */}
+            {!busy && flow === "auth" && lastUsed === "password" && <LastUsedPill label={t("lastUsed")} />}
           </button>
           {error && <p className="text-sm text-danger">{error}</p>}
-          <button
-            type="button"
-            className="py-1 text-sm text-soft hover:text-accent"
-            onClick={() => {
-              setError(null);
-              // Mid-reset this is the way out, back to the form you came from,
-              // rather than the sign-up toggle it is the rest of the time.
-              setFlow(flow === "signIn" ? "signUp" : "signIn");
-            }}
-          >
-            {isReset ? t("backToSignIn") : flow === "signIn" ? t("toggleToSignUp") : t("toggleToSignIn")}
-          </button>
-          {flow === "signUp" && (
+          {/* The way out of the reset detour, and the only navigation this card has
+              left: with one door there is nothing to toggle between. */}
+          {isReset && (
+            <button
+              type="button"
+              className="py-1 text-sm text-soft hover:text-accent"
+              onClick={() => {
+                setError(null);
+                setFlow("auth");
+              }}
+            >
+              {t("backToSignIn")}
+            </button>
+          )}
+          {/* In front of every visitor who presses the button, not just a declared
+              sign-up: pressing it may be what creates the account. */}
+          {!isReset && (
             <p className="text-center text-xs text-soft">
               {t.rich("termsAgreement", {
                 terms: (c) => <Link href="/terms" className="text-accent2 underline-offset-2 hover:underline">{c}</Link>,

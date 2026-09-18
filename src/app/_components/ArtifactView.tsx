@@ -19,7 +19,7 @@ import { Markdown } from "./MarkdownView";
 import { clock, progress } from "./narrationDock";
 import { MarkdownResourceDialog } from "./ResourceItem";
 import { applyProgress, cardIdFromHash, composeCardShare, editionToEdit, resolveArtifactClick, resourceTarget } from "./readerDerive";
-import { Modal, ReaderSkeleton, useExit } from "./ui";
+import { Dialog, Modal, ReaderSkeleton, useExit } from "./ui";
 import { useTheme } from "./ThemeContext";
 import { useTenant } from "./TenantContext";
 import { useHideOnScroll } from "./useHideOnScroll";
@@ -621,11 +621,20 @@ function LessonView({
   const completed = (progress ?? []).some((p) => p.lessonKey === lessonKey && p.status === "completed");
   // The next lesson's row (for the end-of-lesson card's number and title).
   const nextLesson = nextLessonKey ? (lessons?.find((l) => l.key === nextLessonKey) ?? null) : null;
-  // The title row is desktop chrome. On a phone it renders only when the owner's
-  // "Generate next lesson" control is in it, which is the one action with no
-  // other home; everything else in that row is desktop-only or duplicated by the
-  // end-of-lesson card. Keep this in step with the row's contents below.
-  const hasTitleActions = !readOnly && !courseCompleted && isFrontier && completed;
+  // Can the caller ask the teacher to re-author THIS lesson from a brief? Owner
+  // only (a Viewer reads, never authors) and source-Edition only: a regeneration
+  // authors English, which a translated Edition would not show until it is
+  // re-translated. A `preview` caller holds no access to regenerate.
+  // `editionToEdit` resolves the Edition actually being served (a caller holding
+  // only a translated Edition arrives with no `?lang` at all), the same way the
+  // in-place editor below picks the Edition it patches.
+  const canRegenerate = !readOnly && !preview && editionToEdit(header?.lang, lang) === "en";
+  // The title row is desktop chrome. On a phone it renders only when one of the
+  // owner's authoring controls is in it ("Generate next lesson", "Regenerate"),
+  // which are the actions with no other home; everything else in that row is
+  // desktop-only or duplicated by the end-of-lesson card. Keep this in step with
+  // the row's contents below.
+  const hasTitleActions = (!readOnly && !courseCompleted && isFrontier && completed) || canRegenerate;
 
   // **Warm the next lesson** (perceived-performance ticket 05). Forward is how
   // the reader is actually used: finish this one, go to the next. Holding a
@@ -742,6 +751,11 @@ function LessonView({
             {!readOnly && !courseCompleted && isFrontier && completed && (
               <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />
             )}
+            {/* Regeneration is not authoring-forward: it replaces a lesson that
+                already exists, so unlike "Generate next lesson" it stays offered
+                on every lesson and on a completed course (ADR 0015 stops a
+                finished course growing, and the lesson count is unchanged here). */}
+            {canRegenerate && <RegenerateLessonButton topicSlug={topicSlug} lessonKey={lessonKey} />}
             {/* No certificate pill here: Home carries the certificate on every
                 card kind (mobile-reader-todos 01), and on a phone this row is
                 gone entirely. */}
@@ -1422,6 +1436,10 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
     }
   }
 
+  // A regeneration holds the same lock, but it is not authoring the next lesson,
+  // and saying so beside a control that says otherwise is a contradiction on one
+  // row. The regenerate control speaks for that run; this one stands down.
+  if (gen?.regeneratingKey) return null;
   if (generating && !stale) {
     return <span className="animate-pulse text-sm text-soft">{t("generating")}</span>;
   }
@@ -1457,6 +1475,125 @@ function NextLessonButton({ topicSlug, frontierKey }: { topicSlug: string; front
         {pending ? t("starting") : label}
       </button>
     </div>
+  );
+}
+
+// The owner's "regenerate this lesson" control. The brief IS the feature: it
+// becomes the teacher's direction for a REPLACEMENT lesson, which supersedes this
+// one rather than editing it (ADR 0003, immutable Lessons), so the learner's
+// record of what they already read survives intact.
+//
+// It reflects the same single-flight generation lock the next-lesson button does,
+// and fires through the same gate, so a course can never be regenerating and
+// authoring at once, and a regeneration spends the same one-per-day on-demand run.
+function RegenerateLessonButton({ topicSlug, lessonKey }: { topicSlug: string; lessonKey: string }) {
+  const t = useTranslations("Artifact");
+  const router = useRouter();
+  const lang = useEditionLang();
+  const gen = useQuery(api.routine.generationStatus, { topicSlug });
+  // The same table of contents CourseShell already subscribes to (deduped by
+  // Convex), for the follow below.
+  const lessons = useQuery(api.content.reader.listLessons, { topicSlug, lang: lang ?? undefined });
+  const requestRegeneration = useAction(api.routine.requestRegeneration);
+  // Did THIS reader fire the regeneration now on screen? Only then do we follow
+  // the replacement: a lesson can be retired by other means, and yanking someone
+  // off a permalink they navigated to deliberately would be wrong.
+  const fired = useRef(false);
+  const [open, setOpen] = useState(false);
+  const [brief, setBrief] = useState("");
+  const [pending, setPending] = useState(false);
+  // A refusal the server reported without throwing (the daily cap, a run already
+  // in flight). Held so the dialog can say why nothing happened.
+  const [refusal, setRefusal] = useState<string | null>(null);
+
+  const running = gen?.status === "generating";
+  // A run on THIS lesson, as opposed to an ordinary next-lesson run on the same
+  // course: only the first has anything to say here.
+  const mine = running && gen?.regeneratingKey === lessonKey;
+
+  // Follow the replacement. A published revision retires this lesson, which drops
+  // it out of the table of contents while its body stays readable at its
+  // permalink, so without this the owner is left on the retired version watching
+  // nothing happen. The replacement is the live lesson holding this one's place
+  // in the running order, and that place has to be remembered from BEFORE the
+  // retirement, which is the only moment the table of contents still states it.
+  const seq = useRef<number | null>(null);
+  const seenSeq = lessons?.find((l) => l.key === lessonKey)?.seq;
+  useEffect(() => {
+    if (seenSeq !== undefined) seq.current = seenSeq;
+  }, [seenSeq]);
+  useEffect(() => {
+    if (!fired.current || lessons === undefined || seenSeq !== undefined) return;
+    const next = lessons.find((l) => l.seq === seq.current);
+    if (!next) return;
+    fired.current = false;
+    router.replace(withLang(`/courses/${topicSlug}/lessons/${next.key}`, lang));
+  }, [seenSeq, lessons, router, topicSlug, lang]);
+
+  async function fire() {
+    setPending(true);
+    setRefusal(null);
+    try {
+      const res = await requestRegeneration({ topicSlug, lessonKey, brief });
+      if (res?.fired) {
+        fired.current = true;
+        setOpen(false);
+        setBrief("");
+        return;
+      }
+      setRefusal(res?.reason === "rate-limited" ? t("generatedTodayTitle") : t("regenerateBusy"));
+    } catch (e) {
+      setRefusal(refusalMessage(e, t("regenerateFailed")));
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (mine) return <span className="animate-pulse text-sm text-soft">{t("regenerating")}</span>;
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        disabled={running}
+        title={t("regenerateLesson")}
+        className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-sm text-soft transition-colors hover:border-gold/60 hover:text-accent disabled:opacity-50"
+      >
+        <Icon name="refresh" className="h-4 w-4" /> {t("regenerate")}
+      </button>
+      {open && (
+        <Dialog title={t("regenerateLesson")} onClose={() => setOpen(false)}>
+          <p className="text-sm text-soft">{t("regenerateExplainer")}</p>
+          <textarea
+            autoFocus
+            value={brief}
+            onChange={(e) => setBrief(e.target.value)}
+            rows={5}
+            maxLength={2000}
+            placeholder={t("regeneratePlaceholder")}
+            className="mt-3 w-full resize-none rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+          />
+          {refusal && <p className="mt-2 text-sm text-accent2">{refusal}</p>}
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition-colors hover:text-ink"
+            >
+              {t("cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={() => void fire()}
+              disabled={pending || brief.trim() === ""}
+              className="rounded-lg bg-accent px-3 py-1.5 text-sm text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
+            >
+              {pending ? t("starting") : t("regenerate")}
+            </button>
+          </div>
+        </Dialog>
+      )}
+    </>
   );
 }
 

@@ -365,3 +365,69 @@ test("a run whose provider reports no usage leaves the run row's tokens absent",
   expect(runs[0]!.outputTokens).toBeUndefined();
   expect(runs[0]!.model).toBeUndefined();
 });
+
+test("a regeneration revises the named lesson, supersedes it, and leaves the Frontier alone", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await seedOngoing(t);
+  // A second lesson, so the target of the regeneration is NOT the Frontier: what
+  // the run publishes must land at seq 1 and retire only lesson 1.
+  await t.run(async (ctx) => {
+    const sid = await ctx.storage.store(new Blob(["<p>two</p>"], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key: "0002-verbs", seq: 2, title: "Verbs", htmlStorageId: sid });
+    const gen = await ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique();
+    await ctx.db.patch(gen!._id, { regenerate: { lessonKey: "0001-intro", brief: "add worked examples" } });
+  });
+  const { bodies } = stubModelSequence([
+    JSON.stringify({
+      lessonHtml: LESSON_FRAGMENT.replace("Lesson 2 · The Aorist", "Lesson 1 · Intro"),
+      learningRecord: "# Intro\nre-authored with examples",
+    }),
+  ]);
+
+  await t.action(internal.openrouter.authorTopic, { topicSlug: "glm" });
+
+  // One call, carrying the owner's brief and the body being revised.
+  expect(bodies).toHaveLength(1);
+  const prompt = bodies[0].messages[1].content as string;
+  expect(prompt).toContain("add worked examples");
+  expect(prompt).toContain("<p>one</p>");
+
+  const lessons = await t.run((ctx) =>
+    ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect(),
+  );
+  expect(lessons.find((l) => l.key === "0001-intro-r2")).toMatchObject({ seq: 1, title: "Intro" });
+  // Superseded, not mutated (ADR 0003), and only the named lesson is retired.
+  expect(lessons.find((l) => l.key === "0001-intro")?.supersededBy).toBe("0001-intro-r2");
+  expect(lessons.find((l) => l.key === "0002-verbs")?.supersededBy).toBeUndefined();
+
+  expect(await genStatus(t, topicId)).toBe("idle");
+  // The brief is spent, so the next run goes back to authoring the next lesson.
+  const gen = await t.run((ctx) =>
+    ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique(),
+  );
+  expect(gen?.regenerate).toBeUndefined();
+  // The run history names the revision, not the Frontier it never touched.
+  const run = await t.run((ctx) => ctx.db.query("generationRuns").unique());
+  expect(run).toMatchObject({ outcome: "published", producedLessonKey: "0001-intro-r2" });
+});
+
+test("a regeneration that comes back complete fails the run rather than publishing nothing", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await seedOngoing(t);
+  await t.run(async (ctx) => {
+    const gen = await ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).unique();
+    await ctx.db.patch(gen!._id, { regenerate: { lessonKey: "0001-intro", brief: "simpler" } });
+  });
+  stubModel(JSON.stringify({ complete: true }));
+
+  await t.action(internal.openrouter.authorTopic, { topicSlug: "glm" });
+
+  expect(await genStatus(t, topicId)).toBe("failed");
+  // The course is untouched: no revision published, and it is certainly not
+  // completed just because the model reached for the wrong branch.
+  const lessons = await t.run((ctx) =>
+    ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect(),
+  );
+  expect(lessons).toHaveLength(1);
+  expect(await t.run(async (ctx) => (await ctx.db.get(topicId))?.status)).toBe("active");
+});

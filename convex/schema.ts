@@ -361,6 +361,14 @@ export default defineSchema({
     // the course completes, or `cancelRequested` is set. Both absent for normal runs.
     finishRemaining: v.optional(v.number()),
     cancelRequested: v.optional(v.boolean()),
+    // Regeneration brief (owner-side "regenerate this lesson with a prompt").
+    // When armed, THIS run revises the named live Lesson from `brief` instead of
+    // authoring the next one, and the result supersedes it (ADR 0003: supersede,
+    // never mutate). It rides the lock rather than its own table so both authoring
+    // runtimes see it through the context they already pull (`materialiseTopic`
+    // for the claude.ai Routine, `materialiseForProvider` for the OpenRouter
+    // action). Cleared at every terminal exit, like `startedAt`.
+    regenerate: v.optional(v.object({ lessonKey: v.string(), brief: v.string() })),
   }).index("by_topic", ["topicId"]),
 
   // The append-only Generation Run log (generation-observability PRD): one

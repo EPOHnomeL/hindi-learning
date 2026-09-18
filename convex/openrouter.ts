@@ -8,6 +8,7 @@ import {
   assembleReference,
   buildMissionMessages,
   buildOngoingMessages,
+  buildRegenerateMessages,
   nextLessonKey,
   parseAuthoringResult,
   parseMissionResult,
@@ -72,6 +73,11 @@ async function resolveBodies(ctx: ActionCtx, source: ProviderSource): Promise<Pr
     capture: source.capture,
     frontier: source.frontier,
     frontierHtml: await blobText(ctx, frontierStorageId),
+    // The lesson a regeneration is revising, with its body read off storage the
+    // same way the Frontier's is. Null when no brief is armed.
+    regenerate: source.regenerate
+      ? { ...source.regenerate, html: await blobText(ctx, source.regenerate.htmlStorageId) }
+      : null,
   };
 }
 
@@ -83,12 +89,16 @@ async function publishAuthoredLesson(
   topicId: Id<"topics">,
   seq: number,
   result: AuthoringResult,
-): Promise<void> {
+  // Set only by a regeneration: the Lesson this one replaces, and the revision
+  // number that keeps the new key distinct from it. The key we retire is the one
+  // the gate armed, never a `<meta name="supersedes">` the model chose for itself.
+  revise?: { supersedes: string; revision: number },
+): Promise<{ key: string; title: string }> {
   // Only reached on the author path, where the contract requires a lesson.
   if (!result.lessonHtml || !result.learningRecord) throw new Error("authoring: no lesson to publish");
   const html = assembleLesson(result.lessonHtml);
   const title = titleFrom(html);
-  const key = nextLessonKey(seq, title);
+  const key = nextLessonKey(seq, title, revise?.revision);
   // Bodies live in content blobs now (.scratch/html-blob-storage): the HTML never
   // rides through the mutation. In-deployment we can store the blob directly,
   // skipping the CLI's generateContentUploadUrl → PUT dance. publishLesson takes
@@ -114,7 +124,7 @@ async function publishAuthoredLesson(
     seq,
     title,
     storageId,
-    supersedes: supersedesFrom(html),
+    supersedes: revise?.supersedes ?? supersedesFrom(html),
   });
   await ctx.runMutation(api.content.publish.publishLearningRecord, { secret, topicId, key, seq, markdown: result.learningRecord! });
   // Upsert any references the lesson relies on / cross-links to, so a
@@ -135,6 +145,7 @@ async function publishAuthoredLesson(
       contentHash: hashString(refHtml),
     });
   }
+  return { key, title };
 }
 
 // Batched Q&A (issue 05): answer the open questions the model replied to, matching
@@ -195,6 +206,38 @@ export const authorTopic = internalAction({
           topicSlug,
           outcome: "failed",
           error: "no materialised context (missing topic or owner)",
+        });
+        return null;
+      }
+
+      // Regeneration (the owner's brief): revise the named Lesson instead of
+      // authoring the next one, and publish the result as its supersessor. Checked
+      // before the bootstrap/ongoing split because it answers a different question
+      // entirely, and because it is the GATE, not the model, that decides a run is
+      // one. Nothing else in the run differs: same model, same context, same
+      // publish mutations, same report.
+      if (context.regenerate) {
+        const r = context.regenerate;
+        const raw = await call({ model, messages: buildRegenerateMessages(context) });
+        const result = parseAuthoringResult(raw);
+        // Open questions are answered on every run, this one included.
+        await applyReplies(ctx, secret, context, result);
+        // `complete` is the ongoing run's terminate judgement and means nothing
+        // here: a run that returns it has skipped the revision it was asked for,
+        // so fail visibly rather than reporting a published lesson that is not one.
+        if (result.complete) throw new Error("regeneration returned no lesson");
+        const produced = await publishAuthoredLesson(ctx, secret, context.topicId, r.seq, result, {
+          supersedes: r.lessonKey,
+          revision: r.revision,
+        });
+        // No `estimatedLessons`: a revision replaces a lesson rather than adding
+        // one, so the course's eventual total is exactly what it already was.
+        await ctx.runMutation(api.routine.reportGeneration, {
+          secret,
+          topicSlug,
+          outcome: "published",
+          producedLesson: produced,
+          usage: runUsage(),
         });
         return null;
       }

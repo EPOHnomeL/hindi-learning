@@ -173,3 +173,24 @@ already holds.
 `pnpm run publish:prod --topic <slug>` pushes the new lesson, record, and any
 changed references to Convex (the source of truth). **Never commit to git** — the
 `topics/<slug>/` workspace is transient (ADR 0009).
+
+## 10. REGENERATE.md: revise one lesson instead of authoring the next
+
+If the materialised workspace contains a `REGENERATE.md`, the course owner has
+asked for a **revision of an existing lesson**, and that is the whole job of this
+run: do not author the next lesson, and do not judge the course complete.
+
+`REGENERATE.md` names the lesson, the key to publish the replacement under, and
+the owner's brief. Re-author that lesson **in full** (title, body and quiz) to
+answer the brief, and:
+
+- keep its lesson **number** (it replaces a step, it does not add one);
+- write it to the `lessons/<newKey>.html` the file names, with
+  `<meta name="supersedes" content="<old key>">` directly under `<title>`
+  (section 2). That meta is what retires the old lesson at publish;
+- write its learning record to `learning-records/<newKey>.md`;
+- honour the brief wherever it and your own judgement differ.
+
+Then publish as usual (section 9). The brief is spent by the run that reads it:
+the next run gets no `REGENERATE.md` and goes back to authoring the next lesson.
+

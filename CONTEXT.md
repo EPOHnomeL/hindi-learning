@@ -87,6 +87,21 @@ _Avoid_: Draft, stub, request
 The highest-ordered, non-superseded Lesson in a Topic — the learner's leading edge. The Routine authors the next Lesson only once the learner has marked the Frontier `completed`, so a Topic holds at most one unread Lesson beyond what's done (a buffer of one). When the learner completes the Frontier, the reader offers to fire the Routine for the next one — unless the Topic has reached **Completion**, in which case authoring is closed and the reader offers the **Certificate** instead.
 _Avoid_: Latest, head, tip, edge
 
+**Regeneration** _(built 2026-09-18)_:
+The owner asking the teacher to re-author ONE already-published Lesson from a
+free-text **brief** ("too hard, more worked examples"). It is a [[Routine]] run
+like any other: the same single-flight lock, the same one-per-day on-demand cap,
+the same report, the course's own authoring runtime. What differs is that the run
+revises the named Lesson instead of authoring the next one, and the result
+**supersedes** it ([ADR 0003](docs/adr/0003-immutable-lessons-mutable-references.md))
+rather than editing it, keeping the same lesson number under a key tailed `r2`,
+`r3`, and so on. Owner-side only, and on the source Edition only: learners have
+[[Question]]s, not a revise button. Deliberately ungated by the [[Frontier]]
+rule, because a Regeneration replaces a step rather than adding one, and for the
+same reason it stays available after [[Completion]].
+_Avoid_: Edit (that is the in-place prose editor, which patches the same Lesson),
+rewrite, retry, redo
+
 **Share**:
 A grant giving one User access to a single **Edition** (a Topic × language) owned by another User. Created by the Topic's owner, who supplies the recipient's email. A Share carries a **role** — **Viewer** (read-only, the default) or **Editor** (may also correct the Edition's text in place) — but is created as a Viewer; the owner promotes it to Editor afterward (see [ADR 0020](docs/adr/0020-editor-rights-as-a-share-role.md)). If an account with that email already exists the Share takes effect at once; if not, it is held as a **pending Share** and forms automatically the moment that email signs up (sign-up is open — [ADR 0021](docs/adr/0021-open-signup-allowlist-gates-course-creation.md); the Allowlist now gates course *creation*, not sign-up). Revocable by the owner at any time; removed when its Topic is deleted. A Topic may have many Shares (shared with several Users, in several languages).
 _Avoid_: link, permission, grant (as separate terms); "invite" as a *separate* concept — a pending Share is still a Share, just not yet in effect. Distinct from a **Public link** — a Share is always targeted to a specific person by email; a Public link is anonymous and account-less.

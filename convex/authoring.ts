@@ -115,8 +115,12 @@ function slugify(s: string): string {
 }
 
 // The next lesson key: zero-padded seq + dash-cased title, e.g. "0002-the-aorist".
-export function nextLessonKey(seq: number, title: string): string {
-  return `${String(seq).padStart(4, "0")}-${slugify(title) || "lesson"}`;
+export function nextLessonKey(seq: number, title: string, revision?: number): string {
+  const base = `${String(seq).padStart(4, "0")}-${slugify(title) || "lesson"}`;
+  // A regeneration keeps the Lesson's seq (it replaces it in place, it does not
+  // append), so the key needs a tail to stay unique against the row it supersedes.
+  // Revision 1 is the original, which carries no tail at all.
+  return revision && revision > 1 ? `${base}-r${revision}` : base;
 }
 
 export type AuthoringReply = { questionId: string; reply: string };
@@ -200,6 +204,17 @@ export type MaterialisedContext = {
     progress: { lessonKey: string; status: string }[];
   };
   frontier: { key: string; seq: number } | null;
+  // An armed regeneration (owner-side "revise this lesson with a prompt"): the
+  // target Lesson, the owner's brief, and the body being revised. Null on an
+  // ordinary run, and that null is what selects "author the next lesson".
+  regenerate: {
+    lessonKey: string;
+    brief: string;
+    seq: number;
+    title: string;
+    revision: number;
+    html: string | null;
+  } | null;
   // The Frontier lesson's stored body, resolved by the action. Null when there is
   // no Frontier or its blob is missing, in which case the anchor section is left
   // out rather than printed empty.
@@ -341,6 +356,41 @@ First judge whether the mission is met (set "complete" accordingly — never for
 open-ended mission). If not complete, author lesson number ${nextSeq} — the next
 step on this learner's ZPD, grounded in the context above. Answer any open
 questions in "replies". Return the single JSON object per the output contract.`,
+    },
+  ];
+}
+
+
+// Build the chat messages for a REGENERATION: revise one already-published Lesson
+// from the owner's brief. It reuses the ongoing run's system prompt verbatim (the
+// same teach instructions and the same JSON output contract), so a revision is
+// held to exactly the lesson contract a fresh lesson is. Only the task differs:
+// the target's current body is shown, the brief is the direction, and the seq is
+// the target's own rather than the next one.
+export function buildRegenerateMessages(c: MaterialisedContext): ChatMessage[] {
+  const r = c.regenerate;
+  if (!r) throw new Error("regenerate: no brief in context");
+  return [
+    { role: "system", content: TEACH_INSTRUCTIONS + OUTPUT_CONTRACT },
+    {
+      role: "user",
+      content: `${serializeContext(c)}
+
+### The lesson being revised (${r.lessonKey}, lesson ${r.seq})
+${r.html ?? "(body unavailable)"}
+
+### The course owner's brief for the revision
+${r.brief}
+
+# Task
+
+REVISE the lesson above, in full, to answer the owner's brief. This is a
+replacement, not a new step in the curriculum: keep it at lesson number ${r.seq},
+covering the same place on the learner's path, and re-author the whole lesson
+(title, body and quiz) rather than patching fragments of it. Honour the brief
+wherever it and your own judgement differ. Set "complete" to false and return the
+lesson in "lessonHtml" with its record in "learningRecord", per the output
+contract. Answer any open questions in "replies".`,
     },
   ];
 }

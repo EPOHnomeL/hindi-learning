@@ -61,6 +61,35 @@ if (ctx.topic.mission) {
   );
 }
 
+// A regeneration brief armed by the owner (AUTHORING.md section 10). Its presence
+// is the whole signal: this run revises the named lesson instead of authoring the
+// next one. Written only when armed, so an ordinary run's workspace has no such
+// file to misread.
+if (ctx.regenerate) {
+  const r = ctx.regenerate;
+  writeFileSync(
+    `${base}/REGENERATE.md`,
+    `# Regenerate ${r.lessonKey} (lesson ${r.seq})
+
+` +
+      `This run is a REGENERATION, not a new lesson. Re-author \`lessons/${r.lessonKey}.html\` in
+` +
+      `full to answer the brief below, and write it to \`lessons/${r.newKey}.html\` with
+` +
+      `\`<meta name="supersedes" content="${r.lessonKey}">\` directly under its \`<title>\`.
+` +
+      `Keep the lesson number at ${r.seq}. Write its learning record to
+` +
+      `\`learning-records/${r.newKey}.md\`, then publish as usual.
+
+` +
+      `## The owner's brief
+
+${r.brief}
+`,
+  );
+}
+
 // Resources: download the raw blob; record processed manifest + hash so issue
 // 06's ingestion can skip re-rendering when the cache is current.
 for (const res of ctx.resources) {
@@ -90,5 +119,6 @@ writeFileSync(
 
 console.log(
   `materialised "${slug}" → ${base}/ (${ctx.lessons.length} lessons, ${ctx.learningRecords.length} records, ` +
-    `${ctx.references.length} refs, ${ctx.resources.length} resources; ${ctx.topic.mission ? "MISSION.md" : "SEED.md"})`,
+    `${ctx.references.length} refs, ${ctx.resources.length} resources; ${ctx.topic.mission ? "MISSION.md" : "SEED.md"}` +
+    `${ctx.regenerate ? "; REGENERATE.md" : ""})`,
 );

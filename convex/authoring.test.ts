@@ -5,6 +5,7 @@ import {
   assembleReference,
   buildMissionMessages,
   buildOngoingMessages,
+  buildRegenerateMessages,
   nextLessonKey,
   parseAuthoringResult,
   parseMissionResult,
@@ -76,6 +77,12 @@ test("titleFrom / supersedesFrom read the fragment's meta", () => {
 test("nextLessonKey zero-pads the seq and dash-cases the title", () => {
   expect(nextLessonKey(2, "The Aorist!")).toBe("0002-the-aorist");
   expect(nextLessonKey(12, "Verbs & Nouns")).toBe("0012-verbs-nouns");
+  // A regeneration keeps the seq and tails the key with its revision, so the
+  // replacement cannot collide with the row it supersedes. Revision 1 is the
+  // original and carries no tail.
+  expect(nextLessonKey(2, "The Aorist!", 1)).toBe("0002-the-aorist");
+  expect(nextLessonKey(2, "The Aorist!", 2)).toBe("0002-the-aorist-r2");
+  expect(nextLessonKey(2, "The Aorist!", 3)).toBe("0002-the-aorist-r3");
 });
 
 test("parseAuthoringResult reads the JSON contract, tolerating a code fence", () => {
@@ -149,6 +156,8 @@ const SEEDED_CTX: MaterialisedContext = {
   resources: [],
   capture: { openQuestions: [], responses: [], progress: [] },
   frontier: null,
+  frontierHtml: null,
+  regenerate: null,
 };
 
 test("buildMissionMessages injects the seed and asks for the mission contract", () => {
@@ -175,6 +184,7 @@ const ONGOING_CTX: MaterialisedContext = {
   capture: { openQuestions: [], responses: [], progress: [{ lessonKey: "0001-intro", status: "completed" }] },
   frontier: { key: "0001-intro", seq: 1 },
   frontierHtml: "<h1>alpha beta</h1>",
+  regenerate: null,
 };
 
 test("buildOngoingMessages carries the Frontier body as the style anchor and every Reference body in full", () => {
@@ -199,4 +209,32 @@ test("a Reference whose body could not be read prints its heading, never the str
   expect(user.content).toContain("#### Glossary (glossary)");
   expect(user.content).not.toContain("undefined");
   expect(user.content).not.toContain("### Frontier lesson HTML"); // no body, no anchor section
+});
+
+const REGENERATE_CTX: MaterialisedContext = {
+  ...ONGOING_CTX,
+  regenerate: {
+    lessonKey: "0001-intro",
+    brief: "too abstract, add worked examples",
+    seq: 1,
+    title: "Intro",
+    revision: 2,
+    html: "<h1>alpha beta</h1><p>the old body</p>",
+  },
+};
+
+test("buildRegenerateMessages asks for a replacement at the target's own seq", () => {
+  const [system, user] = buildRegenerateMessages(REGENERATE_CTX);
+  // Same system prompt as an ordinary run: a revision is held to the same lesson
+  // contract a fresh lesson is.
+  expect(system.content).toBe(buildOngoingMessages(ONGOING_CTX)[0]!.content);
+  expect(user.content).toContain("too abstract, add worked examples");
+  expect(user.content).toContain("<p>the old body</p>");
+  expect(user.content).toContain("keep it at lesson number 1");
+  // It must not read as "author the next one".
+  expect(user.content).not.toContain("lesson number 2");
+});
+
+test("buildRegenerateMessages refuses a context with no brief", () => {
+  expect(() => buildRegenerateMessages(ONGOING_CTX)).toThrow(/regenerate/);
 });

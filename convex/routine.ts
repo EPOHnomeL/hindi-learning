@@ -13,6 +13,7 @@ import {
   type ActionCtx,
 } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
+import { nextLessonKey } from "./authoring";
 import { getOwnedTopic, topicBySlug } from "./topicAccess";
 import { assertAdmin } from "./adminSecret";
 import { isCallerAdmin, isCallerUncapped } from "./whitelist";
@@ -174,6 +175,10 @@ export const generationStatus = query({
       // A fire-and-pray run the Admin has asked to stop — the ⋯ shows "Cancelling…"
       // until the loop notices and clears the lock.
       cancelRequested: gen?.cancelRequested ?? false,
+      // The Lesson an in-flight REGENERATION is revising, or null for an ordinary
+      // run. The reader shows "Regenerating" on that lesson rather than on the
+      // Frontier, which is where an ordinary run's progress belongs.
+      regeneratingKey: gen?.regenerate?.lessonKey ?? null,
     };
   },
 });
@@ -485,6 +490,72 @@ export const tryAcquireGeneration = internalMutation({
   },
 });
 
+// ---- Regeneration: revise an existing Lesson from the owner's brief --------
+
+// How much brief the owner may write. Long enough for a paragraph of real
+// direction, short enough that it can't be used to smuggle a whole lesson in.
+const MAX_BRIEF_CHARS = 2000;
+
+// Arm the lock for a REGENERATION. Same single-flight lock, same on-demand daily
+// cap, same report path as an ordinary run: the only difference is the brief
+// stored on the row, which tells whichever runtime picks the run up to revise the
+// named Lesson rather than author the next one.
+//
+// Deliberately NOT gated on the Frontier being completed. That gate keeps the
+// curriculum in step with the learner; a regeneration adds no step, it replaces
+// one the learner has already reached. For the same reason a `completed` course
+// can still be regenerated: ADR 0015 stops a finished course GROWING, and the
+// lesson count does not change here.
+export const tryAcquireRegeneration = internalMutation({
+  args: { topicSlug: v.string(), lessonKey: v.string(), brief: v.string() },
+  handler: async (ctx, { topicSlug, lessonKey, brief }): Promise<AcquireResult> => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return { acquired: false, reason: "no-topic" };
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", lessonKey))
+      .unique();
+    // Only a LIVE Lesson can be regenerated. A superseded one has already been
+    // replaced, and reviving it would fork the supersession chain.
+    if (!lesson || lesson.supersededBy) return { acquired: false, reason: "no-lesson" };
+
+    const gen = await generationRow(ctx, topic._id);
+    const now = Date.now();
+    if (gen) {
+      const stale = gen.startedAt !== undefined && now - gen.startedAt > STALE_MS;
+      if (gen.status === "generating" && !stale) return { acquired: false, reason: "already-generating" };
+    }
+    // The same per-user, per-day on-demand cap the "generate next lesson" button
+    // obeys, and for the same reason: a regeneration spends one model run.
+    if (!(await isCallerUncapped(ctx))) {
+      const userId = await getAuthUserId(ctx);
+      if (userId && (await userFiredManuallyWithinDay(ctx, userId, now))) {
+        return { acquired: false, reason: "rate-limited" };
+      }
+    }
+
+    const patch = {
+      status: "generating" as const,
+      // The lock's "what is this run about" key. For a regeneration that is the
+      // Lesson being revised, not the Frontier, so the reader can tell which
+      // lesson the spinner belongs to.
+      frontierKey: lessonKey,
+      startedAt: now,
+      error: undefined,
+      claimedAt: undefined,
+      runId: undefined,
+      lastManualFireAt: now,
+      regenerate: { lessonKey, brief },
+      // A regeneration is one run; it never rides the fire-and-pray loop.
+      finishRemaining: undefined,
+      cancelRequested: undefined,
+    };
+    if (gen) await ctx.db.patch(gen._id, patch);
+    else await ctx.db.insert("generation", { topicId: topic._id, ...patch });
+    return { acquired: true, topicSlug, frontierKey: lessonKey, authoringProvider: authoringProvider(topic) };
+  },
+});
+
 // Release the lock when the fire itself fails to land (network / config). The
 // agent never started, so this is an internal failure, not an agent report.
 export const failGeneration = internalMutation({
@@ -496,7 +567,7 @@ export const failGeneration = internalMutation({
     if (!gen) return;
     // Also end any fire-and-pray run — the fire never landed, so nothing will
     // report back to advance it; leaving the flags set would strand the lock.
-    await ctx.db.patch(gen._id, { status: "failed", error, startedAt: undefined, finishRemaining: undefined, cancelRequested: undefined });
+    await ctx.db.patch(gen._id, { status: "failed", error, startedAt: undefined, finishRemaining: undefined, cancelRequested: undefined, regenerate: undefined });
     // A real run ended (failed to launch) — record it in the history (issue 01).
     await recordRun(ctx, { topicId: topic._id, outcome: "failed", startedAt: gen.startedAt, error });
   },
@@ -517,6 +588,11 @@ export const reportGeneration = mutation({
     // Folded into the Topic here so there's no extra call — the estimate is part
     // of "here's how this run ended". Advisory only; it never gates authoring.
     estimatedLessons: v.optional(v.number()),
+    // The Lesson this run published, when it is NOT the Frontier: a regeneration
+    // publishes a revision of an earlier Lesson, and the run history should name
+    // the one it actually wrote. Omitted by an ordinary run, which authors the
+    // Frontier and lets the lookup below find it.
+    producedLesson: v.optional(v.object({ key: v.string(), title: v.string() })),
     // What the run spent (technical-foundation/12). Optional as a WHOLE, so a
     // runtime that cannot see its own token counts simply omits it and the run
     // is recorded as unknown rather than as zero. Only a runtime the provider
@@ -527,7 +603,7 @@ export const reportGeneration = mutation({
       v.object({ inputTokens: v.number(), outputTokens: v.number(), model: v.string() }),
     ),
   },
-  handler: async (ctx, { secret, topicSlug, outcome, error, estimatedLessons, usage }) => {
+  handler: async (ctx, { secret, topicSlug, outcome, error, estimatedLessons, producedLesson, usage }) => {
     assertAdmin(secret);
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) throw new Error("topic not found");
@@ -537,7 +613,10 @@ export const reportGeneration = mutation({
     if (estimatedLessons !== undefined) await ctx.db.patch(topic._id, { estimatedLessons });
     const gen = await generationRow(ctx, topic._id);
     if (!gen) return;
-    const clear = { startedAt: undefined, claimedAt: undefined, runId: undefined };
+    // A regeneration brief is spent by the run that read it: clearing it here (and
+    // in `failGeneration`) is what stops the NEXT run from revising the same lesson
+    // again.
+    const clear = { startedAt: undefined, claimedAt: undefined, runId: undefined, regenerate: undefined };
     if (outcome === "published") {
       await ctx.db.patch(gen._id, { status: "idle", error: undefined, ...clear });
     } else if (outcome === "nothing") {
@@ -549,7 +628,11 @@ export const reportGeneration = mutation({
     // Record the finished run for the operator's history (issue 01). On a
     // `published` run, stamp the Lesson it advanced to — the current Frontier
     // (highest-seq non-superseded), which is what this run just authored.
-    const produced = outcome === "published" ? await frontierLesson(ctx, topic._id) : null;
+    // A REGENERATION advances no Frontier: it publishes a revision of some earlier
+    // Lesson, so the Frontier lookup below would name a lesson the run never
+    // touched. The reporting run passes `produced` in that case and it wins.
+    const produced =
+      outcome === "published" ? (producedLesson ?? (await frontierLesson(ctx, topic._id))) : null;
     await recordRun(ctx, {
       topicId: topic._id,
       outcome,
@@ -631,12 +714,22 @@ type FireResult = { fired: boolean; reason?: string; error?: string };
 async function fireForTopic(ctx: ActionCtx, topicSlug: string, manual: boolean): Promise<FireResult> {
   const acquired: AcquireResult = await ctx.runMutation(internal.routine.tryAcquireGeneration, { topicSlug, manual });
   if (!acquired.acquired) return { fired: false, reason: acquired.reason };
+  return await fireAcquired(ctx, topicSlug, acquired.authoringProvider);
+}
 
+// Fire the course's own runtime for a lock that is ALREADY armed. Split out of
+// `fireForTopic` so the regeneration path (which arms the lock through its own
+// gate) reuses these two fire mechanics instead of restating them.
+async function fireAcquired(
+  ctx: ActionCtx,
+  topicSlug: string,
+  provider: AuthoringProvider,
+): Promise<FireResult> {
   // OpenRouter path (ADR 0014): author in a Convex action rather than the
-  // claude.ai Routine. No `claim` protocol — hand the action its topic directly.
-  // The gate/lock above is reused unchanged; the action reports via the same
+  // claude.ai Routine. No `claim` protocol: hand the action its topic directly.
+  // The gate/lock is reused unchanged; the action reports via the same
   // `reportGeneration`. A failed schedule releases the lock, as the POST path does.
-  if (acquired.authoringProvider === "openrouter") {
+  if (provider === "openrouter") {
     try {
       await ctx.scheduler.runAfter(0, internal.openrouter.authorTopic, { topicSlug });
       return { fired: true };
@@ -701,6 +794,29 @@ export const requestNextLesson = action({
       throw new Error("topic not found");
     }
     return await fireForTopic(ctx, topicSlug, true);
+  },
+});
+
+// The reader's "regenerate this lesson" control. Owner-only like every other
+// authoring fire (a Viewer reads, never authors); the brief is the owner's free
+// text and rides through to the authoring prompt unchanged. Fires the course's
+// OWN runtime, so a Claude course is never quietly billed to OpenRouter.
+export const requestRegeneration = action({
+  args: { topicSlug: v.string(), lessonKey: v.string(), brief: v.string() },
+  handler: async (ctx, { topicSlug, lessonKey, brief }): Promise<FireResult> => {
+    if (!(await ctx.runQuery(internal.routine.callerOwnsTopic, { topicSlug }))) {
+      throw new Error("topic not found");
+    }
+    const trimmed = brief.trim();
+    if (!trimmed) throw new Error("a regeneration needs a brief");
+    if (trimmed.length > MAX_BRIEF_CHARS) throw new Error("that brief is too long");
+    const acquired: AcquireResult = await ctx.runMutation(internal.routine.tryAcquireRegeneration, {
+      topicSlug,
+      lessonKey,
+      brief: trimmed,
+    });
+    if (!acquired.acquired) return { fired: false, reason: acquired.reason };
+    return await fireAcquired(ctx, topicSlug, acquired.authoringProvider);
   },
 });
 
@@ -947,8 +1063,12 @@ export const dailyFire = internalAction({
 async function collectTopicContext(ctx: QueryCtx, topic: Doc<"topics">, owner: Doc<"users">) {
     // Bodies live in content blobs (.scratch/html-blob-storage); a query can't
     // read blob bytes, so expose a signed `htmlUrl` the materialise CLI fetches.
+    const lessonRows = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id))
+      .collect();
     const lessons = await Promise.all(
-      (await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect())
+      lessonRows
         .filter((l) => !l.supersededBy)
         .map(async (l) => ({
           key: l.key,
@@ -1014,7 +1134,36 @@ async function collectTopicContext(ctx: QueryCtx, topic: Doc<"topics">, owner: D
         ? lessons.map((l) => ({ lessonKey: l.key, status: "completed" }))
         : progress.map((p) => ({ lessonKey: p.lessonKey, status: p.status as string }));
 
+    // The armed regeneration brief, resolved into everything a run needs to revise
+    // that Lesson: the brief, the target's own seq/title/body, and the revision
+    // number the replacement's key will take. `revision` counts EVERY row at that
+    // seq, superseded ones included, so a third pass is `r3` and can never collide
+    // with the `r2` already published. Null for an ordinary run, which is the
+    // signal to author the next lesson as before.
+    const target = gen?.regenerate
+      ? lessonRows.find((l) => l.key === gen.regenerate!.lessonKey && !l.supersededBy)
+      : undefined;
+    const revision = target ? lessonRows.filter((l) => l.seq === target.seq).length + 1 : 0;
+    const regenerate =
+      gen?.regenerate && target
+        ? {
+            lessonKey: target.key,
+            brief: gen.regenerate.brief,
+            seq: target.seq,
+            title: target.title,
+            revision,
+            // The key the replacement should take, minted here so the CLI seam and
+            // the in-deployment action name it the same way. The action re-mints it
+            // from the title the model actually wrote; this is what the CLI seam,
+            // which has no such title until its agent picks one, publishes under.
+            newKey: nextLessonKey(target.seq, target.title, revision),
+            htmlUrl: target.htmlStorageId ? await ctx.storage.getUrl(target.htmlStorageId) : null,
+            htmlStorageId: target.htmlStorageId ?? null,
+          }
+        : null;
+
     return {
+      regenerate,
       topic: {
         slug: topic.slug,
         title: topic.title,
