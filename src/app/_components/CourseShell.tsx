@@ -14,13 +14,14 @@ import { CompletionCelebration } from "./Certificate";
 import { Icon } from "./icons";
 import { NavItem } from "./NavItem";
 import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
-import { dragOffset, shouldDismiss } from "./drawerDrag";
 import { ReadingLanguage } from "./ReadingLanguage";
 import { useEditionLang, withLang } from "./editionUrl";
 import { ResourceItem } from "./ResourceItem";
 import { useTheme } from "./ThemeContext";
 import { useHideOnScroll } from "./useHideOnScroll";
 import { useResourceUpload } from "./useResourceUpload";
+import { refusalMessage } from "./mutationRun";
+import { useSheetDrag } from "./useSheetDrag";
 import { completedKeys, frontierKey, nextLessonKey, resumeLessonKey } from "./readerDerive";
 import { Welcome, useWelcomeDismissed } from "./Welcome";
 import { latchFirstOpen, welcomeVariant } from "./welcomeDerive";
@@ -93,13 +94,11 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const purchaseToken = searchParams.get("purchase") === "return" ? searchParams.get("mp") : null;
   const [menuOpen, setMenuOpen] = useState(false);
   const navHidden = useHideOnScroll();
-  // Swipe-to-dismiss on the mobile drawer (drawerDrag.ts): `drag` is how far the
-  // sheet is currently pulled down (null when no finger is on the handle),
-  // `dragFrom` the pointer-down Y it is measured from, and `drawerRef` supplies
-  // the sheet's own height for the release threshold.
-  const [drag, setDrag] = useState<number | null>(null);
-  const dragFrom = useRef<number | null>(null);
-  const drawerRef = useRef<HTMLElement>(null);
+  // The mobile drawer's gesture and motion (useSheetDrag, fluid-interface 03):
+  // 1:1 under the finger, on a spring otherwise, open and close along the same
+  // path, the scrim's opacity tied to the sheet's position. Shared verbatim with
+  // the Guest reader.
+  const sheet = useSheetDrag(menuOpen, setMenuOpen);
 
   const lessons = useQuery(api.content.reader.listLessons, { topicSlug: slug, lang: lang ?? undefined });
   const references = useQuery(api.content.reader.listReferences, { topicSlug: slug, lang: lang ?? undefined });
@@ -200,7 +199,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
           </button>
           <button
             onClick={() => setMenuOpen((prev) => !prev)}
-            className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-accent hover:text-accent/80 active:scale-98 transition-transform"
+            className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-accent hover:text-accent/80"
           >
             <span className="truncate max-w-[200px]">{header?.title ?? "…"}</span>
             <svg
@@ -219,7 +218,12 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
           </button>
         </header>
 
-        {menuOpen && <div onClick={() => setMenuOpen(false)} aria-hidden className="fixed inset-0 z-30 bg-black/40 md:hidden" />}
+        {/* The scrim stays mounted for as long as the sheet is open or moving;
+            its opacity is painted by the sheet's spring each frame (0 hidden,
+            0.4 at rest) rather than the scrim popping in and out. */}
+        {sheet.scrimMounted && (
+          <div ref={sheet.scrimRef} onClick={() => setMenuOpen(false)} aria-hidden className="fixed inset-0 z-30 bg-black md:hidden" />
+        )}
 
         {/* `pb-[5.75rem]` is the fix for the tail the app tab bar was eating
             (2026-08-24): the drawer is `fixed bottom-0`, the bar is a fixed
@@ -228,14 +232,13 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             any scroll position. A phone screenshot of it cut off is what
             reported this. `max-h-[80vh]` stays: the drawer is a sheet over the
             lesson, not a full-screen takeover.
-            `style.transform` is the live drag (mobile only, while a finger is
-            down); it beats the translate-y classes for exactly that moment. */}
+            Below `md` the sheet's transform is owned by useSheetDrag, written
+            inline each frame; `translate-y-full` is only the parked, shut
+            position (and the pre-hydration paint). No CSS transition: the spring
+            is the motion. */}
         <aside
-          ref={drawerRef}
-          style={drag === null ? undefined : { transform: `translateY(${drag}px)`, transition: "none" }}
-          className={`fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] transform flex-col overflow-y-auto overscroll-y-none border-t border-line rounded-t-2xl bg-paper p-4 pb-[5.75rem] transition-transform duration-300 md:static md:z-auto md:w-64 md:h-auto md:border-e md:border-t-0 md:rounded-t-none md:translate-y-0 md:translate-x-0 md:max-h-none md:p-4 md:transition-none ${
-            menuOpen ? "translate-y-0" : "translate-y-full"
-          }`}
+          ref={sheet.sheetRef}
+          className="fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] translate-y-full flex-col overflow-y-auto overscroll-y-none border-t border-line rounded-t-2xl bg-paper p-4 pb-[5.75rem] md:static md:z-auto md:w-64 md:h-auto md:border-e md:border-t-0 md:rounded-t-none md:translate-y-0 md:max-h-none md:p-4"
         >
           {/* Drawer handle for mobile. Draggable as it looks (2026-08-24): the
               handle used to be decoration, so pulling the sheet down did nothing
@@ -243,26 +246,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
               pointer handlers live on this generous hit area rather than the
               whole aside, which is the scroll container for the lesson list. */}
           <div
-            onPointerDown={(e) => {
-              e.currentTarget.setPointerCapture(e.pointerId);
-              dragFrom.current = e.clientY;
-              setDrag(0);
-            }}
-            onPointerMove={(e) => {
-              if (dragFrom.current === null) return;
-              setDrag(dragOffset(dragFrom.current, e.clientY));
-            }}
-            onPointerUp={(e) => {
-              if (dragFrom.current === null) return;
-              const pulled = dragOffset(dragFrom.current, e.clientY);
-              dragFrom.current = null;
-              setDrag(null);
-              if (shouldDismiss(pulled, drawerRef.current?.offsetHeight ?? 0)) setMenuOpen(false);
-            }}
-            onPointerCancel={() => {
-              dragFrom.current = null;
-              setDrag(null);
-            }}
+            {...sheet.handle}
             className="-mt-1 mb-2.5 flex shrink-0 cursor-grab touch-none justify-center py-2 active:cursor-grabbing md:hidden"
           >
             <span aria-hidden className="h-1.5 w-12 rounded-full bg-line" />
@@ -420,6 +404,7 @@ function ThemeToggle() {
 // each opening in a new tab. Add more by uploading a file or pasting a link.
 function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite: boolean }) {
   const t = useTranslations("Reader");
+  const ta = useTranslations("Artifact");
   const resources = useQuery(api.resources.listResources, { topicSlug });
   const { uploadFile, addLink } = useResourceUpload();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -427,10 +412,16 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
   const [linkDraft, setLinkDraft] = useState("");
   const [adding, setAdding] = useState(false);
 
+  // A failed upload used to reset the button and say nothing (fluid-interface 01);
+  // the PUT throws locally with a localised message, so show it under the buttons.
+  const [uploadError, setUploadError] = useState<string | null>(null);
   async function run(fn: () => Promise<void>) {
     setBusy(true);
+    setUploadError(null);
     try {
       await fn();
+    } catch (e) {
+      setUploadError(refusalMessage(e, ta("uploadFailed")));
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -517,6 +508,7 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
                 </button>
               </div>
             )}
+            {uploadError && <p className="mt-2 text-xs text-danger">{uploadError}</p>}
           </>
         )}
       </div>

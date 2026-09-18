@@ -21,6 +21,7 @@ import { SignIn } from "./SignIn";
 import { useTheme } from "./ThemeContext";
 import { CourseSkeleton, ReaderSkeleton } from "./ui";
 import { useHideOnScroll } from "./useHideOnScroll";
+import { useSheetDrag } from "./useSheetDrag";
 import { firstLessonKey, nextLessonKey, resumeLessonKey } from "./readerDerive";
 import { useStoredSet } from "./useStoredSet";
 import { Welcome, useWelcomeDismissed } from "./Welcome";
@@ -78,6 +79,9 @@ export function PublicCourseShell({ src, children }: { src: GuestSource; childre
   const [menuOpen, setMenuOpen] = useState(false);
   const navHidden = useHideOnScroll();
   useEffect(() => setMenuOpen(false), [pathname]);
+  // The same drawer gesture as the authed reader (useSheetDrag, fluid-interface
+  // 03): until 2026-09-18 this reader drew a handle with no handlers.
+  const sheet = useSheetDrag(menuOpen, setMenuOpen);
 
   // The Guest's completed lessons (per device, per token). Loaded from localStorage
   // on mount; `markComplete` adds one and persists. No account, so this is all
@@ -153,7 +157,7 @@ export function PublicCourseShell({ src, children }: { src: GuestSource; childre
           </Link>
           <button
             onClick={() => setMenuOpen((prev) => !prev)}
-            className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-accent hover:text-accent/80 active:scale-98 transition-transform"
+            className="flex items-center gap-1.5 text-base font-semibold tracking-tight text-accent hover:text-accent/80"
           >
             <span className="truncate max-w-[200px]">{course.title}</span>
             <svg
@@ -172,15 +176,22 @@ export function PublicCourseShell({ src, children }: { src: GuestSource; childre
           </button>
         </header>
 
-        {menuOpen && <div onClick={() => setMenuOpen(false)} aria-hidden className="fixed inset-0 z-30 bg-black/40 md:hidden" />}
+        {/* Scrim mounted while the sheet is open or moving; opacity painted by
+            the sheet's spring each frame, see CourseShell. */}
+        {sheet.scrimMounted && (
+          <div ref={sheet.scrimRef} onClick={() => setMenuOpen(false)} aria-hidden className="fixed inset-0 z-30 bg-black md:hidden" />
+        )}
 
+        {/* Below `md` the transform is useSheetDrag's, inline per frame;
+            `translate-y-full` is the parked, shut position. */}
         <aside
-          className={`fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] transform flex-col overflow-y-auto overscroll-y-none border-t border-line rounded-t-2xl bg-paper p-4 transition-transform duration-300 md:static md:z-auto md:w-64 md:h-auto md:border-e md:border-t-0 md:rounded-t-none md:translate-y-0 md:translate-x-0 md:max-h-none md:transition-none ${
-            menuOpen ? "translate-y-0" : "translate-y-full"
-          }`}
+          ref={sheet.sheetRef}
+          className="fixed bottom-0 inset-x-0 z-40 flex max-h-[80vh] translate-y-full flex-col overflow-y-auto overscroll-y-none border-t border-line rounded-t-2xl bg-paper p-4 md:static md:z-auto md:w-64 md:h-auto md:border-e md:border-t-0 md:rounded-t-none md:translate-y-0 md:max-h-none"
         >
-          {/* Drawer handle for mobile */}
-          <div className="mx-auto mb-3.5 h-1.5 w-12 shrink-0 rounded-full bg-line md:hidden" />
+          {/* Drawer handle for mobile: the grab area for the sheet gesture. */}
+          <div {...sheet.handle} className="-mt-1 mb-2.5 flex shrink-0 cursor-grab touch-none justify-center py-2 active:cursor-grabbing md:hidden">
+            <span aria-hidden className="h-1.5 w-12 rounded-full bg-line" />
+          </div>
           {/* The tenant lockup in the top-left corner. A Guest arrives on a Public
               link with no auth chrome, so this is their one way to the tenant's front
               door: "/" is the landing signed out, the dashboard signed in. */}
