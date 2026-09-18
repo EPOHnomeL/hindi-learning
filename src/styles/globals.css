@@ -1164,11 +1164,27 @@ html[data-theme="dark"] .cert-card--showcase {
     animation-range: entry 24% entry 84%;
   }
 }
+/* The hero's phone frame drifts up and down a few pixels on a slow loop, so the
+   one thing above the fold that moves is the product (landing-page refresh,
+   2026-09-18). Starts after the entrance has landed, and is off under
+   prefers-reduced-motion like the rest. */
+@keyframes land-float {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 0 -10px;
+  }
+}
+.land-float {
+  animation: land-float 4s ease-in-out 1s infinite alternate;
+}
 @media (prefers-reduced-motion: reduce) {
   .land-rise,
   .land-reveal,
   .land-reveal-mid,
-  .land-reveal-late {
+  .land-reveal-late,
+  .land-float {
     animation: none;
   }
 }

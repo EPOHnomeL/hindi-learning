@@ -9,7 +9,7 @@ import { Icon, type IconName } from "./icons";
 import { Brand } from "./Brand";
 import { InterestForm, type InterestFormCopy } from "./InterestForm";
 import { CapabilityBand, Faq, FounderQuote, type CapabilityTile, type FaqItem } from "./LandingSections";
-import { PhoneMockRow, type PhoneMockCopy } from "./PhoneMocks";
+import { PhoneMockRow, QuizMock, type PhoneMockCopy } from "./PhoneMocks";
 import { SignIn } from "./SignIn";
 import { SiteFooter } from "./SiteFooter";
 import { useTheme } from "./ThemeContext";
@@ -164,28 +164,33 @@ export function Landing() {
           </span>
         </nav>
 
-        {/* Bottom padding is deliberately short so the mocks section's heading
-            peeks above the fold on a desktop viewport. */}
-        <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center px-6 pb-16 pt-16 text-center sm:pb-20 sm:pt-24">
-          <p className="land-rise text-xs font-semibold uppercase tracking-[0.35em] text-accent2">
-            {t("hero.eyebrow")}
-          </p>
-          <h1
-            className="land-rise mt-4 text-4xl font-semibold leading-display tracking-display text-ink sm:text-6xl"
-            style={{ "--d": "80ms" } as CSSProperties}
-          >
-            {t.rich("hero.headline", { em: (chunks) => <em className="text-accent">{chunks}</em> })}
-          </h1>
-          <p
-            className="land-rise mt-6 max-w-xl text-base text-soft sm:text-lg"
-            style={{ "--d": "160ms" } as CSSProperties}
-          >
-            {t("hero.subhead")}
-          </p>
-          <div
-            className="land-rise mt-10 flex flex-wrap items-center justify-center gap-3"
-            style={{ "--d": "240ms" } as CSSProperties}
-          >
+        {/* Two columns from lg: the pitch on the left, and on the right the
+            tappable quiz phone, tilted and floating on a gold glow, so the
+            product itself is the thing that catches the eye above the fold. On
+            smaller screens the phone is left out (the mocks section directly
+            below carries it) and the text centres as before. Bottom padding is
+            short so that section's heading peeks above the fold on desktop. */}
+        <div className="relative z-10 mx-auto grid w-full max-w-6xl items-center gap-12 px-6 pb-16 pt-14 sm:pb-20 sm:pt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:gap-16 lg:pb-24">
+          <div className="flex flex-col items-center text-center lg:items-start lg:text-start">
+            <p className="land-rise text-xs font-semibold uppercase tracking-[0.35em] text-accent2">
+              {t("hero.eyebrow")}
+            </p>
+            <h1
+              className="land-rise mt-4 text-4xl font-semibold leading-display tracking-display text-ink sm:text-5xl lg:text-6xl"
+              style={{ "--d": "80ms" } as CSSProperties}
+            >
+              {t.rich("hero.headline", { em: (chunks) => <em className="text-accent">{chunks}</em> })}
+            </h1>
+            <p
+              className="land-rise mt-6 max-w-xl text-base text-soft sm:text-lg"
+              style={{ "--d": "160ms" } as CSSProperties}
+            >
+              {t("hero.subhead")}
+            </p>
+            <div
+              className="land-rise mt-10 flex flex-wrap items-center justify-center gap-3 lg:justify-start"
+              style={{ "--d": "240ms" } as CSSProperties}
+            >
             <a
               href="#get-started"
               className="rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-accent/90"
@@ -208,6 +213,20 @@ export function Landing() {
             <Icon name="book" className="h-3.5 w-3.5 shrink-0 text-accent" />
             {t("hero.materialsPill")}
           </p>
+          </div>
+
+          {/* The eye-catcher: the same tappable quiz frame as the mocks section,
+              scaled up, tilted a few degrees and drifting on a gold glow. Hover
+              straightens it, which is the invitation to tap. */}
+          <div
+            className="land-rise relative hidden justify-self-center lg:block"
+            style={{ "--d": "320ms" } as CSSProperties}
+          >
+            <div aria-hidden className="absolute -inset-8 -z-10 rounded-full bg-gold/30 blur-3xl" />
+            <div className="land-float w-64 -rotate-3 transition-transform duration-500 hover:rotate-0 motion-reduce:transition-none lg:scale-110">
+              <QuizMock copy={phoneCopy} />
+            </div>
+          </div>
         </div>
       </header>
 
@@ -288,7 +307,10 @@ export function Landing() {
                   alt={t("founder.byline")}
                   fill
                   sizes="(min-width: 1024px) 16rem, 60vw"
-                  className="object-cover"
+                  // The photo is a landscape selfie with the face in its left
+                  // quarter, so a centred square crop cut it in half. Anchoring
+                  // the crop left puts the face a third of the way in.
+                  className="object-cover object-left"
                   onError={() => setPortrait(false)}
                 />
               </div>
