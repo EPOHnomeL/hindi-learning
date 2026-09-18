@@ -10,10 +10,37 @@ import { CountryProvider } from "./_components/CountryContext";
 import { LocaleSync } from "~/i18n/locale-client";
 import type { TenantSlug } from "~/lib/tenant";
 import { api } from "../../convex/_generated/api";
+import { retryingTokenFetcher } from "~/lib/authTokenRetry";
 import { isPostHogInitialized } from "./PostHogClient";
 
+// The Convex client refreshes a signed-in learner's token through the fetcher the
+// auth provider hands `setAuth`, and it schedules that refresh with a bare `void`,
+// so a dropped network at refresh time escaped as an unhandled "Failed to fetch"
+// (see src/lib/authTokenRetry.ts for the evidence). Wrapping the fetcher here, at
+// the one point every auth path passes through, retries the blip and otherwise
+// hands the client a clean `null` it already knows how to handle. A subclass
+// rather than a wrapper around the provider: `useAuth`, the hook the Next.js
+// provider composes with, is not exported by @convex-dev/auth.
+class RetryingAuthConvexClient extends ConvexReactClient {
+  setAuth(...args: Parameters<ConvexReactClient["setAuth"]>): void {
+    const [fetchToken, ...rest] = args;
+    super.setAuth(
+      retryingTokenFetcher(fetchToken, {
+        delaysMs: [1_000, 2_000, 4_000],
+        onGiveUp: (error, attempts) => {
+          // Report it by name: the same TypeError, now handled and triageable.
+          if (isPostHogInitialized()) {
+            posthog.captureException(error, { auth_token_refresh_failed: true, attempts });
+          }
+        },
+      }),
+      ...rest,
+    );
+  }
+}
+
 // Next inlines NEXT_PUBLIC_* at build; `npx convex dev` writes it to .env.local.
-const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+const convex = new RetryingAuthConvexClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 // Identifies after Convex has resolved a signed-in account, including on a page
 // refresh. `id` is the immutable Convex user document ID, and it is the ONLY
