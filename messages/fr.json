@@ -628,69 +628,56 @@
     "hero": {
       "eyebrow": "Un studio de cours par IA",
       "headline": "Transformez des livres denses et des notes en <em>cours interactifs</em> que vous terminerez vraiment.",
-      "subhead": "Importez un manuel, un livre ou vos notes. My Course construit un programme court et interactif, avec des quiz intégrés et des questions au professeur en ligne, fondé strictement sur vos sources.",
+      "subhead": "Importez un manuel, un livre ou vos notes. My Course en fait de courtes leçons avec des quiz intégrés et un tuteur à qui poser vos questions en pleine leçon. À partir de vos sources et de rien d’autre.",
       "getStarted": "Commencer",
       "sampleLesson": "Voir une leçon d’exemple",
       "materialsPill": "Fonctionne avec les livres, les Écritures, les procédures d’entreprise et les notes de cours"
     },
     "how": {
-      "heading": "Un cours qui s’écrit à mesure que vous l’apprenez"
+      "heading": "Comment ça marche"
     },
     "steps": {
       "seed": {
-        "title": "Amorcez un cours",
-        "body": "Donnez-lui un titre, dites pourquoi vous apprenez, et téléversez les lectures auxquelles vous faites confiance — un manuel, une écriture, vos propres notes."
+        "title": "Semez un cours",
+        "body": "Nommez-le, dites pourquoi vous apprenez, importez la lecture de confiance."
       },
       "author": {
-        "title": "Un auteur IA se met à écrire",
-        "body": "Il étudie vos sources et publie votre première leçon — une page interactive écrite à partir de vos lectures, jamais au-dessus d’elles."
+        "title": "La première leçon s’écrit",
+        "body": "À partir de vos sources. Si ce n’est pas dedans, ce n’est pas dans la leçon."
       },
       "advance": {
-        "title": "Apprenez, questionnez, avancez",
-        "body": "Terminez une leçon et la suivante est écrite pour vous. Le cours se déploie à votre rythme, aussi loin que vous voulez le mener."
+        "title": "Terminez-en une, recevez la suivante",
+        "body": "Chaque nouvelle leçon se façonne sur vos erreurs et vos questions."
       }
     },
     "features": {
-      "heading": "Conçu pour un vrai apprentissage, pas pour un fil de vidéos",
-      "grounded": {
-        "title": "Ancré dans vos lectures",
-        "body": "Vos ressources téléversées constituent le programme. Les leçons en sont issues et ne privilégient jamais des connaissances non fondées."
-      },
-      "interactive": {
-        "title": "Leçons interactives",
-        "body": "Chaque leçon est une page interactive autonome — lecture, exemples résolus et quiz qui vérifient que vous avez vraiment compris."
-      },
-      "ask": {
-        "title": "Posez n’importe quelle question",
-        "body": "Bloqué en pleine leçon ? Posez la question sur place. L’auteur lit votre question et répond en ligne, dans la leçon où vous l’avez posée."
-      },
+      "heading": "Aussi compris",
       "references": {
-        "title": "Des références toujours à jour",
-        "body": "En plus des leçons, vous obtenez des aide-mémoire vivants — glossaires et faits clés que l’auteur révise à mesure que votre compréhension s’approfondit."
+        "title": "Des fiches qui suivent",
+        "body": "Glossaires et faits clés, révisés au fil du cours."
       },
       "language": {
-        "title": "Dans n’importe quelle langue",
-        "body": "Transformez un cours en une édition complète dans une autre langue — les mêmes leçons, réécrites, pas traduites à la machine. Changez à tout moment."
+        "title": "Toutes les langues",
+        "body": "Réécrivez tout le cours dans une autre langue et changez d’édition à tout moment."
       },
       "share": {
-        "title": "Partage et liens publics",
-        "body": "Partagez un cours avec quelqu’un par e-mail — en lecture seule ou avec droits de modification — ou créez un lien public anonyme que tout le monde peut ouvrir."
+        "title": "Partagez-le",
+        "body": "Par e-mail, en lecture seule ou modifiable, ou par un lien public ouvert à tous."
       }
     },
     "mocks": {
-      "heading": "À quoi ressemble vraiment une leçon",
-      "body": "Pas une vidéo à subir. Une page rédigée à partir de vos sources, avec les questions — et les réponses — à l'endroit même où vous lisiez.",
+      "heading": "À quoi ressemble une leçon",
       "lesson": {
-        "title": "Une leçon écrite à partir de vos lectures",
-        "body": "Du texte, des exemples résolus et des encadrés, assemblés depuis les sources que vous avez déposées et jamais par-dessus elles."
+        "title": "Écrite à partir de votre lecture",
+        "body": "Construite avec les sources que vous avez importées et rien d’autre."
       },
       "quiz": {
-        "title": "Des questions qui vérifient que c'est acquis",
-        "body": "De courts contrôles dans la leçon, corrigés au fil de l'eau, pour repérer la lacune avant de passer à la suite."
+        "title": "Des questions au fil de la lecture",
+        "body": "De courtes questions dans la leçon, corrigées sur place. Touchez-en une."
       },
       "ask": {
-        "title": "Demandez là où vous avez buté",
-        "body": "Votre question reçoit une réponse en ligne, dans la leçon où vous l'avez posée, et non dans un forum qu'il faudrait aller chercher."
+        "title": "Demandez là où vous bloquez",
+        "body": "La réponse arrive sous le paragraphe concerné."
       },
       "phone": {
         "courseTitle": "Le ciel nocturne, d'après votre guide de terrain",
@@ -710,7 +697,7 @@
     },
     "capabilities": {
       "heading": "Conçu en Afrique du Sud, pour partout où vous lisez",
-      "body": "Un petit studio, un support local, et un cours qui voyage : vers une autre langue, sur un téléphone, vers quiconque reçoit le lien.",
+      "body": "Un petit studio, un vrai support, et un cours qui tient dans un téléphone.",
       "t1v": "1:1",
       "t1l": "Demandez en pleine leçon, réponse en ligne",
       "t2v": "100+",
@@ -727,28 +714,28 @@
     "faq": {
       "heading": "Vos questions, nos réponses.",
       "q1": "Le cours est-il écrit par une IA ou par une personne ?",
-      "a1": "Par une IA, et nous n'allons pas prétendre le contraire. Ce qui change, c'est ce qu'elle a le droit d'utiliser : vos sources déposées sont le programme, et une leçon s'écrit à partir d'elles plutôt qu'à partir de ce dont le modèle se souvient par hasard. Si ce n'est pas dans vos lectures, cela n'entre pas dans la leçon.",
+      "a1": "Par une IA, et nous ne prétendrons pas le contraire. La différence tient à ce qu’elle peut utiliser : vos imports sont le programme. Si ce n’est pas dans votre lecture, cela n’entre pas dans la leçon.",
       "q2": "Que dois-je déposer ?",
-      "a2": "Ce que vous auriez étudié de toute façon : un manuel, une écriture, des notes de cours, vos propres textes. Une seule source suffit pour commencer, et vous pourrez en ajouter en chemin.",
+      "a2": "Ce que vous auriez étudié de toute façon. Un manuel, un texte sacré, des notes de cours, vos propres écrits. Une seule source suffit pour commencer.",
       "q3": "Est-ce que je reçois tout le cours d'un coup ?",
-      "a3": "Non. La première leçon est écrite quand vous amorcez le cours, la suivante quand vous terminez la précédente. C'est voulu : l'auteur voit ce que vous avez réussi et ce que vous avez demandé avant d'écrire la suite.",
+      "a3": "Non. La première leçon s’écrit quand vous semez le cours, la suivante quand vous terminez la précédente. L’auteur voit vos erreurs et vos questions avant d’écrire la suite.",
       "q4": "Puis-je apprendre dans une autre langue que l'anglais ?",
-      "a4": "Oui. Un cours peut devenir une édition complète dans une autre langue — les mêmes leçons réécrites, pas traduites à la machine — et vous passez d'une édition à l'autre quand vous voulez.",
+      "a4": "Oui. Un cours peut être réécrit dans une autre langue, les mêmes leçons rédigées à nouveau plutôt que traduites à la machine, et vous changez d’édition quand vous voulez.",
       "q5": "Puis-je partager un cours avec quelqu'un ?",
       "a5": "De trois façons : par e-mail en lecture seule, par e-mail avec droits de modification, ou via un lien public anonyme que n'importe qui peut ouvrir sans compte.",
       "chatgptQ": "Pourquoi ne pas simplement coller mon PDF dans ChatGPT ?",
-      "chatgptA": "ChatGPT vous rend un mur de texte que vous parcourez et oubliez dans l’heure. My Course découpe votre lecture en un programme structuré, étape par étape, avec des quiz de rappel actif, des fiches de référence persistantes et des questions en ligne qui restent attachées à la phrase exacte qui les a suscitées."
+      "chatgptA": "ChatGPT vous rend un mur de texte que vous parcourez et oubliez avant le déjeuner. My Course découpe votre lecture en courtes leçons avec des quiz, des fiches qui suivent, et des questions qui restent attachées à la phrase qui les a suscitées."
     },
     "interest": {
       "heading": "Pas encore prêt à en lancer un ?",
-      "body": "Laissez votre adresse et nous écrirons quand il y aura quelque chose à raconter. Un seul champ, et pas de tapis roulant à newsletters.",
+      "body": "Laissez votre adresse et nous écrirons quand il y aura quelque chose à dire. Un champ, pas de tapis roulant à newsletters.",
       "placeholder": "vous@email.com",
       "submit": "Tenez-moi au courant",
       "submitting": "Ajout en cours…",
       "invalid": "Cela ne ressemble pas à une adresse où nous pourrions vous joindre.",
       "failed": "L'envoi a échoué. Merci de réessayer.",
       "doneTitle": "Vous êtes sur la liste.",
-      "doneBody": "Nous écrirons quand cela vaudra votre temps, et ne confierons jamais votre adresse à personne.",
+      "doneBody": "Nous écrirons quand cela vaudra votre temps, et ne donnerons jamais votre adresse à qui que ce soit.",
       "fieldLabel": "Adresse e-mail"
     }
   },

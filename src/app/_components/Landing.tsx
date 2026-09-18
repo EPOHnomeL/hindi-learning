@@ -52,10 +52,10 @@ import { useTheme } from "./ThemeContext";
 // t(...) inside the component at render.
 const STEP_KEYS = ["seed", "author", "advance"] as const;
 
+// Only the features the phone mocks do NOT already show. Grounded, interactive
+// and ask used to be cards here too, which said the same thing twice on one
+// page; the three frames under the hero now carry them (2026-09-18).
 const FEATURE_KEYS: { icon: IconName; key: string }[] = [
-  { icon: "book", key: "grounded" },
-  { icon: "edit", key: "interactive" },
-  { icon: "chat", key: "ask" },
   { icon: "refresh", key: "references" },
   { icon: "globe", key: "language" },
   { icon: "link", key: "share" },
@@ -223,7 +223,7 @@ export function Landing() {
             style={{ "--d": "320ms" } as CSSProperties}
           >
             <div aria-hidden className="absolute -inset-8 -z-10 rounded-full bg-gold/30 blur-3xl" />
-            <div className="land-float w-64 -rotate-3 transition-transform duration-500 hover:rotate-0 motion-reduce:transition-none lg:scale-110">
+            <div className="land-float w-[17rem] -rotate-3 transition-transform duration-500 hover:rotate-0 motion-reduce:transition-none">
               <QuizMock copy={phoneCopy} />
             </div>
           </div>
@@ -236,10 +236,9 @@ export function Landing() {
              sample lesson" when no public link is configured. ── */}
       <section id="see-it" className="scroll-mt-8 border-y border-line bg-card/60">
         <div className="mx-auto w-full max-w-5xl px-6 pb-20 pt-14">
-          <div className="land-reveal mx-auto max-w-2xl text-center">
-            <h2 className="text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">{t("mocks.heading")}</h2>
-            <p className="mt-3 leading-relaxed text-soft">{t("mocks.body")}</p>
-          </div>
+          <h2 className="land-reveal text-center text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">
+            {t("mocks.heading")}
+          </h2>
           <PhoneMockRow
             copy={phoneCopy}
             captions={[
@@ -254,40 +253,44 @@ export function Landing() {
       {/* ── How it works ── */}
       <section id="how" className="mx-auto w-full max-w-5xl scroll-mt-8 px-6 py-20">
         <h2 className="text-center text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">{t("how.heading")}</h2>
-        <div className="mt-12 grid gap-8 sm:grid-cols-3">
+        {/* A flow, drawn as one: the three numbers sit on a single gold rule so
+            the eye reads left to right (top to bottom on a phone) instead of
+            three unrelated columns. The rule is a pseudo-element on the list,
+            the numbers cover it with a paper disc. */}
+        <ol className="relative mt-12 grid gap-10 before:absolute before:start-5 before:top-0 before:bottom-0 before:w-px before:bg-gold/50 sm:grid-cols-3 sm:gap-8 sm:before:start-[16.67%] sm:before:end-[16.67%] sm:before:top-5 sm:before:bottom-auto sm:before:h-px sm:before:w-auto">
           {steps.map((step, i) => (
-            <div
+            <li
               key={step.key}
-              className={`${["land-reveal", "land-reveal-mid", "land-reveal-late"][i]} flex flex-col items-center text-center`}
+              className={`${["land-reveal", "land-reveal-mid", "land-reveal-late"][i]} relative flex gap-5 sm:flex-col sm:items-center sm:gap-0 sm:text-center`}
             >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-gold/20 text-base font-semibold text-accent">
+              <span className="relative z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gold bg-paper text-base font-semibold text-accent">
                 {i + 1}
               </span>
-              <h3 className="mt-4 text-lg font-semibold text-accent">{step.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-soft">{step.body}</p>
-            </div>
+              <div className="sm:mt-4">
+                <h3 className="text-lg font-semibold text-ink">{step.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-soft">{step.body}</p>
+              </div>
+            </li>
           ))}
-        </div>
+        </ol>
       </section>
 
-      {/* ── Features ── */}
-      <section className="mx-auto w-full max-w-5xl px-6 py-20">
-        <h2 className="text-center text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">
-          {t("features.heading")}
-        </h2>
-        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {features.map((f) => (
-            <div
-              key={f.key}
-              className="land-reveal rounded-lg border border-line bg-card p-6 shadow-sm transition-colors hover:border-gold/60"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-md bg-gold/15 text-accent">
-                <Icon name={f.icon} className="h-5 w-5" />
-              </span>
-              <h3 className="mt-4 font-semibold text-ink">{f.title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-soft">{f.body}</p>
-            </div>
-          ))}
+      {/* ── The rest of the features, as one quiet strip rather than a second
+             grid of cards. Three items, icon and a line each. ── */}
+      <section className="mx-auto w-full max-w-5xl px-6 pb-20">
+        <div className="land-reveal rounded-xl border border-line bg-card/60 px-6 py-8 sm:px-10">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-accent2">{t("features.heading")}</h2>
+          <ul className="mt-6 grid gap-8 sm:grid-cols-3">
+            {features.map((f) => (
+              <li key={f.key} className="flex gap-3">
+                <Icon name={f.icon} className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
+                <div>
+                  <h3 className="font-semibold text-ink">{f.title}</h3>
+                  <p className="mt-1 text-sm leading-relaxed text-soft">{f.body}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 

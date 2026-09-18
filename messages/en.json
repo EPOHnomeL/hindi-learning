@@ -628,69 +628,56 @@
     "hero": {
       "eyebrow": "An AI course studio",
       "headline": "Turn dense books and notes into <em>interactive courses</em> you’ll actually finish.",
-      "subhead": "Upload a handbook, textbook, or notes. My Course builds a bite-sized, interactive curriculum with built-in quizzes and inline teacher Q&A, grounded strictly in your sources.",
+      "subhead": "Upload a handbook, a textbook or your notes. My Course turns it into short lessons with quizzes built in and a tutor you can ask mid-lesson. From your sources and nothing else.",
       "getStarted": "Get started",
       "sampleLesson": "Preview a sample lesson",
       "materialsPill": "Works with books, scripture, company SOPs, and lecture notes"
     },
     "how": {
-      "heading": "A course that’s written as you learn it"
+      "heading": "How it works"
     },
     "steps": {
       "seed": {
         "title": "Seed a course",
-        "body": "Give it a title, say why you’re learning, and upload the reading you trust — a handbook, a scripture, your own notes."
+        "body": "Name it, say why you're learning, upload the reading you trust."
       },
       "author": {
-        "title": "An AI author gets writing",
-        "body": "It studies your sources and publishes your first lesson — an interactive page written from your reading, never over it."
+        "title": "The first lesson is written",
+        "body": "From your sources. If it isn't in them, it isn't in the lesson."
       },
       "advance": {
-        "title": "Learn, ask, advance",
-        "body": "Finish a lesson and the next one is written for you. The course unfolds at your pace, as far as you want to take it."
+        "title": "Finish one, get the next",
+        "body": "Each new lesson is shaped by what you got wrong and what you asked."
       }
     },
     "features": {
-      "heading": "Built for real study, not a feed of videos",
-      "grounded": {
-        "title": "Grounded in your reading",
-        "body": "Your uploaded resources are the syllabus. Lessons are written from them and never trust ungrounded knowledge over them."
-      },
-      "interactive": {
-        "title": "Interactive lessons",
-        "body": "Every lesson is a self-contained interactive page — reading, worked examples, and quizzes that check you actually got it."
-      },
-      "ask": {
-        "title": "Ask anything",
-        "body": "Stuck mid-lesson? Ask right there. The author reads your question and replies inline, in the lesson where you asked it."
-      },
+      "heading": "Also built in",
       "references": {
-        "title": "References that stay current",
-        "body": "Alongside lessons you get living cheat-sheets — glossaries and key facts the author revises as your understanding deepens."
+        "title": "Cheat-sheets that keep up",
+        "body": "Glossaries and key facts, revised as the course goes on."
       },
       "language": {
-        "title": "In any language",
-        "body": "Turn a course into a full edition in another language — the same lessons, re-authored, not machine-glossed. Switch any time."
+        "title": "Any language",
+        "body": "Re-author the whole course in another language and switch editions any time."
       },
       "share": {
-        "title": "Share & public links",
-        "body": "Share a course with someone by email — read-only or with editing rights — or mint an anonymous public link anyone can open."
+        "title": "Share it",
+        "body": "By email, read-only or editable, or as a public link anyone can open."
       }
     },
     "mocks": {
-      "heading": "What a lesson actually looks like",
-      "body": "Not a video to sit through. A page written from your sources, with the questions — and the answers — in the same place you were reading.",
+      "heading": "What a lesson looks like",
       "lesson": {
-        "title": "A lesson, written from your reading",
-        "body": "Prose, worked examples and pull-outs, assembled from the sources you uploaded and never over them."
+        "title": "Written from your reading",
+        "body": "Built from the sources you uploaded and nothing else."
       },
       "quiz": {
-        "title": "Questions that check you got it",
-        "body": "Short checks inside the lesson, marked as you go, so you find the gap before you move past it."
+        "title": "Quizzed as you go",
+        "body": "Short questions inside the lesson, marked on the spot. Tap one."
       },
       "ask": {
-        "title": "Ask where you got stuck",
-        "body": "Your question is answered inline, in the lesson where you asked it — not in a forum you'd have to go find."
+        "title": "Ask where you're stuck",
+        "body": "The answer lands under the paragraph you asked about."
       },
       "phone": {
         "courseTitle": "The Night Sky, from Your Field Guide",
@@ -710,7 +697,7 @@
     },
     "capabilities": {
       "heading": "Built in South Africa, for wherever you're reading",
-      "body": "A small studio, local support, and a course that travels — into another language, onto a phone, to whoever you send the link to.",
+      "body": "A small studio, real support, and a course that fits on a phone.",
       "t1v": "1:1",
       "t1l": "Ask mid-lesson, answered inline",
       "t2v": "100+",
@@ -727,28 +714,28 @@
     "faq": {
       "heading": "Questions, answered.",
       "q1": "Is the course written by AI, or by a person?",
-      "a1": "By AI, and we won't pretend otherwise. What makes it different is what it's allowed to use: your uploaded sources are the syllabus, and a lesson is written from them rather than from whatever the model happens to remember. If it isn't in your reading, it doesn't go in the lesson.",
+      "a1": "By AI, and we won't pretend otherwise. The difference is what it may use: your uploads are the syllabus. If it isn't in your reading, it doesn't go in the lesson.",
       "q2": "What do I need to upload?",
-      "a2": "Whatever you'd have studied anyway — a handbook, a scripture, a set of lecture notes, your own writing. One source is enough to start, and you can add more as the course goes on.",
+      "a2": "Whatever you'd have studied anyway. A handbook, a scripture, lecture notes, your own writing. One source is enough to start.",
       "q3": "Do I get the whole course at once?",
-      "a3": "No. The first lesson is written when you seed the course, and the next when you finish the last. That's deliberate: the author sees what you got right and what you asked about before it writes what comes next.",
+      "a3": "No. The first lesson is written when you seed the course, the next when you finish the last. The author sees what you got wrong and what you asked before it writes on.",
       "q4": "Can I learn in a language other than English?",
-      "a4": "Yes. A course can be turned into a full edition in another language — the same lessons re-authored, not machine-glossed — and you can switch between editions whenever you like.",
+      "a4": "Yes. A course can be re-authored in another language, the same lessons written again rather than machine-glossed, and you can switch editions whenever you like.",
       "q5": "Can I share a course with someone else?",
       "a5": "Three ways: by email as a read-only viewer, by email with editing rights, or as an anonymous public link anyone can open without an account.",
       "chatgptQ": "Why not just paste my PDF into ChatGPT?",
-      "chatgptA": "ChatGPT gives you a wall of text that you skim and forget within an hour. My Course breaks your reading into a structured, step-by-step curriculum with active-recall quizzes, persistent cheat-sheet references, and inline Q&A where your questions stay attached to the exact sentence that prompted them."
+      "chatgptA": "ChatGPT hands you a wall of text you skim and forget by lunch. My Course splits your reading into short lessons with quizzes, cheat-sheets that stay current, and questions that stay pinned to the sentence that prompted them."
     },
     "interest": {
       "heading": "Not ready to start one yet?",
-      "body": "Leave your address and we'll write when there's something worth telling you about. One field, and no newsletter treadmill.",
+      "body": "Leave your address and we'll write when there's something worth telling you. One field, no newsletter treadmill.",
       "placeholder": "you@email.com",
       "submit": "Keep me posted",
       "submitting": "Adding you…",
       "invalid": "That doesn't look like an address we could reach you at.",
       "failed": "That didn't go through. Please try again.",
       "doneTitle": "You're on the list.",
-      "doneBody": "We'll write when there's something worth your time — and never hand your address to anyone else.",
+      "doneBody": "We'll write when there's something worth your time, and never hand your address to anyone else.",
       "fieldLabel": "Email address"
     }
   },
