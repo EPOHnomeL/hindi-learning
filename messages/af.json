@@ -314,6 +314,7 @@
     "copied": "Gekopieer — plak dit enige plek ✓",
     "lessonNotFound": "Les nie gevind nie.",
     "lessonLoadError": "Kon nie hierdie les laai nie. Probeer verfris.",
+    "quizSaveError": "Kon nie jou antwoord stoor nie. Probeer weer.",
     "completed": "✓ Voltooi",
     "markComplete": "Merk as voltooi",
     "nextLesson": "Volgende les →",

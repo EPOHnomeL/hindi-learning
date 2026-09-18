@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { mutation, query, type MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
@@ -60,19 +60,32 @@ export const setTeacherQa = mutation({
 // ---- Reader (learner) ------------------------------------------------------
 
 // First answer wins — a quiz is the learner's initial attempt, recorded once.
+//
+// Owner-only, and it **refuses deliberately** with a `ConvexError` rather than a raw
+// `Error`. The reader fires this as it captures an answer; a plain `Error` reaches
+// the browser as an uncaught rejection (the learner never learns the write refused)
+// and is filed as a crash, and a production Convex deployment redacts its message
+// anyway. A `ConvexError` is an expected refusal the reader catches
+// (`useMutationRun`) and turns into a real message with a retry. `.first()`, not
+// `.unique()`: the query is only ever meant to hold one row, but a duplicate must
+// not turn recording an answer into a thrown internal error.
 export const recordResponse = mutation({
   args: { topicSlug: v.string(), lessonKey: v.string(), quizId: v.string(), answer: v.string(), correct: v.boolean() },
+  returns: v.null(),
   handler: async (ctx, { topicSlug, lessonKey, quizId, answer, correct }) => {
-    const userId = await requireUser(ctx);
-    const topic = await requireOwnedTopic(ctx, userId, topicSlug);
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new ConvexError({ message: "Sign in to save your quiz answer." });
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new ConvexError({ message: "This course is not yours to record answers on." });
     const existing = await ctx.db
       .query("responses")
       .withIndex("by_topic_user_lesson_quiz", (q) =>
         q.eq("topicId", topic._id).eq("userId", userId).eq("lessonKey", lessonKey).eq("quizId", quizId),
       )
-      .unique();
-    if (existing) return; // first answer only
+      .first();
+    if (existing) return null; // first answer only
     await ctx.db.insert("responses", { userId, topicId: topic._id, lessonKey, quizId, answer, correct });
+    return null;
   },
 });
 

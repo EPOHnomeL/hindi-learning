@@ -314,6 +314,7 @@
     "copied": "Copié — collez-le où vous voulez ✓",
     "lessonNotFound": "Leçon introuvable.",
     "lessonLoadError": "Impossible de charger cette leçon. Essayez d’actualiser.",
+    "quizSaveError": "Impossible d’enregistrer votre réponse. Réessayez.",
     "completed": "✓ Terminé",
     "markComplete": "Marquer comme terminé",
     "nextLesson": "Leçon suivante →",

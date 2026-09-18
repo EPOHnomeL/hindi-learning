@@ -314,6 +314,7 @@
     "copied": "Copiado — pégalo donde quieras ✓",
     "lessonNotFound": "Lección no encontrada.",
     "lessonLoadError": "No se pudo cargar esta lección. Prueba a actualizar.",
+    "quizSaveError": "No se pudo guardar tu respuesta. Inténtalo de nuevo.",
     "completed": "✓ Completado",
     "markComplete": "Marcar como completo",
     "nextLesson": "Siguiente lección →",
