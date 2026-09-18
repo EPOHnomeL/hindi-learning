@@ -62,7 +62,7 @@ export function CourseSettingsBody({
           edition ? (
             <EditionDetailsSection topicSlug={topicSlug} edition={edition} />
           ) : (
-            <p className="text-[12.5px] text-soft">{t("loading")}</p>
+            <p className="text-[0.78rem] text-soft">{t("loading")}</p>
           )
         ) : (
           <DetailsSection topicSlug={topicSlug} />
@@ -109,7 +109,7 @@ function TeacherQaSection({ topicSlug }: { topicSlug: string }) {
 
   return (
     <div>
-      <h4 className="text-[13px] font-bold text-ink">{t("teacherQa")}</h4>
+      <h4 className="text-[0.8125rem] font-bold text-ink">{t("teacherQa")}</h4>
       <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-3 py-2.5">
         <div className="flex min-w-0 items-center gap-3">
           <span
@@ -119,7 +119,7 @@ function TeacherQaSection({ topicSlug }: { topicSlug: string }) {
           >
             <Icon name="chat" className="h-4.5 w-4.5" />
           </span>
-          <span className="text-[11.5px] text-soft">
+          <span className="text-[0.72rem] text-soft">
             {on ? t("teacherQaOn") : t("teacherQaOff")}
             {error && <span className="block text-danger">{error}</span>}
           </span>
@@ -161,8 +161,8 @@ function EditionDetailsSection({
 
   return (
     <div>
-      <h4 className="text-[13px] font-bold text-ink">{t("editionDetailsHeading", { native })}</h4>
-      <p className="mt-1 text-[12.5px] text-soft">{t("editionDetailsBody")}</p>
+      <h4 className="text-[0.8125rem] font-bold text-ink">{t("editionDetailsHeading", { native })}</h4>
+      <p className="mt-1 text-[0.78rem] text-soft">{t("editionDetailsBody")}</p>
       <form
         className="mt-4 flex flex-col gap-4"
         onSubmit={async (e) => {
@@ -180,7 +180,7 @@ function EditionDetailsSection({
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wide text-accent2">{t("titleLabel")}</label>
+          <label className="text-[0.6875rem] font-bold uppercase tracking-label text-accent2">{t("titleLabel")}</label>
           <input
             value={title}
             onChange={(e) => {
@@ -192,7 +192,7 @@ function EditionDetailsSection({
         </div>
         {servedMission !== null && (
           <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-bold uppercase tracking-wide text-accent2">{t("missionLabel")}</label>
+            <label className="text-[0.6875rem] font-bold uppercase tracking-label text-accent2">{t("missionLabel")}</label>
             <textarea
               value={mission}
               onChange={(e) => {
@@ -247,8 +247,8 @@ function DetailsSection({ topicSlug }: { topicSlug: string }) {
 
   return (
     <div>
-      <h4 className="text-[13px] font-bold text-ink">{t("detailsHeading")}</h4>
-      <p className="mt-1 text-[12.5px] text-soft">{t("detailsBody")}</p>
+      <h4 className="text-[0.8125rem] font-bold text-ink">{t("detailsHeading")}</h4>
+      <p className="mt-1 text-[0.78rem] text-soft">{t("detailsBody")}</p>
       <form
         className="mt-4 flex flex-col gap-4"
         onSubmit={async (e) => {
@@ -267,7 +267,7 @@ function DetailsSection({ topicSlug }: { topicSlug: string }) {
         }}
       >
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wide text-accent2">{t("titleLabel")}</label>
+          <label className="text-[0.6875rem] font-bold uppercase tracking-label text-accent2">{t("titleLabel")}</label>
           <input
             value={title ?? ""}
             disabled={loading}
@@ -279,7 +279,7 @@ function DetailsSection({ topicSlug }: { topicSlug: string }) {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-[11px] font-bold uppercase tracking-wide text-accent2">{t("missionLabel")}</label>
+          <label className="text-[0.6875rem] font-bold uppercase tracking-label text-accent2">{t("missionLabel")}</label>
           <textarea
             value={mission}
             disabled={loading}
@@ -322,13 +322,13 @@ function LessonsSection({ topicSlug }: { topicSlug: string }) {
 
   return (
     <div>
-      <h4 className="text-[13px] font-bold text-ink">{t("lessonsHeading")}</h4>
-      <p className="mt-1 text-[12.5px] text-soft">{t("lessonsBody")}</p>
+      <h4 className="text-[0.8125rem] font-bold text-ink">{t("lessonsHeading")}</h4>
+      <p className="mt-1 text-[0.78rem] text-soft">{t("lessonsBody")}</p>
 
       {lessons === undefined ? (
-        <p className="mt-4 text-[12.5px] text-soft">{t("loading")}</p>
+        <p className="mt-4 text-[0.78rem] text-soft">{t("loading")}</p>
       ) : lessons.length === 0 ? (
-        <p className="mt-4 text-[12.5px] text-soft">{t("noLessons")}</p>
+        <p className="mt-4 text-[0.78rem] text-soft">{t("noLessons")}</p>
       ) : (
         <ul className="mt-4 flex flex-col divide-y divide-line overflow-hidden rounded-xl border border-line">
           {lessons.map((l) => (
@@ -384,8 +384,8 @@ function CompletionSection({ topicSlug, status }: { topicSlug: string; status: "
   if (status === "completed") {
     return (
       <div>
-        <h4 className="text-[13px] font-bold text-ink">{t("completionHeading")}</h4>
-        <p className="mt-1 text-[12.5px] text-soft">{t("completionDoneBody")}</p>
+        <h4 className="text-[0.8125rem] font-bold text-ink">{t("completionHeading")}</h4>
+        <p className="mt-1 text-[0.78rem] text-soft">{t("completionDoneBody")}</p>
         <button
           type="button"
           disabled={reopen.busy}
@@ -401,8 +401,8 @@ function CompletionSection({ topicSlug, status }: { topicSlug: string; status: "
 
   return (
     <div>
-      <h4 className="text-[13px] font-bold text-ink">{t("completionHeading")}</h4>
-      <p className="mt-1 text-[12.5px] text-soft">{t("completionActiveBody")}</p>
+      <h4 className="text-[0.8125rem] font-bold text-ink">{t("completionHeading")}</h4>
+      <p className="mt-1 text-[0.78rem] text-soft">{t("completionActiveBody")}</p>
       <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3">
         <span className="text-sm text-ink">{t("markCompleteRow")}</span>
         <button

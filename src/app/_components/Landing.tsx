@@ -140,7 +140,7 @@ export function Landing() {
             {t("hero.eyebrow")}
           </p>
           <h1
-            className="land-rise mt-4 text-4xl font-semibold leading-tight tracking-tight text-ink sm:text-6xl"
+            className="land-rise mt-4 text-4xl font-semibold leading-display tracking-display text-ink sm:text-6xl"
             style={{ "--d": "80ms" } as CSSProperties}
           >
             {t.rich("hero.headline", { em: (chunks) => <em className="text-accent">{chunks}</em> })}
@@ -173,7 +173,7 @@ export function Landing() {
 
       {/* ── How it works ── */}
       <section id="how" className="mx-auto w-full max-w-5xl scroll-mt-8 px-6 py-20">
-        <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{t("how.heading")}</h2>
+        <h2 className="text-center text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">{t("how.heading")}</h2>
         <div className="mt-12 grid gap-8 sm:grid-cols-3">
           {steps.map((step, i) => (
             <div
@@ -196,7 +196,7 @@ export function Landing() {
       <section className="border-y border-line bg-card/60">
         <div className="mx-auto w-full max-w-5xl px-6 py-20">
           <div className="land-reveal mx-auto max-w-2xl text-center">
-            <h2 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{t("mocks.heading")}</h2>
+            <h2 className="text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">{t("mocks.heading")}</h2>
             <p className="mt-3 leading-relaxed text-soft">{t("mocks.body")}</p>
           </div>
           <PhoneMockRow
@@ -212,7 +212,7 @@ export function Landing() {
 
       {/* ── Features ── */}
       <section className="mx-auto w-full max-w-5xl px-6 py-20">
-        <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+        <h2 className="text-center text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">
           {t("features.heading")}
         </h2>
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -239,7 +239,7 @@ export function Landing() {
 
       {/* ── FAQ, hardest objection first ── */}
       <section className="mx-auto w-full max-w-3xl px-6 py-20">
-        <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{t("faq.heading")}</h2>
+        <h2 className="text-center text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">{t("faq.heading")}</h2>
         <Faq items={faqItems} />
       </section>
 

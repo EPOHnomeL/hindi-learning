@@ -167,7 +167,7 @@ export function YwamPotch() {
             Youth With A Mission — Potchefstroom
           </p>
           <h1
-            className="land-rise mt-4 text-4xl font-semibold leading-tight tracking-tight text-ink sm:text-6xl"
+            className="land-rise mt-4 text-4xl font-semibold leading-display tracking-display text-ink sm:text-6xl"
             style={{ "--d": "80ms" } as CSSProperties}
           >
             Discover your <em className="text-accent">calling</em>, walk in your creation design.
@@ -217,7 +217,7 @@ export function YwamPotch() {
 
       {/* ── Focus areas ── */}
       <section id="focus" className="mx-auto w-full max-w-5xl scroll-mt-8 px-6 py-20">
-        <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+        <h2 className="text-center text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">
           Evangelism. Training. Mercy.
         </h2>
         <p className="mx-auto mt-3 max-w-2xl text-center text-soft">
@@ -246,7 +246,7 @@ export function YwamPotch() {
         <div className="mx-auto w-full max-w-5xl px-6 py-20">
           <div className="land-reveal mx-auto max-w-2xl text-center">
             <p className="text-xs font-semibold uppercase tracking-[0.35em] text-accent2">Prophetic School</p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+            <h2 className="mt-3 text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">
               Growing in the Holy Spirit
             </h2>
             <p className="mt-4 leading-relaxed text-soft">
@@ -291,7 +291,7 @@ export function YwamPotch() {
 
       {/* ── FAQ, hardest objection first ── */}
       <section className="mx-auto w-full max-w-3xl px-6 py-20">
-        <h2 className="text-center text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Questions, answered.</h2>
+        <h2 className="text-center text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">Questions, answered.</h2>
         <Faq items={FAQ_ITEMS} />
       </section>
 

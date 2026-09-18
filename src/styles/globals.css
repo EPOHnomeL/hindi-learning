@@ -3,10 +3,27 @@
 /* Palette + type lifted from the lesson artifacts (lessons/*.html) so the app
    chrome reads as the same "paper" surface the lessons live on. */
 @theme {
+  /* `--font-sans` deliberately aliases Spectral: `font-sans` anywhere in the app
+     resolves to the same serif the lessons are set in, by design (see the head
+     comment above). A real sans for the chrome is out of scope for the
+     fluid-interface map; it is a brand decision, not a fluidity fix
+     (2026-09-18). */
   --font-sans: var(--font-spectral), Georgia, "Times New Roman", ui-serif, serif;
   --font-serif: var(--font-spectral), Georgia, "Times New Roman", serif;
   --font-deva: var(--font-noto-deva), "Noto Serif Devanagari", serif;
   --font-naskh: var(--font-noto-naskh), "Noto Naskh Arabic", serif;
+
+  /* Tracking and leading by size (fluid-interface 07). Type wants less tracking
+     as it grows and more as it shrinks, so one `tracking-tight` at 16px and at
+     60px is wrong at both ends. `tracking-display`/`leading-display` for
+     text-4xl and up, `tracking-heading`/`leading-heading` for text-lg..text-xl
+     headings, `tracking-label` for uppercase eyebrows. Body copy sets no
+     tracking at all. */
+  --tracking-display: -0.02em;
+  --tracking-heading: -0.01em;
+  --tracking-label: 0.04em;
+  --leading-display: 1.05;
+  --leading-heading: 1.2;
 
   --color-paper: #fbf7f0;
   --color-card: #fffdf9;
@@ -104,6 +121,17 @@ body {
 
 .font-naskh {
   font-family: var(--font-naskh);
+}
+
+/* Devanagari and Naskh carry taller ascenders, deeper descenders and (for
+   Devanagari) the shirorekha, so Latin leading clips them and stacked lines
+   collide. Both families get 1.7 (fluid-interface 07). `<body>` carries the
+   class, so this is the document default for those locales; a Tailwind
+   `leading-*` utility on an element still wins, which is what we want for
+   display lines. */
+.font-deva,
+.font-naskh {
+  line-height: 1.7;
 }
 
 /* Press feedback (fluid-interface 02). On a phone the press is the only feedback

@@ -71,7 +71,7 @@ export function LessonFootCard({
         className="flex items-center gap-3 rounded-2xl border border-accent bg-hi/40 px-4 py-4 transition-colors hover:bg-hi active:bg-hi"
       >
         <span className="min-w-0 flex-1">
-          <span className="block text-[10px] font-bold uppercase tracking-widest text-accent2">
+          <span className="block text-[0.625rem] font-bold uppercase tracking-widest text-accent2">
             {completed ? t("next") : t("completeAndContinue")}
           </span>
           <span className="mt-0.5 block text-base font-semibold leading-snug text-accent">

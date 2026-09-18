@@ -43,7 +43,7 @@ export function SettingsPage() {
   return (
     <div className="mx-auto w-full max-w-2xl px-3 pb-8">
       <header className="flex h-16 items-center">
-        <h1 className="text-2xl font-semibold tracking-tight text-accent">{t("title")}</h1>
+        <h1 className="text-2xl font-semibold leading-display tracking-display text-accent">{t("title")}</h1>
       </header>
       <div>
         {/* An ordinary account has an email and a display name. A **Seat** on a

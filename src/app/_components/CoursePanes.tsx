@@ -154,7 +154,7 @@ function CourseSetupPane({ slug }: { slug: string }) {
         {view.kind === "failed" ? (
           <>
             <div className="flex flex-col items-center gap-2">
-              <h2 className="text-xl font-semibold tracking-tight text-accent">{t("setupFailedTitle")}</h2>
+              <h2 className="text-xl font-semibold leading-heading tracking-heading text-accent">{t("setupFailedTitle")}</h2>
               <p className="text-sm leading-relaxed text-soft">{t("setupFailedBody")}</p>
               {view.error && (
                 <p className="mt-1 max-w-sm break-words rounded-lg bg-hi/60 px-3 py-2 text-start text-xs text-soft">
@@ -167,7 +167,7 @@ function CourseSetupPane({ slug }: { slug: string }) {
         ) : view.kind === "queued" ? (
           <>
             <div className="flex flex-col items-center gap-2">
-              <h2 className="text-xl font-semibold tracking-tight text-accent">{t("setupQueuedTitle")}</h2>
+              <h2 className="text-xl font-semibold leading-heading tracking-heading text-accent">{t("setupQueuedTitle")}</h2>
               <p className="max-w-sm text-sm leading-relaxed text-soft">{t("setupQueuedBody")}</p>
             </div>
             <RestartButton onClick={restart} busy={restarting} label={t("setupStartNow")} />
@@ -175,7 +175,7 @@ function CourseSetupPane({ slug }: { slug: string }) {
         ) : (
           <>
             <div className="flex flex-col items-center gap-2">
-              <h2 className="text-xl font-semibold tracking-tight text-accent">{t("preparingFirstLessonTitle")}</h2>
+              <h2 className="text-xl font-semibold leading-heading tracking-heading text-accent">{t("preparingFirstLessonTitle")}</h2>
               <p className="max-w-sm text-sm leading-relaxed text-soft">{t("preparingFirstLessonBody")}</p>
             </div>
 
@@ -188,7 +188,7 @@ function CourseSetupPane({ slug }: { slug: string }) {
                   style={{ width: `${view.percent}%` }}
                 />
               </div>
-              <div className="mt-2 flex items-baseline justify-between text-[11.5px] text-soft">
+              <div className="mt-2 flex items-baseline justify-between text-[0.72rem] text-soft">
                 <span className="tabular-nums">{formatElapsed(view.elapsedMs)}</span>
                 <span>{view.kind === "slow" ? t("setupTakingLonger") : t("setupUsuallyTenMinutes")}</span>
               </div>
@@ -204,13 +204,13 @@ function CourseSetupPane({ slug }: { slug: string }) {
                 return (
                   <li
                     key={stage.key}
-                    className={`flex items-center gap-2.5 text-[13px] leading-snug transition-colors ${
+                    className={`flex items-center gap-2.5 text-[0.8125rem] leading-snug transition-colors ${
                       live ? "font-semibold text-ink" : done ? "text-soft" : "text-soft/55"
                     }`}
                   >
                     <span
                       aria-hidden
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[0.625rem] font-bold ${
                         done
                           ? "bg-accent2/20 text-accent2"
                           : live

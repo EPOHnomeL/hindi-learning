@@ -94,7 +94,7 @@ export function ManageShell({ slug }: { slug: string }) {
               type="button"
               aria-haspopup="dialog"
               onClick={() => setSheet("editions")}
-              className="flex min-w-0 max-w-[45%] shrink items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 py-1.5 text-[12.5px] font-medium text-ink transition-colors hover:bg-hi"
+              className="flex min-w-0 max-w-[45%] shrink items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 py-1.5 text-[0.78rem] font-medium text-ink transition-colors hover:bg-hi"
             >
               <span className="min-w-0 truncate">{active.name}</span>
               <EditionBadges edition={active} />
@@ -110,7 +110,7 @@ export function ManageShell({ slug }: { slug: string }) {
               role="tab"
               aria-selected={tab === key}
               onClick={() => setTab(key)}
-              className={`-mb-px inline-flex min-w-0 flex-auto items-center justify-center gap-1.5 border-b-2 px-1 py-2.5 text-[12.5px] font-semibold transition-colors sm:flex-none sm:px-4 ${
+              className={`-mb-px inline-flex min-w-0 flex-auto items-center justify-center gap-1.5 border-b-2 px-1 py-2.5 text-[0.78rem] font-semibold transition-colors sm:flex-none sm:px-4 ${
                 tab === key ? "border-accent text-accent" : "border-transparent text-soft hover:text-ink"
               }`}
             >
@@ -179,7 +179,7 @@ export function ManageShell({ slug }: { slug: string }) {
         <div
           role="status"
           onAnimationEnd={toastExit.onAnimationEnd}
-          className={`${toastExit.leaving ? "toast-out" : "toast-in"} fixed bottom-20 left-1/2 z-[70] -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-[12.5px] font-medium text-paper shadow-lg`}
+          className={`${toastExit.leaving ? "toast-out" : "toast-in"} fixed bottom-20 left-1/2 z-[70] -translate-x-1/2 whitespace-nowrap rounded-full bg-ink px-4 py-2 text-[0.78rem] font-medium text-paper shadow-lg`}
         >
           {toast}
         </div>
@@ -197,7 +197,7 @@ function SettingsTab({ topicSlug, lang }: { topicSlug: string; lang: string }) {
   const t = useTranslations("CourseSettings");
   const topics = useQuery(api.content.reader.listTopics);
   const topic = topics?.find((x) => x.slug === topicSlug) ?? null;
-  if (topics === undefined) return <p className="text-[12.5px] text-soft">{t("loading")}</p>;
+  if (topics === undefined) return <p className="text-[0.78rem] text-soft">{t("loading")}</p>;
   if (!topic) return null;
   return (
     <>

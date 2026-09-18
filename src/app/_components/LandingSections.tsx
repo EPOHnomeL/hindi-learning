@@ -65,7 +65,7 @@ export function CapabilityBand({ heading, body, tiles }: { heading: string; body
     <section className="border-y border-line bg-card/60">
       <div className="mx-auto w-full max-w-5xl px-6 py-20">
         <div className="land-reveal mx-auto max-w-2xl text-center">
-          <h2 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">{heading}</h2>
+          <h2 className="text-2xl font-semibold leading-display tracking-display text-ink sm:text-3xl">{heading}</h2>
           <p className="mt-3 leading-relaxed text-soft">{body}</p>
         </div>
         <div className="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-4">
@@ -76,7 +76,7 @@ export function CapabilityBand({ heading, body, tiles }: { heading: string; body
               // sweep rather than a block.
               className={`${["land-reveal", "land-reveal-mid", "land-reveal-late", "land-reveal-late"][i]} rounded-lg border border-line bg-card px-4 py-6 text-center`}
             >
-              <div className="text-2xl font-semibold tracking-tight text-accent sm:text-3xl">{tile.v}</div>
+              <div className="text-2xl font-semibold leading-display tracking-display text-accent sm:text-3xl">{tile.v}</div>
               <div className="mt-2 text-xs leading-snug text-soft">{tile.l}</div>
             </div>
           ))}
