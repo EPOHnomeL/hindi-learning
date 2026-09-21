@@ -1,6 +1,14 @@
 import { ConvexError, v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { action, internalMutation, internalQuery, mutation, type ActionCtx } from "../_generated/server";
+import {
+  action,
+  internalMutation,
+  internalQuery,
+  mutation,
+  query,
+  type ActionCtx,
+  type QueryCtx,
+} from "../_generated/server";
 import { internal } from "../_generated/api";
 import type { Id } from "../_generated/dataModel";
 import { getEditableTopic, getOwnedTopic, topicBySlug } from "../topicAccess";
@@ -216,6 +224,8 @@ const REFUSAL = {
   quizStructure:
     "This edit changes the lesson's quiz structure, so it can't be saved. Reword the text without adding or removing quiz options or answers.",
   unreadableReference: "The edited reference couldn't be read back. Please try saving again.",
+  courseHasHolders:
+    "This course can't be deleted while someone else still holds it. Clear what's listed below first: revoke the shares, un-list it for sale, or, if it has buyers, certificate holders or vouchers sold against it, it can't be deleted at all.",
 } as const;
 
 // The display title from an edit save (editing-obviousness unit 4). The editor
@@ -563,5 +573,167 @@ export const reopenCourse = mutation({
     const topic = await getOwnedTopic(ctx, userId, topicSlug);
     if (!topic) throw new Error("topic not found");
     await ctx.db.patch(topic._id, { status: "active" });
+  },
+});
+
+// ---- Delete a course (authoring/03, decided 2026-09-21) --------------------
+
+// What still holds this course, by the name of the thing the owner has to clear
+// first. Every count is an INDEXED read on the Topic, so this is cheap enough to
+// sit behind a live query and exact enough to be the real guard.
+//
+// The rule, chosen 2026-09-21 and mirroring `tenants.removeTenant`'s
+// refuse-to-remove pattern (ADR 0011): a delete that would take something away
+// from somebody other than the owner is refused outright rather than forced
+// through. It never revokes a purchase, never voids an earned Certificate, and
+// never silently drops a learner who was given the course. Nothing here is a
+// cascade; the cascade in `deleteTopic` runs only once every one of these is zero,
+// which is exactly why that cascade can be as blunt as it is.
+//
+// Deliberately NOT blockers: Public links and pending (unaccepted) e-mail
+// invitations. Neither names a person who holds the course today, and both are
+// already the owner's to revoke at will, so the delete revokes them for you.
+async function courseHolders(ctx: QueryCtx, topicId: Id<"topics">) {
+  const count = async (rows: Promise<unknown[]>) => (await rows).length;
+  return {
+    // Somebody bought an Edition of it.
+    buyers: await count(ctx.db.query("entitlements").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()),
+    // Somebody finished it and holds the Certificate.
+    certificates: await count(
+      ctx.db.query("certificates").withIndex("by_topic_user", (q) => q.eq("topicId", topicId)).collect(),
+    ),
+    // Somebody was given it as a Viewer or an Editor.
+    viewers: await count(ctx.db.query("shares").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()),
+    // Somebody joined it while it was free (grandfathered self-enroll rows).
+    learners: await count(ctx.db.query("enrollments").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()),
+    // It is on sale right now.
+    listings: await count(ctx.db.query("listings").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()),
+    // An organisation bought places on it (voucher batches / access codes), or a
+    // bank transfer for it exists. Money, in other words, which outlives a course.
+    vouchers: await count(
+      ctx.db.query("voucherBatches").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect(),
+    ),
+    accessCodes: await count(
+      ctx.db.query("accessCodes").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect(),
+    ),
+    eftIntents: await count(ctx.db.query("eftIntents").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()),
+  };
+}
+
+export type CourseHolders = Awaited<ReturnType<typeof courseHolders>>;
+
+// What the Course settings danger row reads to disable the button and say why.
+// Owner-only, like the delete it previews. `null` for a course the caller does not
+// own, which the UI reads as "no button".
+export const courseDeleteHolders = query({
+  args: { topicSlug: v.string() },
+  handler: async (ctx, { topicSlug }): Promise<CourseHolders | null> => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) return null;
+    return await courseHolders(ctx, topic._id);
+  },
+});
+
+// Delete a course outright: the Topic row, everything keyed to it, and every
+// content blob it owns. Owner-only and irreversible, which is why the guard above
+// runs first and refuses rather than cascading over anybody else's holdings.
+//
+// This is a HARD delete (decided 2026-09-21), not an archive. The need it answers
+// is cleanup at scale: test courses, abandoned generations and duplicates that
+// would otherwise accumulate forever. An archive flag would have left every one of
+// those rows and blobs in place, which is the opposite of the ask.
+//
+// One transaction on purpose. A Convex mutation is atomic, so a course too large
+// to delete in one go throws and deletes NOTHING, which is the only safe way for
+// this to fail: a half-deleted course would be worse than an undeleted one. A
+// course big enough to hit that ceiling (roughly thousands of rows, so a very long
+// course with many Editions) needs a paged action, and that can be built the day a
+// real course hits it rather than guessed at now.
+export const deleteTopic = mutation({
+  args: { topicSlug: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    // Owner, not Editor: an Editor may rewrite prose, never destroy the course.
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+
+    const holders = await courseHolders(ctx, topic._id);
+    if (Object.values(holders).some((n) => n > 0)) {
+      // A ConvexError's `data` is the only part of a refusal that survives a
+      // production deployment's redaction, so the reason reaches the owner.
+      throw new ConvexError(REFUSAL.courseHasHolders);
+    }
+
+    const topicId = topic._id;
+
+    // Bodies and audio live in File Storage; a deleted row whose blob survives is
+    // an orphan nobody can ever reach, so each blob goes with its row.
+    for (const l of await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect()) {
+      if (l.htmlStorageId) await ctx.storage.delete(l.htmlStorageId);
+      await ctx.db.delete(l._id);
+    }
+    for (const a of await ctx.db.query("lessonAudio").withIndex("by_lesson", (q) => q.eq("topicId", topicId)).collect()) {
+      await ctx.storage.delete(a.storageId);
+      if (a.sourceStorageId) await ctx.storage.delete(a.sourceStorageId);
+      await ctx.db.delete(a._id);
+    }
+    for (const r of await ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()) {
+      if (r.htmlStorageId) await ctx.storage.delete(r.htmlStorageId);
+      await ctx.db.delete(r._id);
+    }
+    for (const r of await ctx.db.query("resources").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()) {
+      if (r.rawStorageId) await ctx.storage.delete(r.rawStorageId);
+      await ctx.db.delete(r._id);
+    }
+    for (const t of await ctx.db.query("translations").withIndex("by_topic_lang", (q) => q.eq("topicId", topicId)).collect()) {
+      if (t.htmlStorageId) await ctx.storage.delete(t.htmlStorageId);
+      await ctx.db.delete(t._id);
+    }
+
+    // Row-only tables: the teaching record, the learner capture, the authoring
+    // bookkeeping, and the access artifacts the guard above ruled were nobody's
+    // but the owner's (a public URL, an invitation never accepted).
+    for (const row of await ctx.db.query("learningRecords").withIndex("by_topic_seq", (q) => q.eq("topicId", topicId)).collect()) {
+      await ctx.db.delete(row._id);
+    }
+    for (const row of await ctx.db.query("responses").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()) {
+      await ctx.db.delete(row._id);
+    }
+    for (const row of await ctx.db.query("progress").withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topicId)).collect()) {
+      await ctx.db.delete(row._id);
+    }
+    for (const row of await ctx.db.query("questions").withIndex("by_topic_user", (q) => q.eq("topicId", topicId)).collect()) {
+      await ctx.db.delete(row._id);
+    }
+    for (const row of await ctx.db.query("generation").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()) {
+      await ctx.db.delete(row._id);
+    }
+    // NOT `generationRuns`. The run log is the operator's record of what authoring
+    // was spent, and `routine.runHistory` already renders a run whose Topic is gone
+    // as "(deleted course)" rather than dropping it. Deleting a course must not
+    // erase the history of what it cost, any more than it erases the Ledger.
+    for (const row of await ctx.db.query("translationJobs").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()) {
+      await ctx.db.delete(row._id);
+    }
+    for (const row of await ctx.db.query("publishedEditions").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()) {
+      await ctx.db.delete(row._id);
+    }
+    for (const row of await ctx.db.query("publicLinks").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()) {
+      await ctx.db.delete(row._id);
+    }
+    for (const row of await ctx.db.query("pendingShares").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()) {
+      await ctx.db.delete(row._id);
+    }
+
+    // The Emblem image, if the owner set one. Safe to drop here and nowhere else:
+    // an earned Certificate freezes its own copy of the Emblem, and the guard
+    // above has already established there are no Certificates.
+    if (topic.emblem?.imageId) await ctx.storage.delete(topic.emblem.imageId);
+    await ctx.db.delete(topicId);
+    return null;
   },
 });

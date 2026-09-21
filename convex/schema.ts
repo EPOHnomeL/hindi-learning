@@ -820,7 +820,9 @@ export default defineSchema({
   })
     .index("by_ref", ["ref"])
     .index("by_status", ["status"])
-    .index("by_user_topic", ["userId", "topicId"]),
+    .index("by_user_topic", ["userId", "topicId"])
+    // Course delete reads this to refuse while an EFT for the course exists.
+    .index("by_topic", ["topicId"]),
 
   // ---- Vouchers (the seller-minted voucher rail, ADR 0029) -------------------
 
@@ -862,7 +864,9 @@ export default defineSchema({
     paymentRef: v.optional(v.string()),
   })
     .index("by_seller", ["sellerId"])
-    .index("by_payment_ref", ["paymentRef"]),
+    .index("by_payment_ref", ["paymentRef"])
+    // Course delete reads this to refuse while a batch was sold for the course.
+    .index("by_topic", ["topicId"]),
 
   // One **Voucher**: a single-use code belonging to a batch. `by_code` is the
   // redeem lookup (unique in practice - minting retries on collision), `by_batch`
@@ -941,7 +945,9 @@ export default defineSchema({
   })
     .index("by_code", ["code"])
     .index("by_seller", ["sellerId"])
-    .index("by_payment_ref", ["paymentRef"]),
+    .index("by_payment_ref", ["paymentRef"])
+    // Course delete reads this to refuse while an org holds places on the course.
+    .index("by_topic", ["topicId"]),
 
   // One **Seat**: a nickname-and-PIN identity on an Access Code (ADR 0031).
   //

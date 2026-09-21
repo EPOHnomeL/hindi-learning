@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "convex/react";
 import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { EmblemSection } from "./Certificate";
@@ -79,8 +80,11 @@ export function CourseSettingsBody({
           <div className="border-t border-line py-5">
             <EmblemSection topicSlug={topicSlug} />
           </div>
-          <div className="border-t border-line pt-5">
+          <div className="border-t border-line py-5">
             <CompletionSection topicSlug={topicSlug} status={status} />
+          </div>
+          <div className="border-t border-line pt-5">
+            <DeleteSection topicSlug={topicSlug} />
           </div>
         </>
       )}
@@ -427,6 +431,87 @@ function CompletionSection({ topicSlug, status }: { topicSlug: string; status: "
           }}
           onClose={() => {
             end.reset();
+            setConfirming(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Delete this course (authoring/03, decided 2026-09-21). The last thing in
+// Course settings, because it is the one control here that cannot be undone.
+//
+// Two states, both driven by the server's own guard (`courseDeleteHolders`, the
+// same counts `deleteTopic` re-derives before it deletes anything): the button is
+// live only for a course nobody else holds, and otherwise it is disabled with the
+// holders named, so "why can't I delete this" is answered on the page rather than
+// in an error. The server refusal is the real boundary; this only saves a trip.
+function DeleteSection({ topicSlug }: { topicSlug: string }) {
+  const t = useTranslations("CourseSettings");
+  const router = useRouter();
+  const holders = useQuery(api.content.authoring.courseDeleteHolders, { topicSlug });
+  const title = useQuery(api.content.reader.courseHeader, { topicSlug })?.title ?? "";
+  const del = useMutationRun(useMutation(api.content.authoring.deleteTopic), t("updateError"));
+  const [confirming, setConfirming] = useState(false);
+  // Type-to-confirm. Every other confirm in this file guards something reversible
+  // (a lesson can be re-authored, a completed course reopened); this one ends a
+  // course and its whole history, so it asks for the name rather than a click.
+  const [typed, setTyped] = useState("");
+
+  // The holders that are actually non-zero, as the label the owner must act on.
+  const blocking = Object.entries(holders ?? {}).filter(([, n]) => n > 0);
+
+  return (
+    <div>
+      <h4 className="text-[0.8125rem] font-bold text-ink">{t("deleteHeading")}</h4>
+      <p className="mt-1 text-[0.78rem] text-soft">{t("deleteBody")}</p>
+      <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-danger/30 bg-danger/5 px-4 py-3">
+        <span className="text-sm text-ink">{t("deleteRow")}</span>
+        <button
+          type="button"
+          disabled={holders === undefined || blocking.length > 0}
+          onClick={() => setConfirming(true)}
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-danger/40 px-3 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10 disabled:opacity-50"
+        >
+          <Icon name="trash" className="h-4 w-4" /> {t("deleteCourse")}
+        </button>
+      </div>
+      {blocking.length > 0 && (
+        <p className="mt-2 text-xs text-soft">
+          {t("deleteBlocked")}{" "}
+          {blocking.map(([k, n]) => t(`deleteHolder_${k}` as "deleteHolder_buyers", { count: n })).join(", ")}
+        </p>
+      )}
+      {del.error && <p className="mt-2 text-xs text-danger">{del.error}</p>}
+      {confirming && (
+        <ConfirmDialog
+          title={t("deleteConfirmCourseTitle")}
+          body={t("deleteConfirmCourseBody", { title })}
+          confirmLabel={del.busy ? t("deleting") : t("deleteCourse")}
+          confirmDisabled={del.busy || typed.trim() !== title.trim()}
+          extra={
+            <>
+              <label className="block text-xs text-soft">{t("deleteTypeToConfirm", { title })}</label>
+              <input
+                autoFocus
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-danger focus:outline-none"
+              />
+              {del.error && <p className="mt-2 text-xs text-danger">{del.error}</p>}
+            </>
+          }
+          onConfirm={() => {
+            void del.run({ topicSlug }).then((r) => {
+              // The course is gone, and so is every query this page is built on,
+              // so leave before the subscriptions resolve to nothing.
+              if (r !== undefined) router.replace("/");
+            });
+          }}
+          onClose={() => {
+            del.reset();
+            setTyped("");
             setConfirming(false);
           }}
         />
