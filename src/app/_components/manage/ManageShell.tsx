@@ -10,7 +10,7 @@ import { DashboardTab } from "./DashboardTab";
 import { UsersTab } from "./UsersTab";
 import { Icon, type IconName } from "../icons";
 import { useMutationRun } from "../mutationRun";
-import { IconButton, useExit } from "../ui";
+import { useExit } from "../ui";
 import { EditionBadges, EmptyPanel, Sheet, type Edition } from "./shared";
 import { AddLanguagePanel, SharingTab } from "./SharingTab";
 
@@ -80,8 +80,11 @@ export function ManageShell({ slug }: { slug: string }) {
   return (
     <div className="mx-auto min-h-dvh w-full max-w-[640px] px-4 pb-24">
       <header className="pt-4">
+        {/* No back chevron here (2026-09-21). This route renders inside
+            CourseShell, whose sidebar already carries "Courses" on desktop and
+            whose mobile header carries the back arrow, so the shell's own
+            chevron was a second back button a few pixels from the first. */}
         <div className="flex items-center gap-2">
-          <IconButton icon="chevron" label={t("backToCourses")} href="/" className="[&_svg]:rotate-90" variant="ghost" />
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold text-accent">{t("manageCourse")}</h1>
           {/* The edition button governs the Sharing and Course settings peers,
               both of which act on one edition (Settings joined them on
