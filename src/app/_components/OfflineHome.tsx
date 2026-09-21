@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useConvexConnectionState } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache";
 import { useTranslations } from "next-intl";
 import { useTenant, useTenantSlug } from "./TenantContext";
 import { catalogueCacheKey, DASHBOARD_CACHE_KEY, readCache, TENANT_NAME_CACHE_KEY } from "./offlineCache";

@@ -1,6 +1,7 @@
 "use client";
 
-import { Authenticated, useQuery } from "convex/react";
+import { Authenticated } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname } from "next/navigation";

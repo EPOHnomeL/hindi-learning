@@ -1,6 +1,7 @@
 "use client";
 
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useMutation } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache";
 import { refusalMessage, useMutationRun } from "./mutationRun";
 import { useTranslations } from "next-intl";
 import Link from "next/link";

@@ -1,6 +1,7 @@
 "use client";
 
-import { useConvex, useQuery } from "convex/react";
+import { useConvex } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useEffect, useState } from "react";

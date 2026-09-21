@@ -1,6 +1,7 @@
 "use client";
 
-import { useAction, useQuery } from "convex/react";
+import { useAction } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../../../convex/_generated/api";

@@ -1,7 +1,8 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { Authenticated, AuthLoading, Unauthenticated, useQuery } from "convex/react";
+import { Authenticated, AuthLoading, Unauthenticated } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache";
 import { refusalTag } from "./mutationRun";
 import { useTranslations } from "next-intl";
 import Link from "next/link";

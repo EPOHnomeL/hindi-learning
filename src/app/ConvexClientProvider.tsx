@@ -2,6 +2,7 @@
 
 import { ConvexAuthNextjsProvider } from "@convex-dev/auth/nextjs";
 import { ConvexReactClient, useQuery } from "convex/react";
+import { ConvexQueryCacheProvider } from "convex-helpers/react/cache";
 import posthog from "posthog-js";
 import { type ReactNode, useEffect } from "react";
 import { ThemeProvider } from "./_components/ThemeContext";
@@ -80,6 +81,15 @@ export function ConvexClientProvider({
 }) {
   return (
     <ConvexAuthNextjsProvider client={convex}>
+      {/* Keeps a query's subscription alive for five minutes after its last
+          component unmounts (2026-09-21). The plain Convex client drops it the
+          instant the last subscriber leaves, so returning to a lesson or the
+          dashboard re-asked the server and painted a skeleton over data the
+          client held a moment ago. Every `useQuery` in src/ imports from
+          convex-helpers/react/cache so it reads through this. The idle ceiling
+          bounds what a long session keeps live on a metered connection: a
+          course open holds about six queries, so 64 is roughly ten screens. */}
+      <ConvexQueryCacheProvider expiration={300_000} maxIdleEntries={64}>
       <CountryProvider country={country}>
         <TenantProvider slug={tenantSlug}>
           {/* Login-sync (ticket 03 §3): seeds the locale cookie from the account's
@@ -89,6 +99,7 @@ export function ConvexClientProvider({
           <ThemeProvider>{children}</ThemeProvider>
         </TenantProvider>
       </CountryProvider>
+      </ConvexQueryCacheProvider>
     </ConvexAuthNextjsProvider>
   );
 }

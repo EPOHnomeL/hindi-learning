@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache";
 import { useTranslations } from "next-intl";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { api } from "../../../convex/_generated/api";

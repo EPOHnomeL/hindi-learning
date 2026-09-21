@@ -1,6 +1,7 @@
 "use client";
 
-import { useConvexAuth, useMutation, useQuery } from "convex/react";
+import { useConvexAuth, useMutation } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef } from "react";
 import { api } from "../../convex/_generated/api";

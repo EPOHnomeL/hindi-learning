@@ -1,7 +1,8 @@
 "use client";
 
 import { useAuthActions } from "@convex-dev/auth/react";
-import { useQuery } from "convex/react";
+import { useMutation } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -80,6 +81,9 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   // Progress is language-agnostic, so `myProgress` never takes `lang`.
   const t = useTranslations("Reader");
   const tc = useTranslations("Common");
+  // "Manage course" is the manage shell's own heading; the sidebar link into it
+  // reuses that string rather than minting a second name for one destination.
+  const te = useTranslations("Editions");
   const lang = useEditionLang();
   const header = useQuery(api.content.reader.courseHeader, { topicSlug: slug, lang: lang ?? undefined });
   const canWrite = header?.role === "owner";
@@ -148,6 +152,7 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
 
   // Which nav item is active, read from the URL.
   const isRef = pathname.includes("/references/");
+  const isManage = pathname.endsWith("/manage");
   const activeKey = decodeURIComponent(pathname.split("/").pop() ?? "");
 
   // The payment-return landing (ywampotch-launch 17): `checkoutStatus` is reactive
@@ -345,6 +350,24 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             ))}
 
             <ResourcesSection topicSlug={slug} canWrite={canWrite} />
+
+            {/* The owner's door to /courses/<slug>/manage, at the foot of the
+                nav (2026-09-21). That route already renders inside this very
+                sidebar, but the only way into it was the course card's kebab
+                back on Home, so an owner reading a lesson had to leave the
+                course to change anything about it. Owner-only, and it carries
+                no ?lang: the manage shell picks its own edition. */}
+            {canWrite && (
+              <Link
+                href={`/courses/${slug}/manage`}
+                className={`mt-4 flex items-center gap-2 rounded-lg border border-line px-2.5 py-2.5 text-sm transition-colors md:py-1.5 ${
+                  isManage ? "border-accent bg-accent text-white" : "text-soft hover:bg-hi hover:text-accent"
+                }`}
+              >
+                <Icon name="sliders" className="h-4 w-4 shrink-0" />
+                {te("manageCourse")}
+              </Link>
+            )}
           </nav>
 
           {/* On a phone the drawer is the lesson list, the reading language and
@@ -421,6 +444,7 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
   const t = useTranslations("Reader");
   const ta = useTranslations("Artifact");
   const resources = useQuery(api.resources.listResources, { topicSlug });
+  const renameResource = useMutation(api.resources.renameResource);
   const { uploadFile, addLink } = useResourceUpload();
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -468,7 +492,12 @@ function ResourcesSection({ topicSlug, canWrite }: { topicSlug: string; canWrite
       <div className="flex flex-col gap-1">
         {resources?.length === 0 && <p className="px-2 text-sm text-soft">{t("noResources")}</p>}
         {resources?.map((r) => (
-          <ResourceItem key={r.id} resource={r} />
+          <ResourceItem
+            key={r.id}
+            resource={r}
+            // Owner-only: a Viewer reads the list, and the pencil is absent for them.
+            onRename={canWrite ? (filename) => run(async () => void (await renameResource({ topicSlug, resourceId: r.id, filename }))) : undefined}
+          />
         ))}
 
         {/* Add controls are owner-only; a Viewer sees the list but can't add. */}

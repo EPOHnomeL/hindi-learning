@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "convex/react";
+import { useQuery } from "convex-helpers/react/cache";
 import { type FunctionReturnType } from "convex/server";
 import { useTranslations } from "next-intl";
 import Link from "next/link";

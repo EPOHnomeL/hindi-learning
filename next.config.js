@@ -14,6 +14,15 @@ const config = {
   // Pin the workspace root — there is another pnpm-lock.yaml in the home dir,
   // and Next otherwise infers the wrong root for output file tracing.
   outputFileTracingRoot: import.meta.dirname,
+  experimental: {
+    // Reuse a visited page's RSC payload for five minutes (2026-09-21). Every
+    // route here is dynamic (the root layout reads headers() for the tenant), and
+    // Next 15 caches dynamic pages in the client router for zero seconds by
+    // default, so going back to a lesson read a minute ago re-ran the server
+    // round trip and flashed loading.tsx over it. The payloads carry no data (the
+    // pages render client components that read Convex), so staleness is harmless.
+    staleTimes: { dynamic: 300 },
+  },
 };
 
 // Generate browser source maps at build and upload them to PostHog, so client
