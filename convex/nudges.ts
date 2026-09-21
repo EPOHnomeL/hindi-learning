@@ -6,76 +6,105 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { getOwnedTopic } from "./topicAccess";
 import { scheduleInvite } from "./shares";
 import { shareRole } from "./shareGrants";
+import { preferEdition } from "./editionPreference";
 import { SOURCE_LANG } from "./sourceLang";
 
 // The two Sharing-tab nudges (2026-09-21). Both are the same shape: the owner
-// picks one Edition, we work out who is sitting on something they never used, and
+// presses a button, we work out who is sitting on something they never used, and
 // we re-send them the one email that unblocks them.
 //
-//   1. Buyers who never started. An Entitlement on this Edition and not a single
-//      Progress row on the Topic. They paid and never opened it.
-//   2. Invited translators who never signed up. A pending invite on this Edition
-//      with the Editor role, so there is no account to hold the Share yet.
+//   1. Buyers who never started. An Entitlement on the course and not a single
+//      Progress row. They hold a seat and never opened it.
+//   2. Invited translators who never signed up. A pending invite carrying the
+//      Editor role, so there is no account yet to hold the Share.
 //
-// Both reuse the invite rail (convex/shares.ts scheduleInvite, convex/email.ts),
-// which means the same Resend sender, the same tenant branding, and the same
-// best-effort property: a bounced nudge never fails the mutation. Both link
-// straight at the Edition, `/courses/<slug>?lang=<lang>`, which is a real URL for
-// a signed-out translator too: AppGate renders sign-in in place at that URL, so
-// creating the account lands them on the language they were asked to edit.
+// **Both audiences are the whole course, every language, not the Edition the
+// Sharing tab happens to be showing.** Scoping them per Edition is what the first
+// cut did and it was wrong in the obvious way: the operator sits on the English
+// source tab, where nobody is invited to translate and the buyers are spread
+// across af/bn/de/es, and both rows read zero while the Dashboard right next to
+// them lists the people by name. The link is what carries the language instead:
+// each recipient is mailed at their OWN Edition.
+//
+// Both ride the existing invite rail (convex/shares.ts scheduleInvite,
+// convex/email.ts): same Resend sender, same tenant branding, same best-effort
+// property, a bounced nudge never fails the mutation. The link is always
+// `/courses/<slug>?lang=<their lang>`, which is a real URL for a signed-out
+// translator too: AppGate renders sign-in in place at that URL, so creating the
+// account lands them on the language they were asked to edit.
 //
 // Neither is scheduled or automatic. They fire only when the owner presses the
-// button and confirms, so re-sending is the operator's judgement call and there is
-// no unsubscribe rail to build for a cron that does not exist.
+// button and confirms, so re-sending is the operator's judgement call and there
+// is no unsubscribe rail to build for a cron that does not exist.
 
-// Has this account opened anything at all in this Topic? One indexed read: the
-// Frontier, the Certificate and the dashboard all derive from `progress`, so a
-// single row of any status is the whole definition of "started".
-async function hasStarted(ctx: QueryCtx, topicId: Id<"topics">, userId: Id<"users">): Promise<boolean> {
-  const row = await ctx.db
+// One nudge: who to mail, and which Edition to land them in.
+type Recipient = { email: string; lang: string };
+
+// Every account that has opened ANY lesson of this Topic. One range read at
+// `topicId`, which is how the Dashboard's rollup reads progress too: cheaper than
+// a per-buyer lookup once a course has more than a handful of seats, and it makes
+// "started" mean exactly what the Dashboard means by it.
+async function startedAccounts(ctx: QueryCtx, topicId: Id<"topics">): Promise<Set<Id<"users">>> {
+  const rows = await ctx.db
     .query("progress")
-    .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topicId).eq("userId", userId))
-    .first();
-  return row !== null;
+    .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topicId))
+    .collect();
+  return new Set(rows.map((r) => r.userId));
 }
 
-// The buyers of one Edition who have never opened the Topic, by email. An
-// Entitlement is the paid right to read a (Topic, language) pair, so scoping to
-// `lang` is what keeps a Spanish buyer out of the Urdu edition's reminder. A row
-// whose account has no email (or was deleted) is dropped rather than guessed at.
-async function unstartedBuyers(ctx: QueryCtx, topicId: Id<"topics">, lang: string): Promise<string[]> {
-  const held = (
-    await ctx.db
-      .query("entitlements")
-      .withIndex("by_topic", (q) => q.eq("topicId", topicId))
-      .collect()
-  ).filter((e) => e.lang === lang);
-  const emails: string[] = [];
+// The seat-holders of this course who have never opened it, whatever language
+// they hold. `entitlements` is the one table a seat is written to, whichever rail
+// sold it (PayFast, EFT, voucher, org Seat, Admin grant), so it is the whole
+// "bought it" audience; `enrollments` is legacy and read-only, nothing writes it.
+// A buyer holding several Editions is mailed ONCE, at the Edition `preferEdition`
+// picks, so two languages is not two emails. The owner is skipped, and so is a
+// row whose account is gone or has no email.
+async function unstartedBuyers(ctx: QueryCtx, topic: Doc<"topics">): Promise<Recipient[]> {
+  const held = await ctx.db
+    .query("entitlements")
+    .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
+    .collect();
+  const started = await startedAccounts(ctx, topic._id);
+
+  const langsByUser = new Map<Id<"users">, string[]>();
   for (const e of held) {
-    if (await hasStarted(ctx, topicId, e.userId)) continue;
-    const user = await ctx.db.get(e.userId);
-    if (user?.email) emails.push(user.email);
+    if (e.userId === topic.ownerId || started.has(e.userId)) continue;
+    langsByUser.set(e.userId, [...(langsByUser.get(e.userId) ?? []), e.lang]);
   }
-  // One address may hold the Edition twice in principle (an Admin grant on top of
-  // a purchase); dedup so nobody gets the same nudge twice from one press.
-  return [...new Set(emails)];
+
+  const out: Recipient[] = [];
+  for (const [userId, langs] of langsByUser) {
+    const user = await ctx.db.get(userId);
+    const lang = preferEdition(langs);
+    if (user?.email && lang) out.push({ email: user.email, lang });
+  }
+  return out;
 }
 
-// The invited translators of one Edition with no account yet: pending invites on
-// this `lang` carrying the Editor role. An accepted Share is excluded by
-// construction, it lives in `shares`, not `pendingShares`, so this email is only
-// ever "you still need an account". Lang is matched in memory because legacy rows
-// carry no `lang` and read as English, which an index eq cannot express.
-async function pendingTranslators(ctx: QueryCtx, topicId: Id<"topics">, lang: string): Promise<string[]> {
+// The invited translators of this course with no account yet: every pending
+// invite carrying the Editor role, in every language. An accepted Share is
+// excluded by construction, it lives in `shares`, not `pendingShares`, so this
+// email is only ever "you still need an account".
+//
+// One email per (address, language), not per address: someone invited to
+// translate two Editions is waiting on two different things and each email links
+// to its own. Legacy rows carry no `lang` and read as the source Edition.
+async function pendingTranslators(ctx: QueryCtx, topicId: Id<"topics">): Promise<Recipient[]> {
   const pending = await ctx.db
     .query("pendingShares")
     .withIndex("by_topic", (q) => q.eq("topicId", topicId))
     .collect();
-  return [
-    ...new Set(
-      pending.filter((p) => (p.lang ?? SOURCE_LANG) === lang && shareRole(p) === "editor").map((p) => p.email),
-    ),
-  ];
+  const seen = new Set<string>();
+  const out: Recipient[] = [];
+  for (const p of pending) {
+    if (shareRole(p) !== "editor") continue;
+    const lang = p.lang ?? SOURCE_LANG;
+    const key = `${p.email}|${lang}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ email: p.email, lang });
+  }
+  return out;
 }
 
 // Owner-only: resolve the Topic the nudge is about, or throw.
@@ -89,60 +118,67 @@ async function ownedTopic(ctx: QueryCtx, topicSlug: string): Promise<{ topic: Do
 }
 
 // How many people each nudge would reach, for the button subtitles and the
-// confirmation. Owner-only, and it counts rather than lists: the Sharing tab only
-// ever needs the number, and a count keeps the audience out of a client payload.
+// confirmations. Owner-only, and it counts rather than lists: the Sharing tab
+// only ever needs the number, and a count keeps the audience out of a client
+// payload. Course-wide, so it does not take a language.
 export const nudgeAudience = query({
-  args: { topicSlug: v.string(), lang: v.string() },
+  args: { topicSlug: v.string() },
   returns: v.object({ buyers: v.number(), translators: v.number() }),
-  handler: async (ctx, { topicSlug, lang }) => {
+  handler: async (ctx, { topicSlug }) => {
     const { topic } = await ownedTopic(ctx, topicSlug);
     return {
-      buyers: (await unstartedBuyers(ctx, topic._id, lang)).length,
-      translators: (await pendingTranslators(ctx, topic._id, lang)).length,
+      buyers: (await unstartedBuyers(ctx, topic)).length,
+      translators: (await pendingTranslators(ctx, topic._id)).length,
     };
   },
 });
 
-// Schedule one nudge email per address, after the mutation commits. Returns how
-// many were scheduled, which is what the tab reports back.
+// Schedule one nudge email per recipient, after the mutation commits, each at its
+// own Edition. Returns how many were scheduled, which is what the tab reports.
 async function sendAll(
   ctx: MutationCtx,
-  emails: string[],
-  opts: { kind: "reminder" | "translator"; topic: Doc<"topics">; lang: string; inviterEmail: string },
+  recipients: Recipient[],
+  opts: { kind: "reminder" | "translator"; topic: Doc<"topics">; inviterEmail: string },
 ): Promise<number> {
-  for (const to of emails) {
+  for (const { email, lang } of recipients) {
     await scheduleInvite(ctx, {
-      to,
+      to: email,
       kind: opts.kind,
       topic: opts.topic,
-      editionLang: opts.lang,
+      editionLang: lang,
       inviterEmail: opts.inviterEmail,
       // A buyer holds a read seat; a pending translator was invited to edit.
       role: opts.kind === "reminder" ? "viewer" : "editor",
     });
   }
-  return emails.length;
+  return recipients.length;
 }
 
-// Remind every buyer of this Edition who has never opened it. Owner-only.
+// Remind every buyer of this course who has never opened it. Owner-only.
 export const remindUnstartedBuyers = mutation({
-  args: { topicSlug: v.string(), lang: v.string() },
+  args: { topicSlug: v.string() },
   returns: v.number(),
-  handler: async (ctx, { topicSlug, lang }) => {
+  handler: async (ctx, { topicSlug }) => {
     const { topic, ownerEmail } = await ownedTopic(ctx, topicSlug);
-    const emails = await unstartedBuyers(ctx, topic._id, lang);
-    return await sendAll(ctx, emails, { kind: "reminder", topic, lang, inviterEmail: ownerEmail });
+    return await sendAll(ctx, await unstartedBuyers(ctx, topic), {
+      kind: "reminder",
+      topic,
+      inviterEmail: ownerEmail,
+    });
   },
 });
 
-// Nudge every invited translator of this Edition who has not created an account.
+// Nudge every invited translator of this course who has not created an account.
 // Owner-only.
 export const remindPendingTranslators = mutation({
-  args: { topicSlug: v.string(), lang: v.string() },
+  args: { topicSlug: v.string() },
   returns: v.number(),
-  handler: async (ctx, { topicSlug, lang }) => {
+  handler: async (ctx, { topicSlug }) => {
     const { topic, ownerEmail } = await ownedTopic(ctx, topicSlug);
-    const emails = await pendingTranslators(ctx, topic._id, lang);
-    return await sendAll(ctx, emails, { kind: "translator", topic, lang, inviterEmail: ownerEmail });
+    return await sendAll(ctx, await pendingTranslators(ctx, topic._id), {
+      kind: "translator",
+      topic,
+      inviterEmail: ownerEmail,
+    });
   },
 });

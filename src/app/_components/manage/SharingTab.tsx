@@ -134,7 +134,7 @@ export function SharingTab({
 
   const pricing = useQuery(api.market.editionPricing, { topicSlug });
   // Who the two nudges would reach on THIS Edition. Counts only, owner-only.
-  const audience = useQuery(api.nudges.nudgeAudience, { topicSlug, lang: edition.lang });
+  const audience = useQuery(api.nudges.nudgeAudience, { topicSlug });
   const remindBuyers = useMutationRun(
     useMutation(api.nudges.remindUnstartedBuyers),
     "Couldn't send the reminders",
@@ -444,9 +444,13 @@ export function SharingTab({
       />
 
       {/* Nudges: the two manual re-sends. Both are owner-pressed and confirmed,
-          never scheduled, so nobody is mailed without the owner deciding to. The
-          counts come from the server; a row with nobody to reach stays inert
-          rather than disappearing, so the owner can see the audience is empty. */}
+          never scheduled, so nobody is mailed without the owner deciding to.
+          Their audience is the WHOLE COURSE, every language, not the Edition
+          this tab is showing: the operator sits on the English source, where
+          nobody is invited to translate, so a per-Edition count read zero while
+          the Dashboard listed the people by name. Each recipient is mailed at
+          their own Edition instead. A row with nobody to reach stays inert
+          rather than disappearing, so an empty audience is visible. */}
       <h3 className="px-1 pt-6 pb-1 text-[13px] font-normal text-soft">Reminders</h3>
 
       <WhatsAppRow
@@ -454,10 +458,10 @@ export function SharingTab({
         title="Remind buyers who never started"
         subtitle={
           audience === undefined
-            ? "Counting who bought this edition without opening it"
+            ? "Counting who holds a seat and never opened the course"
             : audience.buyers === 0
-              ? "Nobody is sitting on an unopened copy of this edition"
-              : `Email ${audience.buyers} ${audience.buyers === 1 ? "buyer" : "buyers"} who bought this edition but never opened it`
+              ? "Every buyer of this course has opened it"
+              : `Email ${audience.buyers} ${audience.buyers === 1 ? "buyer" : "buyers"} across all languages who never opened the course`
         }
         onClick={audience && audience.buyers > 0 ? () => setConfirmNudge("buyers") : undefined}
         right={audience && audience.buyers > 0 ? <Icon name="chevron" className="h-4 w-4 text-soft" /> : null}
@@ -470,8 +474,8 @@ export function SharingTab({
           audience === undefined
             ? "Counting invited translators without an account"
             : audience.translators === 0
-              ? "No invited translator of this edition is still without an account"
-              : `Email ${audience.translators} invited ${audience.translators === 1 ? "translator" : "translators"} to create an account and edit this edition`
+              ? "Every invited translator has an account"
+              : `Email ${audience.translators} invited ${audience.translators === 1 ? "translator" : "translators"} to create an account, each linked to their own language`
         }
         onClick={audience && audience.translators > 0 ? () => setConfirmNudge("translators") : undefined}
         right={audience && audience.translators > 0 ? <Icon name="chevron" className="h-4 w-4 text-soft" /> : null}
@@ -629,12 +633,12 @@ export function SharingTab({
       {confirmNudge === "buyers" && (
         <ConfirmDialog
           title="Send the reminder?"
-          body={`${audience?.buyers ?? 0} ${audience?.buyers === 1 ? "person who bought" : "people who bought"} the ${edition.name} edition and never opened it will get one email, with a link straight into the course.`}
+          body={`${audience?.buyers ?? 0} ${audience?.buyers === 1 ? "person who holds" : "people who hold"} a seat on this course, in any language, and never opened it will get one email each, linking straight into the edition they hold.`}
           extra={remindBuyers.error ? <p className="text-xs text-danger">{remindBuyers.error}</p> : undefined}
           confirmLabel={remindBuyers.busy ? "Sending…" : "Send reminder"}
           confirmDisabled={remindBuyers.busy}
           onConfirm={() => {
-            void remindBuyers.run({ topicSlug, lang: edition.lang }).then((sent) => {
+            void remindBuyers.run({ topicSlug }).then((sent) => {
               if (sent === undefined) return;
               setConfirmNudge(null);
               notify(sent === 1 ? "Reminder sent to 1 buyer" : `Reminder sent to ${sent} buyers`);
@@ -647,12 +651,12 @@ export function SharingTab({
       {confirmNudge === "translators" && (
         <ConfirmDialog
           title="Nudge the translators?"
-          body={`${audience?.translators ?? 0} invited ${audience?.translators === 1 ? "translator has" : "translators have"} no account on the ${edition.name} edition yet. Each gets one email asking them to create one, linked straight to the ${edition.name} edition they were invited to edit.`}
+          body={`${audience?.translators ?? 0} invited ${audience?.translators === 1 ? "translator has" : "translators have"} no account yet, across every language of this course. Each gets one email asking them to create one, linked straight to the edition they were invited to edit.`}
           extra={remindTranslators.error ? <p className="text-xs text-danger">{remindTranslators.error}</p> : undefined}
           confirmLabel={remindTranslators.busy ? "Sending…" : "Send nudge"}
           confirmDisabled={remindTranslators.busy}
           onConfirm={() => {
-            void remindTranslators.run({ topicSlug, lang: edition.lang }).then((sent) => {
+            void remindTranslators.run({ topicSlug }).then((sent) => {
               if (sent === undefined) return;
               setConfirmNudge(null);
               notify(sent === 1 ? "Nudge sent to 1 translator" : `Nudge sent to ${sent} translators`);
