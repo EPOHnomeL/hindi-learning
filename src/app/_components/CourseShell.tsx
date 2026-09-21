@@ -1,20 +1,16 @@
 "use client";
 
-import { useAuthActions } from "@convex-dev/auth/react";
 import { useMutation } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import posthog from "posthog-js";
+import { usePathname, useSearchParams } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { isPostHogInitialized } from "../PostHogClient";
 import { Brand } from "./Brand";
 import { CompletionCelebration } from "./Certificate";
 import { Icon } from "./icons";
 import { NavItem } from "./NavItem";
-import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { ReadingLanguage } from "./ReadingLanguage";
 import { useEditionLang, withLang } from "./editionUrl";
 import { ResourceItem } from "./ResourceItem";
@@ -80,7 +76,6 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   // into every content query so the sidebar + nav follow the chosen language.
   // Progress is language-agnostic, so `myProgress` never takes `lang`.
   const t = useTranslations("Reader");
-  const tc = useTranslations("Common");
   // "Manage course" is the manage shell's own heading; the sidebar link into it
   // reuses that string rather than minting a second name for one destination.
   const te = useTranslations("Editions");
@@ -89,8 +84,6 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
   const canWrite = header?.role === "owner";
   const canEdit = header?.canEdit ?? false;
   const courseCompleted = header?.status === "completed";
-  const { signOut } = useAuthActions();
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   // The card buyer's return marker: PayFast sends them back with
@@ -288,8 +281,9 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             <Brand className="h-8 w-auto max-w-40 object-contain" />
           </Link>
 
-          {/* Desktop only, same reasoning: on a phone, Home is a tab and Sign out
-              lives on /settings, one tab away. */}
+          {/* Desktop only: on a phone, Home is a tab. Sign out left this row on
+              2026-09-21. /settings carries it, one tab away, and in the reader
+              sidebar it sat beside "Courses" as if the two were peers. */}
           <div className="mb-2 hidden items-center justify-between gap-2 md:flex">
             <Link
               href="/"
@@ -298,16 +292,6 @@ export function CourseShell({ slug, children }: { slug: string; children: React.
             >
               <span aria-hidden className="inline-block rtl:-scale-x-100">←</span> {t("backToCourses")}
             </Link>
-            <button
-              onClick={() => {
-                if (isPostHogInitialized()) posthog.reset();
-                clearAccountLocalStateOnSignOut();
-                void signOut().then(() => router.replace("/"));
-              }}
-              className="shrink-0 text-xs text-soft hover:text-accent ms-auto md:ms-0"
-            >
-              {tc("signOut")}
-            </button>
           </div>
           {/* The served Edition's title. Fixing it (and the mission) lives in
               Course settings → Details, which follows the Edition being viewed
