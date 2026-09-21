@@ -43,9 +43,11 @@ Do these steps IN ORDER:
 3. READ two files, and ONLY these, to know how to work:
      - `.agents/skills/teach/SKILL.md`     — the teaching judgement (ZPD,
        fluency vs. storage strength, mission-grounding). Follow it to the letter.
-     - `.agents/skills/teach/AUTHORING.md` — the mechanical contract (lesson file
+     - `lessons/AUTHORING.md`              — the mechanical contract (lesson file
        shape, exact quiz markup, components, cross-link routes, citations,
-       immutability, publish).
+       immutability, publish). It sits beside the template and partials it
+       describes, NOT under `.agents/skills/teach/` (moved 2026-09-08, ticket
+       technical-foundation/36: the skills CLI owns that directory and deleted it).
    AUTHORING.md is authoritative for mechanics: you do NOT need to open the
    `*-FORMAT.md` files (except when actually writing a glossary/record), the
    `lessons/_partials/`, `publish.ts`, or a prior lesson to rediscover
@@ -81,7 +83,7 @@ Do these steps IN ORDER:
    - A lesson opened-but-incomplete or with wrong answers means the learner is
      likely stuck — reinforce/correct rather than racing ahead.
    - TERMINATE vs. pause: judge the course against the mission's "Success looks
-     like" outcomes (see SKILL.md "Terminating a Course"). If they are
+     like" outcomes (the judgement recorded in ADR 0015). If they are
      substantially met or the ZPD is exhausted, END the course instead of
      authoring: run `pnpm run complete:prod "$SLUG"`, then skip to step 8 and
      report `nothing`. This is the terminal `completed` state (gate stops, reader
@@ -105,7 +107,7 @@ Do these steps IN ORDER:
                  still to come). It is a SOFT forecast shown to the owner on their
                  dashboard as "~N lessons", NOT a quota — revise it freely and NEVER
                  author lessons just to reach it (termination stays the step-6
-                 mission judgement; see SKILL.md "The Lesson-Count Estimate").
+                 mission judgement; see ADR 0018, which binds this rule).
    - nothing   — there was nothing to add (or no topic was claimed; if "$SLUG"
                  is empty because step 1 printed "none", just end the run). You may
                  still pass `--estimate <n>` to refresh the forecast.
