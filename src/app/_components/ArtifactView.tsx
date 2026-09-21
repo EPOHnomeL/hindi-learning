@@ -629,12 +629,13 @@ function LessonView({
   // only a translated Edition arrives with no `?lang` at all), the same way the
   // in-place editor below picks the Edition it patches.
   const canRegenerate = !readOnly && !preview && editionToEdit(header?.lang, lang) === "en";
-  // The title row is desktop chrome. On a phone it renders only when one of the
-  // owner's authoring controls is in it ("Generate next lesson", "Regenerate"),
-  // which are the actions with no other home; everything else in that row is
-  // desktop-only or duplicated by the end-of-lesson card. Keep this in step with
-  // the row's contents below.
-  const hasTitleActions = (!readOnly && !courseCompleted && isFrontier && completed) || canRegenerate;
+  // The title row is desktop chrome. On a phone it renders only when the owner's
+  // one remaining authoring control is in it ("Generate next lesson"), which has
+  // no other home; everything else in that row is desktop-only or duplicated by
+  // the end-of-lesson card. "Regenerate" left this row on 2026-09-21 to sit
+  // beside Edit over the lesson, so it no longer keeps the row alive. Keep this
+  // in step with the row's contents below.
+  const hasTitleActions = !readOnly && !courseCompleted && isFrontier && completed;
 
   // **Warm the next lesson** (perceived-performance ticket 05). Forward is how
   // the reader is actually used: finish this one, go to the next. Holding a
@@ -751,11 +752,6 @@ function LessonView({
             {!readOnly && !courseCompleted && isFrontier && completed && (
               <NextLessonButton topicSlug={topicSlug} frontierKey={lessonKey} />
             )}
-            {/* Regeneration is not authoring-forward: it replaces a lesson that
-                already exists, so unlike "Generate next lesson" it stays offered
-                on every lesson and on a completed course (ADR 0015 stops a
-                finished course growing, and the lesson count is unchanged here). */}
-            {canRegenerate && <RegenerateLessonButton topicSlug={topicSlug} lessonKey={lessonKey} />}
             {/* No certificate pill here: Home carries the certificate on every
                 card kind (mobile-reader-todos 01), and on a phone this row is
                 gone entirely. */}
@@ -811,17 +807,27 @@ function LessonView({
             // recorded against the owner. The absence is the switch.
             onResponse={readOnly ? undefined : onResponse}
           />
-          {canEdit && (
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              aria-label={t("editLesson")}
-              title={t("editLesson")}
-              className="absolute end-3 top-3 z-10 flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent/90"
-            >
-              <Icon name="edit" className="h-4 w-4" /> {t("edit")}
-            </button>
-          )}
+          {/* Both lesson-level authoring controls ride the same corner of the
+              frame (2026-09-21). Regeneration is not authoring-forward: it
+              replaces a lesson that already exists, so unlike "Generate next
+              lesson" it stays offered on every lesson and on a completed course
+              (ADR 0015 stops a finished course growing, and the lesson count is
+              unchanged here). That is why it belongs beside Edit rather than in
+              the frontier row above. */}
+          <div className="absolute end-3 top-3 z-10 flex items-center gap-2">
+            {canRegenerate && <RegenerateLessonButton topicSlug={topicSlug} lessonKey={lessonKey} />}
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                aria-label={t("editLesson")}
+                title={t("editLesson")}
+                className="flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-accent/90"
+              >
+                <Icon name="edit" className="h-4 w-4" /> {t("edit")}
+              </button>
+            )}
+          </div>
         </div>
         {canEdit && editing && (
           <ContentEditor
@@ -1549,7 +1555,15 @@ function RegenerateLessonButton({ topicSlug, lessonKey }: { topicSlug: string; l
     }
   }
 
-  if (mine) return <span className="animate-pulse text-sm text-soft">{t("regenerating")}</span>;
+  // Opaque, like the Edit button beside it: both now sit over the lesson body
+  // rather than in a bare row, so a transparent control would read through onto
+  // the content underneath.
+  if (mine)
+    return (
+      <span className="animate-pulse rounded-lg border border-line bg-card px-2.5 py-1.5 text-sm text-soft shadow-sm">
+        {t("regenerating")}
+      </span>
+    );
   return (
     <>
       <button
@@ -1557,7 +1571,7 @@ function RegenerateLessonButton({ topicSlug, lessonKey }: { topicSlug: string; l
         onClick={() => setOpen(true)}
         disabled={running}
         title={t("regenerateLesson")}
-        className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-sm text-soft transition-colors hover:border-gold/60 hover:text-accent disabled:opacity-50"
+        className="flex items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 py-1.5 text-sm text-soft shadow-sm transition-colors hover:border-gold/60 hover:text-accent disabled:opacity-50"
       >
         <Icon name="refresh" className="h-4 w-4" /> {t("regenerate")}
       </button>
