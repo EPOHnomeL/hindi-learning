@@ -287,9 +287,18 @@ describe("resumeLessonKey", () => {
     expect(resumeLessonKey(lessons, progress)).toBe("0003-gamma");
   });
 
-  it("lands on the final lesson itself when it's the last completed (no successor)", () => {
+  it("starts over at lesson 1 once the final lesson is completed (course finished)", () => {
+    const progress = [
+      { lessonKey: "0001-alpha", status: "completed" as const },
+      { lessonKey: "0002-beta", status: "completed" as const },
+      { lessonKey: "0003-gamma", status: "completed" as const },
+    ];
+    expect(resumeLessonKey(lessons, progress)).toBe("0001-alpha");
+  });
+
+  it("starts over at lesson 1 when the final lesson is done even with gaps behind it", () => {
     const progress = [{ lessonKey: "0003-gamma", status: "completed" as const }];
-    expect(resumeLessonKey(lessons, progress)).toBe("0003-gamma");
+    expect(resumeLessonKey(lessons, progress)).toBe("0001-alpha");
   });
 
   it("falls back to lesson 1 when nothing is completed yet", () => {

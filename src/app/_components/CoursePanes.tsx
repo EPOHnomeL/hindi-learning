@@ -16,7 +16,8 @@ import { SETUP_STAGES, formatElapsed, setupView } from "./setupProgress";
 // The course index (`/courses/[slug]`): redirect to a Lesson so the URL always
 // names what's shown (ADR 0012). Everyone — owner or Viewer — resumes at the
 // lesson after their last completed one (open-to-last-completed), falling back
-// to lesson 1 when nothing is completed yet. `replace`, not `push`, so "back"
+// to lesson 1 when nothing is completed yet, and back to lesson 1 once the
+// course is finished. `replace`, not `push`, so "back"
 // from the lesson goes to the dashboard rather than bouncing through here again.
 export function CourseIndex({ slug }: { slug: string }) {
   const lang = useEditionLang();

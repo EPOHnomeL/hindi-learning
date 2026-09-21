@@ -48,9 +48,13 @@ export function nextLessonKey(lessons: readonly LessonLite[], currentKey: string
 // the learner's last completed one — resume where they left off — for everyone,
 // owner and Viewer alike. "Last completed" is the highest-seq lesson marked
 // completed; `listLessons` is seq-ascending, so the last such entry wins. When
-// they've completed the final lesson there's no successor, so land on it; when
-// nothing is completed yet, start at lesson 1. Completed keys not among the
-// current lessons (a superseded or other-edition key) are ignored.
+// they've completed the final lesson there's no successor, so the course is
+// finished and they start over at lesson 1 (2026-09-21), rather than reopening
+// the ending they've already read. A learner who reached the end with lessons
+// skipped in the middle counts as finished too; the sidebar's ticks still show
+// what they missed. When nothing is completed yet, start at lesson 1 as well.
+// Completed keys not among the current lessons (a superseded or other-edition
+// key) are ignored.
 export function resumeLessonKey(
   lessons: readonly LessonLite[],
   progress: readonly ProgressLite[],
@@ -59,7 +63,7 @@ export function resumeLessonKey(
   let lastDoneKey: string | null = null;
   for (const l of lessons) if (done.has(l.key)) lastDoneKey = l.key;
   if (!lastDoneKey) return firstLessonKey(lessons);
-  return nextLessonKey(lessons, lastDoneKey) ?? lastDoneKey;
+  return nextLessonKey(lessons, lastDoneKey) ?? firstLessonKey(lessons);
 }
 
 // The lessonKeys the learner has completed, for the sidebar's ✓ ticks. "opened"
