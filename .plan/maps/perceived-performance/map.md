@@ -62,7 +62,10 @@ there (see Out of scope).
 
 <!-- one line per resolved ticket: gist + link -->
 
-Nothing resolved yet. The map was chartered on 2026-09-09.
+- **10** (2026-09-21): a revisited page paints from what the client already holds. A
+  Convex query cache (convex-helpers) holds subscriptions five minutes past unmount, and
+  the Next router keeps dynamic pages for five minutes, so going back no longer flashes a
+  skeleton. [10](tickets/10-a-revisited-page-paints-from-what-the-client-holds.md)
 
 ## Not yet specified
 
