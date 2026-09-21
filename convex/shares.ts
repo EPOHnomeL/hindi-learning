@@ -23,7 +23,7 @@ import type { InviteKind } from "./inviteEmail";
 // recipient has no account yet). The link rides the course's canonical host via
 // `appUrl` — the tenant subdomain when the course is tenanted (issue 12), else
 // SITE_URL (which appUrl requires — provision it in tests that hit this path).
-async function scheduleInvite(
+export async function scheduleInvite(
   ctx: MutationCtx,
   opts: { to: string; kind: InviteKind; topic: Doc<"topics">; editionLang: string; inviterEmail: string; role: "viewer" | "editor" },
 ): Promise<void> {

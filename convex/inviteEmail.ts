@@ -6,7 +6,14 @@
 // is the one email a buyer gets when the operator confirms their bank transfer
 // cleared. It rides this renderer because the markup, brand and palette are
 // identical and a second email module would be a second thing to keep in step.
-export type InviteKind = "granted" | "invited" | "role-changed" | "purchased";
+//
+// `reminder` and `translator` (the two Sharing-tab nudges, 2026-09-21) are not
+// invites either: they are the owner's deliberate re-send to people who already
+// hold something and never acted on it — a buyer who never opened the course,
+// and an invited translator who never made an account. Same reason as
+// `purchased`: identical markup, brand and palette, so a second module would be
+// a second thing to keep in step.
+export type InviteKind = "granted" | "invited" | "role-changed" | "purchased" | "reminder" | "translator";
 
 export type InviteData = {
   courseTitle: string;
@@ -104,6 +111,9 @@ const roleNoun = (role: InviteData["role"]) => (role === "editor" ? "Editor" : "
 // - "granted"      — recipient already has an account; deep-link into the Edition.
 // - "invited"      — no account yet; link to sign-up.
 // - "role-changed" — an accepted Viewer↔Editor change; deep-link into the Edition.
+// - "reminder"     — a buyer who never started; deep-link into the Edition.
+// - "translator"   — an invited translator with no account; deep-link into
+//                    their Edition, whose URL renders sign-in in place (AppGate).
 export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Brand = DEFAULT_BRAND): RenderedEmail {
   const { courseTitle, langName, inviterEmail, role, link } = data;
   const { name: BRAND, colors: C, logoUrl } = brand;
@@ -113,7 +123,21 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
   let heading: string;
   let lead: string;
   let cta: string;
-  if (kind === "purchased") {
+  if (kind === "reminder") {
+    // The buyer paid and never opened it. No guilt, no "you haven't" scolding —
+    // just the door, named, with the language they bought on it.
+    subject = `Your ${langName} edition of “${courseTitle}” is waiting`;
+    heading = "Your course is waiting";
+    lead = `You have full access to ${edition} on ${BRAND}, and it’s still waiting for its first lesson. It’s yours for good — start whenever you’re ready.`;
+    cta = "Start the course";
+  } else if (kind === "translator") {
+    // An invited translator with no account yet. The link deep-links at their own
+    // Edition, so signing up lands them on the thing they were asked to edit.
+    subject = `Create your account to translate “${courseTitle}”`;
+    heading = "Your translation is waiting";
+    lead = `${inviterEmail} invited you to edit ${edition} on ${BRAND}. Create your account with this email address and you’ll land straight on the ${langName} edition, ready to edit.`;
+    cta = "Create your account";
+  } else if (kind === "purchased") {
     // The buyer paid by bank transfer and has been waiting — hours, maybe days.
     // The only job of this email is "the money landed, your access is live, here
     // is the door". `inviterEmail` is carried in the payload but says nothing to a
@@ -143,7 +167,7 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
   // wrong reason on a payment email is exactly the kind of thing that reads as a
   // scam to someone who has just transferred money to a stranger's account.
   const because =
-    kind === "purchased"
+    kind === "purchased" || kind === "reminder"
       ? `You received this because you bought a course on ${BRAND}.`
       : `You received this because someone shared a course with you on ${BRAND}.`;
 

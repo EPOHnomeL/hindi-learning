@@ -24,6 +24,10 @@ export const sendInvite = internalAction({
       // sender, same no-op-when-unconfigured property: a bounced email must never
       // roll back a confirmed sale.
       v.literal("purchased"),
+      // The two Sharing-tab nudges (2026-09-21): the owner re-mailing buyers who
+      // never started and invited translators who never signed up.
+      v.literal("reminder"),
+      v.literal("translator"),
     ),
     courseTitle: v.string(),
     langName: v.string(),
