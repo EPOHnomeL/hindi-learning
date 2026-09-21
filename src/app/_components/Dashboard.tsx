@@ -1,20 +1,16 @@
 "use client";
 
-import { useAuthActions } from "@convex-dev/auth/react";
 import { useAction, useMutation } from "convex/react";
 import { useQuery } from "convex-helpers/react/cache";
 import { type FunctionReturnType } from "convex/server";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import posthog from "posthog-js";
 import { useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
-import { isPostHogInitialized } from "../PostHogClient";
 import { editionChip } from "../../../convex/languages";
 import { preferEdition } from "../../../convex/editionPreference";
 import { tenantPill } from "~/design/tenantPill";
-import { clearAccountLocalStateOnSignOut } from "./accountLocalState";
 import { catalogueCacheKey, DASHBOARD_CACHE_KEY, TENANT_NAME_CACHE_KEY, writeCache } from "./offlineCache";
 import { useCourseGridCount } from "./useCourseGridCount";
 import { checkoutLink, withLang } from "./editionUrl";
@@ -98,7 +94,6 @@ export function Dashboard() {
   // Placeholder count for the in-flight grid, from the same source page.tsx uses
   // for its AuthLoading skeleton, so the two agree (ticket 06).
   const gridCards = useCourseGridCount(6);
-  const { signOut } = useAuthActions();
   const router = useRouter();
   const tc = useTranslations("Common");
   const ts = useTranslations("Settings");
@@ -167,7 +162,11 @@ export function Dashboard() {
           </div>
           {/* On a phone the header keeps only the brand (mobile bottom nav,
               2026-08-23): Admin is a tab in the bar, and the account controls
-              (gear, sign out) live on the /settings page. Desktop keeps them. */}
+              live on the /settings page. Desktop keeps the two that are not
+              tabs there, as icons, matching the tab bar's own settings gear and
+              admin figures. Sign out went on 2026-09-21: /settings carries it,
+              and as the only worded control up here it read as the header's
+              main action. */}
           <div className="flex shrink-0 items-center gap-1 max-md:hidden">
             <button
               onClick={() => setPrefsOpen(true)}
@@ -178,23 +177,19 @@ export function Dashboard() {
               <Icon name="settings" className="h-4 w-4" />
             </button>
             {scope && scope.role !== "none" && (
-              <Link href="/admin" className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
-                {/* The label names the page the link opens: a sys admin lands on the
-                    platform dashboard ("Admin"), a tenant admin on their own tenant's
-                    panel, whose heading already reads "Tenant". */}
-                {scope.role === "tenant" ? "Tenant" : "Admin"}
+              // The label names the page the link opens: a sys admin lands on
+              // the platform dashboard ("Admin"), a tenant admin on their own
+              // tenant's panel, whose heading already reads "Tenant". Worded as
+              // the tooltip now that the link is the tab bar's admin icon.
+              <Link
+                href="/admin"
+                aria-label={scope.role === "tenant" ? "Tenant" : "Admin"}
+                title={scope.role === "tenant" ? "Tenant" : "Admin"}
+                className="rounded-lg p-1.5 text-soft transition-colors hover:bg-hi hover:text-accent"
+              >
+                <Icon name="users" className="h-4 w-4" />
               </Link>
             )}
-            <button
-              onClick={() => {
-                if (isPostHogInitialized()) posthog.reset();
-                clearAccountLocalStateOnSignOut();
-                void signOut().then(() => router.replace("/"));
-              }}
-              className="rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
-            >
-              {tc("signOut")}
-            </button>
           </div>
         </header>
 
