@@ -41,6 +41,7 @@ import type * as interest from "../interest.js";
 import type * as inviteEmail from "../inviteEmail.js";
 import type * as joinConsent from "../joinConsent.js";
 import type * as languages from "../languages.js";
+import type * as learners from "../learners.js";
 import type * as ledger from "../ledger.js";
 import type * as lessonAudio from "../lessonAudio.js";
 import type * as market from "../market.js";
@@ -123,6 +124,7 @@ declare const fullApi: ApiFromModules<{
   inviteEmail: typeof inviteEmail;
   joinConsent: typeof joinConsent;
   languages: typeof languages;
+  learners: typeof learners;
   ledger: typeof ledger;
   lessonAudio: typeof lessonAudio;
   market: typeof market;

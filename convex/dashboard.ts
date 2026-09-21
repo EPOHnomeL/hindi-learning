@@ -5,6 +5,7 @@ import type { Id } from "./_generated/dataModel";
 import { getOwnedTopic } from "./topicAccess";
 import { normaliseEmail, shareLang, shareRole } from "./shareGrants";
 import { SOURCE_LANG } from "./sourceLang";
+import { learnerCompletion } from "./learners";
 
 // The manage route's Dashboard tab (ui-overhaul 23): ONE owner-gated course-wide
 // query behind the whole tab. Course-wide on purpose, because the obvious way to
@@ -48,16 +49,11 @@ export function progressBucket(completed: number, total: number): ProgressBucket
   return "80-99";
 }
 
-// The `progress` scan's ceiling. The aggregate is one indexed range read over
-// `by_topic_user_lesson` at `topicId`, every reader's every row for this course,
-// grouped by reader in memory, which is readers x lessons documents on every
-// dashboard open. That is the read amplification the ticket flags, and this is
-// the answer to it: past the cap the query REFUSES TO GUESS, returning
-// `truncated: true` and no buckets, rather than a histogram computed from a
-// partial scan that would silently under-count every reader the scan cut off.
-// A denormalised per-reader counter is the fix if a real course ever trips this;
-// at 8192 rows none is close (ticket 14 counted 68 Shares across 14 courses).
-const PROGRESS_SCAN_CAP = 8192;
+// The learner population and each learner's completion count come from
+// `./learners`, which the Sharing tab's "remind the people who never started"
+// nudge reads too: one definition of a learner and of not-started, so the
+// chart and the button can never disagree. Its `PROGRESS_SCAN_CAP` is why
+// `truncated` exists in this query's shape.
 
 export const courseStats = query({
   args: { topicSlug: v.string() },
@@ -126,7 +122,6 @@ export const courseStats = query({
     const byLang = new Map<string, Set<string>>();
     const everyone = new Set<string>();
     const editors = new Set<string>();
-    const accounts = new Set<Id<"users">>();
     // The (editor, Edition) pairs, kept in grant order and resolved to people
     // after the walk so the name lookup happens once per editor account.
     const editorGrants: { lang: string; userId: Id<"users"> | null; email: string | null }[] = [];
@@ -140,7 +135,6 @@ export const courseStats = query({
     for (const s of shares) {
       if (s.viewerId === ownerId) continue;
       grant(shareLang(s), s.viewerId);
-      accounts.add(s.viewerId);
       if (shareRole(s) === "editor") {
         editors.add(s.viewerId);
         editorGrants.push({ lang: shareLang(s), userId: s.viewerId, email: null });
@@ -159,45 +153,18 @@ export const courseStats = query({
     for (const e of entitlements) {
       if (e.userId === ownerId) continue;
       grant(e.lang, e.userId);
-      accounts.add(e.userId);
     }
     for (const e of enrollments) {
       if (e.userId === ownerId) continue;
       grant(e.lang, e.userId);
-      accounts.add(e.userId);
     }
 
-    const lessons = (
-      await ctx.db.query("lessons").withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id)).collect()
-    ).filter((l) => !l.supersededBy);
-    const live = new Set(lessons.map((l) => l.key));
-
-    // The aggregate. One range read at `topicId`; the `+ 1` is how we learn we
-    // hit the cap without a second query.
-    const rows = await ctx.db
-      .query("progress")
-      .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topic._id))
-      .take(PROGRESS_SCAN_CAP + 1);
-    const truncated = rows.length > PROGRESS_SCAN_CAP;
-
-    const done = new Map<Id<"users">, number>();
-    if (!truncated) {
-      for (const r of rows) {
-        if (r.userId === ownerId) continue;
-        // Someone reading a free published Edition holds no grant row at all,
-        // so their progress is the only evidence they exist. Count them.
-        accounts.add(r.userId);
-        if (r.status !== "completed" || !live.has(r.lessonKey)) continue;
-        done.set(r.userId, (done.get(r.userId) ?? 0) + 1);
-      }
-    }
+    const { completed: done, lessonCount, truncated } = await learnerCompletion(ctx, topic);
 
     const counts = new Map<string, number>(PROGRESS_BUCKETS.map((k) => [k, 0]));
-    if (!truncated) {
-      for (const id of accounts) {
-        const key = progressBucket(done.get(id) ?? 0, lessons.length);
-        counts.set(key, (counts.get(key) ?? 0) + 1);
-      }
+    for (const marks of done.values()) {
+      const key = progressBucket(marks, lessonCount);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
 
     // One name lookup per distinct editor account, not per grant, so a person
@@ -217,8 +184,8 @@ export const courseStats = query({
       prices: listings
         .map((l) => ({ lang: l.lang, amount: l.amount, currency: l.currency }))
         .sort((a, b) => a.lang.localeCompare(b.lang)),
-      lessonCount: lessons.length,
-      learners: truncated ? 0 : accounts.size,
+      lessonCount,
+      learners: done.size,
       buckets: PROGRESS_BUCKETS.map((key) => ({ key, count: counts.get(key) ?? 0 })),
       truncated,
       editorRows: editorGrants
