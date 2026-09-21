@@ -11,7 +11,28 @@ import type { SellerStatus } from "../../../convex/sellerStatus";
 import type { TenantFlag } from "../../../convex/tenantFlags";
 import { formatMoney } from "~/lib/money";
 import { coerceImportedTheme, tenantRemovalBlockers, timeAgo, type Palette } from "./adminDerive";
-import { DayStackChart, VizLegend, type DayColumn } from "./dayStackChart";
+import {
+  AdminShell,
+  Amount,
+  Badge,
+  Cell,
+  DataTable,
+  EmptyLine,
+  ListSkeleton,
+  Meter,
+  PageHeader,
+  Panel,
+  Segmented,
+  StatTile,
+  btnDanger,
+  btnGhost,
+  btnPrimary,
+  inputCls,
+  labelCls,
+  type AdminTab,
+} from "./adminUi";
+import { DayStackChart, VizLegend } from "./dayStackChart";
+import { Icon } from "./icons";
 import { TENANT_THEME_TOKENS, type Token } from "../../design/tokens";
 import { salesRange, type SalesPreset } from "./salesRange";
 import { colorVar, rankLanguages, VIZ_SLOTS } from "./salesChart";
@@ -23,11 +44,17 @@ import { refusalMessage, useMutationRun } from "./mutationRun";
 // the three other copies of it.
 
 // The Admin portal (/admin, ADR 0011 + issue 02, whitelabel issue 19): the
-// dashboard is now scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
-// Sellers/Payouts, and every tenant via a tab switcher + tenant picker; a
-// **tenant admin** is locked to their own tenant's panel (no Allowlist, no
-// picker). Client-guarded by `myAdminScope` (UX only; the mutations are the real
-// security boundary). Lists are live Convex queries, so edits reflect immediately.
+// dashboard is scope-aware (ADR 0022). A **sys admin** manages the Allowlist,
+// Sellers/Payouts, and every tenant via a tab strip + tenant picker; a
+// **tenant admin** is locked to their own tenant's panel (no tabs, no picker).
+// Client-guarded by `myAdminScope` (UX only; the mutations are the real security
+// boundary). Lists are live Convex queries, so edits reflect immediately.
+//
+// Revamped 2026-09-21: the tabs moved into a shell (`adminUi.tsx`), every list
+// that is a list of records became a table, and each tab opens on a row of stat
+// tiles so the operator reads the state of things before the rows. The
+// mutations and the queries are the ones that were here before; this changed
+// how they are drawn, not what they do.
 export function AdminPanel() {
   const scope = useQuery(api.whitelist.myAdminScope);
 
@@ -40,573 +67,284 @@ export function AdminPanel() {
         <div className="text-center">
           <h1 className="text-xl font-semibold text-accent">Not authorised</h1>
           <p className="mt-2 text-sm text-soft">This page is for the workspace admin.</p>
-          <Link href="/" className="mt-4 inline-block text-sm text-accent2 underline-offset-2 hover:underline">
-            ← Back to your courses
+          <Link href="/" className={`press mt-5 ${btnGhost}`}>
+            <Icon name="arrow" className="h-4 w-4 rotate-180" />
+            Back to your courses
           </Link>
         </div>
       </div>
     );
   }
-  // A tenant admin sees only their own tenant's panel, directly — no tabs, no
-  // sidebar picker, no create action (issue 19).
+  // A tenant admin sees only their own tenant's panel, directly, in the same
+  // shell minus the tab strip (issue 19).
   if (scope.role === "tenant") {
     return (
-      <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
-        <header className="mb-8 flex items-center justify-between gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Tenant</h1>
-          <Link href="/" className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
-            ← Courses
-          </Link>
-        </header>
+      <AdminShell eyebrow="Tenant admin" title="Your tenant">
         <TenantDetail slug={scope.tenantSlug!} role="tenant" />
-      </div>
+      </AdminShell>
     );
   }
   return <SysAdminDashboard />;
 }
 
-// The sys-admin dashboard: a tab switcher between the platform Allowlist and the
-// per-tenant Tenants panel. Payouts is the default tab (2026-08-25): it is the one
-// screen with money waiting on an action, so it is what the admin opens for.
+type SysTab = "payouts" | "sales" | "allowlist" | "tenants" | "generation";
+
+// The sys-admin dashboard. Payouts is the default tab (2026-08-25): it is the one
+// screen with money waiting on an action, so it is what the admin opens for, and
+// it is first in the strip for the same reason. Its badge is the number of rows
+// waiting on the operator, so the count is readable from any other tab.
 function SysAdminDashboard() {
-  const [tab, setTab] = useState<"allowlist" | "sales" | "payouts" | "tenants" | "generation">("payouts");
+  const [tab, setTab] = useState<SysTab>("payouts");
+  const queues = useMoneyQueues();
+  const waiting =
+    queues.owed && queues.eft && queues.batches && queues.codes
+      ? queues.owed.length + queues.eft.length + queues.batches.length + queues.codes.filter((c) => c.stoppedAt !== null).length
+      : undefined;
+  const tabs: readonly AdminTab<SysTab>[] = [
+    { key: "payouts", label: "Payouts", icon: "tag", badge: waiting },
+    { key: "sales", label: "Sales", icon: "chart" },
+    { key: "allowlist", label: "Access", icon: "users" },
+    { key: "tenants", label: "Tenants", icon: "globe" },
+    { key: "generation", label: "Generation", icon: "refresh" },
+  ];
   return (
-    <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
-      <header className="mb-8 flex items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-card p-1">
-          <TabButton active={tab === "allowlist"} onClick={() => setTab("allowlist")}>
-            Allowlist
-          </TabButton>
-          <TabButton active={tab === "sales"} onClick={() => setTab("sales")}>
-            Sales
-          </TabButton>
-          <TabButton active={tab === "payouts"} onClick={() => setTab("payouts")}>
-            Payouts
-          </TabButton>
-          <TabButton active={tab === "tenants"} onClick={() => setTab("tenants")}>
-            Tenants
-          </TabButton>
-          <TabButton active={tab === "generation"} onClick={() => setTab("generation")}>
-            Generation
-          </TabButton>
-        </div>
-        <Link href="/" className="shrink-0 rounded-lg px-2 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent">
-          ← Courses
-        </Link>
-      </header>
-      {tab === "allowlist" ? (
-        <AllowlistManager />
+    <AdminShell eyebrow="Platform admin" title="Admin console" tabs={tabs} active={tab} onTab={setTab}>
+      {tab === "payouts" ? (
+        <PayoutsManager />
       ) : tab === "sales" ? (
         <SalesManager />
-      ) : tab === "payouts" ? (
-        <PayoutsManager />
+      ) : tab === "allowlist" ? (
+        <AllowlistManager />
       ) : tab === "tenants" ? (
         <TenantsManager />
       ) : (
         <GenerationManager />
       )}
-    </div>
+    </AdminShell>
   );
 }
 
-// The Generation tab (generation-observability, issue 04): what the Routine is
-// authoring right now over a history of past Generation Runs. Both are live Convex
-// queries (sys-admin-gated server-side), so they update on their own while open.
-function GenerationManager() {
+// Ledger amounts, in the shared spelling. The hardcoded `R ` prefix is gone:
+// every row in this panel is Rand today, but the currency beats a prefix that is
+// right by coincidence. `en-ZA` stays explicit, because a cash log the operator
+// reconciles against a bank statement must not change shape with the browser's
+// locale.
+function formatRand(cents: number): string {
+  return formatMoney(cents, "ZAR", { locale: "en-ZA" });
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+// =============================================================================
+// Payouts
+// =============================================================================
+
+// The four money queues the Payouts tab is made of, read once and shared between
+// the tab's tiles, its tables and the tab-strip badge. `useQuery` here is the
+// cached flavour, so the shell and the tab subscribing to the same four reads
+// costs one subscription each, not two.
+function useMoneyQueues() {
+  return {
+    owed: useQuery(api.ledger.owedPayouts),
+    eft: useQuery(api.eft.pendingEftIntents),
+    batches: useQuery(api.vouchers.pendingBatches),
+    codes: useQuery(api.accessCodes.pendingAccessCodes),
+  };
+}
+
+type Owed = FunctionReturnType<typeof api.ledger.owedPayouts>[number];
+type EftIntent = FunctionReturnType<typeof api.eft.pendingEftIntents>[number];
+type Batch = FunctionReturnType<typeof api.vouchers.pendingBatches>[number];
+type AccessCode = FunctionReturnType<typeof api.accessCodes.pendingAccessCodes>[number];
+
+// What the operator owes each Seller (.scratch/payfast-payments, ticket 06) and
+// the money still to be matched on a bank statement (EFT intents, voucher
+// batches, stopped Organisation Vouchers). The three queues sit together
+// deliberately: to the operator they are the same job, and a queue that looks
+// like a stranger is a queue that gets missed. The collection account closes the
+// tab because it is the mirror of everything above it: money coming IN.
+function PayoutsManager() {
+  const { owed, eft, batches, codes } = useMoneyQueues();
+  const sum = <T,>(rows: T[] | undefined, pick: (r: T) => number) =>
+    rows === undefined ? undefined : rows.reduce((s, r) => s + pick(r), 0);
+  const owedTotal = sum(owed, (o) => o.totalOwed);
+  const eftTotal = sum(eft, (e) => e.amount);
+  const batchTotal = sum(batches, (b) => b.total);
+  const running = codes?.filter((c) => c.stoppedAt === null);
+  const ready = codes?.filter((c) => c.stoppedAt !== null);
+
   return (
-    <div className="mx-auto max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Generation</h1>
-        <p className="mt-0.5 text-sm text-soft">What the routine is building, and what it has built</p>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        title="Payouts"
+        hint="What you owe each payee from course sales and donations, and the transfers still to match against your bank statement."
+      />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile
+          label="Owed to payees"
+          icon="tag"
+          tone="gold"
+          value={owedTotal === undefined ? undefined : formatRand(owedTotal)}
+          hint={owed && (owed.length === 0 ? "Everyone is paid out" : `across ${plural(owed.length, "payee")}`)}
+        />
+        <StatTile
+          label="Awaiting EFT"
+          icon="check"
+          tone="accent2"
+          value={eftTotal === undefined ? undefined : formatRand(eftTotal)}
+          hint={eft && (eft.length === 0 ? "No transfers to confirm" : `${plural(eft.length, "transfer")} to confirm`)}
+        />
+        <StatTile
+          label="Voucher batches"
+          icon="qr"
+          value={batchTotal === undefined ? undefined : formatRand(batchTotal)}
+          hint={batches && (batches.length === 0 ? "Nothing unpaid" : `${plural(batches.length, "batch", "batches")} unpaid`)}
+        />
+        <StatTile
+          label="Organisation vouchers"
+          icon="users"
+          value={ready === undefined ? undefined : `${ready.length} to invoice`}
+          hint={running && `${plural(running.length, "deal")} still running`}
+        />
       </div>
-      <GenerationUsageChart />
-      <GeneratingNow />
-      <RunHistory />
-      <TokenUsage />
-    </div>
-  );
-}
 
-// The shared day-bucketed stacked column chart and its legend moved to
-// `dayStackChart.tsx` on 2026-09-08 (ticket 34): it named itself "the shared
-// chart" and already had two adapters, which is a seam rather than reuse.
-
-
-// The Generation-tab activity graph: daily generation + translation usage over
-// the last 30 days as stacked columns (generation on the bottom, translation on
-// top), on one shared count axis. Colours are the shared viz palette (slot 1 /
-// slot 2). The 30-day window is floored to the UTC day so the query args stay
-// stable across renders (a raw Date.now() would resubscribe forever — see
-// salesRange).
-function GenerationUsageChart() {
-  const day = 86_400_000;
-  const to = Math.floor(Date.now() / day) * day + day; // start of tomorrow, UTC
-  const from = to - 30 * day;
-  const rows = useQuery(api.routine.usageByDay, { from, to });
-  const total = rows?.reduce((sum, r) => sum + r.generation + r.translation, 0) ?? 0;
-  return (
-    <figure className="viz-chart mb-12 rounded-xl border border-line bg-card p-4">
-      <figcaption className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="text-xs font-medium tracking-wide text-soft uppercase">
-          Activity · last 30 days
-          {total > 0 && <span className="ml-2 tabular-nums normal-case">{total} in total</span>}
-        </span>
-        <VizLegend
-          series={[
-            { key: "generation", label: "Generation", color: "var(--viz-1)" },
-            { key: "translation", label: "Translation", color: "var(--viz-2)" },
+      <Panel
+        title="Owed payouts"
+        hint="Each payee's share of what sold, with the account to pay it to. Mark paid records the EFT reference against every listed item."
+        tone={owed && owed.length > 0 ? "gold" : "line"}
+        flush
+      >
+        <DataTable<Owed>
+          rows={owed}
+          rowKey={(o) => o.email}
+          empty="Nothing owed. Every sale is paid out."
+          columns={[
+            {
+              key: "payee",
+              header: "Payee",
+              cell: (o) => (
+                <Cell
+                  primary={o.email}
+                  secondary={
+                    o.payout
+                      ? `${o.payout.accountHolder} · ${o.payout.bank} · ${o.payout.accountNumber} · branch ${o.payout.branchCode}`
+                      : "No bank details on file. Ask the seller before paying out."
+                  }
+                />
+              ),
+            },
+            {
+              key: "items",
+              header: "Items",
+              cell: (o) => (
+                <div className="flex flex-wrap gap-1">
+                  {/* A donation has no Edition, so the query hands back a null
+                      `lang` and the kind to label it with (ADR 0027). A voucher
+                      batch DOES have an Edition, so it needs the kind too or it
+                      reads as an ordinary sale of that language at a bulk price
+                      (ADR 0029). */}
+                  {o.sales.map((s) => (
+                    <span
+                      key={s.id}
+                      className="inline-flex items-center gap-1 rounded-md bg-hi px-1.5 py-0.5 text-[11px] text-ink"
+                    >
+                      <span className="font-semibold uppercase tracking-wide text-soft">
+                        {s.kind === "donation" ? "donation" : s.kind === "batch" ? `${s.lang} batch` : s.lang}
+                      </span>
+                      <span className="tabular-nums">{formatRand(s.sellerShare)}</span>
+                    </span>
+                  ))}
+                </div>
+              ),
+            },
+            {
+              key: "owed",
+              header: "Owed",
+              align: "end",
+              cell: (o) => <Amount tone="gold">{formatRand(o.totalOwed)}</Amount>,
+            },
+            {
+              key: "pay",
+              header: "Mark paid",
+              className: "w-[22rem]",
+              cell: (o) => <MarkPaidForm owed={o} />,
+            },
           ]}
         />
-      </figcaption>
-      {rows === undefined ? (
-        <div className="h-40 animate-pulse rounded-lg bg-hi/40" aria-busy />
-      ) : (
-        <DayStackChart
-          columns={rows.map((r) => ({
-            dayMs: r.dayMs,
-            segments: [
-              { key: "generation", label: "Generation", value: r.generation, color: "var(--viz-1)" },
-              { key: "translation", label: "Translation", value: r.translation, color: "var(--viz-2)" },
-            ],
-          }))}
-          empty="No generation or translation in the last 30 days."
-          zero="Nothing built"
-        />
-      )}
-    </figure>
-  );
-}
+      </Panel>
 
-// The live "what's busy now" section — reads the generation lock via generatingNow.
-function GeneratingNow() {
-  const rows = useQuery(api.routine.generatingNow);
-  return (
-    <section>
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">Generating now</h2>
-        <p className="mt-0.5 text-sm text-soft">Courses the routine is authoring this moment</p>
-      </div>
-      {rows === undefined ? (
-        <ul className="flex flex-col gap-2" aria-busy>
-          {[0, 1].map((i) => (
-            <li key={i} className="h-14 animate-pulse rounded-xl border border-line bg-card" />
-          ))}
-        </ul>
-      ) : rows.length === 0 ? (
-        <p className="text-sm text-soft">Nothing generating right now.</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {rows.map((r) => (
-            <li
-              key={r.topicSlug}
-              className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-4 py-3"
-            >
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="relative flex h-2.5 w-2.5 shrink-0">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent2/60" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent2" />
-                </span>
-                <span className="min-w-0 truncate text-sm font-medium text-ink">
-                  {r.topicTitle}
-                  {r.owner && <span className="ml-2 font-normal text-soft">· {r.owner}</span>}
-                </span>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {r.stale && (
-                  <span className="rounded-full bg-hi px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-soft">
-                    Stale — will retry
-                  </span>
-                )}
-                {r.startedAt !== null && <span className="text-xs tabular-nums text-soft">{timeAgo(r.startedAt)}</span>}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
+      {(eft === undefined || eft.length > 0) && <EftQueue pending={eft} />}
+      {(batches === undefined || batches.length > 0) && <BatchQueue pending={batches} />}
+      {(codes === undefined || codes.length > 0) && <AccessCodeQueue pending={codes} />}
 
-// One outcome's badge styling: published (accent2), nothing (muted), failed (danger).
-const OUTCOME_BADGE: Record<"published" | "nothing" | "failed", { label: string; className: string }> = {
-  published: { label: "Published", className: "bg-accent2/15 text-accent2" },
-  nothing: { label: "Caught up", className: "bg-hi text-soft" },
-  failed: { label: "Failed", className: "bg-danger/15 text-danger" },
-};
-
-// The past-runs history — reads generationRuns via runHistory, newest first.
-function RunHistory() {
-  const rows = useQuery(api.routine.runHistory);
-  return (
-    <section className="mt-12">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">History</h2>
-        <p className="mt-0.5 text-sm text-soft">Recent runs, newest first</p>
-      </div>
-      {rows === undefined ? (
-        <ul className="flex flex-col gap-2" aria-busy>
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="h-16 animate-pulse rounded-xl border border-line bg-card" />
-          ))}
-        </ul>
-      ) : rows.length === 0 ? (
-        <p className="text-sm text-soft">No runs recorded yet.</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {rows.map((r, i) => {
-            const badge = OUTCOME_BADGE[r.outcome];
-            return (
-              <li key={i} className="rounded-xl border border-line bg-card px-4 py-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="min-w-0 truncate text-sm font-medium text-ink">{r.topicTitle}</span>
-                    <span
-                      className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${badge.className}`}
-                    >
-                      {badge.label}
-                    </span>
-                  </div>
-                  <span className="shrink-0 text-xs tabular-nums text-soft">{timeAgo(r.endedAt)}</span>
-                </div>
-                {r.owner && <p className="mt-0.5 truncate text-xs text-soft">by {r.owner}</p>}
-                {r.outcome === "published" && r.producedLessonTitle && (
-                  <p className="mt-1 truncate text-xs text-soft">Lesson: {r.producedLessonTitle}</p>
-                )}
-                {r.outcome === "failed" && r.error && (
-                  <p className="mt-1 break-words text-xs text-danger">{r.error}</p>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-// Per-Topic token usage (cost instrumentation, technical-foundation/12). Operator
-// only: `tokenUsageByTopic` is sys-admin gated server-side, and this panel is the
-// only place it is read. Deliberately a plain list of counts, with no price and no
-// currency anywhere: this measures, it does not bill.
-//
-// "n of m runs not measured" is the point of the surface as much as the totals
-// are. A run whose runtime cannot count its own tokens is recorded as unknown,
-// and the cloud claude.ai Routine is exactly that runtime today, so the totals
-// are a floor rather than a bill.
-function TokenUsage() {
-  const rows = useQuery(api.routine.tokenUsageByTopic);
-  return (
-    <section className="mt-12">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">Tokens</h2>
-        <p className="mt-0.5 text-sm text-soft">Reported usage per course. Runs that cannot report are counted, not guessed.</p>
-      </div>
-      {rows === undefined ? (
-        <ul className="flex flex-col gap-2" aria-busy>
-          {[0, 1].map((i) => (
-            <li key={i} className="h-14 animate-pulse rounded-xl border border-line bg-card" />
-          ))}
-        </ul>
-      ) : rows.length === 0 ? (
-        <p className="text-sm text-soft">No runs recorded yet.</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {rows.map((r) => (
-            <li key={r.topicSlug} className="rounded-xl border border-line bg-card px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="min-w-0 truncate text-sm font-medium text-ink">{r.topicTitle}</span>
-                <span className="shrink-0 text-xs tabular-nums text-soft">
-                  {r.inputTokens.toLocaleString()} in · {r.outputTokens.toLocaleString()} out
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs text-soft">
-                {r.runsWithoutUsage > 0
-                  ? `${r.runsWithoutUsage} of ${r.runs} runs not measured`
-                  : `${r.runs} run${r.runs === 1 ? "" : "s"} measured`}
-                {r.models.length > 0 && ` · ${r.models.join(", ")}`}
-              </p>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-current={active ? "page" : undefined}
-      className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors ${
-        active ? "bg-accent text-white" : "text-soft hover:bg-hi hover:text-accent"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-// The Allowlist tab body (sys-admin only, so `whitelist.list` — which rejects
-// non-admins server-side — is never queried by anyone else). Centred at the
-// original width inside the wider dashboard shell.
-function AllowlistManager() {
-  const rows = useQuery(api.whitelist.list);
-
-  return (
-    <div className="mx-auto max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Allowlist</h1>
-        <p className="mt-0.5 text-sm text-soft">Who can create courses</p>
-      </div>
-
-      <AddEmailForm />
-
-      {rows === undefined ? (
-        <ul className="mt-6 flex flex-col gap-2" aria-busy>
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="h-12 animate-pulse rounded-xl border border-line bg-card" />
-          ))}
-        </ul>
-      ) : (
-        <ul className="mt-6 flex flex-col gap-2">
-          {rows
-            .slice()
-            .sort((a, b) => Number(b.isAdmin) - Number(a.isAdmin) || a.email.localeCompare(b.email))
-            .map((row) => (
-              <EmailRow key={row.email} email={row.email} isAdmin={row.isAdmin} />
-            ))}
-        </ul>
-      )}
-
-      <SellersManager />
-    </div>
-  );
-}
-
-// The Sales tab (.scratch/admin-sales): which courses and which editions sold
-// how much over a chosen period. Courses are the rows (title, sale count, gross);
-// each expands to its editions. The period is chosen with quick presets or a
-// custom date range — both feed `sales.report` as ms bounds. Sys-admin gated
-// server-side, so the query is never answered for anyone else.
-const SALES_PRESETS: { key: SalesPreset; label: string }[] = [
-  { key: "7d", label: "Last 7 days" },
-  { key: "30d", label: "Last 30 days" },
-  { key: "month", label: "This month" },
-  { key: "all", label: "All time" },
-  { key: "custom", label: "Custom" },
-];
-
-function SalesManager() {
-  const [preset, setPreset] = useState<SalesPreset>("30d");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  // `salesRange` floors `now` to the day, so these args are stable across
-  // renders — a raw `Date.now()` here would make useQuery loop forever.
-  const range = salesRange(preset, from, to, Date.now());
-  const report = useQuery(api.sales.report, range);
-  const totalGross = report?.reduce((sum, c) => sum + c.gross, 0) ?? 0;
-  const totalCount = report?.reduce((sum, c) => sum + c.count, 0) ?? 0;
-
-  return (
-    <div className="mx-auto max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Sales</h1>
-        <p className="mt-0.5 text-sm text-soft">What each course and edition sold in a period</p>
-      </div>
-
-      <div className="flex flex-wrap gap-1 rounded-xl border border-line bg-card p-1">
-        {SALES_PRESETS.map((p) => (
-          <TabButton key={p.key} active={preset === p.key} onClick={() => setPreset(p.key)}>
-            {p.label}
-          </TabButton>
-        ))}
-      </div>
-      {preset === "custom" && (
-        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-soft">
-          <label className="flex items-center gap-1.5">
-            From
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-ink focus:border-accent focus:outline-none"
-            />
-          </label>
-          <label className="flex items-center gap-1.5">
-            To
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="rounded-lg border border-line bg-card px-2.5 py-1.5 text-ink focus:border-accent focus:outline-none"
-            />
-          </label>
-        </div>
-      )}
-
-      {report === undefined ? (
-        <ul className="mt-6 flex flex-col gap-2" aria-busy>
-          {[0, 1, 2].map((i) => (
-            <li key={i} className="h-14 animate-pulse rounded-xl border border-line bg-card" />
-          ))}
-        </ul>
-      ) : report.length === 0 ? (
-        <p className="mt-6 text-sm text-soft">No sales in this period.</p>
-      ) : (
-        <>
-          <div className="mt-6 mb-3 flex items-center justify-between text-sm">
-            <span className="text-soft">
-              {totalCount} sale{totalCount === 1 ? "" : "s"} across {report.length} course
-              {report.length === 1 ? "" : "s"}
-            </span>
-            <span className="font-semibold tabular-nums text-ink">{formatRand(totalGross)}</span>
-          </div>
-          <SalesDayChart range={range} ranked={rankLanguages(report)} />
-          <ul className="flex flex-col gap-2">
-            {report.map((c) => (
-              <SalesCourseRow key={c.topicId} course={c} />
-            ))}
-          </ul>
-        </>
-      )}
-    </div>
-  );
-}
-
-// The sales-by-day chart (dataviz skill): one column per day of the chosen
-// period, height = that day's sale count on one shared axis, stacked into
-// per-edition segments coloured by language. The language→colour mapping comes
-// from the whole period's ranking (`rankLanguages`), so a language keeps its
-// colour on every day and in the breakdown below — the eye can follow "AF" down
-// the timeline. The course dimension lives in the expandable list underneath;
-// with one course a bar-per-course chart was a one-bar chart, and it never
-// showed *when* anything sold.
-function SalesDayChart({ range, ranked }: { range: { from?: number; to?: number }; ranked: readonly string[] }) {
-  const days = useQuery(api.sales.byDay, range);
-  const order = (lang: string) => {
-    const i = ranked.indexOf(lang);
-    return i < 0 ? ranked.length : i;
-  };
-  return (
-    <figure className="viz-chart mb-4 rounded-xl border border-line bg-card p-4">
-      <figcaption className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="text-xs font-medium tracking-wide text-soft uppercase">Sales by day and edition</span>
-        <VizLegend
-          series={ranked.slice(0, VIZ_SLOTS).map((lang) => ({
-            key: lang,
-            label: lang.toUpperCase(),
-            color: colorVar(lang, ranked),
-          }))}
-        />
-      </figcaption>
-      {days === undefined ? (
-        <div className="h-40 animate-pulse rounded-lg bg-hi/40" aria-busy />
-      ) : (
-        <DayStackChart
-          columns={days.map((d) => ({
-            dayMs: d.dayMs,
-            // Sorted by the period-wide rank — top seller on the baseline — so
-            // the stack order is identical on every column instead of following
-            // each day's own top seller.
-            segments: [...d.editions]
-              .sort((a, b) => order(a.lang) - order(b.lang))
-              .map((e) => ({
-                key: e.lang,
-                label: `${e.lang.toUpperCase()} · ${formatRand(e.gross)}`,
-                value: e.count,
-                color: colorVar(e.lang, ranked),
-              })),
-          }))}
-          empty="No sales in this period."
-          zero="No sales"
-        />
-      )}
-    </figure>
-  );
-}
-
-// One course in the sales report — a click expands its per-edition breakdown.
-function SalesCourseRow({ course }: { course: FunctionReturnType<typeof api.sales.report>[number] }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <li className="rounded-xl border border-line bg-card">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-      >
-        <span className="flex min-w-0 items-center gap-2">
-          <span className={`shrink-0 text-soft transition-transform motion-reduce:transition-none ${open ? "rotate-90" : ""}`} aria-hidden>
-            ▸
-          </span>
-          <span className="truncate text-sm font-medium text-ink">{course.courseTitle}</span>
-        </span>
-        <span className="flex shrink-0 items-center gap-3 text-sm tabular-nums">
-          <span className="text-soft">
-            {course.count} sale{course.count === 1 ? "" : "s"}
-          </span>
-          <span className="font-semibold text-ink">{formatRand(course.gross)}</span>
-        </span>
-      </button>
-      {open && (
-        <ul className="border-t border-line px-4 py-1.5">
-          {course.editions.map((e) => (
-            <li key={e.lang} className="flex items-center justify-between gap-3 py-1.5 text-sm">
-              <span className="flex min-w-0 items-center gap-1.5">
-                <span className="truncate text-soft">{e.title}</span>
-                <span className="shrink-0 rounded bg-hi px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-soft">
-                  {e.lang}
-                </span>
-              </span>
-              <span className="flex shrink-0 items-center gap-3 tabular-nums text-soft">
-                <span>
-                  {e.count} sale{e.count === 1 ? "" : "s"}
-                </span>
-                <span className="font-medium text-ink">{formatRand(e.gross)}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </li>
-  );
-}
-
-// What the operator owes each Seller (.scratch/payfast-payments, ticket 06):
-// the `owed` Ledger rows summed per Seller, with the bank details to EFT to.
-// "Mark paid" flips the listed sales to `paid` with the typed EFT reference —
-// server-enforced Admin-only, never double-counted. Its own tab (admin-sales).
-function PayoutsManager() {
-  const owed = useQuery(api.ledger.owedPayouts);
-  return (
-    <div className="mx-auto max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-accent md:text-3xl">Payouts</h1>
-        <p className="mt-0.5 text-sm text-soft">What you owe each payee — course sales and donations</p>
-      </div>
-      {owed === undefined ? (
-        <ul className="flex flex-col gap-2" aria-busy>
-          {[0, 1].map((i) => (
-            <li key={i} className="h-16 animate-pulse rounded-xl border border-line bg-card" />
-          ))}
-        </ul>
-      ) : owed.length === 0 ? (
-        <p className="text-sm text-soft">Nothing owed — all sales are paid out.</p>
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {owed.map((o) => (
-            <PayoutRow key={o.email} owed={o} />
-          ))}
-        </ul>
-      )}
-
-      <EftQueue />
-      <BatchQueue />
-      <AccessCodeQueue />
       <OperatorBankForm />
     </div>
+  );
+}
+
+// "Mark paid" flips the listed sales to `paid` with the typed EFT reference,
+// server-enforced Admin-only, never double-counted.
+function MarkPaidForm({ owed }: { owed: Owed }) {
+  const markPaid = useMutation(api.ledger.markPaid);
+  return (
+    <ReferenceForm
+      placeholder="EFT reference"
+      label="Mark paid"
+      busyLabel="Recording…"
+      onSubmit={(reference) => markPaid({ ids: owed.sales.map((s) => s.id), reference })}
+    />
+  );
+}
+
+// The one inline "type a reference, press the button" form the three money
+// queues and the owed table share. The field clears on success and stays put on
+// a refusal, so the operator can see what was rejected.
+function ReferenceForm({
+  placeholder,
+  label,
+  busyLabel,
+  onSubmit,
+}: {
+  placeholder: string;
+  label: string;
+  busyLabel: string;
+  onSubmit: (reference: string) => Promise<unknown>;
+}) {
+  const [reference, setReference] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <form
+      className="flex min-w-[16rem] flex-col gap-1"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!reference.trim()) return;
+        setBusy(true);
+        setError(null);
+        try {
+          await onSubmit(reference);
+          setReference("");
+        } catch (err) {
+          setError(refusalMessage(err, "Failed. Retry."));
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      <div className="flex gap-1.5">
+        <input
+          value={reference}
+          onChange={(e) => setReference(e.target.value)}
+          placeholder={placeholder}
+          className={`${inputCls} flex-1 py-1.5`}
+        />
+        <button type="submit" disabled={busy || !reference.trim()} className={`${btnPrimary} py-1.5`}>
+          {busy ? busyLabel : label}
+        </button>
+      </div>
+      {error && <span className="text-xs text-danger">{error}</span>}
+    </form>
   );
 }
 
@@ -614,40 +352,33 @@ function PayoutsManager() {
 // operator reads their bank statement, finds the reference, and clicks. Confirm
 // mints the Entitlement AND the Ledger row in one server transaction, so the sale
 // lands in Sales and as `owed` above like any card sale. Dismiss is for a transfer
-// that never came — stale intents are litter, not errors, and a queue that silts
+// that never came: stale intents are litter, not errors, and a queue that silts
 // up stops being read, which is how a real payment eventually gets missed.
-function EftQueue() {
-  const pending = useQuery(api.eft.pendingEftIntents);
-  if (pending !== undefined && pending.length === 0) return null;
+function EftQueue({ pending }: { pending: EftIntent[] | undefined }) {
   return (
-    <section className="mt-12">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">Awaiting EFT</h2>
-        <p className="mt-0.5 text-sm text-soft">Match the reference on your bank statement, then confirm</p>
-      </div>
-      {pending === undefined ? (
-        <ul className="flex flex-col gap-2" aria-busy>
-          {[0, 1].map((i) => (
-            <li key={i} className="h-16 animate-pulse rounded-xl border border-line bg-card" />
-          ))}
-        </ul>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {pending.map((p) => (
-            <EftQueueRow key={p.ref} intent={p} />
-          ))}
-        </ul>
-      )}
-    </section>
+    <Panel title="Awaiting EFT" hint="Match the reference on your bank statement, then confirm. Confirming grants the buyer access." tone="gold" flush>
+      <DataTable<EftIntent>
+        rows={pending}
+        rowKey={(p) => p.ref}
+        empty="No transfers waiting."
+        columns={[
+          { key: "ref", header: "Reference", cell: (p) => <Cell mono primary={p.ref} /> },
+          { key: "buyer", header: "Buyer", cell: (p) => <Cell primary={p.email} /> },
+          { key: "course", header: "Course", cell: (p) => <CourseCell title={p.courseTitle} lang={p.lang} /> },
+          { key: "amount", header: "Amount", align: "end", cell: (p) => <Amount tone="gold">{formatRand(p.amount)}</Amount> },
+          { key: "actions", header: "", align: "end", cell: (p) => <EftActions intent={p} /> },
+        ]}
+      />
+    </Panel>
   );
 }
 
-function EftQueueRow({ intent }: { intent: FunctionReturnType<typeof api.eft.pendingEftIntents>[number] }) {
+function EftActions({ intent }: { intent: EftIntent }) {
   const confirm = useMutation(api.eft.confirmEftPayment);
   const dismiss = useMutation(api.eft.dismissEftIntent);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
-  // Confirming grants paid access and writes money — a misread statement line is
+  // Confirming grants paid access and writes money. A misread statement line is
   // not a thing to undo, so the destructive-ish half asks once.
   const run = async (action: (args: { ref: string }) => Promise<null>) => {
     setBusy(true);
@@ -660,276 +391,176 @@ function EftQueueRow({ intent }: { intent: FunctionReturnType<typeof api.eft.pen
       setBusy(false);
     }
   };
-
   return (
-    <li className="rounded-xl border border-gold/40 bg-card px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <b className="block font-mono text-sm font-bold tracking-wider text-ink">{intent.ref}</b>
-          <span className="text-xs text-soft">
-            {intent.email} · {intent.courseTitle} · {intent.lang}
-          </span>
-        </div>
-        <span className="shrink-0 rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
-          {formatRand(intent.amount)}
-        </span>
-      </div>
-      <div className="mt-2.5 flex items-center gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => {
-            if (confirm_(`Confirm ${formatRand(intent.amount)} received for ${intent.ref}? This grants access.`)) {
-              void run(confirm);
-            }
-          }}
-          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-        >
-          {busy ? "Working…" : "Confirm payment"}
-        </button>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void run(dismiss)}
-          className="rounded-lg border border-line px-3.5 py-1.5 text-sm font-medium text-soft transition-colors hover:border-danger hover:text-danger disabled:opacity-60"
-        >
-          Dismiss
-        </button>
-        {error && <span className="text-xs text-danger">Failed — retry</span>}
-      </div>
-    </li>
+    <div className="flex items-center justify-end gap-1.5">
+      {error && <span className="text-xs text-danger">Failed. Retry.</span>}
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          if (confirm_(`Confirm ${formatRand(intent.amount)} received for ${intent.ref}? This grants access.`)) {
+            void run(confirm);
+          }
+        }}
+        className={`${btnPrimary} py-1.5`}
+      >
+        {busy ? "Working…" : "Confirm"}
+      </button>
+      <button type="button" disabled={busy} onClick={() => void run(dismiss)} className={`${btnGhost} py-1.5 hover:border-danger hover:bg-card hover:text-danger`}>
+        Dismiss
+      </button>
+    </div>
   );
 }
 
 // The voucher batches whose transfer has not been logged yet (vouchers ticket 04,
-// ADR 0029). Beside the EFT queue deliberately: to the operator this is the same
-// job - money on a bank statement that has to be matched to something in the app -
-// and a queue that looks like a stranger is a queue that gets missed.
-//
-// Two things this is NOT. It is not an approval: the batch's codes have been
-// working since the Seller minted them, so logging the reference changes nothing
-// for the organisation and only makes the Seller's 50% payable. And it never shows
-// a code - `pendingBatches` cannot return one, so the boundary between the money
-// role and the selling role is server-side, not this component's restraint.
-function BatchQueue() {
-  const pending = useQuery(api.vouchers.pendingBatches);
-  if (pending !== undefined && pending.length === 0) return null;
+// ADR 0029). Two things this is NOT. It is not an approval: the batch's codes
+// have been working since the Seller minted them, so logging the reference
+// changes nothing for the organisation and only makes the Seller's 50% payable.
+// And it never shows a code: `pendingBatches` cannot return one, so the boundary
+// between the money role and the selling role is server-side, not this
+// component's restraint.
+function BatchQueue({ pending }: { pending: Batch[] | undefined }) {
   return (
-    <section className="mt-12">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">Bulk Vouchers awaiting payment</h2>
-        <p className="mt-0.5 text-sm text-soft">
-          Check the total against what landed, then log the reference - that makes the seller&apos;s share payable
-        </p>
-      </div>
-      {pending === undefined ? (
-        <ul className="flex flex-col gap-2" aria-busy>
-          {[0, 1].map((i) => (
-            <li key={i} className="h-16 animate-pulse rounded-xl border border-line bg-card" />
-          ))}
-        </ul>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {pending.map((b) => (
-            <BatchQueueRow key={b.batchId} batch={b} />
-          ))}
-        </ul>
-      )}
-    </section>
+    <Panel
+      title="Bulk vouchers awaiting payment"
+      hint="Check the total against what landed, then log the reference. That makes the seller's share payable."
+      tone="gold"
+      flush
+    >
+      <DataTable<Batch>
+        rows={pending}
+        rowKey={(b) => b.batchId}
+        empty="No batches waiting."
+        columns={[
+          { key: "org", header: "Organisation", cell: (b) => <Cell primary={b.orgName} secondary={b.orgContact} /> },
+          { key: "course", header: "Course", cell: (b) => <CourseCell title={b.courseTitle} lang={b.lang} seller={b.sellerEmail} /> },
+          {
+            key: "takeup",
+            header: "Take-up",
+            // Take-up beside the size, because "0 of 200 redeemed" after a month
+            // is a distribution problem to raise with the Seller and "195 of 200"
+            // is a payment to chase. A NUMBER only: a redemption records nothing
+            // about who (ADR 0029).
+            cell: (b) => <Meter fraction={b.seats ? b.redeemed / b.seats : 0} label={`${b.redeemed} of ${b.seats} seats`} />,
+          },
+          {
+            key: "total",
+            header: "Total",
+            align: "end",
+            cell: (b) => (
+              <div className="flex items-center justify-end gap-2">
+                {/* Voided batches stay on this queue: voiding stops codes, never
+                    money, so cash for a collapsed deal can still land and still
+                    has to be matched. */}
+                {b.voided && <Badge tone="danger">Voided</Badge>}
+                <Amount tone="gold">{formatRand(b.total)}</Amount>
+              </div>
+            ),
+          },
+          { key: "log", header: "Log payment", className: "w-[22rem]", cell: (b) => <LogBatchForm batch={b} /> },
+        ]}
+      />
+    </Panel>
   );
 }
 
-function BatchQueueRow({ batch }: { batch: FunctionReturnType<typeof api.vouchers.pendingBatches>[number] }) {
+function LogBatchForm({ batch }: { batch: Batch }) {
   const log = useMutation(api.vouchers.logBatchPayment);
-  const [reference, setReference] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   return (
-    <li className="rounded-xl border border-gold/40 bg-card px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <b className="block truncate text-sm font-semibold text-ink">{batch.orgName}</b>
-          {/* Take-up beside the size, because "0 of 200 redeemed" after a month is a
-              distribution problem to raise with the Seller and "195 of 200" is a
-              payment to chase, and the line could not tell them apart before. A
-              NUMBER only: a redemption records nothing about who (ADR 0029). */}
-          <span className="text-xs text-soft">
-            {batch.redeemed} of {batch.seats} seats taken · {batch.courseTitle} · {batch.lang} ·{" "}
-            {batch.sellerEmail}
-          </span>
-          <span className="block text-xs text-soft">{batch.orgContact}</span>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {/* Voided batches stay on this queue: voiding stops codes, never money,
-              so cash for a collapsed deal can still land and still has to be
-              matched. Marked, so the sysadmin knows which conversation they are
-              in before they chase the transfer. */}
-          {batch.voided && (
-            <span className="rounded-full bg-danger/10 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-danger">
-              Voided
-            </span>
-          )}
-          <span className="rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
-            {formatRand(batch.total)}
-          </span>
-        </div>
-      </div>
-      <form
-        className="mt-2.5 flex flex-wrap items-center gap-2"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!reference.trim()) return;
-          setBusy(true);
-          setError(null);
-          try {
-            await log({ batchId: batch.batchId, reference });
-          } catch (err) {
-            setError(refusalMessage(err, "Failed - retry"));
-            setBusy(false);
-          }
-        }}
-      >
-        <input
-          value={reference}
-          onChange={(e) => setReference(e.target.value)}
-          placeholder="Bank reference / transaction id"
-          className="min-w-0 flex-1 rounded-lg border border-line bg-hi px-2.5 py-1.5 text-sm focus:border-gold focus:outline-none"
-        />
-        <button
-          type="submit"
-          disabled={busy || !reference.trim()}
-          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-        >
-          {busy ? "Working…" : "Log payment"}
-        </button>
-        {error && <span className="text-xs text-danger">{error}</span>}
-      </form>
-    </li>
+    <ReferenceForm
+      placeholder="Bank reference / transaction id"
+      label="Log"
+      busyLabel="Working…"
+      onSubmit={(reference) => log({ batchId: batch.batchId, reference })}
+    />
   );
 }
 
-// The stopped Access Codes whose transfer has not been logged yet (ADR 0031,
-// shared-access-codes ticket 07). Beside the EFT queue and the batch queue
-// deliberately: to the operator all three are the same job, money on a bank
-// statement that has to be matched to something in the app, and a queue that looks
-// like a stranger is a queue that gets missed.
-//
-// **The line carries everything needed to raise the invoice, because the platform
-// does not raise it.** SARS wants seven fields plus a serial and a date within 21
-// days of supply, and a serial series is a thing to own forever and never duplicate,
-// so the operator raises the invoice in whatever they already use and this is the
-// line they read it off. Organisation, billing contact, seats, per-seat price, total.
-//
-// Two things this is NOT. It is not an approval: the seats were granted while the
-// code was live and have been used and finished with by the time it stops, so logging
-// the reference changes nothing for the organisation and only makes the Seller's half
-// payable. And it never shows a code or a nickname, because `pendingAccessCodes`
-// cannot return either. The boundary between the money role and the selling role is
-// server-side, not this component's restraint.
-function AccessCodeQueue() {
-  const pending = useQuery(api.accessCodes.pendingAccessCodes);
-  if (pending !== undefined && pending.length === 0) return null;
+// The Organisation Vouchers (ADR 0031, shared-access-codes ticket 07): running
+// deals and the stopped ones ready to invoice. **The line carries everything
+// needed to raise the invoice, because the platform does not raise it.** SARS
+// wants seven fields plus a serial and a date within 21 days of supply, so the
+// operator raises the invoice in whatever they already use and this is the line
+// they read it off: organisation, billing contact, seats, per-seat price, total.
+// A live voucher shows no reference box, because there is genuinely nothing to
+// log yet. It never shows a code or a nickname: `pendingAccessCodes` cannot
+// return either.
+function AccessCodeQueue({ pending }: { pending: AccessCode[] | undefined }) {
   return (
-    <section className="mt-12">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">Organisation Vouchers</h2>
-        <p className="mt-0.5 text-sm text-soft">
-          Running deals and the ones ready to invoice. A stopped voucher takes a reference; a running one owes nothing
-          yet
-        </p>
-      </div>
-      {pending === undefined ? (
-        <ul className="flex flex-col gap-2" aria-busy>
-          {[0, 1].map((i) => (
-            <li key={i} className="h-16 animate-pulse rounded-xl border border-line bg-card" />
-          ))}
-        </ul>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {pending.map((c) => (
-            <AccessCodeQueueRow key={c.accessCodeId} code={c} />
-          ))}
-        </ul>
-      )}
-    </section>
+    <Panel
+      title="Organisation vouchers"
+      hint="Running deals and the ones ready to invoice. A stopped voucher takes a reference; a running one owes nothing yet."
+      tone="gold"
+      flush
+    >
+      <DataTable<AccessCode>
+        rows={pending}
+        rowKey={(c) => c.accessCodeId}
+        empty="No organisation vouchers."
+        columns={[
+          { key: "org", header: "Organisation", cell: (c) => <Cell primary={c.orgName} secondary={c.orgContact} /> },
+          { key: "course", header: "Course", cell: (c) => <CourseCell title={c.courseTitle} lang={c.lang} seller={c.sellerEmail} /> },
+          {
+            key: "seats",
+            header: "Seats",
+            // The arithmetic spelled out rather than just its answer: the
+            // operator is about to put these numbers on an invoice.
+            cell: (c) => (
+              <span className="tabular-nums text-ink">
+                {c.seats} × {formatRand(c.pricePerSeat)}
+              </span>
+            ),
+          },
+          {
+            key: "status",
+            header: "Status",
+            cell: (c) => (c.stoppedAt === null ? <Badge tone="soft">Running</Badge> : <Badge tone="gold">Ready to invoice</Badge>),
+          },
+          // Running vs ready-to-invoice, because the total means different
+          // things: on a live voucher it is what the deal has run up SO FAR, on a
+          // stopped one it is final and invoiceable.
+          { key: "total", header: "Total", align: "end", cell: (c) => <Amount tone="gold">{formatRand(c.total)}</Amount> },
+          {
+            key: "log",
+            header: "Log payment",
+            className: "w-[22rem]",
+            cell: (c) =>
+              c.stoppedAt === null ? (
+                <span className="text-xs text-soft">Nothing due yet. The seller stops it when the agreement ends.</span>
+              ) : (
+                <LogAccessCodeForm code={c} />
+              ),
+          },
+        ]}
+      />
+    </Panel>
   );
 }
 
-function AccessCodeQueueRow({ code }: { code: FunctionReturnType<typeof api.accessCodes.pendingAccessCodes>[number] }) {
+function LogAccessCodeForm({ code }: { code: AccessCode }) {
   const log = useMutation(api.accessCodes.logAccessCodePayment);
-  const [reference, setReference] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   return (
-    <li className="rounded-xl border border-gold/40 bg-card px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <b className="block truncate text-sm font-semibold text-ink">{code.orgName}</b>
-          {/* The arithmetic spelled out rather than just its answer: the operator is
-              about to put these numbers on an invoice, and "42 x R150.00" is what they
-              have to be able to justify to the organisation. */}
-          <span className="text-xs text-soft">
-            {code.seats} seats x {formatRand(code.pricePerSeat)} · {code.courseTitle} · {code.lang} ·{" "}
-            {code.sellerEmail}
-          </span>
-          <span className="block text-xs text-soft">{code.orgContact}</span>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {/* Running vs ready-to-invoice, because the total means different things:
-              on a live voucher it is what the deal has run up SO FAR and will keep
-              moving, on a stopped one it is final and invoiceable. */}
-          {code.stoppedAt === null && (
-            <span className="rounded-full bg-hi px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-soft">
-              Running
-            </span>
-          )}
-          <span className="rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
-            {formatRand(code.total)}
-          </span>
-        </div>
+    <ReferenceForm
+      placeholder="Bank reference / transaction id"
+      label="Log"
+      busyLabel="Working…"
+      onSubmit={(reference) => log({ accessCodeId: code.accessCodeId, reference })}
+    />
+  );
+}
+
+// A course title with its language badge, and the seller beneath when the row
+// has one.
+function CourseCell({ title, lang, seller }: { title: string; lang: string; seller?: string }) {
+  return (
+    <div className="min-w-0">
+      <div className="flex items-center gap-1.5">
+        <span className="truncate font-medium text-ink">{title}</span>
+        <Badge tone="soft">{lang}</Badge>
       </div>
-      {/* Nothing to log on a live voucher, so no box to type into. Saying why beats a
-          disabled field the operator has to work out the reason for. */}
-      {code.stoppedAt === null ? (
-        <p className="mt-1.5 text-xs text-soft">
-          Still running, so nothing is due yet. The seller stops it when the agreement ends and it moves up this list
-          ready to invoice.
-        </p>
-      ) : (
-      <form
-        className="mt-2.5 flex flex-wrap items-center gap-2"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          if (!reference.trim()) return;
-          setBusy(true);
-          setError(null);
-          try {
-            await log({ accessCodeId: code.accessCodeId, reference });
-          } catch (err) {
-            setError(refusalMessage(err, "Failed - retry"));
-            setBusy(false);
-          }
-        }}
-      >
-        <input
-          value={reference}
-          onChange={(e) => setReference(e.target.value)}
-          placeholder="Bank reference / transaction id"
-          className="min-w-0 flex-1 rounded-lg border border-line bg-hi px-2.5 py-1.5 text-sm focus:border-gold focus:outline-none"
-        />
-        <button
-          type="submit"
-          disabled={busy || !reference.trim()}
-          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-        >
-          {busy ? "Working…" : "Log payment"}
-        </button>
-        {error && <span className="text-xs text-danger">{error}</span>}
-      </form>
-      )}
-    </li>
+      {seller && <div className="mt-0.5 truncate text-xs text-soft">{seller}</div>}
+    </div>
   );
 }
 
@@ -940,12 +571,11 @@ function confirm_(message: string): boolean {
 }
 
 // The operator's **collection** account (manual EFT rail, ywampotch-launch ticket
-// 02): where buyers EFT the purchase price IN — the mirror of the payouts above,
-// which is money going OUT, hence the same tab rather than a sixth one. Editable
-// here so the operator can correct it on prod without a deploy; sys-admin-only
-// server-side (`eft.saveOperatorBank`), so a tenant admin can never move where the
-// platform's money is collected. The `enabled` toggle IS the rail's on/off switch:
-// off, and no buyer is offered "Pay by EFT".
+// 02): where buyers EFT the purchase price IN. Editable here so the operator can
+// correct it on prod without a deploy; sys-admin-only server-side
+// (`eft.saveOperatorBank`), so a tenant admin can never move where the platform's
+// money is collected. The `enabled` toggle IS the rail's on/off switch: off, and
+// no buyer is offered "Pay by EFT".
 function OperatorBankForm() {
   const saved = useQuery(api.eft.operatorBank);
   const save = useMutation(api.eft.saveOperatorBank);
@@ -971,17 +601,20 @@ function OperatorBankForm() {
   };
 
   return (
-    <section className="mt-12">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">EFT collection account</h2>
-        <p className="mt-0.5 text-sm text-soft">Where buyers pay you directly, instead of by card</p>
-      </div>
-
+    <Panel
+      title="EFT collection account"
+      hint="Where buyers pay you directly, instead of by card."
+      actions={
+        values && (
+          <Badge tone={values.enabled ? "accent2" : "soft"}>{values.enabled ? "Offered to buyers" : "Switched off"}</Badge>
+        )
+      }
+    >
       {values === null ? (
-        <div className="h-56 animate-pulse rounded-2xl border border-line bg-card" aria-busy />
+        <div className="h-40 animate-pulse rounded-xl bg-soft/10" aria-busy />
       ) : (
         <form
-          className="flex flex-col gap-3 rounded-2xl border border-gold/50 bg-card p-5 shadow-sm"
+          className="flex flex-col gap-4"
           onSubmit={async (e) => {
             e.preventDefault();
             setBusy(true);
@@ -996,162 +629,314 @@ function OperatorBankForm() {
             }
           }}
         >
-          {(
-            [
-              ["accountHolder", "Account name", "YWAM Potch"],
-              ["bank", "Bank", "FNB"],
-              ["accountNumber", "Account number", "62000000001"],
-              ["branchCode", "Branch code", "250655"],
-            ] as const
-          ).map(([field, label, placeholder]) => (
-            <label key={field} className="flex flex-col gap-1">
-              <span className="text-xs font-semibold uppercase tracking-wide text-accent2">{label}</span>
-              <input
-                value={values[field]}
-                onChange={(e) => set({ [field]: e.target.value })}
-                placeholder={placeholder}
-                className="rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
-              />
-            </label>
-          ))}
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(
+              [
+                ["accountHolder", "Account name", "YWAM Potch"],
+                ["bank", "Bank", "FNB"],
+                ["accountNumber", "Account number", "62000000001"],
+                ["branchCode", "Branch code", "250655"],
+              ] as const
+            ).map(([field, label, placeholder]) => (
+              <label key={field} className="flex flex-col gap-1">
+                <span className={labelCls}>{label}</span>
+                <input value={values[field]} onChange={(e) => set({ [field]: e.target.value })} placeholder={placeholder} className={inputCls} />
+              </label>
+            ))}
+          </div>
 
-          <label className="mt-1 flex items-center gap-2 text-sm text-ink">
-            <input
-              type="checkbox"
-              checked={values.enabled}
-              onChange={(e) => set({ enabled: e.target.checked })}
-              className="size-4 accent-accent"
-            />
-            Offer &ldquo;Pay by EFT&rdquo; to buyers
+          <label className="flex items-center justify-between gap-4 rounded-xl border border-line bg-paper px-4 py-3">
+            <span>
+              <span className="block text-sm font-medium text-ink">Offer &ldquo;Pay by EFT&rdquo; to buyers</span>
+              <span className="block text-xs text-soft">Off, and no buyer sees the bank transfer option at checkout.</span>
+            </span>
+            <Switch checked={values.enabled} onChange={(on) => set({ enabled: on })} label="Offer Pay by EFT to buyers" />
           </label>
 
-          <div className="mt-1 flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-            >
+          <div className="flex items-center gap-3">
+            <button type="submit" disabled={busy} className={btnPrimary}>
               {busy ? "Saving…" : "Save"}
             </button>
             {error && <span className="text-xs text-danger">{error}</span>}
-            {done && !error && <span className="text-xs text-soft">Saved.</span>}
+            {done && !error && <span className="text-xs text-accent2">Saved.</span>}
           </div>
         </form>
       )}
-    </section>
+    </Panel>
   );
 }
 
-// Ledger amounts, in the shared spelling. The hardcoded `R ` prefix is gone:
-// every row in this panel is Rand today, but the currency beats a prefix that is
-// right by coincidence. `en-ZA` stays explicit, because a cash log the operator
-// reconciles against a bank statement must not change shape with the browser's
-// locale.
-function formatRand(cents: number): string {
-  return formatMoney(cents, "ZAR", { locale: "en-ZA" });
+// The one toggle switch, shared by the collection account and the tenant flags.
+function Switch({ checked, onChange, disabled, label }: { checked: boolean; onChange: (on: boolean) => void; disabled?: boolean; label: string }) {
+  return (
+    <span className="relative inline-flex shrink-0 cursor-pointer items-center">
+      <input
+        type="checkbox"
+        role="switch"
+        aria-label={label}
+        checked={checked}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer sr-only"
+      />
+      <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] motion-reduce:after:transition-none peer-checked:bg-accent2 peer-checked:after:translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-disabled:opacity-60" />
+    </span>
+  );
 }
 
-function PayoutRow({ owed }: { owed: FunctionReturnType<typeof api.ledger.owedPayouts>[number] }) {
-  const markPaid = useMutation(api.ledger.markPaid);
-  const [reference, setReference] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
+// =============================================================================
+// Sales
+// =============================================================================
+
+// The Sales tab (.scratch/admin-sales): which courses and which editions sold how
+// much over a chosen period. The period is chosen with quick presets or a custom
+// date range, both feeding `sales.report` as ms bounds. Sys-admin gated
+// server-side, so the query is never answered for anyone else.
+const SALES_PRESETS: { key: SalesPreset; label: string }[] = [
+  { key: "7d", label: "7 days" },
+  { key: "30d", label: "30 days" },
+  { key: "month", label: "This month" },
+  { key: "all", label: "All time" },
+  { key: "custom", label: "Custom" },
+];
+
+type SalesCourse = FunctionReturnType<typeof api.sales.report>[number];
+
+function SalesManager() {
+  const [preset, setPreset] = useState<SalesPreset>("30d");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  // `salesRange` floors `now` to the day, so these args are stable across
+  // renders. A raw `Date.now()` here would make useQuery loop forever.
+  const range = salesRange(preset, from, to, Date.now());
+  const report = useQuery(api.sales.report, range);
+  const totalGross = report?.reduce((sum, c) => sum + c.gross, 0);
+  const totalCount = report?.reduce((sum, c) => sum + c.count, 0);
+  const ranked = report ? rankLanguages(report) : [];
+  const toggle = (id: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   return (
-    <li className="rounded-xl border border-gold/40 bg-card px-4 py-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <b className="block truncate text-sm font-semibold text-ink">{owed.email}</b>
-          <span className="text-xs text-soft">
-            {owed.payout
-              ? `${owed.payout.accountHolder} · ${owed.payout.bank} · ${owed.payout.accountNumber} · branch ${owed.payout.branchCode}`
-              : "No bank details on file — ask the seller before paying out"}
-          </span>
+    <div className="flex flex-col gap-8">
+      <PageHeader
+        title="Sales"
+        hint="What each course and edition sold in a period."
+        actions={<Segmented label="Period" options={SALES_PRESETS} value={preset} onChange={setPreset} />}
+      />
+      {preset === "custom" && (
+        <div className="-mt-4 flex flex-wrap items-center gap-3 text-sm text-soft">
+          <label className="flex items-center gap-2">
+            From
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={`${inputCls} py-1.5`} />
+          </label>
+          <label className="flex items-center gap-2">
+            To
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className={`${inputCls} py-1.5`} />
+          </label>
         </div>
-        <span className="shrink-0 rounded-full bg-gold/15 px-2.5 py-1 text-sm font-bold tabular-nums text-gold">
-          {formatRand(owed.totalOwed)}
-        </span>
-      </div>
-      <p className="mt-1.5 text-xs text-soft">
-        {owed.sales.length} item{owed.sales.length === 1 ? "" : "s"} ·{" "}
-        {/* A donation has no Edition, so the query hands back a null `lang` and
-            the kind to label it with (ADR 0027) — donations settle through this
-            same tab, alongside the payee's sales. A voucher batch DOES have an
-            Edition, so it needs the kind too or it reads as an ordinary sale of
-            that language at a bulk price (ADR 0029). */}
-        {owed.sales
-          .map((s) => {
-            const what = s.kind === "donation" ? "donation" : s.kind === "batch" ? `${s.lang} batch` : s.lang;
-            return `${what} ${formatRand(s.sellerShare)}`;
-          })
-          .join(", ")}
-      </p>
-      <form
-        className="mt-2.5 flex flex-wrap items-center gap-2"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          setBusy(true);
-          setError(false);
-          try {
-            await markPaid({ ids: owed.sales.map((s) => s.id), reference });
-            setReference("");
-          } catch {
-            setError(true);
-          } finally {
-            setBusy(false);
-          }
-        }}
-      >
-        <input
-          value={reference}
-          onChange={(e) => setReference(e.target.value)}
-          placeholder="EFT reference"
-          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-1.5 text-sm focus:border-gold focus:outline-none"
+      )}
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Gross" icon="tag" tone="gold" value={totalGross === undefined ? undefined : formatRand(totalGross)} />
+        <StatTile label="Sales" icon="chart" tone="accent2" value={totalCount === undefined ? undefined : String(totalCount)} />
+        <StatTile
+          label="Courses sold"
+          icon="book"
+          value={report === undefined ? undefined : String(report.length)}
+          hint={report && `${plural(ranked.length, "language")}`}
         />
-        <button
-          type="submit"
-          disabled={busy || !reference.trim()}
-          className="rounded-lg bg-accent px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
-        >
-          {busy ? "Recording…" : "Mark paid"}
-        </button>
-        {error && <span className="text-xs text-danger">Failed — retry</span>}
-      </form>
-    </li>
+        <StatTile
+          label="Average sale"
+          icon="check"
+          value={totalGross === undefined || totalCount === undefined ? undefined : totalCount === 0 ? "None" : formatRand(Math.round(totalGross / totalCount))}
+        />
+      </div>
+
+      <Panel title="Sales by day" hint="One column per day, stacked by edition language. A language keeps its colour in the table below.">
+        <SalesDayChart range={range} ranked={ranked} />
+      </Panel>
+
+      <Panel title="By course" hint="Open a course for its per-edition breakdown." flush>
+        <DataTable<SalesCourse>
+          rows={report}
+          rowKey={(c) => c.topicId}
+          empty="No sales in this period."
+          expanded={(c) =>
+            open.has(c.topicId) ? (
+              <ul className="flex flex-col divide-y divide-line/60">
+                {c.editions.map((e) => (
+                  <li key={e.lang} className="flex items-center justify-between gap-3 py-1.5 text-sm">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span className="inline-block h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: colorVar(e.lang, ranked) }} aria-hidden />
+                      <span className="truncate text-ink">{e.title}</span>
+                      <Badge tone="soft">{e.lang}</Badge>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-4 tabular-nums">
+                      <span className="text-soft">{plural(e.count, "sale")}</span>
+                      <span className="w-24 text-end font-medium text-ink">{formatRand(e.gross)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null
+          }
+          columns={[
+            {
+              key: "course",
+              header: "Course",
+              cell: (c) => (
+                <button type="button" onClick={() => toggle(c.topicId)} aria-expanded={open.has(c.topicId)} className="flex min-w-0 items-center gap-2 text-start">
+                  <Icon name="chevron" className={`h-4 w-4 shrink-0 text-soft transition-transform motion-reduce:transition-none ${open.has(c.topicId) ? "" : "-rotate-90"}`} />
+                  <span className="truncate font-medium text-ink">{c.courseTitle}</span>
+                </button>
+              ),
+            },
+            {
+              key: "editions",
+              header: "Editions",
+              cell: (c) => (
+                <div className="flex flex-wrap gap-1">
+                  {c.editions.map((e) => (
+                    <span key={e.lang} className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-soft">
+                      <span className="inline-block h-2 w-2 rounded-[2px]" style={{ background: colorVar(e.lang, ranked) }} aria-hidden />
+                      {e.lang}
+                    </span>
+                  ))}
+                </div>
+              ),
+            },
+            { key: "count", header: "Sales", align: "end", cell: (c) => <span className="tabular-nums text-ink">{c.count}</span> },
+            {
+              key: "share",
+              header: "Share",
+              cell: (c) => <Meter fraction={totalGross ? c.gross / totalGross : 0} label={totalGross ? `${Math.round((c.gross / totalGross) * 100)}%` : undefined} />,
+            },
+            { key: "gross", header: "Gross", align: "end", cell: (c) => <Amount>{formatRand(c.gross)}</Amount> },
+          ]}
+        />
+      </Panel>
+    </div>
   );
 }
 
-// Who may sell (paid marketplace, ADR 0016 / PayFast rail). The Admin grants a
-// User the **can-sell** capability here; the Seller then saves their payout bank
-// details on their own (the status column reflects how far they've got).
-// Revoking stops new pricing but leaves already-sold access intact.
-function SellersManager() {
-  const sellers = useQuery(api.sellers.listSellers);
+// The sales-by-day chart (dataviz skill): one column per day of the chosen
+// period, height = that day's sale count on one shared axis, stacked into
+// per-edition segments coloured by language. The language to colour mapping
+// comes from the whole period's ranking (`rankLanguages`), so a language keeps
+// its colour on every day and in the table below.
+function SalesDayChart({ range, ranked }: { range: { from?: number; to?: number }; ranked: readonly string[] }) {
+  const days = useQuery(api.sales.byDay, range);
+  const order = (lang: string) => {
+    const i = ranked.indexOf(lang);
+    return i < 0 ? ranked.length : i;
+  };
   return (
-    <section className="mt-12">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold tracking-tight text-accent">Sellers</h2>
-        <p className="mt-0.5 text-sm text-soft">Who may list paid courses</p>
+    <figure className="viz-chart">
+      <figcaption className="mb-4 flex justify-end">
+        <VizLegend series={ranked.slice(0, VIZ_SLOTS).map((lang) => ({ key: lang, label: lang.toUpperCase(), color: colorVar(lang, ranked) }))} />
+      </figcaption>
+      {days === undefined ? (
+        <div className="h-40 animate-pulse rounded-lg bg-soft/10" aria-busy />
+      ) : (
+        <DayStackChart
+          columns={days.map((d) => ({
+            dayMs: d.dayMs,
+            // Sorted by the period-wide rank, top seller on the baseline, so the
+            // stack order is identical on every column.
+            segments: [...d.editions]
+              .sort((a, b) => order(a.lang) - order(b.lang))
+              .map((e) => ({ key: e.lang, label: `${e.lang.toUpperCase()} · ${formatRand(e.gross)}`, value: e.count, color: colorVar(e.lang, ranked) })),
+          }))}
+          empty="No sales in this period."
+          zero="No sales"
+        />
+      )}
+    </figure>
+  );
+}
+
+// =============================================================================
+// Access (Allowlist + Sellers)
+// =============================================================================
+
+type AllowRow = FunctionReturnType<typeof api.whitelist.list>[number];
+type Seller = FunctionReturnType<typeof api.sellers.listSellers>[number];
+
+// The Access tab (sys-admin only, so `whitelist.list`, which rejects non-admins
+// server-side, is never queried by anyone else): who may create courses, and
+// who may sell them.
+function AllowlistManager() {
+  const rows = useQuery(api.whitelist.list);
+  const sellers = useQuery(api.sellers.listSellers);
+  const sorted = rows?.slice().sort((a, b) => Number(b.isAdmin) - Number(a.isAdmin) || a.email.localeCompare(b.email));
+  const ready = sellers?.filter((s) => s.status === "ready").length;
+
+  return (
+    <div className="flex flex-col gap-8">
+      <PageHeader title="Access" hint="Who is admitted to create courses, and which of them may list paid ones." />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Admitted" icon="users" value={rows && String(rows.length)} hint={rows && `${plural(rows.filter((r) => r.isAdmin).length, "admin")}`} />
+        <StatTile label="Sellers" icon="tag" tone="gold" value={sellers && String(sellers.length)} hint={sellers && ready !== undefined ? `${ready} ready to sell` : undefined} />
+        <StatTile
+          label="Missing payout details"
+          icon="lock"
+          tone={sellers && sellers.length - (ready ?? 0) > 0 ? "danger" : "soft"}
+          value={sellers && ready !== undefined ? String(sellers.length - ready) : undefined}
+        />
       </div>
 
-      <GrantSellerForm />
+      <Panel title="Allowlist" hint="They can create courses with their account. The admin row cannot be removed." actions={<AddEmailForm />} flush>
+        <DataTable<AllowRow>
+          rows={sorted}
+          rowKey={(r) => r.email}
+          empty="Nobody admitted yet."
+          columns={[
+            { key: "email", header: "Email", cell: (r) => <Cell primary={r.email} /> },
+            { key: "role", header: "Role", cell: (r) => (r.isAdmin ? <Badge tone="accent">Admin</Badge> : <span className="text-xs text-soft">Member</span>) },
+            {
+              key: "actions",
+              header: "",
+              align: "end",
+              cell: (r) => (r.isAdmin ? <span className="text-xs text-soft">Can't be removed</span> : <RemoveEmailButton email={r.email} />),
+            },
+          ]}
+        />
+      </Panel>
 
-      {sellers === undefined ? (
-        <ul className="mt-6 flex flex-col gap-2" aria-busy>
-          {[0, 1].map((i) => (
-            <li key={i} className="h-12 animate-pulse rounded-xl border border-line bg-card" />
-          ))}
-        </ul>
-      ) : sellers.length === 0 ? (
-        <p className="mt-6 text-sm text-soft">No sellers yet.</p>
-      ) : (
-        <ul className="mt-6 flex flex-col gap-2">
-          {sellers.map((s) => (
-            <SellerRow key={s.email} email={s.email} status={s.status} />
-          ))}
-        </ul>
-      )}
-    </section>
+      {/* Who may sell (paid marketplace, ADR 0016 / PayFast rail). The Admin
+          grants a User the **can-sell** capability here; the Seller then saves
+          their payout bank details on their own (the status column reflects how
+          far they've got). Revoking stops new pricing but leaves already-sold
+          access intact. */}
+      <Panel title="Sellers" hint="Who may list paid courses. They set up payouts and price their finished courses themselves." actions={<GrantSellerForm />} flush>
+        <DataTable<Seller>
+          rows={sellers}
+          rowKey={(s) => s.email}
+          empty="No sellers yet."
+          columns={[
+            { key: "email", header: "Email", cell: (s) => <Cell primary={s.email} /> },
+            {
+              key: "status",
+              header: "Status",
+              cell: (s) => (s.status === "ready" ? <Badge tone="accent2">Ready</Badge> : <Badge tone="soft">No payout details</Badge>),
+            },
+            {
+              key: "payout",
+              header: "Payout account",
+              cell: (s) => (s.payout ? <Cell primary={s.payout.accountHolder} secondary={`${s.payout.bank} · ${s.payout.accountNumber} · branch ${s.payout.branchCode}`} /> : <span className="text-xs text-soft">Not saved yet</span>),
+            },
+            { key: "actions", header: "", align: "end", cell: (s) => <RevokeSellerButton email={s.email} status={s.status} /> },
+          ]}
+        />
+      </Panel>
+    </div>
   );
 }
 
@@ -1159,150 +944,274 @@ function SellersManager() {
 // with no account (you grant a User, not an address); the live list re-renders.
 function GrantSellerForm() {
   const grant = useMutation(api.sellers.grantCanSell);
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   return (
-    <form
-      className="flex flex-col gap-2 rounded-2xl border border-gold/50 bg-card p-5 shadow-sm"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        const addr = email.trim();
-        if (!addr) return;
-        setBusy(true);
-        setError(null);
-        try {
-          await grant({ email: addr });
-          setEmail("");
-        } catch {
-          setError("Couldn't grant — the person must have an account first.");
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Enable selling for</label>
-      <p className="text-sm text-soft">They can then set up payouts and price their finished courses.</p>
-      <div className="mt-1 flex gap-2">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            setError(null);
-          }}
-          placeholder="seller@example.com"
-          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
-        />
-        <button type="submit" disabled={busy} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60">
-          {busy ? "Granting…" : "Grant"}
-        </button>
-      </div>
-      {error && <p className="text-xs text-danger">{error}</p>}
-    </form>
+    <InlineEmailForm
+      placeholder="seller@example.com"
+      label="Grant selling"
+      busyLabel="Granting…"
+      failure="Couldn't grant. The person must have an account first."
+      onSubmit={(email) => grant({ email })}
+    />
   );
 }
 
-// One Seller row: email + readiness status + revoke. Revoke stops new pricing
-// (server-enforced) but does not touch courses they've already sold.
-function SellerRow({
-  email,
-  status,
-}: {
-  email: string;
-  status: SellerStatus;
-}) {
+// One Seller row's revoke. Revoke stops new pricing (server-enforced) but does
+// not touch courses they've already sold.
+function RevokeSellerButton({ email, status }: { email: string; status: SellerStatus }) {
   const revoke = useMutation(api.sellers.revokeCanSell);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
+  return <RowActionButton label="Revoke" busyLabel="Revoking…" aria={`Revoke selling for ${email} (${status})`} run={() => revoke({ email })} />;
+}
 
-  const label = status === "ready" ? "Ready" : "No payout details";
+// =============================================================================
+// Generation
+// =============================================================================
+
+type Run = FunctionReturnType<typeof api.routine.runHistory>[number];
+type TokenRow = FunctionReturnType<typeof api.routine.tokenUsageByTopic>[number];
+
+// The Generation tab (generation-observability, issue 04): what the Routine is
+// authoring right now over a history of past Generation Runs. All live Convex
+// queries (sys-admin-gated server-side), so they update on their own while open.
+function GenerationManager() {
+  const day = 86_400_000;
+  // The 30-day window is floored to the UTC day so the query args stay stable
+  // across renders (a raw Date.now() would resubscribe forever, see salesRange).
+  const to = Math.floor(Date.now() / day) * day + day; // start of tomorrow, UTC
+  const from = to - 30 * day;
+  const usage = useQuery(api.routine.usageByDay, { from, to });
+  const runs = useQuery(api.routine.runHistory);
+  const tokens = useQuery(api.routine.tokenUsageByTopic);
+
+  const generated = usage?.reduce((s, r) => s + r.generation, 0);
+  const translated = usage?.reduce((s, r) => s + r.translation, 0);
+  const failed = runs?.filter((r) => r.outcome === "failed").length;
+  const published = runs?.filter((r) => r.outcome === "published").length;
+  const tokenTotal = tokens?.reduce((s, r) => s + r.inputTokens + r.outputTokens, 0);
+  const unmeasured = tokens?.reduce((s, r) => s + r.runsWithoutUsage, 0);
 
   return (
-    <li className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-4 py-3">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="min-w-0 truncate text-sm text-ink">{email}</span>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
-            status === "ready" ? "bg-accent2/15 text-accent2" : "bg-hi text-soft"
-          }`}
-        >
-          {label}
-        </span>
+    <div className="flex flex-col gap-8">
+      <PageHeader title="Generation" hint="What the routine is building, and what it has built." />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Generated · 30 days" icon="refresh" tone="accent2" value={generated === undefined ? undefined : String(generated)} hint="lessons authored" />
+        <StatTile label="Translated · 30 days" icon="globe" value={translated === undefined ? undefined : String(translated)} hint="edition lessons" />
+        <StatTile
+          label="Recent runs"
+          icon="check"
+          tone={failed ? "danger" : "soft"}
+          value={runs && String(runs.length)}
+          hint={runs && published !== undefined && failed !== undefined ? `${published} published · ${failed} failed` : undefined}
+        />
+        <StatTile
+          label="Tokens reported"
+          icon="chart"
+          value={tokenTotal === undefined ? undefined : tokenTotal.toLocaleString()}
+          hint={unmeasured === undefined ? undefined : unmeasured > 0 ? `${plural(unmeasured, "run")} not measured` : "every run measured"}
+        />
       </div>
-      <div className="flex shrink-0 items-center gap-2">
-        {error && <span className="text-xs text-danger">Failed — retry</span>}
-        <button
-          onClick={async () => {
-            setBusy(true);
-            setError(false);
-            try {
-              await revoke({ email });
-            } catch {
-              setError(true);
-            } finally {
-              setBusy(false);
-            }
-          }}
-          disabled={busy}
-          className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
-          aria-label={`Revoke selling for ${email}`}
-        >
-          {busy ? "Revoking…" : "Revoke"}
-        </button>
-      </div>
-    </li>
+
+      {/* Daily generation + translation usage as stacked columns (generation on
+          the bottom, translation on top), on one shared count axis. */}
+      <Panel title="Activity · last 30 days" hint="Lessons the routine generated and translated, per day.">
+        <figure className="viz-chart">
+          <figcaption className="mb-4 flex justify-end">
+            <VizLegend
+              series={[
+                { key: "generation", label: "Generation", color: "var(--viz-1)" },
+                { key: "translation", label: "Translation", color: "var(--viz-2)" },
+              ]}
+            />
+          </figcaption>
+          {usage === undefined ? (
+            <div className="h-40 animate-pulse rounded-lg bg-soft/10" aria-busy />
+          ) : (
+            <DayStackChart
+              columns={usage.map((r) => ({
+                dayMs: r.dayMs,
+                segments: [
+                  { key: "generation", label: "Generation", value: r.generation, color: "var(--viz-1)" },
+                  { key: "translation", label: "Translation", value: r.translation, color: "var(--viz-2)" },
+                ],
+              }))}
+              empty="No generation or translation in the last 30 days."
+              zero="Nothing built"
+            />
+          )}
+        </figure>
+      </Panel>
+
+      <GeneratingNow />
+
+      <Panel title="History" hint="Recent runs, newest first." flush>
+        <DataTable<Run>
+          rows={runs}
+          rowKey={(r) => `${r.topicSlug}:${r.startedAt}`}
+          empty="No runs recorded yet."
+          columns={[
+            { key: "course", header: "Course", cell: (r) => <Cell primary={r.topicTitle} secondary={r.owner ? `by ${r.owner}` : undefined} /> },
+            {
+              key: "outcome",
+              header: "Outcome",
+              cell: (r) => <Badge tone={OUTCOME_TONE[r.outcome]}>{OUTCOME_LABEL[r.outcome]}</Badge>,
+            },
+            {
+              key: "result",
+              header: "Result",
+              cell: (r) =>
+                r.outcome === "published" && r.producedLessonTitle ? (
+                  <span className="text-ink">{r.producedLessonTitle}</span>
+                ) : r.outcome === "failed" && r.error ? (
+                  <span className="break-words text-xs text-danger">{r.error}</span>
+                ) : (
+                  <span className="text-xs text-soft">Nothing to do</span>
+                ),
+            },
+            {
+              key: "when",
+              header: "When",
+              align: "end",
+              cell: (r) => <span className="text-xs tabular-nums whitespace-nowrap text-soft">{timeAgo(r.endedAt)}</span>,
+            },
+          ]}
+        />
+      </Panel>
+
+      {/* Per-Topic token usage (cost instrumentation, technical-foundation/12).
+          Deliberately counts with no price and no currency anywhere: this
+          measures, it does not bill. "n of m runs not measured" is the point of
+          the surface as much as the totals are: a run whose runtime cannot count
+          its own tokens is recorded as unknown, so the totals are a floor. */}
+      <Panel title="Tokens" hint="Reported usage per course. Runs that cannot report are counted, not guessed." flush>
+        <DataTable<TokenRow>
+          rows={tokens}
+          rowKey={(r) => r.topicSlug}
+          empty="No runs recorded yet."
+          columns={[
+            { key: "course", header: "Course", cell: (r) => <Cell primary={r.topicTitle} secondary={r.models.length > 0 ? r.models.join(", ") : undefined} /> },
+            {
+              key: "runs",
+              header: "Runs",
+              cell: (r) => (
+                <span className="text-xs text-soft">
+                  {r.runsWithoutUsage > 0 ? `${r.runsWithoutUsage} of ${r.runs} not measured` : `${plural(r.runs, "run")} measured`}
+                </span>
+              ),
+            },
+            { key: "in", header: "Input", align: "end", cell: (r) => <span className="tabular-nums text-ink">{r.inputTokens.toLocaleString()}</span> },
+            { key: "out", header: "Output", align: "end", cell: (r) => <span className="tabular-nums text-ink">{r.outputTokens.toLocaleString()}</span> },
+          ]}
+        />
+      </Panel>
+    </div>
   );
 }
 
-// The Tenants tab (sys admin): a sidebar list of every tenant + a "+ New tenant"
-// action on the left, the selected tenant's stacked panel on the right. The list
-// is a live `listTenants` query (sys-admin-gated server-side). Selecting a tenant
-// — or creating one — opens its panel; nothing is selected on first load.
+const OUTCOME_LABEL: Record<Run["outcome"], string> = { published: "Published", nothing: "Caught up", failed: "Failed" };
+const OUTCOME_TONE: Record<Run["outcome"], "accent2" | "soft" | "danger"> = { published: "accent2", nothing: "soft", failed: "danger" };
+
+// The live "what's busy now" section, reading the generation lock via generatingNow.
+function GeneratingNow() {
+  const rows = useQuery(api.routine.generatingNow);
+  return (
+    <Panel title="Generating now" hint="Courses the routine is authoring this moment." actions={rows && rows.length > 0 ? <Badge tone="accent2">{plural(rows.length, "run")} live</Badge> : undefined}>
+      {rows === undefined ? (
+        <ListSkeleton rows={1} height="h-12" />
+      ) : rows.length === 0 ? (
+        <EmptyLine>Nothing generating right now.</EmptyLine>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {rows.map((r) => (
+            <li key={r.topicSlug} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-paper px-4 py-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent2/60" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-accent2" />
+                </span>
+                <span className="min-w-0 truncate text-sm font-medium text-ink">
+                  {r.topicTitle}
+                  {r.owner && <span className="ml-2 font-normal text-soft">· {r.owner}</span>}
+                </span>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {r.stale && <Badge tone="soft">Stale · will retry</Badge>}
+                {r.startedAt !== null && <span className="text-xs tabular-nums text-soft">{timeAgo(r.startedAt)}</span>}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+// =============================================================================
+// Tenants
+// =============================================================================
+
+// The Tenants tab (sys admin): a picker of every tenant plus a "New tenant" form
+// on the left, the selected tenant's stacked panel on the right. The list is a
+// live `listTenants` query (sys-admin-gated server-side). Selecting a tenant, or
+// creating one, opens its panel; nothing is selected on first load.
 function TenantsManager() {
   const tenants = useQuery(api.tenants.listTenants);
   const [selected, setSelected] = useState<string | null>(null);
 
   return (
-    <div className="grid gap-8 md:grid-cols-[16rem_1fr]">
-      <aside className="flex flex-col gap-4">
-        <NewTenantForm onCreated={setSelected} />
-        {tenants === undefined ? (
-          <ul className="flex flex-col gap-2" aria-busy>
-            {[0, 1, 2].map((i) => (
-              <li key={i} className="h-10 animate-pulse rounded-lg border border-line bg-card" />
-            ))}
-          </ul>
-        ) : tenants.length === 0 ? (
-          <p className="text-sm text-soft">No tenants yet — create one above.</p>
-        ) : (
-          <ul className="flex flex-col gap-1">
-            {tenants.map((t) => (
-              <li key={t.slug}>
-                <button
-                  onClick={() => setSelected(t.slug)}
-                  aria-current={selected === t.slug ? "true" : undefined}
-                  className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                    selected === t.slug ? "bg-hi text-accent" : "text-ink hover:bg-hi"
-                  }`}
-                >
-                  <span className="block truncate font-medium">{t.displayName}</span>
-                  <span className="block truncate text-xs text-soft">{t.slug}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </aside>
+    <div className="flex flex-col gap-8">
+      <PageHeader title="Tenants" hint="Each whitelabel subdomain: its brand, its feature flags, its courses and its members." />
+      <div className="grid gap-6 md:grid-cols-[17rem_1fr] md:items-start">
+        <aside className="flex flex-col gap-4 md:sticky md:top-6">
+          <Panel title="All tenants" hint={tenants && plural(tenants.length, "tenant")} flush>
+            {tenants === undefined ? (
+              <div className="p-3">
+                <ListSkeleton rows={3} height="h-11" />
+              </div>
+            ) : tenants.length === 0 ? (
+              <EmptyLine>No tenants yet. Create one below.</EmptyLine>
+            ) : (
+              <ul className="flex flex-col p-1.5">
+                {tenants.map((t) => {
+                  const on = selected === t.slug;
+                  return (
+                    <li key={t.slug}>
+                      <button
+                        onClick={() => setSelected(t.slug)}
+                        aria-current={on ? "true" : undefined}
+                        className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-start text-sm transition-colors ${
+                          on ? "bg-hi text-accent" : "text-ink hover:bg-hi/60"
+                        }`}
+                      >
+                        <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs font-bold uppercase ${on ? "bg-accent text-white" : "bg-paper text-soft"}`}>
+                          {t.displayName.slice(0, 1)}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium">{t.displayName}</span>
+                          <span className="block truncate text-xs text-soft">{t.slug}</span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </Panel>
+          <NewTenantForm onCreated={setSelected} />
+        </aside>
 
-      {selected === null ? (
-        <div className="grid place-items-center rounded-2xl border border-dashed border-line py-24 text-sm text-soft">
-          Select a tenant to manage its branding, flags, courses, and members.
-        </div>
-      ) : (
-        <TenantDetail slug={selected} role="sys" onRemoved={() => setSelected(null)} />
-      )}
+        {selected === null ? (
+          <div className="grid min-h-[20rem] place-items-center rounded-2xl border border-dashed border-line text-center text-sm text-soft">
+            <div className="flex flex-col items-center gap-2 px-6">
+              <span className="grid h-11 w-11 place-items-center rounded-full bg-hi text-soft">
+                <Icon name="globe" className="h-5 w-5" />
+              </span>
+              Select a tenant to manage its branding, flags, courses, and members.
+            </div>
+          </div>
+        ) : (
+          <TenantDetail slug={selected} role="sys" onRemoved={() => setSelected(null)} />
+        )}
+      </div>
     </div>
   );
 }
@@ -1318,146 +1227,134 @@ function NewTenantForm({ onCreated }: { onCreated: (slug: string) => void }) {
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <form
-      className="flex flex-col gap-2 rounded-2xl border border-gold/50 bg-card p-4 shadow-sm"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        setBusy(true);
-        setError(null);
-        try {
-          const { slug: created } = await create({ slug, displayName });
-          setSlug("");
-          setDisplayName("");
-          onCreated(created);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Couldn't create the tenant.");
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">New tenant</label>
-      <input
-        value={displayName}
-        onChange={(e) => {
-          setDisplayName(e.target.value);
+    <Panel title="New tenant" hint="A display name and the subdomain it lives at.">
+      <form
+        className="flex flex-col gap-2"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          setBusy(true);
           setError(null);
+          try {
+            const { slug: created } = await create({ slug, displayName });
+            setSlug("");
+            setDisplayName("");
+            onCreated(created);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Couldn't create the tenant.");
+          } finally {
+            setBusy(false);
+          }
         }}
-        placeholder="Display name"
-        className="min-w-0 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
-      />
-      <input
-        value={slug}
-        onChange={(e) => {
-          setSlug(e.target.value);
-          setError(null);
-        }}
-        placeholder="subdomain-slug"
-        className="min-w-0 rounded-lg border border-line bg-card px-3 py-2 text-sm lowercase focus:border-gold focus:outline-none"
-      />
-      <button
-        type="submit"
-        disabled={busy || !slug.trim() || !displayName.trim()}
-        className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60"
       >
-        {busy ? "Creating…" : "+ New tenant"}
-      </button>
-      {error && <p className="text-xs text-danger">{error}</p>}
-    </form>
+        <input
+          value={displayName}
+          onChange={(e) => {
+            setDisplayName(e.target.value);
+            setError(null);
+          }}
+          placeholder="Display name"
+          className={inputCls}
+        />
+        <input
+          value={slug}
+          onChange={(e) => {
+            setSlug(e.target.value);
+            setError(null);
+          }}
+          placeholder="subdomain-slug"
+          className={`${inputCls} lowercase`}
+        />
+        <button type="submit" disabled={busy || !slug.trim() || !displayName.trim()} className={btnPrimary}>
+          <Icon name="plus" className="h-4 w-4" />
+          {busy ? "Creating…" : "New tenant"}
+        </button>
+        {error && <p className="text-xs text-danger">{error}</p>}
+      </form>
+    </Panel>
   );
 }
 
 // The selected tenant's panel: the stacked-scroll layout the prototype settled on
-// (issue 06 / 19) — Theme, Flags, Courses, Members, Remove tenant as sections on
-// one scrolling page, no sub-navigation. This issue builds the shell + section
-// scaffolding; tickets 20–22 fill in each section's real content and mutations.
-// `displayName` comes from the public `getTheme` read (also serves both admin
-// tiers, so a tenant admin needs no extra query).
+// (issue 06 / 19): Theme, Flags, Donations, Courses, Members, Remove tenant as
+// panels on one scrolling page, no sub-navigation. `displayName` comes from the
+// public `getTheme` read (also serves both admin tiers, so a tenant admin needs
+// no extra query).
 //
-// `role` is which tier is looking. The panel shipped as "the sys-admin panel, minus
-// tabs" — the same sections for both tiers — which handed a tenant admin the
-// *provisioning* surface (flags, the global course pool, member allocation, delete
-// the tenant). A tenant admin manages what the sys admin allocated to them, so they
-// get Theme (their brand) and Courses read-only (what they were given); Flags,
-// Members, and Remove tenant are the allocator's and aren't rendered for them. The
-// mutations behind each are sys-admin-only server-side — this only stops drawing
-// controls that would refuse.
-//
-// That leaves a deliberately thin tenant panel for now: the reads a tenant admin
-// actually wants — their member roster and their payouts — are separate builds
-// (prior review items 5 and 6), each blocked on its own open decision.
+// `role` is which tier is looking. A tenant admin manages what the sys admin
+// allocated to them, so they get Theme (their brand) and Courses read-only (what
+// they were given); Flags, Donations, Members, and Remove tenant are the
+// allocator's and aren't rendered for them. The mutations behind each are
+// sys-admin-only server-side; this only stops drawing controls that would refuse.
 function TenantDetail({ slug, role, onRemoved }: { slug: string; role: "sys" | "tenant"; onRemoved?: () => void }) {
   const view = useQuery(api.tenantTheme.getTheme, { slug });
   const displayName = view?.displayName ?? slug;
   const isSys = role === "sys";
 
   return (
-    <div className="flex flex-col gap-10">
-      <div>
-        <h2 className="text-xl font-semibold tracking-tight text-accent md:text-2xl">{displayName}</h2>
-        <p className="mt-0.5 text-sm text-soft">{slug}.my-course.app</p>
+    <div className="flex min-w-0 flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          {view?.logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Convex storage URL, not a static asset.
+            <img src={view.logoUrl} alt="" className="h-10 w-10 shrink-0 rounded-xl border border-line bg-card object-contain p-1" />
+          ) : (
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-hi text-base font-bold uppercase text-accent">{displayName.slice(0, 1)}</span>
+          )}
+          <div className="min-w-0">
+            <h2 className="truncate text-xl font-semibold leading-heading tracking-heading text-accent md:text-2xl">{displayName}</h2>
+            <p className="truncate text-sm text-soft">{slug}.my-course.app</p>
+          </div>
+        </div>
+        {view && (
+          <div className="flex flex-wrap gap-1">
+            {FLAG_META.filter((f) => view.flags[f.key]).map((f) => (
+              <Badge key={f.key} tone="accent2">
+                {f.label}
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
 
-      <TenantSection title="Theme" hint="Brand palette, logo, favicon, home banner, and motto.">
+      <Panel title="Theme" hint="Brand palette, logo, favicon, home banner, and motto.">
         {view === undefined ? (
-          <span>Loading…</span>
+          <ListSkeleton rows={2} height="h-10" />
         ) : view === null ? (
-          <span>This tenant has no theme yet.</span>
+          <EmptyLine>This tenant has no theme yet.</EmptyLine>
         ) : (
           <ThemeEditor key={slug} slug={slug} view={view} />
         )}
-      </TenantSection>
+      </Panel>
       {isSys && (
-        <TenantSection title="Flags" hint="Which features are on for this tenant.">
+        <Panel title="Flags" hint="Which features are on for this tenant.">
           {view === undefined ? (
-            <span>Loading…</span>
+            <ListSkeleton rows={3} height="h-10" />
           ) : view === null ? (
-            <span>This tenant has no flags yet.</span>
+            <EmptyLine>This tenant has no flags yet.</EmptyLine>
           ) : (
             <FlagToggles key={slug} slug={slug} flags={view.flags} />
           )}
-        </TenantSection>
+        </Panel>
       )}
       {isSys && (
-        <TenantSection
-          title="Donations"
-          hint="Who this tenant's donation income is owed to. Set this before switching the Donations flag on."
-        >
+        <Panel title="Donations" hint="Who this tenant's donation income is owed to. Set this before switching the Donations flag on.">
           <DonationPayee key={slug} slug={slug} />
-        </TenantSection>
+        </Panel>
       )}
-      <TenantSection
-        title="Courses"
-        hint={isSys ? "Which courses belong to this tenant." : "The courses allocated to this tenant."}
-      >
+      <Panel title="Courses" hint={isSys ? "Which courses belong to this tenant." : "The courses allocated to this tenant."}>
         <TenantCourses slug={slug} canAllocate={isSys} />
-      </TenantSection>
+      </Panel>
       {isSys && (
-        <TenantSection title="Members" hint="Who belongs to this tenant, and its admins.">
+        <Panel title="Members" hint="Who belongs to this tenant, and its admins.">
           <TenantMembers slug={slug} />
-        </TenantSection>
+        </Panel>
       )}
       {isSys && (
-        <TenantSection title="Remove tenant" hint="Delete this tenant. Blocked while any course or member still references it.">
+        <Panel title="Remove tenant" hint="Delete this tenant. Blocked while any course or member still references it." tone="danger">
           <TenantRemoval slug={slug} displayName={displayName} onRemoved={onRemoved} />
-        </TenantSection>
+        </Panel>
       )}
     </div>
-  );
-}
-
-// One stacked section of the tenant panel: a titled, bordered block. The body is
-// placeholder scaffolding until 20–22 land — the headings + scroll structure are
-// what issue 19 delivers.
-function TenantSection({ title, hint, children }: { title: string; hint: string; children: ReactNode }) {
-  return (
-    <section>
-      <h3 className="text-lg font-semibold tracking-tight text-accent">{title}</h3>
-      <p className="mt-0.5 text-sm text-soft">{hint}</p>
-      <div className="mt-3 rounded-xl border border-dashed border-line bg-card px-4 py-6 text-sm text-soft">
-        {children}
-      </div>
-    </section>
   );
 }
 
@@ -1626,7 +1523,7 @@ function TenantRemoval({ slug, displayName, onRemoved }: { slug: string; display
               setBusy(false);
             }
           }}
-          className="rounded-lg border border-danger/50 px-3.5 py-1.5 text-sm font-medium text-danger transition-colors hover:bg-danger hover:text-white disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-danger"
+          className={btnDanger}
         >
           {busy ? "Removing…" : "Remove tenant"}
         </button>
@@ -1926,16 +1823,7 @@ function FlagToggles({ slug, flags }: { slug: string; flags: Partial<Record<Tena
               <b className="block text-[13.5px] font-semibold text-ink">{label}</b>
               <span className="text-[11.5px] text-soft">{hint}</span>
             </div>
-            <label className="relative inline-flex shrink-0 cursor-pointer items-center">
-              <input
-                type="checkbox"
-                checked={on}
-                disabled={busy !== null}
-                onChange={(e) => toggle(key, e.target.checked)}
-                className="peer sr-only"
-              />
-              <span className="relative h-6 w-10.5 rounded-full bg-line transition-colors after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition-transform after:content-[''] motion-reduce:after:transition-none peer-checked:bg-accent2 peer-checked:after:translate-x-4.5 peer-focus-visible:ring-2 peer-focus-visible:ring-accent peer-disabled:opacity-60" />
-            </label>
+            <Switch checked={on} disabled={busy !== null} onChange={(next) => void toggle(key, next)} label={label} />
           </div>
         );
       })}
@@ -2419,17 +2307,44 @@ function AssetSlot({
 }
 
 // Add an email to the Allowlist. The mutation normalises + validates; on success
-// the live list above re-renders with the new row, so there's nothing to do here
-// but clear the field.
+// the live list re-renders with the new row, so there's nothing to do here but
+// clear the field. It sits in the Allowlist panel's header, beside the list it
+// adds to. No autoFocus: the Allowlist is a list you come to read, and focusing
+// the field on mount scrolled the roster out of view on a phone.
 function AddEmailForm() {
   const addEmail = useMutation(api.whitelist.addEmail);
+  return (
+    <InlineEmailForm
+      placeholder="name@example.com"
+      label="Admit"
+      busyLabel="Adding…"
+      failure="Couldn't add. Check it's a valid email address."
+      onSubmit={(email) => addEmail({ email })}
+    />
+  );
+}
+
+// The one "type an email, press the button" form the Allowlist and Sellers
+// panels share. The field clears on success and stays put on a refusal.
+function InlineEmailForm({
+  placeholder,
+  label,
+  busyLabel,
+  failure,
+  onSubmit,
+}: {
+  placeholder: string;
+  label: string;
+  busyLabel: string;
+  failure: string;
+  onSubmit: (email: string) => Promise<unknown>;
+}) {
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   return (
     <form
-      className="flex flex-col gap-2 rounded-2xl border border-gold/50 bg-card p-5 shadow-sm"
+      className="flex flex-col items-end gap-1"
       onSubmit={async (e) => {
         e.preventDefault();
         const addr = email.trim();
@@ -2437,20 +2352,16 @@ function AddEmailForm() {
         setBusy(true);
         setError(null);
         try {
-          await addEmail({ email: addr });
+          await onSubmit(addr);
           setEmail("");
         } catch {
-          setError("Couldn't add — check it's a valid email address.");
+          setError(failure);
         } finally {
           setBusy(false);
         }
       }}
     >
-      <label className="text-xs font-semibold uppercase tracking-wide text-accent2">Admit an email</label>
-      <p className="text-sm text-soft">They can then create courses with their account.</p>
-      <div className="mt-1 flex gap-2">
-        {/* No autoFocus: the Allowlist is a list you come to read, and focusing
-            the field on mount scrolled the roster out of view on a phone. */}
+      <div className="flex gap-1.5">
         <input
           type="email"
           value={email}
@@ -2458,11 +2369,12 @@ function AddEmailForm() {
             setEmail(e.target.value);
             setError(null);
           }}
-          placeholder="name@example.com"
-          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-3 py-2 text-sm focus:border-gold focus:outline-none"
+          placeholder={placeholder}
+          className={`${inputCls} w-56 py-1.5`}
         />
-        <button type="submit" disabled={busy} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-accent/90 disabled:opacity-60">
-          {busy ? "Adding…" : "Add"}
+        <button type="submit" disabled={busy || !email.trim()} className={`${btnPrimary} py-1.5`}>
+          <Icon name="plus" className="h-4 w-4" />
+          {busy ? busyLabel : label}
         </button>
       </div>
       {error && <p className="text-xs text-danger">{error}</p>}
@@ -2470,46 +2382,9 @@ function AddEmailForm() {
   );
 }
 
-// One Allowlist row. The Admin's own row is marked and has no remove control —
-// the non-removable-Admin guard (also enforced server-side in removeEmail).
-function EmailRow({ email, isAdmin }: { email: string; isAdmin: boolean }) {
+// One Allowlist row's remove. The Admin's own row never gets one: the
+// non-removable-Admin guard (also enforced server-side in removeEmail).
+function RemoveEmailButton({ email }: { email: string }) {
   const removeEmail = useMutation(api.whitelist.removeEmail);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(false);
-
-  return (
-    <li className="flex items-center justify-between gap-3 rounded-xl border border-line bg-card px-4 py-3">
-      <div className="flex min-w-0 items-center gap-2">
-        <span className="min-w-0 truncate text-sm text-ink">{email}</span>
-        {isAdmin && (
-          <span className="shrink-0 rounded-full bg-hi px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent">Admin</span>
-        )}
-      </div>
-      {isAdmin ? (
-        <span className="shrink-0 text-xs text-soft">Can't be removed</span>
-      ) : (
-        <div className="flex shrink-0 items-center gap-2">
-          {error && <span className="text-xs text-danger">Failed — retry</span>}
-          <button
-            onClick={async () => {
-              setBusy(true);
-              setError(false);
-              try {
-                await removeEmail({ email });
-              } catch {
-                setError(true);
-              } finally {
-                setBusy(false);
-              }
-            }}
-            disabled={busy}
-            className="rounded-lg border border-line px-3 py-1.5 text-sm text-soft transition-colors hover:bg-hi hover:text-accent disabled:opacity-60"
-            aria-label={`Remove ${email}`}
-          >
-            {busy ? "Removing…" : "Remove"}
-          </button>
-        </div>
-      )}
-    </li>
-  );
+  return <RowActionButton label="Remove" busyLabel="Removing…" aria={`Remove ${email}`} run={() => removeEmail({ email })} />;
 }
