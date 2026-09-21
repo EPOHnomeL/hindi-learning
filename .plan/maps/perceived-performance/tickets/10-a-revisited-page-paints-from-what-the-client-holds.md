@@ -38,6 +38,13 @@ browser**: no dev server was listening on port 3000 during the session, and the
 - **What this is not:** offline reading. Both caches die with the tab, so the revocation
   question on `technical-foundation/05` does not reach this.
 
+**Addendum, same day.** A revisit still flashed a skeleton for a frame or two. The
+Convex hook reads its cached result synchronously and Next reuses a fresh cache node, so
+the source could not be pinned without a browser; the fix went to the placeholders instead.
+`ReaderSkeleton`, `CourseSkeleton` and `DashboardSkeleton` wear `.skeleton-hold`
+(`globals.css`), a zero-length animation whose 150ms delay holds them at opacity 0. A
+wait shorter than that paints nothing; a real wait still gets its skeleton.
+
 Walk to confirm, once the dev server has restarted: open a lesson, go to the next, go back,
 then to the dashboard and back into the course. None of those should show a skeleton; the
 first open of an unvisited lesson still does.
