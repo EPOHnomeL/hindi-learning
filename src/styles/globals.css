@@ -189,6 +189,26 @@ body {
   }
 }
 
+/* `.skeleton-hold`: a skeleton that resolves inside 150ms is never seen
+   (2026-09-21). Once revisited pages came from the client's own caches, the
+   reader, course and dashboard skeletons still painted for a frame or two on
+   the way to content the device already held, which read as a flash. The three
+   placeholders in ui.tsx wear this: a zero-length animation whose 150ms delay
+   holds opacity at 0 and then releases it, so a real wait still shows the
+   skeleton and a near-instant one shows nothing. Not motion, so it stays on
+   under prefers-reduced-motion. */
+@keyframes skeleton-hold {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.skeleton-hold {
+  animation: skeleton-hold 0s linear 150ms both;
+}
+
 /* ---------------------------------------------------------------------------
    `.chrome`: the ONE translucent material (fluid-interface 06). Every floating
    surface the content scrolls under wears this class and nothing else: the two

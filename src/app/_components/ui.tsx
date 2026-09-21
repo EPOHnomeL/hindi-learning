@@ -308,7 +308,7 @@ export function ReaderSkeleton({ aside = true }: { aside?: boolean }) {
   // Ragged widths so the body reads like paragraphs rather than a solid block.
   const lines = ["w-11/12", "w-full", "w-4/5", "w-full", "w-3/4", "w-11/12", "w-2/3"];
   return (
-    <div className="flex flex-col flex-1 gap-4 md:h-full md:flex-row">
+    <div className="skeleton-hold flex flex-col flex-1 gap-4 md:h-full md:flex-row">
       {/* Centred reading column, mirroring the lesson body's centred measure. */}
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Title + actions bar skeleton */}
@@ -358,7 +358,7 @@ function SidebarSkeleton() {
 // or the auth gate on a /courses/* deep link). Mirrors CourseShell's outer frame.
 export function CourseSkeleton() {
   return (
-    <div className="flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
+    <div className="skeleton-hold flex min-h-dvh flex-col md:h-screen md:flex-row md:overflow-hidden">
       <SidebarSkeleton />
       <section className="min-w-0 flex-1 md:overflow-hidden md:p-4">
         <ReaderSkeleton />
@@ -378,7 +378,7 @@ export function CourseSkeleton() {
 // jumping.
 export function DashboardSkeleton({ cards = 6 }: { cards?: number } = {}) {
   return (
-    <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
+    <div className="skeleton-hold mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
       <header className="mb-8 flex items-center gap-3">
         <div className="h-10 w-10 shrink-0 animate-pulse rounded-lg bg-soft/20" />
         <div className="flex flex-col gap-2">
