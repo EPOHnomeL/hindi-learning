@@ -35,6 +35,8 @@ export function SettingsPage() {
   const t = useTranslations("Settings");
   const tc = useTranslations("Common");
   const tf = useTranslations("Footer");
+  // "Courses", the same wording the reader sidebar uses for the way home.
+  const tr = useTranslations("Reader");
   const me = useQuery(api.users.me);
   // `undefined` while it loads, so neither the account section nor the seat section
   // flashes before the answer arrives.
@@ -45,6 +47,16 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-3 pb-8">
+      {/* Desktop needs a way out (2026-09-21): the tab bar that carries Home
+          is `md:hidden`, so once the Home gear started linking here instead of
+          opening a dialog, /settings was a dead end at desktop widths. */}
+      <Link
+        href="/"
+        aria-label={tr("backToCoursesLabel")}
+        className="mt-4 hidden w-fit items-center gap-1 rounded-lg px-1.5 py-1 text-sm text-soft transition-colors hover:bg-hi hover:text-accent md:flex"
+      >
+        <span aria-hidden className="inline-block rtl:-scale-x-100">←</span> {tr("backToCourses")}
+      </Link>
       <header className="flex h-16 items-center">
         <h1 className="text-2xl font-semibold leading-display tracking-display text-accent">{t("title")}</h1>
       </header>
