@@ -22,7 +22,9 @@ import { useTheme } from "./ThemeContext";
 // browser back button works. It absorbs everything SettingsDialog offers, the
 // display name above all: removing the Home gear from the mobile header left
 // this page as the display name's only door on a phone, and that name prints on
-// certificates. The gear (and its dialog) survives on desktop.
+// certificates. The desktop header's gear opened a SettingsDialog until
+// 2026-09-21; it now links here too, and that dialog is deleted, so this page
+// is the one settings surface at every width.
 //
 // Two languages, kept apart on purpose: the APP language (chrome locale) is an
 // account-level preference and lives here; the READING language (a course's

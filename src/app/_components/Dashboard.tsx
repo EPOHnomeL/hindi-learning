@@ -19,7 +19,6 @@ import { formatPrice } from "./Paygate";
 import { Logo } from "./Logo";
 import { missionPreview } from "./markdown";
 import { refusalMessage } from "./mutationRun";
-import { SettingsDialog } from "./SettingsDialog";
 import { CardFoot, CardTitleLink } from "./CourseCardParts";
 import { SiteFooter } from "./SiteFooter";
 import { useTenant, useTenantSlug } from "./TenantContext";
@@ -98,7 +97,6 @@ export function Dashboard() {
   const tc = useTranslations("Common");
   const ts = useTranslations("Settings");
   const tenant = useTenant();
-  const [prefsOpen, setPrefsOpen] = useState(false);
 
   // Keep the Offline Catalogue's last-known-good list (installable-app 05):
   // every resolve overwrites the cache, so what OfflineHome renders offline is
@@ -138,113 +136,123 @@ export function Dashboard() {
 
   return (
     <>
-      <div className="mx-auto min-h-dvh max-w-5xl px-4 py-8 md:py-12">
-        <header className="mb-8 flex items-end justify-between gap-4">
-          <div className="flex items-center gap-3">
-            {tenant?.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- Convex storage URL, not a static asset.
-              <img
-                src={tenant.logoUrl}
-                alt={tenant.displayName}
-                className="h-9 w-auto max-w-40 shrink-0 object-contain md:h-10 md:max-w-48"
-              />
-            ) : (
-              <Logo className="h-9 w-9 shrink-0 text-accent md:h-10 md:w-10" />
-            )}
-            <div>
-              <h1 className="text-2xl font-semibold leading-display tracking-display text-accent md:text-3xl">
-                {tenant?.displayName ?? "My Course"}
-              </h1>
-              {(tenant ? tenant.motto : tc("tagline")) && (
-                <p className="mt-0.5 text-sm text-soft">{tenant ? tenant.motto : tc("tagline")}</p>
+      {/* The home screen sits on the same `.cert-stage` atmosphere as the
+          sign-in section of the landing page (2026-09-21): drifting aurora
+          blobs and a faint gold-fleck field over paper, brand-coloured from
+          the live palette tokens, so a signed-in learner does not land on a
+          flat cream page after the page they signed in on. Full-bleed, with
+          the column inside it, because the wash reads as a band if it stops
+          at the content width. `z-10` on the column: the stage paints its
+          decoration in positioned pseudo-elements at z-0, which would
+          otherwise sit over in-flow content. */}
+      <div className="cert-stage min-h-dvh">
+        <div className="relative z-10 mx-auto max-w-5xl px-4 py-8 md:py-12">
+          <header className="mb-8 flex items-end justify-between gap-4">
+            <div className="flex items-center gap-3">
+              {tenant?.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- Convex storage URL, not a static asset.
+                <img
+                  src={tenant.logoUrl}
+                  alt={tenant.displayName}
+                  className="h-9 w-auto max-w-40 shrink-0 object-contain md:h-10 md:max-w-48"
+                />
+              ) : (
+                <Logo className="h-9 w-9 shrink-0 text-accent md:h-10 md:w-10" />
+              )}
+              <div>
+                <h1 className="text-2xl font-semibold leading-display tracking-display text-accent md:text-3xl">
+                  {tenant?.displayName ?? "My Course"}
+                </h1>
+                {(tenant ? tenant.motto : tc("tagline")) && (
+                  <p className="mt-0.5 text-sm text-soft">{tenant ? tenant.motto : tc("tagline")}</p>
+                )}
+              </div>
+            </div>
+            {/* On a phone the header keeps only the brand (mobile bottom nav,
+                2026-08-23): Admin is a tab in the bar, and the account controls
+                live on the /settings page. Desktop keeps the two that are not
+                tabs there, iconed and worded like the tab bar's own settings and
+                admin tabs. Sign out went on 2026-09-21: /settings carries it. */}
+            <div className="flex shrink-0 items-center gap-1 max-md:hidden">
+              {/* /settings, the page the mobile tab bar opens, not the old
+                  SettingsDialog (2026-09-21). The dialog carried three
+                  preferences; the page carries those plus the account email,
+                  the legal pages and sign out, and it is linkable and
+                  back-button-able. One settings surface now, not two. */}
+              <Link
+                href="/settings"
+                className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
+              >
+                <Icon name="settings" className="h-4 w-4 shrink-0" />
+                {ts("title")}
+              </Link>
+              {scope && scope.role !== "none" && (
+                // The label names the page the link opens: a sys admin lands on
+                // the platform dashboard ("Admin"), a tenant admin on their own
+                // tenant's panel, whose heading already reads "Tenant".
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-soft transition-colors hover:bg-hi hover:text-accent"
+                >
+                  <Icon name="users" className="h-4 w-4 shrink-0" />
+                  {scope.role === "tenant" ? "Tenant" : "Admin"}
+                </Link>
               )}
             </div>
-          </div>
-          {/* On a phone the header keeps only the brand (mobile bottom nav,
-              2026-08-23): Admin is a tab in the bar, and the account controls
-              live on the /settings page. Desktop keeps the two that are not
-              tabs there, as icons, matching the tab bar's own settings gear and
-              admin figures. Sign out went on 2026-09-21: /settings carries it,
-              and as the only worded control up here it read as the header's
-              main action. */}
-          <div className="flex shrink-0 items-center gap-1 max-md:hidden">
-            <button
-              onClick={() => setPrefsOpen(true)}
-              aria-label={ts("title")}
-              title={ts("title")}
-              className="rounded-lg p-1.5 text-soft transition-colors hover:bg-hi hover:text-accent"
-            >
-              <Icon name="settings" className="h-4 w-4" />
-            </button>
-            {scope && scope.role !== "none" && (
-              // The label names the page the link opens: a sys admin lands on
-              // the platform dashboard ("Admin"), a tenant admin on their own
-              // tenant's panel, whose heading already reads "Tenant". Worded as
-              // the tooltip now that the link is the tab bar's admin icon.
-              <Link
-                href="/admin"
-                aria-label={scope.role === "tenant" ? "Tenant" : "Admin"}
-                title={scope.role === "tenant" ? "Tenant" : "Admin"}
-                className="rounded-lg p-1.5 text-soft transition-colors hover:bg-hi hover:text-accent"
-              >
-                <Icon name="users" className="h-4 w-4" />
-              </Link>
-            )}
-          </div>
-        </header>
+          </header>
 
-        <HomeBanner />
+          <HomeBanner />
 
-        {courses === undefined ? (
-          // Sized from the last-known-good list, and matching what page.tsx drew
-          // during AuthLoading a moment earlier (perceived-performance ticket
-          // 06). This used to be a hardcoded three against that skeleton's six,
-          // so a cold load painted the course area at three different heights
-          // before any content arrived.
-          //
-          // `bg-soft/20`, not `bg-card`: the fill has to lift off paper to read
-          // as a placeholder at all, which is the convention `ui.tsx` records and
-          // this one call site had drifted from.
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy>
-            {Array.from({ length: gridCards }).map((_, i) => (
-              <div key={i} className="h-44 animate-pulse rounded-2xl border border-line bg-soft/20" />
-            ))}
-          </div>
-        ) : emptyLibrary ? (
-          <EmptyLibrary />
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {courses.map((c) => (
-              <CourseCard key={c.slug} course={c} />
-            ))}
-            {amAllowlisted && <NewCourseCard />}
-          </div>
-        )}
+          {courses === undefined ? (
+            // Sized from the last-known-good list, and matching what page.tsx drew
+            // during AuthLoading a moment earlier (perceived-performance ticket
+            // 06). This used to be a hardcoded three against that skeleton's six,
+            // so a cold load painted the course area at three different heights
+            // before any content arrived.
+            //
+            // `bg-soft/20`, not `bg-card`: the fill has to lift off paper to read
+            // as a placeholder at all, which is the convention `ui.tsx` records and
+            // this one call site had drifted from.
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-busy>
+              {Array.from({ length: gridCards }).map((_, i) => (
+                <div key={i} className="h-44 animate-pulse rounded-2xl border border-line bg-soft/20" />
+              ))}
+            </div>
+          ) : emptyLibrary ? (
+            <EmptyLibrary />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {courses.map((c) => (
+                <CourseCard key={c.slug} course={c} />
+              ))}
+              {amAllowlisted && <NewCourseCard />}
+            </div>
+          )}
 
-        {/* **These four reserve no space while they load, deliberately**
-            (perceived-performance ticket 06, which asked the question and this is
-            the answer). Each renders null for both `undefined` and `[]`, so they
-            do pop in. Reserving for them anyway would be worse, not better: most
-            learners hold no shared course, no purchase and no pending transfer,
-            so three placeholders that resolve to nothing would collapse the page
-            on nearly every load, and a collapse is a bigger shift than the
-            appearance it replaced. Nothing available before the query lands can
-            tell those cases apart, unlike the course grid, which has a
-            last-known-good count.
-            What makes that acceptable is position: all four sit BELOW the course
-            grid, so they push only the footer, never content being read. */}
-        <SharedSection />
-        {/* Above Purchased, deliberately: a transfer you are waiting on is more
-            urgent than the courses you already hold, and it must not sit below
-            the fold on a phone. */}
-        <AwaitingPaymentSection />
-        <PurchasedSection />
-        <AvailableSection />
+          {/* **These four reserve no space while they load, deliberately**
+              (perceived-performance ticket 06, which asked the question and this is
+              the answer). Each renders null for both `undefined` and `[]`, so they
+              do pop in. Reserving for them anyway would be worse, not better: most
+              learners hold no shared course, no purchase and no pending transfer,
+              so three placeholders that resolve to nothing would collapse the page
+              on nearly every load, and a collapse is a bigger shift than the
+              appearance it replaced. Nothing available before the query lands can
+              tell those cases apart, unlike the course grid, which has a
+              last-known-good count.
+              What makes that acceptable is position: all four sit BELOW the course
+              grid, so they push only the footer, never content being read. */}
+          <SharedSection />
+          {/* Above Purchased, deliberately: a transfer you are waiting on is more
+              urgent than the courses you already hold, and it must not sit below
+              the fold on a phone. */}
+          <AwaitingPaymentSection />
+          <PurchasedSection />
+          <AvailableSection />
+        </div>
       </div>
       {/* No global language select on the home screen (2026-08-25): language is
           chosen per course, from the card action row beside "Open course". */}
       <SiteFooter localePicker={false} />
-      {prefsOpen && <SettingsDialog onClose={() => setPrefsOpen(false)} />}
     </>
   );
 }
