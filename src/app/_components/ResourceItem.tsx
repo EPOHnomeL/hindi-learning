@@ -4,7 +4,7 @@ import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
 import { Icon } from "./icons";
 import { Markdown } from "./MarkdownView";
-import { resourceOpenMode } from "./readerDerive";
+import { renamedFilename, resourceOpenMode } from "./readerDerive";
 import { Modal } from "./ui";
 
 // One Resource in a reader sidebar. Shared by the authed reader (CourseShell) and
@@ -29,9 +29,71 @@ function StatusTag({ status }: { status?: string }) {
   return <span className="shrink-0 text-xs text-soft">{status}</span>;
 }
 
-export function ResourceItem({ resource, locked = false }: { resource: Resource; locked?: boolean }) {
+export function ResourceItem({
+  resource,
+  locked = false,
+  onRename,
+}: {
+  resource: Resource;
+  locked?: boolean;
+  // Owner-only, and absent everywhere else (a Viewer, the Guest reader, the
+  // dashboard). Given the already-extension-corrected filename to store.
+  onRename?: (filename: string) => void | Promise<void>;
+}) {
+  const t = useTranslations("Reader");
   const [open, setOpen] = useState(false);
+  // The rename draft, or null when the row is not being renamed. An uploaded
+  // file keeps whatever name the phone gave it ("DOC-20260921-WA0002.pdf") until
+  // someone can change it, and this row is the only place that name is ever seen.
+  const [draft, setDraft] = useState<string | null>(null);
   const { filename, kind, url, status } = resource;
+
+  // The pencil sits beside the row rather than inside it: the row itself is a
+  // link or a button, and a button inside a link is not a thing. Always visible
+  // wherever it applies, never hover-revealed (editing-obviousness).
+  const withRename = (row: React.ReactNode) =>
+    !onRename ? (
+      row
+    ) : (
+      <div className="flex items-center gap-0.5">
+        <div className="min-w-0 flex-1">{row}</div>
+        <button
+          type="button"
+          onClick={() => setDraft(filename)}
+          aria-label={t("rename")}
+          title={t("rename")}
+          className="shrink-0 rounded-lg p-2 text-soft transition-colors hover:bg-hi hover:text-accent md:p-1.5"
+        >
+          <Icon name="edit" className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    );
+
+  if (draft !== null && onRename) {
+    return (
+      <form
+        className="flex items-center gap-1 py-0.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const next = renamedFilename(filename, draft);
+          setDraft(null);
+          if (next) void onRename(next);
+        }}
+      >
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === "Escape" && setDraft(null)}
+          aria-label={t("rename")}
+          className="min-w-0 flex-1 rounded-lg border border-line bg-card px-2 py-1 text-sm focus:border-gold focus:outline-none"
+        />
+        <button type="submit" className="shrink-0 rounded-lg bg-accent2 px-2 py-1 text-xs text-white">
+          {t("save")}
+        </button>
+      </form>
+    );
+  }
 
   // Paid marketplace: a Resource past the free Preview is locked — a muted,
   // non-clickable row with a lock, so the file/link itself never opens.
@@ -57,26 +119,28 @@ export function ResourceItem({ resource, locked = false }: { resource: Resource;
   if (resourceOpenMode(filename, kind) === "dialog") {
     return (
       <>
-        <button type="button" onClick={() => setOpen(true)} className={`w-full text-start ${rowClass}`}>
-          <span className="min-w-0 truncate">
-            <span aria-hidden className="me-1 text-soft">📝</span>
-            {filename}
-          </span>
-          <StatusTag status={status} />
-        </button>
+        {withRename(
+          <button type="button" onClick={() => setOpen(true)} className={`w-full text-start ${rowClass}`}>
+            <span className="min-w-0 truncate">
+              <span aria-hidden className="me-1 text-soft">📝</span>
+              {filename}
+            </span>
+            <StatusTag status={status} />
+          </button>,
+        )}
         {open && <MarkdownResourceDialog title={filename} url={url} onClose={() => setOpen(false)} />}
       </>
     );
   }
 
-  return (
+  return withRename(
     <a href={url} target="_blank" rel="noopener noreferrer" className={rowClass}>
       <span className="min-w-0 truncate">
         <span aria-hidden className="me-1 text-soft">{kind === "url" ? "🔗" : "📄"}</span>
         {filename}
       </span>
       <StatusTag status={status} />
-    </a>
+    </a>,
   );
 }
 

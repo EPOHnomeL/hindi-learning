@@ -65,6 +65,32 @@ export const addResource = mutation({
   },
 });
 
+// Rename a Resource's label (2026-09-21). An uploaded file arrives named
+// whatever the phone or scanner called it ("DOC-20260921-WA0002.pdf"), which is
+// the name the reader sidebar then shows every learner for the life of the
+// course. Owner-only, and the label is all that moves: the blob, its hash and
+// the dedupe index are untouched, so renaming never affects what the row opens.
+// The extension is the client's business (`renamedFilename` carries it over,
+// since `resourceOpenMode` reads it); here it is just a non-empty string.
+export const renameResource = mutation({
+  args: { topicSlug: v.string(), resourceId: v.id("resources"), filename: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { topicSlug, resourceId, filename }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) throw new Error("unauthenticated");
+    const topic = await getOwnedTopic(ctx, userId, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const res = await ctx.db.get(resourceId);
+    // Belongs-to check, not just ownership of the named Topic: the id is the
+    // caller's to pick, so it has to be one of THIS Topic's rows.
+    if (!res || res.topicId !== topic._id) throw new Error("resource not found");
+    const name = filename.trim().slice(0, 200);
+    if (!name) throw new Error("name required");
+    await ctx.db.patch(resourceId, { filename: name });
+    return null;
+  },
+});
+
 // Add an external link Resource (no blob). Deduped by the URL within the Topic.
 export const addUrlResource = mutation({
   args: { topicSlug: v.string(), url: v.string(), label: v.optional(v.string()) },

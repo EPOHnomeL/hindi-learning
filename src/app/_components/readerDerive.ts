@@ -113,6 +113,20 @@ export function resourceOpenMode(filename: string, kind: "file" | "url"): "dialo
   return kind === "file" && /\.(md|markdown)$/i.test(filename) ? "dialog" : "tab";
 }
 
+// The filename to store when the owner renames a Resource in the sidebar
+// (2026-09-21). A Resource's filename is a display label everywhere except
+// `resourceOpenMode` above, which reads its extension to decide whether the row
+// opens the Markdown dialog or a new tab, so the original extension is carried
+// onto the new name unless the owner typed it themselves. Null means "nothing to
+// save": a blank name, or a name that lands back on the one already stored.
+export function renamedFilename(current: string, next: string): string | null {
+  const name = next.trim();
+  if (!name) return null;
+  const ext = current.match(/\.[A-Za-z0-9]+$/)?.[0] ?? "";
+  const full = ext && !name.toLowerCase().endsWith(ext.toLowerCase()) ? `${name}${ext}` : name;
+  return full === current ? null : full;
+}
+
 // What a clicked Resource link actually opens, resolved against the Resource list
 // the reader already holds (freshly-signed urls, never a baked-in expiring one).
 // Null is the graceful no-op (rich-media/11): the id isn't in the bundle because

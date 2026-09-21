@@ -11,6 +11,7 @@ import {
   internalNavTarget,
   nextLessonKey,
   resolveArtifactClick,
+  renamedFilename,
   resourceOpenMode,
   resourceTarget,
   resumeLessonKey,
@@ -135,6 +136,34 @@ describe("resourceOpenMode", () => {
   it("opens an external URL Resource in a new tab, even one ending .md", () => {
     // A `url` Resource is a link to open, never our Markdown dialog.
     expect(resourceOpenMode("https://example.com/readme.md", "url")).toBe("tab");
+  });
+});
+
+describe("renamedFilename", () => {
+  it("keeps the original extension, which is what decides how the Resource opens", () => {
+    expect(renamedFilename("DOC-20260921-WA0002.pdf", "From Refugee to Champion")).toBe(
+      "From Refugee to Champion.pdf",
+    );
+    expect(renamedFilename("notes.md", "Handbook notes")).toBe("Handbook notes.md");
+  });
+
+  it("does not double the extension when the owner typed it", () => {
+    expect(renamedFilename("a.pdf", "Handbook.pdf")).toBe("Handbook.pdf");
+    expect(renamedFilename("a.pdf", "Handbook.PDF")).toBe("Handbook.PDF");
+  });
+
+  it("trims, and refuses a blank name", () => {
+    expect(renamedFilename("a.pdf", "  Handbook  ")).toBe("Handbook.pdf");
+    expect(renamedFilename("a.pdf", "   ")).toBe(null);
+  });
+
+  it("leaves an extensionless original alone", () => {
+    expect(renamedFilename("Handbook", "Guide")).toBe("Guide");
+  });
+
+  it("is a no-op when the name is unchanged", () => {
+    expect(renamedFilename("a.pdf", "a.pdf")).toBe(null);
+    expect(renamedFilename("a.pdf", "a")).toBe(null);
   });
 });
 
