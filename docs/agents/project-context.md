@@ -251,6 +251,17 @@ this section is the current state.
     handled exception tagged `auth_token_refresh_failed`. The service-worker fetch
     guard (`c2049dd`) and the frameless `before_send` filter (PR #122) were both
     correct fixes for *other* shapes and stay.
+  - **That retry is confirmed working, and the remaining inbox noise was the
+    report itself** (verified 2026-09-21 against PostHog project 264778). The fix
+    went live with the 2026-09-18 deploy; since then every *unhandled* "Failed to
+    fetch" event has come from a bundle that 404s on the current deploy (a tab or
+    cached shell running an older build), and the only occurrence on the live
+    bundle was the handled give-up carrying `auth_token_refresh_failed: true`.
+    But it was captured as the raw `TypeError: Failed to fetch`, so PostHog
+    grouped it into the *same* issue as the crash and kept a fixed crash reading
+    as active/high. The give-up is now reported as `AuthTokenRefreshFailed` with
+    the original as `cause`, so it groups on its own. The old issues can be
+    resolved once that deploy is live.
   - **Source maps on PostHog do not cover every deploy.** The frames above reported
     "Could not find sourcemap" for chunks live on 2026-09-15, so when a stack is
     unreadable, `curl` the chunk and read the column before assuming a library.
