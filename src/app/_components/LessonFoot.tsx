@@ -68,7 +68,12 @@ export function LessonFootCard({
         onClick={() => {
           if (!completed) onAdvance();
         }}
-        className="flex items-center gap-3 rounded-2xl border border-accent bg-hi/40 px-4 py-4 transition-colors hover:bg-hi active:bg-hi"
+        // Opaque since 2026-09-21. The card was `bg-hi/40`, a 40% wash that let
+        // the lesson body show through the "Complete and continue" label and the
+        // lesson title under it, which is exactly the two lines a reader at the
+        // foot of the page has to read. Solid `bg-hi` now, so hover moves the
+        // border instead of the wash.
+        className="flex items-center gap-3 rounded-2xl border border-accent bg-hi px-4 py-4 transition-colors hover:border-gold active:border-gold"
       >
         <span className="min-w-0 flex-1">
           <span className="block text-[0.625rem] font-bold uppercase tracking-widest text-accent2">
