@@ -55,3 +55,23 @@ export function retryingTokenFetcher(
     }
   };
 }
+
+// The give-up is reported under its own name, not as the raw `TypeError: Failed
+// to fetch` it wraps. Verified in PostHog on 2026-09-21: since the retry shipped
+// (1883ad6, live from 2026-09-18) every unhandled "Failed to fetch" has come from
+// a bundle that no longer exists on the deploy, and the one post-fix occurrence
+// was this handled report, filed into the *same* error-tracking issue as the
+// crash because the type and message are identical. That kept a fixed crash
+// showing as active and high severity, and made "the retry worked and told us"
+// unreadable against "a learner's tab died". A distinct name and message splits
+// them, and the stack now points at first-party code instead of a minified
+// vendor frame with no source map.
+export class AuthTokenRefreshFailed extends Error {
+  constructor(
+    readonly attempts: number,
+    cause: unknown,
+  ) {
+    super(`Convex auth token refresh failed after ${attempts} attempt(s)`, { cause });
+    this.name = "AuthTokenRefreshFailed";
+  }
+}

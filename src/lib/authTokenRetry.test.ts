@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { retryingTokenFetcher } from "./authTokenRetry";
+import { AuthTokenRefreshFailed, retryingTokenFetcher } from "./authTokenRetry";
 
 const args = { forceRefreshToken: true };
 const noSleep = async () => undefined;
@@ -60,5 +60,19 @@ describe("retryingTokenFetcher", () => {
     const fetcher = retryingTokenFetcher(fetchToken, { delaysMs: [1], sleep: noSleep, onGiveUp: () => undefined });
     await fetcher({ forceRefreshToken: false });
     expect(fetchToken.mock.calls).toEqual([[{ forceRefreshToken: false }], [{ forceRefreshToken: false }]]);
+  });
+});
+
+describe("AuthTokenRefreshFailed", () => {
+  test("groups apart from the TypeError it wraps, and keeps it as the cause", () => {
+    const original = new TypeError("Failed to fetch");
+    const reported = new AuthTokenRefreshFailed(4, original);
+    // PostHog fingerprints on type and message, so both have to differ from the
+    // raw rejection or the handled report lands in the crash's issue.
+    expect(reported.name).toBe("AuthTokenRefreshFailed");
+    expect(reported.message).toBe("Convex auth token refresh failed after 4 attempt(s)");
+    expect(reported.cause).toBe(original);
+    expect(reported.attempts).toBe(4);
+    expect(reported.stack).toBeTruthy();
   });
 });

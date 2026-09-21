@@ -11,7 +11,7 @@ import { CountryProvider } from "./_components/CountryContext";
 import { LocaleSync } from "~/i18n/locale-client";
 import type { TenantSlug } from "~/lib/tenant";
 import { api } from "../../convex/_generated/api";
-import { retryingTokenFetcher } from "~/lib/authTokenRetry";
+import { AuthTokenRefreshFailed, retryingTokenFetcher } from "~/lib/authTokenRetry";
 import { isPostHogInitialized } from "./PostHogClient";
 
 // The Convex client refreshes a signed-in learner's token through the fetcher the
@@ -29,9 +29,16 @@ class RetryingAuthConvexClient extends ConvexReactClient {
       retryingTokenFetcher(fetchToken, {
         delaysMs: [1_000, 2_000, 4_000],
         onGiveUp: (error, attempts) => {
-          // Report it by name: the same TypeError, now handled and triageable.
+          // Report it under its own name. Capturing the raw TypeError put this
+          // handled report in the same error-tracking issue as the unhandled
+          // crash it replaces, so the inbox could not tell them apart (see
+          // authTokenRetry.ts, verified in PostHog 2026-09-21). The original
+          // travels as `cause`.
           if (isPostHogInitialized()) {
-            posthog.captureException(error, { auth_token_refresh_failed: true, attempts });
+            posthog.captureException(new AuthTokenRefreshFailed(attempts, error), {
+              auth_token_refresh_failed: true,
+              attempts,
+            });
           }
         },
       }),
