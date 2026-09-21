@@ -6,6 +6,8 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { getOwnedTopic } from "./topicAccess";
 import { scheduleInvite } from "./shares";
 import { shareRole } from "./shareGrants";
+import { grantsFor } from "./grants";
+import { learnerCompletion } from "./learners";
 import { preferEdition } from "./editionPreference";
 import { SOURCE_LANG } from "./sourceLang";
 
@@ -13,18 +15,25 @@ import { SOURCE_LANG } from "./sourceLang";
 // presses a button, we work out who is sitting on something they never used, and
 // we re-send them the one email that unblocks them.
 //
-//   1. Buyers who never started. An Entitlement on the course and not a single
-//      Progress row. They hold a seat and never opened it.
+//   1. Learners who never started. Exactly the Dashboard's "Not started" bucket,
+//      the people who have completed zero lessons.
 //   2. Invited translators who never signed up. A pending invite carrying the
 //      Editor role, so there is no account yet to hold the Share.
+//
+// **"Not started" means zero COMPLETED lessons, not "never opened".** That is the
+// operator's definition (2026-09-21) and, more to the point, it is the one the
+// Dashboard tab one click away already draws. Both now read it from the same
+// `learners.learnerCompletion` walk, so the chart saying 23 and the button saying
+// 4 is not a state this UI can get into. Someone who opened lesson one, read half
+// of it and never ticked it is precisely who this email is for.
 //
 // **Both audiences are the whole course, every language, not the Edition the
 // Sharing tab happens to be showing.** Scoping them per Edition is what the first
 // cut did and it was wrong in the obvious way: the operator sits on the English
-// source tab, where nobody is invited to translate and the buyers are spread
+// source tab, where nobody is invited to translate and the learners are spread
 // across af/bn/de/es, and both rows read zero while the Dashboard right next to
-// them lists the people by name. The link is what carries the language instead:
-// each recipient is mailed at their OWN Edition.
+// them listed the people by name. The link carries the language instead: each
+// recipient is mailed at their OWN Edition.
 //
 // Both ride the existing invite rail (convex/shares.ts scheduleInvite,
 // convex/email.ts): same Resend sender, same tenant branding, same best-effort
@@ -40,43 +49,32 @@ import { SOURCE_LANG } from "./sourceLang";
 // One nudge: who to mail, and which Edition to land them in.
 type Recipient = { email: string; lang: string };
 
-// Every account that has opened ANY lesson of this Topic. One range read at
-// `topicId`, which is how the Dashboard's rollup reads progress too: cheaper than
-// a per-buyer lookup once a course has more than a handful of seats, and it makes
-// "started" mean exactly what the Dashboard means by it.
-async function startedAccounts(ctx: QueryCtx, topicId: Id<"topics">): Promise<Set<Id<"users">>> {
-  const rows = await ctx.db
-    .query("progress")
-    .withIndex("by_topic_user_lesson", (q) => q.eq("topicId", topicId))
-    .collect();
-  return new Set(rows.map((r) => r.userId));
+// Which Edition to mail a learner at: the one they hold, preferring the source
+// when they hold several. Through `grantsFor`, which is the one place the grant
+// tables are read for a caller (ticket 28's boundary, and a boundary test keeps
+// it that way) and which also resolves a free published Edition, the grant that
+// is not a row. A learner can still hold nothing resolvable, and then the source
+// Edition is the honest fallback.
+async function editionFor(ctx: QueryCtx, topicId: Id<"topics">, userId: Id<"users">): Promise<string> {
+  const grants = await grantsFor(ctx, topicId, userId);
+  return preferEdition([...grants.keys()]) ?? SOURCE_LANG;
 }
 
-// The seat-holders of this course who have never opened it, whatever language
-// they hold. `entitlements` is the one table a seat is written to, whichever rail
-// sold it (PayFast, EFT, voucher, org Seat, Admin grant), so it is the whole
-// "bought it" audience; `enrollments` is legacy and read-only, nothing writes it.
-// A buyer holding several Editions is mailed ONCE, at the Edition `preferEdition`
-// picks, so two languages is not two emails. The owner is skipped, and so is a
-// row whose account is gone or has no email.
-async function unstartedBuyers(ctx: QueryCtx, topic: Doc<"topics">): Promise<Recipient[]> {
-  const held = await ctx.db
-    .query("entitlements")
-    .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
-    .collect();
-  const started = await startedAccounts(ctx, topic._id);
-
-  const langsByUser = new Map<Id<"users">, string[]>();
-  for (const e of held) {
-    if (e.userId === topic.ownerId || started.has(e.userId)) continue;
-    langsByUser.set(e.userId, [...(langsByUser.get(e.userId) ?? []), e.lang]);
-  }
-
+// The learners who have completed nothing, each with the Edition to mail them at.
+// The population and the "completed" rule are `learnerCompletion`'s, so this is
+// the Dashboard's "Not started" bucket and nothing else. An account with no email
+// (deleted, or never had one) is dropped rather than guessed at.
+async function notStartedLearners(ctx: QueryCtx, topic: Doc<"topics">): Promise<Recipient[]> {
+  const { completed, truncated } = await learnerCompletion(ctx, topic);
+  // Past the scan cap the walk refuses to guess, and so does this: mailing an
+  // audience computed from a partial scan is worse than mailing nobody.
+  if (truncated) return [];
   const out: Recipient[] = [];
-  for (const [userId, langs] of langsByUser) {
+  for (const [userId, marks] of completed) {
+    if (marks > 0) continue;
     const user = await ctx.db.get(userId);
-    const lang = preferEdition(langs);
-    if (user?.email && lang) out.push({ email: user.email, lang });
+    if (!user?.email) continue;
+    out.push({ email: user.email, lang: await editionFor(ctx, topic._id, userId) });
   }
   return out;
 }
@@ -120,15 +118,19 @@ async function ownedTopic(ctx: QueryCtx, topicSlug: string): Promise<{ topic: Do
 // How many people each nudge would reach, for the button subtitles and the
 // confirmations. Owner-only, and it counts rather than lists: the Sharing tab
 // only ever needs the number, and a count keeps the audience out of a client
-// payload. Course-wide, so it does not take a language.
+// payload. Course-wide, so it does not take a language. `truncated` mirrors the
+// Dashboard's: too much progress data to count, so the row says so instead of
+// showing a zero it cannot stand behind.
 export const nudgeAudience = query({
   args: { topicSlug: v.string() },
-  returns: v.object({ buyers: v.number(), translators: v.number() }),
+  returns: v.object({ notStarted: v.number(), translators: v.number(), truncated: v.boolean() }),
   handler: async (ctx, { topicSlug }) => {
     const { topic } = await ownedTopic(ctx, topicSlug);
+    const { truncated } = await learnerCompletion(ctx, topic);
     return {
-      buyers: (await unstartedBuyers(ctx, topic)).length,
+      notStarted: (await notStartedLearners(ctx, topic)).length,
       translators: (await pendingTranslators(ctx, topic._id)).length,
+      truncated,
     };
   },
 });
@@ -147,20 +149,20 @@ async function sendAll(
       topic: opts.topic,
       editionLang: lang,
       inviterEmail: opts.inviterEmail,
-      // A buyer holds a read seat; a pending translator was invited to edit.
+      // A learner holds a read seat; a pending translator was invited to edit.
       role: opts.kind === "reminder" ? "viewer" : "editor",
     });
   }
   return recipients.length;
 }
 
-// Remind every buyer of this course who has never opened it. Owner-only.
-export const remindUnstartedBuyers = mutation({
+// Remind every learner on this course who has completed nothing. Owner-only.
+export const remindNotStarted = mutation({
   args: { topicSlug: v.string() },
   returns: v.number(),
   handler: async (ctx, { topicSlug }) => {
     const { topic, ownerEmail } = await ownedTopic(ctx, topicSlug);
-    return await sendAll(ctx, await unstartedBuyers(ctx, topic), {
+    return await sendAll(ctx, await notStartedLearners(ctx, topic), {
       kind: "reminder",
       topic,
       inviterEmail: ownerEmail,

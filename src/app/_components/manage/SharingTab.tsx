@@ -135,8 +135,8 @@ export function SharingTab({
   const pricing = useQuery(api.market.editionPricing, { topicSlug });
   // Who the two nudges would reach on THIS Edition. Counts only, owner-only.
   const audience = useQuery(api.nudges.nudgeAudience, { topicSlug });
-  const remindBuyers = useMutationRun(
-    useMutation(api.nudges.remindUnstartedBuyers),
+  const remindNotStarted = useMutationRun(
+    useMutation(api.nudges.remindNotStarted),
     "Couldn't send the reminders",
   );
   const remindTranslators = useMutationRun(
@@ -449,22 +449,26 @@ export function SharingTab({
           this tab is showing: the operator sits on the English source, where
           nobody is invited to translate, so a per-Edition count read zero while
           the Dashboard listed the people by name. Each recipient is mailed at
-          their own Edition instead. A row with nobody to reach stays inert
-          rather than disappearing, so an empty audience is visible. */}
+          their own Edition instead. "Not started" is the Dashboard's own bucket,
+          zero lessons completed, read from the same walk so the two tabs cannot
+          print different numbers for the same people. A row with nobody to reach
+          stays inert rather than disappearing, so an empty audience is visible. */}
       <h3 className="px-1 pt-6 pb-1 text-[13px] font-normal text-soft">Reminders</h3>
 
       <WhatsAppRow
         icon="mail"
-        title="Remind buyers who never started"
+        title="Remind learners who never started"
         subtitle={
           audience === undefined
-            ? "Counting who holds a seat and never opened the course"
-            : audience.buyers === 0
-              ? "Every buyer of this course has opened it"
-              : `Email ${audience.buyers} ${audience.buyers === 1 ? "buyer" : "buyers"} across all languages who never opened the course`
+            ? "Counting who has completed no lessons yet"
+            : audience.truncated
+              ? "Too much progress data on this course to count the audience"
+              : audience.notStarted === 0
+                ? "Everyone on this course has completed at least one lesson"
+                : `Email the ${audience.notStarted} in the Dashboard's Not started, across all languages`
         }
-        onClick={audience && audience.buyers > 0 ? () => setConfirmNudge("buyers") : undefined}
-        right={audience && audience.buyers > 0 ? <Icon name="chevron" className="h-4 w-4 text-soft" /> : null}
+        onClick={audience && audience.notStarted > 0 ? () => setConfirmNudge("buyers") : undefined}
+        right={audience && audience.notStarted > 0 ? <Icon name="chevron" className="h-4 w-4 text-soft" /> : null}
       />
 
       <WhatsAppRow
@@ -633,15 +637,15 @@ export function SharingTab({
       {confirmNudge === "buyers" && (
         <ConfirmDialog
           title="Send the reminder?"
-          body={`${audience?.buyers ?? 0} ${audience?.buyers === 1 ? "person who holds" : "people who hold"} a seat on this course, in any language, and never opened it will get one email each, linking straight into the edition they hold.`}
-          extra={remindBuyers.error ? <p className="text-xs text-danger">{remindBuyers.error}</p> : undefined}
-          confirmLabel={remindBuyers.busy ? "Sending…" : "Send reminder"}
-          confirmDisabled={remindBuyers.busy}
+          body={`${audience?.notStarted ?? 0} ${audience?.notStarted === 1 ? "person has" : "people have"} completed no lessons on this course, in any language. That is the Dashboard's Not started. Each gets one email, linking straight into the edition they hold.`}
+          extra={remindNotStarted.error ? <p className="text-xs text-danger">{remindNotStarted.error}</p> : undefined}
+          confirmLabel={remindNotStarted.busy ? "Sending…" : "Send reminder"}
+          confirmDisabled={remindNotStarted.busy}
           onConfirm={() => {
-            void remindBuyers.run({ topicSlug }).then((sent) => {
+            void remindNotStarted.run({ topicSlug }).then((sent) => {
               if (sent === undefined) return;
               setConfirmNudge(null);
-              notify(sent === 1 ? "Reminder sent to 1 buyer" : `Reminder sent to ${sent} buyers`);
+              notify(sent === 1 ? "Reminder sent to 1 learner" : `Reminder sent to ${sent} learners`);
             });
           }}
           onClose={() => setConfirmNudge(null)}

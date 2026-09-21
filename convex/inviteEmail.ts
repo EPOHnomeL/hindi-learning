@@ -111,7 +111,8 @@ const roleNoun = (role: InviteData["role"]) => (role === "editor" ? "Editor" : "
 // - "granted"      — recipient already has an account; deep-link into the Edition.
 // - "invited"      — no account yet; link to sign-up.
 // - "role-changed" — an accepted Viewer↔Editor change; deep-link into the Edition.
-// - "reminder"     — a buyer who never started; deep-link into the Edition.
+// - "reminder"     — a learner who has completed nothing; deep-link into the
+//                    Edition they hold.
 // - "translator"   — an invited translator with no account; deep-link into
 //                    their Edition, whose URL renders sign-in in place (AppGate).
 export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Brand = DEFAULT_BRAND): RenderedEmail {
@@ -124,11 +125,14 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
   let lead: string;
   let cta: string;
   if (kind === "reminder") {
-    // The buyer paid and never opened it. No guilt, no "you haven't" scolding —
-    // just the door, named, with the language they bought on it.
+    // Nobody in this audience has ticked off a single lesson. They may well have
+    // opened the course, so the copy cannot say they never did. It also cannot
+    // say they bought it: the audience is every learner, which includes a seat
+    // shared with them and a free published Edition they simply read. No guilt,
+    // no scolding, just the door with their language on it.
     subject = `Your ${langName} edition of “${courseTitle}” is waiting`;
     heading = "Your course is waiting";
-    lead = `You have full access to ${edition} on ${BRAND}, and it’s still waiting for its first lesson. It’s yours for good — start whenever you’re ready.`;
+    lead = `You have full access to ${edition} on ${BRAND}, and not one lesson is ticked off yet. Open it and mark your first lesson complete whenever you’re ready.`;
     cta = "Start the course";
   } else if (kind === "translator") {
     // An invited translator with no account yet. The link deep-links at their own
@@ -167,8 +171,10 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
   // wrong reason on a payment email is exactly the kind of thing that reads as a
   // scam to someone who has just transferred money to a stranger's account.
   const because =
-    kind === "purchased" || kind === "reminder"
+    kind === "purchased"
       ? `You received this because you bought a course on ${BRAND}.`
+      : kind === "reminder"
+      ? `You received this because you have access to a course on ${BRAND}.`
       : `You received this because someone shared a course with you on ${BRAND}.`;
 
   const text = `${heading}\n\n${lead}\n\n${cta}: ${link}\n\n${because}\n`;

@@ -22,6 +22,14 @@ async function seedTopic(t: ReturnType<typeof convexTest>, ownerId: Id<"users">)
   return await t.run((ctx) => ctx.db.insert("topics", { ownerId, slug: "hindi", title: "Hindi", status: "active" }));
 }
 
+async function seedLessons(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, keys: string[]) {
+  await t.run(async (ctx) => {
+    for (const [i, key] of keys.entries()) {
+      await ctx.db.insert("lessons", { topicId, key, seq: i + 1, title: key });
+    }
+  });
+}
+
 // The scheduled sends, read back off the scheduler queue: each nudge is a
 // `sendInvite` job, so the queue is where "who got mailed, with what link" lives.
 async function scheduled(t: ReturnType<typeof convexTest>) {
@@ -31,46 +39,92 @@ async function scheduled(t: ReturnType<typeof convexTest>) {
     .map((j) => j.args[0] as { to: string; kind: string; link: string });
 }
 
-test("reminds the buyers of every language who have never opened the course", async () => {
+test("not started means zero COMPLETED lessons, so an opener with no marks is in", async () => {
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
-  const idleAf = await seedUser(t, "idle-af@example.com");
-  const idleEs = await seedUser(t, "idle-es@example.com");
-  const reader = await seedUser(t, "reader@example.com");
+  const untouched = await seedUser(t, "untouched@example.com");
+  const opener = await seedUser(t, "opener@example.com");
+  const finisher = await seedUser(t, "finisher@example.com");
   const topicId = await seedTopic(t, owner);
+  await seedLessons(t, topicId, ["0001-a", "0002-b"]);
 
   await t.run(async (ctx) => {
-    await ctx.db.insert("entitlements", { userId: idleAf, topicId, lang: "af" });
-    await ctx.db.insert("entitlements", { userId: idleEs, topicId, lang: "es" });
-    await ctx.db.insert("entitlements", { userId: reader, topicId, lang: "af" });
+    for (const userId of [untouched, opener, finisher]) {
+      await ctx.db.insert("entitlements", { userId, topicId, lang: "af" });
+    }
     // The owner's own seat is never nudged.
     await ctx.db.insert("entitlements", { userId: owner, topicId, lang: "en" });
-    // One opened lesson is the whole definition of "started".
-    await ctx.db.insert("progress", { userId: reader, topicId, lessonKey: "0001-a", status: "opened" });
+    // Opened lesson one and never ticked it: this is exactly who the email is for.
+    await ctx.db.insert("progress", { userId: opener, topicId, lessonKey: "0001-a", status: "opened" });
+    await ctx.db.insert("progress", { userId: finisher, topicId, lessonKey: "0001-a", status: "completed" });
   });
 
   const as = asUser(t, owner);
-  // The tab is showing the English source; the audience is still the course.
-  expect(await as.query(api.nudges.nudgeAudience, { topicSlug: "hindi" })).toEqual({ buyers: 2, translators: 0 });
+  expect(await as.query(api.nudges.nudgeAudience, { topicSlug: "hindi" })).toEqual({
+    notStarted: 2,
+    translators: 0,
+    truncated: false,
+  });
 
-  expect(await as.mutation(api.nudges.remindUnstartedBuyers, { topicSlug: "hindi" })).toBe(2);
+  expect(await as.mutation(api.nudges.remindNotStarted, { topicSlug: "hindi" })).toBe(2);
   const sent = await scheduled(t);
-  expect(sent.map((s) => s.to).sort()).toEqual(["idle-af@example.com", "idle-es@example.com"]);
+  expect(sent.map((s) => s.to).sort()).toEqual(["opener@example.com", "untouched@example.com"]);
   expect(sent.every((s) => s.kind === "reminder")).toBe(true);
-  // Each lands in the Edition they actually hold, not the tab's Edition.
-  expect(sent.find((s) => s.to === "idle-af@example.com")?.link).toBe(
-    "https://app.example.com/courses/hindi?lang=af",
-  );
-  expect(sent.find((s) => s.to === "idle-es@example.com")?.link).toBe(
-    "https://app.example.com/courses/hindi?lang=es",
-  );
 });
 
-test("a buyer holding several Editions is reminded once, at their preferred one", async () => {
+test("the reminder's audience is the Dashboard's Not started bucket, to the person", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner);
+  await seedLessons(t, topicId, ["0001-a", "0002-b", "0003-c", "0004-d"]);
+
+  // A deliberately mixed population: a buyer, a shared Viewer, a legacy
+  // enrollment, and someone who holds no grant at all and only has progress.
+  const buyer = await seedUser(t, "buyer@example.com");
+  const viewer = await seedUser(t, "viewer@example.com");
+  const enrolled = await seedUser(t, "enrolled@example.com");
+  const freeReader = await seedUser(t, "free@example.com");
+  const halfway = await seedUser(t, "halfway@example.com");
+
+  await t.run(async (ctx) => {
+    await ctx.db.insert("entitlements", { userId: buyer, topicId, lang: "af" });
+    await ctx.db.insert("shares", { topicId, viewerId: viewer, lang: "de", role: "editor" });
+    await ctx.db.insert("enrollments", { userId: enrolled, topicId, lang: "en" });
+    await ctx.db.insert("entitlements", { userId: halfway, topicId, lang: "en" });
+    await ctx.db.insert("progress", { userId: freeReader, topicId, lessonKey: "0001-a", status: "opened" });
+    await ctx.db.insert("progress", { userId: halfway, topicId, lessonKey: "0001-a", status: "completed" });
+    await ctx.db.insert("progress", { userId: halfway, topicId, lessonKey: "0002-b", status: "completed" });
+  });
+
+  const as = asUser(t, owner);
+  const stats = await as.query(api.dashboard.courseStats, { topicSlug: "hindi" });
+  const notStartedBucket = stats!.buckets.find((b) => b.key === "0")!.count;
+  const audience = await as.query(api.nudges.nudgeAudience, { topicSlug: "hindi" });
+
+  // Four of the five learners have completed nothing; `halfway` has two marks.
+  expect(notStartedBucket).toBe(4);
+  expect(audience.notStarted).toBe(notStartedBucket);
+
+  expect(await as.mutation(api.nudges.remindNotStarted, { topicSlug: "hindi" })).toBe(4);
+  const sent = await scheduled(t);
+  expect(sent.map((s) => s.to).sort()).toEqual([
+    "buyer@example.com",
+    "enrolled@example.com",
+    "free@example.com",
+    "viewer@example.com",
+  ]);
+  // Each lands in the Edition they hold; the free reader holds none, so source.
+  expect(sent.find((s) => s.to === "buyer@example.com")?.link).toBe("https://app.example.com/courses/hindi?lang=af");
+  expect(sent.find((s) => s.to === "viewer@example.com")?.link).toBe("https://app.example.com/courses/hindi?lang=de");
+  expect(sent.find((s) => s.to === "free@example.com")?.link).toBe("https://app.example.com/courses/hindi");
+});
+
+test("a learner holding several Editions is reminded once, at their preferred one", async () => {
   const t = convexTest(schema, modules);
   const owner = await seedUser(t, "owner@example.com");
   const buyer = await seedUser(t, "buyer@example.com");
   const topicId = await seedTopic(t, owner);
+  await seedLessons(t, topicId, ["0001-a"]);
 
   await t.run(async (ctx) => {
     await ctx.db.insert("entitlements", { userId: buyer, topicId, lang: "af" });
@@ -78,9 +132,7 @@ test("a buyer holding several Editions is reminded once, at their preferred one"
   });
 
   const as = asUser(t, owner);
-  expect(await as.query(api.nudges.nudgeAudience, { topicSlug: "hindi" })).toMatchObject({ buyers: 1 });
-  expect(await as.mutation(api.nudges.remindUnstartedBuyers, { topicSlug: "hindi" })).toBe(1);
-
+  expect(await as.mutation(api.nudges.remindNotStarted, { topicSlug: "hindi" })).toBe(1);
   const sent = await scheduled(t);
   expect(sent).toHaveLength(1);
   // `preferEdition` puts the source Edition ahead of whatever else they hold.
@@ -138,9 +190,7 @@ test("only the owner may see the audience or send either nudge", async () => {
 
   const as = asUser(t, stranger);
   await expect(as.query(api.nudges.nudgeAudience, { topicSlug: "hindi" })).rejects.toThrow(/topic not found/);
-  await expect(as.mutation(api.nudges.remindUnstartedBuyers, { topicSlug: "hindi" })).rejects.toThrow(
-    /topic not found/,
-  );
+  await expect(as.mutation(api.nudges.remindNotStarted, { topicSlug: "hindi" })).rejects.toThrow(/topic not found/);
   await expect(as.mutation(api.nudges.remindPendingTranslators, { topicSlug: "hindi" })).rejects.toThrow(
     /topic not found/,
   );
