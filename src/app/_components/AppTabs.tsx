@@ -75,7 +75,7 @@ function Tabs() {
       {onHome && last && (
         <Link
           href={`/courses/${last.topicSlug}/lessons/${last.lessonKey}`}
-          className="chrome chrome--card fixed inset-x-3 bottom-[4.75rem] z-40 flex items-center gap-3 rounded-2xl px-3 py-2.5 shadow-lg md:hidden"
+          className="chrome chrome--card chrome--solid fixed inset-x-3 bottom-[4.75rem] z-40 flex items-center gap-3 rounded-2xl px-3 py-2.5 shadow-lg md:hidden"
         >
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-hi text-sm font-bold text-accent">
             {lesson?.seq ?? "?"}
