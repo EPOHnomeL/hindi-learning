@@ -38,12 +38,18 @@ browser**: no dev server was listening on port 3000 during the session, and the
 - **What this is not:** offline reading. Both caches die with the tab, so the revocation
   question on `technical-foundation/05` does not reach this.
 
-**Addendum, same day.** A revisit still flashed a skeleton for a frame or two. The
-Convex hook reads its cached result synchronously and Next reuses a fresh cache node, so
-the source could not be pinned without a browser; the fix went to the placeholders instead.
-`ReaderSkeleton`, `CourseSkeleton` and `DashboardSkeleton` wear `.skeleton-hold`
-(`globals.css`), a zero-length animation whose 150ms delay holds them at opacity 0. A
-wait shorter than that paints nothing; a real wait still gets its skeleton.
+**Addendum, same day.** A revisit still flashed a skeleton for a frame or two. A 150ms
+opacity hold on the three skeletons (`.skeleton-hold`) was tried and **reverted** the same
+day (`2e29a8b`): the lesson route mounts two skeletons in a chain, `loading.tsx` and then
+the reader's own, and every fresh mount restarted the hold, so a real load flickered
+skeleton, blank, skeleton. Traced from source instead: the Convex hook reads its cached
+result synchronously (`use_queries.js`, `getLocalResults`), and Next reuses a visited
+sibling segment's cache node when the sidebar prefetch entry is `reusable`
+(`fill-lazy-items-till-leaf-with-head.js`, `hasReusablePrefetch`), which it is for five
+minutes after the first visit once `staleTimes.dynamic` is live. That setting is inlined
+at dev-server start, so the flash is expected until the server restarts. **The residual
+flash, if any survives a restart, has not been seen in a browser by an agent** and needs a
+walk with devtools before another fix is attempted.
 
 Walk to confirm, once the dev server has restarted: open a lesson, go to the next, go back,
 then to the dashboard and back into the course. None of those should show a skeleton; the
