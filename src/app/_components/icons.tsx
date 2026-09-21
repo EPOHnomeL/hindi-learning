@@ -39,9 +39,16 @@ export type IconName =
   | "arrow"
   | "play"
   | "pause"
-  | "phone";
+  | "phone"
+  | "mail";
 
 const PATHS: Record<IconName, ReactNode> = {
+  mail: (
+    <>
+      <rect x="2.5" y="5" width="19" height="14" rx="2" />
+      <path d="m3 7 9 6 9-6" />
+    </>
+  ),
   phone: (
     <>
       <rect x="6" y="2" width="12" height="20" rx="2" />

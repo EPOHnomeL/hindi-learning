@@ -133,6 +133,16 @@ export function SharingTab({
   const removeEdition = useMutationRun(useMutation(api.translate.removeEdition), t("updateError"));
 
   const pricing = useQuery(api.market.editionPricing, { topicSlug });
+  // Who the two nudges would reach on THIS Edition. Counts only, owner-only.
+  const audience = useQuery(api.nudges.nudgeAudience, { topicSlug, lang: edition.lang });
+  const remindBuyers = useMutationRun(
+    useMutation(api.nudges.remindUnstartedBuyers),
+    "Couldn't send the reminders",
+  );
+  const remindTranslators = useMutationRun(
+    useMutation(api.nudges.remindPendingTranslators),
+    "Couldn't send the reminders",
+  );
   const sellerStatus = useQuery(api.sellers.sellerStatus);
   const currentPricing = pricing?.find((p) => p.lang === edition.lang) ?? null;
 
@@ -148,6 +158,7 @@ export function SharingTab({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [confirmRetranslate, setConfirmRetranslate] = useState(false);
+  const [confirmNudge, setConfirmNudge] = useState<null | "buyers" | "translators">(null);
   const [retranslateEngine, setRetranslateEngine] = useState<Engine>(edition.engine);
 
   // Optimistic toggle states for responsive UX without layout snap or lag
@@ -432,6 +443,40 @@ export function SharingTab({
         right={completed ? <Icon name="chevron" className="h-4 w-4 text-soft" /> : null}
       />
 
+      {/* Nudges: the two manual re-sends. Both are owner-pressed and confirmed,
+          never scheduled, so nobody is mailed without the owner deciding to. The
+          counts come from the server; a row with nobody to reach stays inert
+          rather than disappearing, so the owner can see the audience is empty. */}
+      <h3 className="px-1 pt-6 pb-1 text-[13px] font-normal text-soft">Reminders</h3>
+
+      <WhatsAppRow
+        icon="mail"
+        title="Remind buyers who never started"
+        subtitle={
+          audience === undefined
+            ? "Counting who bought this edition without opening it"
+            : audience.buyers === 0
+              ? "Nobody is sitting on an unopened copy of this edition"
+              : `Email ${audience.buyers} ${audience.buyers === 1 ? "buyer" : "buyers"} who bought this edition but never opened it`
+        }
+        onClick={audience && audience.buyers > 0 ? () => setConfirmNudge("buyers") : undefined}
+        right={audience && audience.buyers > 0 ? <Icon name="chevron" className="h-4 w-4 text-soft" /> : null}
+      />
+
+      <WhatsAppRow
+        icon="edit"
+        title="Nudge invited translators"
+        subtitle={
+          audience === undefined
+            ? "Counting invited translators without an account"
+            : audience.translators === 0
+              ? "No invited translator of this edition is still without an account"
+              : `Email ${audience.translators} invited ${audience.translators === 1 ? "translator" : "translators"} to create an account and edit this edition`
+        }
+        onClick={audience && audience.translators > 0 ? () => setConfirmNudge("translators") : undefined}
+        right={audience && audience.translators > 0 ? <Icon name="chevron" className="h-4 w-4 text-soft" /> : null}
+      />
+
       {/* ── Section 3: Danger Zone (if not source language) ── */}
       {!edition.source && (
         <div className="mt-6 border-t border-line/40 pt-2">
@@ -578,6 +623,42 @@ export function SharingTab({
               .then((ok) => ok !== undefined && setConfirmRegenerate(false));
           }}
           onClose={() => setConfirmRegenerate(false)}
+        />
+      )}
+
+      {confirmNudge === "buyers" && (
+        <ConfirmDialog
+          title="Send the reminder?"
+          body={`${audience?.buyers ?? 0} ${audience?.buyers === 1 ? "person who bought" : "people who bought"} the ${edition.name} edition and never opened it will get one email, with a link straight into the course.`}
+          extra={remindBuyers.error ? <p className="text-xs text-danger">{remindBuyers.error}</p> : undefined}
+          confirmLabel={remindBuyers.busy ? "Sending…" : "Send reminder"}
+          confirmDisabled={remindBuyers.busy}
+          onConfirm={() => {
+            void remindBuyers.run({ topicSlug, lang: edition.lang }).then((sent) => {
+              if (sent === undefined) return;
+              setConfirmNudge(null);
+              notify(sent === 1 ? "Reminder sent to 1 buyer" : `Reminder sent to ${sent} buyers`);
+            });
+          }}
+          onClose={() => setConfirmNudge(null)}
+        />
+      )}
+
+      {confirmNudge === "translators" && (
+        <ConfirmDialog
+          title="Nudge the translators?"
+          body={`${audience?.translators ?? 0} invited ${audience?.translators === 1 ? "translator has" : "translators have"} no account on the ${edition.name} edition yet. Each gets one email asking them to create one, linked straight to the ${edition.name} edition they were invited to edit.`}
+          extra={remindTranslators.error ? <p className="text-xs text-danger">{remindTranslators.error}</p> : undefined}
+          confirmLabel={remindTranslators.busy ? "Sending…" : "Send nudge"}
+          confirmDisabled={remindTranslators.busy}
+          onConfirm={() => {
+            void remindTranslators.run({ topicSlug, lang: edition.lang }).then((sent) => {
+              if (sent === undefined) return;
+              setConfirmNudge(null);
+              notify(sent === 1 ? "Nudge sent to 1 translator" : `Nudge sent to ${sent} translators`);
+            });
+          }}
+          onClose={() => setConfirmNudge(null)}
         />
       )}
 
