@@ -33,9 +33,12 @@ how it is *translated* is `translation-and-locales`.
   are genuine open decisions.
 - **Verify before reasoning.** Every claim below was checked in the tree on
   2026-09-01: `topics` carries no draft/visibility field (only `status`, which is the
-  *authoring* lifecycle `seeded | active | completed`), and no delete mutation for a
-  course exists anywhere in `convex/`. Re-check before acting; the tickets that came
-  here were written between 2026-07-24 and 2026-08-31.
+  *authoring* lifecycle `seeded | active | completed`). Re-check before acting; the
+  tickets that came here were written between 2026-07-24 and 2026-08-31.
+  **Corrected 2026-09-21:** the second half of that claim, "no delete mutation for a
+  course exists anywhere in `convex/`", is no longer true. `content.authoring.
+  deleteTopic` exists, and so does its guard query `courseDeleteHolders`. Deleting an
+  individual Lesson (`deleteLesson`) was already there and is a different thing.
 - **Manual editing already partly shipped, un-ticketed.** The closed
   [editing-obviousness](../authoring/assets/editing-obviousness-map.md) map's whole spec landed on
   2026-08-31 without tickets ever being cut: the always-visible Edit button, the
@@ -52,11 +55,14 @@ how it is *translated* is `translation-and-locales`.
   [technical-foundation/15](../technical-foundation/tickets/15-adr-mux-as-the-video-rail.md).
   Ticket [06](tickets/06-video-and-audio-integration.md) is the merged product scope
   above it, not the rail choice; do not reopen the rail here.
-- **Deletion has a consumer waiting.**
-  [distribution/06](../distribution/tickets/06-share-management.md) needs the
-  topic-delete share cascade, and it can only be built once
-  [03](tickets/03-delete-button-for-courses.md) exists. That edge is cross-map, so it
-  is prose here and not a `blocked_by` (which is map-local).
+- **Deletion's consumer is unblocked (2026-09-21).**
+  [distribution/06](../distribution/tickets/06-share-management.md) was waiting on a
+  topic-delete mutation existing at all, and
+  [03](tickets/03-delete-button-for-courses.md) has landed. Re-read 06 against what
+  shipped before building it: course delete **refuses** while shares are outstanding
+  rather than cascading over them, so the "share cascade on topic delete" 06 assumed
+  is not the shape it got. That edge is cross-map, so it is prose here and not a
+  `blocked_by` (which is map-local).
 - Skills worth calling here: `grilling` for 01 and 06, `tdd` for 03 (a cascade over
   Entitlements and Certificates is exactly where a test-first habit pays), `ponytail`
   for 08, and `run` for the browser walk in 07.
@@ -94,8 +100,9 @@ One edge.
 ```
 04 reader-visibility gate  ->  05 share with the company
 
-frontier (7):  01 02 03 04 06 07 08
+frontier (6):  01 02 04 06 07 08
 blocked   (1):  05
+resolved  (1):  03
 ```
 
 - **04 to 05**: 05 is the share entry point *plus* the refusal to distribute a draft.
@@ -110,7 +117,12 @@ before it is grilled.
 
 <!-- one line per resolved ticket -->
 
-_(none yet: chartered 2026-09-01.)_
+- [03](tickets/03-delete-button-for-courses.md) **Delete button for courses**
+  (2026-09-21, decided and built): a hard delete, owner-only, from the bottom of
+  Course settings, refused outright while anyone other than the owner holds the
+  course (buyers, certificates, shares, joined learners, a live listing, or any org
+  or money rail). Public links and unaccepted invitations do not block. The run log
+  and the money rails are never deleted.
 
 ## Not yet specified
 
