@@ -373,7 +373,7 @@
     "narrationRendering": "वर्णन तैयार किया जा रहा है…",
     "narrationPause": "वर्णन रोकें",
     "narrationResume": "वर्णन जारी रखें",
-    "narrationFailed": "वर्णन नहीं बनाया जा सका।",
+    "narrationFailed": "वर्णन नहीं बनाया जा सका। कृपया बाद में फिर कोशिश करें।",
     "narrationReady": "तैयार। सुनने के लिए प्ले दबाएँ।",
     "regenerate": "फिर से बनाएँ",
     "regenerateLesson": "यह पाठ फिर से बनाएँ",

@@ -373,7 +373,7 @@
     "narrationRendering": "Rendering the narration…",
     "narrationPause": "Pause narration",
     "narrationResume": "Resume narration",
-    "narrationFailed": "The narration could not be made.",
+    "narrationFailed": "The narration could not be made. Please try again later.",
     "narrationReady": "Ready. Press play to listen.",
     "regenerate": "Regenerate",
     "regenerateLesson": "Regenerate this lesson",

@@ -1378,7 +1378,10 @@ function useLessonNarration(
       return;
     }
     if (url) {
-      a.play().catch(() => setMessage("This browser would not start playback."));
+      // A blocked `play()` is the browser withholding autoplay, not a failure:
+      // the same "press play" line the render path uses, and localised, which
+      // this hardcoded English sentence was not until 2026-09-21.
+      a.play().catch(() => setMessage(t("narrationReady")));
       return;
     }
     // Nothing rendered yet: this press is the one that spends money.
@@ -1387,9 +1390,17 @@ function useLessonNarration(
     void speak({ topicSlug, key: lessonKey, lang: lang ?? undefined }).catch((e: unknown) => {
       wantPlay.current = false;
       setState("idle");
-      // `refusalMessage` reads a ConvexError's `data`, the only part of a refusal
-      // that survives a production deployment's redaction (see `saveError`).
-      setMessage(refusalMessage(e, t("narrationFailed")));
+      // The reader gets the plain sentence, never the server's own words. The
+      // narration refusals are provider facts ("ElevenLabs refused the render
+      // (401)", with its JSON body quoted), and until 2026-09-21 that payload
+      // was printed into the lesson header for whoever happened to press play:
+      // a quota exceeded message, complete with the account's credit balance,
+      // shown to a learner. `refusalMessage` (which reads a ConvexError's
+      // `data`, the only part of a refusal that survives a production
+      // deployment's redaction) now feeds the console instead, for whoever is
+      // debugging it.
+      console.error("narration refused:", refusalMessage(e, t("narrationFailed")));
+      setMessage(t("narrationFailed"));
     });
   }, [url, speak, topicSlug, lessonKey, lang, t]);
 
