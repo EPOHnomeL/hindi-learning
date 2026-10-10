@@ -1,3 +1,5 @@
+import { fetchQuery } from "convex/nextjs";
+import { api } from "../../../../convex/_generated/api";
 import { PublicCourseShell } from "~/app/_components/PublicReader";
 
 // `/share/[token]` and everything under it: the ungated Guest reader (issue 07).
@@ -18,5 +20,22 @@ export default async function PublicCourseLayout({
   params: Promise<{ token: string }>;
 }) {
   const { token } = await params;
-  return <PublicCourseShell src={{ token }}>{children}</PublicCourseShell>;
+  // The course bundle, fetched here so the shell paints from the HTML. Field LCP
+  // on a shared lesson (2026-10-10) was the mobile header's course title, and most
+  // of it was the wait for JS, the Convex socket and this query on the client.
+  // The token is the whole argument and needs no auth, so the server asks
+  // exactly what the client subscribes to. `share/loading.tsx` covers this wait.
+  let initial;
+  try {
+    initial = await fetchQuery(api.public.publicCourse, { token });
+  } catch (err) {
+    // Best-effort, like the course layout's canonical-host lookup: on a Convex
+    // error the shell falls back to its client-side skeleton.
+    console.error("PublicCourseLayout: failed to preload the course bundle", err);
+  }
+  return (
+    <PublicCourseShell src={{ token }} initial={initial}>
+      {children}
+    </PublicCourseShell>
+  );
 }

@@ -69,9 +69,22 @@ function Centered({ children }: { children: React.ReactNode }) {
 
 // The persistent sidebar + pane shell, fixed by the URL token. Fetches the
 // course bundle once; an unknown/revoked token renders a friendly dead-end.
-export function PublicCourseShell({ src, children }: { src: GuestSource; children: React.ReactNode }) {
+//
+// `initial` is the same bundle fetched on the server (`share/[token]/layout.tsx`),
+// so the shell is in the HTML and does not wait for JS and the Convex socket. The
+// live subscription replaces it when it lands, so a revoke still reaches the Guest.
+export function PublicCourseShell({
+  src,
+  initial,
+  children,
+}: {
+  src: GuestSource;
+  initial?: GuestCourse | null;
+  children: React.ReactNode;
+}) {
   const t = useTranslations("Reader");
-  const course = useQuery(api.public.publicCourse, guestArgs(src));
+  const live = useQuery(api.public.publicCourse, guestArgs(src));
+  const course = live === undefined ? initial : live;
   // The Guest's per-device state is scoped to the Edition they are reading, on
   // whichever entrance they came in by (guestSource.ts).
   const scope = guestScope(src);
