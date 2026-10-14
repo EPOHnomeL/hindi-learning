@@ -11,6 +11,7 @@ import {
   shareLocaleMemo,
   SHARE_LOCALE_COOKIE,
 } from "./i18n/shareLocale";
+import { shareEntryRedirect } from "./lib/shareEntry";
 import { AUTH_COOKIE_MAX_AGE_SECONDS } from "./lib/sessionLifetime";
 
 // Convex Auth keeps the session in sync across server/client for the App Router.
@@ -23,6 +24,11 @@ import { AUTH_COOKIE_MAX_AGE_SECONDS } from "./lib/sessionLifetime";
 // though it falls back to NEXT_PUBLIC_CONVEX_URL. Next inlines this at build.
 export default convexAuthNextjsMiddleware(
   async (request) => {
+    // A Public link's course index bounces to its first lesson before any HTML
+    // ships, so analytics never sees the index as a page (lib/shareEntry.ts).
+    const shareEntry = await shareEntryRedirect(request.nextUrl);
+    if (shareEntry) return NextResponse.redirect(shareEntry);
+
     const headers = new Headers(request.headers);
     // Never trust an inbound value — a client must not be able to force a skin by
     // sending its own x-tenant-slug. Resolution is from the Host header only.
