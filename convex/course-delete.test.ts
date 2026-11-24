@@ -42,7 +42,8 @@ async function seedFullCourse(t: ReturnType<typeof convexTest>) {
       status: "active",
       emblem: { imageId: emblemId },
     });
-    await ctx.db.insert("lessons", { topicId: id, key: "0001-intro", seq: 1, title: "Intro", htmlStorageId: await blob("l1") });
+    const lessonBody = await blob("l1");
+    await ctx.db.insert("lessons", { topicId: id, key: "0001-intro", seq: 1, title: "Intro", htmlStorageId: lessonBody });
     await ctx.db.insert("references", { topicId: id, key: "glossary", title: "Glossary", htmlStorageId: await blob("ref"), contentHash: "h" });
     await ctx.db.insert("resources", {
       topicId: id,
@@ -68,6 +69,10 @@ async function seedFullCourse(t: ReturnType<typeof convexTest>) {
       voiceId: "v",
       modelId: "m",
       storageId: await blob("mp3"),
+      // As every real recording has it: the body it narrates IS the lesson's
+      // body. Seeded without this until 2026-11-24, which hid that the cascade
+      // deleted that blob twice and threw on any narrated course.
+      sourceStorageId: lessonBody,
       sampleChars: 0,
       chars: 10,
     });

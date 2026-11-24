@@ -677,8 +677,12 @@ export const deleteTopic = mutation({
       await ctx.db.delete(l._id);
     }
     for (const a of await ctx.db.query("lessonAudio").withIndex("by_lesson", (q) => q.eq("topicId", topicId)).collect()) {
-      await ctx.storage.delete(a.storageId);
-      if (a.sourceStorageId) await ctx.storage.delete(a.sourceStorageId);
+      // Only the mp3. `sourceStorageId` is the lesson BODY the recording was made
+      // from, which belongs to the `lessons` row and went with it above;
+      // deleting it again here threw ("Delete on non-existent doc") and rolled
+      // the whole cascade back, so no narrated course could be deleted (found
+      // 2026-11-24). The existence check is for a row whose file is already gone.
+      if (await ctx.db.system.get(a.storageId)) await ctx.storage.delete(a.storageId);
       await ctx.db.delete(a._id);
     }
     for (const r of await ctx.db.query("references").withIndex("by_topic", (q) => q.eq("topicId", topicId)).collect()) {
