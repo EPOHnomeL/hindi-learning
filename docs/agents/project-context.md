@@ -83,56 +83,38 @@ Validated with `@t3-oss/env` (see [env-validation](#env-validation-t3-oss-env)
 below). PayFast rail vars live in `convex/env.ts`; the Next client var in
 `env.js`.
 
-### `ELEVENLABS_API_KEY` (AI lesson narration, added 2026-09-14)
+### Lesson narration: no provider, no key (corrected 2026-11-24)
 
-- **Who sees the play button at all** is `pilotLesson` in `convex/lessonAudio.ts`:
-  the `prophetic-school` course, English, its first lesson, and a caller who
-  administers it (a sys admin, a `ywampotch` tenant admin, or the course's owner).
-  A learner never sees it and cannot call the action. `convex/lessonAudio.test.ts`
-  is that boundary's regression suite.
-- **Without the key the play button refuses in words**, it does not hide: the
-  pilot's gate and its configuration are separate questions, so an administrator
-  inside the gate is told the deployment is unconfigured rather than seeing nothing
-  at all. Set it with `npx convex env set ELEVENLABS_API_KEY <key>`; never in `.env`.
-- Optional siblings, both read at call time so a voice can be auditioned without a
-  deploy: `ELEVENLABS_VOICE_ID` (default `21m00Tcm4TlvDq8ikWAM`, the stock
-  "Rachel") and `ELEVENLABS_MODEL_ID` (default `eleven_multilingual_v2`, the
-  expressive model, 10,000 characters per request; `eleven_flash_v2_5` is half the
-  price and takes 40,000 at a lower quality bar).
-- `ELEVENLABS_SAMPLE_CHARS` renders only the first N characters (cut at a sentence
-  end) instead of the whole lesson. Unset/0 is the whole lesson, the real product.
-  Set it to ~600 to audition voices: the FREE plan allows 10,000 characters a
-  MONTH and one prophetic-school lesson is about 7,300, so full renders buy one
-  try a month and no way to compare two voices.
-- **All three are part of the `lessonAudio` cache key**, so flipping any of them
-  really does re-render. That is deliberate and it is also the cost trap:
-  auditioning four voices on one full lesson bills four full renders.
-- **A 402 on render means the voice, not the key** (2026-09-14). The free plan can
-  drive Default/premade voices through the API but NOT Voice Library voices, and
-  the pilot's original default ("Rachel", `21m00Tcm4TlvDq8ikWAM`) is a library
-  voice. Run `pnpm voices:prod` to list what the key can actually use and pick a
-  `premade` one; ElevenLabs' own docs say Default voices exist only for accounts
-  created before March 2026 and expire 2026-12-31, so this is a property of the
-  account on the day, not a fixed list.
-- **An ElevenLabs API KEY carries its own credit quota, separate from the plan**
-  (2026-09-15). The key named "My Course" was created with a quota of 10 credits,
-  so a 553-character sample was refused with a **401 `quota_exceeded`** ("exceeds
-  your API key (My Course) quota of 10") while the account's own free allowance was
-  untouched. Raise or remove the limit on the key itself in the ElevenLabs
-  dashboard; upgrading the plan would not have helped. Note the status is 401, not
-  402, so it reads like an auth failure and is not one.
-- **Refusals must be `new ConvexError("<string>")`, never an object.** The client's
-  `refusalMessage` only surfaces string `data`; an object falls through to a
-  generic fallback, which is why the quota refusal above showed in the lesson as
-  "The narration could not be made." Fixed 2026-09-15 and pinned by a test.
-- **Measured cost** (2026-09-14, from the repo's pristine prophetic-school lesson 1
-  run through `narrationFromHtml`): Spanish 8,573 chars, Sesotho 8,421, English
-  MEASURED at 7,214 on 2026-09-15 (the estimate was ~7,300), so about $0.72 a lesson on `eleven_multilingual_v2` at
-  $0.10/1,000 chars, half that on `eleven_flash_v2_5`. The whole 56-lesson course
-  in English is roughly 498,000 chars, about $50 or $25. **The median lesson
-  exceeds the 10,000-char single-request cap** (33 of 56 in Spanish, an estimated
-  8 of 56 in English), so narrating the whole course needs chunk-and-stitch built,
-  or `eleven_flash_v2_5`, whose limit is 40,000.
+- **Narration is rendered off the server and uploaded.** Since 2026-11-24 the
+  recordings are made on the operator's machine with Kokoro (an open speech
+  model) and uploaded by `scripts/narrate.ts`; `convex/lessonAudio.ts` only
+  serves them. The loop is `pnpm narrate:prod --topic <slug>` (pull the text),
+  render (the command is in that script's header), then
+  `pnpm narrate:prod --topic <slug> --push`. The map is
+  `.plan/maps/course-narration/`.
+- **`ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL_ID` and
+  `ELEVENLABS_SAMPLE_CHARS` are dead.** They configured the ElevenLabs pilot
+  (2026-09-14 to 2026-11-24). No code reads them once the commit that removed
+  the pilot is deployed. If they are still set on a deployment they do nothing;
+  removing them is the owner's call. `pnpm voices:prod` is gone with them.
+- **Who hears a recording** is `status` in `convex/lessonAudio.ts`: exactly who
+  the reader would show that lesson to in the English Edition (it asks
+  `resolveEdition` and `lessonLocked`, so a paid course's audio sits behind its
+  paywall), on any course that has a current recording. An administrator holds
+  no special right to it. There is no pilot course constant and no render
+  permission any more. `convex/lessonAudio.test.ts` is that boundary's
+  regression suite.
+- **The voices** are `NARRATION_VOICES` in `convex/narrationVoices.ts`
+  (`am_michael`, `bf_emma`). A recording under any other voice or model is
+  retired: not served, and deleted only by
+  `npx convex run lessonAudio:purgeRetired '{"apply":true}'`, which is
+  irreversible and needs the owner's explicit yes (the pilot's audio was paid
+  for).
+- **`pnpm narrate` without `:prod` is not a safe dry run here.** In the owner's
+  checkout on 2026-11-24 the dev and prod Convex URLs in `.env.local` were the
+  same deployment, so both commands read and write production.
+- **Local working files live in `.narration/`**, gitignored: the pulled text, a
+  manifest of which lesson body each file was made from, and the mp3s.
 
 ### Per-tenant sessions: cookies are host-only (no `NEXT_PUBLIC_COOKIE_DOMAIN`)
 
