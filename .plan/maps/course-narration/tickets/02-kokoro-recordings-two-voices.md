@@ -37,12 +37,15 @@ What has to be true, concretely:
 - A recording is served only when it is of the lesson AS IT READS NOW
   (`sourceStorageId` equals the lesson's current body), in a current voice, under
   the current model.
-- **The gate becomes "a recording exists and you may read the lesson".** Nobody can
-  commission audio from the reader, so the admin-only render permission and the
-  `PILOT_SLUG` constant have nothing left to guard. This WIDENS who the code would
-  serve the day another course gets audio: any reader of that course, not only
-  `prophetic-school`'s. Today that changes nothing, because only one course has
-  recordings.
+- **The gate becomes "a recording exists and the reader would show you the
+  lesson".** Nobody can commission audio from the reader, so the admin-only render
+  permission and the `PILOT_SLUG` constant have nothing left to guard. This WIDENS
+  who the code would serve the day another course gets audio: any reader of that
+  course, not only `prophetic-school`'s. Because of that it has to be the reader's
+  own rule and not a looser cousin: the Edition the caller is actually served
+  (English only), the paywall (`lessonLocked`), no superseded lessons. An
+  independent review on 2026-11-24 found the first draft let a holder of only a
+  translated Edition, and an administrator with no grant, fetch English audio.
 - The old recordings stop being served on deploy but stay in storage until
   `lessonAudio:purgeRetired` is run with `apply`, which needs the owner's explicit
   yes: it deletes audio he paid ElevenLabs for, and it cannot be undone.

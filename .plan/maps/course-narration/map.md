@@ -26,7 +26,11 @@ as Progress.
   `pnpm narrate:prod --topic <slug>` pulls each lesson's narration script into
   `.narration/<slug>/text/` (gitignored); a Kokoro front end renders
   `.narration/<slug>/audio/<voice>/<same name>.mp3`; `pnpm narrate:prod --topic
-  <slug> --push` uploads what the deployment lacks. The header of
+  <slug> --push` uploads what the deployment lacks. A pull deletes a local mp3
+  whose words have moved on (the lesson was edited, or a `speakable` rule
+  changed), and refuses to run against another deployment than the folder was
+  pulled from. In the owner's checkout on 2026-11-24 `pnpm narrate` and
+  `pnpm narrate:prod` resolve to the SAME deployment: both hit production. The header of
   `scripts/narrate.ts` has the render command. The Kokoro tool itself is outside
   this repo (on the owner's laptop at `C:\Code\tools\read-aloud`).
 - **Voice casting, 2026-11-24:** two voices, chosen by the repo owner, and a
@@ -36,7 +40,7 @@ as Progress.
   from a sample of a novel, not of course text. George (ElevenLabs
   `JBFqnCBsd6RMkjVDRZzb`), cast 2026-09-15, is retired.
 - **Measured 2026-11-24:** `prophetic-school` is 56 lessons and 524,690 narration
-  characters (about 96,000 words) after `speakable`, so roughly ten hours of audio
+  characters as first pulled (about 96,000 words) after `speakable`, so roughly ten hours of audio
   per voice. Kokoro on the owner's laptop (i7-1065G7, CPU only) makes about one
   minute of audio per minute when it has the machine to itself, and about a third
   of that while sharing it.
@@ -46,10 +50,13 @@ as Progress.
   read as "slash". Every rule in it is for a pattern counted in `prophetic-school`,
   not a general normaliser: a second course will want its pulled text read through
   before it is rendered.
-- **Who hears a recording:** anyone who may read the lesson (its owner, an admin of
-  its tenant, or a holder of any grant), on any course that has one. The pilot's
-  `prophetic-school`-only constant and its admin-only render permission went with
-  the bill they guarded. A recording counts only if it is in a current voice,
+- **Who hears a recording:** exactly who the reader would show that lesson to, in
+  the English Edition, on any course that has one. Same seam as the reader
+  (`resolveEdition`, `lessonLocked`), so a paid course's narration is behind its
+  paywall and a holder of only a translated Edition hears nothing. An
+  administrator with no grant hears nothing either, as the reader shows them
+  nothing. The pilot's `prophetic-school`-only constant and its admin-only render
+  permission went with the bill they guarded. A recording counts only if it is in a current voice,
   under the current model, and of the lesson body as it reads now; an edited
   lesson goes silent until it is rendered and pushed again.
 - **Retired recordings stay in storage until purged.** `npx convex run
