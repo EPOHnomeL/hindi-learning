@@ -56,8 +56,8 @@ const STEP_KEYS = ["seed", "author", "advance"] as const;
 // Only the features the phone mocks do NOT already show. Grounded, interactive
 // and ask used to be cards here too, which said the same thing twice on one
 // page; the three frames under the hero now carry them (2026-09-18). Every
-// entry here is built and live: narration is the ElevenLabs pilot
-// (convex/lessonAudio.ts), the certificate is /certificate/[token], install is
+// entry here is built and live: narration is recorded per course and uploaded
+// (convex/lessonAudio.ts; Kokoro since 2026-11-24, not on every course), the certificate is /certificate/[token], install is
 // the web manifest plus InstallSheet. Offline READING is not built (ADR 0030),
 // so the install line promises the app, not offline lessons.
 const FEATURE_KEYS: { icon: IconName; key: string }[] = [

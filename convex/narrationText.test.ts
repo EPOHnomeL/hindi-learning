@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { narrationFromHtml, sampleOf } from "./narrationText";
+import { narrationFromHtml, speakable } from "./narrationText";
 
 // A lesson body shaped like a real one: the authored `<head>` with its stylesheet,
 // prose, and an MCQ quiz card matching the authoring contract (see
@@ -26,7 +26,25 @@ const lesson = `<!doctype html>
 describe("narrationFromHtml", () => {
   it("keeps the prose and the headings, in order", () => {
     expect(narrationFromHtml(lesson)).toBe(
-      ["Hearing God", "Hearing God", "Prophecy begins with listening, not speaking.", "Practise this daily."].join("\n"),
+      ["Hearing God", "Prophecy begins with listening, not speaking.", "Practise this daily."].join("\n"),
+    );
+  });
+
+  it("does not say the lesson's name twice", () => {
+    // The document `<title>` repeats the `<h1>`. Narrated, every lesson opened
+    // with its own name said two times over (heard 2026-11-24).
+    expect(narrationFromHtml(lesson).match(/Hearing God/g)).toHaveLength(1);
+  });
+
+  it("decodes typographic entities instead of spelling them out", () => {
+    // prophetic-school carries a literal `&ndash;` in eight places, which a
+    // narrator read as "and n dash". Codepoints, so this file stays plain ASCII.
+    const ch = (cp: number) => String.fromCharCode(cp);
+    expect(narrationFromHtml("<p>pp. 23&ndash;24 &mdash; wait&hellip;</p>")).toBe(
+      `pp. 23${ch(0x2013)}24 ${ch(0x2014)} wait${ch(0x2026)}`,
+    );
+    expect(narrationFromHtml("<p>&lsquo;a&rsquo; &ldquo;b&rdquo;</p>")).toBe(
+      `${ch(0x2018)}a${ch(0x2019)} ${ch(0x201c)}b${ch(0x201d)}`,
     );
   });
 
@@ -70,44 +88,119 @@ describe("narrationFromHtml", () => {
   });
 });
 
-// ---- sampleOf: the free-tier audition -------------------------------------
+// ---- speakable: spelling the script the way it is said ---------------------
 
-describe("sampleOf", () => {
-  const long = "One two three. Four five six. Seven eight nine. Ten eleven twelve.";
+describe("speakable", () => {
+  // Built from codepoints so the test file itself carries none of the marks.
+  const EN = String.fromCharCode(0x2013);
+  const DOT = String.fromCharCode(0x00b7);
+  const ARROW = String.fromCharCode(0x2192);
+  const SECTION = String.fromCharCode(0x00a7);
+  const NB_HYPHEN = String.fromCharCode(0x2011);
 
-  it("returns the whole script when no limit is set", () => {
-    expect(sampleOf(long, 0)).toBe(long);
-    expect(sampleOf(long, -1)).toBe(long);
+  it("reads chapter and verse as chapter and verse", () => {
+    // Left alone, the model says "sixteen thirteen".
+    expect(speakable("John 16:13")).toBe("John 16, verse 13");
   });
 
-  it("returns the whole script when it already fits", () => {
-    expect(sampleOf(long, 1000)).toBe(long);
+  it("reads a verse range, hyphen or en dash", () => {
+    expect(speakable("John 3:1-21")).toBe("John 3, verses 1 to 21");
+    expect(speakable(`1 John 4:1${EN}2`)).toBe("1 John 4, verses 1 to 2");
   });
 
-  it("cuts at the end of the last complete sentence", () => {
-    expect(sampleOf(long, 40)).toBe("One two three. Four five six.");
+  it("reads any other en dash number range as 'to'", () => {
+    expect(speakable(`Lessons 30${EN}33`)).toBe("Lessons 30 to 33");
   });
 
-  it("never exceeds the limit", () => {
-    for (const n of [10, 20, 33, 47, 60]) expect(sampleOf(long, n).length).toBeLessThanOrEqual(n);
+  it("leaves a hyphen between numbers that is not a verse range", () => {
+    // Only the en dash is unambiguous outside a reference: a phone number and
+    // "2-3 minutes" both use a hyphen.
+    expect(speakable("call 555-0100")).toBe("call 555-0100");
   });
 
-  it("falls back to a paragraph break when there is no sentence end", () => {
-    expect(sampleOf("first line here\nsecond line here\nthird", 34)).toBe("first line here\nsecond line here");
+  it("says page and pages", () => {
+    expect(speakable(`(pp. 23${EN}24)`)).toBe("(pages 23 to 24)");
+    expect(speakable("(p. 23)")).toBe("(page 23)");
+    // Not every "p." is a page.
+    expect(speakable("Add 3 tsp. of salt")).toBe("Add 3 tsp. of salt");
   });
 
-  it("falls back to a word boundary when there is neither", () => {
-    expect(sampleOf("alpha bravo charlie delta echo", 20)).toBe("alpha bravo charlie");
+  it("says the authored shorthand in words", () => {
+    expect(speakable("~10 min")).toBe("about 10 minutes");
+    expect(speakable("see L15")).toBe("see Lesson 15");
+    expect(speakable("faith vs fear, faith vs. fear")).toBe("faith versus fear, faith versus fear");
+    expect(speakable(`${SECTION} 4`)).toBe("section 4");
+    expect(speakable(`well${NB_HYPHEN}known`)).toBe("well-known");
   });
 
-  it("does not collapse into a fragment on a stray early full stop", () => {
-    // The trap: "Dr." ends a "sentence" eight characters in. Honouring it would
-    // turn a 60-character sample into two words.
-    const out = sampleOf("Dr. " + "word ".repeat(40), 60);
-    expect(out.length).toBeGreaterThan(24);
+  it("says the marks the model would otherwise name", () => {
+    expect(speakable("give yourself ~60 to 90 seconds")).toBe("give yourself about 60 to 90 seconds");
+    expect(speakable('the recipient "judge[s] the word"')).toBe('the recipient "judges the word"');
+    expect(speakable("how I hear: ___")).toBe("how I hear: blank");
+    expect(speakable("Authority = Accountability + Responsibility")).toBe(
+      "Authority equals Accountability plus Responsibility",
+    );
+    expect(speakable("your Holy Spirit / prophetic-school course")).toBe("your Holy Spirit, prophetic-school course");
+    expect(speakable("learning and/or teaching, Lesson 7/Lesson 1")).toBe(
+      "learning and or teaching, Lesson 7 or Lesson 1",
+    );
   });
 
-  it("clips a single unbroken word rather than returning nothing", () => {
-    expect(sampleOf("x".repeat(100), 10)).toBe("x".repeat(10));
+  it("reads a pair of lesson or section references as one range", () => {
+    // All from the pulled course: the generic range rule needs a digit on both
+    // sides of the dash, so these kept their dash or slash until 2026-11-24.
+    expect(speakable(`(L16${EN}L19)`)).toBe("(Lessons 16 to 19)");
+    expect(speakable(`L30${EN}33`)).toBe("Lessons 30 to 33");
+    expect(speakable("L6/18 (a building-up word)")).toBe("Lesson 6 or 18 (a building-up word)");
+    expect(speakable("L7/L1")).toBe("Lesson 7 or 1");
+    expect(speakable(`${SECTION}3${EN}${SECTION}4 and ${SECTION} 1${EN}6`)).toBe("sections 3 to 4 and sections 1 to 6");
+  });
+
+  it("leaves no en dash for the model to drop", () => {
+    expect(speakable(`the Samuel${EN}Saul passage`)).toBe("the Samuel-Saul passage");
+  });
+
+  it("starts a new sentence when an arrow follows a question", () => {
+    expect(speakable(`Which channel? ${ARROW} L3`)).toBe("Which channel? Then Lesson 3");
+    expect(speakable(`Self at centre? ${ARROW} soul`)).toBe("Self at centre? Then soul");
+  });
+
+  it("does not expand a word that merely contains the shorthand", () => {
+    expect(speakable("canvas, LED, XL15")).toBe("canvas, LED, XL15");
+  });
+
+  it("turns a middle dot into a pause and an arrow into 'then'", () => {
+    // Both are dropped silently by the model, which runs the phrases together.
+    expect(speakable(`Lesson 1 ${DOT} Hearing God`)).toBe("Lesson 1. Hearing God");
+    expect(speakable(`Listen ${ARROW} test ${ARROW} act`)).toBe("Listen, then test, then act");
+  });
+
+  it("does not double a full stop when the separator follows a finished sentence", () => {
+    // Fifty lessons end their source note with a sentence, then a middle dot.
+    expect(speakable(`"Ways God can speak". ${DOT} Lesson 1`)).toBe('"Ways God can speak". Lesson 1');
+    expect(speakable(`(p. 23). ${DOT} Lesson 4`)).toBe("(page 23). Lesson 4");
+    expect(speakable(`Is it Him? ${DOT} Lesson 2`)).toBe("Is it Him? Lesson 2");
+  });
+
+  it("leaves a real ellipsis alone", () => {
+    expect(speakable("Wait... and listen.")).toBe("Wait... and listen.");
+  });
+
+  it("drops a separator stranded at either end of a line", () => {
+    expect(speakable(`${DOT} Scripture\nJohn 16:13 ${DOT}`)).toBe("Scripture\nJohn 16, verse 13.");
+  });
+
+  it("keeps one paragraph per line and drops a line that was only a separator", () => {
+    // The trap this pins: `\s*` around the separator also matched the line
+    // break, so "One / (dot) / Two" came out as the single paragraph "One. Two".
+    expect(speakable(`One\n${DOT}\nTwo`)).toBe("One\nTwo");
+    expect(speakable(`One ${DOT}\nTwo`)).toBe("One.\nTwo");
+  });
+
+  it("reads an arrow on a line of its own as the start of the next step", () => {
+    // A flow diagram: three boxes with a connector element between each.
+    expect(speakable(`1. Honours Jesus?\n${ARROW}\n2. Fits Scripture?`)).toBe(
+      "1. Honours Jesus?\nThen 2. Fits Scripture?",
+    );
   });
 });

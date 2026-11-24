@@ -106,3 +106,7 @@ resources/
 .scratch/**/*.json
 .scratch/**/*.txt
 .scratch/**/*.html
+
+# Locally rendered course narration (scripts/narrate.ts): text pulled from the
+# deployment and the mp3s made from it. Uploaded, never committed.
+.narration/

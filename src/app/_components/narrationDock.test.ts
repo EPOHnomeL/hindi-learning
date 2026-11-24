@@ -1,6 +1,6 @@
 // @vitest-environment node
-import { expect, test } from "vitest";
-import { clock, progress } from "./narrationDock";
+import { describe, expect, it, test } from "vitest";
+import { carryOver, clock, progress } from "./narrationDock";
 
 // The docked narration player's arithmetic (course-narration ticket 01, variant
 // B). Both functions are fed straight from an `<audio>` element, which is a
@@ -57,4 +57,26 @@ test("an unloaded or zero-length track reads as empty, never NaN", () => {
   expect(progress(12, Number.NaN)).toBe(0);
   expect(progress(12, Number.POSITIVE_INFINITY)).toBe(0);
   expect(progress(-1, 552)).toBe(0);
+});
+
+describe("carryOver", () => {
+  it("lands on the same share of a longer or shorter track", () => {
+    // Halfway through a 10 minute reading is halfway through a 12 minute one.
+    expect(carryOver(300, 600, 720)).toBe(360);
+    expect(carryOver(300, 600, 480)).toBe(240);
+  });
+
+  it("starts over when the track being left has no length yet", () => {
+    expect(carryOver(30, NaN, 600)).toBe(0);
+    expect(carryOver(30, 0, 600)).toBe(0);
+  });
+
+  it("starts over when the track being joined has no length yet", () => {
+    expect(carryOver(30, 600, NaN)).toBe(0);
+    expect(carryOver(30, 600, 0)).toBe(0);
+  });
+
+  it("never lands past the end", () => {
+    expect(carryOver(700, 600, 480)).toBe(480);
+  });
 });

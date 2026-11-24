@@ -212,26 +212,23 @@ export default defineSchema({
     .index("by_topic_seq", ["topicId", "seq"])
     .index("by_topic_key", ["topicId", "key"]),
 
-  // A rendered narration of one Lesson, in one Edition language: the ElevenLabs
-  // mp3 in Convex File Storage, plus the inputs that produced it. Written lazily
-  // on first play by `convex/lessonAudio.ts` and never regenerated, which is what
-  // makes the second press of the play button instant and free.
+  // A recording of one Lesson read aloud, in one Edition language: an mp3 in
+  // Convex File Storage, plus what it was made from. Rendered on the operator's
+  // machine and uploaded by `scripts/narrate.ts` through `convex/lessonAudio.ts`
+  // (2026-11-24); never synthesized on the server. One row per lesson and voice.
   //
-  // **`voiceId` and `modelId` are part of the cache identity, not decoration.**
-  // Both are env-overridable so the pilot can audition a different voice without a
-  // deploy; if they were not keyed on, flipping `ELEVENLABS_VOICE_ID` would hand
-  // back the old voice forever and the audition would silently be a no-op.
+  // **`voiceId` and `modelId` are the recording's identity, not decoration.**
+  // The voices a learner can choose between and the current model are
+  // `convex/narrationVoices.ts`; a row under any other voice or model is retired
+  // (not served, and deleted by `lessonAudio.purgeRetired`). The first rows in
+  // this table were the ElevenLabs pilot's (2026-09-14), which is what a retired
+  // row most likely is.
   //
   // The Lesson body is immutable in normal operation, but the owner's in-place
   // prose editor (ADR 0020) can repoint `lessons.htmlStorageId`, which would leave
   // this row narrating superseded text. `sourceStorageId` records which body was
-  // read, so a stale row is DETECTABLE rather than silently wrong; the pilot
-  // treats a mismatch as a cache miss and re-renders.
-  //
-  // Pilot scope (2026-09-14): only the first Lesson of `prophetic-school`, in
-  // English, read by an administrator of that course (a sys admin, a `ywampotch`
-  // tenant admin, or its owner). The table is shaped for the general case so
-  // widening the gate is a one-line change rather than a migration.
+  // read, so a stale row is DETECTABLE rather than silently wrong: it is not
+  // played, and the next upload of that lesson replaces it.
   lessonAudio: defineTable({
     topicId: v.id("topics"),
     lessonKey: v.string(),
@@ -240,14 +237,13 @@ export default defineSchema({
     modelId: v.string(),
     sourceStorageId: v.optional(v.id("_storage")),
     storageId: v.id("_storage"),
-    // The sample budget this row was rendered under (`ELEVENLABS_SAMPLE_CHARS`),
-    // or 0 for the whole lesson. In the KEY for the same reason `voiceId` is: a
-    // 600-character audition and the full narration are different recordings, and
-    // caching one as the other would either replay a snippet forever or bill a
-    // full lesson to hear a sample.
+    // 0 on every recording made today: the whole lesson. The ElevenLabs pilot
+    // could render only the first N characters to audition a voice cheaply and
+    // keyed those samples here; a non-zero value is one of them, and retired.
+    // Still in the index, so it stays a required field.
     sampleChars: v.number(),
-    // What the render cost, in ElevenLabs billing terms (characters sent). The
-    // only spend signal this pilot has; no usage table is invented for it.
+    // How many characters of narration script the recording reads. It was the
+    // pilot's billing unit; now it is only a measure of length.
     chars: v.number(),
   }).index("by_lesson", ["topicId", "lessonKey", "lang", "voiceId", "modelId", "sampleChars"]),
 

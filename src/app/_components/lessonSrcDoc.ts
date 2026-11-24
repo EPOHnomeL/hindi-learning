@@ -195,7 +195,7 @@ function injectReferenceCardCss(html: string): string {
 // beside the authored subtitle. Only a script running inside the document can.
 //
 // It owns no audio. Pressing it posts `narrate` to the parent, which holds the
-// `<audio>` element, the Convex action and the ElevenLabs bill; the parent posts
+// `<audio>` element and the recording's URL; the parent posts
 // state back and this re-skins. Keeping playback in the parent means the sound
 // survives a theme flip and the control never has to know a URL.
 //

@@ -1,513 +1,325 @@
-// **AI narration of a Lesson, pilot scope.** The play control inside the lesson,
-// under its heading, that reads the lesson aloud in an ElevenLabs voice. The
-// control itself is NARRATE_BRIDGE in `src/app/_components/lessonSrcDoc.ts`; this
-// is the rail behind it.
+// **Narration of a Lesson.** The play control inside the lesson, under its
+// heading, that reads the lesson aloud. The control itself is NARRATE_BRIDGE in
+// `src/app/_components/lessonSrcDoc.ts`; this is the rail behind it.
 //
-// This is a deliberately tiny slice of the deferred course-audio design
-// (`.plan/maps/authoring/assets/deferred/course-audio.md`), which leaves format,
-// lifecycle, Editions and Progress all open. Nothing here decides any of them.
-// What it does decide, for the pilot only:
+// **Recordings are made off the server and uploaded** (2026-11-24). The operator
+// renders a course on their own machine with Kokoro, an open speech model, and
+// `scripts/narrate.ts` uploads the finished mp3s through the PUBLISH_SECRET
+// seams below. Nothing in this file calls a speech provider, so there is no key
+// to configure, no per-character bill, and nothing a press of the play button
+// can spend.
 //
-//  - **Straight narration, one voice**, not a two-host podcast overview. No
-//    script-generation LLM pass, so there is no second model call to review, no
-//    second bill, and what you hear is what the lesson says.
-//  - **Lazy, cached forever.** Rendered on the first press of the button and
-//    stored; every later press is a storage URL. Nothing is rendered at publish,
-//    so the pilot cannot quietly start billing for lessons nobody listens to.
-//  - **Gated to one lesson, for administrators of it.** `prophetic-school`,
-//    English, first lesson, and a caller who is a sys admin, a `ywampotch`
-//    tenant admin, or the course's owner (see `pilotLesson`). The gate is
-//    SERVER-side and the UI reads the same verdict back, so there is exactly one
-//    place the pilot can be widened.
+// That replaced the ElevenLabs pilot of 2026-09-14, which rendered on first
+// press and so needed a "who may commission a render" permission, a pilot course
+// constant and a sample budget. All three are gone with it. What is left is one
+// rule: **a recording exists, and the reader would show you the lesson it
+// narrates** (same Edition, same paywall; see `status`).
 //
-// Provider choice: ElevenLabs, chosen 2026-09-14 over Gemini TTS (which would
-// have reused the already-provisioned `GOOGLE_AI_API_KEY`) because voice quality
-// is the thing the pilot exists to judge, and a spike run on the cheaper voice
-// answers a question nobody asked. It costs one operator key, below.
+// What this still does not decide (see `.plan/maps/course-narration/map.md`):
+// translated Editions, and whether listening counts as Progress. Narration is
+// the source Edition only.
 //
-// Operator setup (one line, on the deployment, NOT in `.env`):
-//   npx convex env set ELEVENLABS_API_KEY <key>
-// Optional, all env-overridable so a voice can be auditioned without a deploy,
-// and all three keyed into the cache, so flipping one really does re-render:
-//   ELEVENLABS_VOICE_ID       default below
-//   ELEVENLABS_MODEL_ID       default eleven_multilingual_v2
-//   ELEVENLABS_SAMPLE_CHARS   unset/0 = the whole lesson; 600 = a short audition
-//
-// `pnpm voices:prod` lists the voices the key can actually use. Reach for it the
-// moment a render is refused with a 402: the free plan cannot drive Voice Library
-// voices through the API, only Default/premade ones, and which ids are which is a
-// property of the account rather than of a documentation page.
+// The voices a learner chooses between are `NARRATION_VOICES` in
+// `./narrationVoices`. A recording's identity in `lessonAudio` is
+// topic + lesson + language + voice + model, plus `sampleChars`, a column the
+// pilot's audition budget left behind: every recording made here writes 0, and
+// anything else is one of the pilot's samples.
 
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { action, internalMutation, internalQuery, query, type ActionCtx, type QueryCtx } from "./_generated/server";
-import { narrationFromHtml, sampleOf } from "./narrationText";
+import { internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
 import { assertAdmin } from "./adminSecret";
+import { lessonLocked, resolveEdition } from "./edition";
+import { NARRATION_MODEL, NARRATION_VOICES, isNarrationVoice, type NarrationVoice } from "./narrationVoices";
 import { SOURCE_LANG } from "./sourceLang";
-import { getViewableTopic, topicBySlug } from "./topicAccess";
-import { isCallerAdmin } from "./whitelist";
+import { topicBySlug } from "./topicAccess";
 
-// **Every refusal in this file throws `new ConvexError("<string>")`, never an
-// object.** The client's `refusalMessage` (src/app/_components/mutationRun.ts)
-// only surfaces a ConvexError whose `data` is a STRING; anything else falls
-// through to the caller's generic fallback. This file threw `{ message }` until
-// 2026-09-15, so the operator saw "The narration could not be made." in the
-// lesson while the real reason (an ElevenLabs per-key credit quota) was only
-// readable in `npx convex logs`. `lessonAudio.test.ts` pins the shape.
-
-// The pilot gate, as two constants rather than a config table: widening this is
-// a decision, and a decision should show up in a diff.
-const PILOT_SLUG = "prophetic-school";
-
-// **George**, "Warm, Captivating Storyteller". Chosen by the repo owner on
-// 2026-09-15 after auditioning against Bella on this course's own lesson 1, so
-// this is a real casting decision rather than a placeholder. `ELEVENLABS_VOICE_ID`
-// still overrides it.
-//
-// The previous default was "Rachel" (`21m00Tcm4TlvDq8ikWAM`), which this account
-// cannot use at all: she is a Voice Library voice and the API refuses those on a
-// free plan. `pnpm voices:prod` lists what a key can actually drive.
-const DEFAULT_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb";
-
-// `eleven_multilingual_v2` is the expressive model (10k characters per request).
-// `eleven_flash_v2_5` is half the price and takes 40k, at a lower quality bar.
-// The pilot is a quality audition, so it defaults to the expressive one.
-const DEFAULT_MODEL_ID = "eleven_multilingual_v2";
-
-// `eleven_multilingual_v2`'s per-request character limit. A longer lesson is
-// REFUSED rather than silently truncated: an audio file that stops mid-lesson
-// with no indication is worse than a button that says why it will not play, and
-// chunk-and-stitch is real design work this pilot has not done.
-const MAX_CHARS = 10_000;
-
-const voiceId = () => process.env.ELEVENLABS_VOICE_ID ?? DEFAULT_VOICE_ID;
-const modelId = () => process.env.ELEVENLABS_MODEL_ID ?? DEFAULT_MODEL_ID;
-
-// **The audition budget.** `ELEVENLABS_SAMPLE_CHARS=600` renders only the first
-// 600 characters of a lesson instead of all of it. Unset or 0 is the whole
-// lesson, which is the default and the real product.
-//
-// It exists because ElevenLabs' FREE plan allows 10,000 characters a month and
-// one prophetic-school lesson is around 7,300, so the free tier buys exactly one
-// full render and no way to compare two voices. At 600 it buys sixteen.
-// Deliberately an env var and not a UI control: it is an operator's testing
-// setting, and a second button in the lesson would be a worse lesson.
-const sampleChars = () => {
-  const n = Number(process.env.ELEVENLABS_SAMPLE_CHARS ?? 0);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-};
-
-// What a caller may do with this lesson's narration. The split is the whole
-// point: PLAYING a rendered file is free and shared, RENDERING one spends money
-// at a provider, so they are different permissions rather than one.
-type Pilot = { topic: Doc<"topics">; lesson: Doc<"lessons">; canRender: boolean };
-
-/**
- * The one gate. Returns the Topic and Lesson when this caller, on this lesson,
- * in this Edition, is inside the pilot, and `null` otherwise.
- *
- * Every condition is checked server-side, because the client copy of a rule is a
- * convenience and never a control: `status` below hands the UI this same verdict
- * so the button and the action can never disagree about who is in the pilot.
- */
-async function pilotLesson(
-  ctx: QueryCtx,
-  topicSlug: string,
-  lessonKey: string,
-  lang: string | undefined,
-): Promise<Pilot | null> {
-  if (topicSlug !== PILOT_SLUG) return null;
-  // Absent `?lang` is the source Edition, which IS the pilot's English. Any
-  // explicit other Edition is out.
-  if ((lang ?? SOURCE_LANG) !== SOURCE_LANG) return null;
-  const userId = await getAuthUserId(ctx);
-  if (!userId) return null;
-  const topic = await topicBySlug(ctx, topicSlug);
-  if (!topic) return null;
-  // **Administrators of this course, and nobody else** (2026-09-14). Not
-  // `canWrite`, not an Editor, not a Viewer holding a grant, and emphatically not
-  // a learner: an unproven voice and an unproven bill get the smallest audience
-  // that can still judge them.
-  //
-  // Three principals qualify, and `isCallerAdmin` supplies two of them: a sys
-  // admin (an allowlist row with `isAdmin` and no slug) passes every scoped
-  // check, and a tenant admin passes only their OWN tenant's. Passing
-  // `topic.tenantSlug` is what makes that second clause tenant-local, so
-  // another brand's admin is refused here. A course with no tenant (the apex)
-  // degrades to the unscoped check, which is sys-admin-only: the safe direction.
-  //
-  // The owner is kept alongside them rather than folded in, because course
-  // ownership and the Allowlist are genuinely different tables and an owner who
-  // was never made an admin would otherwise lose the button on their own course.
-  const canRender = (await isCallerAdmin(ctx, topic.tenantSlug)) || topic.ownerId === userId;
-  // **Anyone who may READ the lesson may hear it** (2026-09-15). A rendered file
-  // is cached per lesson, not per person, so a learner pressing play costs
-  // nothing at all: the bytes are already bought and sitting in storage. Refusing
-  // them was only ever a proxy for "do not let anyone run up a bill", and
-  // `canRender` is that control, stated directly.
-  //
-  // `getViewableTopic` is the reader's own rule (owner, or any non-empty grant
-  // walk), so narration is readable by exactly the people the lesson is.
-  if (!canRender && !(await getViewableTopic(ctx, userId, topicSlug))) return null;
-  // Any lesson of the course, not just the first: the pilot widened on 2026-09-15
-  // so a precomputed course can be listened to end to end.
-  const lesson = await ctx.db
-    .query("lessons")
-    .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", lessonKey))
-    .unique();
-  if (!lesson) return null;
-  return { topic, lesson, canRender };
+// Is this row one of today's recordings at all: a voice a learner can pick, made
+// by the current model, of the whole lesson? The ElevenLabs pilot's rows fail it
+// on voice and model both, which is how they stop being served the moment this
+// deploys and how `purgeRetired` finds them.
+function isCurrent(row: Doc<"lessonAudio">): boolean {
+  return isNarrationVoice(row.voiceId) && row.modelId === NARRATION_MODEL && row.sampleChars === 0;
 }
 
-// The cached render for this lesson under the CURRENT voice and model. Keyed on
-// all five so an env swap is a miss, not a stale hit.
-async function cached(ctx: QueryCtx, pilot: Pilot): Promise<Doc<"lessonAudio"> | null> {
-  const row = await ctx.db
+// Every row for one lesson in the source Edition, whatever made it. A lesson has
+// one row per voice (plus, until they are purged, the pilot's), so the bound is
+// generous rather than tight.
+async function rowsFor(ctx: QueryCtx, topicId: Id<"topics">, lessonKey: string) {
+  return await ctx.db
     .query("lessonAudio")
-    .withIndex("by_lesson", (q) =>
-      q
-        .eq("topicId", pilot.topic._id)
-        .eq("lessonKey", pilot.lesson.key)
-        .eq("lang", SOURCE_LANG)
-        .eq("voiceId", voiceId())
-        .eq("modelId", modelId())
-        .eq("sampleChars", sampleChars()),
-    )
-    .unique();
-  if (!row) return null;
-  // The owner's in-place editor (ADR 0020) can repoint the Lesson body. A render
-  // of superseded text is a miss, so an edited lesson re-narrates on next play
-  // instead of reading the old words forever. Legacy rows carry no
-  // `sourceStorageId` and are trusted rather than force-rebilled.
-  if (row.sourceStorageId && row.sourceStorageId !== pilot.lesson.htmlStorageId) return null;
-  return row;
+    .withIndex("by_lesson", (q) => q.eq("topicId", topicId).eq("lessonKey", lessonKey).eq("lang", SOURCE_LANG))
+    .take(50);
 }
 
+const NOTHING = { eligible: false, url: null, voice: null, voices: [] as string[] };
+
 /**
- * What the reader's play button needs, in one subscription: may this caller
- * listen to this lesson at all, and is there already a rendered file to play?
+ * What the reader's play button needs, in one subscription: is there a narration
+ * of this lesson this caller may hear, in which voices, and where is the one they
+ * asked for?
  *
- * `url` is null while nothing has been rendered. Because this is a live query,
- * the button does NOT need the action's return value: the render's insert pushes
- * the URL here and playback starts from the subscription.
+ * `voices` is the subset of `NARRATION_VOICES` with a playable recording of the
+ * lesson AS IT READS NOW, in casting order. `voice` is the requested one when it
+ * is among them, otherwise the first, so a learner whose saved choice has no
+ * recording of this lesson still hears it rather than losing the control.
+ *
+ * Every refusal is the same empty answer: a caller outside the gate learns
+ * nothing about what is behind it, including whether the lesson exists.
  */
 export const status = query({
-  args: { topicSlug: v.string(), key: v.string(), lang: v.optional(v.string()) },
-  handler: async (ctx, { topicSlug, key, lang }) => {
-    const pilot = await pilotLesson(ctx, topicSlug, key, lang);
-    if (!pilot) return { eligible: false, url: null };
-    const row = await cached(ctx, pilot);
-    const url = row ? await ctx.storage.getUrl(row.storageId) : null;
-    // A learner sees the control only when there is something to play, because a
-    // play button that can only ever fail is worse than no play button. An
-    // administrator sees it always: for them an empty lesson is an invitation to
-    // render one.
-    return { eligible: pilot.canRender || url !== null, url };
+  args: { topicSlug: v.string(), key: v.string(), lang: v.optional(v.string()), voice: v.optional(v.string()) },
+  returns: v.object({
+    eligible: v.boolean(),
+    url: v.union(v.string(), v.null()),
+    voice: v.union(v.string(), v.null()),
+    voices: v.array(v.string()),
+  }),
+  handler: async (ctx, { topicSlug, key, lang, voice }) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return NOTHING;
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return NOTHING;
+    // **Exactly the reader's rule, asked through the reader's own seam.**
+    // `resolveEdition` answers which Edition this caller is actually served and
+    // at what level, which is not the same as "holds some grant on the course":
+    //
+    //  - A caller holding only a translated Edition who arrives with no `?lang`
+    //    is served that translation, so `lang` here comes back as it, not as the
+    //    source. The recording is English; over a Hindi lesson it is the wrong
+    //    words, so only the source Edition is narrated.
+    //  - On a paid Edition a `preview` caller reads one lesson and no more.
+    //    `lessonLocked` is that paywall, and audio of a lesson is the lesson.
+    //
+    // No administrator arm (it existed until 2026-11-24, when an admin was who
+    // commissioned a render). The reader gives an admin nothing a grant does
+    // not, and a recording URL is a permanent bearer link to the whole lesson,
+    // so the audio gives them nothing more either.
+    //
+    // There is also no course constant any more. The pilot was gated to
+    // `prophetic-school` because a press could spend money at a provider; now
+    // the only way audio exists is an operator uploading it, so "a recording
+    // exists" IS the gate, for whichever course gets one.
+    const edition = await resolveEdition(ctx, topic, userId, lang ?? null);
+    if (edition.lang !== SOURCE_LANG || edition.level === "none") return NOTHING;
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+      .unique();
+    // A superseded lesson is not found by the reader either (`readLesson`).
+    if (!lesson?.htmlStorageId || lesson.supersededBy) return NOTHING;
+    if (await lessonLocked(ctx, topic._id, edition.level, key)) return NOTHING;
+
+    // The owner's in-place editor (ADR 0020) can repoint the Lesson body. A
+    // recording of superseded text is not a recording of this lesson: it drops
+    // out here, and the operator's next pull deletes the local mp3 so the next
+    // render makes it again.
+    const rows = (await rowsFor(ctx, topic._id, key)).filter(
+      (r) => isCurrent(r) && r.sourceStorageId === lesson.htmlStorageId,
+    );
+    const urls = new Map<NarrationVoice, string>();
+    for (const candidate of NARRATION_VOICES) {
+      const row = rows.find((r) => r.voiceId === candidate);
+      // A row whose blob has gone has nothing to play, so it is not on offer.
+      const url = row ? await ctx.storage.getUrl(row.storageId) : null;
+      if (url) urls.set(candidate, url);
+    }
+    const voices = [...urls.keys()];
+    const first = voices[0];
+    // A learner sees the control only when there is something to play: a play
+    // button that can only ever fail is worse than no play button.
+    if (!first) return NOTHING;
+    const chosen = isNarrationVoice(voice) && urls.has(voice) ? voice : first;
+    return { eligible: true, url: urls.get(chosen) ?? null, voice: chosen, voices };
   },
 });
 
-// The action's read half: the gate again (an action is unauthenticated code
-// until it asks), plus the body to narrate and whatever is already rendered.
-export const pilotBody = internalQuery({
-  args: { topicSlug: v.string(), key: v.string(), lang: v.optional(v.string()) },
-  handler: async (ctx, { topicSlug, key, lang }) => {
-    const pilot = await pilotLesson(ctx, topicSlug, key, lang);
-    if (!pilot) return null;
-    const row = await cached(ctx, pilot);
-    return {
-      topicId: pilot.topic._id,
-      lessonKey: pilot.lesson.key,
-      // Carried through so the action can enforce the spend boundary itself
-      // rather than trusting that `status` already hid the control.
-      canRender: pilot.canRender,
-      sourceStorageId: pilot.lesson.htmlStorageId ?? null,
-      cachedStorageId: row?.storageId ?? null,
-    };
+// ---- the operator's upload rail (scripts/narrate.ts, PUBLISH_SECRET) --------
+
+/**
+ * Which recordings this deployment already holds for a course, so the uploader
+ * sends only what is missing. `chars` is the length of the script the recording
+ * reads: the uploader compares it too, so a lesson whose WORDING changed without
+ * its body changing (a fixed `speakable` rule) is sent again.
+ * A recording of a body the lesson has since moved on
+ * from is still listed, under the body it WAS made from: the uploader compares
+ * that id with the one it pulled, so a stale row reads as "not uploaded" there.
+ */
+export const uploaded = query({
+  args: { secret: v.string(), topicSlug: v.string() },
+  returns: v.array(
+    v.object({ lessonKey: v.string(), voiceId: v.string(), sourceStorageId: v.string(), chars: v.number() }),
+  ),
+  handler: async (ctx, { secret, topicSlug }) => {
+    assertAdmin(secret);
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) return [];
+    // Bounded, not `.collect()`: a course is tens of lessons by a handful of
+    // voices. ponytail: paginate if a course ever nears a thousand recordings.
+    const rows = await ctx.db
+      .query("lessonAudio")
+      .withIndex("by_lesson", (q) => q.eq("topicId", topic._id))
+      .take(2000);
+    const held = [];
+    for (const r of rows) {
+      if (r.lang !== SOURCE_LANG || !isCurrent(r) || !r.sourceStorageId) continue;
+      // A row whose mp3 has gone is not held: `status` will not serve it, so
+      // the uploader must be allowed to send it again.
+      if (!(await ctx.db.system.get(r.storageId))) continue;
+      held.push({ lessonKey: r.lessonKey, voiceId: r.voiceId, sourceStorageId: r.sourceStorageId as string, chars: r.chars });
+    }
+    return held;
   },
 });
 
-// The action's write half. Replaces any row for this exact key rather than
-// inserting beside it, so a re-render after an edit leaves one row, not two.
-export const saveAudio = internalMutation({
+/**
+ * Record an uploaded mp3 as the narration of one lesson in one voice. The bytes
+ * are already in storage (`content.publish.generateContentUploadUrl` minted the
+ * URL); this is the row that makes them a recording.
+ *
+ * **A refusal RETURNS `{ ok: false, reason }`, it does not throw.** A mutation
+ * that throws rolls back everything it did, the `storage.delete` included, so
+ * throwing would leave every refused upload sitting in storage, billed and
+ * unreachable. Returning lets the delete commit. The caller is the operator's
+ * own script, which turns a refusal back into an error on its side.
+ *
+ * The one exception is the secret: a caller without it is not told anything and
+ * nothing of theirs is touched.
+ */
+export const saveUpload = mutation({
   args: {
-    topicId: v.id("topics"),
+    secret: v.string(),
+    topicSlug: v.string(),
     lessonKey: v.string(),
-    sourceStorageId: v.optional(v.id("_storage")),
+    voiceId: v.string(),
+    // The lesson body the mp3 was rendered from, as pulled. The lesson may have
+    // been edited between the pull and this call, hours later.
+    sourceStorageId: v.id("_storage"),
     storageId: v.id("_storage"),
     chars: v.number(),
   },
-  handler: async (ctx, { topicId, lessonKey, sourceStorageId, storageId, chars }) => {
-    const key = { lang: SOURCE_LANG, voiceId: voiceId(), modelId: modelId(), sampleChars: sampleChars() };
+  returns: v.object({ ok: v.boolean(), reason: v.optional(v.string()) }),
+  handler: async (ctx, { secret, topicSlug, lessonKey, voiceId, sourceStorageId, storageId, chars }) => {
+    assertAdmin(secret);
+    // **Two refusals keep their hands off storage**, because `storageId` is an
+    // argument and every refusal below deletes it: aimed at a lesson body, that
+    // would bin the lesson. So the upload must not BE the body it claims to
+    // narrate, and it must not be labelled as anything other than an mp3. (An
+    // upload with no content type at all is let through: the label is only
+    // there when the uploader sent one.)
+    const blob = await ctx.db.system.get(storageId);
+    if (!blob) return { ok: false, reason: "The uploaded file is not in storage." };
+    if (storageId === sourceStorageId) return { ok: false, reason: "The upload is the lesson body, not a recording of it." };
+    if (blob.contentType && blob.contentType !== "audio/mpeg") {
+      return { ok: false, reason: `Expected an audio/mpeg upload, got ${blob.contentType}.` };
+    }
+    const refuse = async (reason: string) => {
+      await ctx.storage.delete(storageId);
+      return { ok: false, reason };
+    };
+
+    const topic = await topicBySlug(ctx, topicSlug);
+    // The third hands-off refusal: a file that is ALREADY some recording of this
+    // course, other than the one this call replaces. Binning it on a refusal, or
+    // pointing a second row at it, would silently take a voice away from a
+    // lesson. The uploader always mints a fresh file, so this is a caller's
+    // mistake, never a retry (a retry names the same lesson and voice).
+    if (topic) {
+      const rows = await ctx.db
+        .query("lessonAudio")
+        .withIndex("by_lesson", (q) => q.eq("topicId", topic._id))
+        .take(2000);
+      const taken = rows.some((r) => r.storageId === storageId && !(r.lessonKey === lessonKey && r.voiceId === voiceId));
+      if (taken) return { ok: false, reason: "That file is already another lesson's recording." };
+    }
+
+    if (!isNarrationVoice(voiceId)) return await refuse(`"${voiceId}" is not a narration voice.`);
+    if (!topic) return await refuse(`No course "${topicSlug}".`);
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", lessonKey))
+      .unique();
+    if (!lesson || lesson.supersededBy) return await refuse(`No lesson "${lessonKey}" in "${topicSlug}".`);
+    if (lesson.htmlStorageId !== sourceStorageId) {
+      return await refuse(`Lesson "${lessonKey}" was edited after this recording was made. Pull and render it again.`);
+    }
+
+    // Replace rather than insert beside: one row per lesson and voice. The
+    // superseded mp3 goes with its row, because Convex storage is billed by the
+    // byte and an orphaned blob is unreachable.
     const existing = await ctx.db
       .query("lessonAudio")
       .withIndex("by_lesson", (q) =>
         q
-          .eq("topicId", topicId)
+          .eq("topicId", topic._id)
           .eq("lessonKey", lessonKey)
-          .eq("lang", key.lang)
-          .eq("voiceId", key.voiceId)
-          .eq("modelId", key.modelId)
-          .eq("sampleChars", key.sampleChars),
+          .eq("lang", SOURCE_LANG)
+          .eq("voiceId", voiceId)
+          .eq("modelId", NARRATION_MODEL)
+          .eq("sampleChars", 0),
       )
-      .unique();
-    if (existing) {
-      // Bin the superseded mp3 as well as the row. Convex storage is billed by
-      // the byte and an orphaned blob is unreachable, so nothing would ever
-      // notice it again.
-      await ctx.storage.delete(existing.storageId);
-      await ctx.db.delete(existing._id);
-    }
-    await ctx.db.insert("lessonAudio", { topicId, lessonKey, ...key, sourceStorageId, storageId, chars });
-  },
-});
-
-/**
- * **Which voices can this API key actually use?** Operator diagnostic, guarded by
- * PUBLISH_SECRET like the rest of the CLI rail (`scripts/voices.ts` calls it).
- *
- * It exists because guessing a voice id is unreliable and the guess is expensive
- * to test. On 2026-09-14 the pilot's default, "Rachel", was refused with a 402:
- * she is a VOICE LIBRARY voice, and ElevenLabs' free plan cannot drive those
- * through the API. Default voices can be, but ElevenLabs' own docs say Default
- * voices exist only for accounts created before March 2026 and expire at the end
- * of 2026, so which ids are usable is a property of THIS account on THIS day, not
- * something a doc page can settle.
- *
- * So ask the account. `category` is the answer: anything other than `premade` is
- * a candidate for the 402 on a free plan.
- */
-export const voices = action({
-  args: { secret: v.string() },
-  handler: async (_ctx, { secret }): Promise<{ voiceId: string; name: string; category: string }[]> => {
-    assertAdmin(secret);
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (!apiKey) throw new ConvexError("ELEVENLABS_API_KEY is not set on this deployment.");
-    const res = await fetch("https://api.elevenlabs.io/v2/voices?page_size=100", {
-      headers: { "xi-api-key": apiKey },
-    });
-    if (!res.ok) {
-      const detail = (await res.text().catch(() => "")).slice(0, 300);
-      throw new ConvexError(`ElevenLabs refused the voice list (${res.status}). ${detail}`.trim());
-    }
-    const json = (await res.json()) as { voices?: { voice_id?: unknown; name?: unknown; category?: unknown }[] };
-    return (json.voices ?? []).map((v2) => ({
-      voiceId: String(v2.voice_id ?? ""),
-      name: String(v2.name ?? ""),
-      category: String(v2.category ?? "unknown"),
-    }));
-  },
-});
-
-/**
- * Render this lesson's narration, or hand back the one already rendered.
- *
- * Safe to press twice: the cache is checked first, and a concurrent double press
- * costs one extra render and converges on one row (the second `saveAudio` bins
- * the first). Returns the playable URL, so a caller that wants to play
- * immediately can, though the live `status` query delivers it too.
- */
-export const speak = action({
-  args: { topicSlug: v.string(), key: v.string(), lang: v.optional(v.string()) },
-  handler: async (ctx, { topicSlug, key, lang }): Promise<string> => {
-    const pilot = await ctx.runQuery(internal.lessonAudio.pilotBody, { topicSlug, key, lang });
-    // Not in the pilot. Deliberately the same refusal for "wrong course", "wrong
-    // lesson" and "not an administrator of it": a caller outside the gate learns
-    // nothing about what is behind it.
-    if (!pilot) throw new ConvexError("Narration is not available for this lesson.");
-    // The spend boundary. A learner can reach this action (they can see the
-    // control when a render exists) and must not be able to commission a new one.
-    if (!pilot.canRender) throw new ConvexError("Narration is not available for this lesson.");
-
-    if (pilot.cachedStorageId) {
-      const url = await ctx.storage.getUrl(pilot.cachedStorageId);
-      if (url) return url;
-      // A row pointing at a deleted blob: fall through and re-render rather than
-      // hand back a URL that 404s.
-    }
-
-    if (!pilot.sourceStorageId) throw new ConvexError("This lesson has no body to read.");
-    const { url } = await renderNarration(ctx, {
-      topicId: pilot.topicId,
-      lessonKey: pilot.lessonKey,
-      sourceStorageId: pilot.sourceStorageId,
-    });
-    return url;
-  },
-});
-
-// ---- precompute -------------------------------------------------------------
-
-/** Every lesson of a course, with what it would take to narrate each. */
-export const courseLessons = internalQuery({
-  args: { topicSlug: v.string() },
-  handler: async (ctx, { topicSlug }) => {
-    const topic = await topicBySlug(ctx, topicSlug);
-    if (!topic) return null;
-    const lessons = await ctx.db
-      .query("lessons")
-      .withIndex("by_topic_seq", (q) => q.eq("topicId", topic._id))
-      .collect();
-    const out = [];
-    for (const lesson of lessons) {
-      const row = await cached(ctx, { topic, lesson, canRender: true });
-      out.push({
-        key: lesson.key,
-        seq: lesson.seq,
-        title: lesson.title,
-        sourceStorageId: lesson.htmlStorageId ?? null,
-        rendered: !!row,
-        renderedChars: row?.chars ?? null,
-      });
-    }
-    return { topicId: topic._id, lessons: out };
-  },
-});
-
-/**
- * **Narrate a whole course ahead of time**, so a learner never waits for a render
- * and the bill is spent deliberately rather than by whoever presses play first.
- *
- * DRY RUN unless `apply` is true, matching the other operator CLIs here
- * (`sweep-lesson-text`). A dry run makes no provider call at all: it reads each
- * lesson's blob, extracts the narration, and reports the character count, so the
- * cost of the whole course is knowable for free before a cent is spent.
- *
- * Already-rendered lessons are skipped, so this is resumable: run it, hit a
- * quota, top up, run it again.
- */
-export const precompute = action({
-  args: { secret: v.string(), topicSlug: v.string(), apply: v.optional(v.boolean()) },
-  handler: async (
-    ctx,
-    { secret, topicSlug, apply },
-  ): Promise<{
-    lessons: { key: string; seq: number; chars: number; rendered: boolean; skipped: string | null }[];
-  }> => {
-    assertAdmin(secret);
-    const course = await ctx.runQuery(internal.lessonAudio.courseLessons, { topicSlug });
-    if (!course) throw new ConvexError(`No course "${topicSlug}".`);
-    const report: { key: string; seq: number; chars: number; rendered: boolean; skipped: string | null }[] = [];
-    for (const lesson of course.lessons) {
-      if (lesson.rendered) {
-        report.push({ key: lesson.key, seq: lesson.seq, chars: lesson.renderedChars ?? 0, rendered: true, skipped: "already rendered" });
-        continue;
+      .take(10);
+    for (const row of existing) {
+      if (row.storageId !== storageId && (await ctx.db.system.get(row.storageId))) {
+        await ctx.storage.delete(row.storageId);
       }
-      if (!lesson.sourceStorageId) {
-        report.push({ key: lesson.key, seq: lesson.seq, chars: 0, rendered: false, skipped: "no body" });
-        continue;
-      }
-      const body = await ctx.storage.get(lesson.sourceStorageId);
-      if (!body) {
-        report.push({ key: lesson.key, seq: lesson.seq, chars: 0, rendered: false, skipped: "body missing" });
-        continue;
-      }
-      const text = sampleOf(narrationFromHtml(await body.text()), sampleChars());
-      if (text.length > MAX_CHARS) {
-        // Reported rather than thrown: one over-long lesson must not stop the
-        // other fifty-five, and the operator needs the full list to decide
-        // whether chunking is worth building.
-        report.push({ key: lesson.key, seq: lesson.seq, chars: text.length, rendered: false, skipped: `over the ${MAX_CHARS} cap` });
-        continue;
-      }
-      if (!apply) {
-        report.push({ key: lesson.key, seq: lesson.seq, chars: text.length, rendered: false, skipped: null });
-        continue;
-      }
-      await renderNarration(ctx, {
-        topicId: course.topicId,
-        lessonKey: lesson.key,
-        sourceStorageId: lesson.sourceStorageId,
-      });
-      report.push({ key: lesson.key, seq: lesson.seq, chars: text.length, rendered: true, skipped: null });
+      await ctx.db.delete(row._id);
     }
-    return { lessons: report };
-  },
-});
-
-// ---- the render itself ------------------------------------------------------
-
-/**
- * One lesson, from stored HTML to a stored mp3 and a `lessonAudio` row. Shared by
- * the reader's play button and the precompute CLI, which differ only in who is
- * allowed to call them and how many lessons they do at once. Authorization is the
- * CALLER's job: this function spends money and asks no questions.
- */
-async function renderNarration(
-  ctx: ActionCtx,
-  p: { topicId: Id<"topics">; lessonKey: string; sourceStorageId: Id<"_storage"> },
-): Promise<{ url: string; chars: number }> {
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (!apiKey) {
-      throw new ConvexError("Narration is not configured yet: ELEVENLABS_API_KEY is not set on this deployment.");
-    }
-
-    if (!p.sourceStorageId) throw new ConvexError("This lesson has no body to read.");
-    const body = await ctx.storage.get(p.sourceStorageId);
-    if (!body) throw new ConvexError("This lesson's body could not be loaded.");
-    const full = narrationFromHtml(await body.text());
-    if (!full) throw new ConvexError("This lesson has no prose to read aloud.");
-    // Sampling happens BEFORE the length guard, so an audition of a lesson that
-    // is too long to narrate in full still works: the point of a sample is to
-    // judge a voice, and that does not need the whole lesson.
-    const text = sampleOf(full, sampleChars());
-    if (text.length > MAX_CHARS) {
-      // Named numbers, because the operator reading this needs to know how far
-      // over it is before deciding whether chunking is worth building.
-      throw new ConvexError(
-        `This lesson is ${text.length} characters, past the ${MAX_CHARS} a single render takes. Splitting long lessons is not built yet.`,
-      );
-    }
-
-    // **The bill, before it is incurred.** ElevenLabs charges per character, so
-    // this line IS the cost of the render, visible in `npx convex logs` whether
-    // the call then succeeds or fails. It exists because on 2026-09-14 the first
-    // real press was refused by the provider and there was no way to answer "what
-    // would that lesson have cost?" without it. USD is at the published
-    // multilingual-v2 rate; flash models are half.
-    const usd = ((text.length / 1000) * 0.1).toFixed(3);
-    const scope = sampleChars() ? `sample of ${full.length}` : "full lesson";
-    console.log(
-      `lessonAudio: ${p.lessonKey} narration is ${text.length} chars (${scope}), about $${usd} on ${modelId()}`,
-    );
-
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId()}`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "xi-api-key": apiKey },
-      body: JSON.stringify({ text, model_id: modelId(), output_format: "mp3_44100_128" }),
-    });
-    if (!res.ok) {
-      // The provider's own words, truncated. A 401 (bad key) and a 429 (quota)
-      // are the two that will actually happen, and both are unguessable from a
-      // generic failure message.
-      const detail = (await res.text().catch(() => "")).slice(0, 300);
-      // 402 is its own case because it is the one refusal that is not a bug and
-      // not a typo: the account cannot use this voice on its current plan. Saying
-      // so plainly, and naming the two ways out, saves reading a raw provider
-      // payload in a lesson header.
-      if (res.status === 402) {
-        throw new ConvexError(
-          `This ElevenLabs plan cannot use voice ${voiceId()}. Upgrade the plan, or point ` +
-            `ELEVENLABS_VOICE_ID at a voice the account owns. Provider said: ${detail}`,
-        );
-      }
-      throw new ConvexError(`ElevenLabs refused the render (${res.status}). ${detail}`.trim());
-    }
-
-    // `res.blob()` carries the provider's content type; restate it so the stored
-    // blob is served as audio no matter what the response header said.
-    const storageId: Id<"_storage"> = await ctx.storage.store(
-      new Blob([await res.arrayBuffer()], { type: "audio/mpeg" }),
-    );
-    await ctx.runMutation(internal.lessonAudio.saveAudio, {
-      topicId: p.topicId,
-      lessonKey: p.lessonKey,
-      sourceStorageId: p.sourceStorageId,
+    await ctx.db.insert("lessonAudio", {
+      topicId: topic._id,
+      lessonKey,
+      lang: SOURCE_LANG,
+      voiceId,
+      modelId: NARRATION_MODEL,
+      sampleChars: 0,
+      sourceStorageId,
       storageId,
-      chars: text.length,
+      chars,
     });
-    const url = await ctx.storage.getUrl(storageId);
-    if (!url) throw new ConvexError("The narration was rendered but could not be served.");
-    return { url, chars: text.length };
-}
+    return { ok: true };
+  },
+});
+
+/**
+ * **Delete every recording that is no longer served**: a voice that left
+ * `NARRATION_VOICES`, an older model, one of the pilot's samples. This is how the
+ * ElevenLabs pilot's recordings leave a deployment.
+ *
+ * DRY RUN unless `apply` is true, like the other operator rails here: without it
+ * each batch only reports what it would delete (in the return value for the
+ * first batch, in `npx convex logs` for the rest).
+ *
+ * IRREVERSIBLE with `apply`. The pilot's audio was paid for per character, and
+ * deleting it cannot be undone short of paying again, so this runs only on the
+ * owner's explicit say-so:
+ *
+ *   npx convex run lessonAudio:purgeRetired '{"apply":true}'
+ *
+ * It does NOT touch a current recording of a body the lesson has moved on from;
+ * `saveUpload` replaces that one when the lesson is rendered again.
+ */
+export const purgeRetired = internalMutation({
+  args: { apply: v.optional(v.boolean()), cursor: v.optional(v.union(v.string(), v.null())) },
+  returns: v.object({ retired: v.number(), applied: v.boolean(), more: v.boolean() }),
+  handler: async (ctx, { apply, cursor }): Promise<{ retired: number; applied: boolean; more: boolean }> => {
+    // The table has no index on voice or model and does not need one for a
+    // one-off sweep: walk it a page at a time, continuing in a fresh transaction.
+    const page = await ctx.db.query("lessonAudio").paginate({ numItems: 100, cursor: cursor ?? null });
+    const retired = page.page.filter((r) => !isCurrent(r));
+    if (apply) {
+      for (const row of retired) {
+        if (await ctx.db.system.get(row.storageId)) await ctx.storage.delete(row.storageId);
+        await ctx.db.delete(row._id);
+      }
+    }
+    console.log(
+      `lessonAudio.purgeRetired: ${retired.length} of ${page.page.length} rows retired, ${apply ? "deleted" : "dry run, nothing deleted"}`,
+    );
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(0, internal.lessonAudio.purgeRetired, { apply, cursor: page.continueCursor });
+    }
+    return { retired: retired.length, applied: !!apply, more: !page.isDone };
+  },
+});

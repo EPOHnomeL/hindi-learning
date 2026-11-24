@@ -1,340 +1,578 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { ConvexError } from "convex/values";
 import { expect, test } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { NARRATION_MODEL, NARRATION_VOICES } from "./narrationVoices";
 import schema from "./schema";
 
-// **The narration pilot's gate, which is a production permission boundary.**
-// `lessonAudio.status` is what decides whether the play button exists at all, so
-// every one of these tests is really asking "can this person make us spend money
-// on ElevenLabs, on a course that is live on a real tenant?".
+// **Who hears a narration, and what an upload may do to storage.**
 //
-// The suite is written around `status` rather than `speak` on purpose: they share
-// `pilotLesson`, and `status` is the one a learner's browser subscribes to
-// unprompted. `speak` is covered for the one thing `status` cannot show, which is
-// that the action re-checks instead of trusting its caller.
+// Two boundaries live in `lessonAudio.ts` and this suite is both of them:
+//
+//  - `status` decides whether the play control exists and hands out a signed URL
+//    to a recording, on a course that is live on a real tenant. Until 2026-11-24
+//    it also guarded a provider bill; recordings are uploaded now, so what is
+//    left to protect is the audio itself: nobody outside the lesson's readers
+//    gets a URL.
+//  - `saveUpload` and `purgeRetired` DELETE blobs. The tests below pin exactly
+//    which ones, because a storage delete has no undo.
 
 const modules = import.meta.glob("./**/*.ts");
 
 const TENANT = "ywampotch";
 const SLUG = "prophetic-school";
+const SECRET = "test-secret";
+const [MICHAEL, EMMA] = NARRATION_VOICES;
+// The ElevenLabs pilot's recordings, as they sit in production.
+const GEORGE = { voiceId: "JBFqnCBsd6RMkjVDRZzb", modelId: "eleven_multilingual_v2" };
 
-function asUser(t: ReturnType<typeof convexTest>, userId: Id<"users">) {
+const NOTHING = { eligible: false, url: null, voice: null, voices: [] };
+
+type T = ReturnType<typeof convexTest>;
+
+function asUser(t: T, userId: Id<"users">) {
   return t.withIdentity({ subject: `${userId}|session` });
 }
 
-async function user(t: ReturnType<typeof convexTest>, email: string) {
+async function user(t: T, email: string) {
   return await t.run((ctx) => ctx.db.insert("users", { email }));
 }
 
 // An Allowlist admin row. No `tenantSlug` is a sys admin (passes every tenant's
 // check); a slug makes them that tenant's admin and nobody else's.
-async function admin(t: ReturnType<typeof convexTest>, email: string, tenantSlug?: string) {
+async function admin(t: T, email: string, tenantSlug?: string) {
   const userId = await user(t, email);
   await t.run((ctx) => ctx.db.insert("whitelist", { email, isAdmin: true, tenantSlug }));
   return userId;
 }
 
-// The pilot course as it actually exists: on the `ywampotch` tenant, two lessons,
-// a body blob on each so a passing gate has something to narrate.
-async function seedCourse(t: ReturnType<typeof convexTest>, ownerId: Id<"users">) {
+// A course on the `ywampotch` tenant: two lessons, each with its OWN body blob,
+// so "a recording of this body" and "of the other lesson's body" differ.
+async function seedCourse(t: T, ownerId: Id<"users">, slug = SLUG) {
   return await t.run(async (ctx) => {
-    const topicId = await ctx.db.insert("topics", { ownerId, slug: SLUG, title: "Prophetic School", tenantSlug: TENANT });
-    const html = await ctx.storage.store(new Blob(["<p>Listen first.</p>"], { type: "text/html" }));
-    await ctx.db.insert("lessons", { topicId, key: "l1", seq: 1, title: "One", htmlStorageId: html });
-    await ctx.db.insert("lessons", { topicId, key: "l2", seq: 2, title: "Two", htmlStorageId: html });
+    const topicId = await ctx.db.insert("topics", { ownerId, slug, title: "Prophetic School", tenantSlug: TENANT });
+    for (const [i, key] of ["l1", "l2"].entries()) {
+      const html = await ctx.storage.store(new Blob([`<p>Lesson ${key}.</p>`], { type: "text/html" }));
+      await ctx.db.insert("lessons", { topicId, key, seq: i + 1, title: key, htmlStorageId: html });
+    }
     return topicId;
   });
 }
 
-const ask = (t: ReturnType<typeof convexTest>, key = "l1", lang?: string) =>
-  t.query(api.lessonAudio.status, { topicSlug: SLUG, key, lang });
-
-// ---- who gets the button ---------------------------------------------------
-
-test("the course owner sees it", async () => {
-  const t = convexTest(schema, modules);
-  const owner = await user(t, "owner@example.com");
-  await seedCourse(t, owner);
-  expect(await ask(asUser(t, owner))).toEqual({ eligible: true, url: null });
-});
-
-test("an admin of this course's tenant sees it", async () => {
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const ta = await admin(t, "ta@ywam.example", TENANT);
-  expect(await ask(asUser(t, ta))).toEqual({ eligible: true, url: null });
-});
-
-test("a sys admin sees it, being an administrator of every tenant", async () => {
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const sys = await admin(t, "sys@example.com");
-  expect(await ask(asUser(t, sys))).toEqual({ eligible: true, url: null });
-});
-
-// ---- who does not ----------------------------------------------------------
-
-test("a learner does not, which is the whole point of the gate", async () => {
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const learner = await user(t, "learner@example.com");
-  expect(await ask(asUser(t, learner))).toEqual({ eligible: false, url: null });
-});
-
-test("ANOTHER tenant's admin does not", async () => {
-  // The reason `isCallerAdmin` is passed `topic.tenantSlug` rather than called
-  // bare: an unscoped check would hand every branded site's administrator a
-  // button on every other site's course.
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const other = await admin(t, "ta@othertenant.example", "othertenant");
-  expect(await ask(asUser(t, other))).toEqual({ eligible: false, url: null });
-});
-
-test("an allowlisted member who is not an admin does not", async () => {
-  // Being admitted to CREATE courses (ADR 0021) is not being an administrator.
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const member = await user(t, "member@example.com");
-  await t.mutation(internal.whitelist.seedEmail, { email: "member@example.com" });
-  expect(await ask(asUser(t, member))).toEqual({ eligible: false, url: null });
-});
-
-test("a signed-out visitor does not", async () => {
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  expect(await ask(t)).toEqual({ eligible: false, url: null });
-});
-
-// ---- the rest of the pilot's scope ----------------------------------------
-
-test("any lesson of the course, not just the first", async () => {
-  // Widened 2026-09-15 so a precomputed course can be heard end to end. The
-  // course is still the gate; the lesson is not.
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const sys = await admin(t, "sys@example.com");
-  expect(await ask(asUser(t, sys), "l2")).toEqual({ eligible: true, url: null });
-});
-
-test("a lesson that does not exist is still nothing", async () => {
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const sys = await admin(t, "sys@example.com");
-  expect(await ask(asUser(t, sys), "no-such-lesson")).toEqual({ eligible: false, url: null });
-});
-
-test("not a translated Edition, even for a sys admin", async () => {
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const sys = await admin(t, "sys@example.com");
-  expect(await ask(asUser(t, sys), "l1", "hi")).toEqual({ eligible: false, url: null });
-  // An absent `?lang` IS the English Edition, so it must still pass.
-  expect(await ask(asUser(t, sys), "l1", undefined)).toEqual({ eligible: true, url: null });
-});
-
-test("not another course, even for its own owner", async () => {
-  const t = convexTest(schema, modules);
-  const owner = await user(t, "owner@example.com");
-  await t.run((ctx) => ctx.db.insert("topics", { ownerId: owner, slug: "other-course", title: "Other", tenantSlug: TENANT }));
-  const res = await asUser(t, owner).query(api.lessonAudio.status, { topicSlug: "other-course", key: "l1" });
-  expect(res).toEqual({ eligible: false, url: null });
-});
-
-// ---- the action re-checks ---------------------------------------------------
-
-test("speak refuses a learner rather than trusting the caller", async () => {
-  // `status` hiding the button is UX. This is the boundary: a learner who calls
-  // the action directly must be refused, and must not be told why.
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const learner = await user(t, "learner@example.com");
-  await expect(
-    asUser(t, learner).action(api.lessonAudio.speak, { topicSlug: SLUG, key: "l1" }),
-  ).rejects.toThrow(/not available/i);
-});
-
-test("speak refuses a lesson that does not exist, with the same words", async () => {
-  // The refusal is deliberately identical for "no such lesson" and "not allowed
-  // to render", so probing it leaks nothing about the gate's shape.
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const sys = await admin(t, "sys@example.com");
-  await expect(
-    asUser(t, sys).action(api.lessonAudio.speak, { topicSlug: SLUG, key: "no-such-lesson" }),
-  ).rejects.toThrow(/not available/i);
-});
-
-test("an admin past the gate still stops at an unconfigured deployment", async () => {
-  // The order that matters: the gate first, THEN configuration. An admin is told
-  // the key is missing; a learner never learns that much.
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const sys = await admin(t, "sys@example.com");
-  const had = process.env.ELEVENLABS_API_KEY;
-  delete process.env.ELEVENLABS_API_KEY;
-  try {
-    await expect(
-      asUser(t, sys).action(api.lessonAudio.speak, { topicSlug: SLUG, key: "l1" }),
-    ).rejects.toThrow(/ELEVENLABS_API_KEY/);
-  } finally {
-    if (had !== undefined) process.env.ELEVENLABS_API_KEY = had;
-  }
-});
-
-// ---- the audition budget ----------------------------------------------------
-
-test("a sample and a full render are different cache entries", async () => {
-  // The trap this pins: if `sampleChars` were not in the key, turning sampling on
-  // would replay the full lesson (so the audition never happens), and turning it
-  // off would replay the 600-character snippet forever.
-  const t = convexTest(schema, modules);
-  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
-  const sys = await admin(t, "sys@example.com");
-  // Pin the voice rather than inheriting DEFAULT_VOICE_ID, so re-casting the
-  // narrator (as 2026-09-15 did, Rachel to George) never breaks this test.
-  process.env.ELEVENLABS_VOICE_ID = "test-voice";
-  await t.run(async (ctx) => {
-    const lesson = await ctx.db
-      .query("lessons")
-      .withIndex("by_topic_seq", (q) => q.eq("topicId", topicId))
-      .first();
-    const storageId = await ctx.storage.store(new Blob(["mp3"], { type: "audio/mpeg" }));
-    await ctx.db.insert("lessonAudio", {
-      topicId,
-      lessonKey: "l1",
-      lang: "en",
-      voiceId: "test-voice",
-      modelId: "eleven_multilingual_v2",
-      sampleChars: 0,
-      sourceStorageId: lesson!.htmlStorageId,
-      storageId,
-      chars: 20,
-    });
-  });
-
-  // Sampling off: the cached full render is a hit.
-  expect((await ask(asUser(t, sys))).url).not.toBeNull();
-
-  // Sampling on: a miss, because what is cached is not what was asked for.
-  process.env.ELEVENLABS_SAMPLE_CHARS = "600";
-  try {
-    expect((await ask(asUser(t, sys))).url).toBeNull();
-  } finally {
-    delete process.env.ELEVENLABS_SAMPLE_CHARS;
-    delete process.env.ELEVENLABS_VOICE_ID;
-  }
-});
-
-test("a malformed sample budget reads as off rather than breaking the button", async () => {
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const sys = await admin(t, "sys@example.com");
-  for (const bad of ["", "abc", "-5", "0"]) {
-    process.env.ELEVENLABS_SAMPLE_CHARS = bad;
-    try {
-      expect(await ask(asUser(t, sys))).toEqual({ eligible: true, url: null });
-    } finally {
-      delete process.env.ELEVENLABS_SAMPLE_CHARS;
-    }
-  }
-});
-
-test("the voices diagnostic refuses without the operator secret", async () => {
-  const t = convexTest(schema, modules);
-  await expect(t.action(api.lessonAudio.voices, { secret: "wrong" })).rejects.toThrow(/unauthorized/i);
-});
-
-test("a refusal reaches the reader instead of being swallowed", async () => {
-  // **The client only surfaces a `ConvexError` whose `data` is a STRING.**
-  // `refusalMessage` in `src/app/_components/mutationRun.ts` returns the caller's
-  // generic fallback for anything else, so throwing `new ConvexError({ message })`
-  // meant every carefully worded refusal in this file reached the lesson as
-  // "The narration could not be made." and the operator saw nothing useful.
-  // Found on 2026-09-15 when an ElevenLabs per-key quota refusal was invisible in
-  // the UI and only readable in `npx convex logs`.
-  const t = convexTest(schema, modules);
-  await seedCourse(t, await user(t, "owner@example.com"));
-  const learner = await user(t, "learner@example.com");
-  const err = await asUser(t, learner)
-    .action(api.lessonAudio.speak, { topicSlug: SLUG, key: "l1" })
-    .then(() => null)
-    .catch((e: unknown) => e);
-  expect(err).toBeInstanceOf(ConvexError);
-  expect(typeof (err as ConvexError<string>).data).toBe("string");
-  expect((err as ConvexError<string>).data).toMatch(/not available/i);
-});
-
-// ---- playing is free and shared; rendering spends money --------------------
-
-// A rendered narration already sitting in storage for this lesson.
-async function seedRender(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, lessonKey: string) {
-  await t.run(async (ctx) => {
+async function bodyOf(t: T, topicId: Id<"topics">, lessonKey: string) {
+  return await t.run(async (ctx) => {
     const lesson = await ctx.db
       .query("lessons")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", lessonKey))
       .unique();
-    const storageId = await ctx.storage.store(new Blob(["mp3"], { type: "audio/mpeg" }));
-    await ctx.db.insert("lessonAudio", {
-      topicId,
-      lessonKey,
-      lang: "en",
-      voiceId: "JBFqnCBsd6RMkjVDRZzb",
-      modelId: "eleven_multilingual_v2",
-      sampleChars: 0,
-      sourceStorageId: lesson!.htmlStorageId,
-      storageId,
-      chars: 7214,
-    });
+    return lesson!.htmlStorageId!;
   });
 }
 
-test("a learner with a grant hears a lesson that has already been rendered", async () => {
-  // The point of precomputing: the bytes are bought once and everyone plays them.
-  const t = convexTest(schema, modules);
+const mp3 = (t: T, bytes = "mp3") => t.run((ctx) => ctx.storage.store(new Blob([bytes], { type: "audio/mpeg" })));
+const blobExists = async (t: T, id: Id<"_storage">) => (await t.run((ctx) => ctx.db.system.get(id))) !== null;
+const rowCount = (t: T) => t.run(async (ctx) => (await ctx.db.query("lessonAudio").collect()).length);
+
+// A recording already in the table. Defaults to a current one of the lesson as
+// it reads now; `over` bends any part of that.
+async function seedRecording(
+  t: T,
+  topicId: Id<"topics">,
+  lessonKey: string,
+  voiceId: string,
+  over: { modelId?: string; sampleChars?: number; sourceStorageId?: Id<"_storage"> } = {},
+) {
+  const sourceStorageId = over.sourceStorageId ?? (await bodyOf(t, topicId, lessonKey));
+  const storageId = await mp3(t, `${voiceId} reads ${lessonKey}`);
+  await t.run((ctx) =>
+    ctx.db.insert("lessonAudio", {
+      topicId,
+      lessonKey,
+      lang: "en",
+      voiceId,
+      modelId: over.modelId ?? NARRATION_MODEL,
+      sampleChars: over.sampleChars ?? 0,
+      sourceStorageId,
+      storageId,
+      chars: 100,
+    }),
+  );
+  return storageId;
+}
+
+const ask = (t: T, over: { key?: string; lang?: string; voice?: string } = {}) =>
+  t.query(api.lessonAudio.status, { topicSlug: SLUG, key: over.key ?? "l1", lang: over.lang, voice: over.voice });
+
+// A course with both voices recorded on l1, and a learner holding a grant on it.
+async function recordedCourse(t: T) {
   const owner = await user(t, "owner@example.com");
   const topicId = await seedCourse(t, owner);
-  await seedRender(t, topicId, "l1");
+  await seedRecording(t, topicId, "l1", MICHAEL);
+  await seedRecording(t, topicId, "l1", EMMA);
   const learner = await user(t, "learner@example.com");
   await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: learner }));
+  return { owner, topicId, learner };
+}
+
+// ---- who hears it -----------------------------------------------------------
+
+test("a learner with a grant hears a recorded lesson, in the first voice by default", async () => {
+  const t = convexTest(schema, modules);
+  const { learner } = await recordedCourse(t);
   const res = await ask(asUser(t, learner));
   expect(res.eligible).toBe(true);
   expect(res.url).not.toBeNull();
+  // The default is the FIRST entry of `NARRATION_VOICES`, which is the casting
+  // decision, and both are on offer in that order.
+  expect(res.voice).toBe(MICHAEL);
+  expect(res.voices).toEqual([MICHAEL, EMMA]);
 });
 
-test("a learner sees no control on a lesson nobody has rendered", async () => {
-  // A play button that can only ever fail is worse than no play button.
+test("the course owner hears it", async () => {
+  const t = convexTest(schema, modules);
+  const { owner } = await recordedCourse(t);
+  expect((await ask(asUser(t, owner))).eligible).toBe(true);
+});
+
+test("a signed-in visitor to a paid course hears the free preview lesson and no other", async () => {
+  // The reader's paywall, not a rule of its own: on a paid Edition a caller
+  // with no grant reads the first lesson only, and audio of a lesson IS the
+  // lesson. Without this, pricing a course would leave its narration free.
+  const t = convexTest(schema, modules);
+  const { topicId } = await recordedCourse(t);
+  await seedRecording(t, topicId, "l2", MICHAEL);
+  await t.run((ctx) => ctx.db.insert("listings", { topicId, lang: "en", amount: 25000, currency: "zar" }));
+  const visitor = await user(t, "visitor@example.com");
+  expect((await ask(asUser(t, visitor), { key: "l1" })).eligible).toBe(true);
+  expect(await ask(asUser(t, visitor), { key: "l2" })).toEqual(NOTHING);
+});
+
+// ---- who does not -----------------------------------------------------------
+
+test("a stranger with no grant hears nothing, recorded or not", async () => {
+  const t = convexTest(schema, modules);
+  await recordedCourse(t);
+  const stranger = await user(t, "stranger@example.com");
+  expect(await ask(asUser(t, stranger))).toEqual(NOTHING);
+});
+
+test("an administrator without a grant hears nothing, sys admin or tenant admin", async () => {
+  // Until 2026-11-24 administrators were let in here, because they were the
+  // ones who commissioned a render. The reader shows an admin nothing a grant
+  // does not, and a recording URL is a permanent link to the whole lesson, so
+  // neither does this.
+  const t = convexTest(schema, modules);
+  await recordedCourse(t);
+  const sys = await admin(t, "sys@example.com");
+  const ta = await admin(t, "ta@ywam.example", TENANT);
+  const other = await admin(t, "ta@othertenant.example", "othertenant");
+  for (const who of [sys, ta, other]) expect(await ask(asUser(t, who))).toEqual(NOTHING);
+});
+
+test("a learner who holds only a translated Edition hears nothing", async () => {
+  // They arrive with no `?lang` and the reader serves them the Hindi lesson.
+  // "Holds some grant on the course" would have played English over it, and on
+  // a paid English Edition would have handed out the narration of every lesson.
+  const t = convexTest(schema, modules);
+  const { topicId } = await recordedCourse(t);
+  await seedRecording(t, topicId, "l2", MICHAEL);
+  const hindi = await user(t, "hindi@example.com");
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: hindi, lang: "hi" }));
+  expect(await ask(asUser(t, hindi))).toEqual(NOTHING);
+  expect(await ask(asUser(t, hindi), { lang: "en" })).toEqual(NOTHING);
+  await t.run((ctx) => ctx.db.insert("listings", { topicId, lang: "en", amount: 25000, currency: "zar" }));
+  expect(await ask(asUser(t, hindi), { key: "l2" })).toEqual(NOTHING);
+  expect(await ask(asUser(t, hindi), { lang: "en", key: "l2" })).toEqual(NOTHING);
+});
+
+test("an allowlisted member who is not an admin hears nothing", async () => {
+  // Being admitted to CREATE courses (ADR 0021) is not a grant on this one.
+  const t = convexTest(schema, modules);
+  await recordedCourse(t);
+  const member = await user(t, "member@example.com");
+  await t.mutation(internal.whitelist.seedEmail, { email: "member@example.com" });
+  expect(await ask(asUser(t, member))).toEqual(NOTHING);
+});
+
+test("a signed-out visitor hears nothing", async () => {
+  const t = convexTest(schema, modules);
+  await recordedCourse(t);
+  expect(await ask(t)).toEqual(NOTHING);
+});
+
+test("an absent ?lang is the English Edition for someone who holds it", async () => {
+  const t = convexTest(schema, modules);
+  const { learner } = await recordedCourse(t);
+  expect((await ask(asUser(t, learner), { lang: undefined })).eligible).toBe(true);
+  expect((await ask(asUser(t, learner), { lang: "en" })).eligible).toBe(true);
+});
+
+test("a superseded lesson is not narrated, as the reader does not show it", async () => {
+  const t = convexTest(schema, modules);
+  const { owner, topicId } = await recordedCourse(t);
+  await t.run(async (ctx) => {
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", "l1"))
+      .unique();
+    await ctx.db.patch(lesson!._id, { supersededBy: "l1b" });
+  });
+  expect(await ask(asUser(t, owner))).toEqual(NOTHING);
+});
+
+// ---- the gate is "a recording exists" --------------------------------------
+
+test("nobody sees a control on a lesson with no recording, the owner included", async () => {
+  // A play button that can only ever fail is worse than no play button. Under
+  // the ElevenLabs pilot an administrator saw it anyway, as an invitation to
+  // render; nobody can commission a render from the reader any more.
+  const t = convexTest(schema, modules);
+  const { owner, learner } = await recordedCourse(t);
+  for (const who of [owner, learner]) expect(await ask(asUser(t, who), { key: "l2" })).toEqual(NOTHING);
+});
+
+test("a lesson that does not exist is the same nothing", async () => {
+  const t = convexTest(schema, modules);
+  const { owner } = await recordedCourse(t);
+  expect(await ask(asUser(t, owner), { key: "no-such-lesson" })).toEqual(NOTHING);
+});
+
+test("any course with a recording is narrated, not one named course", async () => {
+  // The pilot's `PILOT_SLUG` constant went with the provider bill it guarded.
+  const t = convexTest(schema, modules);
+  const owner = await user(t, "owner@example.com");
+  const topicId = await seedCourse(t, owner, "another-course");
+  await seedRecording(t, topicId, "l1", MICHAEL);
+  const res = await asUser(t, owner).query(api.lessonAudio.status, { topicSlug: "another-course", key: "l1" });
+  expect(res.eligible).toBe(true);
+});
+
+// ---- choosing a voice -------------------------------------------------------
+
+test("the learner's chosen voice is the one that plays", async () => {
+  const t = convexTest(schema, modules);
+  const { learner } = await recordedCourse(t);
+  const michael = await ask(asUser(t, learner), { voice: MICHAEL });
+  const emma = await ask(asUser(t, learner), { voice: EMMA });
+  expect(emma.voice).toBe(EMMA);
+  expect(emma.voices).toEqual([MICHAEL, EMMA]);
+  // Two different files, not the same one under two names.
+  expect(emma.url).not.toBeNull();
+  expect(emma.url).not.toBe(michael.url);
+});
+
+test("a chosen voice with no recording of this lesson falls back to one that has", async () => {
+  // Mid-rollout a lesson can be recorded in one voice only. A learner who chose
+  // the other must still be able to listen, and is told which voice they got.
   const t = convexTest(schema, modules);
   const owner = await user(t, "owner@example.com");
   const topicId = await seedCourse(t, owner);
-  const learner = await user(t, "learner@example.com");
-  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: learner }));
-  expect(await ask(asUser(t, learner))).toEqual({ eligible: false, url: null });
+  await seedRecording(t, topicId, "l1", EMMA);
+  const res = await ask(asUser(t, owner), { voice: MICHAEL });
+  expect(res).toMatchObject({ eligible: true, voice: EMMA, voices: [EMMA] });
+  expect(res.url).not.toBeNull();
 });
 
-test("a learner who CAN see the control still cannot commission a render", async () => {
-  // The spend boundary, and the reason `canRender` is threaded into the action
-  // rather than left to `status` having hidden the button.
+test("a voice nobody cast is ignored rather than trusted", async () => {
+  // `voice` is a client argument, so it can be anything, George's old id included.
+  const t = convexTest(schema, modules);
+  const { learner } = await recordedCourse(t);
+  for (const voice of ["", "nonsense", GEORGE.voiceId]) {
+    expect((await ask(asUser(t, learner), { voice })).voice).toBe(MICHAEL);
+  }
+});
+
+// ---- what counts as a recording --------------------------------------------
+
+test("the ElevenLabs pilot's recordings are no longer served", async () => {
+  // They stay in the table until `purgeRetired` is run, and must not play.
   const t = convexTest(schema, modules);
   const owner = await user(t, "owner@example.com");
   const topicId = await seedCourse(t, owner);
-  await seedRender(t, topicId, "l1");
-  const learner = await user(t, "learner@example.com");
-  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: learner }));
-  // They can see and play l1 (previous test), but l2 is unrendered and theirs to
-  // ask for only if they were allowed to spend. They are not.
-  await expect(
-    asUser(t, learner).action(api.lessonAudio.speak, { topicSlug: SLUG, key: "l2" }),
-  ).rejects.toThrow(/not available/i);
+  await seedRecording(t, topicId, "l1", GEORGE.voiceId, { modelId: GEORGE.modelId });
+  expect(await ask(asUser(t, owner))).toEqual(NOTHING);
+  expect(await ask(asUser(t, owner), { voice: GEORGE.voiceId })).toEqual(NOTHING);
 });
 
-test("a stranger with no grant at all hears nothing, rendered or not", async () => {
+test("a current voice under another model, or a sample, is not a recording", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await user(t, "owner@example.com");
+  const topicId = await seedCourse(t, owner);
+  await seedRecording(t, topicId, "l1", MICHAEL, { modelId: "kokoro-v0.19" });
+  await seedRecording(t, topicId, "l1", EMMA, { sampleChars: 600 });
+  expect(await ask(asUser(t, owner))).toEqual(NOTHING);
+});
+
+test("a recording of words the lesson no longer says is not played", async () => {
+  // The owner's in-place editor (ADR 0020) repoints the Lesson body. Reading the
+  // old words over the new page is worse than silence.
+  const t = convexTest(schema, modules);
+  const { owner, topicId } = await recordedCourse(t);
+  await t.run(async (ctx) => {
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", "l1"))
+      .unique();
+    const edited = await ctx.storage.store(new Blob(["<p>Edited.</p>"], { type: "text/html" }));
+    await ctx.db.patch(lesson!._id, { htmlStorageId: edited });
+  });
+  expect(await ask(asUser(t, owner))).toEqual(NOTHING);
+});
+
+test("a recording whose file has gone is not on offer", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await user(t, "owner@example.com");
+  const topicId = await seedCourse(t, owner);
+  const michael = await seedRecording(t, topicId, "l1", MICHAEL);
+  await seedRecording(t, topicId, "l1", EMMA);
+  await t.run((ctx) => ctx.storage.delete(michael));
+  expect(await ask(asUser(t, owner))).toMatchObject({ eligible: true, voice: EMMA, voices: [EMMA] });
+});
+
+// ---- the operator's upload rail --------------------------------------------
+
+// `assertAdmin` reads PUBLISH_SECRET at call time.
+async function withSecret<R>(run: () => Promise<R>): Promise<R> {
+  const had = process.env.PUBLISH_SECRET;
+  process.env.PUBLISH_SECRET = SECRET;
+  try {
+    return await run();
+  } finally {
+    if (had === undefined) delete process.env.PUBLISH_SECRET;
+    else process.env.PUBLISH_SECRET = had;
+  }
+}
+
+const upload = (
+  t: T,
+  args: { lessonKey?: string; voiceId?: string; sourceStorageId: Id<"_storage">; storageId: Id<"_storage">; topicSlug?: string },
+) =>
+  withSecret(() =>
+    t.mutation(api.lessonAudio.saveUpload, {
+      secret: SECRET,
+      topicSlug: args.topicSlug ?? SLUG,
+      lessonKey: args.lessonKey ?? "l1",
+      voiceId: args.voiceId ?? MICHAEL,
+      sourceStorageId: args.sourceStorageId,
+      storageId: args.storageId,
+      chars: 1234,
+    }),
+  );
+
+test("an upload becomes a recording a learner can play", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await user(t, "owner@example.com");
+  const topicId = await seedCourse(t, owner);
+  const storageId = await mp3(t);
+  expect(await upload(t, { sourceStorageId: await bodyOf(t, topicId, "l1"), storageId })).toEqual({ ok: true });
+  expect(await ask(asUser(t, owner))).toMatchObject({ eligible: true, voice: MICHAEL, voices: [MICHAEL] });
+  const row = await t.run((ctx) => ctx.db.query("lessonAudio").first());
+  expect(row).toMatchObject({ lang: "en", voiceId: MICHAEL, modelId: NARRATION_MODEL, sampleChars: 0, chars: 1234, storageId });
+});
+
+test("uploading a lesson again replaces the recording and bins the old file", async () => {
   const t = convexTest(schema, modules);
   const topicId = await seedCourse(t, await user(t, "owner@example.com"));
-  await seedRender(t, topicId, "l1");
-  const stranger = await user(t, "stranger@example.com");
-  expect(await ask(asUser(t, stranger))).toEqual({ eligible: false, url: null });
+  const source = await bodyOf(t, topicId, "l1");
+  const first = await mp3(t, "first take");
+  const second = await mp3(t, "second take");
+  await upload(t, { sourceStorageId: source, storageId: first });
+  await upload(t, { sourceStorageId: source, storageId: second });
+  expect(await rowCount(t)).toBe(1);
+  expect(await blobExists(t, first)).toBe(false);
+  expect(await blobExists(t, second)).toBe(true);
+});
+
+test("an upload in one voice leaves the other voice's recording alone", async () => {
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const emma = await seedRecording(t, topicId, "l1", EMMA);
+  await upload(t, { sourceStorageId: await bodyOf(t, topicId, "l1"), storageId: await mp3(t) });
+  expect(await rowCount(t)).toBe(2);
+  expect(await blobExists(t, emma)).toBe(true);
+});
+
+test("sending the same upload twice does not delete it", async () => {
+  // A retried request carries the same `storageId`. Replacing the row must not
+  // bin the file the new row points at.
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const source = await bodyOf(t, topicId, "l1");
+  const storageId = await mp3(t);
+  await upload(t, { sourceStorageId: source, storageId });
+  await upload(t, { sourceStorageId: source, storageId });
+  expect(await rowCount(t)).toBe(1);
+  expect(await blobExists(t, storageId)).toBe(true);
+});
+
+test("a refused upload is deleted, so nothing is left orphaned in storage", async () => {
+  // Each refusal RETURNS rather than throws: a throw would roll the delete back
+  // and leave the mp3 in storage, billed and unreachable.
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const source = await bodyOf(t, topicId, "l1");
+  const refusals: [string, Parameters<typeof upload>[1], RegExp][] = [
+    ["an unknown voice", { voiceId: GEORGE.voiceId, sourceStorageId: source, storageId: await mp3(t) }, /not a narration voice/],
+    ["a missing course", { topicSlug: "nope", sourceStorageId: source, storageId: await mp3(t) }, /No course/],
+    ["a missing lesson", { lessonKey: "l99", sourceStorageId: source, storageId: await mp3(t) }, /No lesson/],
+    // l2's body is a real blob, but it is not what l1 reads.
+    ["a body the lesson has moved on from", { sourceStorageId: await bodyOf(t, topicId, "l2"), storageId: await mp3(t) }, /edited after/],
+  ];
+  for (const [name, args, reason] of refusals) {
+    const res = await upload(t, args);
+    expect(res.ok, name).toBe(false);
+    expect(res.reason, name).toMatch(reason);
+    expect(await blobExists(t, args.storageId), name).toBe(false);
+  }
+  expect(await rowCount(t)).toBe(0);
+  // The lesson bodies themselves were never candidates for deletion.
+  expect(await blobExists(t, source)).toBe(true);
+});
+
+test("an upload that IS the lesson body is refused and NOT deleted", async () => {
+  // The refusal that keeps its hands off storage. `storageId` is an argument:
+  // every other refusal bins it, and aimed at a lesson body that would bin the
+  // lesson. The unknown voice here would otherwise trigger exactly that delete.
+  //
+  // Its sibling, "labelled as something other than audio/mpeg", is NOT covered
+  // here: convex-test records no content type on a stored blob, so that branch
+  // can only be exercised against a real deployment.
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const body = await bodyOf(t, topicId, "l1");
+  const res = await upload(t, { voiceId: "nonsense", sourceStorageId: body, storageId: body });
+  expect(res.ok).toBe(false);
+  expect(res.reason).toMatch(/lesson body/);
+  expect(await blobExists(t, body)).toBe(true);
+});
+
+test("an upload naming a file that is not in storage is refused", async () => {
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const gone = await mp3(t);
+  await t.run((ctx) => ctx.storage.delete(gone));
+  const res = await upload(t, { sourceStorageId: await bodyOf(t, topicId, "l1"), storageId: gone });
+  expect(res.ok).toBe(false);
+  expect(res.reason).toMatch(/not in storage/);
+  expect(await rowCount(t)).toBe(0);
+});
+
+test("the upload rail refuses a caller without the operator secret", async () => {
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const storageId = await mp3(t);
+  await withSecret(async () => {
+    await expect(
+      t.mutation(api.lessonAudio.saveUpload, {
+        secret: "wrong",
+        topicSlug: SLUG,
+        lessonKey: "l1",
+        voiceId: MICHAEL,
+        sourceStorageId: await bodyOf(t, topicId, "l1"),
+        storageId,
+        chars: 1,
+      }),
+    ).rejects.toThrow(/unauthorized/i);
+    await expect(t.query(api.lessonAudio.uploaded, { secret: "wrong", topicSlug: SLUG })).rejects.toThrow(/unauthorized/i);
+  });
+  // A stranger's call touches nothing, the file they named included.
+  expect(await blobExists(t, storageId)).toBe(true);
+  expect(await rowCount(t)).toBe(0);
+});
+
+test("the uploader is told what the deployment holds, and only current recordings", async () => {
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  await seedRecording(t, topicId, "l1", MICHAEL);
+  await seedRecording(t, topicId, "l2", EMMA);
+  await seedRecording(t, topicId, "l1", GEORGE.voiceId, { modelId: GEORGE.modelId });
+  const held = await withSecret(() => t.query(api.lessonAudio.uploaded, { secret: SECRET, topicSlug: SLUG }));
+  expect(held).toHaveLength(2);
+  expect(held).toContainEqual({ lessonKey: "l1", voiceId: MICHAEL, sourceStorageId: await bodyOf(t, topicId, "l1"), chars: 100 });
+  expect(held).toContainEqual({ lessonKey: "l2", voiceId: EMMA, sourceStorageId: await bodyOf(t, topicId, "l2"), chars: 100 });
+  expect(await withSecret(() => t.query(api.lessonAudio.uploaded, { secret: SECRET, topicSlug: "nope" }))).toEqual([]);
+});
+
+test("a recording whose file has gone is not reported as held, so it is sent again", async () => {
+  // `status` will not serve it. If the uploader were told it was there, that
+  // voice would stay missing for the lesson while every push reported success.
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const lost = await seedRecording(t, topicId, "l1", MICHAEL);
+  await t.run((ctx) => ctx.storage.delete(lost));
+  expect(await withSecret(() => t.query(api.lessonAudio.uploaded, { secret: SECRET, topicSlug: SLUG }))).toEqual([]);
+  // And the repair works: the dangling row is replaced, not tripped over.
+  expect((await upload(t, { sourceStorageId: await bodyOf(t, topicId, "l1"), storageId: await mp3(t) })).ok).toBe(true);
+  expect(await rowCount(t)).toBe(1);
+});
+
+test("a file that is already another lesson's recording is refused and NOT deleted", async () => {
+  // Refusing would bin it, accepting would point two rows at one file, and the
+  // next re-upload of either lesson would then delete it from under the other.
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const l1Michael = await seedRecording(t, topicId, "l1", MICHAEL);
+  const asL2 = await upload(t, { lessonKey: "l2", sourceStorageId: await bodyOf(t, topicId, "l2"), storageId: l1Michael });
+  const badVoice = await upload(t, { voiceId: "nonsense", sourceStorageId: await bodyOf(t, topicId, "l1"), storageId: l1Michael });
+  for (const res of [asL2, badVoice]) {
+    expect(res.ok).toBe(false);
+    expect(res.reason).toMatch(/already another lesson's recording/);
+  }
+  expect(await blobExists(t, l1Michael)).toBe(true);
+  expect(await rowCount(t)).toBe(1);
+});
+
+test("a superseded lesson takes no new recording", async () => {
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const source = await bodyOf(t, topicId, "l1");
+  await t.run(async (ctx) => {
+    const lesson = await ctx.db
+      .query("lessons")
+      .withIndex("by_topic_key", (q) => q.eq("topicId", topicId).eq("key", "l1"))
+      .unique();
+    await ctx.db.patch(lesson!._id, { supersededBy: "l1b" });
+  });
+  const storageId = await mp3(t);
+  expect((await upload(t, { sourceStorageId: source, storageId })).ok).toBe(false);
+  expect(await blobExists(t, storageId)).toBe(false);
+});
+
+// ---- retiring the pilot's recordings ---------------------------------------
+
+test("purgeRetired is a dry run until it is told to apply", async () => {
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const george = await seedRecording(t, topicId, "l1", GEORGE.voiceId, { modelId: GEORGE.modelId });
+  expect(await t.mutation(internal.lessonAudio.purgeRetired, {})).toEqual({ retired: 1, applied: false, more: false });
+  expect(await rowCount(t)).toBe(1);
+  expect(await blobExists(t, george)).toBe(true);
+});
+
+test("purgeRetired deletes retired recordings and their files, and nothing current", async () => {
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const george = await seedRecording(t, topicId, "l1", GEORGE.voiceId, { modelId: GEORGE.modelId });
+  const sample = await seedRecording(t, topicId, "l2", MICHAEL, { sampleChars: 600 });
+  const oldModel = await seedRecording(t, topicId, "l2", EMMA, { modelId: "kokoro-v0.19" });
+  const michael = await seedRecording(t, topicId, "l1", MICHAEL);
+  const emma = await seedRecording(t, topicId, "l1", EMMA);
+  const body = await bodyOf(t, topicId, "l1");
+
+  expect(await t.mutation(internal.lessonAudio.purgeRetired, { apply: true })).toEqual({ retired: 3, applied: true, more: false });
+
+  for (const gone of [george, sample, oldModel]) expect(await blobExists(t, gone)).toBe(false);
+  for (const kept of [michael, emma, body]) expect(await blobExists(t, kept)).toBe(true);
+  expect(await rowCount(t)).toBe(2);
+});
+
+test("purgeRetired survives a row whose file is already gone", async () => {
+  // Deleting a missing blob throws, and a throw would roll back the whole batch.
+  const t = convexTest(schema, modules);
+  const topicId = await seedCourse(t, await user(t, "owner@example.com"));
+  const george = await seedRecording(t, topicId, "l1", GEORGE.voiceId, { modelId: GEORGE.modelId });
+  await t.run((ctx) => ctx.storage.delete(george));
+  await t.mutation(internal.lessonAudio.purgeRetired, { apply: true });
+  expect(await rowCount(t)).toBe(0);
 });

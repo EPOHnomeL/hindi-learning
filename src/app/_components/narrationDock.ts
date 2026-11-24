@@ -33,3 +33,14 @@ export function progress(current: number, duration: number): number {
   if (!usable(duration) || duration === 0 || !usable(current)) return 0;
   return Math.min(1, current / duration);
 }
+
+// Where to pick up when the SAME lesson is switched to another narrator
+// (2026-11-24). Two voices read the same words at different paces, so "4:10 in"
+// is a different sentence in each recording; the same SHARE of the track is
+// very nearly the same sentence. Seconds into the new track, or 0 (start over)
+// when either duration is not yet a number, which is the honest fallback: a
+// wrong guess mid-lesson is worse than the beginning.
+export function carryOver(current: number, fromDuration: number, toDuration: number): number {
+  if (!usable(toDuration) || toDuration === 0) return 0;
+  return progress(current, fromDuration) * toDuration;
+}

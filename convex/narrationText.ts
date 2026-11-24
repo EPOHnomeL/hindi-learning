@@ -35,6 +35,15 @@ const ENTITIES: Record<string, string> = {
   "#39": "'",
   apos: "'",
   nbsp: " ",
+  // Typographic entities, added 2026-11-24: prophetic-school carries a literal
+  // `&ndash;` in eight places, and a narrator read it out as "and n dash".
+  ndash: String.fromCharCode(0x2013),
+  mdash: String.fromCharCode(0x2014),
+  hellip: String.fromCharCode(0x2026),
+  lsquo: String.fromCharCode(0x2018),
+  rsquo: String.fromCharCode(0x2019),
+  ldquo: String.fromCharCode(0x201c),
+  rdquo: String.fromCharCode(0x201d),
 };
 
 // Remove every element whose opening tag matches `open`, along with its
@@ -83,7 +92,7 @@ function dropElements(html: string, open: RegExp, tag: string): string {
 }
 
 function decode(s: string): string {
-  return s.replace(/&(amp|lt|gt|quot|#39|apos|nbsp);/g, (raw, e: string) => ENTITIES[e] ?? raw);
+  return s.replace(/&(#39|[a-z]+);/g, (raw, e: string) => ENTITIES[e] ?? raw);
 }
 
 /**
@@ -94,6 +103,10 @@ export function narrationFromHtml(html: string): string {
   let s = html;
   s = dropElements(s, /<script\b[^>]*>/, "script");
   s = dropElements(s, /<style\b[^>]*>/, "style");
+  // The document `<title>` is the browser tab's label, not part of the lesson. It
+  // repeats the heading that follows, so narrating it opened every lesson by
+  // saying its name twice (found 2026-11-24, reading a pulled script).
+  s = dropElements(s, /<title\b[^>]*>/, "title");
   // `class="quiz"`, `class="quiz fill"`, `class="card quiz"`: the token, not a
   // prefix, so a `.quizzical` class (none today) would not be swallowed.
   s = dropElements(s, /<div\b[^>]*\bclass\s*=\s*["'][^"']*\bquiz\b[^"']*["'][^>]*>/, "div");
@@ -111,34 +124,90 @@ export function narrationFromHtml(html: string): string {
     .join("\n");
 }
 
+const EN_DASH = String.fromCharCode(0x2013);
+const RANGE = `(?:-|${EN_DASH})`;
+
 /**
- * The first `limit` characters of a narration script, cut where a reader would
- * stop rather than mid-word.
+ * A narration script rewritten the way a person would SAY it, for a speech model
+ * that reads characters literally.
  *
- * This exists for the free-tier audition. ElevenLabs' free plan allows 10,000
- * characters a MONTH, and one prophetic-school lesson is around 7,300, so
- * rendering a whole lesson just to find out whether you like a voice spends most
- * of the month on the first try and makes comparing two voices impossible. A
- * 600-character sample costs 6% of it instead.
+ * Kokoro, the model `scripts/narrate.ts` renders with, does no text
+ * normalisation of its own: handed "John 16:13" it says "sixteen thirteen",
+ * "~10 min" comes out as a tilde, and a middle dot or an arrow is silently
+ * dropped so two phrases run together. Every rule below is for a pattern counted
+ * in prophetic-school on 2026-11-24 (422 chapter-and-verse references, 748 middle
+ * dots, 252 number ranges, 85 arrows, 57 "~10 min"), not a general-purpose
+ * normaliser.
  *
- * The cut walks backwards from the limit: the end of the last complete sentence,
- * failing that a paragraph break, failing that the last space. Each fallback is
- * only taken if it leaves a reasonable amount of text, so a stray early full stop
- * cannot collapse a 600-character sample into eight words. A hard slice is the
- * last resort, because a clipped word beats returning nothing.
- *
- * `limit <= 0` means no sampling at all: the whole script, which is the default.
+ * ponytail: any `digits:digits` is read as chapter and verse. True of this
+ * course; a lesson that quotes a clock time would want that rule narrowed.
  */
-export function sampleOf(text: string, limit: number): string {
-  if (limit <= 0 || text.length <= limit) return text;
-  const head = text.slice(0, limit);
-  // Enough of the budget used that the cut is a sample rather than a fragment.
-  const enough = limit * 0.4;
-  // Greedy, so this matches up to the LAST sentence-ending mark in `head`.
-  const sentence = head.match(/[\s\S]*[.!?](?=\s|$)/);
-  if (sentence && sentence[0].length > enough) return sentence[0].trim();
-  const para = head.lastIndexOf("\n");
-  if (para > enough) return head.slice(0, para).trim();
-  const space = head.lastIndexOf(" ");
-  return (space > 0 ? head.slice(0, space) : head).trim();
+export function speakable(text: string): string {
+  return (
+    text
+      // The authored cross-reference shorthand, in its paired forms, before the
+      // generic rules below get half of each: "L16(en dash)L19" is Lessons 16 to
+      // 19, "L6/18" is Lesson 6 or 18, and the section sign ranges the same way.
+      // (The generic range rule wants a digit on BOTH sides of the dash, and the
+      // generic slash rule a letter after it, so neither sees these.)
+      .replace(new RegExp(`\\bL(\\d+)\\s*${RANGE}\\s*L?(\\d+)\\b`, "g"), "Lessons $1 to $2")
+      .replace(/\bL(\d+)\/L?(\d+)\b/g, "Lesson $1 or $2")
+      .replace(new RegExp(`§\\s*(\\d+)\\s*${RANGE}\\s*§?\\s*(\\d+)`, "g"), "sections $1 to $2")
+      // "John 3:1-21" and "1 John 4:1(en dash)2", then the single verse.
+      .replace(new RegExp(`(\\d+):(\\d+)${RANGE}(\\d+)`, "g"), "$1, verses $2 to $3")
+      .replace(/(\d+):(\d+)/g, "$1, verse $2")
+      // Any range left: "pp. 23(en dash)24", "Lessons 30(en dash)33".
+      .replace(new RegExp(`(\\d)${EN_DASH}(\\d)`, "g"), "$1 to $2")
+      .replace(/\bpp\.\s*/g, "pages ")
+      // "p. 23" is a page too; alone, the letter is read out as a letter.
+      .replace(/\bp\.\s*(?=\d)/g, "page ")
+      .replace(/~\s*(\d+)\s*min\b/g, "about $1 minutes")
+      .replace(/~\s*(?=\d)/g, "about ")
+      // An editorial bracket inside a quotation, "judge[s]", is read as the word.
+      .replace(/\[([a-z]+)\]/g, "$1")
+      // A fill-in blank, a spelled-out sum ("Authority = Accountability +
+      // Responsibility") and a slash are all read out as the name of the mark.
+      // A spaced slash separates two phrases; an unspaced one offers two words.
+      .replace(/_{3,}/g, "blank")
+      .replace(/ = /g, " equals ")
+      .replace(/ \+ /g, " plus ")
+      .replace(/\band\/or\b/g, "and or")
+      .replace(/ \/ /g, ", ")
+      .replace(/([A-Za-z0-9])\/(?=[A-Za-z])/g, "$1 or ")
+      // The authored cross-reference shorthand: "L15" is Lesson 15.
+      .replace(/\bL(\d+)\b/g, "Lesson $1")
+      .replace(/\bvs\b\.?/g, "versus")
+      .replace(/§\s*/g, "section ")
+      // Separators that carry a pause on the page and nothing in the audio.
+      // `[^\S\n]` is a space that is not a line break: plain `\s` ate the break
+      // too and ran two paragraphs into one wherever a line ended on a separator.
+      .replace(/[^\S\n]*·[^\S\n]*/g, ". ")
+      // An arrow alone on its line is a flow diagram's connector between two
+      // boxes: it opens the next step ("Then 2. Does it agree with Scripture?")
+      // instead of becoming a paragraph that says only "then".
+      .replace(/(^|\n)[^\S\n]*→[^\S\n]*\n/g, "$1Then ")
+      .replace(/[^\S\n]*→[^\S\n]*/g, ", then ")
+      // After a question the arrow starts a new sentence: "Which channel?, then
+      // Lesson 3" has no sentence end for the voice to fall on.
+      .replace(/([?!.]), then /g, "$1 Then ")
+      // An en dash still standing joins two words ("the Samuel(en dash)Saul
+      // passage"), which is a hyphen's job and a mark the model knows.
+      .replace(new RegExp(EN_DASH, "g"), "-")
+      // A non-breaking hyphen is a hyphen to a reader.
+      .replace(/‑/g, "-")
+      // A separator at the start or end of a line leaves a stray mark behind.
+      .split("\n")
+      .map((line) =>
+        line
+          .replace(/^[.,]\s+/, "")
+          // A separator after a sentence that had already ended doubles its full
+          // stop ('speak".. Lesson 1'), anywhere in the line. A real ellipsis is
+          // three dots or its own character, so it is left alone.
+          .replace(/(?<!\.)\.\s*\.(?!\.)/g, ".")
+          .replace(/([?!:;,])\.(?=\s|$)/g, "$1")
+          .trim(),
+      )
+      .filter((line) => line.length > 0)
+      .join("\n")
+  );
 }

@@ -17,7 +17,7 @@ import { buildEditDoc, buildSrcDoc, lessonMessage, narrateMessage, replaceBodyIn
 import { Icon } from "./icons";
 import { LessonFootCard } from "./LessonFoot";
 import { Markdown } from "./MarkdownView";
-import { clock, progress } from "./narrationDock";
+import { carryOver, clock, progress } from "./narrationDock";
 import { MarkdownResourceDialog } from "./ResourceItem";
 import { applyProgress, cardIdFromHash, composeCardShare, editionToEdit, resolveArtifactClick, resourceTarget } from "./readerDerive";
 import { Dialog, Modal, ReaderSkeleton, useExit } from "./ui";
@@ -1135,13 +1135,14 @@ function ContentEditor({
 // the reader flipped the theme. So the frame owns the pixels and this owns the
 // sound, joined by two postMessages.
 //
-// Whether the control exists at all is `lessonAudio.status`, the server's verdict
-// on the whole pilot gate. `undefined` here means the document is built with no
-// trace of the feature, which is what every learner gets.
+// Whether the control exists at all is `lessonAudio.status`, the server's
+// verdict: this caller may read the lesson AND a recording of it exists.
+// `undefined` here means the document is built with no trace of the feature,
+// which is what a lesson nobody has recorded gets.
 //
-// ponytail: the strings are hardcoded English. The pilot is admin-only on one
-// English lesson, and `messages/parity.test.ts` demands every new key in all six
-// catalogues. Add keys when the gate widens past administrators.
+// Nothing here can commission audio (2026-11-24). Recordings are rendered on the
+// operator's machine and uploaded (`scripts/narrate.ts`); the ElevenLabs pilot's
+// "this press spends money" branch and its `speak` action are gone.
 // **The docked narration player** (course-narration ticket 01, variant B of the
 // 2026-09-18 prototype). The circular control inside the lesson starts playback
 // and then scrolls away with the heading, which left a nine-minute narration
@@ -1277,18 +1278,60 @@ const resumeAt = new Map<string, number>();
 // Bank a position, ignoring the two that mean "nothing to come back to": the
 // very start, and a track played to its end.
 function remember(key: string, a: HTMLAudioElement) {
-  if (a.currentTime > 0 && !a.ended) resumeAt.set(key, a.currentTime);
-  else resumeAt.delete(key);
+  if (a.ended) resumeAt.delete(key);
+  // Zero is "never started THIS time", not "start over": a lesson revisited and
+  // left again without pressing play keeps the place it was banked at.
+  else if (a.currentTime > 0) resumeAt.set(key, a.currentTime);
+}
+
+// **Which narrator this device prefers** (2026-11-24). One key, per device, in
+// localStorage and not on the server: it is a taste, like the theme was before
+// accounts, and a server-side preference would be a schema change for something
+// nobody has asked to follow them between devices. Absent means "whichever the
+// course lists first", which the server decides.
+const VOICE_KEY = "hindi:narrationVoice";
+
+// Why `play()` rejected, as the message key to show. Only `NotAllowedError` is
+// the browser withholding autoplay ("Ready. Press play"). An `AbortError` is a
+// newer `play()` or a change of file superseding this one, and anything else is
+// the file failing to load, which the element's `error` event has usually
+// already reported: answering every rejection with "Ready" overwrote that
+// failure line with an invitation to press a button that cannot work.
+function playRefusal(e: unknown): "narrationReady" | "narrationFailed" {
+  return e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "AbortError")
+    ? "narrationReady"
+    : "narrationFailed";
+}
+
+function storedVoice(): string | undefined {
+  try {
+    return window.localStorage.getItem(VOICE_KEY) ?? undefined;
+  } catch {
+    // Server render, or storage switched off: no preference, the default voice.
+    return undefined;
+  }
 }
 
 function useLessonNarration(
   topicSlug: string,
   lessonKey: string,
-): { state: NarrateState; message: string; onToggle: () => void; audio: HTMLAudioElement | null } | undefined {
+):
+  | {
+      state: NarrateState;
+      message: string;
+      onToggle: () => void;
+      audio: HTMLAudioElement | null;
+      // The narrator playing and the ones this lesson is recorded in, for the
+      // voice picker. `voices` has one entry on a lesson recorded in one voice.
+      voice: string | null;
+      voices: string[];
+      onVoice: (voice: string) => void;
+    }
+  | undefined {
   const t = useTranslations("Artifact");
   const lang = useEditionLang();
-  const status = useQuery(api.lessonAudio.status, { topicSlug, key: lessonKey, lang: lang ?? undefined });
-  const speak = useAction(api.lessonAudio.speak);
+  const [wanted, setWanted] = useState(storedVoice);
+  const live = useQuery(api.lessonAudio.status, { topicSlug, key: lessonKey, lang: lang ?? undefined, voice: wanted });
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // The same element as `audioRef`, held in state as well so the dock re-renders
   // once it exists. The ref is what the callbacks below read (they must not
@@ -1300,8 +1343,17 @@ function useLessonNarration(
   const resumeKey = `${topicSlug}:${lessonKey}:${lang ?? "en"}`;
   const resumeKeyRef = useRef(resumeKey);
   resumeKeyRef.current = resumeKey;
-  // Whether the reader has asked to hear it, so a render that finishes can start
-  // playback itself instead of making them press a second time.
+  // **Hold the last answer for this lesson while a new one is in flight.**
+  // Changing the voice changes the query's arguments, and `useQuery` answers
+  // `undefined` until the new subscription lands. Read literally, that is "no
+  // narration here", which would unmount the control and the dock for a beat,
+  // mid-sentence, every time somebody switched narrator.
+  const held = useRef<{ key: string; status: NonNullable<typeof live> } | null>(null);
+  if (live !== undefined) held.current = { key: resumeKey, status: live };
+  const status = live ?? (held.current?.key === resumeKey ? held.current.status : undefined);
+  // Whether the reader has asked to hear it, so a recording that arrives (a
+  // change of voice, mid-sentence) can start itself instead of making them
+  // press a second time.
   const wantPlay = useRef(false);
   const url = status?.url ?? null;
 
@@ -1312,9 +1364,16 @@ function useLessonNarration(
     a.preload = "none";
     const playing = () => setState("playing");
     const stopped = () => setState("idle");
+    // A recording that will not load (the file is gone, the network is): say so
+    // rather than leave a control that silently does nothing.
+    const failed = () => {
+      setState("idle");
+      setMessage(t("narrationFailed"));
+    };
     a.addEventListener("play", playing);
     a.addEventListener("pause", stopped);
     a.addEventListener("ended", stopped);
+    a.addEventListener("error", failed);
     audioRef.current = a;
     setAudio(a);
     return () => {
@@ -1325,9 +1384,13 @@ function useLessonNarration(
       a.removeEventListener("play", playing);
       a.removeEventListener("pause", stopped);
       a.removeEventListener("ended", stopped);
+      a.removeEventListener("error", failed);
       audioRef.current = null;
       setAudio(null);
     };
+    // `t` is stable for the life of the pane; re-running this would rebuild the
+    // element and stop the audio.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // A lesson switch keeps the same pane, so stop the previous lesson's audio and
@@ -1346,66 +1409,92 @@ function useLessonNarration(
     wantPlay.current = false;
   }, [resumeKey]);
 
-  // Point the element at whatever the live query says is rendered, and start it if
-  // this URL arrived because the reader asked for it. A render takes long enough
-  // that the browser may have forgotten the click, so a blocked `play()` is
-  // EXPECTED rather than an error: fall back to a control sitting on Play.
+  // Which lesson the element's current `src` belongs to, so the effect below can
+  // tell "another narrator for the lesson already playing" from "another lesson".
+  const loadedFor = useRef<string | null>(null);
+
+  // Point the element at whatever the live query says to play.
   useEffect(() => {
     const a = audioRef.current;
     if (!a || !url) return;
     if (a.src !== url) {
+      // **A change of narrator, mid-lesson.** Same lesson, different file: carry
+      // on from the same place in the TEXT, and keep playing if it was playing.
+      // Two voices read at different paces, so the place is carried as a share
+      // of the track rather than as seconds (`carryOver`).
+      const swap = loadedFor.current === resumeKey && a.src !== "";
+      const from = swap ? { at: a.currentTime, of: a.duration } : null;
+      if (swap && !a.paused) wantPlay.current = true;
+      // Otherwise: resume where this lesson was left earlier in the visit.
+      const banked = swap ? undefined : resumeAt.get(resumeKey);
       a.src = url;
-      // Resume where this lesson was left. `currentTime` is ignored until the
-      // element knows how long the track is, so it waits for the metadata
-      // rather than being set alongside the `src` above.
-      const at = resumeAt.get(resumeKey);
-      if (at) a.addEventListener("loadedmetadata", () => (a.currentTime = at), { once: true });
+      loadedFor.current = resumeKey;
+      // `currentTime` is ignored until the element knows how long the track is,
+      // so it waits for the metadata rather than being set alongside the `src`.
+      if (from || banked) {
+        a.addEventListener(
+          "loadedmetadata",
+          () => {
+            // The listener waits for metadata, which with `preload = "none"`
+            // may not come until play is pressed, by when the element can be
+            // on another lesson's file. A seek meant for this one must not
+            // land on that one.
+            if (a.src !== url) return;
+            const at = from ? carryOver(from.at, from.of, a.duration) : (banked ?? 0);
+            if (at > 0) a.currentTime = at;
+          },
+          { once: true },
+        );
+        // A paused swap still has to show where it is, and `preload = "none"`
+        // would leave the clock on 0:00 until the next press of play.
+        if (from) a.load();
+      }
     }
     if (!wantPlay.current) return;
     wantPlay.current = false;
-    a.play().catch(() => {
+    a.play().catch((e: unknown) => {
       setState("idle");
-      setMessage(t("narrationReady"));
+      setMessage(t(playRefusal(e)));
     });
   }, [url, resumeKey, t]);
 
+  // **The server's answer can turn into "nothing to play" while it is playing**:
+  // the owner saves an edit to the lesson, so the recording no longer reads what
+  // the page says. The control and the dock unmount on that answer, and without
+  // this the audio would carry on with nothing left on screen to stop it.
+  // `live`, not `status`: a change of narrator makes `live` undefined for a
+  // beat, which is not an answer and must not pause anything.
+  const gone = live !== undefined && !live.eligible;
+  useEffect(() => {
+    if (!gone) return;
+    audioRef.current?.pause();
+    wantPlay.current = false;
+  }, [gone]);
+
   const onToggle = useCallback(() => {
     const a = audioRef.current;
-    if (!a) return;
+    // No `url` cannot happen while the control is on screen: the server only
+    // reports a lesson as eligible when there is a recording to play.
+    if (!a || !url) return;
     setMessage("");
     if (!a.paused) {
       a.pause();
       return;
     }
-    if (url) {
-      // A blocked `play()` is the browser withholding autoplay, not a failure:
-      // the same "press play" line the render path uses, and localised, which
-      // this hardcoded English sentence was not until 2026-09-21.
-      a.play().catch(() => setMessage(t("narrationReady")));
-      return;
+    a.play().catch((e: unknown) => setMessage(t(playRefusal(e))));
+  }, [url, t]);
+
+  const onVoice = useCallback((voice: string) => {
+    setWanted(voice);
+    try {
+      window.localStorage.setItem(VOICE_KEY, voice);
+    } catch {
+      // Storage switched off: the choice lasts for this visit only.
     }
-    // Nothing rendered yet: this press is the one that spends money.
-    wantPlay.current = true;
-    setState("loading");
-    void speak({ topicSlug, key: lessonKey, lang: lang ?? undefined }).catch((e: unknown) => {
-      wantPlay.current = false;
-      setState("idle");
-      // The reader gets the plain sentence, never the server's own words. The
-      // narration refusals are provider facts ("ElevenLabs refused the render
-      // (401)", with its JSON body quoted), and until 2026-09-21 that payload
-      // was printed into the lesson header for whoever happened to press play:
-      // a quota exceeded message, complete with the account's credit balance,
-      // shown to a learner. `refusalMessage` (which reads a ConvexError's
-      // `data`, the only part of a refusal that survives a production
-      // deployment's redaction) now feeds the console instead, for whoever is
-      // debugging it.
-      console.error("narration refused:", refusalMessage(e, t("narrationFailed")));
-      setMessage(t("narrationFailed"));
-    });
-  }, [url, speak, topicSlug, lessonKey, lang, t]);
+  }, []);
 
   if (!status?.eligible) return undefined;
-  return { state, message, onToggle, audio };
+  return { state, message, onToggle, audio, voice: status.voice, voices: status.voices, onVoice };
 }
 
 // completed Frontier. It reflects the lock so a press can't double-fire and a
