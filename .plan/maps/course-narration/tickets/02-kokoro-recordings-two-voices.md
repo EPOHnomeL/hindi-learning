@@ -50,6 +50,18 @@ What has to be true, concretely:
   `lessonAudio:purgeRetired` is run with `apply`, which needs the owner's explicit
   yes: it deletes audio he paid ElevenLabs for, and it cannot be undone.
 
+**Progress, 2026-11-25.** Deployed to production on the owner's "push" (commit
+`6952080`). The first `--push` uploaded 66 recordings (lessons 1 to 33, both
+voices) with none refused, and a second run reported all 66 already there, so
+`saveUpload` and `uploaded` are now proven against the real deployment, not only
+in tests. The render was killed once by a laptop restart (11:28) and restarted;
+it is resumable. The owner asked for lessons to come online as they are rendered,
+so a second detached loop, `.narration/autopush.ps1`, runs `--push` whenever the
+count of finished mp3s grows. The three `ELEVENLABS_*` variables that were set on
+production are removed. The purge is NOT run: his words were "purge george its
+fine for now", which reads either way, and the delete cannot be undone, so it
+waits for an unambiguous yes.
+
 ## Done when
 
 - `pnpm narrate:prod --topic prophetic-school` pulls every lesson's narration
