@@ -95,8 +95,9 @@ below). PayFast rail vars live in `convex/env.ts`; the Next client var in
 - **`ELEVENLABS_API_KEY`, `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL_ID` and
   `ELEVENLABS_SAMPLE_CHARS` are dead.** They configured the ElevenLabs pilot
   (2026-09-14 to 2026-11-24). No code reads them once the commit that removed
-  the pilot is deployed. If they are still set on a deployment they do nothing;
-  removing them is the owner's call. `pnpm voices:prod` is gone with them.
+  the pilot is deployed. The owner had them removed from production
+  (`capable-barracuda-769`) on 2026-11-25, after that deploy; only three were
+  set there (`ELEVENLABS_MODEL_ID` never was). `pnpm voices:prod` is gone too.
 - **Who hears a recording** is `status` in `convex/lessonAudio.ts`: exactly who
   the reader would show that lesson to in the English Edition (it asks
   `resolveEdition` and `lessonLocked`, so a paid course's audio sits behind its
