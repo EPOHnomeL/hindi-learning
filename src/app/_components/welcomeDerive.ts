@@ -22,8 +22,12 @@ const HEADING_MARKER = /^[ \t]*#{1,6}[ \t]*/gm;
 // Flatten authored markdown prose to the one plain-text line the panel renders.
 // Emphasis and inline code are matched as *pairs*, so a lone underscore in a
 // snake_case word isn't silently eaten.
+// Whitespace collapses FIRST: missions are hard-wrapped, so an italic book title
+// often opens on one line and closes on the next, and a per-line match left its
+// asterisks on screen (Growing Unto Glory's welcome panel, 2026-11-25).
 function flatten(text: string): string {
   return text
+    .replace(/\s+/g, " ")
     .replace(/\*\*?([^*\n]+)\*\*?/g, "$1") // **bold** / *italic*
     .replace(/_([^_\n]+)_/g, "$1") // _emphasis_
     .replace(/`([^`\n]+)`/g, "$1") // `code`

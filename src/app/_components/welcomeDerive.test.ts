@@ -46,6 +46,12 @@ describe("missionExcerpt", () => {
     expect(missionExcerpt("Read `Godaan` first.")).toBe("Read Godaan first.");
   });
 
+  it("strips emphasis that wraps across an authored line break", () => {
+    expect(missionExcerpt("Read *Growing unto Glory: Biblical parables of\nspiritual growth* closely.")).toBe(
+      "Read Growing unto Glory: Biblical parables of spiritual growth closely.",
+    );
+  });
+
   it("leaves a hash that isn't a heading marker alone", () => {
     expect(missionExcerpt("Lesson #1 covers C# and #hashtags")).toBe("Lesson #1 covers C# and #hashtags");
   });
