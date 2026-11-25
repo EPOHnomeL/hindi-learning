@@ -112,6 +112,11 @@ export function narrationFromHtml(html: string): string {
   s = dropElements(s, /<div\b[^>]*\bclass\s*=\s*["'][^"']*\bquiz\b[^"']*["'][^>]*>/, "div");
   // HTML comments carry authoring notes, never speech.
   s = s.replace(/<!--[\s\S]*?-->/g, "");
+  // A section number is its own word. Headings written with no space after the
+  // number span ("<span class=num>1</span>Glory") read as "1Glory" once the tags
+  // went (growing-unto-glory, 2026-11-25). A heading that already had the space
+  // gains a second one, which the whitespace collapse below removes again.
+  s = s.replace(/(<span\b[^>]*\bclass\s*=\s*["'][^"']*\bnum\b[^"']*["'][^>]*>[^<]*<\/span>)/gi, "$1 ");
   // Block tags become breaks; every other tag simply disappears.
   s = s.replace(BLOCK, "\n").replace(/<[^>]+>/g, "");
   s = decode(s);
@@ -176,6 +181,13 @@ export function speakable(text: string): string {
       .replace(/([A-Za-z0-9])\/(?=[A-Za-z])/g, "$1 or ")
       // The authored cross-reference shorthand: "L15" is Lesson 15.
       .replace(/\bL(\d+)\b/g, "Lesson $1")
+      // Book names abbreviated before a chapter, read as letters otherwise. Only
+      // the three growing-unto-glory uses that prophetic-school does not: adding a
+      // name prophetic-school uses ("Cor", "Rom") would change its words and throw
+      // away every recording already rendered from them.
+      .replace(/\bRev (?=\d)/g, "Revelation ")
+      .replace(/\bPs (?=\d)/g, "Psalm ")
+      .replace(/\bJosh (?=\d)/g, "Joshua ")
       .replace(/\bvs\b\.?/g, "versus")
       .replace(/§\s*/g, "section ")
       // Separators that carry a pause on the page and nothing in the audio.

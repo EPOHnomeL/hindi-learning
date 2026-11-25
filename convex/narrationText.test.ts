@@ -204,3 +204,31 @@ describe("speakable", () => {
     );
   });
 });
+
+// growing-unto-glory, 2026-11-25: its section headings carry no space between the
+// number span and the words, so stripping the tags read "1Glory as inheritance".
+describe("narrationFromHtml section numbers", () => {
+  it("keeps a section number apart from a heading written without a space", () => {
+    expect(narrationFromHtml('<h2><span class="num">1</span>Glory as inheritance</h2>')).toBe(
+      "1 Glory as inheritance",
+    );
+  });
+
+  it("leaves a heading that already had the space exactly as it was", () => {
+    expect(narrationFromHtml('<h2><span class="num">1</span> You were made to hear</h2>')).toBe(
+      "1 You were made to hear",
+    );
+  });
+});
+
+describe("speakable book abbreviations", () => {
+  it("names Revelation, Psalm and Joshua when abbreviated before a chapter", () => {
+    expect(speakable("Rev 2:7, Ps 110:1 and Josh 6:1")).toBe(
+      "Revelation 2, verse 7, Psalm 110, verse 1 and Joshua 6, verse 1",
+    );
+  });
+
+  it("leaves the words rev, ps and josh alone when no chapter follows", () => {
+    expect(speakable("Rev up. PS. Josh said")).toBe("Rev up. PS. Josh said");
+  });
+});
