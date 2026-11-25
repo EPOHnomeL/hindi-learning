@@ -4,9 +4,9 @@
 //   token: the bearer-token share link, `/share/<token>`. Any Edition it was
 //          minted for, free or paid.
 //   slug:  the course's own pretty URL, `/courses/<slug>`, which serves the
-//          Guest reader only when the Edition is published AND priced (see
-//          `guestEditionFromSlug` in convex/public.ts). Signed out on anything
-//          else, the visitor is asked to create an account instead.
+//          Guest reader only when the Edition is published AND either priced or
+//          has its Public link on (since 2026-11-25; convex/guestEntrance.ts).
+//          Signed out on anything else, the visitor is asked to create an account.
 //
 // These helpers are the whole difference between the two: the query args, the
 // href base, and the per-device storage scope. Pure, so they unit-test without a

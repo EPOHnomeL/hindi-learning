@@ -132,11 +132,11 @@ test("courseHeader exposes publicLink only when the course is publicly shared (r
   const priv = await as.query(api.content.reader.courseHeader, { topicSlug: "hindi" });
   expect(priv?.publicLink).toBeNull();
 
-  // Once shared, the header carries the share token + tenant so the reader can
-  // build the public `/share/<token>` link for the per-card share.
+  // Once shared, the header carries the public path + tenant so the reader can
+  // build the per-card share link (`/share/<token>` until the course is published).
   await t.run((ctx) => ctx.db.patch(topicId, { publicToken: "pubtok", tenantSlug: "yknot" }));
   const shared = await as.query(api.content.reader.courseHeader, { topicSlug: "hindi" });
-  expect(shared?.publicLink).toEqual({ shareToken: "pubtok", tenantSlug: "yknot" });
+  expect(shared?.publicLink).toEqual({ path: "/share/pubtok", tenantSlug: "yknot" });
 });
 
 test("dashboard returns the user's topics with live lesson + completed counts", async () => {

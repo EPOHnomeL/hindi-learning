@@ -11,6 +11,7 @@ import { Icon, type IconName } from "../icons";
 import { toMajor } from "~/lib/money";
 import { useMutationRun } from "../mutationRun";
 import { formatPrice } from "../Paygate";
+import { editionSharePath } from "../editionUrl";
 import { ConfirmDialog } from "../ui";
 import { EmptyPanel, Sheet, type Edition, type Engine } from "./shared";
 import { VoucherCard } from "./VoucherCard";
@@ -182,7 +183,8 @@ export function SharingTab({
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const effectiveToken = localPublic === false ? null : (edition.publicToken ?? null);
-  const url = effectiveToken ? `${origin}/share/${effectiveToken}` : null;
+  const sharePath = (token: string) => `${origin}${editionSharePath(topicSlug, edition, token, isPublished)}`;
+  const url = effectiveToken ? sharePath(effectiveToken) : null;
 
   // Translating state
   if (edition.status === "translating") {
@@ -236,7 +238,7 @@ export function SharingTab({
       setLocalPublic(true);
       const token = await publish.run({ topicSlug, lang: edition.lang, isPublic: true });
       if (token) {
-        linkUrl = `${origin}/share/${token}`;
+        linkUrl = sharePath(token);
       } else {
         setLocalPublic(null);
         notify("Could not activate link");

@@ -5,6 +5,7 @@ import type { Doc, Id } from "../_generated/dataModel";
 import { buildPaywall, paywallValidator, heldLangs, lessonsToc, loadEdition, readLesson, readReference, referencesToc, resolveEdition } from "../edition";
 import { getEditableTopic, topicBySlug } from "../topicAccess";
 import { SOURCE_LANG } from "../sourceLang";
+import { publicCoursePath } from "../guestEntrance";
 import { teacherQaOn } from "../capture";
 import { topicLessonCounts } from "../progressCounts";
 import { editionChip, langDir } from "../languages";
@@ -157,13 +158,14 @@ export const courseHeader = query({
       // Present only for a `preview` caller: the paid Edition's price(s) and
       // which Lesson is the free Preview, so the reader can render the paygate.
       paywall: v.optional(paywallValidator),
-      // The course's public `/share/<token>` link when it's publicly shared, else
+      // The course's public link (`path`, from guestEntrance.ts: `/courses/<slug>`
+      // when the Edition opens there, else `/share/<token>`) when it's publicly shared, else
       // null (reference-cards/03). Drives the per-card share affordance in the reader
       // — only offered when there's a public page a stranger can open. The token is
       // the course identifier (not secret; it's what the Guest reader is keyed on),
       // and `tenantSlug` mints the link on the course's canonical host. Mirrors the
       // certificate's `course` field (certificates.ts).
-      publicLink: v.union(v.null(), v.object({ shareToken: v.string(), tenantSlug: v.union(v.null(), v.string()) })),
+      publicLink: v.union(v.null(), v.object({ path: v.string(), tenantSlug: v.union(v.null(), v.string()) })),
       // Teacher Q&A (teacher-qa): whether this course offers a question channel.
       // THIS is the course bundle that carries the setting to the authed reader,
       // so the Q&A surfaces branch on the boolean and never on an empty question
@@ -202,7 +204,7 @@ export const courseHeader = query({
       // Public link when the course is publicly shared (the legacy per-Topic English
       // Public link, ADR 0013) — same source the certificate share uses.
       publicLink: topic.publicToken
-        ? { shareToken: topic.publicToken, tenantSlug: topic.tenantSlug ?? null }
+        ? { path: await publicCoursePath(ctx, topic, SOURCE_LANG, topic.publicToken), tenantSlug: topic.tenantSlug ?? null }
         : null,
       teacherQa: teacherQaOn(topic),
     };

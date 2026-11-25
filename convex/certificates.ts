@@ -7,6 +7,7 @@ import { holdsSeat } from "./grants";
 import { getViewableTopic } from "./topicAccess";
 import { mintToken } from "./tokens";
 import { SOURCE_LANG } from "./sourceLang";
+import { publicCoursePath } from "./guestEntrance";
 import { assertTenantFlag } from "./tenantFlags";
 import { topicLessonCounts } from "./progressCounts";
 import { langDir } from "./languages";
@@ -220,7 +221,7 @@ export const publicCertificate = query({
       dir: v.union(v.literal("ltr"), v.literal("rtl")),
       emblem: resolvedEmblemValidator,
       // The course's public link, present ONLY when the course is publicly
-      // available (its `publicToken` is live). `shareToken` is the course's own
+      // available (its `publicToken` is live). `path` (guestEntrance.ts) is the course's own
       // anonymous read capability — already designed to be handed out — so the
       // certificate's Share button can point back at the course; `tenantSlug`
       // picks the canonical host (my-course.app apex or a tenant subdomain). Null
@@ -228,7 +229,7 @@ export const publicCertificate = query({
       // no course to link to. Never leaks the topicId, owner, or Lesson content.
       course: v.union(
         v.null(),
-        v.object({ shareToken: v.string(), tenantSlug: v.union(v.null(), v.string()) }),
+        v.object({ path: v.string(), tenantSlug: v.union(v.null(), v.string()) }),
       ),
     }),
   ),
@@ -250,7 +251,7 @@ export const publicCertificate = query({
       dir: langDir(lang),
       emblem: await resolveEmblem(ctx, row.emblem),
       course: topic?.publicToken
-        ? { shareToken: topic.publicToken, tenantSlug: topic.tenantSlug ?? null }
+        ? { path: await publicCoursePath(ctx, topic, SOURCE_LANG, topic.publicToken), tenantSlug: topic.tenantSlug ?? null }
         : null,
     };
   },

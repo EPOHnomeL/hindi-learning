@@ -297,9 +297,10 @@ test("publicCourse.languages: an unreachable English source is not live, and a r
   expect(await t.query(api.public.publicCourse, { token: english! })).toBeNull();
 });
 
-// ---- The slug entrance (2026-09-08) ---------------------------------------
-// `/courses/<slug>` serves the same Guest reader with no token, but only for an
-// Edition that is published AND priced. Everything else stays behind sign-in.
+// ---- The slug entrance (2026-09-08, widened 2026-11-25) --------------------
+// `/courses/<slug>` serves the same Guest reader with no token, for an Edition
+// that is published AND (priced OR has its Public link on). Everything else
+// stays behind sign-in.
 
 async function publish(t: ReturnType<typeof convexTest>, topicId: Id<"topics">, lang: string) {
   await t.run((ctx) => ctx.db.insert("publishedEditions", { topicId, lang, published: true }));
@@ -351,7 +352,7 @@ test("the slug entrance stays shut for a free, an unpublished and an unknown cou
   await price(t, topicId, "en");
   expect(await t.query(api.public.publicCourse, { slug: "hindi" })).toBeNull();
 
-  // Published but free: free access is worth an account, so the sign-in gate holds.
+  // Published but free with no Public link: the sign-in gate holds.
   await t.run(async (ctx) => {
     const listing = await ctx.db.query("listings").first();
     if (listing) await ctx.db.delete(listing._id);
@@ -385,4 +386,47 @@ test("publicCourseLang reports the Edition the slug entrance serves, honouring a
   expect(await t.query(api.public.publicCourseLang, { slug: "hindi", lang: "ur" })).toBe("en");
   // A course with no public slug entrance offers no hint at all.
   expect(await t.query(api.public.publicCourseLang, { slug: "no-such-course" })).toBeNull();
+});
+
+test("a published free course with its Public link on reads in full by slug, and the link says so", async () => {
+  const t = convexTest(schema, modules);
+  const owner = await seedUser(t, "owner@example.com");
+  const topicId = await seedTopic(t, owner, "hindi", "Hindi");
+  const sid = await t.run(async (ctx) => {
+    const sid = await ctx.storage.store(new Blob(["<p>lesson</p>"], { type: "text/html" }));
+    await ctx.db.insert("lessons", { topicId, key: "0001-a", seq: 1, title: "A", htmlStorageId: sid });
+    await ctx.db.insert("lessons", { topicId, key: "0002-b", seq: 2, title: "B", htmlStorageId: sid });
+    await ctx.db.insert("translationJobs", { topicId, lang: "es", status: "ready", total: 2, done: 2, failed: 0 });
+    return sid;
+  });
+  const as = asUser(t, owner);
+  const token = (await as.mutation(api.shares.setEditionPublic, { topicSlug: "hindi", lang: "en", isPublic: true }))!;
+
+  // Public link on but not published: the slug stays shut and the link is the token one.
+  expect(await t.query(api.public.publicCourse, { slug: "hindi" })).toBeNull();
+  expect((await t.query(api.public.publicCourse, { token }))?.path).toBe(`/share/${token}`);
+
+  // Published + free + public: every Lesson opens on the course's own URL.
+  await publish(t, topicId, "en");
+  const course = await t.query(api.public.publicCourse, { slug: "hindi" });
+  expect(course).toMatchObject({ lang: "en", path: "/courses/hindi", lessons: [{ locked: false }, { locked: false }] });
+  expect(course?.paywall).toBeUndefined();
+  expect(await t.query(api.public.publicLesson, { slug: "hindi", key: "0002-b" })).toMatchObject({
+    contentUrl: expect.stringContaining(`/content?id=${sid}`),
+  });
+  // Every surface that hands out the link now hands out the readable one.
+  expect((await t.query(api.public.publicCourse, { token }))?.path).toBe("/courses/hindi");
+  expect((await as.query(api.content.reader.courseHeader, { topicSlug: "hindi" }))?.publicLink?.path).toBe("/courses/hindi");
+
+  // A translated Edition carries its language on the readable URL.
+  await publish(t, topicId, "es");
+  const esToken = (await as.mutation(api.shares.setEditionPublic, { topicSlug: "hindi", lang: "es", isPublic: true }))!;
+  expect((await t.query(api.public.publicCourse, { token: esToken }))?.path).toBe("/courses/hindi?lang=es");
+  expect(await t.query(api.public.publicCourseLang, { slug: "hindi", lang: "es" })).toBe("es");
+
+  // Turning the Public link off shuts the slug again (es is still public, so ?lang=es stays open).
+  await as.mutation(api.shares.setEditionPublic, { topicSlug: "hindi", lang: "en", isPublic: false });
+  expect(await t.query(api.public.publicCourseLang, { slug: "hindi" })).toBe("es");
+  await as.mutation(api.shares.setEditionPublic, { topicSlug: "hindi", lang: "es", isPublic: false });
+  expect(await t.query(api.public.publicCourse, { slug: "hindi" })).toBeNull();
 });

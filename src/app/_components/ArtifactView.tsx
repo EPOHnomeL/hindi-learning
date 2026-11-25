@@ -1867,7 +1867,7 @@ function ReferenceView({
   // Per-card share (reference-cards/03), only when the course has a public link. The
   // snippet points at the course's public `/share/<token>` page on its canonical host.
   const publicLink = header?.publicLink ?? null;
-  const shareUrl = publicLink ? publicCourseUrl(publicLink.shareToken, publicLink.tenantSlug) : null;
+  const shareUrl = publicLink ? publicCourseUrl(publicLink.path, publicLink.tenantSlug) : null;
   const share = publicLink && shareUrl && header ? { courseTitle: header.title, url: shareUrl } : null;
   // Editable by the owner or by an Editor of the Edition being read: the
   // server's per-Edition `canEdit` is the whole gate, so an Editor of the Dutch

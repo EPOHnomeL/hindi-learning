@@ -668,7 +668,7 @@ export function EmblemSection({ topicSlug }: { topicSlug: string }) {
 // The course the certificate was earned in, when it's publicly available — a
 // same-origin share token plus its canonical tenant. Null when the course is
 // private (nothing to link to). Mirrors publicCertificate's `course` field.
-type PublicCourseLink = { shareToken: string; tenantSlug: string | null };
+type PublicCourseLink = { path: string; tenantSlug: string | null };
 
 // The absolute URL of the public course, minted on its canonical host: the
 // `/share/<token>` Guest reader, with the host swapped to the course's tenant
@@ -676,7 +676,7 @@ type PublicCourseLink = { shareToken: string; tenantSlug: string | null };
 // same rule links elsewhere in the app are minted with, so a shared certificate
 // always points at the course on the right skin.
 function publicCourseUrl(course: PublicCourseLink): string | null {
-  return buildPublicCourseUrl(course.shareToken, course.tenantSlug);
+  return buildPublicCourseUrl(course.path, course.tenantSlug);
 }
 
 // The public certificate's Share affordance. Opens the native share sheet (phones,

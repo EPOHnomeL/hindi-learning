@@ -37,7 +37,7 @@ export function PosterPage({ token, fontClass }: { token: string; fontClass: str
 
   // The QR encodes the canonical public URL, the same one the Sharing tab's QR
   // download encodes, at 600 px with margin 2.
-  const shareUrl = course ? publicCourseUrl(token, course.tenantSlug) : null;
+  const shareUrl = course ? publicCourseUrl(course.path, course.tenantSlug) : null;
   useEffect(() => {
     if (!shareUrl) return;
     let live = true;

@@ -19,10 +19,11 @@ export function AppGate({ children }: { children: React.ReactNode }) {
     <main className="min-h-screen bg-paper text-ink">
       <AuthLoading>{onCourse ? <CourseSkeleton /> : <DashboardSkeleton />}</AuthLoading>
       {/* Signed out on a course URL, the course itself may be public: a published
-          AND priced Edition serves the Guest reader on `/courses/<slug>` with its
-          free Preview (2026-09-08), so a shared course link opens rather than
-          walling. `PublicCourseFallback` renders `SignIn` itself for every other
-          course, so a private or published-free course still asks for an account. */}
+          Edition that is priced (free Preview, 2026-09-08) or has its Public link
+          on (full read, 2026-11-25) serves the Guest reader on `/courses/<slug>`,
+          so a shared course link opens rather than walling. `PublicCourseFallback`
+          renders `SignIn` itself for every other course, so a private course, or a
+          published free one with no Public link, still asks for an account. */}
       <Unauthenticated>{onCourse ? <PublicCourseFallback /> : <SignIn />}</Unauthenticated>
       <Authenticated>{children}</Authenticated>
     </main>

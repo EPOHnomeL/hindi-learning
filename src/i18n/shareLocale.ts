@@ -77,7 +77,7 @@ export function readShareLocaleMemo(value: string | undefined | null, token: str
 // ---- The course-URL entrance (2026-09-08) --------------------------------
 //
 // `/courses/<slug>` serves the same Guest reader to a signed-out visitor when the
-// Edition is published AND priced (convex/public.ts), so it deserves the same
+// Edition is published AND priced or Public-linked (convex/guestEntrance.ts), so it deserves the same
 // chrome hint: a stranger following a shared course link should not read a Hindi
 // shopfront in English chrome.
 //

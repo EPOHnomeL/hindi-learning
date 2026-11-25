@@ -2,7 +2,8 @@ import { v } from "convex/values";
 import { query, type QueryCtx } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import { buildPaywall, editionAccessLevel, editionPrice, lessonsToc, paywallValidator, loadEdition, readLesson, readReference, referencesToc, type EditionAccess } from "./edition";
-import { livePublishedLangs, publishedLangs } from "./publishedEditions";
+import { publishedLangs } from "./publishedEditions";
+import { pickSlugLang, publicCoursePath, slugOpenLangs, slugPath } from "./guestEntrance";
 import { topicBySlug } from "./topicAccess";
 import { SOURCE_LANG } from "./sourceLang";
 import { teacherQaOn } from "./capture";
@@ -43,18 +44,18 @@ async function guestEditionFromToken(ctx: QueryCtx, token: string): Promise<{ to
 // `/courses/<slug>`, serving the same Guest reader as `/share/<token>` with no
 // bearer token, so a course can be shared on a link that reads like a course.
 //
-// It opens for exactly one kind of Edition: **published AND priced**. That is the
-// shopfront case, where the free Preview (the first Lesson) is the advertisement
-// and everything past it is the paygate, so nothing is given away here that the
-// paygate was not already giving away on `/share`. A published FREE Edition
-// deliberately does NOT open here: free access is worth an account, so the
-// sign-in gate stays and the surface asks the visitor to create one. An
-// unpublished course is not public at all. Both resolve to null, and the client
-// falls back to `SignIn`.
+// It opens for a **published** Edition that is either PRICED (the shopfront: the
+// free Preview is the advertisement and everything past it is the paygate, as
+// since 2026-09-08) or has its **Public link on** (since 2026-11-25: the owner
+// chose to make a free course public, so it reads in full here instead of only on
+// the long `/share/<token>` URL). A published free Edition with no Public link
+// still asks for an account, and an unpublished course is not public here at all.
+// Both resolve to null, and the client falls back to `SignIn`. The rule lives in
+// guestEntrance.ts, which also builds every public course link from it.
 //
 // `requested` is the reader's `?lang=` (course-translation), honoured when that
-// Edition is published; otherwise the English source Edition, else the lowest
-// published code, so a URL carrying no language still lands somewhere real.
+// Edition is open; otherwise the English source Edition, else the lowest open
+// code, so a URL carrying no language still lands somewhere real.
 async function guestEditionFromSlug(
   ctx: QueryCtx,
   slug: string,
@@ -63,14 +64,8 @@ async function guestEditionFromSlug(
   if (!slug) return null;
   const topic = await topicBySlug(ctx, slug);
   if (!topic) return null;
-  const live = await livePublishedLangs(ctx, topic._id);
-  const lang =
-    requested && live.has(requested) ? requested : live.has(SOURCE_LANG) ? SOURCE_LANG : [...live].sort()[0];
-  if (!lang) return null;
-  // Priced only. The presence of a `listings` row is the single source of truth
-  // for "paid" (edition.ts); a free published Edition falls through to sign-in.
-  if ((await editionPrice(ctx, topic._id, lang)) === null) return null;
-  return { topic, lang };
+  const lang = pickSlugLang(await slugOpenLangs(ctx, topic), requested);
+  return lang ? { topic, lang } : null;
 }
 
 // Where a Guest read came from: the bearer-token link, or the course's own URL.
@@ -223,6 +218,10 @@ export const publicCourse = query({
       // The course's live Editions (course-poster): the poster's language line.
       // See liveLanguages for what "live" means and why it leaks nothing.
       languages: v.array(v.object({ lang: v.string(), native: v.string() })),
+      // The path a public link to this Edition carries (guestEntrance.ts): the
+      // readable `/courses/<slug>` when it opens there, else `/share/<token>`.
+      // The poster's QR encodes it.
+      path: v.string(),
     }),
   ),
   handler: async (ctx, src) => {
@@ -311,6 +310,7 @@ export const publicCourse = query({
       teacherQa: qaOn,
       paywall,
       languages: await liveLanguages(ctx, topic),
+      path: src.token ? await publicCoursePath(ctx, topic, lang, src.token) : slugPath(topic, lang),
     };
   },
 });

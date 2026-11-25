@@ -533,11 +533,12 @@ export function PublicReferencePane({ src, refKey }: { src: GuestSource; refKey:
 }
 
 // The signed-out branch of every `/courses/...` route (AppGate). A course whose
-// Edition is published AND priced is public on its own URL, so a stranger who
-// follows that link gets the Guest reader with its free Preview instead of a
-// login wall. Everything else, a private course, an unpublished one, a published
-// FREE one, resolves to null here and the visitor is asked to create an account,
-// which is the gate that has always been there.
+// Edition is published AND either priced (free Preview + paygate) or has its
+// Public link on (full read, since 2026-11-25) is public on its own URL, so a
+// stranger who follows that link gets the Guest reader instead of a login wall.
+// Everything else, a private course, an unpublished one, a published free one
+// with no Public link, resolves to null here and the visitor is asked to create
+// an account. The rule lives in convex/guestEntrance.ts.
 export function PublicCourseFallback() {
   const pathname = usePathname() ?? "";
   const lang = useEditionLang();

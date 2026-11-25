@@ -47,14 +47,30 @@ export function checkoutLink(slug: string, lang: string): string {
   return `/checkout/${slug}/${encodeURIComponent(lang)}`;
 }
 
-// The absolute URL of a course's public `/share/<token>` Guest reader, minted on
-// its canonical host — the tenant subdomain (or apex for a default-site course) —
-// so a link shared out of the app always points at the course on the right skin.
-// Null on the server (no `window`). Used by the reference card share (reference-
-// cards/03) and the certificate share; keep it the one place this URL is built.
-export function publicCourseUrl(shareToken: string, tenantSlug: string | null): string | null {
+// The absolute URL of a course's public Guest reader, minted on its canonical
+// host — the tenant subdomain (or apex for a default-site course) — so a link
+// shared out of the app always points at the course on the right skin. `path` is
+// what the server chose (convex/guestEntrance.ts `publicCoursePath`): the readable
+// `/courses/<slug>` when the Edition opens there (published, and priced or its
+// Public link on), else `/share/<token>`. Null on the server (no `window`). Used by
+// the Sharing tab, reference card share, certificate share and poster QR.
+export function publicCourseUrl(path: string, tenantSlug: string | null): string | null {
   if (typeof window === "undefined") return null;
-  const u = new URL(window.location.origin);
-  u.pathname = `/share/${shareToken}`;
+  const u = new URL(path, window.location.origin);
   return canonicalRedirect(u.toString(), (tenantSlug as TenantSlug | null) ?? null) ?? u.toString();
+}
+
+// The Sharing tab's client-side twin of guestEntrance.ts, needed because the tab
+// flips "public" and "published" optimistically before the server answers. Every
+// Edition the tab shows a link for is ready, so "live" holds and the rule reduces
+// to: published → the readable course URL, else the bearer-token link.
+export function editionSharePath(
+  slug: string,
+  edition: { lang: string; source: boolean },
+  token: string,
+  published: boolean,
+): string {
+  if (!published) return `/share/${encodeURIComponent(token)}`;
+  const base = `/courses/${encodeURIComponent(slug)}`;
+  return edition.source ? base : `${base}?lang=${encodeURIComponent(edition.lang)}`;
 }

@@ -304,14 +304,14 @@ test("publicCertificate exposes the course share link only when the course is pu
   // course's own share token plus its canonical tenant.
   await t.run((ctx) => ctx.db.patch(topicId, { publicToken: "pub-tok-123", tenantSlug: "ywampotch" }));
   expect((await t.query(api.certificates.publicCertificate, { token: cert.token }))?.course).toEqual({
-    shareToken: "pub-tok-123",
+    path: "/share/pub-tok-123",
     tenantSlug: "ywampotch",
   });
 
   // A default-site course (no tenant) reports a null tenantSlug (apex host).
   await t.run((ctx) => ctx.db.patch(topicId, { tenantSlug: undefined }));
   expect((await t.query(api.certificates.publicCertificate, { token: cert.token }))?.course).toEqual({
-    shareToken: "pub-tok-123",
+    path: "/share/pub-tok-123",
     tenantSlug: null,
   });
 });
