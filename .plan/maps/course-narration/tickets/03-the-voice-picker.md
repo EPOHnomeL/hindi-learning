@@ -51,6 +51,14 @@ appears only after the first press, so a cog there cannot be used before it), an
 what the popup looks like. Next step is a mock of the cog and popup for him to
 open, not code in `src/`.
 
+**Built, 2026-11-25.** He was sent a second mock with the cog in three places (the
+player bar, the lesson's title bar, beside the play button) and answered "A": the
+player bar. Built to match in `NarrationDock` (`ArtifactView.tsx`) and deployed
+in commit `e74ad29`. Evidence so far: typechecked, and reviewed by reading (the
+review's three confirmed faults are fixed in that commit). NOT walked in a
+browser by anyone. This ticket stays open until he has pressed it on a live
+lesson, which is the last line of Done-when.
+
 **This is a HITL prototype.** CLAUDE.md is explicit that a prototype is not decided
 until the human has actually seen it: show the owner something he can open (an
 Artifact is enough) BEFORE any picker is written into `src/`, and resolve this

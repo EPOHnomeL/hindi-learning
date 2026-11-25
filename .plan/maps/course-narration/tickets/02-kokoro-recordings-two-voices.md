@@ -58,9 +58,15 @@ in tests. The render was killed once by a laptop restart (11:28) and restarted;
 it is resumable. The owner asked for lessons to come online as they are rendered,
 so a second detached loop, `.narration/autopush.ps1`, runs `--push` whenever the
 count of finished mp3s grows. The three `ELEVENLABS_*` variables that were set on
-production are removed. The purge is NOT run: his words were "purge george its
-fine for now", which reads either way, and the delete cannot be undone, so it
-waits for an unambiguous yes.
+production are removed. The purge ran the same day on his plain "yes purge": a
+dry run counted 3 retired rows of 69 (George's), `apply` deleted them, and a
+second dry run counted 0. So `purgeRetired` is proven on the real deployment too.
+
+**What is left is machine time, not code:** the render (67 of 112 at 16:36) and
+the uploads. The owner was on mobile data, so the uploader was stopped with
+`.narration\STOP-PUSH` after the first 66; on wifi, delete that file and start
+`.narration\autopush.ps1` again (and `.narration\render.ps1` if the laptop has
+restarted). Both pick up where they left off.
 
 ## Done when
 

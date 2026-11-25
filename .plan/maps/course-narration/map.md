@@ -59,6 +59,8 @@ as Progress.
   permission went with the bill they guarded. A recording counts only if it is in a current voice,
   under the current model, and of the lesson body as it reads now; an edited
   lesson goes silent until it is rendered and pushed again.
+- **George's recordings were purged from production on 2026-11-25** (3 rows, on
+  the owner's yes). The rule below still holds for anything retired later.
 - **Retired recordings stay in storage until purged.** `npx convex run
   lessonAudio:purgeRetired '{"apply":true}'` deletes every row and file that is no
   longer served (dry run without `apply`). It is irreversible and deletes audio
