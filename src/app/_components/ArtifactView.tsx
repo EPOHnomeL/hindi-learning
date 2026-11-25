@@ -902,6 +902,9 @@ function LessonView({
             message={narrate.message}
             title={headTitle(lesson.title)}
             onToggle={narrate.onToggle}
+            voice={narrate.voice}
+            voices={narrate.voices}
+            onVoice={narrate.onVoice}
           />
         )}
       </div>
@@ -1177,6 +1180,9 @@ function NarrationDock({
   message,
   title,
   onToggle,
+  voice,
+  voices,
+  onVoice,
 }: {
   audio: HTMLAudioElement | null;
   state: NarrateState;
@@ -1187,11 +1193,55 @@ function NarrationDock({
   message: string;
   title: string;
   onToggle: () => void;
+  // The voice picker (course-narration ticket 03, variant A of the 2026-11-25
+  // mock, the owner's own idea: a cog that opens a Male / Female popup).
+  // `voices` is what THIS lesson is recorded in; with one there is no choice
+  // and no cog.
+  voice: string | null;
+  voices: string[];
+  onVoice: (voice: string) => void;
 }) {
   const t = useTranslations("Artifact");
   const navHidden = useHideOnScroll();
   const [at, setAt] = useState(0);
   const [total, setTotal] = useState(0);
+  const [picking, setPicking] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const cogRef = useRef<HTMLButtonElement>(null);
+  // A voice was chosen from this bar. Swapping the file empties the element and
+  // puts its clock back on 0:00, and on a PAUSED track that made `started`
+  // below false: the bar, cog and all, vanished under the finger that had just
+  // used it (review, 2026-11-25). Once a voice has been chosen here the bar
+  // stays until the lesson changes.
+  const [chose, setChose] = useState(false);
+  useEffect(() => {
+    setChose(false);
+    setPicking(false);
+  }, [title]);
+
+  // Open only: a press anywhere else, or Escape, closes the popup. The lesson
+  // itself is an iframe, whose presses and keys never reach this document, so
+  // the window losing focus to it (`blur`) closes the popup as well.
+  useEffect(() => {
+    if (!picking) return;
+    const close = () => setPicking(false);
+    const away = (e: PointerEvent) => {
+      if (!pickerRef.current?.contains(e.target as Node)) close();
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      close();
+      cogRef.current?.focus();
+    };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    window.addEventListener("blur", close);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", esc);
+      window.removeEventListener("blur", close);
+    };
+  }, [picking]);
 
   // The clock lives HERE rather than in `useLessonNarration`, so `timeupdate`
   // (roughly four times a second) re-renders this bar alone instead of the whole
@@ -1212,7 +1262,7 @@ function NarrationDock({
 
   // Rendering, playing, or paused partway through: all three are "in progress"
   // and want the bar. A lesson nobody has pressed play on does not.
-  const started = state !== "idle" || at > 0;
+  const started = state !== "idle" || at > 0 || chose;
   if (!started) return null;
 
   const playing = state === "playing";
@@ -1258,6 +1308,68 @@ function NarrationDock({
             </p>
             {message && !playing && <p className="text-xs text-danger">{message}</p>}
           </div>
+          {voices.length > 1 && (
+            <div
+              ref={pickerRef}
+              className="relative shrink-0"
+              // Tabbing out of the popup closes it rather than leaving it open
+              // behind the focus. Only when focus LANDS somewhere else: Safari
+              // blurs to nothing on a press of a button, and closing on that
+              // would unmount the option before its click arrived.
+              onBlur={(e) => {
+                if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget)) setPicking(false);
+              }}
+            >
+              <button
+                ref={cogRef}
+                type="button"
+                onClick={() => setPicking((open) => !open)}
+                aria-label={t("narrationVoice")}
+                aria-expanded={picking}
+                className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-hi hover:text-accent ${
+                  picking ? "bg-hi text-accent" : "text-soft"
+                }`}
+              >
+                <Icon name="settings" className="h-5 w-5" />
+              </button>
+              {picking && (
+                // Opens upward: the dock sits at the foot of the screen. `end-0`
+                // so it hangs off the cog's own edge in a right-to-left Edition.
+                // A labelled group of two toggle buttons, not a `menu`: that
+                // role promises arrow-key navigation this does not have.
+                <div
+                  role="group"
+                  aria-label={t("narrationVoice")}
+                  className="absolute bottom-full end-0 mb-2 w-48 rounded-xl border border-line bg-card p-2 shadow-lg"
+                >
+                  <p aria-hidden className="px-2 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-soft">
+                    {t("narrationVoice")}
+                  </p>
+                  {voices.map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      aria-pressed={v === voice}
+                      onClick={() => {
+                        setPicking(false);
+                        // The button under the focus is about to unmount.
+                        cogRef.current?.focus();
+                        if (v === voice) return;
+                        setChose(true);
+                        onVoice(v);
+                      }}
+                      className={`flex min-h-11 w-full items-center gap-2 rounded-lg px-2 text-start text-sm hover:bg-paper ${
+                        v === voice ? "font-semibold" : ""
+                      }`}
+                    >
+                      <span className="flex-1">{voiceLabel(v, t)}</span>
+                      {v === voice && <Icon name="check" className="h-4 w-4 text-accent" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>
@@ -1289,6 +1401,15 @@ function remember(key: string, a: HTMLAudioElement) {
 // accounts, and a server-side preference would be a schema change for something
 // nobody has asked to follow them between devices. Absent means "whichever the
 // course lists first", which the server decides.
+// What a learner is shown for each voice. The owner asked for "male or female",
+// not Kokoro's names for them (2026-11-25). A voice with no entry here (a third
+// one cast later) shows its id, which is ugly but not wrong.
+function voiceLabel(voice: string, t: (key: "narrationVoiceMale" | "narrationVoiceFemale") => string): string {
+  if (voice === "am_michael") return t("narrationVoiceMale");
+  if (voice === "bf_emma") return t("narrationVoiceFemale");
+  return voice;
+}
+
 const VOICE_KEY = "hindi:narrationVoice";
 
 // Why `play()` rejected, as the message key to show. Only `NotAllowedError` is
@@ -1446,8 +1567,12 @@ function useLessonNarration(
           { once: true },
         );
         // A paused swap still has to show where it is, and `preload = "none"`
-        // would leave the clock on 0:00 until the next press of play.
-        if (from) a.load();
+        // would leave the clock on 0:00 until the next press of play. `load()`
+        // alone does not override that hint, so ask for the metadata outright.
+        if (from) {
+          a.preload = "metadata";
+          a.load();
+        }
       }
     }
     if (!wantPlay.current) return;
