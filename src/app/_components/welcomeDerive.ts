@@ -55,6 +55,10 @@ export function missionExcerpt(mission: string | null | undefined, limit = 180):
   if (!text) return null;
   if (text.length <= limit) return text;
   const cut = text.slice(0, limit);
+  // A whole sentence that fills at least half the space reads better than a
+  // fragment trailing into an ellipsis ("…what the next step asks of you. It…").
+  const sentenceEnd = Math.max(...[". ", "! ", "? "].map((p) => text.slice(0, limit + 1).lastIndexOf(p)));
+  if (sentenceEnd >= limit / 2) return text.slice(0, sentenceEnd + 1);
   const lastSpace = cut.lastIndexOf(" ");
   return `${(lastSpace > 0 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 }

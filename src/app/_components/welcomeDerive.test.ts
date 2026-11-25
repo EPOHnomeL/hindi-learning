@@ -73,6 +73,15 @@ describe("missionExcerpt", () => {
     expect(out.slice(0, -1).trimEnd().endsWith("a")).toBe(true);
   });
 
+  it("ends on the last whole sentence when one fits, instead of a dangling fragment", () => {
+    const mission =
+      "People can sit in church for years and never grow. This course maps that growth. " +
+      "It follows one study through every parable it teaches, so you can walk others along the same road.";
+    expect(missionExcerpt(mission, 100)).toBe(
+      "People can sit in church for years and never grow. This course maps that growth.",
+    );
+  });
+
   it("hard-cuts a single word longer than the limit (nothing to break on)", () => {
     expect(missionExcerpt("Donaudampfschifffahrtsgesellschaftskapitaenswitwe", 10)).toBe("Donaudampf…");
   });
