@@ -41,6 +41,16 @@ What is open:
   learner should see those, or a description ("American, male" and "British,
   female"), is a product call.
 
+**The owner's reaction, 2026-11-25**, after being sent a three-variant mock (two
+segments in the dock, one chip that flips, words under the lesson heading), in his
+words: "what about adding a settings cog where they can choose male or female in
+the popup". So none of the three as drawn: a cog that opens a small popup, and the
+two options are labelled **Male** and **Female**, not "Michael" and "Emma". That
+settles Naming. Still open, and not to be guessed: where the cog sits (the dock
+appears only after the first press, so a cog there cannot be used before it), and
+what the popup looks like. Next step is a mock of the cog and popup for him to
+open, not code in `src/`.
+
 **This is a HITL prototype.** CLAUDE.md is explicit that a prototype is not decided
 until the human has actually seen it: show the owner something he can open (an
 Artifact is enough) BEFORE any picker is written into `src/`, and resolve this
