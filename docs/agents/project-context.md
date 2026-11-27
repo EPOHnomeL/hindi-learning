@@ -73,6 +73,12 @@ Dates are absolute. `[[links]]` in older notes have been resolved to sections he
 - **Resend** sends invite email from an address on this domain
   (`INVITE_FROM_EMAIL`, e.g. `"Y-Knot Courses <invites@my-course.app>"`); the
   SPF/DKIM records live in Cloudflare.
+  - On production it is `My Course <support@my-course.app>` since 2026-11-27. Until
+    then it was the bare address, so inboxes showed the sender as "support". It
+    is also the From of the password-reset email (`convex/passwordReset.ts`).
+    The round sender picture in Gmail is NOT set by the email: it comes from the
+    Google account that owns the address, or from BIMI on the domain, so one
+    sender address cannot show a different logo per tenant.
 - **Tenant subdomains** `upf`, `ywampotch`, `almighty-warriors` (plural), `yknot`
   `.my-course.app` are live over HTTPS — explicit Cloudflare CNAMEs →
   `cname.vercel-dns.com` (DNS-only), each added to the Vercel project.
