@@ -8,7 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { langInfo, nonSourceEditionName } from "../../../convex/languages";
-import { Frame, useCardTarget, useContentHtml } from "./ArtifactView";
+import { Frame, NarrationDock, useCardTarget, useContentHtml, useLessonNarration } from "./ArtifactView";
 import { Brand } from "./Brand";
 import { checkoutLink, useEditionLang } from "./editionUrl";
 import { guestArgs, guestHref, guestRoute, guestScope, type GuestSource } from "./guestSource";
@@ -347,6 +347,9 @@ export function PublicLessonPane({ src, lessonKey }: { src: GuestSource; lessonK
   const { course, completed, markComplete } = useGuestCourse();
   const lesson = useQuery(api.public.publicLesson, { ...guestArgs(src), key: lessonKey });
   const html = useContentHtml(lesson);
+  // Narration for a Guest (2026-11-27): the same control and player bar as the
+  // signed-in reader, wherever the server says this Guest may hear the lesson.
+  const narrate = useLessonNarration(guestScope(src), lessonKey, guestArgs(src));
   const qa = course.questions.filter((q) => q.lessonKey === lessonKey);
   const next = nextLessonKey(course.lessons, lessonKey);
 
@@ -407,6 +410,7 @@ export function PublicLessonPane({ src, lessonKey }: { src: GuestSource; lessonK
           lang={course.lang}
           resources={course.resources}
           teacherQa={course.teacherQa}
+          narrate={narrate}
         />
         {/* The end-of-lesson Next card, mirroring the authed reader (they are
             deliberate twins until ui-overhaul 06 rules on collapsing them).
@@ -421,6 +425,22 @@ export function PublicLessonPane({ src, lessonKey }: { src: GuestSource; lessonK
           <div className="p-3 md:hidden">
             <GuestQuestions qa={qa} />
           </div>
+        )}
+        {/* Last in the column, as in the signed-in reader, so it sticks to the
+            foot of it on desktop. No tab bar under it here. */}
+        {narrate && (
+          <NarrationDock
+            audio={narrate.audio}
+            state={narrate.state}
+            message={narrate.message}
+            title={lesson.title.split(TITLE_SEP)[0]!.trim()}
+            onToggle={narrate.onToggle}
+            voice={narrate.voice}
+            voices={narrate.voices}
+            onVoice={narrate.onVoice}
+            course={course.title}
+            tabBar={false}
+          />
         )}
       </div>
       {!preview && teacherQa && (

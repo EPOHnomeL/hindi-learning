@@ -576,3 +576,71 @@ test("purgeRetired survives a row whose file is already gone", async () => {
   await t.mutation(internal.lessonAudio.purgeRetired, { apply: true });
   expect(await rowCount(t)).toBe(0);
 });
+
+// ---- a Guest hears what a Guest can read (2026-11-27) -------------------------
+//
+// The owner's call: any course with recordings plays them in the public reader
+// too. It is still the reader's rule and no new one: `public.publicNarration`
+// resolves the Guest exactly as `publicLesson` does (Public link token or the
+// course's own URL), so the audio opens and locks with the lesson it narrates.
+
+const guestAsk = (t: T, src: { token?: string; slug?: string }, over: { key?: string; voice?: string } = {}) =>
+  t.query(api.public.publicNarration, { ...src, key: over.key ?? "l1", voice: over.voice });
+
+async function openToGuests(t: T, topicId: Id<"topics">, token = "tok") {
+  await t.run((ctx) => ctx.db.patch(topicId, { publicToken: token }));
+  return token;
+}
+
+test("a Guest on a Public link hears a recorded lesson, with both voices on offer", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await recordedCourse(t);
+  const token = await openToGuests(t, topicId);
+  const res = await guestAsk(t, { token });
+  expect(res.eligible).toBe(true);
+  expect(res.url).not.toBeNull();
+  expect(res.voice).toBe(MICHAEL);
+  expect(res.voices).toEqual([MICHAEL, EMMA]);
+  expect((await guestAsk(t, { token }, { voice: EMMA })).voice).toBe(EMMA);
+});
+
+test("a Guest with no link, a wrong link, or on a course that is not open hears nothing", async () => {
+  const t = convexTest(schema, modules);
+  await recordedCourse(t);
+  // Recorded, but no Public link and not published: the Guest reader is shut.
+  expect(await guestAsk(t, { token: "nope" })).toEqual(NOTHING);
+  expect(await guestAsk(t, { slug: SLUG })).toEqual(NOTHING);
+  expect(await guestAsk(t, {})).toEqual(NOTHING);
+});
+
+test("a Guest on the course's own URL hears it once the Edition is published with its Public link on", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await recordedCourse(t);
+  await openToGuests(t, topicId);
+  await t.run((ctx) => ctx.db.insert("publishedEditions", { topicId, lang: "en", published: true }));
+  expect((await guestAsk(t, { slug: SLUG })).eligible).toBe(true);
+});
+
+test("a Guest on a paid course hears the free preview lesson and no other", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await recordedCourse(t);
+  await seedRecording(t, topicId, "l2", MICHAEL);
+  const token = await openToGuests(t, topicId);
+  await t.run((ctx) => ctx.db.insert("listings", { topicId, lang: "en", amount: 25000, currency: "zar" }));
+  expect((await guestAsk(t, { token }, { key: "l1" })).eligible).toBe(true);
+  expect(await guestAsk(t, { token }, { key: "l2" })).toEqual(NOTHING);
+});
+
+test("a Guest on a translated Edition's link hears nothing: the recording is English", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await recordedCourse(t);
+  await t.run((ctx) => ctx.db.insert("publicLinks", { topicId, lang: "af", token: "af-tok" }));
+  expect(await guestAsk(t, { token: "af-tok" })).toEqual(NOTHING);
+});
+
+test("a Guest sees no control on an open lesson that has no recording", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await recordedCourse(t);
+  const token = await openToGuests(t, topicId);
+  expect(await guestAsk(t, { token }, { key: "l2" })).toEqual(NOTHING);
+});

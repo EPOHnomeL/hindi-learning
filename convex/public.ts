@@ -8,6 +8,7 @@ import { topicBySlug } from "./topicAccess";
 import { SOURCE_LANG } from "./sourceLang";
 import { teacherQaOn } from "./capture";
 import { editionChip, langDir } from "./languages";
+import { NOTHING, narrationFor, narrationStatus } from "./lessonAudio";
 
 // The Guest read seam (issue 07 / ADR 0013). Every function here authorizes by
 // the Public link token, NOT by getAuthUserId — these serve anonymous Guests.
@@ -339,6 +340,22 @@ export const publicLesson = query({
     // Same shared reader core as the authed getLesson (edition-deepening/04); this
     // adapter only resolves the Guest principal via its Public-link token.
     return await readLesson(ctx, resolved.topic, resolved.lang, resolved.level, key);
+  },
+});
+
+// The narration of one Lesson for a Guest (2026-11-27, the owner's call: a course
+// with recordings plays them in the public reader too). Not a rule of its own:
+// the Guest is resolved exactly as `publicLesson` resolves them, and
+// `narrationFor` then applies the same Edition, paywall and freshness checks the
+// signed-in reader gets, so the audio opens and locks with the Lesson. Every
+// refusal is the same empty answer.
+export const publicNarration = query({
+  args: { ...guestSource, key: v.string(), voice: v.optional(v.string()) },
+  returns: narrationStatus,
+  handler: async (ctx, { key, voice, ...src }) => {
+    const resolved = await resolveGuestEdition(ctx, src);
+    if (!resolved) return NOTHING;
+    return await narrationFor(ctx, resolved.topic, resolved, key, voice);
   },
 });
 

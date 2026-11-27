@@ -1175,7 +1175,7 @@ function ContentEditor({
 // ponytail: no scrubber, no skip, no speed. The ticket asked to see where you
 // are and to pause from anywhere; those are the parts nobody asked for, and the
 // track is a display, not an input.
-function NarrationDock({
+export function NarrationDock({
   audio,
   state,
   message,
@@ -1185,7 +1185,12 @@ function NarrationDock({
   voices,
   onVoice,
   course,
+  tabBar = true,
 }: {
+  // Whether a bottom tab bar shares the foot of the screen on a phone. The Guest
+  // reader has none, so there the bar sits on the bottom edge instead of riding
+  // 4.75rem above it over nothing.
+  tabBar?: boolean;
   audio: HTMLAudioElement | null;
   state: NarrateState;
   // The refusal or fallback line from `useLessonNarration`. It is also posted
@@ -1284,7 +1289,7 @@ function NarrationDock({
         // hides, it only rides above or below the tab bar's 4.75rem, so reduced
         // motion gets a jump rather than a cross-fade that would blink it away.
         className={`chrome chrome--card fixed inset-x-0 bottom-0 z-20 shadow-lg transition-transform duration-300 motion-reduce:transition-none md:sticky md:z-auto md:mt-2 md:translate-y-0 md:rounded-t-xl md:border-x md:border-line ${
-          navHidden ? "translate-y-0" : "-translate-y-[4.75rem]"
+          navHidden || !tabBar ? "translate-y-0" : "-translate-y-[4.75rem]"
         }`}
       >
         {/* The played hairline fills by `scaleX`, not `width` (fluid-interface 05):
@@ -1518,9 +1523,13 @@ function storedVoice(): string | undefined {
   }
 }
 
-function useLessonNarration(
+// `guest` is the Guest reader's source (`guestArgs(src)`): given, the same hook
+// asks `public.publicNarration` instead, and `topicSlug` is only the key the
+// resume position is banked under.
+export function useLessonNarration(
   topicSlug: string,
   lessonKey: string,
+  guest?: { token?: string; slug?: string; lang?: string },
 ):
   | {
       state: NarrateState;
@@ -1537,7 +1546,12 @@ function useLessonNarration(
   const t = useTranslations("Artifact");
   const lang = useEditionLang();
   const [wanted, setWanted] = useState(storedVoice);
-  const live = useQuery(api.lessonAudio.status, { topicSlug, key: lessonKey, lang: lang ?? undefined, voice: wanted });
+  const mine = useQuery(
+    api.lessonAudio.status,
+    guest ? "skip" : { topicSlug, key: lessonKey, lang: lang ?? undefined, voice: wanted },
+  );
+  const theirs = useQuery(api.public.publicNarration, guest ? { ...guest, key: lessonKey, voice: wanted } : "skip");
+  const live = guest ? theirs : mine;
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // The same element as `audioRef`, held in state as well so the dock re-renders
   // once it exists. The ref is what the callbacks below read (they must not

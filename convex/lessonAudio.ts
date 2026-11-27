@@ -31,7 +31,7 @@ import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
 import { assertAdmin } from "./adminSecret";
-import { lessonLocked, resolveEdition } from "./edition";
+import { lessonLocked, resolveEdition, type EditionAccess } from "./edition";
 import { NARRATION_MODEL, NARRATION_VOICES, isNarrationVoice, type NarrationVoice } from "./narrationVoices";
 import { SOURCE_LANG } from "./sourceLang";
 import { topicBySlug } from "./topicAccess";
@@ -54,7 +54,59 @@ async function rowsFor(ctx: QueryCtx, topicId: Id<"topics">, lessonKey: string) 
     .take(50);
 }
 
-const NOTHING = { eligible: false, url: null, voice: null, voices: [] as string[] };
+export const NOTHING = { eligible: false, url: null, voice: null, voices: [] as string[] };
+
+export const narrationStatus = v.object({
+  eligible: v.boolean(),
+  url: v.union(v.string(), v.null()),
+  voice: v.union(v.string(), v.null()),
+  voices: v.array(v.string()),
+});
+
+/**
+ * The recordings of one lesson for a caller the reader has ALREADY resolved to
+ * an Edition and an access level. Shared by `status` (a signed-in learner) and
+ * `public.publicNarration` (a Guest), so the two cannot drift: whoever resolved
+ * the caller, the same Edition rule, paywall and freshness checks decide.
+ */
+export async function narrationFor(
+  ctx: QueryCtx,
+  topic: Doc<"topics">,
+  edition: { lang: string; level: EditionAccess },
+  key: string,
+  voice: string | undefined,
+) {
+  if (edition.lang !== SOURCE_LANG || edition.level === "none") return NOTHING;
+  const lesson = await ctx.db
+    .query("lessons")
+    .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
+    .unique();
+  // A superseded lesson is not found by the reader either (`readLesson`).
+  if (!lesson?.htmlStorageId || lesson.supersededBy) return NOTHING;
+  if (await lessonLocked(ctx, topic._id, edition.level, key)) return NOTHING;
+
+  // The owner's in-place editor (ADR 0020) can repoint the Lesson body. A
+  // recording of superseded text is not a recording of this lesson: it drops
+  // out here, and the operator's next pull deletes the local mp3 so the next
+  // render makes it again.
+  const rows = (await rowsFor(ctx, topic._id, key)).filter(
+    (r) => isCurrent(r) && r.sourceStorageId === lesson.htmlStorageId,
+  );
+  const urls = new Map<NarrationVoice, string>();
+  for (const candidate of NARRATION_VOICES) {
+    const row = rows.find((r) => r.voiceId === candidate);
+    // A row whose blob has gone has nothing to play, so it is not on offer.
+    const url = row ? await ctx.storage.getUrl(row.storageId) : null;
+    if (url) urls.set(candidate, url);
+  }
+  const voices = [...urls.keys()];
+  const first = voices[0];
+  // A learner sees the control only when there is something to play: a play
+  // button that can only ever fail is worse than no play button.
+  if (!first) return NOTHING;
+  const chosen = isNarrationVoice(voice) && urls.has(voice) ? voice : first;
+  return { eligible: true, url: urls.get(chosen) ?? null, voice: chosen, voices };
+}
 
 /**
  * What the reader's play button needs, in one subscription: is there a narration
@@ -71,12 +123,7 @@ const NOTHING = { eligible: false, url: null, voice: null, voices: [] as string[
  */
 export const status = query({
   args: { topicSlug: v.string(), key: v.string(), lang: v.optional(v.string()), voice: v.optional(v.string()) },
-  returns: v.object({
-    eligible: v.boolean(),
-    url: v.union(v.string(), v.null()),
-    voice: v.union(v.string(), v.null()),
-    voices: v.array(v.string()),
-  }),
+  returns: narrationStatus,
   handler: async (ctx, { topicSlug, key, lang, voice }) => {
     const userId = await getAuthUserId(ctx);
     if (!userId) return NOTHING;
@@ -103,36 +150,7 @@ export const status = query({
     // the only way audio exists is an operator uploading it, so "a recording
     // exists" IS the gate, for whichever course gets one.
     const edition = await resolveEdition(ctx, topic, userId, lang ?? null);
-    if (edition.lang !== SOURCE_LANG || edition.level === "none") return NOTHING;
-    const lesson = await ctx.db
-      .query("lessons")
-      .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
-      .unique();
-    // A superseded lesson is not found by the reader either (`readLesson`).
-    if (!lesson?.htmlStorageId || lesson.supersededBy) return NOTHING;
-    if (await lessonLocked(ctx, topic._id, edition.level, key)) return NOTHING;
-
-    // The owner's in-place editor (ADR 0020) can repoint the Lesson body. A
-    // recording of superseded text is not a recording of this lesson: it drops
-    // out here, and the operator's next pull deletes the local mp3 so the next
-    // render makes it again.
-    const rows = (await rowsFor(ctx, topic._id, key)).filter(
-      (r) => isCurrent(r) && r.sourceStorageId === lesson.htmlStorageId,
-    );
-    const urls = new Map<NarrationVoice, string>();
-    for (const candidate of NARRATION_VOICES) {
-      const row = rows.find((r) => r.voiceId === candidate);
-      // A row whose blob has gone has nothing to play, so it is not on offer.
-      const url = row ? await ctx.storage.getUrl(row.storageId) : null;
-      if (url) urls.set(candidate, url);
-    }
-    const voices = [...urls.keys()];
-    const first = voices[0];
-    // A learner sees the control only when there is something to play: a play
-    // button that can only ever fail is worse than no play button.
-    if (!first) return NOTHING;
-    const chosen = isNarrationVoice(voice) && urls.has(voice) ? voice : first;
-    return { eligible: true, url: urls.get(chosen) ?? null, voice: chosen, voices };
+    return await narrationFor(ctx, topic, edition, key, voice);
   },
 });
 
