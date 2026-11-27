@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, test } from "vitest";
-import { carryOver, clock, progress } from "./narrationDock";
+import { carryOver, clock, positionState, progress } from "./narrationDock";
 
 // The docked narration player's arithmetic (course-narration ticket 01, variant
 // B). Both functions are fed straight from an `<audio>` element, which is a
@@ -78,5 +78,27 @@ describe("carryOver", () => {
 
   it("never lands past the end", () => {
     expect(carryOver(700, 600, 480)).toBe(480);
+  });
+});
+
+// ---- positionState ------------------------------------------------------------
+
+describe("positionState", () => {
+  it("says nothing until the duration is a real number", () => {
+    expect(positionState(0, NaN, 1)).toBeNull();
+    expect(positionState(0, Infinity, 1)).toBeNull();
+    expect(positionState(0, 0, 1)).toBeNull();
+  });
+
+  it("passes a sane position straight through", () => {
+    expect(positionState(134, 552, 1)).toEqual({ duration: 552, position: 134, playbackRate: 1 });
+  });
+
+  it("clamps a position a hair past the end, which the API would throw on", () => {
+    expect(positionState(552.04, 552, 1)?.position).toBe(552);
+  });
+
+  it("falls back to the start and normal speed on garbage", () => {
+    expect(positionState(NaN, 552, 0)).toEqual({ duration: 552, position: 0, playbackRate: 1 });
   });
 });

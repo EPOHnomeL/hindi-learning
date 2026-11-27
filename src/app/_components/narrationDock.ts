@@ -44,3 +44,21 @@ export function carryOver(current: number, fromDuration: number, toDuration: num
   if (!usable(toDuration) || toDuration === 0) return 0;
   return progress(current, fromDuration) * toDuration;
 }
+
+// What to hand `navigator.mediaSession.setPositionState` (2026-11-27), so the
+// phone's lock-screen and notification player draws a real scrubber for the
+// lesson. The API THROWS on a NaN or Infinity duration and on a position past
+// the end, both of which an audio element reports in passing, so this answers
+// `null` ("say nothing yet") rather than letting one of those through.
+export function positionState(
+  current: number,
+  duration: number,
+  rate: number,
+): { duration: number; position: number; playbackRate: number } | null {
+  if (!usable(duration) || duration === 0) return null;
+  return {
+    duration,
+    position: usable(current) ? Math.min(current, duration) : 0,
+    playbackRate: Number.isFinite(rate) && rate > 0 ? rate : 1,
+  };
+}

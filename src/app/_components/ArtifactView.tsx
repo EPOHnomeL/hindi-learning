@@ -17,7 +17,7 @@ import { buildEditDoc, buildSrcDoc, lessonMessage, narrateMessage, replaceBodyIn
 import { Icon } from "./icons";
 import { LessonFootCard } from "./LessonFoot";
 import { Markdown } from "./MarkdownView";
-import { carryOver, clock, progress } from "./narrationDock";
+import { carryOver, clock, positionState, progress } from "./narrationDock";
 import { MarkdownResourceDialog } from "./ResourceItem";
 import { applyProgress, cardIdFromHash, composeCardShare, editionToEdit, resolveArtifactClick, resourceTarget } from "./readerDerive";
 import { Dialog, Modal, ReaderSkeleton, useExit } from "./ui";
@@ -905,6 +905,7 @@ function LessonView({
             voice={narrate.voice}
             voices={narrate.voices}
             onVoice={narrate.onVoice}
+            course={header?.title}
           />
         )}
       </div>
@@ -1183,6 +1184,7 @@ function NarrationDock({
   voice,
   voices,
   onVoice,
+  course,
 }: {
   audio: HTMLAudioElement | null;
   state: NarrateState;
@@ -1200,9 +1202,14 @@ function NarrationDock({
   voice: string | null;
   voices: string[];
   onVoice: (voice: string) => void;
+  // The course's title, for the phone's lock-screen player (below). Undefined
+  // while `courseHeader` is still loading.
+  course: string | undefined;
 }) {
   const t = useTranslations("Artifact");
   const navHidden = useHideOnScroll();
+  const tenant = useTenant();
+  useMediaSession(audio, title, course, tenant?.displayName ?? "My Course");
   const [at, setAt] = useState(0);
   const [total, setTotal] = useState(0);
   const [picking, setPicking] = useState(false);
@@ -1374,6 +1381,84 @@ function NarrationDock({
       </div>
     </>
   );
+}
+
+// **The phone's own media player** (2026-11-27). With no Media Session set, an
+// installed PWA's narration showed up on the Android lock screen and in the
+// notification shade as just the site's name and favicon, with a bare play
+// button. This tells the OS what is playing (lesson, course, school, the App
+// Icon as artwork) and wires its buttons to the same `<audio>` element the dock
+// drives: play, pause, skip back and forward, and drag-to-seek on the scrubber.
+//
+// Lives in the dock, beside the clock it mirrors. The OS only shows the player
+// once the element actually plays, so a reader nobody pressed play on sees
+// nothing. Unmounting (reader left, narration gone) hands the session back, so
+// the notification does not linger on a dead track.
+const SKIP_SECONDS = 10;
+
+function useMediaSession(audio: HTMLAudioElement | null, title: string, course: string | undefined, brand: string) {
+  useEffect(() => {
+    if (!audio || typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    const ms = navigator.mediaSession;
+    ms.metadata = new MediaMetadata({
+      title,
+      artist: course ?? brand,
+      album: brand,
+      artwork: [
+        { src: "/app-icon?size=192", sizes: "192x192", type: "image/png" },
+        { src: "/app-icon?size=512", sizes: "512x512", type: "image/png" },
+      ],
+    });
+  }, [audio, title, course, brand]);
+
+  useEffect(() => {
+    if (!audio || typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    const ms = navigator.mediaSession;
+    const seek = (to: number) => {
+      const end = Number.isFinite(audio.duration) ? audio.duration : to;
+      audio.currentTime = Math.max(0, Math.min(end, to));
+    };
+    const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
+      ["play", () => void audio.play().catch(() => {})],
+      ["pause", () => audio.pause()],
+      ["stop", () => audio.pause()],
+      ["seekbackward", (d) => seek(audio.currentTime - (d.seekOffset ?? SKIP_SECONDS))],
+      ["seekforward", (d) => seek(audio.currentTime + (d.seekOffset ?? SKIP_SECONDS))],
+      ["seekto", (d) => d.seekTime !== undefined && seek(d.seekTime)],
+    ];
+    // An action the browser does not know throws rather than being ignored.
+    const set = (action: MediaSessionAction, fn: MediaSessionActionHandler | null) => {
+      try {
+        ms.setActionHandler(action, fn);
+      } catch {
+        // Unsupported here: that button simply does not appear.
+      }
+    };
+    for (const [action, fn] of handlers) set(action, fn);
+
+    // The scrubber's position. The OS extrapolates from position + rate between
+    // updates, so this only needs the moments the clock jumps or changes speed,
+    // not every `timeupdate`.
+    const sync = () => {
+      ms.playbackState = audio.paused ? "paused" : "playing";
+      const ps = positionState(audio.currentTime, audio.duration, audio.playbackRate);
+      if (!ps) return;
+      try {
+        ms.setPositionState(ps);
+      } catch {
+        // Older engines without position support: no scrubber, nothing else lost.
+      }
+    };
+    sync();
+    const events = ["play", "pause", "ended", "seeked", "loadedmetadata", "durationchange", "ratechange"] as const;
+    for (const e of events) audio.addEventListener(e, sync);
+    return () => {
+      for (const e of events) audio.removeEventListener(e, sync);
+      for (const [action] of handlers) set(action, null);
+      ms.metadata = null;
+      ms.playbackState = "none";
+    };
+  }, [audio]);
 }
 
 // **Resume, for the length of one visit** (ticket 01, 2026-09-18). Where each
