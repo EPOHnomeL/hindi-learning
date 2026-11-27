@@ -1203,6 +1203,8 @@ export const readEditionBodies = query({
         title: v.optional(v.string()),
         html: v.optional(v.string()),
         url: v.union(v.string(), v.null()),
+        // The body blob's id, which `scripts/narrate.ts` pins a recording to.
+        htmlStorageId: v.optional(v.id("_storage")),
         text: v.optional(v.string()),
         reply: v.optional(v.string()),
       }),
@@ -1224,6 +1226,7 @@ export const readEditionBodies = query({
         title: r.title,
         html: r.html,
         url: r.htmlStorageId ? await ctx.storage.getUrl(r.htmlStorageId) : null,
+        htmlStorageId: r.htmlStorageId,
         text: r.text,
         reply: r.reply,
       });

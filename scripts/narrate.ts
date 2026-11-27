@@ -19,6 +19,12 @@
 // deployment does not already hold. It is resumable: render ten lessons, push,
 // render ten more, push again. `--force` sends them all regardless.
 //
+// A translated Edition: add `--lang hi` to all three steps. It is pulled into
+// `.narration/<slug>.<lang>/`, in the voices `narrationVoices(lang)` lists, and
+// only its EDITED lessons are pulled: a lesson nobody has edited is still the
+// machine translation, which is not narrated (see `convex/lessonAudio.ts`). Its
+// render needs the language too (`--lang hi` to read_aloud_kokoro.py).
+//
 // The render. Any Kokoro front end that turns a folder of .txt into a folder of
 // same-named .mp3 will do. The one this was built against:
 //
@@ -26,7 +32,7 @@
 //     .narration\prophetic-school\text ^
 //     --out .narration\prophetic-school\audio\am_michael --voice am_michael
 //
-// once per voice in `NARRATION_VOICES` (convex/narrationVoices.ts). About one
+// once per voice in `narrationVoices(lang)` (convex/narrationVoices.ts). About one
 // minute of laptop time per minute of audio, and it skips files that exist.
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -35,7 +41,8 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "../convex/_generated/api";
 import type { Id } from "../convex/_generated/dataModel";
 import { narrationFromHtml, speakable } from "../convex/narrationText";
-import { NARRATION_VOICES } from "../convex/narrationVoices";
+import { narrationVoices } from "../convex/narrationVoices";
+import { SOURCE_LANG } from "../convex/sourceLang";
 import { convexUrl, publishSecret, topicArg } from "./_env";
 
 const PROD = process.argv.includes("--prod");
@@ -44,12 +51,19 @@ const PUSH = process.argv.includes("--push");
 // was rendered again by hand (it sounded wrong) with nothing else changed.
 const FORCE = process.argv.includes("--force");
 const slug = topicArg();
+const langAt = process.argv.indexOf("--lang");
+const LANG = langAt > 0 ? (process.argv[langAt + 1] ?? "") : SOURCE_LANG;
+const VOICES = narrationVoices(LANG);
+if (VOICES.length === 0) {
+  console.error(`No narration voices for "${LANG}" (convex/narrationVoices.ts).`);
+  process.exit(1);
+}
 const deployment = convexUrl(PROD);
 const client = new ConvexHttpClient(deployment);
 const secret = publishSecret();
 const where = PROD ? "PROD (live site)" : "dev";
 
-const root = join(".narration", slug);
+const root = join(".narration", LANG === SOURCE_LANG ? slug : `${slug}.${LANG}`);
 const textDir = join(root, "text");
 const manifestPath = join(root, "manifest.json");
 
@@ -109,19 +123,38 @@ async function pull() {
     process.exit(1);
   }
 
+  // A translated Edition reads each lesson's `translations` row instead, and
+  // only the edited ones (a blob); the rest are skipped and counted.
+  const translated =
+    LANG === SOURCE_LANG
+      ? null
+      : new Map(
+          ((await client.query(api.translate.readEditionBodies, { secret, topicSlug: slug, lang: LANG })) ?? [])
+            .filter((r) => r.kind === "lesson")
+            .map((r) => [r.key, r]),
+        );
+  let unedited = 0;
+
   const before = new Map(previous.lessons.map((e) => [e.key, e]));
   mkdirSync(textDir, { recursive: true });
   const entries: Entry[] = [];
   let edited = 0;
   let reworded = 0;
   for (const l of [...source.lessons].sort((a, b) => a.seq - b.seq)) {
-    if (!l.htmlUrl || !l.htmlStorageId) {
+    const tr = translated?.get(l.key);
+    if (translated && !(tr?.htmlStorageId && tr.url)) {
+      unedited += 1;
+      continue;
+    }
+    const bodyUrl = tr ? tr.url : l.htmlUrl;
+    const bodyId = tr ? tr.htmlStorageId : l.htmlStorageId;
+    if (!bodyUrl || !bodyId) {
       console.log(`  ${String(l.seq).padStart(3)}  no body, skipped        ${l.key}`);
       continue;
     }
-    const res = await fetch(l.htmlUrl);
+    const res = await fetch(bodyUrl);
     if (!res.ok) throw new Error(`fetching ${l.key} failed: ${res.status} ${res.statusText}`);
-    const text = speakable(narrationFromHtml(await res.text()));
+    const text = speakable(narrationFromHtml(await res.text()), LANG);
     if (!text) {
       console.log(`  ${String(l.seq).padStart(3)}  no prose, skipped       ${l.key}`);
       continue;
@@ -135,33 +168,34 @@ async function pull() {
     // entry from before hashes existed says nothing about the second, so it is
     // left alone rather than guessed at.
     const was = before.get(l.key);
-    const bodyMoved = !!was && was.sourceStorageId !== l.htmlStorageId;
+    const bodyMoved = !!was && was.sourceStorageId !== bodyId;
     const wordsMoved = !!was && !bodyMoved && was.textHash !== undefined && was.textHash !== textHash;
     if (was && (bodyMoved || wordsMoved)) {
-      for (const voice of NARRATION_VOICES) rmSync(audioPath(voice, was.file), { force: true });
+      for (const voice of VOICES) rmSync(audioPath(voice, was.file), { force: true });
       if (bodyMoved) edited += 1;
       else reworded += 1;
     }
     // One paragraph per blank-line-separated block, which is the shape a TTS
     // front end splits on; `narrationFromHtml` returns one paragraph per line.
     writeFileSync(join(textDir, `${file}.txt`), `${text.split("\n").join("\n\n")}\n`, "utf8");
-    entries.push({ key: l.key, seq: l.seq, title: l.title, file, sourceStorageId: l.htmlStorageId, chars: text.length, textHash });
+    entries.push({ key: l.key, seq: l.seq, title: tr?.title ?? l.title, file, sourceStorageId: bodyId, chars: text.length, textHash });
   }
   // A lesson that has left the course takes its text file and its recordings
   // with it, so the render step never narrates a lesson nobody can open.
   const keep = new Set(entries.map((e) => e.file));
   for (const f of readdirSync(textDir)) if (!keep.has(f.replace(/\.txt$/, ""))) rmSync(join(textDir, f));
   for (const e of previous.lessons) {
-    if (!keep.has(e.file)) for (const voice of NARRATION_VOICES) rmSync(audioPath(voice, e.file), { force: true });
+    if (!keep.has(e.file)) for (const voice of VOICES) rmSync(audioPath(voice, e.file), { force: true });
   }
   const manifest: Manifest = { deployment, lessons: entries };
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
   const chars = entries.reduce((n, e) => n + e.chars, 0);
-  console.log(`\n${slug} on ${where}: ${entries.length} lessons, ${chars} characters, in ${textDir}`);
+  console.log(`\n${slug} (${LANG}) on ${where}: ${entries.length} lessons, ${chars} characters, in ${textDir}`);
+  if (unedited) console.log(`${unedited} lesson(s) not edited in "${LANG}" yet (machine translation), so not narrated.`);
   if (edited) console.log(`${edited} lesson(s) were edited since the last pull; their old recordings were deleted.`);
   if (reworded) console.log(`${reworded} lesson(s) read differently under the current rules; their old recordings were deleted.`);
-  for (const voice of NARRATION_VOICES) {
+  for (const voice of VOICES) {
     const have = entries.filter((e) => existsSync(audioPath(voice, e.file))).length;
     console.log(`  ${voice}: ${have} of ${entries.length} rendered locally`);
   }
@@ -182,6 +216,7 @@ async function send(voice: string, e: Entry): Promise<{ ok: boolean; reason?: st
     secret,
     topicSlug: slug,
     lessonKey: e.key,
+    lang: LANG,
     voiceId: voice,
     sourceStorageId: e.sourceStorageId as Id<"_storage">,
     storageId,
@@ -209,7 +244,7 @@ async function push() {
     console.error(`Nothing pulled for "${slug}" yet. Run without --push first.`);
     process.exit(1);
   }
-  const held = await client.query(api.lessonAudio.uploaded, { secret, topicSlug: slug });
+  const held = await client.query(api.lessonAudio.uploaded, { secret, topicSlug: slug, lang: LANG });
   // `chars` is in the key beside the body: a script reworded by a rule change
   // keeps its body id, and its length is the one trace of that the server has.
   // (A rewording of exactly the same length slips past; `--force` is for that.)
@@ -222,7 +257,7 @@ async function push() {
   // Lesson by lesson, every voice of one before the next, so a run cut short
   // leaves whole lessons online rather than one voice of all of them.
   for (const e of entries) {
-    for (const voice of NARRATION_VOICES) {
+    for (const voice of VOICES) {
       if (!existsSync(audioPath(voice, e.file))) {
         missing += 1;
         continue;

@@ -644,3 +644,101 @@ test("a Guest sees no control on an open lesson that has no recording", async ()
   const token = await openToGuests(t, topicId);
   expect(await guestAsk(t, { token }, { key: "l2" })).toEqual(NOTHING);
 });
+
+// ---- a translated Edition (Hindi, 2026-11-27) ---------------------------------
+//
+// A translated lesson is narrated once a person has edited it: the Edition
+// editor's save makes its body a blob, and a recording pins that blob. The
+// machine's untouched inline translation is never narrated.
+
+const [OMEGA, ALPHA] = ["hm_omega", "hf_alpha"];
+
+// The Hindi Edition of the seeded course: l1 edited (a blob), l2 still the
+// machine's inline html. Returns l1's Hindi body.
+async function hindiEdition(t: T, topicId: Id<"topics">) {
+  return await t.run(async (ctx) => {
+    const html = await ctx.storage.store(new Blob(["<p>पाठ एक।</p>"], { type: "text/html" }));
+    await ctx.db.insert("translations", { topicId, lang: "hi", kind: "lesson", key: "l1", htmlStorageId: html, sourceHash: "h1" });
+    await ctx.db.insert("translations", { topicId, lang: "hi", kind: "lesson", key: "l2", html: "<p>पाठ दो।</p>", sourceHash: "h2" });
+    return html;
+  });
+}
+
+const uploadHi = (t: T, args: { lessonKey?: string; voiceId?: string; sourceStorageId: Id<"_storage">; storageId: Id<"_storage"> }) =>
+  withSecret(() =>
+    t.mutation(api.lessonAudio.saveUpload, {
+      secret: SECRET,
+      topicSlug: SLUG,
+      lessonKey: args.lessonKey ?? "l1",
+      lang: "hi",
+      voiceId: args.voiceId ?? OMEGA,
+      sourceStorageId: args.sourceStorageId,
+      storageId: args.storageId,
+      chars: 500,
+    }),
+  );
+
+async function hindiLearner(t: T) {
+  const owner = await user(t, "owner@example.com");
+  const topicId = await seedCourse(t, owner);
+  const hiBody = await hindiEdition(t, topicId);
+  const learner = await user(t, "hindi@example.com");
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: learner, lang: "hi" }));
+  return { topicId, hiBody, learner };
+}
+
+test("a Hindi holder hears the Hindi recordings of an edited lesson, male first", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId, hiBody, learner } = await hindiLearner(t);
+  await seedRecording(t, topicId, "l1", MICHAEL);
+  expect(await uploadHi(t, { sourceStorageId: hiBody, storageId: await mp3(t, "a") })).toEqual({ ok: true });
+  expect(await uploadHi(t, { voiceId: ALPHA, sourceStorageId: hiBody, storageId: await mp3(t, "b") })).toEqual({ ok: true });
+  expect(await ask(asUser(t, learner))).toMatchObject({ eligible: true, voice: OMEGA, voices: [OMEGA, ALPHA] });
+  expect(await ask(asUser(t, learner), { voice: ALPHA })).toMatchObject({ voice: ALPHA });
+  // An English voice asked for on the Hindi Edition falls back to its first.
+  expect(await ask(asUser(t, learner), { voice: MICHAEL })).toMatchObject({ voice: OMEGA });
+});
+
+test("a Hindi recording goes silent when its editor saves the lesson again", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId, hiBody, learner } = await hindiLearner(t);
+  await uploadHi(t, { sourceStorageId: hiBody, storageId: await mp3(t) });
+  await t.run(async (ctx) => {
+    const row = await ctx.db
+      .query("translations")
+      .withIndex("by_topic_lang_kind_key", (q) => q.eq("topicId", topicId).eq("lang", "hi").eq("kind", "lesson").eq("key", "l1"))
+      .unique();
+    const edited = await ctx.storage.store(new Blob(["<p>पाठ एक, संशोधित।</p>"], { type: "text/html" }));
+    await ctx.db.patch(row!._id, { htmlStorageId: edited });
+  });
+  expect(await ask(asUser(t, learner))).toEqual(NOTHING);
+});
+
+test("an unedited (machine) Hindi lesson refuses an upload and bins it", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId } = await hindiLearner(t);
+  const storageId = await mp3(t);
+  const res = await uploadHi(t, { lessonKey: "l2", sourceStorageId: await bodyOf(t, topicId, "l2"), storageId });
+  expect(res.ok).toBe(false);
+  expect(await blobExists(t, storageId)).toBe(false);
+});
+
+test("an English voice is refused on the Hindi Edition, and a Hindi one on English", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId, hiBody } = await hindiLearner(t);
+  expect((await uploadHi(t, { voiceId: MICHAEL, sourceStorageId: hiBody, storageId: await mp3(t, "a") })).ok).toBe(false);
+  expect((await upload(t, { voiceId: OMEGA, sourceStorageId: await bodyOf(t, topicId, "l1"), storageId: await mp3(t, "b") })).ok).toBe(false);
+});
+
+test("an English holder never hears the Hindi recording, and the uploader lists each Edition apart", async () => {
+  const t = convexTest(schema, modules);
+  const { topicId, hiBody } = await hindiLearner(t);
+  await uploadHi(t, { sourceStorageId: hiBody, storageId: await mp3(t) });
+  const english = await user(t, "english@example.com");
+  await t.run((ctx) => ctx.db.insert("shares", { topicId, viewerId: english }));
+  expect(await ask(asUser(t, english))).toEqual(NOTHING);
+  const hi = await withSecret(() => t.query(api.lessonAudio.uploaded, { secret: SECRET, topicSlug: SLUG, lang: "hi" }));
+  const en = await withSecret(() => t.query(api.lessonAudio.uploaded, { secret: SECRET, topicSlug: SLUG }));
+  expect(hi).toEqual([{ lessonKey: "l1", voiceId: OMEGA, sourceStorageId: hiBody, chars: 500 }]);
+  expect(en).toEqual([]);
+});

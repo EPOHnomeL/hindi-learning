@@ -16,10 +16,19 @@
 // narrates** (same Edition, same paywall; see `status`).
 //
 // What this still does not decide (see `.plan/maps/course-narration/map.md`):
-// translated Editions, and whether listening counts as Progress. Narration is
-// the source Edition only.
+// whether listening counts as Progress.
 //
-// The voices a learner chooses between are `NARRATION_VOICES` in
+// **A translated Edition is narrated once a person has edited it** (2026-11-27,
+// Hindi first). A recording reads a body, and the body a translated lesson
+// reads is its `translations` row. Only a row whose body is a blob is narrated:
+// that is what the Edition editor's save writes (`content/authoring.ts`), while
+// a lesson nobody has touched is still the machine's inline `html`. That inline
+// body has no id to pin a recording to, and narrating it would put a voice on
+// words no person has checked. So the rule is the source one, with the
+// translated body in place of the lesson's: a recording of the body as it reads
+// now, or nothing.
+//
+// The voices a learner chooses between are `narrationVoices(lang)` in
 // `./narrationVoices`. A recording's identity in `lessonAudio` is
 // topic + lesson + language + voice + model, plus `sampleChars`, a column the
 // pilot's audition budget left behind: every recording made here writes 0, and
@@ -32,7 +41,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
 import { assertAdmin } from "./adminSecret";
 import { lessonLocked, resolveEdition, type EditionAccess } from "./edition";
-import { NARRATION_MODEL, NARRATION_VOICES, isNarrationVoice, type NarrationVoice } from "./narrationVoices";
+import { NARRATION_MODEL, isNarrationVoice, narrationVoices } from "./narrationVoices";
 import { SOURCE_LANG } from "./sourceLang";
 import { topicBySlug } from "./topicAccess";
 
@@ -41,17 +50,38 @@ import { topicBySlug } from "./topicAccess";
 // on voice and model both, which is how they stop being served the moment this
 // deploys and how `purgeRetired` finds them.
 function isCurrent(row: Doc<"lessonAudio">): boolean {
-  return isNarrationVoice(row.voiceId) && row.modelId === NARRATION_MODEL && row.sampleChars === 0;
+  return isNarrationVoice(row.voiceId, row.lang) && row.modelId === NARRATION_MODEL && row.sampleChars === 0;
 }
 
-// Every row for one lesson in the source Edition, whatever made it. A lesson has
+// Every row for one lesson in one Edition, whatever made it. A lesson has
 // one row per voice (plus, until they are purged, the pilot's), so the bound is
 // generous rather than tight.
-async function rowsFor(ctx: QueryCtx, topicId: Id<"topics">, lessonKey: string) {
+async function rowsFor(ctx: QueryCtx, topicId: Id<"topics">, lessonKey: string, lang: string) {
   return await ctx.db
     .query("lessonAudio")
-    .withIndex("by_lesson", (q) => q.eq("topicId", topicId).eq("lessonKey", lessonKey).eq("lang", SOURCE_LANG))
+    .withIndex("by_lesson", (q) => q.eq("topicId", topicId).eq("lessonKey", lessonKey).eq("lang", lang))
     .take(50);
+}
+
+/**
+ * The body a recording of this lesson in `lang` must have been made from, or
+ * null when that Edition's lesson is not narrated. The source Edition reads the
+ * lesson's own body; a translated one reads its `translations` row, and only a
+ * blob there (an edited lesson, see the header).
+ */
+async function narratedBody(
+  ctx: QueryCtx,
+  lesson: Doc<"lessons">,
+  lang: string,
+): Promise<Id<"_storage"> | null> {
+  if (lang === SOURCE_LANG) return lesson.htmlStorageId ?? null;
+  const row = await ctx.db
+    .query("translations")
+    .withIndex("by_topic_lang_kind_key", (q) =>
+      q.eq("topicId", lesson.topicId).eq("lang", lang).eq("kind", "lesson").eq("key", lesson.key),
+    )
+    .unique();
+  return row?.htmlStorageId ?? null;
 }
 
 export const NOTHING = { eligible: false, url: null, voice: null, voices: [] as string[] };
@@ -76,7 +106,8 @@ export async function narrationFor(
   key: string,
   voice: string | undefined,
 ) {
-  if (edition.lang !== SOURCE_LANG || edition.level === "none") return NOTHING;
+  const cast = narrationVoices(edition.lang);
+  if (cast.length === 0 || edition.level === "none") return NOTHING;
   const lesson = await ctx.db
     .query("lessons")
     .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", key))
@@ -89,11 +120,13 @@ export async function narrationFor(
   // recording of superseded text is not a recording of this lesson: it drops
   // out here, and the operator's next pull deletes the local mp3 so the next
   // render makes it again.
-  const rows = (await rowsFor(ctx, topic._id, key)).filter(
-    (r) => isCurrent(r) && r.sourceStorageId === lesson.htmlStorageId,
+  const body = await narratedBody(ctx, lesson, edition.lang);
+  if (!body) return NOTHING;
+  const rows = (await rowsFor(ctx, topic._id, key, edition.lang)).filter(
+    (r) => isCurrent(r) && r.sourceStorageId === body,
   );
-  const urls = new Map<NarrationVoice, string>();
-  for (const candidate of NARRATION_VOICES) {
+  const urls = new Map<string, string>();
+  for (const candidate of cast) {
     const row = rows.find((r) => r.voiceId === candidate);
     // A row whose blob has gone has nothing to play, so it is not on offer.
     const url = row ? await ctx.storage.getUrl(row.storageId) : null;
@@ -104,7 +137,7 @@ export async function narrationFor(
   // A learner sees the control only when there is something to play: a play
   // button that can only ever fail is worse than no play button.
   if (!first) return NOTHING;
-  const chosen = isNarrationVoice(voice) && urls.has(voice) ? voice : first;
+  const chosen = voice && urls.has(voice) ? voice : first;
   return { eligible: true, url: urls.get(chosen) ?? null, voice: chosen, voices };
 }
 
@@ -113,7 +146,7 @@ export async function narrationFor(
  * of this lesson this caller may hear, in which voices, and where is the one they
  * asked for?
  *
- * `voices` is the subset of `NARRATION_VOICES` with a playable recording of the
+ * `voices` is the subset of the Edition's `narrationVoices(lang)` with a playable recording of the
  * lesson AS IT READS NOW, in casting order. `voice` is the requested one when it
  * is among them, otherwise the first, so a learner whose saved choice has no
  * recording of this lesson still hears it rather than losing the control.
@@ -135,8 +168,8 @@ export const status = query({
     //
     //  - A caller holding only a translated Edition who arrives with no `?lang`
     //    is served that translation, so `lang` here comes back as it, not as the
-    //    source. The recording is English; over a Hindi lesson it is the wrong
-    //    words, so only the source Edition is narrated.
+    //    source. They hear that Edition's recordings (if it has any), never the
+    //    English ones over a Hindi lesson.
     //  - On a paid Edition a `preview` caller reads one lesson and no more.
     //    `lessonLocked` is that paywall, and audio of a lesson is the lesson.
     //
@@ -166,14 +199,17 @@ export const status = query({
  * that id with the one it pulled, so a stale row reads as "not uploaded" there.
  */
 export const uploaded = query({
-  args: { secret: v.string(), topicSlug: v.string() },
+  // `lang` absent is the source Edition, which is what every caller sent before
+  // translated Editions were narrated.
+  args: { secret: v.string(), topicSlug: v.string(), lang: v.optional(v.string()) },
   returns: v.array(
     v.object({ lessonKey: v.string(), voiceId: v.string(), sourceStorageId: v.string(), chars: v.number() }),
   ),
-  handler: async (ctx, { secret, topicSlug }) => {
+  handler: async (ctx, { secret, topicSlug, lang }) => {
     assertAdmin(secret);
     const topic = await topicBySlug(ctx, topicSlug);
     if (!topic) return [];
+    const edition = lang ?? SOURCE_LANG;
     // Bounded, not `.collect()`: a course is tens of lessons by a handful of
     // voices. ponytail: paginate if a course ever nears a thousand recordings.
     const rows = await ctx.db
@@ -182,7 +218,7 @@ export const uploaded = query({
       .take(2000);
     const held = [];
     for (const r of rows) {
-      if (r.lang !== SOURCE_LANG || !isCurrent(r) || !r.sourceStorageId) continue;
+      if (r.lang !== edition || !isCurrent(r) || !r.sourceStorageId) continue;
       // A row whose mp3 has gone is not held: `status` will not serve it, so
       // the uploader must be allowed to send it again.
       if (!(await ctx.db.system.get(r.storageId))) continue;
@@ -211,16 +247,20 @@ export const saveUpload = mutation({
     secret: v.string(),
     topicSlug: v.string(),
     lessonKey: v.string(),
+    // The Edition the recording is in; absent is the source Edition.
+    lang: v.optional(v.string()),
     voiceId: v.string(),
-    // The lesson body the mp3 was rendered from, as pulled. The lesson may have
+    // The lesson body the mp3 was rendered from, as pulled (a translated
+    // Edition's: its `translations` row's blob). The lesson may have
     // been edited between the pull and this call, hours later.
     sourceStorageId: v.id("_storage"),
     storageId: v.id("_storage"),
     chars: v.number(),
   },
   returns: v.object({ ok: v.boolean(), reason: v.optional(v.string()) }),
-  handler: async (ctx, { secret, topicSlug, lessonKey, voiceId, sourceStorageId, storageId, chars }) => {
+  handler: async (ctx, { secret, topicSlug, lessonKey, lang, voiceId, sourceStorageId, storageId, chars }) => {
     assertAdmin(secret);
+    const edition = lang ?? SOURCE_LANG;
     // **Two refusals keep their hands off storage**, because `storageId` is an
     // argument and every refusal below deletes it: aimed at a lesson body, that
     // would bin the lesson. So the upload must not BE the body it claims to
@@ -249,18 +289,22 @@ export const saveUpload = mutation({
         .query("lessonAudio")
         .withIndex("by_lesson", (q) => q.eq("topicId", topic._id))
         .take(2000);
-      const taken = rows.some((r) => r.storageId === storageId && !(r.lessonKey === lessonKey && r.voiceId === voiceId));
+      const taken = rows.some(
+        (r) => r.storageId === storageId && !(r.lessonKey === lessonKey && r.lang === edition && r.voiceId === voiceId),
+      );
       if (taken) return { ok: false, reason: "That file is already another lesson's recording." };
     }
 
-    if (!isNarrationVoice(voiceId)) return await refuse(`"${voiceId}" is not a narration voice.`);
+    if (!isNarrationVoice(voiceId, edition)) return await refuse(`"${voiceId}" is not a narration voice for "${edition}".`);
     if (!topic) return await refuse(`No course "${topicSlug}".`);
     const lesson = await ctx.db
       .query("lessons")
       .withIndex("by_topic_key", (q) => q.eq("topicId", topic._id).eq("key", lessonKey))
       .unique();
     if (!lesson || lesson.supersededBy) return await refuse(`No lesson "${lessonKey}" in "${topicSlug}".`);
-    if (lesson.htmlStorageId !== sourceStorageId) {
+    const body = await narratedBody(ctx, lesson, edition);
+    if (!body) return await refuse(`Lesson "${lessonKey}" is not narrated in "${edition}": nobody has edited its translation.`);
+    if (body !== sourceStorageId) {
       return await refuse(`Lesson "${lessonKey}" was edited after this recording was made. Pull and render it again.`);
     }
 
@@ -273,7 +317,7 @@ export const saveUpload = mutation({
         q
           .eq("topicId", topic._id)
           .eq("lessonKey", lessonKey)
-          .eq("lang", SOURCE_LANG)
+          .eq("lang", edition)
           .eq("voiceId", voiceId)
           .eq("modelId", NARRATION_MODEL)
           .eq("sampleChars", 0),
@@ -288,7 +332,7 @@ export const saveUpload = mutation({
     await ctx.db.insert("lessonAudio", {
       topicId: topic._id,
       lessonKey,
-      lang: SOURCE_LANG,
+      lang: edition,
       voiceId,
       modelId: NARRATION_MODEL,
       sampleChars: 0,
@@ -302,7 +346,7 @@ export const saveUpload = mutation({
 
 /**
  * **Delete every recording that is no longer served**: a voice that left
- * `NARRATION_VOICES`, an older model, one of the pilot's samples. This is how the
+ * its language's `narrationVoices`, an older model, one of the pilot's samples. This is how the
  * ElevenLabs pilot's recordings leave a deployment.
  *
  * DRY RUN unless `apply` is true, like the other operator rails here: without it

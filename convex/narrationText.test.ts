@@ -232,3 +232,20 @@ describe("speakable book abbreviations", () => {
     expect(speakable("Rev up. PS. Josh said")).toBe("Rev up. PS. Josh said");
   });
 });
+
+describe("speakable in Hindi", () => {
+  it("says chapter and verse, ranges, pages, dots and arrows in Hindi", () => {
+    const dash = String.fromCharCode(0x2013);
+    expect(speakable(`यूहन्ना 5:19 · पृ. 23${dash}24`, "hi")).toBe("यूहन्ना 5, पद 19। पृष्ठ 23 से 24");
+    expect(speakable("1 कुरिन्थियों 14:1-3", "hi")).toBe("1 कुरिन्थियों 14, पद 1 से 3");
+    expect(speakable("Holy Spirit Course · p. 23", "hi")).toBe("Holy Spirit Course। पृष्ठ 23");
+    expect(speakable("सुनो → लिखो", "hi")).toBe("सुनो, फिर लिखो");
+    expect(speakable("~10 min", "hi")).toBe("लगभग 10 मिनट");
+    expect(speakable("पाठ समाप्त। · अगला", "hi")).toBe("पाठ समाप्त। अगला");
+  });
+
+  it("leaves English on the English rules", () => {
+    expect(speakable("John 5:19", "en")).toBe(speakable("John 5:19"));
+    expect(speakable("John 5:19")).toBe("John 5, verse 19");
+  });
+});

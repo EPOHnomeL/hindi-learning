@@ -1552,11 +1552,12 @@ function remember(key: string, a: HTMLAudioElement) {
 // nobody has asked to follow them between devices. Absent means "whichever the
 // course lists first", which the server decides.
 // What a learner is shown for each voice. The owner asked for "male or female",
-// not Kokoro's names for them (2026-11-25). A voice with no entry here (a third
-// one cast later) shows its id, which is ugly but not wrong.
+// not Kokoro's names for them (2026-11-25). Kokoro's id says which: its second
+// letter is `m` or `f` (am_michael, hf_alpha), so every Edition's cast labels
+// itself. Anything else shows its id, which is ugly but not wrong.
 function voiceLabel(voice: string, t: (key: "narrationVoiceMale" | "narrationVoiceFemale") => string): string {
-  if (voice === "am_michael") return t("narrationVoiceMale");
-  if (voice === "bf_emma") return t("narrationVoiceFemale");
+  if (voice[1] === "m") return t("narrationVoiceMale");
+  if (voice[1] === "f") return t("narrationVoiceFemale");
   return voice;
 }
 

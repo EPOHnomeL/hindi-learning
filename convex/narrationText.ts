@@ -147,8 +147,9 @@ const RANGE = `(?:-|${EN_DASH})`;
  * ponytail: any `digits:digits` is read as chapter and verse. True of this
  * course; a lesson that quotes a clock time would want that rule narrowed.
  */
-export function speakable(text: string): string {
-  return (
+export function speakable(text: string, lang = "en"): string {
+  if (lang === "hi") return speakableHindi(text);
+  return tidyLines(
     text
       // The authored cross-reference shorthand, in its paired forms, before the
       // generic rules below get half of each: "L16(en dash)L19" is Lessons 16 to
@@ -206,20 +207,62 @@ export function speakable(text: string): string {
       // passage"), which is a hyphen's job and a mark the model knows.
       .replace(new RegExp(EN_DASH, "g"), "-")
       // A non-breaking hyphen is a hyphen to a reader.
+      .replace(/‑/g, "-"),
+  );
+}
+
+// A separator at the start or end of a line leaves a stray mark behind. (The
+// Hindi full stop, ।, is in the class for the Hindi rules; English has none.)
+function tidyLines(text: string): string {
+  return text
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(/^[.,।]\s+/, "")
+        // A separator after a sentence that had already ended doubles its full
+        // stop ('speak".. Lesson 1'), anywhere in the line. A real ellipsis is
+        // three dots or its own character, so it is left alone.
+        .replace(/(?<!\.)\.\s*\.(?!\.)/g, ".")
+        .replace(/([?!:;,])\.(?=\s|$)/g, "$1")
+        .trim(),
+    )
+    .filter((line) => line.length > 0)
+    .join("\n");
+}
+
+/**
+ * The Hindi Edition's script, said the way a Hindi reader says it (2026-11-27,
+ * when the owner cast two Kokoro Hindi voices). The English rules' marks, spoken
+ * in Hindi: "5:19" is chapter 5, verse (पद) 19, a range is "से", a middle dot is
+ * a full stop (।) and an arrow is "फिर". Counted in prophetic-school lessons 1 to
+ * 16 as their editor had left them on 2026-11-27: 228 middle dots, 189 page marks
+ * (p., pp. and पृ.), 27 arrows, 24 slashes, 16 tildes. The citations stay half
+ * English (the book's own title), and the Hindi voice reads those words as they are.
+ */
+function speakableHindi(text: string): string {
+  return tidyLines(
+    text
+      .replace(new RegExp(`\\bL(\\d+)\\s*${RANGE}\\s*L?(\\d+)\\b`, "g"), "पाठ $1 से $2")
+      .replace(new RegExp(`(\\d+):(\\d+)\\s*${RANGE}\\s*(\\d+)`, "g"), "$1, पद $2 से $3")
+      .replace(/(\d+):(\d+)/g, "$1, पद $2")
+      .replace(new RegExp(`(\\d)\\s*${RANGE}\\s*(\\d)`, "g"), "$1 से $2")
+      .replace(/\bpp?\.\s*/g, "पृष्ठ ")
+      .replace(/पृ\.\s*/g, "पृष्ठ ")
+      .replace(/~\s*(\d+)\s*min\b/g, "लगभग $1 मिनट")
+      .replace(/~\s*/g, "लगभग ")
+      .replace(/_{3,}/g, "रिक्त स्थान")
+      .replace(/ = /g, " बराबर ")
+      .replace(/ \+ /g, " और ")
+      .replace(/ \/ /g, ", ")
+      .replace(/([A-Za-z0-9ऀ-ॿ])\/(?=[A-Za-zऀ-ॿ])/g, "$1 या ")
+      .replace(/\bL(\d+)\b/g, "पाठ $1")
+      .replace(/§\s*/g, "खंड ")
+      .replace(/[^\S\n]*·[^\S\n]*/g, "। ")
+      .replace(/(^|\n)[^\S\n]*→[^\S\n]*\n/g, "$1फिर ")
+      .replace(/[^\S\n]*→[^\S\n]*/g, ", फिर ")
+      .replace(new RegExp(EN_DASH, "g"), "-")
       .replace(/‑/g, "-")
-      // A separator at the start or end of a line leaves a stray mark behind.
-      .split("\n")
-      .map((line) =>
-        line
-          .replace(/^[.,]\s+/, "")
-          // A separator after a sentence that had already ended doubles its full
-          // stop ('speak".. Lesson 1'), anywhere in the line. A real ellipsis is
-          // three dots or its own character, so it is left alone.
-          .replace(/(?<!\.)\.\s*\.(?!\.)/g, ".")
-          .replace(/([?!:;,])\.(?=\s|$)/g, "$1")
-          .trim(),
-      )
-      .filter((line) => line.length > 0)
-      .join("\n")
+      // A sentence that had already ended before a middle dot ends once.
+      .replace(/([।.?!])\s*।/g, "$1"),
   );
 }
