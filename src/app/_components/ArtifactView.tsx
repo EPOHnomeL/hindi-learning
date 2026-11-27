@@ -17,7 +17,7 @@ import { buildEditDoc, buildSrcDoc, lessonMessage, narrateMessage, replaceBodyIn
 import { Icon } from "./icons";
 import { LessonFootCard } from "./LessonFoot";
 import { Markdown } from "./MarkdownView";
-import { carryOver, clock, positionState, progress } from "./narrationDock";
+import { carryOver, clock, nextSpeed, parseSpeed, positionState, progress, speedLabel } from "./narrationDock";
 import { MarkdownResourceDialog } from "./ResourceItem";
 import { applyProgress, cardIdFromHash, composeCardShare, editionToEdit, resolveArtifactClick, resourceTarget } from "./readerDerive";
 import { Dialog, Modal, ReaderSkeleton, useExit } from "./ui";
@@ -1172,9 +1172,10 @@ function ContentEditor({
 // scroller there. A fixed full-width bar would run under the sidebar and the
 // Teacher Q&A aside, and stop reading as part of the lesson.
 //
-// ponytail: no scrubber, no skip, no speed. The ticket asked to see where you
-// are and to pause from anywhere; those are the parts nobody asked for, and the
-// track is a display, not an input.
+// Scrubber and speed arrived 2026-11-27, when the owner asked for them and
+// picked variant A of a prototype (same one-row bar: the hairline becomes
+// draggable, a speed chip sits by the cog). ponytail: still no skip buttons in
+// the bar; the phone's own media player has them (`useMediaSession`).
 export function NarrationDock({
   audio,
   state,
@@ -1230,6 +1231,25 @@ export function NarrationDock({
     setChose(false);
     setPicking(false);
   }, [title]);
+
+  // **Playback speed**, per device like the voice (2026-11-27). Set on BOTH
+  // rates: `playbackRate` alone is reset to `defaultPlaybackRate` every time the
+  // element loads a new file (next lesson, change of narrator), which would drop
+  // the listener back to 1× mid-course.
+  const [rate, setRateState] = useState(storedSpeed);
+  const setRate = useCallback((next: number) => {
+    setRateState(next);
+    try {
+      window.localStorage.setItem(SPEED_KEY, String(next));
+    } catch {
+      // Storage switched off: the speed lasts for this visit only.
+    }
+  }, []);
+  useEffect(() => {
+    if (!audio) return;
+    audio.defaultPlaybackRate = rate;
+    audio.playbackRate = rate;
+  }, [audio, rate]);
 
   // Open only: a press anywhere else, or Escape, closes the popup. The lesson
   // itself is an iframe, whose presses and keys never reach this document, so
@@ -1294,11 +1314,39 @@ export function NarrationDock({
       >
         {/* The played hairline fills by `scaleX`, not `width` (fluid-interface 05):
             a compositor-only property, and `motion-reduce:transition-none` makes it
-            step instead of glide. `progress()` is already 0 to 1. */}
-        <div className="h-[3px] w-full bg-line">
+            step instead of glide. `progress()` is already 0 to 1.
+
+            **It is also the scrubber** (2026-11-27, variant A of the dock
+            prototype, the owner's pick). A transparent range input lies over the
+            hairline with a 24px-tall hit area, so a thumb can grab a 3px line; the
+            dot under the finger shows only while it is touched, hovered or
+            focused, so at rest the bar looks exactly as it did. */}
+        <div className="group relative h-[3px] w-full bg-line">
           <div
             className="h-full w-full origin-left bg-accent transition-transform duration-300 motion-reduce:transition-none rtl:origin-right"
             style={{ transform: `scaleX(${progress(at, total)})` }}
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full border-2 border-card bg-accent opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 group-active:opacity-100 ltr:-translate-x-1/2 rtl:translate-x-1/2"
+            style={{ insetInlineStart: `${progress(at, total) * 100}%` }}
+          />
+          <input
+            type="range"
+            min={0}
+            max={Number.isFinite(total) && total > 0 ? total : 0}
+            step="any"
+            value={Number.isFinite(at) ? at : 0}
+            disabled={!(Number.isFinite(total) && total > 0)}
+            aria-label={t("narrationSeek")}
+            aria-valuetext={`${clock(at)} / ${clock(total)}`}
+            onChange={(e) => {
+              if (!audio) return;
+              const to = Number(e.target.value);
+              audio.currentTime = to;
+              setAt(to);
+            }}
+            className="absolute inset-x-0 -top-2.5 h-6 w-full cursor-pointer opacity-0 disabled:cursor-default"
           />
         </div>
         <div className="flex items-center gap-3 px-3 py-2">
@@ -1316,10 +1364,22 @@ export function NarrationDock({
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{title}</p>
             <p className="text-xs tabular-nums text-soft">
-              {state === "loading" ? t("narrationRendering") : `${clock(at)} / ${clock(total)}`}
+              {state === "loading"
+                ? t("narrationRendering")
+                : `${clock(at)} / ${clock(total)}${rate === 1 ? "" : `  ·  ${speedLabel(rate)}`}`}
             </p>
             {message && !playing && <p className="text-xs text-danger">{message}</p>}
           </div>
+          {/* Playback speed (variant A): one chip, each press steps to the next
+              speed in `SPEEDS` and wraps. Remembered on this device. */}
+          <button
+            type="button"
+            onClick={() => setRate(nextSpeed(rate))}
+            aria-label={`${t("narrationSpeed")}: ${speedLabel(rate)}`}
+            className="h-8 min-w-[3.25rem] shrink-0 rounded-full border border-line bg-paper px-2.5 text-[13px] font-semibold tabular-nums text-accent transition-colors hover:bg-hi"
+          >
+            {speedLabel(rate)}
+          </button>
           {voices.length > 1 && (
             <div
               ref={pickerRef}
@@ -1501,6 +1561,18 @@ function voiceLabel(voice: string, t: (key: "narrationVoiceMale" | "narrationVoi
 }
 
 const VOICE_KEY = "hindi:narrationVoice";
+
+// The listener's playback speed on this device, the same shape as the voice.
+const SPEED_KEY = "hindi:narrationSpeed";
+
+function storedSpeed(): number {
+  try {
+    return parseSpeed(window.localStorage.getItem(SPEED_KEY));
+  } catch {
+    // Server render, or storage switched off: normal speed.
+    return 1;
+  }
+}
 
 // Why `play()` rejected, as the message key to show. Only `NotAllowedError` is
 // the browser withholding autoplay ("Ready. Press play"). An `AbortError` is a

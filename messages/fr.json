@@ -376,6 +376,8 @@
     "narrationVoice": "Voix de la narration",
     "narrationVoiceMale": "Masculine",
     "narrationVoiceFemale": "Féminine",
+    "narrationSpeed": "Vitesse de lecture",
+    "narrationSeek": "Position dans la narration",
     "narrationFailed": "La narration n'a pas pu être créée. Veuillez réessayer plus tard.",
     "narrationReady": "Prêt. Appuyez sur lecture pour écouter.",
     "regenerate": "Régénérer",

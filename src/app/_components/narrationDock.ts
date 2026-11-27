@@ -62,3 +62,29 @@ export function positionState(
     playbackRate: Number.isFinite(rate) && rate > 0 ? rate : 1,
   };
 }
+
+// **Playback speed** (2026-11-27, variant A of the narration-dock prototype).
+// The owner's own list: 0.8× for a slower listen (not 0.75×), and 1.1× and
+// 1.33× as the small steps up that a teaching narration mostly wants. The chip
+// in the dock steps through these in order and wraps.
+export const SPEEDS = [0.8, 1, 1.1, 1.25, 1.33, 1.5, 1.75, 2] as const;
+
+// The speed after `rate`. A stored or foreign value that is not in the list
+// (an older build's 0.75, a hand-edited localStorage) steps to the first speed
+// above it, so the chip never sticks on an unlisted number.
+export function nextSpeed(rate: number): number {
+  const i = SPEEDS.indexOf(rate as (typeof SPEEDS)[number]);
+  if (i >= 0) return SPEEDS[(i + 1) % SPEEDS.length]!;
+  return SPEEDS.find((s) => s > rate) ?? SPEEDS[0];
+}
+
+// The chip's text: "1×", "1.25×", "0.8×".
+export function speedLabel(rate: number): string {
+  return `${rate}×`;
+}
+
+// A stored speed, if it is one of ours; anything else is "normal speed".
+export function parseSpeed(raw: string | null | undefined): number {
+  const n = Number(raw);
+  return (SPEEDS as readonly number[]).includes(n) ? n : 1;
+}

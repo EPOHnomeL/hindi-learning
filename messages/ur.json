@@ -376,6 +376,8 @@
     "narrationVoice": "بیانیہ کی آواز",
     "narrationVoiceMale": "مرد",
     "narrationVoiceFemale": "خاتون",
+    "narrationSpeed": "پلے بیک کی رفتار",
+    "narrationSeek": "بیانیہ میں مقام",
     "narrationFailed": "بیانیہ تیار نہیں کیا جا سکا۔ براہ کرم بعد میں دوبارہ کوشش کریں۔",
     "narrationReady": "تیار ہے۔ سننے کے لیے پلے دبائیں۔",
     "regenerate": "دوبارہ بنائیں",

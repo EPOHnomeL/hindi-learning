@@ -376,6 +376,8 @@
     "narrationVoice": "Verteller se stem",
     "narrationVoiceMale": "Manlik",
     "narrationVoiceFemale": "Vroulik",
+    "narrationSpeed": "Afspeelspoed",
+    "narrationSeek": "Posisie in die vertelling",
     "narrationFailed": "Die vertelling kon nie gemaak word nie. Probeer asseblief later weer.",
     "narrationReady": "Gereed. Druk speel om te luister.",
     "regenerate": "Hergenereer",

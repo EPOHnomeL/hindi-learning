@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, test } from "vitest";
-import { carryOver, clock, positionState, progress } from "./narrationDock";
+import { carryOver, clock, nextSpeed, parseSpeed, positionState, progress, SPEEDS, speedLabel } from "./narrationDock";
 
 // The docked narration player's arithmetic (course-narration ticket 01, variant
 // B). Both functions are fed straight from an `<audio>` element, which is a
@@ -100,5 +100,34 @@ describe("positionState", () => {
 
   it("falls back to the start and normal speed on garbage", () => {
     expect(positionState(NaN, 552, 0)).toEqual({ duration: 552, position: 0, playbackRate: 1 });
+  });
+});
+
+// ---- speed ------------------------------------------------------------------
+
+describe("speed", () => {
+  it("steps through the owner's list in order and wraps", () => {
+    expect(SPEEDS).toEqual([0.8, 1, 1.1, 1.25, 1.33, 1.5, 1.75, 2]);
+    expect(nextSpeed(1)).toBe(1.1);
+    expect(nextSpeed(1.25)).toBe(1.33);
+    expect(nextSpeed(2)).toBe(0.8);
+  });
+
+  it("moves an unlisted speed to the next one up", () => {
+    expect(nextSpeed(0.75)).toBe(0.8);
+    expect(nextSpeed(3)).toBe(0.8);
+  });
+
+  it("labels a speed the way the chip shows it", () => {
+    expect(speedLabel(1)).toBe("1×");
+    expect(speedLabel(0.8)).toBe("0.8×");
+    expect(speedLabel(1.33)).toBe("1.33×");
+  });
+
+  it("only trusts a stored speed that is on the list", () => {
+    expect(parseSpeed("1.5")).toBe(1.5);
+    expect(parseSpeed("0.75")).toBe(1);
+    expect(parseSpeed(null)).toBe(1);
+    expect(parseSpeed("fast")).toBe(1);
   });
 });
