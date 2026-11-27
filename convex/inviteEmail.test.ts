@@ -73,6 +73,22 @@ describe("the audio announcement", () => {
     expect(text).toContain("because someone shared a course with you");
   });
 
+  test("both say other languages are coming and where to write, with a mail link", () => {
+    for (const kind of ["audio", "audio-invited"] as const) {
+      const { text, html } = renderInviteEmail(kind, data);
+      expect(text).toContain("English for now");
+      expect(text).toContain("other languages");
+      expect(text).toContain("support@my-course.app");
+      expect(html).toContain('href="mailto:support@my-course.app"');
+    }
+  });
+
+  test("no other email gains the second paragraph", () => {
+    for (const kind of ["granted", "invited", "role-changed", "purchased", "reminder", "translator"] as const) {
+      expect(renderInviteEmail(kind, data).text).not.toContain("support@my-course.app");
+    }
+  });
+
   test("neither wording names a voice by its internal name", () => {
     for (const kind of ["audio", "audio-invited"] as const) {
       expect(renderInviteEmail(kind, data).text).not.toMatch(/michael|emma|kokoro/i);

@@ -68,6 +68,9 @@ export type Brand = {
 // see in the From address and the link.
 export const BRAND = "My Course";
 
+// Where a recipient can write back. The same address the legal pages give.
+export const SUPPORT_EMAIL = "support@my-course.app";
+
 // Warm palette, aligned with the app (maroon accent, cream/brown).
 export const C: Palette = {
   page: "#f5efe6",
@@ -137,6 +140,12 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
   let heading: string;
   let lead: string;
   let cta: string;
+  // A second, quieter paragraph under the lead. Only the audio announcement has
+  // one; every other kind renders exactly as it did before it existed.
+  const note =
+    kind === "audio" || kind === "audio-invited"
+      ? `The audio is in English for now, and we are working on bringing it to the other languages. Questions, or trouble playing a lesson? Email ${SUPPORT_EMAIL}.`
+      : "";
   if (kind === "audio") {
     // A learner who already holds the course. Say what is new, where the button
     // is and that there is a choice of voice; nothing about how it was made.
@@ -204,13 +213,22 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
       ? `You received this because you have access to a course on ${BRAND}.`
       : `You received this because someone shared a course with you on ${BRAND}.`;
 
-  const text = `${heading}\n\n${lead}\n\n${cta}: ${link}\n\n${because}\n`;
+  const text = `${heading}\n\n${lead}\n\n${note ? `${note}\n\n` : ""}${cta}: ${link}\n\n${because}\n`;
 
   // Header: the tenant logo (absolute storage URL) when set, else the text
   // wordmark (the brand name in the accent colour) — the pre-whitelabel default.
   const wordmark = logoUrl
     ? `<img src="${esc(logoUrl)}" alt="${esc(BRAND)}" height="32" style="display:block;height:32px;width:auto;border:0;outline:none;text-decoration:none;">`
     : BRAND;
+
+  // Empty for every kind without a note, so those emails are byte-identical.
+  const noteHtml = note
+    ? `
+              <p style="margin:0 0 26px;font-size:14px;line-height:1.6;color:${C.muted};">${esc(note).replace(
+                SUPPORT_EMAIL,
+                `<a href="mailto:${SUPPORT_EMAIL}" style="color:${C.accent};">${SUPPORT_EMAIL}</a>`,
+              )}</p>`
+    : "";
 
   const html = `<!-- invite email -->
 <div style="margin:0;padding:0;background:${C.page};">
@@ -225,7 +243,7 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
           <tr>
             <td style="background:${C.card};border:1px solid ${C.border};border-radius:14px;padding:32px;font-family:${FONT};">
               <h1 style="margin:0 0 14px;font-size:20px;line-height:1.3;font-weight:700;color:${C.heading};">${esc(heading)}</h1>
-              <p style="margin:0 0 26px;font-size:16px;line-height:1.6;color:${C.body};">${esc(lead)}</p>
+              <p style="margin:0 0 ${note ? 14 : 26}px;font-size:16px;line-height:1.6;color:${C.body};">${esc(lead)}</p>${noteHtml}
               <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
                 <tr>
                   <td style="border-radius:8px;background:${C.accent};">
