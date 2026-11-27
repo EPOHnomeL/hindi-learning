@@ -53,7 +53,8 @@ as Progress.
 - **Who hears a recording:** exactly who the reader would show that lesson to, in
   the English Edition, on any course that has one. Same seam as the reader
   (`resolveEdition`, `lessonLocked`), so a paid course's narration is behind its
-  paywall and a holder of only a translated Edition hears nothing. An
+  paywall and a holder of only a translated Edition hears that Edition's
+  recordings or nothing (see the Hindi note below), never English. An
   administrator with no grant hears nothing either, as the reader shows them
   nothing. The pilot's `prophetic-school`-only constant and its admin-only render
   permission went with the bill they guarded. A recording counts only if it is in a current voice,
@@ -70,6 +71,20 @@ as Progress.
   replaces "a signed-out visitor hears nothing". Cost is download traffic only
   (about 4 MB a full listen), paid when play is pressed. Evidence: 6 tests in
   `convex/lessonAudio.test.ts`, typechecked; NOT walked in a browser.
+- **Hindi is narrated, 2026-11-27** (the owner's instruction): Kokoro `hm_omega`
+  (male, the default) and `hf_alpha` (female), chosen from samples of lesson 1
+  (`docs/narration-tts-by-language.html`). The rule is the English one with the
+  translated body in place of the lesson's: **a translated lesson is narrated once
+  a person has edited it.** The Edition editor's save makes a `translations` row's
+  body a blob, a recording pins that blob, and the next save silences it until it
+  is rendered again. A lesson still on the machine's inline translation is not
+  narrated and refuses an upload. The voices per language are
+  `NARRATION_VOICES_BY_LANG` in `convex/narrationVoices.ts`; the operator loop is the
+  same three steps with `--lang hi` (`.narration/prophetic-school.hi/`), and
+  `speakable(text, "hi")` says chapter and verse, pages and ranges in Hindi. On
+  2026-11-27 lessons 1 to 16 were the edited ones, so those 16 were rendered.
+  Evidence: 7 tests in `convex/lessonAudio.test.ts` and `narrationText.test.ts`,
+  typechecked; NOT walked in a browser.
 - **George's recordings were purged from production on 2026-11-25** (3 rows, on
   the owner's yes). The rule below still holds for anything retired later.
 - **Retired recordings stay in storage until purged.** `npx convex run
@@ -106,12 +121,10 @@ as Progress.
   that keeps reading while the learner moves through the course is a different
   component in the root layout with its own queue, and it needs a reason to exist
   before it gets one: nobody has asked to listen across lessons yet.
-- **Editions.** Narration is English-only today and the cache is keyed by `lang`,
-  so the shape is ready, but nobody has decided whether audio multiplies per
-  language or whether that is a per-tenant opt-in. Since 2026-11-24 the cost of a
-  language is laptop hours, not dollars (about ten per voice for a 56-lesson
-  course), but the harder question is new: Kokoro's voices are per language, and
-  whether it has one worth listening to in Hindi, Urdu or Afrikaans is unknown.
+- **Editions beyond Hindi.** Hindi is decided (see Notes). Urdu and Afrikaans
+  have no Kokoro voice of their own; the measured options (Piper, Mimic 3) and
+  their licences are in `docs/narration-tts-by-language.html`. Nobody has decided
+  whether those Editions get audio, or whether it is a per-tenant opt-in.
 - **Does listening count as Progress?** A learner who hears a lesson end to end has
   arguably completed it, and the reader currently only ticks on advance.
 - **Other courses.** `prophetic-school` (all 56 lessons, 2026-11-27) and
