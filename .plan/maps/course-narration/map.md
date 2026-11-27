@@ -59,6 +59,17 @@ as Progress.
   permission went with the bill they guarded. A recording counts only if it is in a current voice,
   under the current model, and of the lesson body as it reads now; an edited
   lesson goes silent until it is rendered and pushed again.
+- **A Guest hears it too, since 2026-11-27** (the owner's instruction: "any
+  course that has audio to show it on the free / public version as well"). The
+  public reader (`/share/<token>` and `/courses/<slug>`) asks
+  `public.publicNarration`, which resolves the Guest exactly as `publicLesson`
+  does and then runs the same `narrationFor` checks as the signed-in `status`.
+  So it is still the rule above and not a second one: a Guest on a free open
+  course hears every recorded lesson, a Guest on a paid course hears the free
+  preview lesson only, and a translated Edition's link hears nothing. This
+  replaces "a signed-out visitor hears nothing". Cost is download traffic only
+  (about 4 MB a full listen), paid when play is pressed. Evidence: 6 tests in
+  `convex/lessonAudio.test.ts`, typechecked; NOT walked in a browser.
 - **George's recordings were purged from production on 2026-11-25** (3 rows, on
   the owner's yes). The rule below still holds for anything retired later.
 - **Retired recordings stay in storage until purged.** `npx convex run
@@ -103,7 +114,8 @@ as Progress.
   whether it has one worth listening to in Hindi, Urdu or Afrikaans is unknown.
 - **Does listening count as Progress?** A learner who hears a lesson end to end has
   arguably completed it, and the reader currently only ticks on advance.
-- **Other courses.** Only `prophetic-school` is recorded. The gate no longer names
+- **Other courses.** `prophetic-school` (all 56 lessons, 2026-11-27) and
+  `growing-unto-glory` (all 8, uploaded 2026-11-27) are recorded, both voices. The gate no longer names
   a course, so recording another is an operator decision (render, push), not a
   code change. Nobody has decided which courses get audio or who asks for it.
 
