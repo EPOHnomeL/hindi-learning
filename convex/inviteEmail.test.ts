@@ -66,9 +66,11 @@ describe("the audio announcement", () => {
     expect(html).toContain(`href="${data.link}"`);
   });
 
-  test("an invitee with no account is told who invited them and to create an account", () => {
+  test("an invitee with no account is told the site invited them and to create an account", () => {
     const { text } = renderInviteEmail("audio-invited", data);
-    expect(text).toContain("owner@example.com invited you");
+    // The site is the inviter, not the owner's own address.
+    expect(text).toContain("My Course invited you to “Prophetic School”");
+    expect(text).not.toContain("owner@example.com");
     expect(text).toContain("Create your account");
     expect(text).toContain("because someone shared a course with you");
   });

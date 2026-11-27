@@ -158,7 +158,9 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
     // in place (AppGate), so creating the account lands them on the course.
     subject = `“${courseTitle}” now has audio`;
     heading = "Your course now has audio";
-    lead = `${inviterEmail} invited you to “${courseTitle}” on ${BRAND}, and every lesson can now be listened to as well as read. Create your account with this email address, open a lesson and press play. You can pick a male or female voice.`;
+    // The site's name, not the owner's address (the owner's call, 2026-11-27):
+    // this goes to a whole list at once and reads as the organisation speaking.
+    lead = `${BRAND} invited you to “${courseTitle}”, and every lesson can now be listened to as well as read. Create your account with this email address, open a lesson and press play. You can pick a male or female voice.`;
     cta = "Create your account";
   } else if (kind === "reminder") {
     // Nobody in this audience has ticked off a single lesson. They may well have
