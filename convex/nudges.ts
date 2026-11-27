@@ -1,9 +1,9 @@
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
-import { getOwnedTopic } from "./topicAccess";
+import { getOwnedTopic, topicBySlug } from "./topicAccess";
 import { scheduleInvite } from "./shares";
 import { shareRole } from "./shareGrants";
 import { grantsFor } from "./grants";
@@ -182,5 +182,73 @@ export const remindPendingTranslators = mutation({
       topic,
       inviterEmail: ownerEmail,
     });
+  },
+});
+
+// ---- the audio announcement (2026-11-27) -------------------------------------
+//
+// A one-off the operator runs from the CLI once a course has been recorded:
+//
+//   npx convex run nudges:announceAudio '{"topicSlug":"prophetic-school"}'               # count
+//   npx convex run nudges:announceAudio '{"topicSlug":"prophetic-school","apply":true}'  # send
+//
+// Internal, with no button: unlike the two nudges above it is not something to
+// re-send, and a second run mails everybody a second time. Without `apply` it
+// counts and sends nothing.
+//
+// **The audience is who can actually hear it.** Narration is the English Edition
+// only (`lessonAudio.narrationFor`), so a learner holding only a translation
+// would open the course and find no play control. So: every account that HOLDS
+// the English Edition, and every address INVITED to it that has no account yet.
+// A translated Edition's holders and invited translators are left out.
+//
+// Sends are a second apart. Resend's default limit is a couple of requests a
+// second and `email.sendInvite` only logs a refusal, so a batch scheduled all
+// at once would lose its tail without anybody noticing.
+const AUDIO_SPACING_MS = 1000;
+
+export const announceAudio = internalMutation({
+  args: { topicSlug: v.string(), apply: v.optional(v.boolean()) },
+  returns: v.object({ holders: v.number(), invited: v.number(), sent: v.boolean() }),
+  handler: async (ctx, { topicSlug, apply }) => {
+    const topic = await topicBySlug(ctx, topicSlug);
+    if (!topic) throw new Error("topic not found");
+    const { completed, truncated } = await learnerCompletion(ctx, topic);
+    // Same refusal as the reminder: an audience from a partial scan is a guess.
+    if (truncated) throw new Error("too much progress data to resolve the audience");
+
+    const holders = new Set<string>();
+    for (const userId of completed.keys()) {
+      if (!(await grantsFor(ctx, topic._id, userId)).has(SOURCE_LANG)) continue;
+      const user = await ctx.db.get(userId);
+      if (user?.email) holders.add(user.email);
+    }
+    const pending = await ctx.db
+      .query("pendingShares")
+      .withIndex("by_topic", (q) => q.eq("topicId", topic._id))
+      .collect();
+    const invited = new Set<string>();
+    for (const p of pending) {
+      if ((p.lang ?? SOURCE_LANG) === SOURCE_LANG && !holders.has(p.email)) invited.add(p.email);
+    }
+
+    if (apply) {
+      const owner = topic.ownerId ? await ctx.db.get(topic.ownerId) : null;
+      const mail = [
+        ...[...holders].map((to) => ({ to, kind: "audio" as const })),
+        ...[...invited].map((to) => ({ to, kind: "audio-invited" as const })),
+      ];
+      for (const [i, m] of mail.entries()) {
+        await scheduleInvite(ctx, {
+          ...m,
+          topic,
+          editionLang: SOURCE_LANG,
+          inviterEmail: owner?.email ?? "",
+          role: "viewer",
+          delayMs: i * AUDIO_SPACING_MS,
+        });
+      }
+    }
+    return { holders: holders.size, invited: invited.size, sent: !!apply };
   },
 });

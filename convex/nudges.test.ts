@@ -215,3 +215,73 @@ test("an unconfigured Resend makes the nudge a no-op rather than a failure", asy
   expect(warn).toHaveBeenCalled();
   warn.mockRestore();
 });
+
+// ---- the audio announcement (2026-11-27) -------------------------------------
+//
+// One-off, run by the operator from the CLI (an internal mutation, no button):
+// tell everyone who can hear a course that it can now be listened to. Narration
+// is the English Edition only, so the audience is who HOLDS English plus who was
+// INVITED to English and has no account yet. A dry run counts and sends nothing.
+
+async function audioCourse(t: ReturnType<typeof convexTest>) {
+  const owner = await seedUser(t, "owner@example.com");
+  const english = await seedUser(t, "english@example.com");
+  const both = await seedUser(t, "both@example.com");
+  const afrikaans = await seedUser(t, "afrikaans@example.com");
+  const topicId = await seedTopic(t, owner);
+  await t.run(async (ctx) => {
+    await ctx.db.insert("entitlements", { userId: english, topicId, lang: "en" });
+    await ctx.db.insert("shares", { topicId, viewerId: both, lang: "af" });
+    await ctx.db.insert("entitlements", { userId: both, topicId, lang: "en" });
+    // Holds only a translation: no play button there, so no email.
+    await ctx.db.insert("entitlements", { userId: afrikaans, topicId, lang: "af" });
+    await ctx.db.insert("entitlements", { userId: owner, topicId, lang: "en" });
+    await ctx.db.insert("pendingShares", { topicId, email: "invited@example.com" });
+    await ctx.db.insert("pendingShares", { topicId, email: "invited@example.com", lang: "en" });
+    await ctx.db.insert("pendingShares", { topicId, email: "translator@example.com", lang: "de", role: "editor" });
+  });
+  return { topicId };
+}
+
+test("a dry run of the audio announcement counts the audience and mails nobody", async () => {
+  const t = convexTest(schema, modules);
+  await audioCourse(t);
+  expect(await t.mutation(internal.nudges.announceAudio, { topicSlug: "hindi" })).toEqual({
+    holders: 2,
+    invited: 1,
+    sent: false,
+  });
+  expect(await scheduled(t)).toEqual([]);
+});
+
+test("the audio announcement mails English holders and English invitees once each, and nobody else", async () => {
+  const t = convexTest(schema, modules);
+  await audioCourse(t);
+  expect(await t.mutation(internal.nudges.announceAudio, { topicSlug: "hindi", apply: true })).toEqual({
+    holders: 2,
+    invited: 1,
+    sent: true,
+  });
+  const sent = await scheduled(t);
+  expect(sent.map((s) => `${s.kind} ${s.to}`).sort()).toEqual([
+    "audio both@example.com",
+    "audio english@example.com",
+    "audio-invited invited@example.com",
+  ]);
+  // Everyone lands on the English course URL: an invitee signs in in place there.
+  expect(new Set(sent.map((s) => s.link))).toEqual(new Set(["https://app.example.com/courses/hindi"]));
+});
+
+test("the audio announcement is spaced out, so a provider's rate limit does not drop any", async () => {
+  const t = convexTest(schema, modules);
+  await audioCourse(t);
+  await t.mutation(internal.nudges.announceAudio, { topicSlug: "hindi", apply: true });
+  const jobs = await t.run((ctx) => ctx.db.system.query("_scheduled_functions").collect());
+  const times = jobs.map((j) => j.scheduledTime).sort((a, b) => a - b);
+  for (let i = 1; i < times.length; i++) expect(times[i]! - times[i - 1]!).toBeGreaterThanOrEqual(900);
+});
+
+test("the audio announcement for an unknown course throws rather than reporting zero", async () => {
+  const t = convexTest(schema, modules);
+  await expect(t.mutation(internal.nudges.announceAudio, { topicSlug: "nope" })).rejects.toThrow();
+});

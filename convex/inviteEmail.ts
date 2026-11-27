@@ -13,7 +13,20 @@
 // and an invited translator who never made an account. Same reason as
 // `purchased`: identical markup, brand and palette, so a second module would be
 // a second thing to keep in step.
-export type InviteKind = "granted" | "invited" | "role-changed" | "purchased" | "reminder" | "translator";
+//
+// `audio` and `audio-invited` (2026-11-27) announce that a course can now be
+// listened to: the first to everyone who holds its English Edition, the second
+// to people invited to it who have no account yet. Same reason again: identical
+// markup, brand and palette.
+export type InviteKind =
+  | "granted"
+  | "invited"
+  | "role-changed"
+  | "purchased"
+  | "reminder"
+  | "translator"
+  | "audio"
+  | "audio-invited";
 
 export type InviteData = {
   courseTitle: string;
@@ -124,7 +137,21 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
   let heading: string;
   let lead: string;
   let cta: string;
-  if (kind === "reminder") {
+  if (kind === "audio") {
+    // A learner who already holds the course. Say what is new, where the button
+    // is and that there is a choice of voice; nothing about how it was made.
+    subject = `You can now listen to “${courseTitle}”`;
+    heading = "Now you can listen";
+    lead = `Every lesson of “${courseTitle}” on ${BRAND} now has audio. Open a lesson, press play under its heading, and pick a male or female voice from the cog on the player. Listen on a walk, in the car, or while you follow along on the page.`;
+    cta = "Listen now";
+  } else if (kind === "audio-invited") {
+    // Invited, no account yet. The link is the course URL, which renders sign-in
+    // in place (AppGate), so creating the account lands them on the course.
+    subject = `“${courseTitle}” now has audio`;
+    heading = "Your course now has audio";
+    lead = `${inviterEmail} invited you to “${courseTitle}” on ${BRAND}, and every lesson can now be listened to as well as read. Create your account with this email address, open a lesson and press play. You can pick a male or female voice.`;
+    cta = "Create your account";
+  } else if (kind === "reminder") {
     // Nobody in this audience has ticked off a single lesson. They may well have
     // opened the course, so the copy cannot say they never did. It also cannot
     // say they bought it: the audience is every learner, which includes a seat
@@ -173,7 +200,7 @@ export function renderInviteEmail(kind: InviteKind, data: InviteData, brand: Bra
   const because =
     kind === "purchased"
       ? `You received this because you bought a course on ${BRAND}.`
-      : kind === "reminder"
+      : kind === "reminder" || kind === "audio"
       ? `You received this because you have access to a course on ${BRAND}.`
       : `You received this because someone shared a course with you on ${BRAND}.`;
 

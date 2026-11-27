@@ -25,9 +25,19 @@ import type { InviteKind } from "./inviteEmail";
 // SITE_URL (which appUrl requires — provision it in tests that hit this path).
 export async function scheduleInvite(
   ctx: MutationCtx,
-  opts: { to: string; kind: InviteKind; topic: Doc<"topics">; editionLang: string; inviterEmail: string; role: "viewer" | "editor" },
+  opts: {
+    to: string;
+    kind: InviteKind;
+    topic: Doc<"topics">;
+    editionLang: string;
+    inviterEmail: string;
+    role: "viewer" | "editor";
+    // When to send, from now. A batch spaces its sends out with this so the
+    // provider's per-second rate limit does not silently drop the tail of it.
+    delayMs?: number;
+  },
 ): Promise<void> {
-  const { to, kind, topic, editionLang, inviterEmail, role } = opts;
+  const { to, kind, topic, editionLang, inviterEmail, role, delayMs = 0 } = opts;
   const path =
     kind === "invited"
       ? "/"
@@ -35,7 +45,7 @@ export async function scheduleInvite(
         ? `/courses/${topic.slug}`
         : `/courses/${topic.slug}?lang=${encodeURIComponent(editionLang)}`;
   const link = appUrl(path, topic.tenantSlug);
-  await ctx.scheduler.runAfter(0, internal.email.sendInvite, {
+  await ctx.scheduler.runAfter(delayMs, internal.email.sendInvite, {
     to,
     kind,
     courseTitle: topic.title,

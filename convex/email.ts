@@ -28,6 +28,10 @@ export const sendInvite = internalAction({
       // never started and invited translators who never signed up.
       v.literal("reminder"),
       v.literal("translator"),
+      // The one-off "this course can now be listened to" announcement
+      // (2026-11-27, nudges.announceAudio): holders, and invitees with no account.
+      v.literal("audio"),
+      v.literal("audio-invited"),
     ),
     courseTitle: v.string(),
     langName: v.string(),

@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { describe, expect, test } from "vitest";
 import { renderInviteEmail } from "./inviteEmail";
 
 const base = {
@@ -44,4 +44,38 @@ test("html-escapes the course title so a stray angle bracket can't break markup"
   const { html } = renderInviteEmail("granted", { ...base, courseTitle: "A <b> course" });
   expect(html).toContain("A &lt;b&gt; course");
   expect(html).not.toContain("A <b> course");
+});
+
+// The audio announcement (2026-11-27): two wordings, one per audience.
+describe("the audio announcement", () => {
+  const data = {
+    courseTitle: "Prophetic School",
+    langName: "English",
+    inviterEmail: "owner@example.com",
+    role: "viewer" as const,
+    link: "https://app.example.com/courses/prophetic-school",
+  };
+
+  test("a holder is told they can listen, how, and is not told they were invited", () => {
+    const { subject, text, html } = renderInviteEmail("audio", data);
+    expect(subject).toContain("listen");
+    expect(text).toContain("press play");
+    expect(text).toContain("male or female");
+    expect(text).not.toContain("owner@example.com");
+    expect(text).toContain("because you have access to a course");
+    expect(html).toContain(`href="${data.link}"`);
+  });
+
+  test("an invitee with no account is told who invited them and to create an account", () => {
+    const { text } = renderInviteEmail("audio-invited", data);
+    expect(text).toContain("owner@example.com invited you");
+    expect(text).toContain("Create your account");
+    expect(text).toContain("because someone shared a course with you");
+  });
+
+  test("neither wording names a voice by its internal name", () => {
+    for (const kind of ["audio", "audio-invited"] as const) {
+      expect(renderInviteEmail(kind, data).text).not.toMatch(/michael|emma|kokoro/i);
+    }
+  });
 });
